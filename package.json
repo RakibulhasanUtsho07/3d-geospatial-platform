@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "copy:cesium": "node scripts/copy-cesium-assets.mjs"
+    "copy:cesium": "node scripts/copy-cesium-assets.mjs",
+     "predev": "npm run copy:cesium",
+    "prebuild": "npm run copy:cesium"
   },
   "dependencies": {
     "cesium": "^1.146.0",
