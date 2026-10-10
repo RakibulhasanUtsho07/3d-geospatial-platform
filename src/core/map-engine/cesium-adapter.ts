@@ -1468,9 +1468,16 @@ export class CesiumAdapter implements MapEngine {
 
     this.prepareSelectedBuildingForLodTransition(record);
 
+    // Full-height multi-floor textures are expensive. Keep saved profiles
+    // lightweight while not selected; render ground/upper-floor separation
+    // only for the actively selected building.
+    const renderStyle = record.entity === this.selectedBuilding
+      ? record.visualStyle
+      : { ...record.visualStyle, fullHeightTexture: false };
+
     if (!record.detailedWall) {
       const facadeTexture = createBuildingFacadeTexture(
-        record.visualStyle,
+        renderStyle,
         record.heightInfo.meters,
       );
       if (!facadeTexture) {
@@ -1490,8 +1497,8 @@ export class CesiumAdapter implements MapEngine {
             wallPositions,
             record.heightInfo.meters,
             Cesium,
-            record.visualStyle.repeatWidthMeters,
-            record.visualStyle.fullHeightTexture === true,
+            renderStyle.repeatWidthMeters,
+            renderStyle.fullHeightTexture === true,
           ),
           // The canvas already carries the palette; avoid tinting its glass.
           color: Cesium.Color.WHITE,
@@ -2410,8 +2417,23 @@ export class CesiumAdapter implements MapEngine {
           footprintAreaM2,
         });
 
-        // Promote the selected building to the detailed tier immediately,
-        // then highlight it if its LOD did not need to change.
+        // A saved research profile may use a full-height texture. Force a
+        // selected-only detail rebuild so ground-floor arches and upper-floor
+        // patterns become visible without keeping large textures for every LOD.
+        const selectedRecord = this.buildingLodRecords.find(
+          (record) => record.entity === entity,
+        );
+        if (selectedRecord?.visualStyle.fullHeightTexture && selectedRecord.isDetailed) {
+          selectedRecord.detailedWall = null;
+          selectedRecord.polygonStyleCache = null;
+          selectedRecord.roofEquipmentBox = null;
+          selectedRecord.roofEquipmentPosition = null;
+          selectedRecord.entity.wall = undefined;
+          selectedRecord.entity.box = undefined;
+          selectedRecord.entity.position = undefined;
+          selectedRecord.isDetailed = false;
+        }
+
         this.updateBuildingLod(viewer, Cesium, true);
         this.applySelectionHighlight(entity, Cesium);
         viewer.scene.requestRender();
