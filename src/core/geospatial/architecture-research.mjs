@@ -238,7 +238,7 @@ export function resolveArchitectureMediaPreview(reference) {
     source.hostname !== "commons.wikimedia.org" ||
     !source.pathname.startsWith("/wiki/File:") ||
     !usageStatus.includes("open-licence-candidate") ||
-    !/cc by(?:-sa)?(?:\\s|$)/i.test(license)
+    !/^cc by(?:-sa)?\s/i.test(license)
   ) {
     // Only previews from the catalogue's explicit Wikimedia Commons, open-
     // licence candidate set are embedded. Other photos remain source links.
@@ -251,7 +251,7 @@ export function resolveArchitectureMediaPreview(reference) {
   } catch {
     return { mediaPreviewUrl: null, mediaPreviewKind: null };
   }
-  if (!filename || filename.length > 240 || filename.includes("/") || filename.includes("\\\\")) {
+  if (!filename || filename.length > 240 || filename.includes("/") || filename.includes("\\")) {
     return { mediaPreviewUrl: null, mediaPreviewKind: null };
   }
 
