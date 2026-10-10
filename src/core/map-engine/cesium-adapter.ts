@@ -242,7 +242,10 @@ export class CesiumAdapter implements MapEngine {
 
     try {
       const endpoint = requestedBounds
-        ? this.getViewportEndpoint(requestedBounds)
+        ? this.getViewportEndpoint(
+            requestedBounds,
+            this.getViewportFeatureLimit(viewer),
+          )
         : "/api/geospatial/overture-buildings";
 
       console.info("[Overture] Fetching building viewport...", {
@@ -272,7 +275,12 @@ export class CesiumAdapter implements MapEngine {
         candidateFeatures: response.headers.get(
           "X-Building-Candidate-Feature-Count",
         ),
+        matchedFeatures: response.headers.get(
+          "X-Building-Matched-Feature-Count",
+        ),
         returnedFeatures: response.headers.get("X-Building-Feature-Count"),
+        featureLimit: response.headers.get("X-Building-Feature-Limit"),
+        truncated: response.headers.get("X-Building-Truncated"),
         tileCacheHits: response.headers.get("X-Building-Tile-Cache-Hits"),
       });
 
@@ -616,12 +624,27 @@ export class CesiumAdapter implements MapEngine {
     return padded;
   }
 
-  private getViewportEndpoint(bounds: ViewportBounds): string {
+  private getViewportFeatureLimit(viewer: CesiumViewer): number {
+    const height = viewer.camera.positionCartographic.height;
+
+    if (height >= 25_000) return 500;
+    if (height >= 12_000) return 900;
+    if (height >= 6_000) return 1_400;
+    if (height >= 2_500) return 2_000;
+
+    return 3_000;
+  }
+
+  private getViewportEndpoint(
+    bounds: ViewportBounds,
+    featureLimit: number,
+  ): string {
     const params = new URLSearchParams({
       west: bounds.west.toFixed(6),
       south: bounds.south.toFixed(6),
       east: bounds.east.toFixed(6),
       north: bounds.north.toFixed(6),
+      limit: String(featureLimit),
     });
 
     return `/api/geospatial/overture-buildings/viewport?${params.toString()}`;
