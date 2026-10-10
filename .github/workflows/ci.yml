@@ -43,6 +43,9 @@ jobs:
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
 
+      - name: Test camera-aware facade LOD budget
+        run: npm run test:lod-budget
+
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 

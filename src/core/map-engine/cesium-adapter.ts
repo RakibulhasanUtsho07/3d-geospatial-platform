@@ -5,6 +5,7 @@ import {
 } from "../buildings/building-style";
 import type { BuildingVisualStyle } from "../buildings/building-style";
 import { getViewportFeatureLimit } from "./viewport-budget.mjs";
+import { getDetailedFacadeBudget } from "./lod-detail-budget.mjs";
 
 import type {
   CameraTarget,
@@ -34,6 +35,20 @@ type BuildingHeight = {
     | "fallback-estimate";
 };
 
+type BuildingPolygonLodStyleCache = {
+  lightweightHeight: import("cesium").ConstantProperty;
+  lightweightExtrudedHeight: import("cesium").ConstantProperty;
+  detailedHeight: import("cesium").ConstantProperty | null;
+  perPositionHeight: import("cesium").ConstantProperty;
+  lightweightMaterial: CesiumMaterialProperty;
+  detailedRoofMaterial: CesiumMaterialProperty | null;
+  outline: import("cesium").ConstantProperty;
+  wallOutlineColor: import("cesium").ConstantProperty;
+  roofOutlineColor: import("cesium").ConstantProperty | null;
+  closeTop: import("cesium").ConstantProperty;
+  closeBottom: import("cesium").ConstantProperty;
+};
+
 type BuildingLodRecord = {
   entity: CesiumEntity;
   heightInfo: BuildingHeight;
@@ -44,6 +59,18 @@ type BuildingLodRecord = {
   center: CesiumCartesian3 | null;
   isPart: boolean;
   isDetailed: boolean;
+  polygonStyleCache: BuildingPolygonLodStyleCache | null;
+  detailedWall: import("cesium").WallGraphics | null;
+  roofEquipmentBox: import("cesium").BoxGraphics | null;
+  roofEquipmentPosition: import("cesium").ConstantPositionProperty | null;
+};
+
+type LodGraphicsCacheMetrics = {
+  polygonStyleCachesCreated: number;
+  detailedWallsCreated: number;
+  detailedWallCacheHits: number;
+  roofEquipmentCreated: number;
+  roofEquipmentCacheHits: number;
 };
 
 type ViewportBounds = {
@@ -71,7 +98,6 @@ const ROOF_OUTLINE_COLOR = "#586978";
 
 // Detail budgets adapt to camera altitude to keep distant city views lightweight.
 const BATCH_SIZE = 200;
-const MAX_DETAILED_FACADES = 650;
 const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
 const VIEWPORT_PADDING_FACTOR = 0.4;
 const VIEWPORT_MIN_PADDING_DEGREES = 0.004;
@@ -113,6 +139,13 @@ export class CesiumAdapter implements MapEngine {
   private cameraMoveEndUnsubscribe: (() => void) | null = null;
   private lastLodOrigin: CesiumCartesian3 | null = null;
   private lastLodBudget: number | null = null;
+  private lodGraphicsCacheMetrics: LodGraphicsCacheMetrics = {
+    polygonStyleCachesCreated: 0,
+    detailedWallsCreated: 0,
+    detailedWallCacheHits: 0,
+    roofEquipmentCreated: 0,
+    roofEquipmentCacheHits: 0,
+  };
 
   private loadedViewportBounds: ViewportBounds | null = null;
   // null means the uncapped full pilot dataset is loaded.
@@ -346,6 +379,13 @@ export class CesiumAdapter implements MapEngine {
       const time = Cesium.JulianDate.now();
       const entities = [...dataSource.entities.values];
       const lodRecords: BuildingLodRecord[] = [];
+      this.lodGraphicsCacheMetrics = {
+        polygonStyleCachesCreated: 0,
+        detailedWallsCreated: 0,
+        detailedWallCacheHits: 0,
+        roofEquipmentCreated: 0,
+        roofEquipmentCacheHits: 0,
+      };
 
       let renderedBuildings = 0;
       let renderedParts = 0;
@@ -449,6 +489,10 @@ export class CesiumAdapter implements MapEngine {
               center,
               isPart: role === "building_part",
               isDetailed: false,
+              polygonStyleCache: null,
+              detailedWall: null,
+              roofEquipmentBox: null,
+              roofEquipmentPosition: null,
             };
 
             this.applyLightweightBuildingStyle(record, Cesium);
@@ -527,6 +571,7 @@ export class CesiumAdapter implements MapEngine {
         renderedParts,
         renderedExtrusions,
         detailedFacades: lodRecords.filter((record) => record.isDetailed).length,
+        graphicsCache: { ...this.lodGraphicsCacheMetrics },
         hiddenParents,
         hiddenUnderground,
         invalidPolygons,
@@ -750,26 +795,6 @@ export class CesiumAdapter implements MapEngine {
     this.updateBuildingLod(viewer, Cesium);
   }
 
-  private getDetailedFacadeBudget(cameraHeightMeters: number): number {
-    if (cameraHeightMeters >= 25_000) {
-      return 0;
-    }
-
-    if (cameraHeightMeters >= 12_000) {
-      return 80;
-    }
-
-    if (cameraHeightMeters >= 6_000) {
-      return 220;
-    }
-
-    if (cameraHeightMeters >= 2_500) {
-      return 420;
-    }
-
-    return MAX_DETAILED_FACADES;
-  }
-
   private getLodOrigin(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
@@ -822,7 +847,7 @@ export class CesiumAdapter implements MapEngine {
       0,
       viewer.camera.positionCartographic.height,
     );
-    const detailBudget = this.getDetailedFacadeBudget(cameraHeightMeters);
+    const detailBudget = getDetailedFacadeBudget(cameraHeightMeters);
     const origin = this.getLodOrigin(viewer, Cesium);
     const originMoved =
       this.lastLodOrigin === null ||
@@ -900,6 +925,7 @@ export class CesiumAdapter implements MapEngine {
       detailedBuildings: this.buildingLodRecords.filter(
         (record) => record.isDetailed,
       ).length,
+      graphicsCache: { ...this.lodGraphicsCacheMetrics },
       viewCenter: {
         longitude: Number(
           Cesium.Math.toDegrees(
@@ -915,41 +941,96 @@ export class CesiumAdapter implements MapEngine {
     });
   }
 
+  private getBuildingPolygonLodStyleCache(
+    record: BuildingLodRecord,
+    Cesium: CesiumModule,
+  ): BuildingPolygonLodStyleCache {
+    if (record.polygonStyleCache) {
+      return record.polygonStyleCache;
+    }
+
+    const facadeColor =
+      Cesium.Color.fromCssColorString(record.visualStyle.facadeColor) ??
+      Cesium.Color.LIGHTGRAY;
+
+    record.polygonStyleCache = {
+      lightweightHeight: new Cesium.ConstantProperty(record.baseHeight),
+      lightweightExtrudedHeight: new Cesium.ConstantProperty(record.topHeight),
+      detailedHeight: null,
+      perPositionHeight: new Cesium.ConstantProperty(false),
+      lightweightMaterial: new Cesium.ColorMaterialProperty(facadeColor),
+      detailedRoofMaterial: null,
+      outline: new Cesium.ConstantProperty(true),
+      wallOutlineColor: new Cesium.ConstantProperty(
+        Cesium.Color.fromCssColorString(WALL_OUTLINE_COLOR),
+      ),
+      roofOutlineColor: null,
+      closeTop: new Cesium.ConstantProperty(true),
+      closeBottom: new Cesium.ConstantProperty(true),
+    };
+
+    this.lodGraphicsCacheMetrics.polygonStyleCachesCreated += 1;
+    return record.polygonStyleCache;
+  }
+
+  private prepareSelectedBuildingForLodTransition(
+    record: BuildingLodRecord,
+  ): void {
+    const entity = record.entity;
+
+    if (this.selectedBuilding !== entity) {
+      return;
+    }
+
+    const originalPolygonMaterial = this.selectedBuildingOriginalMaterial;
+    const originalWallMaterial = this.selectedBuildingOriginalWallMaterial;
+
+    // The detailed wall may be detached while the selected building is in
+    // lightweight mode. Restore the cached object's original material too.
+    if (originalPolygonMaterial !== null && entity.polygon) {
+      entity.polygon.material = originalPolygonMaterial;
+    }
+
+    if (originalWallMaterial !== null) {
+      if (entity.wall) {
+        entity.wall.material = originalWallMaterial;
+      }
+      if (record.detailedWall) {
+        record.detailedWall.material = originalWallMaterial;
+      }
+    }
+
+    this.selectedBuildingOriginalMaterial = null;
+    this.selectedBuildingOriginalWallMaterial = null;
+  }
+
   private applyLightweightBuildingStyle(
     record: BuildingLodRecord,
     Cesium: CesiumModule,
   ): void {
     const entity = record.entity;
-
-    if (this.selectedBuilding === entity) {
-      this.selectedBuildingOriginalMaterial = null;
-      this.selectedBuildingOriginalWallMaterial = null;
-    }
-
     const polygon = entity.polygon;
 
     if (!polygon) {
       return;
     }
 
+    this.prepareSelectedBuildingForLodTransition(record);
+
+    // Keep expensive detailed graphics cached on the record while detached.
     entity.wall = undefined;
     entity.box = undefined;
     entity.position = undefined;
 
-    const facadeColor =
-      Cesium.Color.fromCssColorString(record.visualStyle.facadeColor) ??
-      Cesium.Color.LIGHTGRAY;
-
-    polygon.height = new Cesium.ConstantProperty(record.baseHeight);
-    polygon.extrudedHeight = new Cesium.ConstantProperty(record.topHeight);
-    polygon.perPositionHeight = new Cesium.ConstantProperty(false);
-    polygon.material = new Cesium.ColorMaterialProperty(facadeColor);
-    polygon.outline = new Cesium.ConstantProperty(true);
-    polygon.outlineColor = new Cesium.ConstantProperty(
-      Cesium.Color.fromCssColorString(WALL_OUTLINE_COLOR),
-    );
-    polygon.closeTop = new Cesium.ConstantProperty(true);
-    polygon.closeBottom = new Cesium.ConstantProperty(true);
+    const styleCache = this.getBuildingPolygonLodStyleCache(record, Cesium);
+    polygon.height = styleCache.lightweightHeight;
+    polygon.extrudedHeight = styleCache.lightweightExtrudedHeight;
+    polygon.perPositionHeight = styleCache.perPositionHeight;
+    polygon.material = styleCache.lightweightMaterial;
+    polygon.outline = styleCache.outline;
+    polygon.outlineColor = styleCache.wallOutlineColor;
+    polygon.closeTop = styleCache.closeTop;
+    polygon.closeBottom = styleCache.closeBottom;
 
     record.isDetailed = false;
     this.applySelectionHighlight(entity, Cesium);
@@ -960,12 +1041,6 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
   ): void {
     const entity = record.entity;
-
-    if (this.selectedBuilding === entity) {
-      this.selectedBuildingOriginalMaterial = null;
-      this.selectedBuildingOriginalWallMaterial = null;
-    }
-
     const polygon = entity.polygon;
     const wallPositions = record.wallPositions;
 
@@ -974,88 +1049,110 @@ export class CesiumAdapter implements MapEngine {
       return;
     }
 
-    const facadeTexture = createBuildingFacadeTexture(record.visualStyle);
+    this.prepareSelectedBuildingForLodTransition(record);
 
-    if (!facadeTexture) {
-      this.applyLightweightBuildingStyle(record, Cesium);
-      return;
+    if (!record.detailedWall) {
+      const facadeTexture = createBuildingFacadeTexture(record.visualStyle);
+      if (!facadeTexture) {
+        this.applyLightweightBuildingStyle(record, Cesium);
+        return;
+      }
+
+      record.detailedWall = new Cesium.WallGraphics({
+        positions: wallPositions,
+        minimumHeights: wallPositions.map(() => record.baseHeight),
+        maximumHeights: wallPositions.map(() => record.topHeight),
+        fill: new Cesium.ConstantProperty(true),
+        outline: new Cesium.ConstantProperty(false),
+        material: new Cesium.ImageMaterialProperty({
+          image: facadeTexture,
+          repeat: this.getFacadeRepeat(
+            wallPositions,
+            record.heightInfo.meters,
+            Cesium,
+            record.visualStyle.repeatWidthMeters,
+          ),
+          // The canvas already carries the palette; avoid tinting its glass.
+          color: Cesium.Color.WHITE,
+          transparent: false,
+        }),
+      });
+      this.lodGraphicsCacheMetrics.detailedWallsCreated += 1;
+    } else {
+      this.lodGraphicsCacheMetrics.detailedWallCacheHits += 1;
     }
 
-    const roofColor =
+    entity.wall = record.detailedWall;
+
+    const styleCache = this.getBuildingPolygonLodStyleCache(record, Cesium);
+    styleCache.detailedHeight ??= new Cesium.ConstantProperty(record.topHeight);
+    styleCache.detailedRoofMaterial ??= new Cesium.ColorMaterialProperty(
       Cesium.Color.fromCssColorString(record.visualStyle.roofColor) ??
-      Cesium.Color.GRAY;
-
-    entity.wall = new Cesium.WallGraphics({
-      positions: wallPositions,
-      minimumHeights: wallPositions.map(() => record.baseHeight),
-      maximumHeights: wallPositions.map(() => record.topHeight),
-      fill: new Cesium.ConstantProperty(true),
-      outline: new Cesium.ConstantProperty(false),
-      material: new Cesium.ImageMaterialProperty({
-        image: facadeTexture,
-        repeat: this.getFacadeRepeat(
-          wallPositions,
-          record.heightInfo.meters,
-          Cesium,
-          record.visualStyle.repeatWidthMeters,
-        ),
-        // The canvas already carries the palette; avoid tinting its glass.
-        color: Cesium.Color.WHITE,
-        transparent: false,
-      }),
-    });
-
-    polygon.height = new Cesium.ConstantProperty(record.topHeight);
-    polygon.extrudedHeight = undefined;
-    polygon.perPositionHeight = new Cesium.ConstantProperty(false);
-    polygon.material = new Cesium.ColorMaterialProperty(roofColor);
-    polygon.outline = new Cesium.ConstantProperty(true);
-    polygon.outlineColor = new Cesium.ConstantProperty(
+        Cesium.Color.GRAY,
+    );
+    styleCache.roofOutlineColor ??= new Cesium.ConstantProperty(
       Cesium.Color.fromCssColorString(ROOF_OUTLINE_COLOR),
     );
-    polygon.closeTop = new Cesium.ConstantProperty(true);
-    polygon.closeBottom = new Cesium.ConstantProperty(true);
+
+    polygon.height = styleCache.detailedHeight;
+    polygon.extrudedHeight = undefined;
+    polygon.perPositionHeight = styleCache.perPositionHeight;
+    polygon.material = styleCache.detailedRoofMaterial;
+    polygon.outline = styleCache.outline;
+    polygon.outlineColor = styleCache.roofOutlineColor;
+    polygon.closeTop = styleCache.closeTop;
+    polygon.closeBottom = styleCache.closeBottom;
 
     // Sparse rooftop shapes are illustrative, not verified roof assets.
     entity.box = undefined;
     entity.position = undefined;
 
-    if (
+    const shouldShowRoofEquipment =
       record.visualStyle.roofDetail !== "none" &&
-      (this.hashEntityId(entity.id) % 5 === 0 || record.isPart)
-    ) {
-      const centerCartographic = Cesium.Cartographic.fromCartesian(
-        record.center ?? wallPositions[0],
-      );
-      const equipmentHeight =
-        record.visualStyle.roofDetail === "water-tank" ? 1.8 : 1.2;
-      const equipmentWidth =
-        record.visualStyle.roofDetail === "water-tank" ? 1.6 : 2.4;
-      const roofPosition = Cesium.Cartesian3.fromRadians(
-        centerCartographic.longitude,
-        centerCartographic.latitude,
-        record.topHeight + equipmentHeight / 2,
-      );
+      (this.hashEntityId(entity.id) % 5 === 0 || record.isPart);
 
-      entity.position = new Cesium.ConstantPositionProperty(roofPosition);
-      entity.box = new Cesium.BoxGraphics({
-        dimensions: new Cesium.Cartesian3(
-          equipmentWidth,
-          equipmentWidth,
-          equipmentHeight,
-        ),
-        material:
-          Cesium.Color.fromCssColorString(
-            record.visualStyle.roofDetail === "water-tank"
-              ? "#657b89"
-              : "#aeb8bf",
-          ) ?? Cesium.Color.GRAY,
-        outline: new Cesium.ConstantProperty(true),
-        outlineColor: new Cesium.ConstantProperty(
-          Cesium.Color.fromCssColorString("#4d5b64") ??
-            Cesium.Color.DARKGRAY,
-        ),
-      });
+    if (shouldShowRoofEquipment) {
+      if (!record.roofEquipmentBox || !record.roofEquipmentPosition) {
+        const centerCartographic = Cesium.Cartographic.fromCartesian(
+          record.center ?? wallPositions[0],
+        );
+        const equipmentHeight =
+          record.visualStyle.roofDetail === "water-tank" ? 1.8 : 1.2;
+        const equipmentWidth =
+          record.visualStyle.roofDetail === "water-tank" ? 1.6 : 2.4;
+        const roofPosition = Cesium.Cartesian3.fromRadians(
+          centerCartographic.longitude,
+          centerCartographic.latitude,
+          record.topHeight + equipmentHeight / 2,
+        );
+
+        record.roofEquipmentPosition =
+          new Cesium.ConstantPositionProperty(roofPosition);
+        record.roofEquipmentBox = new Cesium.BoxGraphics({
+          dimensions: new Cesium.Cartesian3(
+            equipmentWidth,
+            equipmentWidth,
+            equipmentHeight,
+          ),
+          material:
+            Cesium.Color.fromCssColorString(
+              record.visualStyle.roofDetail === "water-tank"
+                ? "#657b89"
+                : "#aeb8bf",
+            ) ?? Cesium.Color.GRAY,
+          outline: new Cesium.ConstantProperty(true),
+          outlineColor: new Cesium.ConstantProperty(
+            Cesium.Color.fromCssColorString("#4d5b64") ??
+              Cesium.Color.DARKGRAY,
+          ),
+        });
+        this.lodGraphicsCacheMetrics.roofEquipmentCreated += 1;
+      } else {
+        this.lodGraphicsCacheMetrics.roofEquipmentCacheHits += 1;
+      }
+
+      entity.position = record.roofEquipmentPosition;
+      entity.box = record.roofEquipmentBox;
     }
 
     record.isDetailed = true;

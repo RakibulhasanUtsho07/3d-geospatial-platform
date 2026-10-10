@@ -12,6 +12,7 @@
     "test:geospatial-tiles": "node --test tests/overture-spatial-tiles.test.mjs",
     "test:geospatial-api": "node --test tests/overture-viewport-api.test.mjs",
     "test:viewport-budget": "node --test tests/viewport-feature-budget.test.mjs",
+    "test:lod-budget": "node --test tests/lod-detail-budget.test.mjs",
     "test:viewport-selection": "node --test tests/viewport-feature-selection.test.mjs",
      "predev": "npm run copy:cesium",
     "prebuild": "npm run copy:cesium"
