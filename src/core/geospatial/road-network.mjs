@@ -6,10 +6,15 @@ const EARTH_RADIUS_METERS = 6_371_008.8;
 
 const ROAD_WIDTHS = Object.freeze({
   motorway: 11,
+  motorway_link: 7,
   trunk: 9,
+  trunk_link: 6.5,
   primary: 7.5,
+  primary_link: 5.5,
   secondary: 6,
+  secondary_link: 4.5,
   tertiary: 4.8,
+  tertiary_link: 4,
   unclassified: 3.8,
   residential: 3.5,
   living_street: 3,
@@ -19,6 +24,9 @@ const ROAD_WIDTHS = Object.freeze({
   footway: 1.3,
   cycleway: 1.6,
   path: 1.2,
+  steps: 1.2,
+  bridleway: 1.5,
+  busway: 3.5,
   track: 2,
 });
 
@@ -149,8 +157,8 @@ function isValidCoordinate(point) {
 }
 
 function roadClass(highway) {
-  if (["motorway", "trunk", "primary"].includes(highway)) return "arterial";
-  if (["secondary", "tertiary", "unclassified"].includes(highway)) return "collector";
+  if (["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link"].includes(highway)) return "arterial";
+  if (["secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified"].includes(highway)) return "collector";
   if (["residential", "living_street", "service", "road"].includes(highway)) return "local";
   return "path";
 }
