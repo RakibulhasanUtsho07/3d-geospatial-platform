@@ -180,6 +180,40 @@ jobs:
             process.exit(1);
           }
 
+          const commonsMedia = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/architecture-research?q=Mugda&mediaType=image&limit=10",
+          );
+          const commonsPayload = await commonsMedia.json();
+          if (
+            !commonsMedia.ok ||
+            !commonsPayload.results?.some((item) =>
+              item.id === "R02" &&
+              item.mediaPreviewKind === "image" &&
+              typeof item.mediaPreviewUrl === "string" &&
+              item.mediaPreviewUrl.includes("commons.wikimedia.org")
+            )
+          ) {
+            console.error("Architecture research endpoint failed its reuse-aware image preview smoke test.");
+            process.exit(1);
+          }
+
+          const videoMedia = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/architecture-research?mediaType=video&limit=10",
+          );
+          const videoPayload = await videoMedia.json();
+          if (
+            !videoMedia.ok ||
+            !videoPayload.results?.some((item) =>
+              item.mediaType === "video" &&
+              item.mediaPreviewKind === "video" &&
+              typeof item.mediaPreviewUrl === "string" &&
+              item.mediaPreviewUrl.startsWith("https://www.youtube-nocookie.com/embed/")
+            )
+          ) {
+            console.error("Architecture research endpoint failed its validated YouTube context preview smoke test.");
+            process.exit(1);
+          }
+
           const propertySearch = await fetch(
             "http://127.0.0.1:3000/api/geospatial/properties?lat=23.7461&lon=90.3742&radius=20000&minRent=20000&maxRent=40000&minBedrooms=2&type=apartment&limit=10",
           );
