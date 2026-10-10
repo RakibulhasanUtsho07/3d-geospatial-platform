@@ -87,7 +87,7 @@ export function buildOverpassRoadQuery(request) {
   return [
     "[out:json][timeout:20][bbox:" + request.south + "," + request.west + "," + request.north + "," + request.east + "];",
     'way["highway"~"^(' + highwayPattern + ')$"];',
-    "out body geom;",
+    "out body geom " + Math.min(request.limit ?? DEFAULT_ROAD_FEATURES, MAX_ROAD_FEATURES) + ";",
   ].join("\n");
 }
 
