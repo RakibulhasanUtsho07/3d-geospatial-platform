@@ -923,10 +923,23 @@ export class CesiumAdapter implements MapEngine {
       const labelIds = new Set(labelCandidates.map((road) => road.id));
 
       const roadColors: Record<RoadFeature["roadClass"], string> = {
-        arterial: "#E0A65D",
-        collector: "#D6DEE6",
-        local: "#F3F5F7",
-        path: "#9BA99F",
+        arterial: "#84919D",
+        collector: "#AAB4BD",
+        local: "#D3D9DE",
+        path: "#BBB6A9",
+      };
+      const surfaceColors: Record<string, string> = {
+        asphalt: "#69757F",
+        concrete: "#A9B0B7",
+        paving_stones: "#B9B5AD",
+        cobblestone: "#8B8580",
+        gravel: "#9B8F7B",
+        unpaved: "#B99B75",
+        ground: "#AA8D6A",
+        dirt: "#AA8D6A",
+        earth: "#AA8D6A",
+        sand: "#D0B88C",
+        grass: "#72936A",
       };
 
       for (const road of payload.results) {
@@ -950,8 +963,15 @@ export class CesiumAdapter implements MapEngine {
         );
         const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
         const roadColor = Cesium.Color.fromCssColorString(
-          roadColors[road.roadClass] ?? roadColors.local,
+          (road.surface ? surfaceColors[road.surface.toLowerCase()] : null)
+            ?? roadColors[road.roadClass]
+            ?? roadColors.local,
         ) ?? Cesium.Color.LIGHTGRAY;
+        const renderHeight = road.bridge
+          ? Math.max(3, (road.layer ?? 1) * 3)
+          : road.tunnel
+            ? -3
+            : 0;
         const roadwayWidth = Math.max(1.1, Math.min(24, road.widthMeters));
         const safeName = road.name
           ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
@@ -966,7 +986,7 @@ export class CesiumAdapter implements MapEngine {
           corridor: {
             positions,
             width: roadwayWidth,
-            height: 0,
+            height: renderHeight,
             cornerType: Cesium.CornerType.ROUNDED,
             material: new Cesium.ColorMaterialProperty(
               roadColor.withAlpha(road.roadClass === "path" ? 0.72 : 0.9),
