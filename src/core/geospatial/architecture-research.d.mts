@@ -15,6 +15,7 @@ export interface ArchitectureResearchReference {
   mediaType: ArchitectureResearchMediaType;
   title: string;
   sourceUrl: string;
+  buildingMatchConfidence?: string;
   mediaPreviewUrl?: string | null;
   mediaPreviewKind?: "image" | "video" | null;
   sourceName?: string | null;
@@ -105,3 +106,6 @@ export interface ArchitectureMediaPreview {
 }
 
 export function resolveArchitectureMediaPreview(reference: ArchitectureResearchReference): ArchitectureMediaPreview;
+export function canAssignArchitectureReference(
+  reference: ArchitectureResearchReference,
+): boolean;
