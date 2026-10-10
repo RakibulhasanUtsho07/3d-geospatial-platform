@@ -46,8 +46,11 @@ The LOD budget is a performance heuristic rather than a device benchmark. Tune i
 - All four bounds are required. Longitude must be in `[-180, 180]`, latitude in `[-85, 85]`, west must be less than east, and south must be less than north.
 - The requested rectangle is capped at 2 degrees per axis; for wider views, the map retains the full-dataset endpoint as a compatibility fallback.
 - A feature is returned when its geometry bounding box intersects the request rectangle. Geometry is not clipped, so buildings that cross a viewport edge remain intact.
-- Response headers report the returned feature count and the total indexed pilot feature count.
-- The index is cached in the API module after the first successful read. It must be rebuilt when the underlying pilot file is changed during a long-lived server process.
+- Response headers report the returned feature count, total source feature count, data source, and number of selected tiles.
+- Run `npm run build:geospatial-tiles` after generating or updating the pilot GeoJSON. The script writes a deterministic `data/overture/spatial-tiles/manifest.json`, small GeoJSON grid tiles, and an optional sidecar for geometries that would touch too many tiles.
+- Generated spatial tiles are ignored by Git and are rebuilt locally or in CI. If the manifest or any selected tile is missing or invalid, the API falls back to the original in-memory GeoJSON spatial index rather than returning a partial tile response.
+- Tile grid cells are 0.005 degrees on each axis (roughly half a kilometre north-south near Dhaka; longitude distance varies with latitude). A feature may be copied to multiple tiles when its bounding box crosses tile boundaries; the API deduplicates returned features.
+- The server caches the full source index only when the fallback is used. Generated tile queries read only intersecting tile files plus the optional oversized-geometry sidecar.
 
 ## Important data limitations
 
@@ -84,8 +87,18 @@ After pulling the branch, run:
 
 ```powershell
 npm run lint
+npm run build:geospatial-tiles
 npm run build
 npm run dev
 ```
+
+To verify the viewport API directly after the development server starts, use a small geographic rectangle around central Dhaka:
+
+```powershell
+Invoke-WebRequest "http://localhost:3000/api/geospatial/overture-buildings/viewport?west=90.38&south=23.72&east=90.42&north=23.76" -UseBasicParsing |
+  Select-Object StatusCode, Headers
+```
+
+Check `X-Building-Data-Source`: it should be `generated-tiles` after tile generation and `indexed-geojson` when generated tiles are unavailable. Compare `X-Building-Feature-Count` with `X-Building-Tile-Count` and inspect the response's feature array to confirm that it is not returning the whole pilot by default.
 
 Open `/map`, wait for the Overture pilot layer to finish loading, and inspect buildings around the initial Dhaka camera position. Check the browser console for the `[Overture] Pilot dataset rendered.` message and confirm the detailed facade count is non-zero.
