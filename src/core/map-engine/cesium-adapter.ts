@@ -629,6 +629,12 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
   ): void {
     const entity = record.entity;
+
+    if (this.selectedBuilding === entity) {
+      this.selectedBuildingOriginalMaterial = null;
+      this.selectedBuildingOriginalWallMaterial = null;
+    }
+
     const polygon = entity.polygon;
 
     if (!polygon) {
@@ -663,6 +669,12 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
   ): void {
     const entity = record.entity;
+
+    if (this.selectedBuilding === entity) {
+      this.selectedBuildingOriginalMaterial = null;
+      this.selectedBuildingOriginalWallMaterial = null;
+    }
+
     const polygon = entity.polygon;
     const wallPositions = record.wallPositions;
 
