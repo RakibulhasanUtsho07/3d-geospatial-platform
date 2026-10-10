@@ -192,11 +192,37 @@ function haversineDistanceMeters(latitudeA, longitudeA, latitudeB, longitudeB) {
   return 2 * 6_371_008.8 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
+function safeWebsite(tags) {
+  for (const key of ["contact:website", "website"]) {
+    const candidate = safeTag(tags, key, 240);
+    if (!candidate) continue;
+
+    try {
+      // OSM tags are community-edited input. Never forward script/data schemes
+      // into an href; allow bare hostnames by treating them as HTTPS URLs.
+      const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(candidate);
+      const url = new URL(hasScheme ? candidate : `https://${candidate}`);
+      if (
+        (url.protocol === "https:" || url.protocol === "http:") &&
+        !url.username &&
+        !url.password &&
+        url.hostname
+      ) {
+        return url.toString();
+      }
+    } catch {
+      // Ignore malformed link values and keep looking for a valid tag.
+    }
+  }
+
+  return null;
+}
+
 function buildAddress(tags) {
   const parts = [
     safeTag(tags, "addr:street"),
-    safeTag(tags, "addr:suburb"),
-    safeTag(tags, "addr:city"),
+    safeTag(tags, "addr:suburb") ?? safeTag(tags, "addr:place"),
+    safeTag(tags, "addr:city") ?? safeTag(tags, "addr:district"),
   ].filter(Boolean);
   return parts.length ? parts.join(", ") : null;
 }
@@ -256,6 +282,10 @@ export function normalizeOverpassElements(elements, request) {
       latitude,
       longitude,
     );
+    // Displayed distance is measured to the node/way centre. Keep the result
+    // set consistent with the radius shown to the user.
+    if (distanceMeters > request.radiusMeters) continue;
+
     const tags = {};
 
     for (const key of [
@@ -290,7 +320,7 @@ export function normalizeOverpassElements(elements, request) {
       address,
       openingHours: safeTag(element.tags, "opening_hours"),
       phone: safeTag(element.tags, "contact:phone") ?? safeTag(element.tags, "phone"),
-      website: safeTag(element.tags, "contact:website") ?? safeTag(element.tags, "website"),
+      website: safeWebsite(element.tags),
       operator: safeTag(element.tags, "operator"),
       tags,
       osmUrl: `https://www.openstreetmap.org/${osmType}/${osmId}`,
