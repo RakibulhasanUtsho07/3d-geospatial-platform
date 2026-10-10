@@ -163,9 +163,9 @@ export function createArchitectureStylePreview(reference) {
     /brick|masonry|terracotta|fair-faced-red-brick|brick-cladding/.test(materialHints) ? "brick"
       : /weathered|aged-plaster/.test(materialHints) ? "weathered"
         : /white.*glass|glass.*white|vertical-glass/.test(family) ? "glass"
-          : /light-stone|stone-like|stone/.test(family + " " + features) ? "stone"
+          : /light-stone|stone-like|stone/.test(materialHints) ? "stone"
             : /painted-mid-rise|blue.*yellow/.test(materialHints) ? "painted"
-              : "plaster";
+              : undefined;
 
   const hasArches = /arched|arches|arch openings/.test(features);
   const hasColumns = /column|corinthian|fluted|pilaster/.test(features);
@@ -259,4 +259,22 @@ export function resolveArchitectureMediaPreview(reference) {
     mediaPreviewUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/" + encodeURIComponent(filename) + "?width=720",
     mediaPreviewKind: "image",
   };
+}
+
+
+export function canAssignArchitectureReference(reference) {
+  if (!reference || typeof reference !== "object" || reference.mediaType !== "image") return false;
+  const profile = reference.designProfile ?? {};
+  const confidence = stringValue(reference.buildingMatchConfidence).toLowerCase();
+  const text = [
+    profile.styleFamily,
+    profile.reconstructionUse,
+    confidence,
+    ...(Array.isArray(reference.limitations) ? reference.limitations : []),
+  ].map(stringValue).join(" ").toLowerCase();
+
+  // Skyline, broad panoramas and building clusters describe neighbourhood
+  // context, not a single identifiable facade; they must not be assigned to
+  // one arbitrary footprint as though the image showed that exact property.
+  return !/(skyline|panoramic|urban.?context|dense.?cluster|cityscape|camera.?viewpoint|route.?level|context.?only|density.?template|individual facades? not matched|not attributed to an individual building)/i.test(text);
 }
