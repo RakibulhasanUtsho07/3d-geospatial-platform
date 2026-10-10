@@ -2295,6 +2295,16 @@ export class CesiumAdapter implements MapEngine {
           height_source: heightInfo.source,
         };
 
+        const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
+        if (savedArchitectureProfile) {
+          selectedProperties.architecture_profile_id = savedArchitectureProfile.referenceId;
+          selectedProperties.architecture_profile_title = savedArchitectureProfile.referenceTitle;
+          selectedProperties.architecture_profile_source = savedArchitectureProfile.sourceUrl;
+          selectedProperties.architecture_profile_license = savedArchitectureProfile.license ?? "Not recorded";
+          selectedProperties.architecture_profile_confidence =
+            "User-confirmed visual association; not survey-verified";
+        }
+
         const names = properties.names;
 
         if (
