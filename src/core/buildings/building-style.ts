@@ -148,7 +148,7 @@ function resolveResearchPalette(
       facade: "#a35338",
       roof: "#a7a69e",
       accent: "#c7b5a0",
-      pattern: "brick-modernist",
+      pattern: "urban-grid",
     };
   }
 
