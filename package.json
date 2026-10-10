@@ -22,7 +22,8 @@
     "test:footprint-area": "node --test tests/footprint-area.test.mjs",
     "test:nearby-places": "node --test tests/nearby-places.test.mjs",
     "test:property-listings": "node --test tests/property-listings.test.mjs",
-    "test:street-imagery": "node --test tests/street-imagery.test.mjs"
+    "test:street-imagery": "node --test tests/street-imagery.test.mjs",
+    "test:architecture-research": "node --test tests/architecture-research.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
