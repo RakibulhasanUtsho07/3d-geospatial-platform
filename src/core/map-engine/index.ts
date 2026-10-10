@@ -1,9 +1,11 @@
+
 export type {
   CameraTarget,
   GeoCoordinate,
   MapEngine,
   MapEngineCapabilities,
   MapEngineState,
+  MapFeatureSelection,
   MapLayer,
 } from "./types";
 
