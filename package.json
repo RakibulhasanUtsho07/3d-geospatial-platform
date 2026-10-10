@@ -24,7 +24,8 @@
     "test:property-listings": "node --test tests/property-listings.test.mjs",
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
     "test:architecture-research": "node --test tests/architecture-research.test.mjs",
-    "test:road-network": "node --test tests/road-network.test.mjs"
+    "test:road-network": "node --test tests/road-network.test.mjs",
+    "test:building-style": "node --test tests/building-style.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
