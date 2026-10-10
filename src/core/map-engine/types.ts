@@ -13,6 +13,7 @@ export type CameraTarget = {
   durationMs?: number;
 };
 
+import type { BuildingVisualStyle } from "../buildings/building-style";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 
@@ -79,6 +80,7 @@ export interface MapEngine {
   ): () => void;
 
   clearFeatureSelection(): void;
+  previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean;
   destroy(): void;
   resize(): void;
 
