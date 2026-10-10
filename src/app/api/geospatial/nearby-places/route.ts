@@ -5,7 +5,10 @@ import {
   normalizeOverpassElements,
   parseNearbyPlacesParams,
 } from "@/core/geospatial/nearby-places.mjs";
-import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
+import type {
+  NearbyPlace,
+  NearbyPlacesRequest,
+} from "@/core/geospatial/nearby-places.mjs";
 
 type JsonObject = Record<string, unknown>;
 type CachedPlaces = { expiresAt: number; places: NearbyPlace[] };
@@ -134,7 +137,7 @@ async function queryOverpass(request: Parameters<typeof buildOverpassQuery>[0]):
 
 function responseWithPlaces(
   places: NearbyPlace[],
-  request: ReturnType<typeof parseNearbyPlacesParams> extends { ok: true; value: infer T } ? T : never,
+  request: NearbyPlacesRequest,
   cacheStatus: "HIT" | "MISS" | "COALESCED",
 ): Response {
   return NextResponse.json(
