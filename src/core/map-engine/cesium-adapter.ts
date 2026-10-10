@@ -141,6 +141,8 @@ export class CesiumAdapter implements MapEngine {
     | null = null;
 
   private roadNetworkDataSource: import("cesium").CustomDataSource | null = null;
+  private readonly roadByEntityId = new Map<string, RoadFeature>();
+  private readonly roadSelectionListeners = new Set<(road: RoadFeature | null) => void>();
   private roadRequestAbortController: AbortController | null = null;
   private activeRoadRequestKey: string | null = null;
   private loadedRoadBounds: ViewportBounds | null = null;
@@ -917,6 +919,7 @@ export class CesiumAdapter implements MapEngine {
       }
 
       dataSource.entities.removeAll();
+      this.roadByEntityId.clear();
       const labelCandidates = payload.results
         .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
         .slice(0, 40);
@@ -977,6 +980,7 @@ export class CesiumAdapter implements MapEngine {
           ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
           : null;
 
+        this.roadByEntityId.set(road.id, road);
         dataSource.entities.add({
           id: road.id,
           name: safeName ?? road.highway + " road",
@@ -1018,6 +1022,7 @@ export class CesiumAdapter implements MapEngine {
         // A thin centre highlight improves road hierarchy at ground-level zoom;
         // physical-width corridor geometry remains the controlling road surface.
         if (road.roadClass === "arterial" && road.widthMeters >= 5) {
+          this.roadByEntityId.set(road.id + "-centre-line", road);
           dataSource.entities.add({
             id: road.id + "-centre-line",
             name: (safeName ?? "Road") + " centre detail",
@@ -2130,6 +2135,7 @@ export class CesiumAdapter implements MapEngine {
     this.restoreSelectedBuilding();
     this.emitFeatureSelection(null);
     this.emitPlaceSelection(null);
+    this.emitRoadSelection(null);
 
     if (
       hadSelection &&
@@ -2177,6 +2183,21 @@ export class CesiumAdapter implements MapEngine {
     }
 
     return null;
+  }
+
+  onRoadSelected(listener: (road: RoadFeature | null) => void): () => void {
+    this.roadSelectionListeners.add(listener);
+    return () => this.roadSelectionListeners.delete(listener);
+  }
+
+  private emitRoadSelection(road: RoadFeature | null): void {
+    for (const listener of this.roadSelectionListeners) {
+      try {
+        listener(road);
+      } catch (error: unknown) {
+        console.error("[Map] Road selection listener failed:", error instanceof Error ? error.message : String(error));
+      }
+    }
   }
 
   onPropertySelected(listener: (property: PropertyListing | null) => void): () => void {
@@ -2349,6 +2370,19 @@ export class CesiumAdapter implements MapEngine {
           return;
         }
 
+        const roadSource = this.roadNetworkDataSource;
+        const roadEntity = roadSource
+          ? this.getEntityFromPick(picked, Cesium, roadSource)
+          : null;
+        const road = roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
+        if (road) {
+          this.clearFeatureSelection();
+          this.emitPlaceSelection(null);
+          this.emitPropertySelection(null);
+          this.emitRoadSelection(road);
+          return;
+        }
+
         const dataSource = this.overtureBuildings;
         if (!dataSource) {
           this.clearFeatureSelection();
@@ -2371,6 +2405,7 @@ export class CesiumAdapter implements MapEngine {
         this.emitPropertySelection(null);
 
         this.selectedBuilding = entity;
+        this.emitRoadSelection(null);
 
         const properties = this.readProperties(
           entity,
@@ -2567,6 +2602,8 @@ export class CesiumAdapter implements MapEngine {
 
     this.featureSelectionListeners.clear();
     this.buildingStyleAssignments.clear();
+    this.roadSelectionListeners.clear();
+    this.roadByEntityId.clear();
     this.placeSelectionListeners.clear();
     this.propertySelectionListeners.clear();
     this.nearbyPlaceByEntityId.clear();
