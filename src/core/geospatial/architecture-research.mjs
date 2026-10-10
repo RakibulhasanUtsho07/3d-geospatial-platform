@@ -132,6 +132,8 @@ export function createArchitectureStylePreview(reference) {
   const features = facadeFeatures.join(" ").toLowerCase();
   const roofDescription = roofFeatures.join(" ").toLowerCase();
   const colors = Array.isArray(profile.colorPalette) ? profile.colorPalette : [];
+  const paletteNames = colors.map((swatch) => String(swatch?.name ?? "")).join(" ").toLowerCase();
+  const materialHints = family + " " + features + " " + paletteNames;
   const colorBy = (pattern, fallback) => colors.find((swatch) =>
     pattern.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? ""))
   )?.hex ?? fallback;
@@ -154,11 +156,11 @@ export function createArchitectureStylePreview(reference) {
   }
 
   const materialPattern =
-    /brick|masonry|terracotta|fair-faced-red-brick|brick-cladding/.test(family + " " + features) ? "brick"
-      : /weathered|aged-plaster/.test(family + " " + features) ? "weathered"
+    /brick|masonry|terracotta|fair-faced-red-brick|brick-cladding/.test(materialHints) ? "brick"
+      : /weathered|aged-plaster/.test(materialHints) ? "weathered"
         : /white.*glass|glass.*white|vertical-glass/.test(family) ? "glass"
           : /light-stone|stone-like|stone/.test(family + " " + features) ? "stone"
-            : /painted-mid-rise|blue.*yellow/.test(family + " " + features) ? "painted"
+            : /painted-mid-rise|blue.*yellow/.test(materialHints) ? "painted"
               : "plaster";
 
   const hasArches = /arched|arches|arch openings/.test(features);
