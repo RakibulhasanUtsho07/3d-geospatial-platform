@@ -223,6 +223,18 @@ export default function MapCanvas({
         properties.architecture_profile_source = assignment.sourceUrl;
         properties.architecture_profile_license = assignment.license ?? "Not recorded";
         properties.architecture_profile_confidence = "User-confirmed visual association; not survey-verified";
+        properties.architecture_profile_reported_floor_count = assignment.style.reportedFloorCount;
+        properties.architecture_profile_reported_height_m = assignment.style.reportedHeightMeters;
+        properties.architecture_profile_reported_building_area_sqm = assignment.style.reportedBuildingAreaSqM;
+        properties.architecture_profile_reported_metadata = assignment.reportedBuildingMetadata ?? {};
+
+        if (typeof assignment.style.reportedHeightMeters === "number") {
+          properties.rendered_height_m = assignment.style.reportedHeightMeters;
+          properties.height_source = "reference-reported-height";
+        } else if (typeof assignment.style.reportedFloorCount === "number") {
+          properties.rendered_height_m = assignment.style.reportedFloorCount * 3;
+          properties.height_source = "reference-reported-floors";
+        }
       }
 
       const updated = { ...current, properties };
