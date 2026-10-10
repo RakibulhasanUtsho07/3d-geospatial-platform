@@ -1,11 +1,14 @@
 export type FacadePattern = "balcony" | "vertical-glass" | "urban-grid" | "compact";
 
+export type RoofDetail = "water-tank" | "hvac-unit" | "none";
+
 export type BuildingVisualStyle = {
   id: string;
   facadeColor: string;
   roofColor: string;
   accentColor: string;
   pattern: FacadePattern;
+  roofDetail: RoofDetail;
   repeatWidthMeters: number;
 };
 
@@ -115,6 +118,39 @@ function choosePattern(
   return patterns[seed % patterns.length];
 }
 
+function chooseRoofDetail(
+  properties: BuildingProperties,
+  heightMeters: number,
+  seed: number,
+): RoofDetail {
+  const use = readText(properties, [
+    "subtype",
+    "class",
+    "use",
+    "building",
+    "building_use",
+    "function",
+  ]);
+
+  // Rooftop equipment is a visual hint, not a claim about actual fixtures.
+  if (/industrial|warehouse|factory|hangar/.test(use)) {
+    return seed % 3 === 0 ? "hvac-unit" : "none";
+  }
+
+  if (heightMeters >= 60) {
+    return seed % 3 === 0 ? "none" : "hvac-unit";
+  }
+
+  if (
+    /residential|apartments|apartment|house|dormitory/.test(use) ||
+    heightMeters < 24
+  ) {
+    return seed % 4 === 0 ? "water-tank" : "none";
+  }
+
+  return seed % 5 === 0 ? "hvac-unit" : "none";
+}
+
 /**
  * Pick a stable facade palette and facade pattern from available metadata.
  * The same feature id always gets the same visual style on every reload.
@@ -148,6 +184,7 @@ export function resolveBuildingVisualStyle(
     roofColor,
     accentColor: palette.accent,
     pattern: choosePattern(properties, heightMeters, seed >>> 3),
+    roofDetail: chooseRoofDetail(properties, heightMeters, seed >>> 5),
     repeatWidthMeters: heightMeters >= 60 ? 8.5 : heightMeters >= 24 ? 7.2 : 6.2,
   };
 }
@@ -230,7 +267,8 @@ export function createBuildingFacadeTexture(
 
   const canvas = document.createElement("canvas");
   canvas.width = 192;
-  canvas.height = 128;
+  // One texture tile represents approximately one 3 m floor.
+  canvas.height = 96;
 
   const context = canvas.getContext("2d");
 
@@ -243,46 +281,42 @@ export function createBuildingFacadeTexture(
 
   // Per-floor slab bands and fine architectural reveals.
   context.fillStyle = style.accentColor;
-  context.fillRect(0, 0, canvas.width, 7);
-  context.fillRect(0, 121, canvas.width, 7);
-  context.fillRect(0, 62, canvas.width, 3);
+  context.fillRect(0, 0, canvas.width, 5);
+  context.fillRect(0, 90, canvas.width, 6);
 
   context.fillStyle = "rgba(255, 255, 255, 0.38)";
-  context.fillRect(0, 8, canvas.width, 2);
-  context.fillRect(0, 65, canvas.width, 1.5);
+  context.fillRect(0, 6, canvas.width, 2);
 
   const frameColor = "#e4e8e8";
 
   if (style.pattern === "vertical-glass") {
     for (const x of [12, 72, 132]) {
-      drawWindow(context, x, 14, 48, 99, frameColor);
+      drawWindow(context, x, 11, 48, 75, frameColor);
     }
 
     context.fillStyle = style.accentColor;
     for (const x of [7, 66, 126, 185]) {
-      context.fillRect(x, 8, 4, 112);
+      context.fillRect(x, 8, 4, 81);
     }
   } else if (style.pattern === "balcony") {
     for (const x of [13, 106]) {
-      drawWindow(context, x, 13, 69, 77, frameColor);
-      drawBalcony(context, x - 2, 91, 73, style.accentColor);
+      drawWindow(context, x, 10, 69, 49, frameColor);
+      drawBalcony(context, x - 2, 62, 73, style.accentColor);
     }
   } else if (style.pattern === "urban-grid") {
     for (const x of [12, 72, 132]) {
-      drawWindow(context, x, 15, 46, 42, frameColor);
-      drawWindow(context, x, 72, 46, 39, frameColor);
+      drawWindow(context, x, 15, 46, 66, frameColor);
     }
   } else {
     for (const x of [15, 74, 133]) {
-      drawWindow(context, x, 18, 43, 38, frameColor);
-      drawWindow(context, x, 72, 43, 37, frameColor);
+      drawWindow(context, x, 23, 43, 57, frameColor);
     }
   }
 
   // Slim vertical joints keep the surface from looking like one flat slab.
   context.fillStyle = "rgba(65, 78, 82, 0.14)";
-  context.fillRect(0, 7, 2, 114);
-  context.fillRect(canvas.width - 2, 7, 2, 114);
+  context.fillRect(0, 7, 2, 82);
+  context.fillRect(canvas.width - 2, 7, 2, 82);
 
   if (textureCache.size >= 48) {
     const oldestKey = textureCache.keys().next().value;
