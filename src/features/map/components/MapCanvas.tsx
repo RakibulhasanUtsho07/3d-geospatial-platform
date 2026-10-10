@@ -24,6 +24,8 @@ import BuildingDetailsPanel from "./BuildingDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
 
+const EMPTY_STYLE_ASSIGNMENTS: BuildingStyleAssignment[] = [];
+
 interface StylePreviewRequest {
   revision: number;
   style: BuildingVisualStyle | null;
@@ -52,7 +54,7 @@ const DHAKA_CAMERA_ORIENTATION = {
 export default function MapCanvas({
   onSelectedFeatureChange,
   stylePreviewRequest,
-  styleAssignments = [],
+  styleAssignments = EMPTY_STYLE_ASSIGNMENTS,
   onStylePreviewResult,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
