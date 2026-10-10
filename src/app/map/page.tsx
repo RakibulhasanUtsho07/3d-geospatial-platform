@@ -61,7 +61,7 @@ function isHexColor(value: unknown): value is string {
 }
 
 function parseSavedAssignments(serialized: string | null): BuildingStyleAssignment[] {
-  if (!serialized) return [];
+  if (!serialized || serialized.length > 2_000_000) return [];
   try {
     const parsed: unknown = JSON.parse(serialized);
     if (!Array.isArray(parsed)) return [];
@@ -116,6 +116,40 @@ function parseSavedAssignments(serialized: string | null): BuildingStyleAssignme
         style.windowBayCount < 2 ||
         style.windowBayCount > 5
       )) continue;
+      if (style.reportedFloorCount !== undefined && (
+        typeof style.reportedFloorCount !== "number" ||
+        !Number.isInteger(style.reportedFloorCount) ||
+        style.reportedFloorCount < 1 ||
+        style.reportedFloorCount > 100
+      )) continue;
+      if (style.reportedHeightMeters !== undefined && (
+        typeof style.reportedHeightMeters !== "number" ||
+        !Number.isFinite(style.reportedHeightMeters) ||
+        style.reportedHeightMeters < 3 ||
+        style.reportedHeightMeters > 300
+      )) continue;
+      if (style.reportedBuildingAreaSqM !== undefined && (
+        typeof style.reportedBuildingAreaSqM !== "number" ||
+        !Number.isFinite(style.reportedBuildingAreaSqM) ||
+        style.reportedBuildingAreaSqM < 10 ||
+        style.reportedBuildingAreaSqM > 100000
+      )) continue;
+
+      const reportedBuildingMetadata: Record<string, unknown> = {};
+      if (isRecord(candidate.reportedBuildingMetadata)) {
+        for (const [key, value] of Object.entries(candidate.reportedBuildingMetadata).slice(0, 40)) {
+          if (key.length > 100) continue;
+          if (typeof value === "string") reportedBuildingMetadata[key] = value.slice(0, 500);
+          else if (typeof value === "number" && Number.isFinite(value)) reportedBuildingMetadata[key] = value;
+          else if (typeof value === "boolean") reportedBuildingMetadata[key] = value;
+          else if (Array.isArray(value)) {
+            reportedBuildingMetadata[key] = value
+              .filter((item): item is string => typeof item === "string")
+              .slice(0, 20)
+              .map((item) => item.slice(0, 240));
+          }
+        }
+      }
 
       if (seen.has(featureId)) continue;
       seen.add(featureId);
@@ -127,6 +161,7 @@ function parseSavedAssignments(serialized: string | null): BuildingStyleAssignme
         license: typeof candidate.license === "string" ? candidate.license.slice(0, 240) : null,
         usageStatus: usageStatus.slice(0, 240),
         assignedAt,
+        reportedBuildingMetadata,
         style: style as unknown as BuildingVisualStyle,
       });
       if (safe.length >= 400) break;
@@ -242,6 +277,7 @@ export default function MapPage() {
       license: reference.license ?? null,
       usageStatus: reference.usageStatus,
       assignedAt: new Date().toISOString(),
+      reportedBuildingMetadata: reference.reportedBuildingMetadata ?? {},
       style: { ...style, fullHeightTexture: true },
     };
     setSavedAssignments((current) => [
