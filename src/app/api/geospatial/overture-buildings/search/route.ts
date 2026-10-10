@@ -58,8 +58,6 @@ function getBuildingSearchIndex(): Promise<BuildingSearchDocument[]> {
   return buildingSearchIndexPromise;
 }
 
-export const runtime = "nodejs";
-
 export async function GET(request: Request): Promise<Response> {
   const requestUrl = new URL(request.url);
   const query = requestUrl.searchParams.get("q")?.trim() ?? "";
