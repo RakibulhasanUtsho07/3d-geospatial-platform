@@ -558,9 +558,64 @@
   ],
   "evidencePolicy": {
     "palette": "Every hex value attached to a photo/project is an estimated design colour unless pixel extraction and image provenance are explicitly recorded. It is not a measured paint/manufacturer colour.",
-    "location": "Keep locationText, coordinates if provided, location source, precision level, and building-match confidence separately. A photo GPS point can be a camera location, not the photographed building centroid.",
+    "location": "Keep locationText, coordinates if provided, location source, precision level, and building-match confidence separately. A photo GPS point can be a camera location, not the photographed building centroid. Known coordinates are stored with their semantic meaning (landmark point, locality centre, camera viewpoint, or conflicting candidate). A coordinate must never be assumed to be the facade centre or plot centroid.",
     "projectInfo": "Architect/developer pages describe design intent/project programme; distinguish these from independent survey, current as-built verification, property availability and official cadastral data.",
     "copyright": "Source accessibility does not imply reuse permission. CC BY and CC BY-SA media require the particular licence's attribution/ShareAlike terms; editorial, property-listing, developer and architecture-site media remain research-only unless permission is clear.",
     "reconstruction": "Preserve source footprint, imagery reference, inferred facade parameters and output mesh as linked but separate records. Low-confidence inference must not overwrite source geometry."
-  }
+  },
+  "locationCoordinates": [
+    {
+      "id": "rose-garden-palace",
+      "name": "Rose Garden Palace",
+      "latitude": 23.71836,
+      "longitude": 90.4264,
+      "coordinateMeaning": "OSM-mapped named-landmark feature point",
+      "sourceUrl": "https://mapcarta.com/W439770540",
+      "confidence": "medium; validate exact building polygon before modelling",
+      "linkedReferences": [
+        "R19"
+      ]
+    },
+    {
+      "id": "shakhari-bazar-centre",
+      "name": "Shakhari Bazar locality reference point",
+      "latitude": 23.71016,
+      "longitude": 90.40881,
+      "coordinateMeaning": "locality/quarter point, not a building",
+      "sourceUrl": "https://mapcarta.com/N393920647",
+      "confidence": "medium for neighbourhood-level map focus only",
+      "linkedReferences": []
+    },
+    {
+      "id": "tanti-bazar-centre",
+      "name": "Tanti Bazar locality reference point",
+      "latitude": 23.71215,
+      "longitude": 90.40788,
+      "coordinateMeaning": "locality/suburb point, not a building",
+      "sourceUrl": "https://mapcarta.com/N393921256",
+      "confidence": "medium for neighbourhood-level map focus only",
+      "linkedReferences": []
+    },
+    {
+      "id": "beauty-boarding",
+      "name": "Beauty Boarding coordinate candidates",
+      "coordinateMeaning": "conflicting public secondary location values; do not create a canonical point yet",
+      "candidates": [
+        {
+          "latitude": 23.7063,
+          "longitude": 90.4131,
+          "sourceUrl": "https://webfiddle.net/21ideas-org/en.wikipedia.org/wiki/Beauty_Boarding"
+        },
+        {
+          "latitude": 23.73339,
+          "longitude": 90.4157,
+          "sourceUrl": "https://bangladesh.worldplaces.me/review/90854224-beauty-boarding.html"
+        }
+      ],
+      "confidence": "low; manually reconcile exact address against OSM before pinning",
+      "linkedReferences": [
+        "R18"
+      ]
+    }
+  ]
 }
