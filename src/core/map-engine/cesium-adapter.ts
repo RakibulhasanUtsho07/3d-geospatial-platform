@@ -1675,8 +1675,9 @@ export class CesiumAdapter implements MapEngine {
               });
             const rings = [
               toDegreesRing(hierarchy.positions),
-              ...(hierarchy.holes ?? []).map((hole) =>
-                toDegreesRing(hole.positions),
+              ...(hierarchy.holes ?? []).map(
+                (hole: { positions: CesiumCartesian3[] }) =>
+                  toDegreesRing(hole.positions),
               ),
             ];
             footprintAreaM2 = calculateFootprintAreaM2(rings);
