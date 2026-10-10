@@ -85,6 +85,10 @@ function getHeightSourceLabel(value: string | null): string {
       return "Estimated from floors";
     case "fallback-estimate":
       return "Fallback estimate";
+    case "reference-reported-height":
+      return "Source-reported project height";
+    case "reference-reported-floors":
+      return "Estimated from reference-reported storeys";
     default:
       return "Rendered estimate";
   }
@@ -125,6 +129,19 @@ function normalizeColorSwatch(value: string): string | null {
   return named[trimmed.toLowerCase()] ?? null;
 }
 
+function getReportedMetadataEntries(value: unknown): Array<[string, string]> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) =>
+      typeof item === "string" ||
+      typeof item === "number" ||
+      typeof item === "boolean" ||
+      (Array.isArray(item) && item.every((entry) => typeof entry === "string"))
+    )
+    .slice(0, 12)
+    .map(([key, item]) => [humanizeKey(key), formatValue(item)]);
+}
+
 function findSourceColor(
   properties: Record<string, unknown>,
   candidates: string[],
@@ -154,17 +171,34 @@ export default function BuildingDetailsPanel({
       "buildingname",
     ]) ?? "Selected 3D Building";
 
-  const height = findNumericProperty(feature.properties, [
+  const referenceReportedHeight = findNumericProperty(feature.properties, [
+    "architecture_profile_reported_height_m",
+  ]);
+  const referenceReportedFloors = findNumericProperty(feature.properties, [
+    "architecture_profile_reported_floor_count",
+  ]);
+  const sourceRenderedHeight = findNumericProperty(feature.properties, [
     "rendered_height_m",
     "height_m",
     "height",
   ]);
-  const floorCount = findNumericProperty(feature.properties, [
+  const height = referenceReportedHeight ?? (
+    referenceReportedFloors !== null
+      ? referenceReportedFloors * 3
+      : sourceRenderedHeight
+  );
+  const floorCount = referenceReportedFloors ?? findNumericProperty(feature.properties, [
     "num_floors",
     "numfloors",
     "building:levels",
     "levels",
   ]);
+  const reportedBuildingAreaSqM = findNumericProperty(feature.properties, [
+    "architecture_profile_reported_building_area_sqm",
+  ]);
+  const reportedMetadataEntries = getReportedMetadataEntries(
+    feature.properties.architecture_profile_reported_metadata,
+  );
   const heightSource = findProperty(feature.properties, ["height_source"]);
   const footprintAreaM2 =
     typeof feature.footprintAreaM2 === "number" &&
@@ -219,6 +253,8 @@ export default function BuildingDetailsPanel({
   const assignedProfileSource = findProperty(feature.properties, ["architecture_profile_source"]);
   const assignedProfileLicense = findProperty(feature.properties, ["architecture_profile_license"]);
   const assignedProfileConfidence = findProperty(feature.properties, ["architecture_profile_confidence"]);
+  const assignedProfileReportedFloorCount = findNumericProperty(feature.properties, ["architecture_profile_reported_floor_count"]);
+  const assignedProfileReportedHeightM = findNumericProperty(feature.properties, ["architecture_profile_reported_height_m"]);
 
   const preferredProperties = [
     "class",
@@ -282,7 +318,7 @@ export default function BuildingDetailsPanel({
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        {(height !== null || floorCount !== null || footprintAreaM2 !== null) && (
+        {(height !== null || floorCount !== null || footprintAreaM2 !== null || reportedBuildingAreaSqM !== null) && (
           <section
             aria-label="Building summary"
             className="grid grid-cols-2 gap-2"
@@ -306,7 +342,7 @@ export default function BuildingDetailsPanel({
                   {Math.round(floorCount)}
                 </p>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Source attribute
+                  {referenceReportedFloors !== null ? "Reference-reported storeys" : "Source attribute"}
                 </p>
               </div>
             )}
@@ -331,6 +367,17 @@ export default function BuildingDetailsPanel({
                 </p>
                 <p className="mt-1 text-[11px] text-slate-500">
                   Footprint × {Math.round(floorCount ?? 0)} floors
+                </p>
+              </div>
+            )}
+            {reportedBuildingAreaSqM !== null && (
+              <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/[0.05] p-3">
+                <p className="text-xs text-slate-400">Source-reported building area</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-100">
+                  {Math.round(reportedBuildingAreaSqM * SQUARE_METERS_TO_SQUARE_FEET).toLocaleString("en-US")} ft²
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {Math.round(reportedBuildingAreaSqM).toLocaleString("en-US")} m² · linked research source
                 </p>
               </div>
             )}
@@ -377,6 +424,17 @@ export default function BuildingDetailsPanel({
             </dl>
             {assignedProfileSource && /^https:\/\//i.test(assignedProfileSource) && (
               <a href={assignedProfileSource} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-semibold text-cyan-200 underline underline-offset-4">Open assigned source ↗</a>
+            )}
+            {(reportedMetadataEntries.length > 0 || assignedProfileReportedFloorCount !== null || assignedProfileReportedHeightM !== null) && (
+              <div className="mt-3 border-t border-emerald-200/10 pt-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-100">Reported project details</p>
+                <dl className="mt-2 space-y-2 text-xs">
+                  {assignedProfileReportedFloorCount !== null && <div className="grid grid-cols-[105px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Reported floors</dt><dd className="text-slate-100">{Math.round(assignedProfileReportedFloorCount)}</dd></div>}
+                  {assignedProfileReportedHeightM !== null && <div className="grid grid-cols-[105px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Reported height</dt><dd className="text-slate-100">{assignedProfileReportedHeightM.toFixed(2)} m</dd></div>}
+                  {reportedMetadataEntries.map(([label, value]) => <div key={label} className="grid grid-cols-[105px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">{label}</dt><dd className="break-words text-slate-100">{value}</dd></div>)}
+                </dl>
+                <p className="mt-2 text-[10px] leading-4 text-slate-500">Values are attributed to the assigned reference source; a manually assigned profile is not an independently surveyed building match.</p>
+              </div>
             )}
           </section>
         )}
