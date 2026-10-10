@@ -70,6 +70,9 @@ jobs:
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
 
+      - name: Test OSM road network query and width normalization
+        run: npm run test:road-network
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
@@ -133,6 +136,14 @@ jobs:
           );
           if (streetImagery.status !== 400) {
             console.error("Street imagery endpoint should reject a request without coordinates.");
+            process.exit(1);
+          }
+
+          const roads = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/roads",
+          );
+          if (roads.status !== 400) {
+            console.error("Road network endpoint should reject a request without viewport bounds.");
             process.exit(1);
           }
 
