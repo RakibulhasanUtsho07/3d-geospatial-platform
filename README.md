@@ -76,7 +76,7 @@ npm run dev
 npm run test:geospatial-api
 ```
 
-CI also starts the production server and verifies the viewport and building-search endpoints against the built app.
+CI also starts the production server and verifies the viewport endpoint, nearby-place request validation, and a successful filtered property search against the built app.
 
 ## API routes
 

@@ -121,6 +121,20 @@ jobs:
             console.error("Property endpoint should reject a request without coordinates.");
             process.exit(1);
           }
+
+          const propertySearch = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/properties?lat=23.7461&lon=90.3742&radius=20000&minRent=20000&maxRent=40000&minBedrooms=2&type=apartment&limit=10",
+          );
+          const propertyPayload = await propertySearch.json();
+          if (
+            !propertySearch.ok ||
+            propertyPayload.dataStatus !== "demo" ||
+            !Array.isArray(propertyPayload.results) ||
+            propertyPayload.results.length === 0
+          ) {
+            console.error("Property endpoint failed a valid filtered-search smoke test.");
+            process.exit(1);
+          }
           NODE
 
           npm run test:geospatial-api
