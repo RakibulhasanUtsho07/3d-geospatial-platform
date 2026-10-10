@@ -208,7 +208,7 @@ export default function ArchitectureResearchPanel({
 
       {isOpen && (
         <div className="border-t border-slate-200">
-          <form onSubmit={submitFilters} className="grid gap-3 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5 sm:px-6">
+          <form onSubmit={submitFilters} className="grid gap-3 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-6 sm:px-6">
             <label className="min-w-0 text-xs font-medium text-slate-700">
               Search styles, features, colours
               <input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
@@ -236,6 +236,15 @@ export default function ArchitectureResearchPanel({
                 <option value="all">Images and videos</option>
                 <option value="image">Image / project</option>
                 <option value="video">Video</option>
+              </select>
+            </label>
+            <label className="min-w-0 text-xs font-medium text-slate-700">
+              Reuse status
+              <select value={filters.usage} onChange={(event) => setFilters((current) => ({ ...current, usage: event.target.value as Filters["usage"] }))}
+                className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                <option value="all">All rights statuses</option>
+                <option value="open">Open-licence candidates</option>
+                <option value="research-only">Research-only / permissions unclear</option>
               </select>
             </label>
             <div className="flex items-end gap-2">
@@ -307,10 +316,11 @@ export default function ArchitectureResearchPanel({
                   </div>
 
                   <div className="mt-auto space-y-3 pt-4">
-                    <button type="button" disabled={!canPreview}
+                    <button type="button" disabled={!canPreview || reference.mediaType === "video"}
                       onClick={() => onPreview(createArchitectureStylePreview(reference), reference.title)}
+                      title={reference.mediaType === "video" ? "Video references are for street context, not direct facade styling." : undefined}
                       className="w-full rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
-                      Preview style on selected building
+                      {reference.mediaType === "video" ? "Video context only" : "Preview style on selected building"}
                     </button>
                     <div className="flex flex-wrap gap-3 text-xs font-semibold">
                     <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Open source ↗</a>
