@@ -66,6 +66,16 @@ test("ignores malformed, duplicate and out-of-view road ways", () => {
   assert.deepEqual(normalized.map((road) => road.osmWayId), ["1"]);
 });
 
+test("includes connecting carriageways and pedestrian steps in the road vocabulary", () => {
+  const normalized = normalizeOverpassRoadElements([
+    { type: "way", id: 61, tags: { highway: "primary_link", name: "Main Road Connector" }, geometry: [{ lon: 90.405, lat: 23.75 }, { lon: 90.406, lat: 23.751 }] },
+    { type: "way", id: 62, tags: { highway: "steps", name: "Footpath Steps" }, geometry: [{ lon: 90.405, lat: 23.75 }, { lon: 90.406, lat: 23.751 }] },
+  ], defaultBounds);
+  assert.equal(normalized.length, 2);
+  assert.equal(normalized.find((road) => road.osmWayId === "61")?.roadClass, "arterial");
+  assert.equal(normalized.find((road) => road.osmWayId === "62")?.roadClass, "path");
+});
+
 test("uses explicit OSM width ahead of typical road-class widths", () => {
   const [road] = normalizeOverpassRoadElements([
     { type: "way", id: 50, tags: { highway: "residential", width: "5.5 m", layer: "1", bridge: "yes" }, geometry: [{ lon: 90.405, lat: 23.75 }, { lon: 90.406, lat: 23.751 }] },
