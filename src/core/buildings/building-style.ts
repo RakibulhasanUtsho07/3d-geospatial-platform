@@ -210,10 +210,6 @@ function readText(properties: BuildingProperties, keys: string[]): string {
   return "";
 }
 
-function validColor(value: unknown): value is string {
-  return typeof value === "string" && HEX_COLOR.test(value);
-}
-
 function choosePattern(
   properties: BuildingProperties,
   heightMeters: number,
