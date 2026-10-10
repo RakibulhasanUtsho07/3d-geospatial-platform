@@ -125,14 +125,19 @@ function parseLanes(value) {
 
 function getRoadVisualWidth(tags) {
   const explicitWidth = parseWidth(tags.width);
-  if (explicitWidth !== null) return Math.max(1, Math.min(explicitWidth, 24));
+  if (explicitWidth !== null) {
+    return { widthMeters: Math.max(1, Math.min(explicitWidth, 24)), widthSource: "tagged" };
+  }
   const highway = tags.highway;
   const lanes = parseLanes(tags.lanes);
   if (lanes !== null && lanes <= 8) {
     const inferred = lanes * (highway === "motorway" || highway === "trunk" ? 3.5 : 3);
-    return Math.max(1.2, Math.min(inferred, 24));
+    return { widthMeters: Math.max(1.2, Math.min(inferred, 24)), widthSource: "lanes-estimate" };
   }
-  return ROAD_WIDTHS[highway] ?? ROAD_WIDTHS.road;
+  return {
+    widthMeters: ROAD_WIDTHS[highway] ?? ROAD_WIDTHS.road,
+    widthSource: "highway-class-estimate",
+  };
 }
 
 function isValidCoordinate(point) {
@@ -179,6 +184,8 @@ export function normalizeOverpassRoadElements(elements, request) {
 
     const highway = item.tags.highway;
     const name = safeText(item.tags.name ?? item.tags["name:en"] ?? item.tags.ref, 140);
+    const widthInfo = getRoadVisualWidth(item.tags);
+    const layerValue = finiteNumber(item.tags.layer);
     roads.push({
       id: "osm-road-" + String(id),
       osmWayId: String(id),
@@ -188,7 +195,9 @@ export function normalizeOverpassRoadElements(elements, request) {
       surface: safeText(item.tags.surface, 60),
       lanes: parseLanes(item.tags.lanes),
       maxSpeed: safeText(item.tags.maxspeed, 32),
-      widthMeters: getRoadVisualWidth(item.tags),
+      widthMeters: widthInfo.widthMeters,
+      widthSource: widthInfo.widthSource,
+      layer: layerValue !== null && layerValue >= -5 && layerValue <= 5 ? layerValue : null,
       bridge: item.tags.bridge === "yes",
       tunnel: item.tags.tunnel === "yes",
       oneway: item.tags.oneway === "yes" || item.tags.oneway === "1",
