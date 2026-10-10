@@ -40,7 +40,7 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 ### Road geometry and architecture research implementation
 
-- The default **Detailed OSM roads** layer draws viewport-clipped vector road geometry from OpenStreetMap, with mapped road names/classes, tagged or estimated width, surface colours, bridge/tunnel hints and an OSM way details panel. If width or elevation tags are absent, those visual properties are estimates, not a survey.
+- The default **Detailed OSM roads** layer draws viewport-clipped vector road geometry from OpenStreetMap, with mapped road names/classes (including connector ramps and steps), tagged or estimated width, surface colours, bridge/tunnel hints and an OSM way details panel. If width or elevation tags are absent, those visual properties are estimates, not a survey.
 - Select an Overture building, then use **Dhaka Architecture Library** to inspect source images (Wikimedia Commons previews only for CC BY/CC BY-SA candidate records) and embedded YouTube street-context videos. Source pages with unclear image reuse rights remain link-only.
 - **Apply & save to this building** saves a chosen facade/roof profile against the selected Overture feature ID in this browser. Named research may affect procedural wall texture and, where metadata is unambiguous, rendered height/storey estimate; source-reported built area and metadata are shown separately in Building Details. This is a user-confirmed visual association, not automatically verified identity or a photogrammetry model.
 - Broad skyline, panorama and multi-building-cluster references are blocked from assignment to an individual footprint. Mixed-wing house descriptions are not collapsed into one floor count.
