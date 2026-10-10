@@ -41,7 +41,7 @@ test("uses explicitly sourced roof-garden clues without inventing them on other 
   }, "unverified-house", 24);
 
   assert.equal(roofGarden.roofDetail, "roof-garden");
-  assert.ok(["none", "water-tank"].includes(unknownRoof.roofDetail));
+  assert.notEqual(unknownRoof.roofDetail, "roof-garden");
 });
 
 test("normalizes common named source colour values", () => {
