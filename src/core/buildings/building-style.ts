@@ -130,7 +130,7 @@ function resolveResearchPalette(
     };
   }
 
-  if (/painted.*blue.*ochre|blue.*ochre|mugda-painted/.test(family)) {
+  if (/painted.*(?:blue|ochre)|painted-mid-rise|blue.*ochre|mugda-painted/.test(family)) {
     return {
       id: "research-painted-blue-ochre",
       facade: "#2f6c96",
