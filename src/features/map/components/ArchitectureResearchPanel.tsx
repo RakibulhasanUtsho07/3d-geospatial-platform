@@ -86,6 +86,17 @@ function formatMetadata(metadata: Record<string, unknown> | undefined): string[]
     .map(([key, value]) => readableName(key) + ": " + String(value));
 }
 
+function videoIdFromEmbedUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const match = url.pathname.match(/^\\/embed\\/([A-Za-z0-9_-]{11})$/);
+    return url.protocol === "https:" && url.hostname === "www.youtube-nocookie.com" ? match?.[1] ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
 function locationMapUrl(reference: ArchitectureResearchReference): string | null {
   if (
     typeof reference.latitude !== "number" ||
@@ -313,6 +324,49 @@ export default function ArchitectureResearchPanel({
                   </div>
                   <h3 className="mt-3 break-words text-sm font-semibold leading-5 text-slate-900">{reference.title}</h3>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{reference.sourceName ?? "Source page"} · {reference.locationText}</p>
+                  {reference.mediaPreviewKind === "image" && reference.mediaPreviewUrl && (
+                    <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-lg border border-slate-200 bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={"Open original image source for " + reference.title}>
+                      {/* Direct third-party Commons preview; image bytes are never copied into this repository. */}
+                      <div className="relative aspect-[4/3] w-full bg-slate-100">
+                        <img
+                          src={reference.mediaPreviewUrl}
+                          alt={"Reference image preview: " + reference.title}
+                          loading="lazy"
+                          className="h-full w-full object-contain"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    </a>
+                  )}
+                  {reference.mediaPreviewKind === "video" && videoIdFromEmbedUrl(reference.mediaPreviewUrl) && (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-black">
+                      <div className="aspect-video">
+                        <iframe
+                          title={"Video context: " + reference.title}
+                          src={reference.mediaPreviewUrl ?? undefined}
+                          loading="lazy"
+                          referrerPolicy="strict-origin-when-cross-origin"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          className="h-full w-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {reference.mediaType === "image" && !reference.mediaPreviewUrl && (
+                    <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 flex aspect-[4/1] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-xs font-medium text-blue-800 underline underline-offset-4">
+                      Open source photo / project gallery
+                    </a>
+                  )}
+                  {reference.mediaType === "video" && !reference.mediaPreviewUrl && (
+                    <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 flex aspect-[4/1] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-xs font-medium text-blue-800 underline underline-offset-4">
+                      Watch source video
+                    </a>
+                  )}
+
                   <p className="mt-2 break-words text-xs font-medium text-blue-800">{readableName(reference.designProfile.styleFamily)}</p>
 
                   <div className="mt-3 flex flex-wrap gap-1.5" aria-label={"Estimated design palette for " + reference.id}>
