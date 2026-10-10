@@ -5,9 +5,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
-import type { MapFeatureSelection } from "@/core/map-engine/types";
+import type {
+  MapFeatureSelection,
+  MapLayer,
+} from "@/core/map-engine/types";
 
 import MapControls from "./MapControls";
+import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
@@ -34,6 +38,7 @@ export default function MapCanvas() {
     useState<string | null>(null);
   const [selectedFeature, setSelectedFeature] =
     useState<MapFeatureSelection | null>(null);
+  const [layers, setLayers] = useState<MapLayer[]>([]);
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
@@ -52,6 +57,7 @@ export default function MapCanvas() {
 
     engineRef.current = engine;
     cameraRef.current = camera;
+    setLayers(engine.getLayers());
 
     let cancelled = false;
 
@@ -75,6 +81,8 @@ export default function MapCanvas() {
           engine.destroy();
           return;
         }
+
+        setLayers(engine.getLayers());
 
         /*
          * Explicitly position the camera over Dhaka after
@@ -188,6 +196,19 @@ export default function MapCanvas() {
     });
   }
 
+  function toggleLayerVisibility(
+    layerId: MapLayer["id"],
+    visible: boolean,
+  ) {
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+
+    engine.setLayerVisibility(layerId, visible);
+    setLayers(engine.getLayers());
+  }
+
   return (
     <div className="relative h-full min-h-[600px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       {/* This ref belongs to the same component as the initialization effect. */}
@@ -195,6 +216,14 @@ export default function MapCanvas() {
         ref={containerRef}
         className="absolute inset-0"
       />
+
+      {layers.length > 0 && (
+        <MapLayersPanel
+          layers={layers}
+          disabled={status !== "ready"}
+          onToggle={toggleLayerVisibility}
+        />
+      )}
 
       <MapControls
         disabled={status !== "ready"}

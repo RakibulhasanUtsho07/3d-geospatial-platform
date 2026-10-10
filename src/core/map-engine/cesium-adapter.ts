@@ -12,12 +12,14 @@ import {
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 
+import { MAP_LAYER_IDS } from "./types";
 import type {
   CameraTarget,
   MapEngine,
   MapEngineCapabilities,
   MapEngineState,
   MapLayer,
+  MapLayerId,
   MapFeatureSelection,
 } from "./types";
 
@@ -128,6 +130,11 @@ export class CesiumAdapter implements MapEngine {
 
   private overtureBuildings: CesiumDataSource | null = null;
 
+  private readonly layerVisibility = new Map<MapLayerId, boolean>([
+    [MAP_LAYER_IDS.baseImagery, true],
+    [MAP_LAYER_IDS.overtureBuildings, true],
+  ]);
+
   private clickHandler:
     | import("cesium").ScreenSpaceEventHandler
     | null = null;
@@ -237,6 +244,9 @@ export class CesiumAdapter implements MapEngine {
         viewer.imageryLayers.addImageryProvider(
           imageryProvider,
         );
+      this.baseImageryLayer.show = this.isLayerVisible(
+        MAP_LAYER_IDS.baseImagery,
+      );
 
       console.info("[Map] OpenStreetMap basemap initialized.");
     } catch (error: unknown) {
@@ -618,7 +628,9 @@ export class CesiumAdapter implements MapEngine {
       // Choose facade detail from the live camera, rather than a fixed Dhaka sort.
       this.updateBuildingLod(viewer, Cesium, true);
 
-      dataSource.show = true;
+      dataSource.show = this.isLayerVisible(
+        MAP_LAYER_IDS.overtureBuildings,
+      );
       viewer.scene.requestRender();
 
       if (previousDataSource && previousDataSource !== dataSource) {
@@ -859,7 +871,8 @@ export class CesiumAdapter implements MapEngine {
   ): void {
     if (
       this.viewer !== viewer ||
-      viewer.isDestroyed()
+      viewer.isDestroyed() ||
+      !this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings)
     ) {
       return;
     }
@@ -1924,20 +1937,61 @@ export class CesiumAdapter implements MapEngine {
     };
   }
 
-  addLayer(layer: MapLayer): void {
-    void layer;
+  private isLayerVisible(layerId: MapLayerId): boolean {
+    return this.layerVisibility.get(layerId) ?? true;
   }
 
-  removeLayer(layerId: string): void {
-    void layerId;
+  getLayers(): MapLayer[] {
+    return [
+      {
+        id: MAP_LAYER_IDS.baseImagery,
+        name: "Street map imagery",
+        visible: this.isLayerVisible(MAP_LAYER_IDS.baseImagery),
+      },
+      {
+        id: MAP_LAYER_IDS.overtureBuildings,
+        name: "Overture 3D buildings",
+        visible: this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+      },
+    ];
   }
 
-  setLayerVisibility(
-    layerId: string,
-    visible: boolean,
-  ): void {
-    void layerId;
-    void visible;
+  setLayerVisibility(layerId: MapLayerId, visible: boolean): void {
+    this.layerVisibility.set(layerId, visible);
+
+    if (layerId === MAP_LAYER_IDS.baseImagery) {
+      if (this.baseImageryLayer) {
+        this.baseImageryLayer.show = visible;
+      }
+    } else if (layerId === MAP_LAYER_IDS.overtureBuildings) {
+      if (this.overtureBuildings) {
+        this.overtureBuildings.show = visible;
+      }
+
+      if (!visible) {
+        // Do not keep fetching obsolete viewports while the building layer is hidden.
+        this.pendingViewportBounds = null;
+        this.pendingViewportFeatureLimit = null;
+        this.viewportRequestAbortController?.abort();
+      }
+    }
+
+    const viewer = this.viewer;
+    if (!viewer || viewer.isDestroyed()) {
+      return;
+    }
+
+    if (
+      layerId === MAP_LAYER_IDS.overtureBuildings &&
+      visible &&
+      this.cesium
+    ) {
+      // The camera may have moved while the layer was disabled.
+      this.handleCameraMoveEnd(viewer, this.cesium);
+      return;
+    }
+
+    viewer.scene.requestRender();
   }
 
   pickFeature(

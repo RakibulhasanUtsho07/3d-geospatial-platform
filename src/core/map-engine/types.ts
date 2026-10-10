@@ -40,8 +40,16 @@ export type MapEngineCapabilities = {
   featurePicking: boolean;
 };
 
+export const MAP_LAYER_IDS = {
+  baseImagery: "base-imagery",
+  overtureBuildings: "overture-buildings",
+} as const;
+
+export type MapLayerId =
+  (typeof MAP_LAYER_IDS)[keyof typeof MAP_LAYER_IDS];
+
 export type MapLayer = {
-  id: string;
+  id: MapLayerId;
   name: string;
   visible: boolean;
 };
@@ -82,13 +90,9 @@ export interface MapEngine {
 
   getCapabilities(): MapEngineCapabilities;
 
-  addLayer(layer: MapLayer): void;
-  removeLayer(layerId: string): void;
+  getLayers(): MapLayer[];
 
-  setLayerVisibility(
-    layerId: string,
-    visible: boolean,
-  ): void;
+  setLayerVisibility(layerId: MapLayerId, visible: boolean): void;
 
   pickFeature(
     screenX: number,
