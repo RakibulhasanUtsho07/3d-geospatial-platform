@@ -97,3 +97,9 @@ export interface ArchitectureStylePreview {
 export function createArchitectureStylePreview(
   reference: ArchitectureResearchReference,
 ): ArchitectureStylePreview;
+export interface ArchitectureMediaPreview {
+  mediaPreviewUrl: string | null;
+  mediaPreviewKind: "image" | "video" | null;
+}
+
+export function resolveArchitectureMediaPreview(reference: ArchitectureResearchReference): ArchitectureMediaPreview;
