@@ -131,6 +131,10 @@ export function createArchitectureStylePreview(reference) {
   const roofFeatures = Array.isArray(profile.roofFeatures) ? profile.roofFeatures : [];
   const features = facadeFeatures.join(" ").toLowerCase();
   const roofDescription = roofFeatures.join(" ").toLowerCase();
+  const buildingMetadataText = reference?.reportedBuildingMetadata && typeof reference.reportedBuildingMetadata === "object"
+    ? JSON.stringify(reference.reportedBuildingMetadata).toLowerCase()
+    : "";
+  const roofEvidence = roofDescription + " " + buildingMetadataText;
   const colors = Array.isArray(profile.colorPalette) ? profile.colorPalette : [];
   const paletteNames = colors.map((swatch) => String(swatch?.name ?? "")).join(" ").toLowerCase();
   const materialHints = family + " " + features + " " + paletteNames;
@@ -169,8 +173,8 @@ export function createArchitectureStylePreview(reference) {
   const hasLouvres = /louvre|louver|sunshade|sun-shading|vertical shade/.test(features);
   const hasGrilles = /grille|grilled|grill/.test(features);
   const hasBalconies = /balcon|terrace/.test(features);
-  const hasRoofGarden = /garden|green zone|green roof|landscaped terrace/.test(roofDescription + " " + String(profile.reconstructionUse ?? "").toLowerCase());
-  const hasRoofTerrace = /terrace|deck|seating/.test(roofDescription);
+  const hasRoofGarden = /rooftop garden|roof garden|green roof|shared rooftop green|roof garden and|rooftop.*green zone/.test(roofEvidence);
+  const hasRoofTerrace = /roof.?terrace|roof.?deck|shared rooftop space|landscaped terrace/.test(roofEvidence);
   const isVideoContext = reference?.mediaType === "video";
 
   return {
