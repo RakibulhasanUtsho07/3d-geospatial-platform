@@ -1,0 +1,547 @@
+{
+  "schemaVersion": 1,
+  "systemId": "dhaka-architecture-and-geospatial-ui-design-system",
+  "researchedAt": "2026-10-10",
+  "status": "research-proposal-for-implementation-review",
+  "scope": "Consolidate all earlier 33 source records with building typology, estimated facade colors, source/location confidence, map/product UI tokens, rendering colors, and evidence/licensing rules.",
+  "sourceCataloguePath": "data/research/dhaka-building-reference-catalog.json",
+  "documentationPath": "docs/research/DHAKA-ARCHITECTURE-AND-UI-DESIGN-SYSTEM.md",
+  "researchSources": [
+    {
+      "title": "Dwelling Morphology of Courtyard Houses in Old Dhaka",
+      "url": "https://www.duet.ac.bd/storage/journal/volume-8-issue-1-2-december-2022%2813-23%29-1678357453.pdf",
+      "relevance": "Survey-based research on courtyard layouts and changing spatial organization in Shakhari Bazar and Tantibazar."
+    },
+    {
+      "title": "Preserving Urban Roots: The Case of Shakhari Bazaar",
+      "url": "https://ph01.tci-thaijo.org/index.php/nakhara/article/view/104875",
+      "relevance": "Heritage conservation and historic urban-block context."
+    },
+    {
+      "title": "Changing Morphology and Emerging Pattern: Tanti Bazar",
+      "url": "https://www.researchgate.net/publication/354821449_Changing_Morphology_and_the_Emerging_Pattern_of_a_Traditional_City_A_Case_of_Tanti_Bazar_Area_in_Old_Dhaka",
+      "relevance": "Shop-house transformations into multi-level rentable retail/wholesale facilities."
+    },
+    {
+      "title": "Multicourtyard Mansion of Old Dhaka",
+      "url": "https://www.researchgate.net/publication/396516227_Multicourtyard_Mansion_of_Old_Dhaka",
+      "relevance": "European/classical facade elements combined with local courtyard-centered spatial planning."
+    },
+    {
+      "title": "Height-responsive balcony-integrated envelopes in Dhaka's hot-humid climate",
+      "url": "https://doi.org/10.15627/jd.2025.24",
+      "relevance": "Balcony geometry, shading, daylight, glare, thermal comfort and energy-use trade-offs."
+    },
+    {
+      "title": "Karim Residence",
+      "url": "https://archfieldbd.com/karim-residence/",
+      "relevance": "Architect-reported green façade, planter beds, large openings, cross-ventilation and roof gardens."
+    },
+    {
+      "title": "Bo Metta",
+      "url": "https://archfieldbd.com/bo-metta/",
+      "relevance": "Banani DOHS project with balconies, brick cladding, metal railings and planting."
+    },
+    {
+      "title": "Chowdhury Residence",
+      "url": "https://www.archnet.org/sites/282",
+      "relevance": "Bashirul Haq modernist brick residence, L-shaped lower massing and upper volume."
+    },
+    {
+      "title": "Rose Garden Palace (historical report)",
+      "url": "https://www.prothomalo.com/bangladesh/%E0%A6%87%E0%A6%A4%E0%A6%BF%E0%A6%B9%E0%A6%BE%E0%A6%B8%E0%A7%87%E0%A6%B0-%E0%A6%B0%E0%A7%8B%E0%A6%9C-%E0%A6%97%E0%A6%BE%E0%A6%B0%E0%A7%8D%E0%A6%A1%E0%A7%87%E0%A6%A8",
+      "relevance": "Reported Tikatuli location, two-storey building, approximate dimensions and decorative façade details."
+    },
+    {
+      "title": "Overture Buildings schema",
+      "url": "https://docs.overturemaps.org/schema/reference/buildings/building/",
+      "relevance": "Footprints, height, floors and building parts support approximate 3D massing."
+    },
+    {
+      "title": "Overture BuildingPart schema",
+      "url": "https://docs.overturemaps.org/schema/reference/buildings/building_part/",
+      "relevance": "Building-part height/floors, min height/floor, façade colour/material and roof material/shape/colour fields."
+    },
+    {
+      "title": "OpenStreetMap building:colour tag",
+      "url": "https://wiki.openstreetmap.org/wiki/Key:building:colour",
+      "relevance": "Hex-coded facade colour can be tagged for 3D renderers, but colour-name interpretation varies."
+    },
+    {
+      "title": "KartaView terms",
+      "url": "https://kartaview.org/terms",
+      "relevance": "Street imagery and 3D spatial data CC BY-SA 4.0; credit © Grab and KartaView Contributors."
+    },
+    {
+      "title": "Mapillary CC BY-SA guidance",
+      "url": "https://help.mapillary.com/hc/en-us/articles/115001770409-CC-BY-SA-license-for-open-data",
+      "relevance": "Contributor imagery available under CC BY-SA with attribution and license conditions."
+    }
+  ],
+  "appUi": {
+    "goals": [
+      "Map-first and information-rich",
+      "Blue/white/light-grey base suited to technical geospatial application",
+      "Clear separation between observed, estimated and unverified property/building facts",
+      "Accessible contrast and keyboard-visible focus",
+      "Do not use a building's estimated facade colour to imply ownership, quality or safety"
+    ],
+    "typography": {
+      "fontStack": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+      "scalePx": {
+        "caption": 12,
+        "small": 13,
+        "body": 14,
+        "bodyLarge": 16,
+        "section": 18,
+        "pageTitle": 24,
+        "hero": 32
+      },
+      "lineHeight": {
+        "compact": 1.25,
+        "body": 1.5,
+        "relaxed": 1.65
+      }
+    },
+    "radiiPx": {
+      "small": 6,
+      "control": 8,
+      "card": 12,
+      "largePanel": 16,
+      "pill": 999
+    },
+    "spacingPx": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 24,
+      "xxl": 32
+    },
+    "light": {
+      "background": "#F8FAFC",
+      "panel": "#FFFFFF",
+      "panelMuted": "#F1F5F9",
+      "panelRaised": "#FFFFFF",
+      "text": "#0F172A",
+      "textSecondary": "#475569",
+      "textMuted": "#64748B",
+      "border": "#CBD5E1",
+      "borderStrong": "#94A3B8",
+      "primary": "#2563EB",
+      "primaryHover": "#1D4ED8",
+      "primarySoft": "#DBEAFE",
+      "accent": "#0891B2",
+      "focusRing": "#0EA5E9",
+      "success": "#15803D",
+      "successSoft": "#DCFCE7",
+      "warning": "#B45309",
+      "warningSoft": "#FEF3C7",
+      "danger": "#B91C1C",
+      "dangerSoft": "#FEE2E2",
+      "disabled": "#E2E8F0",
+      "mapBuildingDefault": "#A9B7C8",
+      "mapBuildingSelected": "#2563EB",
+      "mapBuildingHighlighted": "#06B6D4",
+      "mapFootprintOutline": "#334155",
+      "mapParcelOrBounds": "#64748B",
+      "mapRoad": "#E5E7EB",
+      "mapWater": "#BDE7F3",
+      "mapVegetation": "#A8D5AE",
+      "mapUnknown": "#94A3B8"
+    },
+    "dark": {
+      "background": "#0B1220",
+      "panel": "#111827",
+      "panelMuted": "#1F2937",
+      "panelRaised": "#253245",
+      "text": "#F8FAFC",
+      "textSecondary": "#CBD5E1",
+      "textMuted": "#94A3B8",
+      "border": "#334155",
+      "borderStrong": "#475569",
+      "primary": "#60A5FA",
+      "primaryHover": "#93C5FD",
+      "primarySoft": "#1E3A8A",
+      "accent": "#22D3EE",
+      "focusRing": "#38BDF8",
+      "success": "#4ADE80",
+      "successSoft": "#14532D",
+      "warning": "#FBBF24",
+      "warningSoft": "#78350F",
+      "danger": "#F87171",
+      "dangerSoft": "#7F1D1D",
+      "disabled": "#334155",
+      "mapBuildingDefault": "#64748B",
+      "mapBuildingSelected": "#60A5FA",
+      "mapBuildingHighlighted": "#22D3EE",
+      "mapFootprintOutline": "#CBD5E1",
+      "mapParcelOrBounds": "#94A3B8",
+      "mapRoad": "#263445",
+      "mapWater": "#164E63",
+      "mapVegetation": "#166534",
+      "mapUnknown": "#475569"
+    },
+    "semanticMapLegend": [
+      {
+        "key": "building-default",
+        "label": "Building footprint/standard 3D mass",
+        "colorToken": "mapBuildingDefault"
+      },
+      {
+        "key": "building-selected",
+        "label": "Selected building",
+        "colorToken": "mapBuildingSelected"
+      },
+      {
+        "key": "building-highlighted",
+        "label": "Search result / hover highlight",
+        "colorToken": "mapBuildingHighlighted"
+      },
+      {
+        "key": "verified-data",
+        "label": "Source-verified record",
+        "colorToken": "success"
+      },
+      {
+        "key": "estimated-data",
+        "label": "Estimated model/data",
+        "colorToken": "warning"
+      },
+      {
+        "key": "unverified-data",
+        "label": "Unresolved source/building match",
+        "colorToken": "textMuted"
+      }
+    ],
+    "propertyCategoryColors": {
+      "propertyListing": "#2563EB",
+      "pharmacy": "#0D9488",
+      "hospital": "#DC2626",
+      "clinicMedicalCentre": "#7C3AED",
+      "supermarket": "#D97706",
+      "marketBazaar": "#A16207",
+      "transportOrRoad": "#64748B"
+    },
+    "uiComponents": {
+      "topBar": "white/light panel with primary-blue actions; sticky at desktop, compact on small screen",
+      "mapCanvas": "dominant canvas; panels should not cover selected feature or navigation controls",
+      "leftSearchPanel": "search and quick filters, avoid more than two levels of nesting",
+      "buildingDetailsPanel": "location/source first, dimensional estimates next, imagery references and 3D confidence clearly separated",
+      "imageryGallery": "each source shows author/source, licence, capture date, location precision and confidence; no unlabeled copyrighted media",
+      "confidenceBadge": "text label + icon, not color alone",
+      "colorSwatches": "always display hex and mark sampled vs estimated",
+      "loadingState": "skeleton or small spinner; preserve map interaction where possible",
+      "errors": "human-readable error and retry action; do not rely on red alone"
+    },
+    "accessibility": {
+      "rules": [
+        "Text/icon contrast target 4.5:1 for normal text and 3:1 for large text/UI boundaries; run automated contrast checks before implementation.",
+        "Colour is never the only signal for selected, verified, warning or error state.",
+        "Use visible keyboard focus and accessible labels for map controls.",
+        "Ensure labels, attribution and image licence are legible on both light and dark panels."
+      ],
+      "note": "Tokens are a proposed palette; automated contrast and actual component-state testing are still required before claiming WCAG conformance."
+    }
+  },
+  "architecturePalettes": [
+    {
+      "id": "modern-white-glass",
+      "name": "Contemporary white, concrete and glass",
+      "hex": [
+        "#F1F0EA",
+        "#D0D0C8",
+        "#91A8B5",
+        "#414A50",
+        "#4A774F"
+      ],
+      "bestFit": [
+        "R09",
+        "R21",
+        "R22",
+        "R26",
+        "R27",
+        "R28"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "brick-biophilic",
+      "name": "Brick, pale concrete and tropical greenery",
+      "hex": [
+        "#A35338",
+        "#B5B0A5",
+        "#8FA8B0",
+        "#3B7544",
+        "#414748"
+      ],
+      "bestFit": [
+        "R23",
+        "R24",
+        "R25",
+        "R29"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "painted-blue-ochre",
+      "name": "Blue and ochre painted facade",
+      "hex": [
+        "#2F6C96",
+        "#D8B044",
+        "#D8D4C9",
+        "#29363D"
+      ],
+      "bestFit": [
+        "R02"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "old-dhaka-weathered-courtyard",
+      "name": "Weathered ochre, aged plaster and courtyard green",
+      "hex": [
+        "#B29A5F",
+        "#C5B18C",
+        "#2D634E",
+        "#3F6E3D",
+        "#352F2A"
+      ],
+      "bestFit": [
+        "R07",
+        "R08",
+        "R18",
+        "V01",
+        "V02",
+        "V03"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "heritage-white-mansion",
+      "name": "Ivory mansion and garden green",
+      "hex": [
+        "#F1EFE7",
+        "#D9D3C7",
+        "#625D55",
+        "#3E6B43"
+      ],
+      "bestFit": [
+        "R19"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "legacy-red-brick-modernist",
+      "name": "Fair-faced red brick and exposed concrete",
+      "hex": [
+        "#9A4D34",
+        "#C7C1B4",
+        "#30383C",
+        "#426941"
+      ],
+      "bestFit": [
+        "R25",
+        "R20"
+      ],
+      "status": "estimated palette"
+    },
+    {
+      "id": "dense-dhaka-skyline",
+      "name": "Concrete-grey skyline",
+      "hex": [
+        "#E7E8E4",
+        "#B8C0C5",
+        "#C7B8A5",
+        "#55734E"
+      ],
+      "bestFit": [
+        "R01",
+        "R06",
+        "R10",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "status": "estimated palette"
+    }
+  ],
+  "locationClusters": [
+    {
+      "id": "old-dhaka-heritage-core",
+      "label": "Old Dhaka heritage core",
+      "places": [
+        "Shakhari Bazar",
+        "Tantibazar",
+        "Shyambazar",
+        "Rankin Street",
+        "Shree Shash Lane",
+        "KM Das Lane / Tikatuli"
+      ],
+      "relatedReferenceIds": [
+        "R07",
+        "R08",
+        "R18",
+        "R19",
+        "V01",
+        "V02",
+        "V03"
+      ],
+      "urbanFormHypothesis": [
+        "narrow interlinked lanes",
+        "courtyard houses and multi-courtyard mansions",
+        "historic shop-house/frontage mix",
+        "strong adjacency and partial party walls"
+      ],
+      "locationPrecision": "street/neighbourhood for some sources; confirm each building polygon before modelling"
+    },
+    {
+      "id": "gulshan-banani",
+      "label": "Gulshan and Banani / Banani DOHS",
+      "places": [
+        "Gulshan-1",
+        "Gulshan",
+        "Gulshan-2",
+        "Banani Model Town",
+        "Banani DOHS"
+      ],
+      "relatedReferenceIds": [
+        "R05",
+        "R10",
+        "R13",
+        "R16",
+        "R17",
+        "R23",
+        "R24",
+        "R26",
+        "R29",
+        "V04"
+      ],
+      "urbanFormHypothesis": [
+        "mix of private houses and multi-storey apartments",
+        "balconies and landscaped setbacks in selected projects",
+        "some sources include vine-covered/biophilic facades"
+      ],
+      "locationPrecision": "mixed: some camera viewpoints or project names, many exact footprints still unverified"
+    },
+    {
+      "id": "bashundhara-ra",
+      "label": "Bashundhara Residential Area",
+      "places": [
+        "Block L / Road 40",
+        "Block M / Road 18/19 / 10th Avenue",
+        "Block I / Road 6/7"
+      ],
+      "relatedReferenceIds": [
+        "R09",
+        "R21",
+        "R22",
+        "R27",
+        "R28"
+      ],
+      "urbanFormHypothesis": [
+        "contemporary apartment and condominium projects",
+        "repeated window/balcony rhythms",
+        "some projects report roof gardens, pools, lobby/parking/service levels"
+      ],
+      "locationPrecision": "project address stated by architect/developer; must be geocoded and matched before attaching imagery"
+    },
+    {
+      "id": "azimpur-lalbagh",
+      "label": "Azimpur and Lalbagh",
+      "places": [
+        "Azimpur",
+        "Lalbagh Kella Road"
+      ],
+      "relatedReferenceIds": [
+        "R14"
+      ],
+      "urbanFormHypothesis": [
+        "multi-storey residential blocks"
+      ],
+      "locationPrecision": "neighbourhood level, current condition may differ from the photo date"
+    },
+    {
+      "id": "mugda",
+      "label": "Mugda",
+      "places": [
+        "Mugda"
+      ],
+      "relatedReferenceIds": [
+        "R02"
+      ],
+      "urbanFormHypothesis": [
+        "painted mid-rise residential facade with repeated openings"
+      ],
+      "locationPrecision": "neighbourhood level"
+    },
+    {
+      "id": "uttara",
+      "label": "Uttara",
+      "places": [
+        "Uttara"
+      ],
+      "relatedReferenceIds": [
+        "R03"
+      ],
+      "urbanFormHypothesis": [
+        "residential building reference, typology pending visual review"
+      ],
+      "locationPrecision": "neighbourhood only; named building not yet resolved"
+    },
+    {
+      "id": "banasree",
+      "label": "Banasree",
+      "places": [
+        "Banasree"
+      ],
+      "relatedReferenceIds": [
+        "R04"
+      ],
+      "urbanFormHypothesis": [
+        "apartment rental and street-frontage context"
+      ],
+      "locationPrecision": "listing page/area, exact building match not confirmed"
+    },
+    {
+      "id": "dhanmondi",
+      "label": "Dhanmondi",
+      "places": [
+        "Dhanmondi Lake"
+      ],
+      "relatedReferenceIds": [
+        "R15",
+        "R20"
+      ],
+      "urbanFormHypothesis": [
+        "lake-edge context in one source; historical duplex typology in another"
+      ],
+      "locationPrecision": "district/neighbourhood, separate building identity required"
+    },
+    {
+      "id": "citywide-context",
+      "label": "Citywide Dhaka views",
+      "places": [
+        "unspecified"
+      ],
+      "relatedReferenceIds": [
+        "R01",
+        "R06",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "urbanFormHypothesis": [
+        "dense mid-rise/high-rise fabric and mixed building height"
+      ],
+      "locationPrecision": "context-only unless the photo metadata provides a camera viewpoint"
+    }
+  ],
+  "evidencePolicy": {
+    "palette": "Every hex value attached to a photo/project is an estimated design colour unless pixel extraction and image provenance are explicitly recorded. It is not a measured paint/manufacturer colour.",
+    "location": "Keep locationText, coordinates if provided, location source, precision level, and building-match confidence separately. A photo GPS point can be a camera location, not the photographed building centroid.",
+    "projectInfo": "Architect/developer pages describe design intent/project programme; distinguish these from independent survey, current as-built verification, property availability and official cadastral data.",
+    "copyright": "Source accessibility does not imply reuse permission. CC BY and CC BY-SA media require the particular licence's attribution/ShareAlike terms; editorial, property-listing, developer and architecture-site media remain research-only unless permission is clear.",
+    "reconstruction": "Preserve source footprint, imagery reference, inferred facade parameters and output mesh as linked but separate records. Low-confidence inference must not overwrite source geometry."
+  }
+}
