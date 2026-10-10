@@ -3,7 +3,7 @@
   "catalogueId": "dhaka-building-image-video-research",
   "researchedAt": "2026-10-10",
   "purpose": "Reference catalogue for the 3D Geospatial Platform's building visualisation and future reconstruction work.",
-  "completeness": "Expanded curated starter set; not a complete inventory of Dhaka buildings and not a uniform reusable-media collection.",
+  "completeness": "Expanded consolidated research catalogue, not a complete Dhaka-building inventory. Some records refer to the same design/building or broad urban context; validate identities and locations before linking to map footprints.",
   "assetPolicy": "Store source metadata and links only. Do not bundle or redistribute media unless its individual licence/permission is checked.",
   "references": [
     {
@@ -29,7 +29,45 @@
         "single viewpoint",
         "individual buildings not all identified",
         "no exact dimensions or floor plans"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "dense-high-rise-residential-context",
+        "colorPalette": [
+          {
+            "name": "concrete-light-grey",
+            "hex": "#D9D9D4"
+          },
+          {
+            "name": "aged-white",
+            "hex": "#EEECE5"
+          },
+          {
+            "name": "shadow-slate",
+            "hex": "#555C61"
+          },
+          {
+            "name": "urban-green",
+            "hex": "#4B684A"
+          }
+        ],
+        "facadeFeatures": [
+          "varied high-rise silhouettes",
+          "repetitive window fields",
+          "tight urban spacing"
+        ],
+        "roofFeatures": [
+          "not fully resolved from one viewpoint"
+        ],
+        "siteContext": [
+          "skyline density",
+          "relative height comparison"
+        ],
+        "locationPrecision": "viewpoint-level, not building centroids",
+        "paletteConfidence": "low-to-medium visual estimate",
+        "reconstructionUse": "urban-density and massing context only"
+      },
+      "locationConfidence": "viewpoint-level, not building centroids",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R02",
@@ -53,7 +91,44 @@
       "limitations": [
         "single near-frontal view",
         "hidden elevations not visible"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "painted-mid-rise-apartment",
+        "colorPalette": [
+          {
+            "name": "facade-blue",
+            "hex": "#2F6C96"
+          },
+          {
+            "name": "ochre-yellow",
+            "hex": "#D8B044"
+          },
+          {
+            "name": "window-shadow",
+            "hex": "#29363D"
+          },
+          {
+            "name": "concrete-trim",
+            "hex": "#D8D4C9"
+          }
+        ],
+        "facadeFeatures": [
+          "repeating windows and balconies",
+          "strong blue/yellow facade zoning",
+          "symmetrical bay rhythm"
+        ],
+        "roofFeatures": [
+          "not confirmed"
+        ],
+        "siteContext": [
+          "Mugda residential area"
+        ],
+        "locationPrecision": "neighbourhood-level",
+        "paletteConfidence": "medium visual estimate from source preview/title",
+        "reconstructionUse": "facade repetition and color-zone template"
+      },
+      "locationConfidence": "neighbourhood-level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R03",
@@ -74,7 +149,42 @@
       ],
       "limitations": [
         "file title alone does not verify building identity, use, storey count or exact location"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Uttara-residential-building-unresolved",
+        "colorPalette": [
+          {
+            "name": "warm-concrete",
+            "hex": "#C9C4B9"
+          },
+          {
+            "name": "off-white",
+            "hex": "#E9E5DC"
+          },
+          {
+            "name": "dark-glazing",
+            "hex": "#35414A"
+          },
+          {
+            "name": "shadow",
+            "hex": "#656767"
+          }
+        ],
+        "facadeFeatures": [
+          "building reference only; inspect source photo before interpreting details"
+        ],
+        "roofFeatures": [
+          "unknown"
+        ],
+        "siteContext": [
+          "Uttara area"
+        ],
+        "locationPrecision": "neighbourhood-level; precise building match unverified",
+        "paletteConfidence": "low visual estimate",
+        "reconstructionUse": "candidate only; manual visual review required"
+      },
+      "locationConfidence": "neighbourhood-level; precise building match unverified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R04",
@@ -99,7 +209,45 @@
       "limitations": [
         "listing metadata is not independently verified measurement",
         "image reuse rights not established"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "rental-apartment-street-facade",
+        "colorPalette": [
+          {
+            "name": "painted-plaster",
+            "hex": "#D7CFC1"
+          },
+          {
+            "name": "metal-grille",
+            "hex": "#41464B"
+          },
+          {
+            "name": "road-grey",
+            "hex": "#767873"
+          },
+          {
+            "name": "utility-shadow",
+            "hex": "#363B3E"
+          }
+        ],
+        "facadeFeatures": [
+          "stacked apartment floors",
+          "balcony/grille treatments",
+          "street-facing openings"
+        ],
+        "roofFeatures": [
+          "not established"
+        ],
+        "siteContext": [
+          "Banasree rental listing context",
+          "narrow street / overhead utilities described in initial review"
+        ],
+        "locationPrecision": "neighbourhood and listing-level; specific building-to-listing match uncertain",
+        "paletteConfidence": "low; commercial listing image not sampled",
+        "reconstructionUse": "research-only facade typology, no image reuse without permission"
+      },
+      "locationConfidence": "neighbourhood and listing-level; specific building-to-listing match uncertain",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R05",
@@ -122,7 +270,44 @@
       ],
       "limitations": [
         "photo alone cannot verify construction materials or exact building identity"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Banani-DOHS-residential-street",
+        "colorPalette": [
+          {
+            "name": "brick-like-warm",
+            "hex": "#9D6048"
+          },
+          {
+            "name": "plaster-cream",
+            "hex": "#E7E0D4"
+          },
+          {
+            "name": "railing-charcoal",
+            "hex": "#42474A"
+          },
+          {
+            "name": "tree-green",
+            "hex": "#386543"
+          }
+        ],
+        "facadeFeatures": [
+          "multi-storey frontage",
+          "balcony projections",
+          "warm facade treatment"
+        ],
+        "roofFeatures": [
+          "unknown"
+        ],
+        "siteContext": [
+          "Banani DOHS; tree-lined street"
+        ],
+        "locationPrecision": "neighbourhood/listing level",
+        "paletteConfidence": "low-to-medium visual estimate",
+        "reconstructionUse": "streetscape reference only unless building identity confirmed"
+      },
+      "locationConfidence": "neighbourhood/listing level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R06",
@@ -146,7 +331,44 @@
       "limitations": [
         "editorial context image",
         "no exact geolocation for visible buildings"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "dense-midrise-urban-cluster",
+        "colorPalette": [
+          {
+            "name": "off-white-blocks",
+            "hex": "#E7E8E4"
+          },
+          {
+            "name": "cool-grey",
+            "hex": "#B8C0C5"
+          },
+          {
+            "name": "faded-beige",
+            "hex": "#C7B8A5"
+          },
+          {
+            "name": "street-green",
+            "hex": "#55734E"
+          }
+        ],
+        "facadeFeatures": [
+          "closely spaced mid-rise blocks",
+          "varied facades",
+          "rooftop variations"
+        ],
+        "roofFeatures": [
+          "varied/partly visible"
+        ],
+        "siteContext": [
+          "dense Dhaka urban morphology"
+        ],
+        "locationPrecision": "city-level, exact blocks unknown",
+        "paletteConfidence": "low visual estimate",
+        "reconstructionUse": "city-scale contextual massing only"
+      },
+      "locationConfidence": "city-level, exact blocks unknown",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R07",
@@ -170,7 +392,43 @@
       "limitations": [
         "not a surveyed drawing",
         "precise age and dimensions need authoritative evidence"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-heritage-facade",
+        "colorPalette": [
+          {
+            "name": "historic-brick",
+            "hex": "#9B543C"
+          },
+          {
+            "name": "aged-plaster",
+            "hex": "#C5B49A"
+          },
+          {
+            "name": "dark-wood",
+            "hex": "#5E4636"
+          },
+          {
+            "name": "shadow",
+            "hex": "#352F2A"
+          }
+        ],
+        "facadeFeatures": [
+          "arched openings",
+          "ornamental brick/parapet details"
+        ],
+        "roofFeatures": [
+          "decorative parapet reported/visible in reference"
+        ],
+        "siteContext": [
+          "Rankin Street, Old Dhaka"
+        ],
+        "locationPrecision": "street-level landmark context; exact footprint match not independently confirmed",
+        "paletteConfidence": "medium-low estimate",
+        "reconstructionUse": "heritage facade typology; hidden sides remain unknown"
+      },
+      "locationConfidence": "street-level landmark context; exact footprint match not independently confirmed",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R08",
@@ -203,7 +461,44 @@
       ],
       "limitations": [
         "avoid inferring full geometry from a single image"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-multi-courtyard-mansion",
+        "colorPalette": [
+          {
+            "name": "aged-plaster",
+            "hex": "#C8BDA7"
+          },
+          {
+            "name": "wood-brown",
+            "hex": "#674B37"
+          },
+          {
+            "name": "muted-sash-color",
+            "hex": "#8A856D"
+          },
+          {
+            "name": "courtyard-green",
+            "hex": "#4D7148"
+          }
+        ],
+        "facadeFeatures": [
+          "columns and ornate openings reported by article",
+          "courtyard-based spatial organization",
+          "wings with different heights"
+        ],
+        "roofFeatures": [
+          "rooftop/upper wing treatment needs source-specific confirmation"
+        ],
+        "siteContext": [
+          "Shyambazar, Old Dhaka"
+        ],
+        "locationPrecision": "named landmark/neighbourhood; exact polygon match unverified",
+        "paletteConfidence": "low visual estimate; source description stronger for form than color",
+        "reconstructionUse": "courtyard/wing topology hypothesis, not surveyed dimensions"
+      },
+      "locationConfidence": "named landmark/neighbourhood; exact polygon match unverified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R09",
@@ -230,7 +525,44 @@
       ],
       "limitations": [
         "design renderings are not necessarily surveyed as-built geometry"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "contemporary-G+6-residential-design",
+        "colorPalette": [
+          {
+            "name": "white-plaster",
+            "hex": "#F1F0EA"
+          },
+          {
+            "name": "glass-blue-grey",
+            "hex": "#8FA6B2"
+          },
+          {
+            "name": "shadow-charcoal",
+            "hex": "#3E4549"
+          },
+          {
+            "name": "roof-green",
+            "hex": "#47744D"
+          }
+        ],
+        "facadeFeatures": [
+          "repeating window/balcony rhythm",
+          "vertical sun-shading elements described",
+          "clean geometric bands"
+        ],
+        "roofFeatures": [
+          "roof garden/terrace reported in design page"
+        ],
+        "siteContext": [
+          "Bashundhara Residential Area"
+        ],
+        "locationPrecision": "named residential project; map polygon requires confirmation",
+        "paletteConfidence": "medium from architect-described palette; hex values estimated",
+        "reconstructionUse": "contemporary procedural facade template; distinguish render from as-built"
+      },
+      "locationConfidence": "named residential project; map polygon requires confirmation",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "V01",
@@ -251,7 +583,42 @@
       ],
       "limitations": [
         "documentary video is not necessarily a calibrated overlapping photogrammetry sequence"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-heritage-street-video",
+        "colorPalette": [
+          {
+            "name": "weathered-brick",
+            "hex": "#96523B"
+          },
+          {
+            "name": "aged-plaster",
+            "hex": "#BDAA8B"
+          },
+          {
+            "name": "shadow-charcoal",
+            "hex": "#393B38"
+          },
+          {
+            "name": "urban-green",
+            "hex": "#4B6F49"
+          }
+        ],
+        "facadeFeatures": [
+          "moving street-level views of heritage architecture"
+        ],
+        "roofFeatures": [
+          "not reliably measurable"
+        ],
+        "siteContext": [
+          "Old Dhaka broad-area video"
+        ],
+        "locationPrecision": "route/context-level, no per-building metadata",
+        "paletteConfidence": "low scene estimate",
+        "reconstructionUse": "discovery/context only, not photogrammetry source without rights and camera overlap"
+      },
+      "locationConfidence": "route/context-level, no per-building metadata",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R10",
@@ -276,7 +643,42 @@
       "limitations": [
         "title and tags do not by themselves establish which exact facade is shown",
         "single panorama does not supply side elevations"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Gulshan-1-panoramic-urban-context",
+        "colorPalette": [
+          {
+            "name": "sky-blue-grey",
+            "hex": "#A9BFC8"
+          },
+          {
+            "name": "concrete-grey",
+            "hex": "#BFC3C1"
+          },
+          {
+            "name": "off-white",
+            "hex": "#E8E8E1"
+          },
+          {
+            "name": "tree-green",
+            "hex": "#537252"
+          }
+        ],
+        "facadeFeatures": [
+          "panoramic skyline/urban massing"
+        ],
+        "roofFeatures": [
+          "panoramic viewpoint; no individual roofs attributed"
+        ],
+        "siteContext": [
+          "Gulshan-1; stored coordinates represent camera/viewpoint"
+        ],
+        "locationPrecision": "viewpoint coordinates exist; visible building identities unresolved",
+        "paletteConfidence": "low visual estimate",
+        "reconstructionUse": "skyline and density context only"
+      },
+      "locationConfidence": "viewpoint coordinates exist; visible building identities unresolved",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R11",
@@ -299,7 +701,42 @@
       "limitations": [
         "location says only Dhaka",
         "image resolution is modest and one viewpoint cannot reveal other elevations"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "single-tall-building-reference",
+        "colorPalette": [
+          {
+            "name": "light-concrete",
+            "hex": "#D4D4CE"
+          },
+          {
+            "name": "warm-grey",
+            "hex": "#A7A79F"
+          },
+          {
+            "name": "window-dark",
+            "hex": "#454D52"
+          },
+          {
+            "name": "sky-haze",
+            "hex": "#B7C8CF"
+          }
+        ],
+        "facadeFeatures": [
+          "single tall building reference; detailed facade must be reviewed"
+        ],
+        "roofFeatures": [
+          "unknown"
+        ],
+        "siteContext": [
+          "Dhaka; exact neighbourhood absent"
+        ],
+        "locationPrecision": "city-level only",
+        "paletteConfidence": "low",
+        "reconstructionUse": "not enough for building-specific reconstruction without visual/source match"
+      },
+      "locationConfidence": "city-level only",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R12",
@@ -321,7 +758,42 @@
       ],
       "limitations": [
         "not a survey and cannot be used to estimate any named building's dimensions"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Dhaka-skyline-context",
+        "colorPalette": [
+          {
+            "name": "sky-grey-blue",
+            "hex": "#A6BAC5"
+          },
+          {
+            "name": "concrete-grey",
+            "hex": "#BAC0C2"
+          },
+          {
+            "name": "off-white",
+            "hex": "#E6E6E0"
+          },
+          {
+            "name": "urban-shadow",
+            "hex": "#656C6E"
+          }
+        ],
+        "facadeFeatures": [
+          "city-level height variation"
+        ],
+        "roofFeatures": [
+          "not reliable per-building roof data"
+        ],
+        "siteContext": [
+          "Dhaka skyline; exact viewpoint absent"
+        ],
+        "locationPrecision": "city-level/context-only",
+        "paletteConfidence": "low visual estimate",
+        "reconstructionUse": "city-scale heights and density context, not individual building dimensions"
+      },
+      "locationConfidence": "city-level/context-only",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R13",
@@ -346,7 +818,43 @@
       "limitations": [
         "single panorama/view",
         "camera coordinate does not identify every visible building"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "apartment-block-cluster",
+        "colorPalette": [
+          {
+            "name": "aged-concrete",
+            "hex": "#BFC1BC"
+          },
+          {
+            "name": "painted-white",
+            "hex": "#E6E5DD"
+          },
+          {
+            "name": "facade-beige",
+            "hex": "#C5B59E"
+          },
+          {
+            "name": "window-charcoal",
+            "hex": "#4A5051"
+          }
+        ],
+        "facadeFeatures": [
+          "clustered apartment buildings",
+          "relative building proximity"
+        ],
+        "roofFeatures": [
+          "partly visible; not all buildings identified"
+        ],
+        "siteContext": [
+          "Dhaka camera viewpoint coordinates recorded; coordinate is not the building centroid"
+        ],
+        "locationPrecision": "camera viewpoint located; individual buildings unverified",
+        "paletteConfidence": "low-to-medium estimate",
+        "reconstructionUse": "neighbourhood massing only unless visually georeferenced"
+      },
+      "locationConfidence": "camera viewpoint located; individual buildings unverified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R14",
@@ -369,7 +877,43 @@
       "limitations": [
         "do not repeat legal or project-status claims in the uploader description as verified facts",
         "construction status may have changed since capture"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Azimpur-multi-storey-residential-complex",
+        "colorPalette": [
+          {
+            "name": "concrete-grey",
+            "hex": "#A8AAA5"
+          },
+          {
+            "name": "aged-cream",
+            "hex": "#D6CEBD"
+          },
+          {
+            "name": "shadow-charcoal",
+            "hex": "#484B4A"
+          },
+          {
+            "name": "construction-earth",
+            "hex": "#8C6752"
+          }
+        ],
+        "facadeFeatures": [
+          "large repetitive multi-storey massing",
+          "floor-height rhythm"
+        ],
+        "roofFeatures": [
+          "capture-era roof/structure state must be checked"
+        ],
+        "siteContext": [
+          "Azimpur/Lalbagh area near Lalbagh Kella Road per source"
+        ],
+        "locationPrecision": "neighbourhood context; exact footprint match needs review",
+        "paletteConfidence": "low-to-medium estimate",
+        "reconstructionUse": "capture-date-specific visual reference; current state may have changed"
+      },
+      "locationConfidence": "neighbourhood context; exact footprint match needs review",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R15",
@@ -391,7 +935,42 @@
       ],
       "limitations": [
         "title alone does not establish building name or surveyed geometry"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Dhanmondi-Lake-edge-architecture-context",
+        "colorPalette": [
+          {
+            "name": "warm-white",
+            "hex": "#E8E4D9"
+          },
+          {
+            "name": "concrete-grey",
+            "hex": "#9EA29C"
+          },
+          {
+            "name": "water-blue-green",
+            "hex": "#5A8A8A"
+          },
+          {
+            "name": "landscape-green",
+            "hex": "#477149"
+          }
+        ],
+        "facadeFeatures": [
+          "architectural form beside lake; exact style depends on inspected image"
+        ],
+        "roofFeatures": [
+          "not confirmed"
+        ],
+        "siteContext": [
+          "Dhanmondi Lake edge; plot/building unresolved"
+        ],
+        "locationPrecision": "landmark-area level",
+        "paletteConfidence": "low; do not assume title identifies exact building",
+        "reconstructionUse": "lake-to-building context; confirm image/footprint manually"
+      },
+      "locationConfidence": "landmark-area level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R16",
@@ -413,7 +992,43 @@
       ],
       "limitations": [
         "single photograph does not define rear/side elevations or floor plans"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Banani-modern-private-building",
+        "colorPalette": [
+          {
+            "name": "warm-brick",
+            "hex": "#A6583D"
+          },
+          {
+            "name": "cream-concrete",
+            "hex": "#E5DED0"
+          },
+          {
+            "name": "dark-metal",
+            "hex": "#414748"
+          },
+          {
+            "name": "plant-green",
+            "hex": "#4B744B"
+          }
+        ],
+        "facadeFeatures": [
+          "modern private building",
+          "window/facade bays to inspect in high-resolution image"
+        ],
+        "roofFeatures": [
+          "not confirmed"
+        ],
+        "siteContext": [
+          "Banani Model Town"
+        ],
+        "locationPrecision": "neighbourhood-level; exact building geometry unresolved",
+        "paletteConfidence": "medium visual estimate based on image source",
+        "reconstructionUse": "strong open-licence candidate; preserve CC BY-SA attribution"
+      },
+      "locationConfidence": "neighbourhood-level; exact building geometry unresolved",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R17",
@@ -435,7 +1050,43 @@
       ],
       "limitations": [
         "do not assume this is the same building as other Banani photos without visual matching"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Banani-house-scale-residential",
+        "colorPalette": [
+          {
+            "name": "plaster-warm-white",
+            "hex": "#E4DFD3"
+          },
+          {
+            "name": "brick-or-earth",
+            "hex": "#A85C43"
+          },
+          {
+            "name": "window-dark",
+            "hex": "#394045"
+          },
+          {
+            "name": "garden-green",
+            "hex": "#4B764D"
+          }
+        ],
+        "facadeFeatures": [
+          "house-scale residential geometry",
+          "contrast with apartment tower massing"
+        ],
+        "roofFeatures": [
+          "must inspect source image"
+        ],
+        "siteContext": [
+          "Banani Model Town"
+        ],
+        "locationPrecision": "neighbourhood-level",
+        "paletteConfidence": "medium-low estimate",
+        "reconstructionUse": "open-licence candidate; don't assume same building as R16"
+      },
+      "locationConfidence": "neighbourhood-level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R18",
@@ -458,7 +1109,45 @@
       "limitations": [
         "news photo copyright applies unless terms/permission say otherwise",
         "one view cannot reconstruct hidden wings or exact room dimensions"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-courtyard-historic-house",
+        "colorPalette": [
+          {
+            "name": "weathered-ochre",
+            "hex": "#B29A5F"
+          },
+          {
+            "name": "aged-plaster",
+            "hex": "#C5B18C"
+          },
+          {
+            "name": "door-green",
+            "hex": "#2D634E"
+          },
+          {
+            "name": "courtyard-green",
+            "hex": "#3F6E3D"
+          }
+        ],
+        "facadeFeatures": [
+          "two-storey form",
+          "arched ground-floor veranda",
+          "upper-level openings",
+          "weathered wall finish"
+        ],
+        "roofFeatures": [
+          "not visible enough to determine"
+        ],
+        "siteContext": [
+          "Shree Shash/Shash Lane, Old Dhaka per article"
+        ],
+        "locationPrecision": "named site/street in article; footprint still needs validation",
+        "paletteConfidence": "medium visual estimate",
+        "reconstructionUse": "heritage courtyard-style procedural family; media research-only"
+      },
+      "locationConfidence": "named site/street in article; footprint still needs validation",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R19",
@@ -491,7 +1180,45 @@
       ],
       "limitations": [
         "article is not a measured survey; dimensions and plans remain unknown"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "formal-heritage-mansion-garden",
+        "colorPalette": [
+          {
+            "name": "ivory-white",
+            "hex": "#F1EFE7"
+          },
+          {
+            "name": "ornamental-off-white",
+            "hex": "#D9D3C7"
+          },
+          {
+            "name": "dark-shadow",
+            "hex": "#625D55"
+          },
+          {
+            "name": "garden-green",
+            "hex": "#3E6B43"
+          }
+        ],
+        "facadeFeatures": [
+          "reported three entrance arches",
+          "semi-circular balcony",
+          "fluted columns",
+          "decorative tracery/geometric motifs"
+        ],
+        "roofFeatures": [
+          "parapet/roof details need multi-photo review"
+        ],
+        "siteContext": [
+          "Rose Garden Palace, KM Das Lane, Tikatuli, Old Dhaka; source reports approx 7,000 sq ft and 45 ft height"
+        ],
+        "locationPrecision": "named landmark; authoritative address but footprint not linked in this catalogue",
+        "paletteConfidence": "medium visual estimate; white facade clearly described",
+        "reconstructionUse": "high-priority landmark model reference, but current survey/footprint needed; media research-only"
+      },
+      "locationConfidence": "named landmark; authoritative address but footprint not linked in this catalogue",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R20",
@@ -525,7 +1252,45 @@
       ],
       "limitations": [
         "feature examples are selective and some buildings may have been demolished or altered"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "1970s-1980s-duplex-and-family-house",
+        "colorPalette": [
+          {
+            "name": "exposed-brick",
+            "hex": "#A4563C"
+          },
+          {
+            "name": "aged-concrete",
+            "hex": "#9A9B93"
+          },
+          {
+            "name": "cream-plaster",
+            "hex": "#E0D5C2"
+          },
+          {
+            "name": "window-grille",
+            "hex": "#373B3D"
+          }
+        ],
+        "facadeFeatures": [
+          "boxy volumes",
+          "large grilled windows",
+          "louvres/sunshades",
+          "courtyard or open front/back in selected examples"
+        ],
+        "roofFeatures": [
+          "flat roof/parapet described for some examples"
+        ],
+        "siteContext": [
+          "multiple Dhaka neighbourhoods, not one building"
+        ],
+        "locationPrecision": "neighbourhood/type-level, source includes historical and possibly changed/demolished homes",
+        "paletteConfidence": "low-to-medium visual estimate from article examples",
+        "reconstructionUse": "style-family hypothesis only; not tied to one footprint"
+      },
+      "locationConfidence": "neighbourhood/type-level, source includes historical and possibly changed/demolished homes",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R21",
@@ -560,7 +1325,44 @@
       ],
       "limitations": [
         "designer's web description is not a measured drawing or independent as-built survey"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "contemporary-apartment-Sakoon",
+        "colorPalette": [
+          {
+            "name": "clean-white",
+            "hex": "#F2F2EC"
+          },
+          {
+            "name": "glass-blue-grey",
+            "hex": "#91A8B5"
+          },
+          {
+            "name": "dark-frame",
+            "hex": "#414A50"
+          },
+          {
+            "name": "roof-green",
+            "hex": "#4B7A4C"
+          }
+        ],
+        "facadeFeatures": [
+          "white walls and glass reported",
+          "large windows",
+          "balconies on north/south faces reported"
+        ],
+        "roofFeatures": [
+          "shared rooftop green zone/seating reported"
+        ],
+        "siteContext": [
+          "Plot 1716–1717, Road 40, Block L, Bashundhara Residential Area, Dhaka"
+        ],
+        "locationPrecision": "project address reported by architect; not GIS-verified here",
+        "paletteConfidence": "medium from architect text; exact hex is estimated",
+        "reconstructionUse": "contemporary façade/roof component template; imagery research-only"
+      },
+      "locationConfidence": "project address reported by architect; not GIS-verified here",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "R22",
@@ -592,7 +1394,44 @@
       ],
       "limitations": [
         "do not infer hidden elevations or exact floor geometry from marketing renders"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "contemporary-apartment-Nest-Florence",
+        "colorPalette": [
+          {
+            "name": "warm-white",
+            "hex": "#F0EEE7"
+          },
+          {
+            "name": "light-concrete",
+            "hex": "#C9C9C1"
+          },
+          {
+            "name": "glass-blue-grey",
+            "hex": "#91A8B3"
+          },
+          {
+            "name": "landscape-green",
+            "hex": "#4A774F"
+          }
+        ],
+        "facadeFeatures": [
+          "clean lines",
+          "large windows",
+          "expansive opening rhythm reported"
+        ],
+        "roofFeatures": [
+          "rooftop terrace reported"
+        ],
+        "siteContext": [
+          "Bashundhara, Dhaka"
+        ],
+        "locationPrecision": "neighbourhood/project-level",
+        "paletteConfidence": "low-to-medium; design page description, not calibrated image sampling",
+        "reconstructionUse": "design reference only; imagery reuse not cleared"
+      },
+      "locationConfidence": "neighbourhood/project-level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "V02",
@@ -614,7 +1453,44 @@
       ],
       "limitations": [
         "camera path is not a calibrated photogrammetry capture; overlapping imagery and camera pose metadata are not established"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-walking-tour",
+        "colorPalette": [
+          {
+            "name": "weathered-plaster",
+            "hex": "#BFAE8F"
+          },
+          {
+            "name": "brick-brown",
+            "hex": "#98533D"
+          },
+          {
+            "name": "shadow",
+            "hex": "#3D3C37"
+          },
+          {
+            "name": "green",
+            "hex": "#4C7047"
+          }
+        ],
+        "facadeFeatures": [
+          "street widths",
+          "dense facades",
+          "heritage-adjacency"
+        ],
+        "roofFeatures": [
+          "not measurable"
+        ],
+        "siteContext": [
+          "Old Dhaka broad-area video"
+        ],
+        "locationPrecision": "broad route level",
+        "paletteConfidence": "low scene estimate",
+        "reconstructionUse": "streetscape discovery only; no frame extraction without permission"
+      },
+      "locationConfidence": "broad route level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "V03",
@@ -637,7 +1513,44 @@
       ],
       "limitations": [
         "not a calibrated capture sequence; people/private spaces may appear and should not be republished without review"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Old-Dhaka-dense-market-street",
+        "colorPalette": [
+          {
+            "name": "aged-brick",
+            "hex": "#99543E"
+          },
+          {
+            "name": "plaster-beige",
+            "hex": "#C3B499"
+          },
+          {
+            "name": "market-shadow",
+            "hex": "#383B3A"
+          },
+          {
+            "name": "street-green",
+            "hex": "#52714C"
+          }
+        ],
+        "facadeFeatures": [
+          "narrow lanes",
+          "shopfront/street edge",
+          "closely abutting buildings"
+        ],
+        "roofFeatures": [
+          "not measurable"
+        ],
+        "siteContext": [
+          "Old Dhaka alleys and market streets"
+        ],
+        "locationPrecision": "broad tour route level",
+        "paletteConfidence": "low scene estimate",
+        "reconstructionUse": "urban morphology and collision/occlusion context only"
+      },
+      "locationConfidence": "broad tour route level",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     },
     {
       "id": "V04",
@@ -660,7 +1573,527 @@
       ],
       "limitations": [
         "weather and moving-camera footage are contextual references; no exact building measurements or photogrammetry guarantee"
-      ]
+      ],
+      "designProfile": {
+        "styleFamily": "Gulshan-Banani-residential-street-video",
+        "colorPalette": [
+          {
+            "name": "wet-asphalt",
+            "hex": "#4F5C62"
+          },
+          {
+            "name": "concrete-grey",
+            "hex": "#AEB7B8"
+          },
+          {
+            "name": "foliage-green",
+            "hex": "#456F4B"
+          },
+          {
+            "name": "sky-grey-blue",
+            "hex": "#9DAEB5"
+          }
+        ],
+        "facadeFeatures": [
+          "modern residential street frontages and setbacks"
+        ],
+        "roofFeatures": [
+          "not measurable"
+        ],
+        "siteContext": [
+          "Kamal Ataturk Avenue/Gulshan-2 towards Banani per video description"
+        ],
+        "locationPrecision": "route-level; specific properties not identified",
+        "paletteConfidence": "low scene estimate",
+        "reconstructionUse": "streetscape/weather context; video not calibrated photogrammetry"
+      },
+      "locationConfidence": "route-level; specific properties not identified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R23",
+      "mediaType": "image",
+      "title": "Karim Residence — climate-responsive biophilic residence",
+      "sourceUrl": "https://archfieldbd.com/karim-residence/",
+      "sourceName": "Archfield",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Dhaka, Bangladesh; exact plot not recorded in source consulted",
+      "reportedBuildingMetadata": {
+        "builtYear": 2013,
+        "builtAreaSqM": 1834.45,
+        "features": [
+          "planter beds",
+          "hanging creepers",
+          "north/south openings for cross ventilation",
+          "wide balconies",
+          "rooftop garden"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only until imagery licence is confirmed",
+      "buildingMatchConfidence": "medium for architect-reported design intent; exact coordinates not verified",
+      "observedFeatures": [
+        "integrated planter beds",
+        "hanging creepers",
+        "wide balconies",
+        "cross-ventilation strategy"
+      ],
+      "limitations": [
+        "designer description is not an as-built survey; colour palette is estimated from image preview"
+      ],
+      "designProfile": {
+        "styleFamily": "Gulshan-climate-responsive-residence",
+        "colorPalette": [
+          {
+            "name": "warm-brick",
+            "hex": "#A5543A"
+          },
+          {
+            "name": "fair-faced-concrete",
+            "hex": "#B5B0A6"
+          },
+          {
+            "name": "glass-muted-blue",
+            "hex": "#91A6AE"
+          },
+          {
+            "name": "cascading-green",
+            "hex": "#3F7746"
+          }
+        ],
+        "facadeFeatures": [
+          "integrated planter beds",
+          "hanging creepers",
+          "wide balconies",
+          "large openings",
+          "north/south cross-ventilation described by architect"
+        ],
+        "roofFeatures": [
+          "rooftop garden and landscaped terraces described"
+        ],
+        "siteContext": [
+          "Gulshan/Dhaka, Bangladesh; exact street/plot not recorded in source used"
+        ],
+        "locationPrecision": "city/area level per architect page",
+        "paletteConfidence": "medium-low estimated from source imagery and materials description",
+        "reconstructionUse": "climate-responsive biophilic model family; not generic for all Dhaka homes"
+      },
+      "locationConfidence": "city/area level per architect page",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R24",
+      "mediaType": "image",
+      "title": "Bo Metta — residential balconies in Banani DOHS",
+      "sourceUrl": "https://archfieldbd.com/bo-metta/",
+      "sourceName": "Archfield",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Banani DOHS, Dhaka",
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only until architecture-page image reuse rights are confirmed",
+      "buildingMatchConfidence": "medium for area and visible facade typology",
+      "observedFeatures": [
+        "stacked concrete balconies",
+        "slim metal railings",
+        "brick cladding",
+        "potted planting and cascading vines"
+      ],
+      "limitations": [
+        "not a full building survey; hidden elevations unknown"
+      ],
+      "designProfile": {
+        "styleFamily": "Banani-DOHS-brick-and-balcony-residence",
+        "colorPalette": [
+          {
+            "name": "terracotta-brick",
+            "hex": "#9E543B"
+          },
+          {
+            "name": "light-concrete",
+            "hex": "#D5D1C8"
+          },
+          {
+            "name": "dark-metal-rail",
+            "hex": "#555653"
+          },
+          {
+            "name": "vine-green",
+            "hex": "#3F7546"
+          }
+        ],
+        "facadeFeatures": [
+          "stacked concrete balconies",
+          "slim metal railings",
+          "brick cladding",
+          "potted plants/furnishings"
+        ],
+        "roofFeatures": [
+          "not fully documented in reference"
+        ],
+        "siteContext": [
+          "Banani DOHS, Dhaka"
+        ],
+        "locationPrecision": "neighbourhood level from architecture page",
+        "paletteConfidence": "medium visual estimate",
+        "reconstructionUse": "balcony, brick and greenery component reference; page imagery not licensed for reuse by default"
+      },
+      "locationConfidence": "neighbourhood level from architecture page",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R25",
+      "mediaType": "image",
+      "title": "Chowdhury Residence — modernist brick residence",
+      "sourceUrl": "https://www.archnet.org/sites/282",
+      "sourceName": "Archnet / Bashirul Haq Design Associates historical project",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Dhaka, Bangladesh; exact plot coordinate not stored",
+      "reportedBuildingMetadata": {
+        "completionYear": 1980,
+        "style": "modernist",
+        "reportedStructure": "fair-faced brickwork on concrete frame",
+        "reportedLayout": [
+          "L-shaped ground-floor volume",
+          "square upper-floor volume",
+          "two roof terraces"
+        ]
+      },
+      "license": "Not established for reproduced project imagery",
+      "attributionText": null,
+      "usageStatus": "reference-only until source-image reuse is cleared",
+      "buildingMatchConfidence": "medium-high for named project and design description, low for exact GIS matching",
+      "observedFeatures": [
+        "red brick massing",
+        "contrasting concrete frame",
+        "L-shaped ground floor",
+        "upper volume",
+        "vertical windows"
+      ],
+      "limitations": [
+        "historical project images cannot establish today's condition"
+      ],
+      "designProfile": {
+        "styleFamily": "Bashirul-Haq-modernist-brick-house",
+        "colorPalette": [
+          {
+            "name": "fair-faced-red-brick",
+            "hex": "#9A4D34"
+          },
+          {
+            "name": "concrete-pale",
+            "hex": "#C7C1B4"
+          },
+          {
+            "name": "window-shadow",
+            "hex": "#30383C"
+          },
+          {
+            "name": "garden-green",
+            "hex": "#426941"
+          }
+        ],
+        "facadeFeatures": [
+          "fair-faced brick on concrete frame",
+          "angular/L-shaped ground-floor volume",
+          "upper-level square volume",
+          "tall vertical windows",
+          "small curved balcony"
+        ],
+        "roofFeatures": [
+          "two roof terraces reported in ArchNet record"
+        ],
+        "siteContext": [
+          "Chowdhury Residence, Dhaka; construction reported 1978–1982, completed 1980 by another source"
+        ],
+        "locationPrecision": "named house/city-level; exact map point not stored",
+        "paletteConfidence": "high for broad brick-vs-concrete materials; hex is a visual estimate",
+        "reconstructionUse": "valuable modernist low-rise typology; project image copyright/reuse rights must be cleared"
+      },
+      "locationConfidence": "named house/city-level; exact map point not stored",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R26",
+      "mediaType": "image",
+      "title": "Palm Grove — Banani residential tower",
+      "sourceUrl": "https://btibd.com/gallery/palm-grove-banani-2021/",
+      "sourceName": "BTI developer gallery",
+      "author": null,
+      "capturedAt": "2021 (project gallery title)",
+      "locationText": "Banani, Dhaka",
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only until developer grants/establishes image reuse rights",
+      "buildingMatchConfidence": "medium for named project/neighbourhood; exact coordinates not captured",
+      "observedFeatures": [
+        "light stone-like cladding",
+        "white plaster",
+        "repeating/staggered balconies",
+        "glass railings",
+        "landscaped trees"
+      ],
+      "limitations": [
+        "visual preview is not a material specification or surveyed drawing"
+      ],
+      "designProfile": {
+        "styleFamily": "Banani-Palm-Grove-contemporary-tower",
+        "colorPalette": [
+          {
+            "name": "warm-white",
+            "hex": "#F0EFE9"
+          },
+          {
+            "name": "light-stone",
+            "hex": "#CCCBC4"
+          },
+          {
+            "name": "glass-cool-grey",
+            "hex": "#94A9B4"
+          },
+          {
+            "name": "palm-green",
+            "hex": "#427044"
+          }
+        ],
+        "facadeFeatures": [
+          "staggered/repeating balconies",
+          "light stone-like cladding",
+          "white plaster",
+          "glass railings described/visible"
+        ],
+        "roofFeatures": [
+          "entrance canopy/lighting visible; rooftop features not confirmed"
+        ],
+        "siteContext": [
+          "Palm Grove, Banani, Dhaka; developer gallery"
+        ],
+        "locationPrecision": "named project/neighbourhood; exact plot not established by gallery URL",
+        "paletteConfidence": "medium visual estimate",
+        "reconstructionUse": "contemporary material and balcony rhythm reference; image reuse not assumed"
+      },
+      "locationConfidence": "named project/neighbourhood; exact plot not established by gallery URL",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R27",
+      "mediaType": "image",
+      "title": "JCX Autograph — condominium project",
+      "sourceUrl": "https://jcxbd.com/projects/autograph/",
+      "sourceName": "JCX Developments",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Plot 2850–2853, Road 18, 19 and 10th Avenue, Block M, Bashundhara R/A, Dhaka",
+      "reportedBuildingMetadata": {
+        "buildingType": "residential condominium",
+        "landSize": "12 katha",
+        "floors": "B+G+9",
+        "units": 17,
+        "parkingSpaces": 18,
+        "frontRoadWidth": "60 ft",
+        "orientation": "South-East-North",
+        "reportedAmenities": [
+          "wood-panelled entrance",
+          "rooftop garden",
+          "swimming pool/community hall"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only; project photography not assumed reusable",
+      "buildingMatchConfidence": "medium for address/programme per developer page; independent GIS match pending",
+      "observedFeatures": [
+        "large entry portal",
+        "condominium-scale building",
+        "roof/community amenities"
+      ],
+      "limitations": [
+        "developer description is not independent survey verification"
+      ],
+      "designProfile": {
+        "styleFamily": "Bashundhara-large-condominium-tower",
+        "colorPalette": [
+          {
+            "name": "warm-white",
+            "hex": "#EFEDE5"
+          },
+          {
+            "name": "wood-brown",
+            "hex": "#79553B"
+          },
+          {
+            "name": "glass-blue-grey",
+            "hex": "#8EA8B5"
+          },
+          {
+            "name": "landscape-green",
+            "hex": "#48764B"
+          }
+        ],
+        "facadeFeatures": [
+          "large wood-panel entrance",
+          "condominium layout",
+          "pool/community features reported"
+        ],
+        "roofFeatures": [
+          "rooftop garden reported"
+        ],
+        "siteContext": [
+          "JCX Autograph; Plot 2850–2853, Road 18/19 and 10th Avenue, Block M, Bashundhara R/A; front road reported 60 ft; 12 katha; B+G+9; 17 units"
+        ],
+        "locationPrecision": "project address detailed in developer page but not GIS-verified",
+        "paletteConfidence": "low-to-medium; generic palette from page/photo review",
+        "reconstructionUse": "large-project context; don't equate developer marketing images with as-built survey"
+      },
+      "locationConfidence": "project address detailed in developer page but not GIS-verified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R28",
+      "mediaType": "image",
+      "title": "JCX Olympus — condominium project",
+      "sourceUrl": "https://jcxbd.com/projects/jcx-olympus/",
+      "sourceName": "JCX Developments",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Plot 291–293, Road 6/7, Block I, Bashundhara R/A, Dhaka",
+      "reportedBuildingMetadata": {
+        "buildingType": "residential condominium",
+        "landSize": "14 katha",
+        "floors": "B+G+11",
+        "units": 30,
+        "parkingSpaces": 30,
+        "frontRoadWidth": "50 ft",
+        "reportedAmenities": [
+          "rooftop deck",
+          "gym",
+          "green space",
+          "community hall",
+          "pool",
+          "kids play zone"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only; project photography not assumed reusable",
+      "buildingMatchConfidence": "medium for address/programme per developer page; independent GIS match pending",
+      "observedFeatures": [
+        "high-rise condominium massing",
+        "rooftop and community amenity programme"
+      ],
+      "limitations": [
+        "developer claims need as-built verification"
+      ],
+      "designProfile": {
+        "styleFamily": "Bashundhara-high-rise-condominium",
+        "colorPalette": [
+          {
+            "name": "warm-white",
+            "hex": "#EFEDE5"
+          },
+          {
+            "name": "wood-brown",
+            "hex": "#79553B"
+          },
+          {
+            "name": "glass-blue-grey",
+            "hex": "#8EA8B5"
+          },
+          {
+            "name": "landscape-green",
+            "hex": "#48764B"
+          }
+        ],
+        "facadeFeatures": [
+          "multi-floor condominium",
+          "community amenity programme",
+          "modern massing as described by developer"
+        ],
+        "roofFeatures": [
+          "rooftop deck/garden described"
+        ],
+        "siteContext": [
+          "JCX Olympus; Plot 291–293, Road 6/7, Block I, Bashundhara R/A; front road reported 50 ft; 14 katha; B+G+11; 30 units"
+        ],
+        "locationPrecision": "project address detailed in developer page but not GIS-verified",
+        "paletteConfidence": "low-to-medium",
+        "reconstructionUse": "programmatic high-rise template reference; visual asset reuse rights not established"
+      },
+      "locationConfidence": "project address detailed in developer page but not GIS-verified",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+    },
+    {
+      "id": "R29",
+      "mediaType": "image",
+      "title": "Additional climate-responsive residence / Karim Residence imagery",
+      "sourceUrl": "https://www.chintonarch.com/project/karim-residence",
+      "sourceName": "Chinton Architects",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Gulshan, Dhaka as stated by source title/context",
+      "reportedBuildingMetadata": {
+        "designFeatures": [
+          "hanging greenery",
+          "brick and concrete",
+          "wide balconies",
+          "climate-responsive shading"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only until source images are cleared for reuse",
+      "buildingMatchConfidence": "medium for design case identity; exact mapped polygon not captured",
+      "observedFeatures": [
+        "brick and exposed concrete contrast",
+        "deep balcony slabs",
+        "cascading green facade"
+      ],
+      "limitations": [
+        "may depict same Karim Residence design as R23; catalogued as complementary source, not a distinct building"
+      ],
+      "designProfile": {
+        "styleFamily": "Bashundhara-Karim-Residence-biophilic",
+        "colorPalette": [
+          {
+            "name": "terracotta-brick",
+            "hex": "#A35338"
+          },
+          {
+            "name": "exposed-concrete",
+            "hex": "#B5B0A5"
+          },
+          {
+            "name": "glass-muted-blue",
+            "hex": "#8FA8B0"
+          },
+          {
+            "name": "plant-green",
+            "hex": "#3B7544"
+          }
+        ],
+        "facadeFeatures": [
+          "integrated planter beds",
+          "hanging creepers as shade",
+          "large openings on north/south facades",
+          "wide balconies",
+          "cross ventilation reported"
+        ],
+        "roofFeatures": [
+          "rooftop garden and landscaped terraces"
+        ],
+        "siteContext": [
+          "Karim Residence, Dhaka; architect page reports built 2013 and 1834.45 sqm built area"
+        ],
+        "locationPrecision": "Dhaka-level in source, exact street/building polygon not stored",
+        "paletteConfidence": "medium-low visual estimate",
+        "reconstructionUse": "biophilic/tropical-shading design reference; image reuse needs rights review"
+      },
+      "locationConfidence": "Dhaka-level in source, exact street/building polygon not stored",
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
     }
   ],
   "derivedArchitectureNotes": {
@@ -710,5 +2143,16 @@
       "Commercial real-estate project pages and rendered visuals are not open-licensed by default; keep them research-only unless permissions are confirmed.",
       "Open licences differ: CC BY 2.0 requires attribution; CC BY-SA files additionally require compatible ShareAlike distribution for adaptations. Preserve each file's own licence and source."
     ]
+  },
+  "referenceTotals": {
+    "total": 33,
+    "images": 29,
+    "videos": 4
+  },
+  "colourAndLocationPolicy": {
+    "palettePolicy": "Hex colours in designProfile are visual/description-based estimates for design and procedural-rendering experiments. Do not treat them as sampled truth, material specifications or legal property facts.",
+    "locationPolicy": "Location text can describe a neighbourhood, article-stated place, camera viewpoint, route, or exact project address. A camera coordinate is not a building centroid. Each value must preserve its locationPrecision and be matched independently to an Overture footprint.",
+    "identityPolicy": "Different source pages can refer to the same building/project (e.g. Karim Residence across architect sites). Cross-source references should be linked as related sources, not counted automatically as distinct buildings.",
+    "modelPolicy": "Store footprint geometry, reported metadata, inferred design parameters, and render presentation separately."
   }
 }
