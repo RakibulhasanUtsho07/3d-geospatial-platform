@@ -124,6 +124,62 @@ export function summarizeArchitectureReferences(references) {
   };
 }
 
+function parseReportedFloorCount(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  for (const key of ["reportedFloorCount", "reportedStoreys", "storeysAboveGround", "storeys", "floors"]) {
+    const value = metadata[key];
+    if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 1 && value <= 100) {
+      return value;
+    }
+    if (typeof value !== "string") continue;
+    const text = value.trim().toUpperCase().replace(/\s+/g, "");
+    if (!text || /SOUTHERNWING|MAINHOUSE|;|,/.test(text)) continue;
+    const basementGroundPattern = text.match(/^(?:B\+)?G\+(\d+)$/);
+    if (basementGroundPattern) return Math.min(100, Number(basementGroundPattern[1]) + 1);
+    const numericPattern = text.match(/^(\d+)(?:STOREYS?|FLOORS?|LEVELS?)?$/);
+    if (numericPattern) {
+      const number = Number(numericPattern[1]);
+      if (Number.isInteger(number) && number >= 1 && number <= 100) return number;
+    }
+  }
+  return undefined;
+}
+
+function parseReportedHeightMeters(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  for (const key of ["reportedHeightMeters", "heightMeters", "height_m"]) {
+    const value = metadata[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 3 && value <= 300) return value;
+  }
+  const feet = metadata.reportedHeightFeet;
+  if (typeof feet === "number" && Number.isFinite(feet) && feet >= 10 && feet <= 1000) {
+    return Math.round(feet * 0.3048 * 100) / 100;
+  }
+  const reportedText = metadata.reportedHeight;
+  if (typeof reportedText === "string") {
+    const feetMatch = reportedText.match(/(\d+(?:\.\d+)?)\s*(?:ft|feet|foot)\b/i);
+    if (feetMatch) {
+      const converted = Number(feetMatch[1]) * 0.3048;
+      if (Number.isFinite(converted) && converted >= 3 && converted <= 300) return Math.round(converted * 100) / 100;
+    }
+    const meterMatch = reportedText.match(/(\d+(?:\.\d+)?)\s*m(?:eter|eters)?\b/i);
+    if (meterMatch) {
+      const converted = Number(meterMatch[1]);
+      if (Number.isFinite(converted) && converted >= 3 && converted <= 300) return converted;
+    }
+  }
+  return undefined;
+}
+
+function parseReportedBuildingAreaSqM(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  for (const key of ["builtAreaSqM", "reportedBuildingAreaSqM", "buildingAreaSqM", "built_area_m2"]) {
+    const value = metadata[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 10 && value <= 100000) return value;
+  }
+  return undefined;
+}
+
 export function createArchitectureStylePreview(reference) {
   const profile = reference?.designProfile ?? {};
   const family = String(profile.styleFamily ?? "").toLowerCase();
@@ -197,6 +253,9 @@ export function createArchitectureStylePreview(reference) {
     upperFloorPattern: hasArches && /upper-level openings|upper.*window/.test(features) ? "heritage-arches" : "urban-grid",
     balconyProjectionMeters: hasBalconies ? (/wide|deep|stacked|staggered|cantilever/.test(features) ? 1.6 : 0.9) : undefined,
     fullHeightTexture: !isVideoContext,
+    reportedFloorCount: parseReportedFloorCount(reference?.reportedBuildingMetadata),
+    reportedHeightMeters: parseReportedHeightMeters(reference?.reportedBuildingMetadata),
+    reportedBuildingAreaSqM: parseReportedBuildingAreaSqM(reference?.reportedBuildingMetadata),
   };
 }
 
