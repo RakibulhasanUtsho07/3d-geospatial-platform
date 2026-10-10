@@ -62,6 +62,8 @@ export default function PropertyListingsPanel({
     try {
       const stored: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
       if (Array.isArray(stored)) {
+        // Hydrate browser-local saved IDs after SSR; server rendering cannot read localStorage.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSavedIds([...new Set(stored.filter((id): id is string => typeof id === "string" && /^[a-z0-9-]{1,80}$/i.test(id)))].slice(0, 100));
       }
     } catch {
@@ -81,10 +83,6 @@ export default function PropertyListingsPanel({
   }, [savedIds, savedLoaded]);
 
   useEffect(() => () => activeRequestRef.current?.abort(), []);
-  useEffect(() => {
-    if (nearbyPlaces !== null) setServiceError(null);
-  }, [nearbyPlaces]);
-
   function toggleSaved(id: string) {
     setSavedIds((previous) => previous.includes(id)
       ? previous.filter((value) => value !== id)
@@ -161,7 +159,6 @@ export default function PropertyListingsPanel({
     setServiceError(null);
     try {
       await onCheckNearbyServices(property);
-      onSelectProperty(property);
     } catch (error: unknown) {
       setServiceError(error instanceof Error ? error.message : "Nearby service matching failed.");
     } finally {
