@@ -8,11 +8,12 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Overture-derived building footprints rendered as extruded 3D geometry.
 - Camera-aware viewport requests with bounded feature budgets, spatially sampled results, response caching, request cancellation, and adaptive facade-detail budgets.
 - Click-to-select building details, geographic coordinates, source attributes, and a camera-focus action.
+- Approximate ground footprint in square metres and square feet; when a floor count exists, an explicitly labeled gross floor-area estimate.
 - Bounded building-discovery search across source names, attributes, categories, and Overture IDs; selecting a result moves the camera to its geographic center.
 - A map-layer panel to show or hide the OpenStreetMap street imagery and the Overture 3D building layer independently.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 
-The displayed facade details are procedural visualizations. They are illustrative and are not verified architectural measurements.
+The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
 
 ## Tech stack
 
@@ -57,6 +58,7 @@ npm run test:viewport-selection
 npm run test:viewport-cache
 npm run test:viewport-load-policy
 npm run test:building-search
+npm run test:footprint-area
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build

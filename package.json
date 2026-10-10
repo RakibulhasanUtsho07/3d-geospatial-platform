@@ -18,7 +18,8 @@
     "prebuild": "npm run copy:cesium",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
     "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs",
-    "test:building-search": "node --test tests/building-search.test.mjs"
+    "test:building-search": "node --test tests/building-search.test.mjs",
+    "test:footprint-area": "node --test tests/footprint-area.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

@@ -1,5 +1,6 @@
 "use client";
 
+import { SQUARE_METERS_TO_SQUARE_FEET } from "@/core/geospatial/footprint-area.mjs";
 import type { MapFeatureSelection } from "@/core/map-engine/types";
 
 interface BuildingDetailsPanelProps {
@@ -126,6 +127,20 @@ export default function BuildingDetailsPanel({
     "levels",
   ]);
   const heightSource = findProperty(feature.properties, ["height_source"]);
+  const footprintAreaM2 =
+    typeof feature.footprintAreaM2 === "number" &&
+    Number.isFinite(feature.footprintAreaM2) &&
+    feature.footprintAreaM2 > 0
+      ? feature.footprintAreaM2
+      : null;
+  const footprintAreaSqFt =
+    footprintAreaM2 === null
+      ? null
+      : footprintAreaM2 * SQUARE_METERS_TO_SQUARE_FEET;
+  const estimatedGrossFloorAreaM2 =
+    footprintAreaM2 !== null && floorCount !== null
+      ? footprintAreaM2 * floorCount
+      : null;
   const sourceLabel =
     feature.source === "overture-local-buildings"
       ? "Local Overture pilot"
@@ -224,6 +239,30 @@ export default function BuildingDetailsPanel({
                 </p>
               </div>
             )}
+
+            {footprintAreaM2 !== null && footprintAreaSqFt !== null && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-400">Approx. footprint area</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-cyan-100">
+                  {Math.round(footprintAreaSqFt).toLocaleString("en-US")} ft²
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {Math.round(footprintAreaM2).toLocaleString("en-US")} m² · geometry estimate
+                </p>
+              </div>
+            )}
+
+            {estimatedGrossFloorAreaM2 !== null && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-400">Approx. total floor area</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">
+                  {Math.round(estimatedGrossFloorAreaM2 * SQUARE_METERS_TO_SQUARE_FEET).toLocaleString("en-US")} ft²
+                </p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Footprint × {Math.round(floorCount ?? 0)} floors
+                </p>
+              </div>
+            )}
           </section>
         )}
 
@@ -305,8 +344,10 @@ export default function BuildingDetailsPanel({
 
         <p className="text-xs leading-5 text-slate-500">
           Height may be sourced from Overture attributes or estimated from floor
-          count. Procedural facade details are illustrative and are not verified
-          architectural measurements.
+          count. Footprint area is a local-projection estimate; total floor area
+          is footprint multiplied by the available floor count. Neither value is
+          a verified unit size or survey measurement. Procedural facade details
+          are illustrative.
         </p>
       </div>
 

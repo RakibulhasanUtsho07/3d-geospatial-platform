@@ -12,6 +12,7 @@ import {
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 
+import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import type {
   CameraTarget,
@@ -1643,6 +1644,7 @@ export class CesiumAdapter implements MapEngine {
         }
 
         let focusCoordinates: MapFeatureSelection["focusCoordinates"] = null;
+        let footprintAreaM2: number | null = null;
 
         try {
           const hierarchy = entity.polygon.hierarchy?.getValue(
@@ -1662,10 +1664,26 @@ export class CesiumAdapter implements MapEngine {
               latitude: Cesium.Math.toDegrees(center.latitude),
               height: heightInfo.baseHeight + heightInfo.meters,
             };
+
+            const toDegreesRing = (positions: CesiumCartesian3[]) =>
+              positions.map((position) => {
+                const cartographic = Cesium.Cartographic.fromCartesian(position);
+                return {
+                  longitude: Cesium.Math.toDegrees(cartographic.longitude),
+                  latitude: Cesium.Math.toDegrees(cartographic.latitude),
+                };
+              });
+            const rings = [
+              toDegreesRing(hierarchy.positions),
+              ...(hierarchy.holes ?? []).map((hole) =>
+                toDegreesRing(hole.positions),
+              ),
+            ];
+            footprintAreaM2 = calculateFootprintAreaM2(rings);
           }
         } catch (error: unknown) {
           console.debug(
-            "[Map] Could not calculate building focus coordinates:",
+            "[Map] Could not calculate building footprint measurements:",
             error instanceof Error ? error.message : String(error),
           );
         }
@@ -1675,6 +1693,7 @@ export class CesiumAdapter implements MapEngine {
           properties: selectedProperties,
           coordinates,
           focusCoordinates,
+          footprintAreaM2,
         });
 
         // Promote the selected building to the detailed tier immediately,

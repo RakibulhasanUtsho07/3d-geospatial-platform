@@ -28,6 +28,9 @@ export interface MapFeatureSelection {
 
   /** Building-center coordinates for camera focus, when geometry permits. */
   focusCoordinates?: GeoCoordinate | null;
+
+  /** Approximate horizontal footprint area derived from polygon geometry. */
+  footprintAreaM2?: number | null;
 }
 
 export type MapEngineCapabilities = {

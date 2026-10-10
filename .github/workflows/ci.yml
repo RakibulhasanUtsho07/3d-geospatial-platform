@@ -55,6 +55,9 @@ jobs:
       - name: Test building search index
         run: npm run test:building-search
 
+      - name: Test building footprint area calculations
+        run: npm run test:footprint-area
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
