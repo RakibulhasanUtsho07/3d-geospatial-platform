@@ -150,25 +150,30 @@ test("viewport API caps response features and reports truncation diagnostics", a
     response.headers.get("X-Building-Truncated"),
     String(matched > returned),
   );
+  assert.equal(
+    response.headers.get("X-Building-Sampling-Strategy"),
+    matched > returned ? "spatial-grid-round-robin" : "none",
+  );
 });
 
-test("viewport API rejects feature limits above the supported maximum", async (context) => {
+test("viewport API rejects malformed and out-of-range feature limits", async (context) => {
   if (skipWithoutServer(context)) return;
 
-  const query = new URLSearchParams({
-    west: "90.405",
-    south: "23.775",
-    east: "90.415",
-    north: "23.785",
-    limit: "5001",
-  });
+  for (const limit of ["0", "-1", "1.5", "NaN", "5001"]) {
+    const query = new URLSearchParams({
+      west: "90.405",
+      south: "23.775",
+      east: "90.415",
+      north: "23.785",
+      limit,
+    });
 
-  const response = await fetch(
-    baseUrl + viewportPath + "?" + query,
-  );
+    const response = await fetch(
+      baseUrl + viewportPath + "?" + query,
+    );
+    const body = await response.json();
 
-  assert.equal(response.status, 400);
-
-  const body = await response.json();
-  assert.match(body.error, /feature limit/i);
+    assert.equal(response.status, 400, `limit ${limit} should be rejected`);
+    assert.match(body.error, /feature limit/i);
+  }
 });

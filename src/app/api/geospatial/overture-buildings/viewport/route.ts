@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { NextResponse } from "next/server";
+import { selectViewportFeatures } from "../../../../../core/geospatial/select-viewport-features.mjs";
 
 type JsonObject = Record<string, unknown>;
 
@@ -631,115 +632,6 @@ function getRenderRole(feature: unknown): string {
 }
 
 
-function selectViewportFeatures(
-  features: unknown[],
-  viewport: ViewportBounds,
-  limit: number,
-): unknown[] {
-  if (features.length <= limit) {
-    return features;
-  }
-
-  const columns = Math.ceil(Math.sqrt(limit));
-  const rows = Math.ceil(limit / columns);
-  const cellWidth = (viewport.east - viewport.west) / columns;
-  const cellHeight = (viewport.north - viewport.south) / rows;
-
-  type Candidate = {
-    feature: unknown;
-    priority: number;
-    distance: number;
-  };
-
-  const buckets = new Map<number, Candidate[]>();
-
-  for (const feature of features) {
-    const bounds = getFeatureBounds(feature);
-    if (!bounds) continue;
-
-    const longitude = (bounds.west + bounds.east) / 2;
-    const latitude = (bounds.south + bounds.north) / 2;
-
-    const column = Math.max(
-      0,
-      Math.min(
-        columns - 1,
-        Math.floor((longitude - viewport.west) / cellWidth),
-      ),
-    );
-    const row = Math.max(
-      0,
-      Math.min(
-        rows - 1,
-        Math.floor((latitude - viewport.south) / cellHeight),
-      ),
-    );
-
-    const cellKey = row * columns + column;
-    const cellCenterLongitude =
-      viewport.west + (column + 0.5) * cellWidth;
-    const cellCenterLatitude =
-      viewport.south + (row + 0.5) * cellHeight;
-
-    const role = getRenderRole(feature);
-    const priority =
-      role === "building_part" ? 0 :
-      role === "building" ? 1 :
-      2;
-
-    const longitudeDistance =
-      (longitude - cellCenterLongitude) *
-      Math.cos((cellCenterLatitude * Math.PI) / 180);
-    const latitudeDistance = latitude - cellCenterLatitude;
-
-    const candidate: Candidate = {
-      feature,
-      priority,
-      distance:
-        longitudeDistance * longitudeDistance +
-        latitudeDistance * latitudeDistance,
-    };
-
-    const bucket = buckets.get(cellKey);
-    if (bucket) {
-      bucket.push(candidate);
-    } else {
-      buckets.set(cellKey, [candidate]);
-    }
-  }
-
-  const orderedBuckets = [...buckets.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([, bucket]) =>
-      bucket.sort(
-        (left, right) =>
-          left.priority - right.priority ||
-          left.distance - right.distance,
-      ),
-    );
-
-  const selected: unknown[] = [];
-  let depth = 0;
-
-  while (selected.length < limit) {
-    let foundCandidate = false;
-
-    for (const bucket of orderedBuckets) {
-      const candidate = bucket[depth];
-      if (!candidate) continue;
-
-      selected.push(candidate.feature);
-      foundCandidate = true;
-      if (selected.length >= limit) break;
-    }
-
-    if (!foundCandidate) break;
-    depth += 1;
-  }
-
-  return selected;
-}
-
 export async function GET(request: Request): Promise<Response> {
   const parsedBounds = parseViewportBounds(new URL(request.url));
 
@@ -781,7 +673,13 @@ export async function GET(request: Request): Promise<Response> {
       matchingFeatures,
       viewport,
       featureLimit,
+      getFeatureBounds,
+      getRenderRole,
     );
+    const samplingStrategy =
+      matchedFeatureCount > limitedFeatures.length
+        ? "spatial-grid-round-robin"
+        : "none";
 
     let buildingCount = 0;
     let parentCount = 0;
@@ -818,6 +716,7 @@ export async function GET(request: Request): Promise<Response> {
       returnedFeatures: limitedFeatures.length,
       featureLimit,
       truncated: matchedFeatureCount > limitedFeatures.length,
+      samplingStrategy,
       selectedTiles: tileResult?.tileCount ?? 0,
       candidateFeatures: tileResult?.candidateFeatureCount ?? 0,
       tileCacheHits: tileResult?.tileCacheHits ?? 0,
@@ -837,6 +736,7 @@ export async function GET(request: Request): Promise<Response> {
         "X-Building-Truncated": String(
           matchedFeatureCount > limitedFeatures.length,
         ),
+        "X-Building-Sampling-Strategy": samplingStrategy,
         "X-Building-Total-Feature-Count": String(totalFeatureCount),
         "X-Building-Data-Source": tileResult
           ? "generated-tiles"

@@ -43,6 +43,9 @@ jobs:
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
 
+      - name: Test viewport spatial sampling
+        run: npm run test:viewport-selection
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
