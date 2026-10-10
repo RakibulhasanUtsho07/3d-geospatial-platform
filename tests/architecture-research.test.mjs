@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createArchitectureStylePreview,
   filterArchitectureReferences,
   parseArchitectureResearchParams,
   summarizeArchitectureReferences,
@@ -121,4 +122,17 @@ test("summarizes image/video totals and unique facets", () => {
   assert.equal(summary.videoCount, 1);
   assert.ok(summary.styles.includes("painted-mid-rise-apartment"));
   assert.ok(summary.areas.includes("Mugda, Dhaka"));
+});
+
+test("builds temporary facade preview styles from researched architecture palettes", () => {
+  const heritage = createArchitectureStylePreview(references[1]);
+  assert.equal(heritage.id, "research-preview-R18");
+  assert.equal(heritage.pattern, "heritage-arches");
+  assert.equal(heritage.facadeColor, "#C5B18C");
+  assert.equal(heritage.roofDetail, "none");
+
+  const painted = createArchitectureStylePreview(references[0]);
+  assert.equal(painted.pattern, "painted-balcony");
+  assert.equal(painted.facadeColor, "#2F6C96");
+  assert.match(painted.id, /^research-preview-/);
 });
