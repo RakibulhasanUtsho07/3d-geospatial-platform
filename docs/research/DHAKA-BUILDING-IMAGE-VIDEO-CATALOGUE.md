@@ -137,7 +137,7 @@ A single facade image cannot determine rear/side facades, interior floor plans, 
 
 ## 8. Expanded research pass — 10 October 2026
 
-This pass adds 13 new source records (10 still-image/project references and 3 videos) to the structured catalogue. Existing entries R01–R09 and V01 remain unchanged.
+This pass adds 16 new source records (13 still-image/project references and 3 videos) to the structured catalogue. Existing entries R01–R09 and V01 remain unchanged.
 
 ### R10 — Red Rocket / Gulshan-1 panoramic reference
 - Source: https://commons.wikimedia.org/wiki/File:Red_Rocket_-_panoramio.jpg
