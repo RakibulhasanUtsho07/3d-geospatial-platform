@@ -276,7 +276,22 @@ export default function ArchitectureResearchPanel({
             {results.map((reference) => {
               const metadata = formatMetadata(reference.reportedBuildingMetadata);
               const mapUrl = locationMapUrl(reference);
-              const observations = (reference.designProfile.facadeFeatures ?? []).slice(0, 3);
+              const observations = (reference.designProfile.facadeFeatures ?? []).slice(0, 4);
+              const roofObservations = (reference.designProfile.roofFeatures ?? []).slice(0, 2);
+              const siteObservations = (reference.designProfile.siteContext ?? []).slice(0, 2);
+              const renderProfile = reference.mediaType === "image"
+                ? createArchitectureStylePreview(reference)
+                : null;
+              const renderFlags = renderProfile ? [
+                renderProfile.materialPattern ? readableName(renderProfile.materialPattern) + " surface" : null,
+                renderProfile.decorativeColumns ? "Decorative columns" : null,
+                renderProfile.verticalLouvres ? "Vertical sun-shading" : null,
+                renderProfile.greenery ? "Planters / creepers" : null,
+                renderProfile.grilles ? "Window grilles" : null,
+                renderProfile.groundFloorArches ? "Ground-floor arches" : null,
+                renderProfile.roofDetail === "roof-garden" ? "Roof garden" : null,
+                renderProfile.roofDetail === "roof-terrace" ? "Roof terrace" : null,
+              ].filter((flag): flag is string => Boolean(flag)) : [];
               return (
                 <li key={reference.id} className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-2">
@@ -298,9 +313,46 @@ export default function ArchitectureResearchPanel({
                   <p className="mt-1 text-[10px] leading-4 text-amber-700">Estimated visual palette · {reference.designProfile.paletteConfidence}</p>
 
                   {observations.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-xs leading-4 text-slate-700">
-                      {observations.map((feature) => <li key={feature} className="flex gap-2"><span className="text-blue-600">•</span><span>{feature}</span></li>)}
-                    </ul>
+                    <div className="mt-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Observed facade cues</p>
+                      <ul className="mt-1 space-y-1 text-xs leading-4 text-slate-700">
+                        {observations.map((feature) => <li key={feature} className="flex gap-2"><span className="text-blue-600">•</span><span>{feature}</span></li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(roofObservations.length > 0 || siteObservations.length > 0) && (
+                    <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                      {roofObservations.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Roof / upper massing clues</p>
+                          {roofObservations.map((item) => <p key={item} className="mt-1 text-[11px] leading-4 text-slate-700">{item}</p>)}
+                        </div>
+                      )}
+                      {siteObservations.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{reference.mediaType === "video" ? "Street context from video description" : "Site / street context"}</p>
+                          {siteObservations.map((item) => <p key={item} className="mt-1 text-[11px] leading-4 text-slate-700">{item}</p>)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {renderFlags.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900">Features used by procedural preview</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {renderFlags.map((flag) => <span key={flag} className="rounded-full border border-blue-200 bg-white px-2 py-1 text-[10px] text-blue-900">{flag}</span>)}
+                      </div>
+                      <p className="mt-2 text-[10px] leading-4 text-blue-800">Rendered on demand from the saved text profile and estimated colour swatches; this is not pixel-extracted geometry.</p>
+                    </div>
+                  )}
+
+                  {reference.mediaType === "video" && (
+                    <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-900">Video-derived context only</p>
+                      <p className="mt-1 text-[11px] leading-4 text-violet-900">Lane enclosure, frontage density and broad street character can inform a streetscape preset, but this route is not frame-matched to a particular mapped property. Video reuse permissions are not established.</p>
+                    </div>
                   )}
 
                   {metadata.length > 0 && (
