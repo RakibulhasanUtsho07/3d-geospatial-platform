@@ -519,7 +519,9 @@ export class CesiumAdapter implements MapEngine {
                   Cesium,
                   visualStyle.repeatWidthMeters,
                 ),
-                color: facadeColor,
+                // The canvas already contains the chosen facade palette.
+                // White avoids tinting the dark window glass with facade paint.
+                color: Cesium.Color.WHITE,
                 transparent: false,
               }),
             });
