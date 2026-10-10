@@ -25,6 +25,7 @@ export interface BuildingStyleAssignment {
   license?: string | null;
   usageStatus: string;
   assignedAt: string;
+  reportedBuildingMetadata?: Record<string, unknown>;
   style: BuildingVisualStyle;
 }
 
