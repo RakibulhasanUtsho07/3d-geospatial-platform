@@ -66,7 +66,7 @@ test("deduplicates category selections and rejects unsupported query tags", () =
   assert.match(query, /\["amenity"="pharmacy"\]/);
   assert.match(query, /\["amenity"="marketplace"\]/);
   assert.match(query, /\["shop"="market"\]/);
-  assert.match(query, /out center tags 120;/);
+  assert.match(query, /out center tags 300;/);
   assert.doesNotMatch(query, /\["name"~|userSupplied/i);
 });
 
