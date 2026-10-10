@@ -99,6 +99,44 @@ function humanizeKey(key: string): string {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+type SourceColor = { key: string; value: string; hex: string | null };
+
+function normalizeColorSwatch(value: string): string | null {
+  const trimmed = value.trim();
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed;
+  if (/^#[0-9a-f]{3}$/i.test(trimmed)) {
+    return "#" + trimmed.slice(1).split("").map((digit) => digit + digit).join("");
+  }
+  const named: Record<string, string> = {
+    white: "#FFFFFF",
+    ivory: "#EEE5D6",
+    cream: "#E7D2BD",
+    beige: "#D9CBB9",
+    grey: "#A9AFB2",
+    gray: "#A9AFB2",
+    black: "#24292D",
+    red: "#B94B3A",
+    brown: "#8B5E45",
+    brick: "#9A4D34",
+    blue: "#2F6C96",
+    yellow: "#D8B044",
+    green: "#47744D",
+  };
+  return named[trimmed.toLowerCase()] ?? null;
+}
+
+function findSourceColor(
+  properties: Record<string, unknown>,
+  candidates: string[],
+): SourceColor | null {
+  const keys = new Set(candidates.map((key) => key.toLowerCase()));
+  for (const [key, value] of Object.entries(properties)) {
+    if (!keys.has(key.toLowerCase()) || typeof value !== "string" || !value.trim()) continue;
+    return { key: humanizeKey(key), value: value.trim(), hex: normalizeColorSwatch(value) };
+  }
+  return null;
+}
+
 export default function BuildingDetailsPanel({
   feature,
   onClose,
@@ -149,6 +187,33 @@ export default function BuildingDetailsPanel({
   const hasFocusCoordinates = Boolean(
     feature.focusCoordinates ?? feature.coordinates,
   );
+  const sourceFacadeColor = findSourceColor(feature.properties, [
+    "facade_color",
+    "facade:colour",
+    "facade_colour",
+    "building:colour",
+    "building:color",
+    "building_color",
+    "building_colour",
+  ]);
+  const sourceRoofColor = findSourceColor(feature.properties, [
+    "roof_color",
+    "roof:colour",
+    "roof_colour",
+    "building:roof:colour",
+  ]);
+  const sourceStyleFamily = findProperty(feature.properties, [
+    "architecture_style",
+    "style_family",
+    "facade_style",
+    "design_family",
+  ]);
+  const sourceFacadeMaterial = findProperty(feature.properties, [
+    "facade_material",
+    "facade:material",
+    "building:material",
+    "material",
+  ]);
 
   const preferredProperties = [
     "class",
@@ -290,6 +355,46 @@ export default function BuildingDetailsPanel({
             </p>
           </section>
         )}
+
+        <section aria-label="Source-reported facade and roof design" className="rounded-xl border border-blue-300/20 bg-blue-300/[0.04] p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">Source design attributes</h3>
+              <p className="mt-1 text-[11px] leading-4 text-slate-400">Only explicit source attributes are shown here. A missing value is not guessed as verified data.</p>
+            </div>
+            <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[10px] text-slate-300">Source only</span>
+          </div>
+
+          {(sourceFacadeColor || sourceRoofColor) ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[sourceFacadeColor, sourceRoofColor].filter((item): item is SourceColor => item !== null).map((item) => (
+                <div key={item.key} className="rounded-lg border border-white/10 bg-black/20 p-2.5">
+                  <p className="text-[11px] text-slate-400">{item.key}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    {item.hex && <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-md border border-white/20" style={{ backgroundColor: item.hex }} />}
+                    <span className="break-all font-mono text-xs text-slate-100">{item.hex ?? item.value}</span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-500">{item.hex ? "Normalized source colour" : "Source value; no exact swatch mapping"}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2.5 text-xs leading-5 text-slate-400">
+              No explicit facade/roof colour attribute is available for this feature. The displayed procedural texture uses a default style palette, not a verified photo-derived colour.
+            </p>
+          )}
+
+          {(sourceStyleFamily || sourceFacadeMaterial) && (
+            <dl className="mt-3 space-y-2">
+              {sourceStyleFamily && <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-2 text-xs"><dt className="text-slate-400">Style family</dt><dd className="break-words text-slate-100">{sourceStyleFamily}</dd></div>}
+              {sourceFacadeMaterial && <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-2 text-xs"><dt className="text-slate-400">Facade material</dt><dd className="break-words text-slate-100">{sourceFacadeMaterial}</dd></div>}
+            </dl>
+          )}
+
+          <p className="mt-3 border-t border-white/10 pt-2 text-[10px] leading-4 text-slate-500">
+            The Dhaka Architecture Library below the map contains candidate styles, source links and estimated palettes. Those references are not automatically assigned to this building unless the identity can be established.
+          </p>
+        </section>
 
         {hasFocusCoordinates && (
           <button
