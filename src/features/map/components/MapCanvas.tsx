@@ -211,11 +211,36 @@ export default function MapCanvas({
       const selectedId = typeof featureId === "string" ? featureId : String(featureId ?? "");
       const assignment = styleAssignments.find((item) => item.featureId === selectedId);
       const properties = { ...current.properties };
-      delete properties.architecture_profile_id;
-      delete properties.architecture_profile_title;
-      delete properties.architecture_profile_source;
-      delete properties.architecture_profile_license;
-      delete properties.architecture_profile_confidence;
+      const previousAssignmentId = typeof properties.architecture_profile_id === "string"
+        ? properties.architecture_profile_id
+        : null;
+
+      if (assignment) {
+        // Keep the original mapped height/provenance across profile swaps and
+        // browser reloads, so removing a profile can restore the baseline.
+        if (typeof properties.source_rendered_height_m !== "number") {
+          properties.source_rendered_height_m = current.properties.source_rendered_height_m
+            ?? current.properties.rendered_height_m;
+        }
+        if (typeof properties.source_height_source !== "string") {
+          properties.source_height_source = current.properties.source_height_source
+            ?? current.properties.height_source;
+        }
+      }
+
+      for (const key of [
+        "architecture_profile_id",
+        "architecture_profile_title",
+        "architecture_profile_source",
+        "architecture_profile_license",
+        "architecture_profile_confidence",
+        "architecture_profile_reported_floor_count",
+        "architecture_profile_reported_height_m",
+        "architecture_profile_reported_building_area_sqm",
+        "architecture_profile_reported_metadata",
+      ]) {
+        delete properties[key];
+      }
 
       if (assignment) {
         properties.architecture_profile_id = assignment.referenceId;
@@ -234,7 +259,23 @@ export default function MapCanvas({
         } else if (typeof assignment.style.reportedFloorCount === "number") {
           properties.rendered_height_m = assignment.style.reportedFloorCount * 3;
           properties.height_source = "reference-reported-floors";
+        } else {
+          if (typeof properties.source_rendered_height_m === "number") {
+            properties.rendered_height_m = properties.source_rendered_height_m;
+          }
+          if (typeof properties.source_height_source === "string") {
+            properties.height_source = properties.source_height_source;
+          }
         }
+      } else if (previousAssignmentId) {
+        if (typeof properties.source_rendered_height_m === "number") {
+          properties.rendered_height_m = properties.source_rendered_height_m;
+        }
+        if (typeof properties.source_height_source === "string") {
+          properties.height_source = properties.source_height_source;
+        }
+        delete properties.source_rendered_height_m;
+        delete properties.source_height_source;
       }
 
       const updated = { ...current, properties };
