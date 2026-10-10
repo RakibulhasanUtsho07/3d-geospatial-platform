@@ -334,6 +334,7 @@ export class CesiumAdapter implements MapEngine {
       });
 
       let geoJson: unknown;
+      let responseHeaders: Headers | null = null;
       const cachedGeoJson = getCachedViewportResponse(
         this.viewportResponseCache,
         endpoint,
@@ -349,6 +350,7 @@ export class CesiumAdapter implements MapEngine {
         const response = await fetch(endpoint, {
           signal: requestController.signal,
         });
+        responseHeaders = response.headers;
 
         if (!response.ok) {
           const result = (await response.json().catch(() => null)) as
@@ -377,18 +379,18 @@ export class CesiumAdapter implements MapEngine {
       }
 
       console.info("[Overture] Viewport API response received.", {
-        dataSource: response.headers.get("X-Building-Data-Source"),
-        selectedTiles: response.headers.get("X-Building-Tile-Count"),
-        candidateFeatures: response.headers.get(
+        dataSource: responseHeaders?.get("X-Building-Data-Source"),
+        selectedTiles: responseHeaders?.get("X-Building-Tile-Count"),
+        candidateFeatures: responseHeaders?.get(
           "X-Building-Candidate-Feature-Count",
         ),
-        matchedFeatures: response.headers.get(
+        matchedFeatures: responseHeaders?.get(
           "X-Building-Matched-Feature-Count",
         ),
-        returnedFeatures: response.headers.get("X-Building-Feature-Count"),
-        featureLimit: response.headers.get("X-Building-Feature-Limit"),
-        truncated: response.headers.get("X-Building-Truncated"),
-        tileCacheHits: response.headers.get("X-Building-Tile-Cache-Hits"),
+        returnedFeatures: responseHeaders?.get("X-Building-Feature-Count"),
+        featureLimit: responseHeaders?.get("X-Building-Feature-Limit"),
+        truncated: responseHeaders?.get("X-Building-Truncated"),
+        tileCacheHits: responseHeaders?.get("X-Building-Tile-Cache-Hits"),
       });
 
       if (
