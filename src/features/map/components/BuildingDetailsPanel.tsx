@@ -214,6 +214,11 @@ export default function BuildingDetailsPanel({
     "building:material",
     "material",
   ]);
+  const assignedProfileTitle = findProperty(feature.properties, ["architecture_profile_title"]);
+  const assignedProfileId = findProperty(feature.properties, ["architecture_profile_id"]);
+  const assignedProfileSource = findProperty(feature.properties, ["architecture_profile_source"]);
+  const assignedProfileLicense = findProperty(feature.properties, ["architecture_profile_license"]);
+  const assignedProfileConfidence = findProperty(feature.properties, ["architecture_profile_confidence"]);
 
   const preferredProperties = [
     "class",
@@ -353,6 +358,26 @@ export default function BuildingDetailsPanel({
             <p className="mt-2 text-xs text-slate-400">
               Picked point height: {feature.coordinates.height.toFixed(2)} m
             </p>
+          </section>
+        )}
+
+        {assignedProfileTitle && (
+          <section aria-label="Saved research architecture profile" className="rounded-xl border border-emerald-300/25 bg-emerald-300/[0.05] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-emerald-100">Saved architecture profile</h3>
+                <p className="mt-1 text-sm font-medium text-slate-100">{assignedProfileTitle}</p>
+              </div>
+              <span className="shrink-0 rounded-full border border-emerald-200/20 px-2 py-1 text-[10px] text-emerald-100">User assigned</span>
+            </div>
+            <dl className="mt-3 space-y-2 text-xs">
+              {assignedProfileId && <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Reference ID</dt><dd className="break-words text-slate-100">{assignedProfileId}</dd></div>}
+              {assignedProfileLicense && <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Source rights</dt><dd className="break-words text-slate-100">{assignedProfileLicense}</dd></div>}
+              {assignedProfileConfidence && <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-2"><dt className="text-slate-400">Match status</dt><dd className="break-words text-amber-100">{assignedProfileConfidence}</dd></div>}
+            </dl>
+            {assignedProfileSource && /^https:\/\//i.test(assignedProfileSource) && (
+              <a href={assignedProfileSource} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-semibold text-cyan-200 underline underline-offset-4">Open assigned source ↗</a>
+            )}
           </section>
         )}
 
