@@ -2103,9 +2103,15 @@ export class CesiumAdapter implements MapEngine {
     // Restore any highlighted material before invalidating the cached graphics.
     this.restoreSelectedBuilding();
     record.visualStyle = style ?? record.baseVisualStyle;
+    const geometryStyle = style && (
+      typeof style.reportedHeightMeters === "number" ||
+      typeof style.reportedFloorCount === "number"
+    )
+      ? style
+      : record.baseVisualStyle;
     record.heightInfo = this.getResearchAdjustedBuildingHeight(
       record.sourceHeightInfo,
-      record.visualStyle,
+      geometryStyle,
     );
     record.baseHeight = record.heightInfo.baseHeight;
     record.topHeight = record.heightInfo.baseHeight + record.heightInfo.meters;
