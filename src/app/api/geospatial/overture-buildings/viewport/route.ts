@@ -22,9 +22,29 @@ type IndexedFeature = {
 };
 
 type IndexedDataset = {
-  rawContents: string;
   collection: GeoJsonFeatureCollection;
   indexedFeatures: IndexedFeature[];
+};
+
+type TileManifestEntry = {
+  id: string;
+  file: string;
+  featureCount: number;
+  bounds: ViewportBounds;
+};
+
+type TileManifest = {
+  sourceFeatureCount: number;
+  tileCount: number;
+  oversizedFile: string | null;
+  tiles: TileManifestEntry[];
+};
+
+type TileQueryResult = {
+  features: unknown[];
+  totalFeatureCount: number;
+  tileCount: number;
+  oversizedFeatureCount: number;
 };
 
 const DATA_FILE = resolve(
@@ -36,6 +56,13 @@ const DATA_FILE = resolve(
 
 const DATA_FILE_RELATIVE =
   "data/overture/dhaka-buildings-3d-pilot.geojson";
+const TILE_DIRECTORY = resolve(
+  process.cwd(),
+  "data",
+  "overture",
+  "spatial-tiles",
+);
+const TILE_MANIFEST_FILE = resolve(TILE_DIRECTORY, "manifest.json");
 const MAX_VIEWPORT_SPAN_DEGREES = 2;
 
 let indexedDatasetPromise: Promise<IndexedDataset> | null = null;
@@ -157,7 +184,6 @@ async function readAndIndexDataset(): Promise<IndexedDataset> {
   });
 
   return {
-    rawContents,
     collection: parsedData,
     indexedFeatures,
   };
@@ -236,6 +262,170 @@ function intersects(
   );
 }
 
+
+function isValidTileManifest(value: unknown): value is TileManifest {
+  if (
+    !isRecord(value) ||
+    typeof value.sourceFeatureCount !== "number" ||
+    typeof value.tileCount !== "number" ||
+    !Array.isArray(value.tiles)
+  ) {
+    return false;
+  }
+
+  return value.tiles.every((entry: unknown) => {
+    if (!isRecord(entry) || !isRecord(entry.bounds)) {
+      return false;
+    }
+
+    const bounds = entry.bounds;
+    return (
+      typeof entry.id === "string" &&
+      typeof entry.file === "string" &&
+      typeof entry.featureCount === "number" &&
+      ["west", "south", "east", "north"].every(
+        (key) => typeof bounds[key] === "number" &&
+          Number.isFinite(bounds[key]),
+      )
+    );
+  });
+}
+
+function getFeatureIdentity(feature: unknown): string {
+  if (!isRecord(feature)) {
+    return JSON.stringify(feature);
+  }
+
+  if (feature.id !== undefined && feature.id !== null) {
+    return "feature-id:" + String(feature.id);
+  }
+
+  const properties = isRecord(feature.properties) ? feature.properties : {};
+  for (const key of [
+    "id",
+    "feature_id",
+    "featureId",
+    "building_id",
+    "overture_id",
+  ]) {
+    const value = properties[key];
+    if (typeof value === "string" || typeof value === "number") {
+      return "property-id:" + String(value);
+    }
+  }
+
+  return "feature-json:" + JSON.stringify(feature);
+}
+
+async function queryGeneratedTiles(
+  viewport: ViewportBounds,
+): Promise<TileQueryResult | null> {
+  let manifestContents: string;
+
+  try {
+    manifestContents = await readFile(TILE_MANIFEST_FILE, "utf8");
+  } catch (error: unknown) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? String(error.code)
+        : "";
+    if (code === "ENOENT") return null;
+    throw error;
+  }
+
+  let parsedManifest: unknown;
+  try {
+    parsedManifest = JSON.parse(manifestContents);
+  } catch {
+    console.warn("[Overture Viewport API] Tile manifest is invalid JSON; using GeoJSON index.");
+    return null;
+  }
+
+  if (!isValidTileManifest(parsedManifest)) {
+    console.warn("[Overture Viewport API] Tile manifest schema is invalid; using GeoJSON index.");
+    return null;
+  }
+
+  const selectedTiles = parsedManifest.tiles.filter((tile) =>
+    intersects(tile.bounds, viewport),
+  );
+
+  const featureMap = new Map<string, unknown>();
+  let oversizedFeatureCount = 0;
+
+  async function readCollection(relativeFile: string): Promise<unknown[] | null> {
+    // Only allow the generated relative file layout, never arbitrary paths from a manifest.
+    if (
+      relativeFile.startsWith("/") ||
+      relativeFile.includes("..") ||
+      !/^(tiles\/x\d+_y\d+\.geojson|oversized\.geojson)$/.test(relativeFile)
+    ) {
+      return null;
+    }
+
+    let raw: string;
+    try {
+      raw = await readFile(resolve(TILE_DIRECTORY, relativeFile), "utf8");
+    } catch (error: unknown) {
+      const code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String(error.code)
+          : "";
+      if (code === "ENOENT") return null;
+      throw error;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+
+    if (!isFeatureCollection(parsed)) return null;
+    return parsed.features;
+  }
+
+  for (const tile of selectedTiles) {
+    const features = await readCollection(tile.file);
+    if (!features) {
+      console.warn("[Overture Viewport API] Generated tile is missing or invalid; falling back to GeoJSON index.", {
+        tile: tile.id,
+      });
+      return null;
+    }
+
+    for (const feature of features) {
+      const identity = getFeatureIdentity(feature);
+      if (!featureMap.has(identity)) featureMap.set(identity, feature);
+    }
+  }
+
+  if (parsedManifest.oversizedFile) {
+    const oversizedFeatures = await readCollection(parsedManifest.oversizedFile);
+    if (!oversizedFeatures) {
+      console.warn("[Overture Viewport API] Oversized feature sidecar is missing or invalid; falling back to GeoJSON index.");
+      return null;
+    }
+
+    for (const feature of oversizedFeatures) {
+      const featureBounds = getCoordinateBounds(getGeometryCoordinates(feature));
+      if (featureBounds && intersects(featureBounds, viewport)) {
+        const identity = getFeatureIdentity(feature);
+        if (!featureMap.has(identity)) featureMap.set(identity, feature);
+        oversizedFeatureCount += 1;
+      }
+    }
+  }
+
+  return {
+    features: [...featureMap.values()],
+    totalFeatureCount: parsedManifest.sourceFeatureCount,
+    tileCount: selectedTiles.length,
+    oversizedFeatureCount,
+  };
+}
+
 function getRenderRole(feature: unknown): string {
   if (!isRecord(feature) || !isRecord(feature.properties)) {
     return "unknown";
@@ -258,13 +448,19 @@ export async function GET(request: Request): Promise<Response> {
   const viewport = parsedBounds.bounds;
 
   try {
-    const dataset = await getIndexedDataset();
-    const matchingFeatures = dataset.indexedFeatures
-      .filter(
-        (entry) =>
-          entry.bounds !== null && intersects(entry.bounds, viewport),
-      )
-      .map((entry) => entry.feature);
+    const tileResult = await queryGeneratedTiles(viewport);
+    const dataset = tileResult ? null : await getIndexedDataset();
+    const matchingFeatures = tileResult
+      ? tileResult.features
+      : (dataset?.indexedFeatures ?? [])
+          .filter(
+            (entry) =>
+              entry.bounds !== null && intersects(entry.bounds, viewport),
+          )
+          .map((entry) => entry.feature);
+    const totalFeatureCount = tileResult
+      ? tileResult.totalFeatureCount
+      : dataset?.indexedFeatures.length ?? 0;
 
     let buildingCount = 0;
     let parentCount = 0;
@@ -289,13 +485,17 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const viewportCollection = {
-      ...dataset.collection,
+      type: "FeatureCollection",
+      ...(dataset?.collection ?? {}),
       features: matchingFeatures,
     };
 
     console.info("[Overture Viewport API] Viewport ready.", {
-      totalFeatures: dataset.indexedFeatures.length,
+      source: tileResult ? "generated-tiles" : "indexed-geojson",
+      totalFeatures: totalFeatureCount,
       returnedFeatures: matchingFeatures.length,
+      selectedTiles: tileResult?.tileCount ?? 0,
+      oversizedFeatures: tileResult?.oversizedFeatureCount ?? 0,
       buildings: buildingCount,
       buildingParts: partCount,
       parents: parentCount,
@@ -306,9 +506,11 @@ export async function GET(request: Request): Promise<Response> {
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
         "X-Building-Dataset": "overture-3d-pilot",
         "X-Building-Feature-Count": String(matchingFeatures.length),
-        "X-Building-Total-Feature-Count": String(
-          dataset.indexedFeatures.length,
-        ),
+        "X-Building-Total-Feature-Count": String(totalFeatureCount),
+        "X-Building-Data-Source": tileResult
+          ? "generated-tiles"
+          : "indexed-geojson",
+        "X-Building-Tile-Count": String(tileResult?.tileCount ?? 0),
         "X-Building-Count": String(buildingCount),
         "X-Building-Parent-Count": String(parentCount),
         "X-Building-Part-Count": String(partCount),
