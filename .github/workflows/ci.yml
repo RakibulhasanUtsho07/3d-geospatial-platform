@@ -67,6 +67,9 @@ jobs:
       - name: Test street imagery validation and reference normalization
         run: npm run test:street-imagery
 
+      - name: Test architecture research filters and metadata
+        run: npm run test:architecture-research
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
@@ -130,6 +133,36 @@ jobs:
           );
           if (streetImagery.status !== 400) {
             console.error("Street imagery endpoint should reject a request without coordinates.");
+            process.exit(1);
+          }
+
+          const architectureResearch = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/architecture-research?limit=50",
+          );
+          const architecturePayload = await architectureResearch.json();
+          if (
+            !architectureResearch.ok ||
+            architecturePayload.dataStatus !== "curated-research" ||
+            !Array.isArray(architecturePayload.results) ||
+            architecturePayload.results.length < 1 ||
+            !architecturePayload.results[0].designProfile?.colorPalette
+          ) {
+            console.error("Architecture research endpoint failed its catalogue smoke test.");
+            process.exit(1);
+          }
+
+          const filteredArchitecture = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/architecture-research?area=Mugda&mediaType=image",
+          );
+          const filteredArchitecturePayload = await filteredArchitecture.json();
+          if (
+            !filteredArchitecture.ok ||
+            !Array.isArray(filteredArchitecturePayload.results) ||
+            !filteredArchitecturePayload.results.every((item) =>
+              item.locationText.toLowerCase().includes("mugda") && item.mediaType === "image"
+            )
+          ) {
+            console.error("Architecture research endpoint failed a filtered catalogue smoke test.");
             process.exit(1);
           }
 
