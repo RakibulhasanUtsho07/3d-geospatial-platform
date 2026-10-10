@@ -166,9 +166,11 @@ test("every manifest tile exists and contains valid, spatially relevant features
     assert.ok(tile.bounds.west < tile.bounds.east);
     assert.ok(tile.bounds.south < tile.bounds.north);
 
-    const filePath = path.resolve(tilesPath, tile.file);
+    // Manifest paths are relative to the spatial-tiles root and already
+    // include the "tiles/" directory segment.
+    const filePath = path.resolve(generatedPath, tile.file);
     assert.ok(
-      filePath.startsWith(path.resolve(tilesPath) + path.sep),
+      filePath.startsWith(path.resolve(generatedPath) + path.sep),
       `tile path escaped output directory: ${tile.file}`,
     );
 
