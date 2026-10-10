@@ -236,3 +236,65 @@ This pass adds 16 new source records (13 still-image/project references and 3 vi
 - Research use: street/building setbacks, trees, road width and changing visibility under rain. Moving video without camera calibration should not be used as a standalone photogrammetry input.
 - Rights: ordinary YouTube viewing does not imply permission to download or extract frames.
 
+
+
+## 9. Deep research addendum — architecture projects, facade palettes and UI/location enrichment
+
+The consolidated JSON catalogue now has **33 source records: 29 image/project references and 4 video references**. Each record has a designProfile with a typology, observed facade elements, roof/site-context notes, an estimated color palette, location-precision note and intended reconstruction use. The machine-readable catalogue is the canonical source for the per-record data; exact colours are design estimates, not calibrated pixel samples.
+
+### R23 — Karim Residence (biophilic, climate-responsive residence)
+- Source: https://archfieldbd.com/karim-residence/
+- Location stated by the project source: Dhaka, Bangladesh; exact plot coordinates are not recorded in this catalogue.
+- The architect describes planter beds, hanging creepers, wide balconies, large openings, north/south cross-ventilation, rooftop garden and landscaped terraces; page reports a 2013 built project and 1,834.45 m² built area.
+- Approximate visual palette: brick red, pale concrete, blue-grey glazing and tropical plant green.
+- Reuse status: research-only until the architecture-site image rights are confirmed.
+
+### R24 — Bo Metta, Banani DOHS
+- Source: https://archfieldbd.com/bo-metta/
+- Location: Banani DOHS, Dhaka.
+- Visible design clues: stacked concrete balconies, slim metal railings, brick cladding, potted planting and cascading vines.
+- Approximate visual palette: terracotta brick, light concrete, dark metal and vine green.
+- Use: procedural component reference for balcony edges/rails/greenery. Site imagery is not assumed open-licensed.
+
+### R25 — Chowdhury Residence, modernist brick house
+- Source: https://www.archnet.org/sites/282
+- Location: Dhaka; precise plot point not stored here.
+- Archnet describes a modernist house completed around 1980 using fair-faced brick on a concrete frame, an L-shaped ground-level volume, a square upper volume and two roof terraces.
+- Approximate visual palette: fair-faced red brick, pale concrete, dark window recess and garden green.
+- Use: low-rise modernist typology; not equivalent to a current building survey. Project imagery reuse rights are not established by this catalogue.
+
+### R26 — Palm Grove, Banani
+- Source: https://btibd.com/gallery/palm-grove-banani-2021/
+- Location: Banani, Dhaka.
+- Visible clues: light stone-like cladding, white plaster, repeated/staggered balconies, glass rails and tropical landscaping.
+- Approximate visual palette: warm white, light stone, cool grey-blue glazing and palm green.
+- Use: contemporary apartment facade rhythm/material study. Developer gallery imagery remains research-only until reuse rights are confirmed.
+
+### R27 — JCX Autograph, Bashundhara R/A
+- Source: https://jcxbd.com/projects/autograph/
+- Developer-reported address: Plot 2850–2853, Road 18/19 and 10th Avenue, Block M, Bashundhara R/A. Page reports 12 katha, B+G+9 floors, 17 units, 18 parking spaces and a 60-ft front road.
+- Reported design features include a wood-panelled entrance, rooftop garden and pool/community hall.
+- Location/address and programme are developer-published and not GIS-verified in this research.
+
+### R28 — JCX Olympus, Bashundhara R/A
+- Source: https://jcxbd.com/projects/jcx-olympus/
+- Developer-reported address: Plot 291–293, Road 6/7, Block I, Bashundhara R/A. Page reports 14 katha, B+G+11 floors, 30 units and 30 parking spaces.
+- Reported amenities include rooftop deck, gym, green space, community hall, pool, kids' play area and lift lobby.
+- These are project-page claims, not independent measured/as-built verification. Use the details as programmatic hypotheses until cross-checked.
+
+### R29 — Karim Residence, complementary architectural-source reference
+- Source: https://www.chintonarch.com/project/karim-residence
+- Source describes the Karim Residence in Gulshan and shows a brick/concrete/greenery composition with deep balcony slabs and cascading plants.
+- This is an additional source for the **same design as R23**, not an extra unique building record. Keep these references linked during future data normalization.
+- Approximate visual palette: terracotta brick, exposed concrete, muted glazing and plant green.
+
+### UI and 3D rendering palette
+
+The proposed app palette is blue/white/light-grey for information surfaces and a dark navy variant for immersive 3D. Full tokens are saved in [the architecture design-system JSON](../../data/research/dhaka-architecture-design-system.json) and [the consolidated design guide](DHAKA-ARCHITECTURE-AND-UI-DESIGN-SYSTEM.md).
+
+- Light: canvas #F8FAFC, panel #FFFFFF, text #0F172A, primary blue #2563EB, cyan #0891B2, border #CBD5E1.
+- Dark: canvas #0B1220, panel #111827, text #F8FAFC, primary blue #60A5FA, cyan #22D3EE, border #334155.
+- Map: ordinary building #A9B7C8; selected building #2563EB; search/hover #06B6D4; roads #E5E7EB; water #BDE7F3; vegetation #A8D5AE.
+- Confidence labels: **Source-reported**, **Estimated**, **Unverified match**, **Not available**. Color must not be the only way to communicate state.
+
+All facade palettes remain estimated from available source previews and/or written material descriptions; they are not measured paint colours. Keep image/source colour separate from semantic UI colours.
