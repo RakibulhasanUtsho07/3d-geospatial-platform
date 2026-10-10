@@ -148,7 +148,10 @@
       "mapRoad": "#E5E7EB",
       "mapWater": "#BDE7F3",
       "mapVegetation": "#A8D5AE",
-      "mapUnknown": "#94A3B8"
+      "mapUnknown": "#94A3B8",
+      "primaryText": "#FFFFFF",
+      "accentAction": "#0E7490",
+      "accentText": "#FFFFFF"
     },
     "dark": {
       "background": "#0B1220",
@@ -180,7 +183,10 @@
       "mapRoad": "#263445",
       "mapWater": "#164E63",
       "mapVegetation": "#166534",
-      "mapUnknown": "#475569"
+      "mapUnknown": "#475569",
+      "primaryText": "#0B1220",
+      "accentAction": "#22D3EE",
+      "accentText": "#0B1220"
     },
     "semanticMapLegend": [
       {
@@ -232,7 +238,9 @@
       "confidenceBadge": "text label + icon, not color alone",
       "colorSwatches": "always display hex and mark sampled vs estimated",
       "loadingState": "skeleton or small spinner; preserve map interaction where possible",
-      "errors": "human-readable error and retry action; do not rely on red alone"
+      "errors": "human-readable error and retry action; do not rely on red alone",
+      "primaryButton": "Use primary as the button fill and primaryText for its label; never assume white text works on every blue variant.",
+      "accent": "Use accent for map outlines/highlights; use accentAction for text-bearing accent buttons. Dark-mode cyan accent should use dark-navy text."
     },
     "accessibility": {
       "rules": [
@@ -241,7 +249,18 @@
         "Use visible keyboard focus and accessible labels for map controls.",
         "Ensure labels, attribution and image licence are legible on both light and dark panels."
       ],
-      "note": "Tokens are a proposed palette; automated contrast and actual component-state testing are still required before claiming WCAG conformance."
+      "note": "Tokens are a proposed palette; automated contrast and actual component-state testing are still required before claiming WCAG conformance.",
+      "contrastReview": {
+        "method": "WCAG relative-luminance contrast formula applied to selected foreground/background token pairs",
+        "sampleRatios": {
+          "lightBodyTextOnWhitePanel": 17.85,
+          "lightWhiteTextOnPrimaryBlue": 5.17,
+          "lightWhiteTextOnOriginalCyanAccent": 3.68,
+          "darkBodyTextOnDarkPanel": 16.96,
+          "darkWhiteTextOnOriginalLightBluePrimary": 2.54
+        },
+        "guidance": "Use the dedicated primaryText/accentText tokens. In light mode #0891B2 is a visual/map accent, not a default background for small white text; use #0E7490 when an accent button needs white text. In dark mode #60A5FA needs dark-navy text rather than white for a primary button. Run automated checks on final component states."
+      }
     }
   },
   "architecturePalettes": [
