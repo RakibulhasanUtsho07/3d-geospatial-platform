@@ -21,9 +21,21 @@ The first building-rendering pass converts Overture building footprints into lig
 
 Palette and pattern selection are deterministic. The same feature ID should retain its style across reloads, avoiding random visual flicker.
 
-## Performance controls
+## Performance controls and camera-aware LOD
 
-The initial detailed-facade budget is `MAX_DETAILED_FACADES = 650`. The dataset is still processed in batches, and the camera prioritization means the detail budget is spent near the initial Dhaka view rather than on whichever features happen to appear first in the GeoJSON file. Tune this cap only after checking browser memory, frame rate, and visual quality on the target machine.
+The map starts by styling the full Overture pilot with lightweight polygon extrusions in batches. It then promotes only a bounded set of buildings near the live view center to textured facades. The detail budget is selected from camera altitude:
+
+| Camera height | Detailed facade budget |
+| --- | ---: |
+| Below 2.5 km | 650 |
+| 2.5–6 km | 420 |
+| 6–12 km | 220 |
+| 12–25 km | 80 |
+| 25 km and above | 0 |
+
+After a camera move ends, the adapter picks the center of the current view on the ellipsoid, ranks eligible building footprints by distance, and updates only those whose LOD tier changed. The camera origin is only recomputed once the view center has moved by a small threshold, preventing unnecessary re-styling after tiny movements. A selected building is kept in the detailed tier while its details panel is open.
+
+The LOD budget is a performance heuristic rather than a device benchmark. Tune it after measuring frame rate, memory, and visual quality on target hardware. This is client-side entity LOD; the pilot data is still loaded as GeoJSON and is not yet streamed as tiled city geometry.
 
 ## Important data limitations
 
@@ -48,11 +60,11 @@ The initial detailed-facade budget is `MAX_DETAILED_FACADES = 650`. The dataset 
 
 ## Next improvements
 
-1. Add explicit LOD tiers based on camera distance and device capability.
-2. Add roof profiles and restrained rooftop equipment only when they can be generated without overwhelming entity count.
-3. Move dense city geometry to streamed 3D Tiles rather than keeping the entire pilot as one GeoJSON data source.
-4. Support per-property GLB models and verified photogrammetry for locations where high fidelity matters.
-5. Add visual regression snapshots and a local performance benchmark before increasing the detailed facade budget.
+1. Replace the GeoJSON city pilot with streamed vector/3D Tiles as the coverage and dataset size grow.
+2. Add device-capability-aware budgets and benchmark LOD thresholds on low- and mid-range hardware.
+3. Support per-property GLB models and verified photogrammetry where high fidelity matters.
+4. Add visual regression snapshots and a repeatable local frame-time/memory benchmark.
+5. Revisit roof profiles and rooftop equipment only where geometry can remain within a measured entity budget.
 
 ## Verification
 
