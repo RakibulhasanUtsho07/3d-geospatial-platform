@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated Overture viewport tiles (rebuild with npm run build:geospatial-tiles)
+/data/overture/spatial-tiles/
