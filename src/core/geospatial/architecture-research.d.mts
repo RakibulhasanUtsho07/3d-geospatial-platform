@@ -61,3 +61,27 @@ export function filterArchitectureReferences(
 export function summarizeArchitectureReferences(
   references: ArchitectureResearchReference[],
 ): ArchitectureResearchSummary;
+
+export type ArchitecturePreviewPattern =
+  | "balcony"
+  | "vertical-glass"
+  | "urban-grid"
+  | "compact"
+  | "heritage-arches"
+  | "painted-balcony"
+  | "biophilic-balcony"
+  | "brick-modernist";
+
+export interface ArchitectureStylePreview {
+  id: string;
+  facadeColor: string;
+  roofColor: string;
+  accentColor: string;
+  pattern: ArchitecturePreviewPattern;
+  roofDetail: "water-tank" | "hvac-unit" | "none";
+  repeatWidthMeters: number;
+}
+
+export function createArchitectureStylePreview(
+  reference: ArchitectureResearchReference,
+): ArchitectureStylePreview;
