@@ -230,7 +230,7 @@ export function createArchitectureStylePreview(reference) {
   const hasGrilles = /grille|grilled|grill/.test(features);
   const hasBalconies = /balcon|terrace/.test(features);
   const hasRoofGarden = /rooftop garden|roof garden|green roof|shared rooftop green|roof garden and|rooftop.*green zone/.test(roofEvidence);
-  const hasRoofTerrace = /roof.?terrace|roof.?deck|shared rooftop space|landscaped terrace/.test(roofEvidence);
+  const hasRoofTerrace = /rooftop terrace|roof.?terrace|rooftop deck|roof.?deck|shared rooftop space|landscaped terrace/.test(roofEvidence);
   const isVideoContext = reference?.mediaType === "video";
 
   return {
