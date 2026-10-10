@@ -13,6 +13,7 @@ import {
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
+import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import type {
   CameraTarget,
@@ -130,10 +131,16 @@ export class CesiumAdapter implements MapEngine {
     | null = null;
 
   private overtureBuildings: CesiumDataSource | null = null;
+  private nearbyPlacesDataSource: import("cesium").CustomDataSource | null = null;
+  private readonly nearbyPlaceByEntityId = new Map<string, NearbyPlace>();
+  private readonly placeSelectionListeners = new Set<
+    (place: NearbyPlace | null) => void
+  >();
 
   private readonly layerVisibility = new Map<MapLayerId, boolean>([
     [MAP_LAYER_IDS.baseImagery, true],
     [MAP_LAYER_IDS.overtureBuildings, true],
+    [MAP_LAYER_IDS.nearbyPlaces, false],
   ]);
 
   private clickHandler:
@@ -1442,6 +1449,120 @@ export class CesiumAdapter implements MapEngine {
     };
   }
 
+  onPlaceSelected(
+    listener: (place: NearbyPlace | null) => void,
+  ): () => void {
+    this.placeSelectionListeners.add(listener);
+    return () => this.placeSelectionListeners.delete(listener);
+  }
+
+  private emitPlaceSelection(place: NearbyPlace | null): void {
+    for (const listener of this.placeSelectionListeners) {
+      try {
+        listener(place);
+      } catch (error: unknown) {
+        console.error(
+          "[Map] Nearby-place selection listener failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+  }
+
+  getGroundCenter(): import("./types").GeoCoordinate | null {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return null;
+
+    const screenCenter = new Cesium.Cartesian2(
+      viewer.scene.canvas.clientWidth / 2,
+      viewer.scene.canvas.clientHeight / 2,
+    );
+    const ray = viewer.camera.getPickRay(screenCenter);
+    const groundPosition =
+      (ray ? viewer.scene.globe.pick(ray, viewer.scene) : undefined) ??
+      viewer.camera.pickEllipsoid(screenCenter, viewer.scene.globe.ellipsoid);
+    if (!groundPosition) return null;
+
+    const cartographic = Cesium.Cartographic.fromCartesian(groundPosition);
+    const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+    const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    return { latitude, longitude, height: 0 };
+  }
+
+  async setNearbyPlaces(places: NearbyPlace[]): Promise<void> {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+
+    let dataSource = this.nearbyPlacesDataSource;
+    if (!dataSource) {
+      dataSource = new Cesium.CustomDataSource("OpenStreetMap Nearby Places");
+      await viewer.dataSources.add(dataSource);
+      if (this.viewer !== viewer || viewer.isDestroyed()) {
+        viewer.dataSources.remove(dataSource, true);
+        return;
+      }
+      this.nearbyPlacesDataSource = dataSource;
+    }
+
+    dataSource.entities.removeAll();
+    this.nearbyPlaceByEntityId.clear();
+
+    const categoryColors: Record<NearbyPlace["category"], string> = {
+      pharmacy: "#22c55e",
+      hospital: "#ef4444",
+      medical_center: "#fb923c",
+      supermarket: "#38bdf8",
+      market: "#c084fc",
+    };
+
+    for (const place of places) {
+      const entityId = place.id;
+      const color = Cesium.Color.fromCssColorString(
+        categoryColors[place.category],
+      ) ?? Cesium.Color.CYAN;
+
+      dataSource.entities.add({
+        id: entityId,
+        name: place.name,
+        position: Cesium.Cartesian3.fromDegrees(
+          place.longitude,
+          place.latitude,
+          3,
+        ),
+        point: {
+          pixelSize: 11,
+          color: color.withAlpha(0.98),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: 1200,
+        },
+        label: {
+          text: place.name,
+          font: "12px sans-serif",
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          showBackground: true,
+          backgroundColor: Cesium.Color.BLACK.withAlpha(0.72),
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          scaleByDistance: new Cesium.NearFarScalar(100, 1, 2600, 0.2),
+          disableDepthTestDistance: 1200,
+        },
+      });
+      this.nearbyPlaceByEntityId.set(entityId, place);
+    }
+
+    dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.nearbyPlaces);
+    viewer.scene.requestRender();
+  }
+
   private emitFeatureSelection(
     selection: MapFeatureSelection | null,
   ): void {
@@ -1483,6 +1604,7 @@ export class CesiumAdapter implements MapEngine {
     const hadSelection = this.selectedBuilding !== null;
     this.restoreSelectedBuilding();
     this.emitFeatureSelection(null);
+    this.emitPlaceSelection(null);
 
     if (
       hadSelection &&
@@ -1554,9 +1676,26 @@ export class CesiumAdapter implements MapEngine {
         }
 
         const picked = viewer.scene.pick(movement.position);
-        const dataSource = this.overtureBuildings;
+        if (!picked) {
+          this.clearFeatureSelection();
+          return;
+        }
 
-        if (!picked || !dataSource) {
+        const nearbySource = this.nearbyPlacesDataSource;
+        const nearbyEntity = nearbySource
+          ? this.getEntityFromPick(picked, Cesium, nearbySource)
+          : null;
+
+        if (nearbyEntity?.point) {
+          this.clearFeatureSelection();
+          this.emitPlaceSelection(
+            this.nearbyPlaceByEntityId.get(nearbyEntity.id) ?? null,
+          );
+          return;
+        }
+
+        const dataSource = this.overtureBuildings;
+        if (!dataSource) {
           this.clearFeatureSelection();
           return;
         }
@@ -1573,6 +1712,7 @@ export class CesiumAdapter implements MapEngine {
         }
 
         this.restoreSelectedBuilding();
+        this.emitPlaceSelection(null);
 
         this.selectedBuilding = entity;
 
@@ -1730,6 +1870,8 @@ export class CesiumAdapter implements MapEngine {
     this.cameraMoveEndUnsubscribe = null;
 
     this.featureSelectionListeners.clear();
+    this.placeSelectionListeners.clear();
+    this.nearbyPlaceByEntityId.clear();
     this.renderedBuildingMetadata.clear();
     this.buildingLodRecords = [];
     this.loadedViewportBounds = null;
@@ -1743,6 +1885,7 @@ export class CesiumAdapter implements MapEngine {
 
     this.baseImageryLayer = null;
     this.overtureBuildings = null;
+    this.nearbyPlacesDataSource = null;
 
     if (this.viewer && !this.viewer.isDestroyed()) {
       this.viewer.destroy();
@@ -1973,6 +2116,11 @@ export class CesiumAdapter implements MapEngine {
         name: "Overture 3D buildings",
         visible: this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
       },
+      {
+        id: MAP_LAYER_IDS.nearbyPlaces,
+        name: "Nearby places",
+        visible: this.isLayerVisible(MAP_LAYER_IDS.nearbyPlaces),
+      },
     ];
   }
 
@@ -1993,6 +2141,10 @@ export class CesiumAdapter implements MapEngine {
         this.pendingViewportBounds = null;
         this.pendingViewportFeatureLimit = null;
         this.viewportRequestAbortController?.abort();
+      }
+    } else if (layerId === MAP_LAYER_IDS.nearbyPlaces) {
+      if (this.nearbyPlacesDataSource) {
+        this.nearbyPlacesDataSource.show = visible;
       }
     }
 

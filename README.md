@@ -10,7 +10,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Click-to-select building details, geographic coordinates, source attributes, and a camera-focus action.
 - Approximate ground footprint in square metres and square feet; when a floor count exists, an explicitly labeled gross floor-area estimate.
 - Bounded building-discovery search across source names, attributes, categories, and Overture IDs; selecting a result moves the camera to its geographic center.
-- A map-layer panel to show or hide the OpenStreetMap street imagery and the Overture 3D building layer independently.
+- A map-layer panel to show or hide OpenStreetMap street imagery, Overture 3D buildings, and nearby service markers independently.
+- Nearby-place discovery for pharmacies, hospitals, clinics/medical centres, supermarkets, and markets/bazars around the visible map centre; results can be focused and opened in OpenStreetMap.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
@@ -59,6 +60,7 @@ npm run test:viewport-cache
 npm run test:viewport-load-policy
 npm run test:building-search
 npm run test:footprint-area
+npm run test:nearby-places
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
@@ -80,8 +82,11 @@ CI also starts the production server and verifies the viewport and building-sear
 - `GET /api/geospatial/overture-buildings` — pilot building collection.
 - `GET /api/geospatial/overture-buildings/viewport?west=…&south=…&east=…&north=…&limit=…` — viewport-specific building data.
 - `GET /api/geospatial/overture-buildings/search?q=…&limit=8` — bounded search through names, source attributes, categories, and feature identifiers. Queries must be 2–100 characters; results are capped at 20.
+- `GET /api/geospatial/nearby-places?lat=…&lon=…&radius=800&categories=pharmacy,hospital&limit=100` — nearby pharmacies, hospitals, clinics, supermarkets, and markets. Radius is capped at 1.5 km and results at 150.
 
 The viewport endpoint validates coordinate bounds and feature limits. Responses include diagnostic headers for data source, tile count, candidate/matched/returned features, truncation, sampling strategy, and cache activity. The search API caches a compact search index in memory and returns only summary fields needed by the map UI.
+
+Nearby-place results come from the public OpenStreetMap Overpass API and are cached in application memory for five minutes, with duplicate in-flight requests coalesced and active upstream queries bounded. Public Overpass instances are shared community infrastructure intended for modest workloads; a production deployment with growing usage should move to a managed data provider or an operated instance. OSM content is attributed to OpenStreetMap contributors under the ODbL.
 
 ## Current pilot limitations
 

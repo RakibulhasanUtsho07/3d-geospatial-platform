@@ -14,6 +14,8 @@ function getLayerDescription(layerId: MapLayerId): string {
       return "OpenStreetMap streets and place labels";
     case "overture-buildings":
       return "Extruded building footprints with adaptive detail";
+    case "nearby-places":
+      return "Pharmacies, hospitals, markets and supermarkets";
   }
 }
 

@@ -13,6 +13,8 @@ export type CameraTarget = {
   durationMs?: number;
 };
 
+import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
+
 export interface MapFeatureSelection {
   source:
     | "cesium-ion-osm-buildings"
@@ -46,6 +48,7 @@ export type MapEngineCapabilities = {
 export const MAP_LAYER_IDS = {
   baseImagery: "base-imagery",
   overtureBuildings: "overture-buildings",
+  nearbyPlaces: "nearby-places",
 } as const;
 
 export type MapLayerId =
@@ -96,6 +99,10 @@ export interface MapEngine {
   getLayers(): MapLayer[];
 
   setLayerVisibility(layerId: MapLayerId, visible: boolean): void;
+
+  getGroundCenter(): GeoCoordinate | null;
+  setNearbyPlaces(places: NearbyPlace[]): Promise<void>;
+  onPlaceSelected(listener: (place: NearbyPlace | null) => void): () => void;
 
   pickFeature(
     screenX: number,

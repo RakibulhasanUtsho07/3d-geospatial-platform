@@ -6,12 +6,14 @@ import { useEffect, useRef, useState } from "react";
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
+import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type {
   MapFeatureSelection,
   MapLayer,
 } from "@/core/map-engine/types";
 
 import BuildingSearchPanel from "./BuildingSearchPanel";
+import NearbyPlacesPanel from "./NearbyPlacesPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
@@ -40,6 +42,7 @@ export default function MapCanvas() {
     useState<string | null>(null);
   const [selectedFeature, setSelectedFeature] =
     useState<MapFeatureSelection | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<NearbyPlace | null>(null);
   const [layers, setLayers] = useState<MapLayer[]>([]);
   const [retryKey, setRetryKey] = useState(0);
 
@@ -67,15 +70,23 @@ export default function MapCanvas() {
       (feature) => {
         if (!cancelled) {
           setSelectedFeature(feature);
+          if (feature) setSelectedPlace(null);
         }
       },
     );
+    const unsubscribePlaceSelection = engine.onPlaceSelected((place) => {
+      if (!cancelled) {
+        setSelectedPlace(place);
+        if (place) setSelectedFeature(null);
+      }
+    });
 
     async function initialize(container: HTMLDivElement) {
       try {
         setStatus("loading");
         setErrorMessage(null);
         setSelectedFeature(null);
+        setSelectedPlace(null);
 
         await engine.initialize(container);
 
@@ -124,6 +135,7 @@ export default function MapCanvas() {
       cancelled = true;
 
       unsubscribeSelection();
+      unsubscribePlaceSelection();
 
       if (cameraRef.current === camera) {
         cameraRef.current = null;
@@ -142,6 +154,7 @@ export default function MapCanvas() {
     setErrorMessage(null);
     setStatus("loading");
     setSelectedFeature(null);
+    setSelectedPlace(null);
     setRetryKey((previous) => previous + 1);
   }
 
@@ -211,6 +224,37 @@ export default function MapCanvas() {
     setLayers(engine.getLayers());
   }
 
+  function getNearbyPlacesCenter() {
+    return engineRef.current?.getGroundCenter() ?? null;
+  }
+
+  async function handleNearbyPlacesLoaded(places: NearbyPlace[]) {
+    const engine = engineRef.current;
+    if (!engine) return;
+    await engine.setNearbyPlaces(places);
+    setLayers(engine.getLayers());
+  }
+
+  function focusNearbyPlace(place: NearbyPlace) {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+    setSelectedPlace(place);
+    engine.flyTo({
+      destination: {
+        longitude: place.longitude,
+        latitude: place.latitude,
+        height: 180,
+      },
+      heading: 0,
+      pitch: -48,
+      roll: 0,
+      durationMs: 900,
+    });
+  }
+
   function focusSearchResult(result: BuildingSearchResult) {
     const engine = engineRef.current;
     if (!engine) {
@@ -247,6 +291,15 @@ export default function MapCanvas() {
       <BuildingSearchPanel
         disabled={status !== "ready"}
         onSelect={focusSearchResult}
+      />
+
+      <NearbyPlacesPanel
+        disabled={status !== "ready"}
+        getCenter={getNearbyPlacesCenter}
+        onPlacesLoaded={handleNearbyPlacesLoaded}
+        selectedPlace={selectedPlace}
+        onSelectPlace={focusNearbyPlace}
+        onClearSelectedPlace={() => setSelectedPlace(null)}
       />
 
       {layers.length > 0 && (

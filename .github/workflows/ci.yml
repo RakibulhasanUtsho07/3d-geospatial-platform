@@ -58,6 +58,9 @@ jobs:
       - name: Test building footprint area calculations
         run: npm run test:footprint-area
 
+      - name: Test nearby-place query and normalization
+        run: npm run test:nearby-places
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
@@ -97,6 +100,14 @@ jobs:
 
           if (!ready) {
             console.error("Next.js production server did not become ready.");
+            process.exit(1);
+          }
+
+          const nearby = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/nearby-places",
+          );
+          if (nearby.status !== 400) {
+            console.error("Nearby places endpoint should reject a request without coordinates.");
             process.exit(1);
           }
           NODE
