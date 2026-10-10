@@ -14,6 +14,7 @@ import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
+import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import type {
   CameraTarget,
@@ -136,11 +137,18 @@ export class CesiumAdapter implements MapEngine {
   private readonly placeSelectionListeners = new Set<
     (place: NearbyPlace | null) => void
   >();
+  private propertyListingsDataSource: import("cesium").CustomDataSource | null = null;
+  private readonly propertyByEntityId = new Map<string, PropertyListing>();
+  private readonly propertySelectionListeners = new Set<
+    (property: PropertyListing | null) => void
+  >();
+  private propertyNavigationEntity: CesiumEntity | null = null;
 
   private readonly layerVisibility = new Map<MapLayerId, boolean>([
     [MAP_LAYER_IDS.baseImagery, true],
     [MAP_LAYER_IDS.overtureBuildings, true],
     [MAP_LAYER_IDS.nearbyPlaces, false],
+    [MAP_LAYER_IDS.propertyListings, false],
   ]);
 
   private clickHandler:
@@ -1660,6 +1668,124 @@ export class CesiumAdapter implements MapEngine {
     return null;
   }
 
+  onPropertySelected(listener: (property: PropertyListing | null) => void): () => void {
+    this.propertySelectionListeners.add(listener);
+    return () => this.propertySelectionListeners.delete(listener);
+  }
+
+  private emitPropertySelection(property: PropertyListing | null): void {
+    for (const listener of this.propertySelectionListeners) {
+      try {
+        listener(property);
+      } catch (error: unknown) {
+        console.error(
+          "[Map] Property-selection listener failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+  }
+
+  async setPropertyListings(properties: PropertyListing[]): Promise<void> {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+
+    let dataSource = this.propertyListingsDataSource;
+    if (!dataSource) {
+      dataSource = new Cesium.CustomDataSource("Illustrative Property Listings");
+      await viewer.dataSources.add(dataSource);
+      if (this.viewer !== viewer || viewer.isDestroyed()) {
+        viewer.dataSources.remove(dataSource, true);
+        return;
+      }
+      this.propertyListingsDataSource = dataSource;
+    }
+
+    dataSource.entities.removeAll();
+    this.propertyByEntityId.clear();
+    const rentColor = Cesium.Color.fromCssColorString("#fbbf24") ?? Cesium.Color.YELLOW;
+    const labelColor = Cesium.Color.fromCssColorString("#fde68a") ?? Cesium.Color.YELLOW;
+
+    for (const property of properties) {
+      const entityId = "property:" + property.id;
+      dataSource.entities.add({
+        id: entityId,
+        name: property.title,
+        position: Cesium.Cartesian3.fromDegrees(property.longitude, property.latitude, 3),
+        point: {
+          pixelSize: 13,
+          color: rentColor.withAlpha(0.98),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: 1500,
+        },
+        label: {
+          text: "৳" + property.monthlyRentBdt.toLocaleString("en-BD"),
+          font: "11px sans-serif",
+          fillColor: labelColor,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: 1000,
+          showBackground: true,
+          backgroundColor: Cesium.Color.BLACK.withAlpha(0.65),
+        },
+      });
+      this.propertyByEntityId.set(entityId, property);
+    }
+
+    this.layerVisibility.set(MAP_LAYER_IDS.propertyListings, properties.length > 0);
+    dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.propertyListings);
+    viewer.scene.requestRender();
+  }
+
+  setNavigationPath(
+    origin: import("./types").GeoCoordinate | null,
+    destination: import("./types").GeoCoordinate | null,
+  ): void {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+
+    if (this.propertyNavigationEntity) {
+      viewer.entities.remove(this.propertyNavigationEntity);
+      this.propertyNavigationEntity = null;
+    }
+    if (!origin || !destination) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    const routeColor = Cesium.Color.fromCssColorString("#22d3ee") ?? Cesium.Color.CYAN;
+    this.propertyNavigationEntity = viewer.entities.add({
+      id: "selected-property-straight-line",
+      name: "Selected property straight-line indicator (not road routing)",
+      position: Cesium.Cartesian3.fromDegrees(destination.longitude, destination.latitude, 4),
+      point: {
+        pixelSize: 15,
+        color: Cesium.Color.fromCssColorString("#fbbf24") ?? Cesium.Color.YELLOW,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: 2000,
+      },
+      polyline: {
+        positions: [
+          Cesium.Cartesian3.fromDegrees(origin.longitude, origin.latitude, 3),
+          Cesium.Cartesian3.fromDegrees(destination.longitude, destination.latitude, 3),
+        ],
+        width: 3,
+        material: routeColor,
+        clampToGround: true,
+        arcType: Cesium.ArcType.GEODESIC,
+      },
+    });
+    viewer.scene.requestRender();
+  }
+
   private installFeaturePicking(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
@@ -1694,9 +1820,21 @@ export class CesiumAdapter implements MapEngine {
 
         if (nearbyEntity?.point) {
           this.clearFeatureSelection();
+          this.emitPropertySelection(null);
           this.emitPlaceSelection(
             this.nearbyPlaceByEntityId.get(nearbyEntity.id) ?? null,
           );
+          return;
+        }
+
+        const propertySource = this.propertyListingsDataSource;
+        const propertyEntity = propertySource
+          ? this.getEntityFromPick(picked, Cesium, propertySource)
+          : null;
+        if (propertyEntity?.point) {
+          this.clearFeatureSelection();
+          this.emitPlaceSelection(null);
+          this.emitPropertySelection(this.propertyByEntityId.get(propertyEntity.id) ?? null);
           return;
         }
 
@@ -1719,6 +1857,7 @@ export class CesiumAdapter implements MapEngine {
 
         this.restoreSelectedBuilding();
         this.emitPlaceSelection(null);
+        this.emitPropertySelection(null);
 
         this.selectedBuilding = entity;
 
@@ -1877,7 +2016,9 @@ export class CesiumAdapter implements MapEngine {
 
     this.featureSelectionListeners.clear();
     this.placeSelectionListeners.clear();
+    this.propertySelectionListeners.clear();
     this.nearbyPlaceByEntityId.clear();
+    this.propertyByEntityId.clear();
     this.renderedBuildingMetadata.clear();
     this.buildingLodRecords = [];
     this.loadedViewportBounds = null;
@@ -1892,6 +2033,8 @@ export class CesiumAdapter implements MapEngine {
     this.baseImageryLayer = null;
     this.overtureBuildings = null;
     this.nearbyPlacesDataSource = null;
+    this.propertyListingsDataSource = null;
+    this.propertyNavigationEntity = null;
 
     if (this.viewer && !this.viewer.isDestroyed()) {
       this.viewer.destroy();
@@ -2127,6 +2270,11 @@ export class CesiumAdapter implements MapEngine {
         name: "Nearby places",
         visible: this.isLayerVisible(MAP_LAYER_IDS.nearbyPlaces),
       },
+      {
+        id: MAP_LAYER_IDS.propertyListings,
+        name: "Property listings (demo)",
+        visible: this.isLayerVisible(MAP_LAYER_IDS.propertyListings),
+      },
     ];
   }
 
@@ -2151,6 +2299,10 @@ export class CesiumAdapter implements MapEngine {
     } else if (layerId === MAP_LAYER_IDS.nearbyPlaces) {
       if (this.nearbyPlacesDataSource) {
         this.nearbyPlacesDataSource.show = visible;
+      }
+    } else if (layerId === MAP_LAYER_IDS.propertyListings) {
+      if (this.propertyListingsDataSource) {
+        this.propertyListingsDataSource.show = visible;
       }
     }
 

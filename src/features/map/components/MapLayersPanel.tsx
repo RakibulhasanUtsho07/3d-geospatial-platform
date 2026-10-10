@@ -16,6 +16,8 @@ function getLayerDescription(layerId: MapLayerId): string {
       return "Extruded building footprints with adaptive detail";
     case "nearby-places":
       return "Pharmacies, hospitals, markets and supermarkets";
+    case "property-listings":
+      return "Illustrative rental markers from the demo listing data";
   }
 }
 

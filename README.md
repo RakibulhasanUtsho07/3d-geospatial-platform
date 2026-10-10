@@ -12,6 +12,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Bounded building-discovery search across source names, attributes, categories, and Overture IDs; selecting a result moves the camera to its geographic center.
 - A map-layer panel to show or hide OpenStreetMap street imagery, Overture 3D buildings, and nearby service markers independently.
 - Nearby-place discovery for pharmacies, hospitals, clinics/medical centres, supermarkets, and markets/bazars around the visible map centre; results can be focused and opened in OpenStreetMap.
+- Filterable **illustrative demo property listings** with rent, bedrooms, property type, furnishing, area and radius filters; browser-local saved favourites persist between visits.
+- Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
@@ -61,6 +63,7 @@ npm run test:viewport-load-policy
 npm run test:building-search
 npm run test:footprint-area
 npm run test:nearby-places
+npm run test:property-listings
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
@@ -83,6 +86,7 @@ CI also starts the production server and verifies the viewport and building-sear
 - `GET /api/geospatial/overture-buildings/viewport?west=…&south=…&east=…&north=…&limit=…` — viewport-specific building data.
 - `GET /api/geospatial/overture-buildings/search?q=…&limit=8` — bounded search through names, source attributes, categories, and feature identifiers. Queries must be 2–100 characters; results are capped at 20.
 - `GET /api/geospatial/nearby-places?lat=…&lon=…&radius=800&categories=pharmacy,hospital&limit=100` — nearby pharmacies, hospitals, clinics, supermarkets, and markets. Radius is capped at 1.5 km and results at 150.
+- `GET /api/geospatial/properties?lat=…&lon=…&radius=5000&minRent=15000&maxRent=45000&minBedrooms=2&type=apartment&furnishing=all&limit=50` — bounded demo-property discovery with rent, type, bedroom, furnishing, text and radius filters. Saved-only queries accept a browser-provided `savedIds` list.
 
 The viewport endpoint validates coordinate bounds and feature limits. Responses include diagnostic headers for data source, tile count, candidate/matched/returned features, truncation, sampling strategy, and cache activity. The search API caches a compact search index in memory and returns only summary fields needed by the map UI.
 
@@ -90,6 +94,6 @@ Nearby-place results come from the public OpenStreetMap Overpass API and are cac
 
 ## Current pilot limitations
 
-This is not yet a production property marketplace. Property listings, rent/price availability, room and floor-plan modeling, indoor furniture configuration, AI interior design, and categorized nearby-place search still need their own data models and feature modules. The current dataset and visual quality should be treated as a Dhaka-focused technical pilot.
+This is not yet a production property marketplace. The property API currently returns clearly labelled illustrative seed records for prototyping; they are not real offers and have no verified prices, owner information, or live availability. Saved listings are stored in the current browser only. Road-network routing, room and floor-plan modeling, indoor furniture configuration and AI interior design still need dedicated data sources and feature modules. Service matching is limited to mapped OpenStreetMap objects returned by the latest nearby query; straight-line distances are not walking or driving routes. The current building dataset and visual quality remain a Dhaka-focused technical pilot.
 
 For more detail on tile generation, endpoint validation, diagnostics, and manual map checks, see [the Geospatial Tile Pipeline guide](docs/GEOSPATIAL-TILE-PIPELINE.md).

@@ -7,6 +7,7 @@ import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
+import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type {
   MapFeatureSelection,
   MapLayer,
@@ -14,6 +15,7 @@ import type {
 
 import BuildingSearchPanel from "./BuildingSearchPanel";
 import NearbyPlacesPanel from "./NearbyPlacesPanel";
+import PropertyListingsPanel from "./PropertyListingsPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
@@ -43,6 +45,8 @@ export default function MapCanvas() {
   const [selectedFeature, setSelectedFeature] =
     useState<MapFeatureSelection | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<NearbyPlace | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[] | null>(null);
   const [layers, setLayers] = useState<MapLayer[]>([]);
   const [retryKey, setRetryKey] = useState(0);
 
@@ -70,15 +74,26 @@ export default function MapCanvas() {
       (feature) => {
         if (!cancelled) {
           setSelectedFeature(feature);
-          if (feature) setSelectedPlace(null);
+          if (feature) {
+            setSelectedPlace(null);
+            setSelectedProperty(null);
+            engine.setNavigationPath(null, null);
+          }
         }
       },
     );
     const unsubscribePlaceSelection = engine.onPlaceSelected((place) => {
       if (!cancelled) {
         setSelectedPlace(place);
-        if (place) setSelectedFeature(null);
+        if (place) {
+          setSelectedFeature(null);
+          setSelectedProperty(null);
+          engine.setNavigationPath(null, null);
+        }
       }
+    });
+    const unsubscribePropertySelection = engine.onPropertySelected((property) => {
+      if (!cancelled && property) focusProperty(property);
     });
 
     async function initialize(container: HTMLDivElement) {
@@ -87,6 +102,8 @@ export default function MapCanvas() {
         setErrorMessage(null);
         setSelectedFeature(null);
         setSelectedPlace(null);
+        setSelectedProperty(null);
+        setNearbyPlaces(null);
 
         await engine.initialize(container);
 
@@ -136,6 +153,7 @@ export default function MapCanvas() {
 
       unsubscribeSelection();
       unsubscribePlaceSelection();
+      unsubscribePropertySelection();
 
       if (cameraRef.current === camera) {
         cameraRef.current = null;
@@ -155,6 +173,9 @@ export default function MapCanvas() {
     setStatus("loading");
     setSelectedFeature(null);
     setSelectedPlace(null);
+    setSelectedProperty(null);
+    setNearbyPlaces(null);
+    engineRef.current?.setNavigationPath(null, null);
     setRetryKey((previous) => previous + 1);
   }
 
@@ -164,6 +185,8 @@ export default function MapCanvas() {
   }
 
   function goHomeToDhaka() {
+    engineRef.current?.setNavigationPath(null, null);
+    setSelectedProperty(null);
     engineRef.current?.flyTo({
       destination: DHAKA_CAMERA_TARGET,
       ...DHAKA_CAMERA_ORIENTATION,
@@ -232,7 +255,58 @@ export default function MapCanvas() {
     const engine = engineRef.current;
     if (!engine) return;
     await engine.setNearbyPlaces(places);
+    setNearbyPlaces(places);
     setLayers(engine.getLayers());
+  }
+
+  async function handlePropertiesLoaded(properties: PropertyListing[]) {
+    const engine = engineRef.current;
+    if (!engine) return;
+    await engine.setPropertyListings(properties);
+    setLayers(engine.getLayers());
+  }
+
+  function focusProperty(property: PropertyListing) {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const origin = engine.getGroundCenter();
+    const destination = { longitude: property.longitude, latitude: property.latitude, height: 0 };
+    engine.clearFeatureSelection();
+    engine.setNavigationPath(origin, destination);
+    setSelectedFeature(null);
+    setSelectedPlace(null);
+    setSelectedProperty(property);
+    engine.flyTo({
+      destination: { longitude: property.longitude, latitude: property.latitude, height: 190 },
+      heading: 0,
+      pitch: -48,
+      roll: 0,
+      durationMs: 1000,
+    });
+  }
+
+  async function checkNearbyServicesForProperty(property: PropertyListing) {
+    focusProperty(property);
+    const params = new URLSearchParams({
+      lat: String(property.latitude),
+      lon: String(property.longitude),
+      radius: "1500",
+      categories: "pharmacy,hospital,medical_center,supermarket,market",
+      limit: "100",
+    });
+    const response = await fetch("/api/geospatial/nearby-places?" + params.toString(), {
+      signal: AbortSignal.timeout(30_000),
+    });
+    const payload = (await response.json()) as { error?: string; results?: NearbyPlace[] };
+    if (!response.ok) throw new Error(payload.error ?? "Could not load services around this property.");
+    if (!Array.isArray(payload.results)) throw new Error("The nearby service API returned an invalid response.");
+    await handleNearbyPlacesLoaded(payload.results);
+  }
+
+  function clearSelectedProperty() {
+    engineRef.current?.setNavigationPath(null, null);
+    setSelectedProperty(null);
   }
 
   function focusNearbyPlace(place: NearbyPlace) {
@@ -240,6 +314,8 @@ export default function MapCanvas() {
     if (!engine) return;
 
     engine.clearFeatureSelection();
+    engine.setNavigationPath(null, null);
+    setSelectedProperty(null);
     setSelectedFeature(null);
     setSelectedPlace(place);
     engine.flyTo({
@@ -262,6 +338,8 @@ export default function MapCanvas() {
     }
 
     engine.clearFeatureSelection();
+    engine.setNavigationPath(null, null);
+    setSelectedProperty(null);
     setSelectedFeature(null);
 
     engine.flyTo({
@@ -296,10 +374,22 @@ export default function MapCanvas() {
       <NearbyPlacesPanel
         disabled={status !== "ready"}
         getCenter={getNearbyPlacesCenter}
+        loadedPlaces={nearbyPlaces}
         onPlacesLoaded={handleNearbyPlacesLoaded}
         selectedPlace={selectedPlace}
         onSelectPlace={focusNearbyPlace}
         onClearSelectedPlace={() => setSelectedPlace(null)}
+      />
+
+      <PropertyListingsPanel
+        disabled={status !== "ready"}
+        getCenter={getNearbyPlacesCenter}
+        onPropertiesLoaded={handlePropertiesLoaded}
+        nearbyPlaces={nearbyPlaces}
+        selectedProperty={selectedProperty}
+        onSelectProperty={focusProperty}
+        onCheckNearbyServices={checkNearbyServicesForProperty}
+        onClearSelectedProperty={clearSelectedProperty}
       />
 
       {layers.length > 0 && (

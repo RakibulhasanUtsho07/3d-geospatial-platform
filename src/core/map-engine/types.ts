@@ -14,6 +14,7 @@ export type CameraTarget = {
 };
 
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
+import type { PropertyListing } from "../geospatial/property-listings.mjs";
 
 export interface MapFeatureSelection {
   source:
@@ -49,6 +50,7 @@ export const MAP_LAYER_IDS = {
   baseImagery: "base-imagery",
   overtureBuildings: "overture-buildings",
   nearbyPlaces: "nearby-places",
+  propertyListings: "property-listings",
 } as const;
 
 export type MapLayerId =
@@ -103,6 +105,10 @@ export interface MapEngine {
   getGroundCenter(): GeoCoordinate | null;
   setNearbyPlaces(places: NearbyPlace[]): Promise<void>;
   onPlaceSelected(listener: (place: NearbyPlace | null) => void): () => void;
+
+  setPropertyListings(properties: PropertyListing[]): Promise<void>;
+  onPropertySelected(listener: (property: PropertyListing | null) => void): () => void;
+  setNavigationPath(origin: GeoCoordinate | null, destination: GeoCoordinate | null): void;
 
   pickFeature(
     screenX: number,

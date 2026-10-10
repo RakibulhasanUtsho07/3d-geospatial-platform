@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import {
   NEARBY_PLACE_CATEGORIES,
@@ -13,6 +13,7 @@ import type {
 interface NearbyPlacesPanelProps {
   disabled: boolean;
   getCenter: () => { latitude: number; longitude: number } | null;
+  loadedPlaces: NearbyPlace[] | null;
   onPlacesLoaded: (places: NearbyPlace[]) => Promise<void>;
   selectedPlace: NearbyPlace | null;
   onSelectPlace: (place: NearbyPlace) => void;
@@ -36,6 +37,7 @@ const CATEGORY_ORDER: NearbyPlaceCategory[] = [
 export default function NearbyPlacesPanel({
   disabled,
   getCenter,
+  loadedPlaces,
   onPlacesLoaded,
   selectedPlace,
   onSelectPlace,
@@ -48,6 +50,12 @@ export default function NearbyPlacesPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    if (loadedPlaces === null) return;
+    setResults(loadedPlaces);
+    setHasSearched(true);
+  }, [loadedPlaces]);
 
   function toggleCategory(category: NearbyPlaceCategory, checked: boolean) {
     setCategories((previous) => checked
