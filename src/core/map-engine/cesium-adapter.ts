@@ -6,6 +6,11 @@ import {
 import type { BuildingVisualStyle } from "../buildings/building-style";
 import { getViewportFeatureLimit } from "./viewport-budget.mjs";
 import { getDetailedFacadeBudget } from "./lod-detail-budget.mjs";
+import {
+  cacheViewportResponse,
+  getCachedViewportResponse,
+} from "./viewport-response-cache.mjs";
+import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 
 import type {
   CameraTarget,
@@ -102,6 +107,16 @@ const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
 const VIEWPORT_PADDING_FACTOR = 0.4;
 const VIEWPORT_MIN_PADDING_DEGREES = 0.004;
 const MAX_VIEWPORT_SPAN_DEGREES = 1.8;
+const MAX_CACHED_VIEWPORT_RESPONSES = 2;
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
+}
 
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
@@ -152,6 +167,9 @@ export class CesiumAdapter implements MapEngine {
   private loadedViewportFeatureLimit: number | null = null;
   private hasLoadedBuildings = false;
   private viewportLoadInProgress = false;
+  private activeViewportEndpoint: string | null = null;
+  private viewportRequestAbortController: AbortController | null = null;
+  private readonly viewportResponseCache = new Map<string, unknown>();
   private pendingViewportBounds: ViewportBounds | null = null;
   private pendingViewportFeatureLimit: number | null = null;
 
@@ -185,6 +203,10 @@ export class CesiumAdapter implements MapEngine {
       infoBox: false,
       selectionIndicator: false,
       scene3DOnly: true,
+      // Avoid continuous idle rendering; camera moves and our layer updates
+      // still request frames through Cesium's scene lifecycle.
+      requestRenderMode: true,
+      maximumRenderTimeChange: Infinity,
       shouldAnimate: false,
     });
 
@@ -245,6 +267,8 @@ export class CesiumAdapter implements MapEngine {
      */
     void this.loadOvertureBuildings(viewer, Cesium).catch(
       (error: unknown) => {
+        if (isAbortError(error)) return;
+
         if (
           this.viewer === viewer &&
           !viewer.isDestroyed()
@@ -272,15 +296,21 @@ export class CesiumAdapter implements MapEngine {
 
     if (this.viewportLoadInProgress) {
       if (requestedBounds) {
-        this.pendingViewportBounds = requestedBounds;
-        this.pendingViewportFeatureLimit = requestedFeatureLimit;
+        this.queuePendingViewport(
+          requestedBounds,
+          requestedFeatureLimit ??
+            getViewportFeatureLimit(
+              viewer.camera.positionCartographic.height,
+            ),
+        );
       }
       return;
     }
 
     this.viewportLoadInProgress = true;
-    let completedSuccessfully = false;
     let stagedDataSource: CesiumDataSource | null = null;
+    let activeEndpoint: string | null = null;
+    let requestController: AbortController | null = null;
 
     try {
       const endpoint = requestedBounds
@@ -293,26 +323,58 @@ export class CesiumAdapter implements MapEngine {
           )
         : "/api/geospatial/overture-buildings";
 
+      activeEndpoint = endpoint;
+      this.activeViewportEndpoint = endpoint;
+      requestController = new AbortController();
+      this.viewportRequestAbortController = requestController;
+
       console.info("[Overture] Fetching building viewport...", {
         endpoint,
         viewport: requestedBounds,
       });
 
-      // Respect the endpoint's short private HTTP cache when revisiting a viewport.
-      const response = await fetch(endpoint);
+      let geoJson: unknown;
+      const cachedGeoJson = getCachedViewportResponse(
+        this.viewportResponseCache,
+        endpoint,
+      );
 
-      if (!response.ok) {
-        const result = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
+      if (cachedGeoJson !== undefined) {
+        geoJson = cachedGeoJson;
+        console.info("[Overture] Reusing cached viewport payload.", {
+          endpoint,
+          cacheEntries: this.viewportResponseCache.size,
+        });
+      } else {
+        const response = await fetch(endpoint, {
+          signal: requestController.signal,
+        });
 
-        throw new Error(
-          result?.error ??
-            `Building API returned HTTP ${response.status}.`,
+        if (!response.ok) {
+          const result = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+
+          throw new Error(
+            result?.error ??
+              `Building API returned HTTP ${response.status}.`,
+          );
+        }
+
+        geoJson = await response.json();
+        cacheViewportResponse(
+          this.viewportResponseCache,
+          endpoint,
+          geoJson,
+          MAX_CACHED_VIEWPORT_RESPONSES,
         );
       }
 
-      const geoJson: unknown = await response.json();
+      // Cancel network work only until the payload is ready. After that, stage
+      // the data source and coalesce later camera moves into a single follow-up.
+      if (this.viewportRequestAbortController === requestController) {
+        this.viewportRequestAbortController = null;
+      }
 
       console.info("[Overture] Viewport API response received.", {
         dataSource: response.headers.get("X-Building-Data-Source"),
@@ -562,7 +624,6 @@ export class CesiumAdapter implements MapEngine {
       }
 
       stagedDataSource = null;
-      completedSuccessfully = true;
 
       console.info("[Overture] Building viewport rendered.", {
         returnedFeatures: entities.length,
@@ -578,15 +639,21 @@ export class CesiumAdapter implements MapEngine {
         cameraAwareLod: true,
       });
     } catch (error: unknown) {
-      console.error(
-        "[Overture] Building rendering failed:",
-        error instanceof Error
-          ? {
-              name: error.name,
-              message: error.message,
-            }
-          : String(error),
-      );
+      if (isAbortError(error)) {
+        console.info("[Overture] Cancelled an obsolete viewport request.", {
+          endpoint: activeEndpoint,
+        });
+      } else {
+        console.error(
+          "[Overture] Building rendering failed:",
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+              }
+            : String(error),
+        );
+      }
 
       if (
         stagedDataSource &&
@@ -595,10 +662,31 @@ export class CesiumAdapter implements MapEngine {
         this.overtureBuildings !== stagedDataSource
       ) {
         viewer.dataSources.remove(stagedDataSource, true);
+        stagedDataSource = null;
       }
 
-      throw error;
+      if (!isAbortError(error)) {
+        throw error;
+      }
     } finally {
+      // Clean hidden staging data even when setup exits through an early return.
+      if (
+        stagedDataSource &&
+        this.viewer === viewer &&
+        !viewer.isDestroyed() &&
+        this.overtureBuildings !== stagedDataSource
+      ) {
+        viewer.dataSources.remove(stagedDataSource, true);
+        stagedDataSource = null;
+      }
+
+      if (this.viewportRequestAbortController === requestController) {
+        this.viewportRequestAbortController = null;
+      }
+      if (this.activeViewportEndpoint === activeEndpoint) {
+        this.activeViewportEndpoint = null;
+      }
+
       this.viewportLoadInProgress = false;
 
       const pendingBounds = this.pendingViewportBounds;
@@ -609,8 +697,9 @@ export class CesiumAdapter implements MapEngine {
         pendingFeatureLimit ??
         getViewportFeatureLimit(viewer.camera.positionCartographic.height);
 
+      // Always service the latest queued viewport, even if its predecessor was
+      // cancelled or failed. The coverage check prevents redundant reloads.
       if (
-        completedSuccessfully &&
         pendingBounds &&
         !this.isViewportCoveredByLoadedData(
           pendingBounds,
@@ -622,6 +711,7 @@ export class CesiumAdapter implements MapEngine {
           Cesium,
           pendingBounds,
         ).catch((error: unknown) => {
+          if (isAbortError(error)) return;
           console.error(
             "[Overture] Follow-up viewport load failed:",
             error instanceof Error ? error.message : String(error),
@@ -743,6 +833,24 @@ export class CesiumAdapter implements MapEngine {
     );
   }
 
+  private queuePendingViewport(
+    bounds: ViewportBounds,
+    featureLimit: number,
+  ): void {
+    this.pendingViewportBounds = bounds;
+    this.pendingViewportFeatureLimit = featureLimit;
+
+    const nextEndpoint = this.getViewportEndpoint(bounds, featureLimit);
+    if (
+      shouldAbortViewportRequest(
+        this.activeViewportEndpoint,
+        nextEndpoint,
+      )
+    ) {
+      this.viewportRequestAbortController?.abort();
+    }
+  }
+
   private handleCameraMoveEnd(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
@@ -767,8 +875,7 @@ export class CesiumAdapter implements MapEngine {
     );
 
     if (this.viewportLoadInProgress) {
-      this.pendingViewportBounds = requestedBounds;
-      this.pendingViewportFeatureLimit = requiredFeatureLimit;
+      this.queuePendingViewport(requestedBounds, requiredFeatureLimit);
       return;
     }
 
@@ -783,6 +890,7 @@ export class CesiumAdapter implements MapEngine {
         Cesium,
         requestedBounds,
       ).catch((error: unknown) => {
+        if (isAbortError(error)) return;
         console.error(
           "[Overture] Viewport refresh failed:",
           error instanceof Error ? error.message : String(error),
@@ -1573,6 +1681,12 @@ export class CesiumAdapter implements MapEngine {
 
   destroy(): void {
     this.restoreSelectedBuilding();
+
+    // Prevent requests from surviving a retry or component unmount.
+    this.viewportRequestAbortController?.abort();
+    this.viewportRequestAbortController = null;
+    this.activeViewportEndpoint = null;
+    this.viewportResponseCache.clear();
 
     this.clickHandler?.destroy();
     this.clickHandler = null;

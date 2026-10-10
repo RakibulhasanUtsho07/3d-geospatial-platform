@@ -14,8 +14,10 @@
     "test:viewport-budget": "node --test tests/viewport-feature-budget.test.mjs",
     "test:lod-budget": "node --test tests/lod-detail-budget.test.mjs",
     "test:viewport-selection": "node --test tests/viewport-feature-selection.test.mjs",
-     "predev": "npm run copy:cesium",
-    "prebuild": "npm run copy:cesium"
+    "predev": "npm run copy:cesium",
+    "prebuild": "npm run copy:cesium",
+    "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
+    "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
