@@ -763,10 +763,16 @@ export class CesiumAdapter implements MapEngine {
     entity: CesiumEntity,
     Cesium: CesiumModule,
   ): void {
-    if (this.selectedBuilding !== entity || !entity.polygon) {
+    if (
+      this.selectedBuilding !== entity ||
+      !entity.polygon ||
+      this.selectedBuildingOriginalMaterial !== null
+    ) {
       return;
     }
 
+    // Capture the unhighlighted materials only once per selection. LOD
+    // transitions must not accidentally save the cyan highlight as original.
     this.selectedBuildingOriginalMaterial = entity.polygon.material;
     this.selectedBuildingOriginalWallMaterial =
       entity.wall?.material ?? null;
@@ -1045,23 +1051,6 @@ export class CesiumAdapter implements MapEngine {
         this.restoreSelectedBuilding();
 
         this.selectedBuilding = entity;
-        this.selectedBuildingOriginalMaterial =
-          entity.polygon.material;
-
-        this.selectedBuildingOriginalWallMaterial =
-          entity.wall?.material ?? null;
-
-        entity.polygon.material =
-          new Cesium.ColorMaterialProperty(
-            Cesium.Color.CYAN.withAlpha(0.98),
-          );
-
-        if (entity.wall) {
-          entity.wall.material =
-            new Cesium.ColorMaterialProperty(
-              Cesium.Color.CYAN.withAlpha(0.98),
-            );
-        }
 
         const properties = this.readProperties(
           entity,
@@ -1165,8 +1154,10 @@ export class CesiumAdapter implements MapEngine {
           focusCoordinates,
         });
 
-        // Promote the selected building to the detailed tier immediately.
+        // Promote the selected building to the detailed tier immediately,
+        // then highlight it if its LOD did not need to change.
         this.updateBuildingLod(viewer, Cesium, true);
+        this.applySelectionHighlight(entity, Cesium);
         viewer.scene.requestRender();
 
         console.info(
