@@ -1,4 +1,9 @@
 
+import {
+  createBuildingFacadeTexture,
+  resolveBuildingVisualStyle,
+} from "../buildings/building-style";
+
 import type {
   CameraTarget,
   MapEngine,
@@ -34,7 +39,7 @@ type FeatureSelectionListener = (
 const DHAKA_CAMERA = {
   longitude: 90.41,
   latitude: 23.78,
-  height: 1800,
+  height: 950,
   heading: 0,
   pitch: -55,
   roll: 0,
@@ -45,7 +50,7 @@ const ROOF_OUTLINE_COLOR = "#586978";
 
 // Detailed facade rendering is deliberately limited for performance.
 const BATCH_SIZE = 200;
-const MAX_DETAILED_FACADES = 300;
+const MAX_DETAILED_FACADES = 650;
 
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
@@ -70,8 +75,6 @@ export class CesiumAdapter implements MapEngine {
   private selectedBuildingOriginalWallMaterial:
     | CesiumMaterialProperty
     | null = null;
-
-  private facadeTextureCanvas: HTMLCanvasElement | null = null;
 
   private readonly featureSelectionListeners =
     new Set<FeatureSelectionListener>();
@@ -252,9 +255,26 @@ export class CesiumAdapter implements MapEngine {
 
       this.overtureBuildings = dataSource;
 
-      const entities = [...dataSource.entities.values];
       const time = Cesium.JulianDate.now();
-      const facadeTexture = this.getFacadeTextureCanvas();
+      const detailOrigin = Cesium.Cartesian3.fromDegrees(
+        DHAKA_CAMERA.longitude,
+        DHAKA_CAMERA.latitude,
+        0,
+      );
+      const entities = [...dataSource.entities.values]
+        .map((entity) => {
+          const hierarchy = entity.polygon?.hierarchy?.getValue(time);
+          if (!hierarchy || hierarchy.positions.length < 3) {
+            return { entity, distance: Number.POSITIVE_INFINITY };
+          }
+          const bounds = Cesium.BoundingSphere.fromPoints(hierarchy.positions);
+          return {
+            entity,
+            distance: Cesium.Cartesian3.distance(bounds.center, detailOrigin),
+          };
+        })
+        .sort((left, right) => left.distance - right.distance)
+        .map((item) => item.entity);
 
       let renderedBuildings = 0;
       let renderedParts = 0;
@@ -336,18 +356,18 @@ export class CesiumAdapter implements MapEngine {
             const topHeight =
               heightInfo.baseHeight + heightInfo.meters;
 
-            const facadeColor = this.getBuildingColor(
+            const visualStyle = resolveBuildingVisualStyle(
               properties,
-              heightInfo.meters,
-              Cesium,
               entity.id,
+              heightInfo.meters,
             );
-
-            const roofColor = this.getRoofColor(
-              properties,
-              facadeColor,
-              Cesium,
-            );
+            const facadeColor =
+              Cesium.Color.fromCssColorString(visualStyle.facadeColor) ??
+              Cesium.Color.LIGHTGRAY;
+            const roofColor =
+              Cesium.Color.fromCssColorString(visualStyle.roofColor) ??
+              Cesium.Color.GRAY;
+            const facadeTexture = createBuildingFacadeTexture(visualStyle);
 
             const hierarchy =
               polygon.hierarchy?.getValue(time);
@@ -497,6 +517,7 @@ export class CesiumAdapter implements MapEngine {
                   wallPositions,
                   heightInfo.meters,
                   Cesium,
+                  visualStyle.repeatWidthMeters,
                 ),
                 color: facadeColor,
                 transparent: false,
@@ -573,7 +594,7 @@ export class CesiumAdapter implements MapEngine {
         hiddenParents,
         hiddenUnderground,
         invalidPolygons,
-        canvasTextureAvailable: facadeTexture !== null,
+        cameraPrioritized: true,
       });
     } catch (error: unknown) {
       console.error(
@@ -590,92 +611,11 @@ export class CesiumAdapter implements MapEngine {
     }
   }
 
-  /**
-   * One repeatable floor tile with two high-contrast windows.
-   */
-  private getFacadeTextureCanvas(): HTMLCanvasElement | null {
-    if (this.facadeTextureCanvas) {
-      return this.facadeTextureCanvas;
-    }
-
-    if (typeof document === "undefined") {
-      return null;
-    }
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 128;
-    canvas.height = 64;
-
-    const context = canvas.getContext("2d");
-
-    if (!context) {
-      return null;
-    }
-
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, 128, 64);
-
-    // Floor slab bands.
-    context.fillStyle = "#c3cbd0";
-    context.fillRect(0, 0, 128, 4);
-    context.fillRect(0, 59, 128, 5);
-
-    const windows = [
-      { x: 9, y: 8, width: 47, height: 47 },
-      { x: 72, y: 8, width: 47, height: 47 },
-    ];
-
-    for (const item of windows) {
-      const { x, y, width, height } = item;
-
-      // Window frame.
-      context.fillStyle = "#e0e5e8";
-      context.fillRect(x, y, width, height);
-
-      // Dark glass.
-      context.fillStyle = "#17384d";
-      context.fillRect(
-        x + 4,
-        y + 4,
-        width - 8,
-        height - 8,
-      );
-
-      // Window dividers.
-      context.fillStyle = "#91aab8";
-
-      context.fillRect(
-        x + width / 2 - 1,
-        y + 4,
-        2,
-        height - 8,
-      );
-
-      context.fillRect(
-        x + 4,
-        y + height * 0.58,
-        width - 8,
-        2,
-      );
-
-      // Light glass reflection.
-      context.strokeStyle = "#9db6c4";
-      context.lineWidth = 2;
-      context.beginPath();
-      context.moveTo(x + 9, y + 8);
-      context.lineTo(x + 9, y + height * 0.4);
-      context.stroke();
-    }
-
-    this.facadeTextureCanvas = canvas;
-
-    return canvas;
-  }
-
   private getFacadeRepeat(
     positions: CesiumCartesian3[],
     height: number,
     Cesium: CesiumModule,
+    repeatWidthMeters = 6,
   ): CesiumCartesian2 {
     let perimeter = 0;
 
@@ -691,7 +631,7 @@ export class CesiumAdapter implements MapEngine {
     }
 
     return new Cesium.Cartesian2(
-      Math.min(64, Math.max(1, perimeter / 6)),
+      Math.min(64, Math.max(1, perimeter / repeatWidthMeters)),
       Math.min(80, Math.max(1, height / 3)),
     );
   }
@@ -781,105 +721,6 @@ export class CesiumAdapter implements MapEngine {
   ): boolean {
     const value = properties.is_underground;
     return value === true || value === "true";
-  }
-
-  private hasValidHexColor(value: unknown): boolean {
-    return (
-      typeof value === "string" &&
-      /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)
-    );
-  }
-
-  private getBuildingColor(
-    properties: BuildingProperties,
-    height: number,
-    Cesium: CesiumModule,
-    seed = "",
-  ): import("cesium").Color {
-    const value = properties.facade_color;
-
-    if (this.hasValidHexColor(value)) {
-      const parsed = Cesium.Color.fromCssColorString(
-        value as string,
-      );
-
-      if (parsed) {
-        return parsed.withAlpha(1);
-      }
-    }
-
-    const lowRise = [
-      "#d8cbbb",
-      "#c9d0ca",
-      "#d7d0c3",
-      "#c5cdd2",
-      "#d4c5b5",
-      "#bbc8c2",
-    ];
-
-    const midRise = [
-      "#c4ccd0",
-      "#d0c7b9",
-      "#b8c5ca",
-      "#c7c5b9",
-      "#d2cabc",
-      "#b8c0c5",
-    ];
-
-    const highRise = [
-      "#aebdc5",
-      "#bac5ca",
-      "#a7b8c2",
-      "#bdc6c4",
-      "#b0bac3",
-      "#c3c9c6",
-    ];
-
-    const palette =
-      height >= 60
-        ? highRise
-        : height >= 25
-          ? midRise
-          : lowRise;
-
-    let hash = 0;
-
-    for (let index = 0; index < seed.length; index += 1) {
-      hash =
-        (hash * 31 + seed.charCodeAt(index)) >>> 0;
-    }
-
-    const color =
-      Cesium.Color.fromCssColorString(
-        palette[hash % palette.length],
-      ) ?? Cesium.Color.LIGHTGRAY;
-
-    return color.withAlpha(1);
-  }
-
-  private getRoofColor(
-    properties: BuildingProperties,
-    facadeColor: import("cesium").Color,
-    Cesium: CesiumModule,
-  ): import("cesium").Color {
-    const value = properties.roof_color;
-
-    if (this.hasValidHexColor(value)) {
-      const parsed = Cesium.Color.fromCssColorString(
-        value as string,
-      );
-
-      if (parsed) {
-        return parsed.withAlpha(1);
-      }
-    }
-
-    return new Cesium.Color(
-      facadeColor.red * 0.78,
-      facadeColor.green * 0.78,
-      facadeColor.blue * 0.78,
-      1,
-    );
   }
 
   onFeatureSelected(
@@ -1130,7 +971,6 @@ export class CesiumAdapter implements MapEngine {
 
     this.baseImageryLayer = null;
     this.overtureBuildings = null;
-    this.facadeTextureCanvas = null;
 
     if (this.viewer && !this.viewer.isDestroyed()) {
       this.viewer.destroy();
