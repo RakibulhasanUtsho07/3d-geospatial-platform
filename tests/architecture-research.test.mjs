@@ -215,6 +215,63 @@ test("resolves only reuse-aware Commons image previews and validated YouTube emb
   assert.deepEqual(unsafeHost, { mediaPreviewUrl: null, mediaPreviewKind: null });
 });
 
+test("derives reported geometry only when source metadata has an unambiguous floor count or height", () => {
+  const roseGarden = createArchitectureStylePreview({
+    id: "R19",
+    mediaType: "image",
+    reportedBuildingMetadata: {
+      reportedStoreys: 2,
+      reportedHeightFeet: 45,
+    },
+    designProfile: {
+      styleFamily: "formal-heritage-mansion-garden",
+      colorPalette: [{ name: "ivory", hex: "#F1EFE7" }],
+      facadeFeatures: ["three entrance arches", "fluted columns"],
+      roofFeatures: [],
+      siteContext: [],
+      locationPrecision: "named landmark",
+      paletteConfidence: "medium estimate",
+      reconstructionUse: "heritage mansion",
+    },
+  });
+  assert.equal(roseGarden.reportedFloorCount, 2);
+  assert.equal(roseGarden.reportedHeightMeters, 13.72);
+
+  const jcx = createArchitectureStylePreview({
+    id: "R27",
+    mediaType: "image",
+    reportedBuildingMetadata: { floors: "B+G+9" },
+    designProfile: {
+      styleFamily: "residential-tower",
+      colorPalette: [{ name: "white", hex: "#F1EFE7" }],
+      facadeFeatures: ["balconies"],
+      roofFeatures: ["rooftop garden"],
+      siteContext: [],
+      locationPrecision: "developer-reported plot address",
+      paletteConfidence: "estimated",
+      reconstructionUse: "building reference",
+    },
+  });
+  assert.equal(jcx.reportedFloorCount, 10);
+
+  const complexWings = createArchitectureStylePreview({
+    id: "R08",
+    mediaType: "image",
+    reportedBuildingMetadata: { storeys: "two-storey main house; three-storey southern wing" },
+    designProfile: {
+      styleFamily: "courtyard-family-house",
+      colorPalette: [{ name: "cream", hex: "#E7D2BD" }],
+      facadeFeatures: [],
+      roofFeatures: [],
+      siteContext: [],
+      locationPrecision: "street level",
+      paletteConfidence: "low estimate",
+      reconstructionUse: "multi-wing house",
+    },
+  });
+  assert.equal(complexWings.reportedFloorCount, undefined);
+});
+
 test("blocks single-building assignment for skyline, panoramic and cluster-only context", () => {
   assert.equal(canAssignArchitectureReference({
     id: "R01",
