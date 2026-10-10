@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { NextResponse } from "next/server";
 
@@ -19,6 +19,27 @@ type ViewportBounds = {
 type IndexedFeature = {
   feature: unknown;
   bounds: ViewportBounds | null;
+};
+
+type IndexedTileFeature = {
+  feature: unknown;
+  bounds: ViewportBounds | null;
+  identity: string;
+};
+
+type CachedTileEntry = {
+  signature: string;
+  features: IndexedTileFeature[];
+};
+
+type CachedManifestEntry = {
+  signature: string;
+  manifest: TileManifest;
+};
+
+type TileCollectionRead = {
+  features: IndexedTileFeature[];
+  cacheHit: boolean;
 };
 
 type IndexedDataset = {
@@ -45,6 +66,8 @@ type TileQueryResult = {
   totalFeatureCount: number;
   tileCount: number;
   oversizedFeatureCount: number;
+  candidateFeatureCount: number;
+  tileCacheHits: number;
 };
 
 const DATA_FILE = resolve(
@@ -64,8 +87,13 @@ const TILE_DIRECTORY = resolve(
 );
 const TILE_MANIFEST_FILE = resolve(TILE_DIRECTORY, "manifest.json");
 const MAX_VIEWPORT_SPAN_DEGREES = 2;
+const MAX_CACHED_TILE_FILES = 64;
 
 let indexedDatasetPromise: Promise<IndexedDataset> | null = null;
+let cachedTileManifest: CachedManifestEntry | null = null;
+
+// Parsed tiles retain precomputed bounds and identities between viewport requests.
+const tileFeatureCache = new Map<string, CachedTileEntry>();
 
 function isRecord(value: unknown): value is JsonObject {
   return (
@@ -99,12 +127,41 @@ function isFeatureCollection(
   });
 }
 
-function getGeometryCoordinates(feature: unknown): unknown {
-  if (!isRecord(feature) || !isRecord(feature.geometry)) {
-    return null;
+function mergeBounds(
+  boundsList: Array<ViewportBounds | null>,
+): ViewportBounds | null {
+  const validBounds = boundsList.filter(
+    (bounds): bounds is ViewportBounds => bounds !== null,
+  );
+  const firstBounds = validBounds[0];
+
+  if (!firstBounds) return null;
+
+  return validBounds.slice(1).reduce(
+    (merged, bounds) => ({
+      west: Math.min(merged.west, bounds.west),
+      south: Math.min(merged.south, bounds.south),
+      east: Math.max(merged.east, bounds.east),
+      north: Math.max(merged.north, bounds.north),
+    }),
+    { ...firstBounds },
+  );
+}
+
+function getGeometryBounds(geometry: unknown): ViewportBounds | null {
+  if (!isRecord(geometry)) return null;
+
+  if (geometry.type === "GeometryCollection") {
+    if (!Array.isArray(geometry.geometries)) return null;
+    return mergeBounds(geometry.geometries.map(getGeometryBounds));
   }
 
-  return feature.geometry.coordinates;
+  return getCoordinateBounds(geometry.coordinates);
+}
+
+function getFeatureBounds(feature: unknown): ViewportBounds | null {
+  if (!isRecord(feature) || !isRecord(feature.geometry)) return null;
+  return getGeometryBounds(feature.geometry);
 }
 
 function getCoordinateBounds(coordinates: unknown): ViewportBounds | null {
@@ -175,7 +232,7 @@ async function readAndIndexDataset(): Promise<IndexedDataset> {
 
   const indexedFeatures = parsedData.features.map((feature) => ({
     feature,
-    bounds: getCoordinateBounds(getGeometryCoordinates(feature)),
+    bounds: getFeatureBounds(feature),
   }));
 
   console.info("[Overture Viewport API] Spatial index ready.", {
@@ -267,26 +324,46 @@ function isValidTileManifest(value: unknown): value is TileManifest {
   if (
     !isRecord(value) ||
     typeof value.sourceFeatureCount !== "number" ||
+    !Number.isInteger(value.sourceFeatureCount) ||
+    value.sourceFeatureCount < 0 ||
     typeof value.tileCount !== "number" ||
-    !Array.isArray(value.tiles)
+    !Number.isInteger(value.tileCount) ||
+    !Array.isArray(value.tiles) ||
+    value.tileCount !== value.tiles.length ||
+    !(value.oversizedFile === null || value.oversizedFile === "oversized.geojson")
   ) {
     return false;
   }
 
   return value.tiles.every((entry: unknown) => {
-    if (!isRecord(entry) || !isRecord(entry.bounds)) {
-      return false;
-    }
+    if (!isRecord(entry) || !isRecord(entry.bounds)) return false;
 
     const bounds = entry.bounds;
+    const validBounds =
+      ["west", "south", "east", "north"].every(
+        (key) =>
+          typeof bounds[key] === "number" &&
+          Number.isFinite(bounds[key]),
+      ) &&
+      typeof bounds.west === "number" &&
+      typeof bounds.south === "number" &&
+      typeof bounds.east === "number" &&
+      typeof bounds.north === "number" &&
+      bounds.west >= -180 &&
+      bounds.east <= 180 &&
+      bounds.south >= -90 &&
+      bounds.north <= 90 &&
+      bounds.west < bounds.east &&
+      bounds.south < bounds.north;
+
     return (
       typeof entry.id === "string" &&
-      typeof entry.file === "string" &&
+      /^x\d+_y\d+$/.test(entry.id) &&
+      entry.file === "tiles/" + entry.id + ".geojson" &&
       typeof entry.featureCount === "number" &&
-      ["west", "south", "east", "north"].every(
-        (key) => typeof bounds[key] === "number" &&
-          Number.isFinite(bounds[key]),
-      )
+      Number.isInteger(entry.featureCount) &&
+      entry.featureCount >= 0 &&
+      validBounds
     );
   });
 }
@@ -317,112 +394,192 @@ function getFeatureIdentity(feature: unknown): string {
   return "feature-json:" + JSON.stringify(feature);
 }
 
-async function queryGeneratedTiles(
-  viewport: ViewportBounds,
-): Promise<TileQueryResult | null> {
-  let manifestContents: string;
+function getErrorCode(error: unknown): string {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String(error.code)
+    : "";
+}
 
+async function getFileSignature(filePath: string): Promise<string | null> {
   try {
-    manifestContents = await readFile(TILE_MANIFEST_FILE, "utf8");
+    const fileInfo = await stat(filePath);
+    if (!fileInfo.isFile()) return null;
+    return fileInfo.size + ":" + fileInfo.mtimeMs;
   } catch (error: unknown) {
-    const code =
-      typeof error === "object" && error !== null && "code" in error
-        ? String(error.code)
-        : "";
-    if (code === "ENOENT") return null;
+    if (getErrorCode(error) === "ENOENT") return null;
+    throw error;
+  }
+}
+
+async function readCachedTileManifest(): Promise<TileManifest | null> {
+  const signature = await getFileSignature(TILE_MANIFEST_FILE);
+  if (signature === null) {
+    cachedTileManifest = null;
+    return null;
+  }
+
+  if (cachedTileManifest?.signature === signature) {
+    return cachedTileManifest.manifest;
+  }
+
+  let contents: string;
+  try {
+    contents = await readFile(TILE_MANIFEST_FILE, "utf8");
+  } catch (error: unknown) {
+    if (getErrorCode(error) === "ENOENT") return null;
     throw error;
   }
 
-  let parsedManifest: unknown;
+  let parsed: unknown;
   try {
-    parsedManifest = JSON.parse(manifestContents);
+    parsed = JSON.parse(contents);
   } catch {
-    console.warn("[Overture Viewport API] Tile manifest is invalid JSON; using GeoJSON index.");
+    console.warn(
+      "[Overture Viewport API] Tile manifest is invalid JSON; using GeoJSON index.",
+    );
     return null;
   }
 
-  if (!isValidTileManifest(parsedManifest)) {
-    console.warn("[Overture Viewport API] Tile manifest schema is invalid; using GeoJSON index.");
+  if (!isValidTileManifest(parsed)) {
+    console.warn(
+      "[Overture Viewport API] Tile manifest schema is invalid; using GeoJSON index.",
+    );
     return null;
   }
 
-  const selectedTiles = parsedManifest.tiles.filter((tile) =>
+  cachedTileManifest = { signature, manifest: parsed };
+  return parsed;
+}
+
+async function readCachedTileCollection(
+  relativeFile: string,
+): Promise<TileCollectionRead | null> {
+  // Accept only generated filenames; never use arbitrary manifest paths.
+  if (
+    relativeFile !== "oversized.geojson" &&
+    !/^tiles\/x\d+_y\d+\.geojson$/.test(relativeFile)
+  ) {
+    return null;
+  }
+
+  const absolutePath = resolve(TILE_DIRECTORY, relativeFile);
+  const signature = await getFileSignature(absolutePath);
+  if (signature === null) {
+    tileFeatureCache.delete(relativeFile);
+    return null;
+  }
+
+  const cached = tileFeatureCache.get(relativeFile);
+  if (cached?.signature === signature) {
+    // Refresh insertion order so the Map can act as a small LRU cache.
+    tileFeatureCache.delete(relativeFile);
+    tileFeatureCache.set(relativeFile, cached);
+    return { features: cached.features, cacheHit: true };
+  }
+
+  let raw: string;
+  try {
+    raw = await readFile(absolutePath, "utf8");
+  } catch (error: unknown) {
+    if (getErrorCode(error) === "ENOENT") return null;
+    throw error;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+
+  if (!isFeatureCollection(parsed)) return null;
+
+  const indexedFeatures: IndexedTileFeature[] = parsed.features.map((feature) => ({
+    feature,
+    bounds: getFeatureBounds(feature),
+    identity: getFeatureIdentity(feature),
+  }));
+
+  tileFeatureCache.delete(relativeFile);
+  tileFeatureCache.set(relativeFile, {
+    signature,
+    features: indexedFeatures,
+  });
+
+  while (tileFeatureCache.size > MAX_CACHED_TILE_FILES) {
+    const oldestPath = tileFeatureCache.keys().next().value;
+    if (typeof oldestPath !== "string") break;
+    tileFeatureCache.delete(oldestPath);
+  }
+
+  return { features: indexedFeatures, cacheHit: false };
+}
+
+async function queryGeneratedTiles(
+  viewport: ViewportBounds,
+): Promise<TileQueryResult | null> {
+  const manifest = await readCachedTileManifest();
+  if (!manifest) return null;
+
+  const selectedTiles = manifest.tiles.filter((tile) =>
     intersects(tile.bounds, viewport),
   );
 
   const featureMap = new Map<string, unknown>();
   let oversizedFeatureCount = 0;
-
-  async function readCollection(relativeFile: string): Promise<unknown[] | null> {
-    // Only allow the generated relative file layout, never arbitrary paths from a manifest.
-    if (
-      relativeFile.startsWith("/") ||
-      relativeFile.includes("..") ||
-      !/^(tiles\/x\d+_y\d+\.geojson|oversized\.geojson)$/.test(relativeFile)
-    ) {
-      return null;
-    }
-
-    let raw: string;
-    try {
-      raw = await readFile(resolve(TILE_DIRECTORY, relativeFile), "utf8");
-    } catch (error: unknown) {
-      const code =
-        typeof error === "object" && error !== null && "code" in error
-          ? String(error.code)
-          : "";
-      if (code === "ENOENT") return null;
-      throw error;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-
-    if (!isFeatureCollection(parsed)) return null;
-    return parsed.features;
-  }
+  let candidateFeatureCount = 0;
+  let tileCacheHits = 0;
 
   for (const tile of selectedTiles) {
-    const features = await readCollection(tile.file);
-    if (!features) {
-      console.warn("[Overture Viewport API] Generated tile is missing or invalid; falling back to GeoJSON index.", {
-        tile: tile.id,
-      });
+    const tileCollection = await readCachedTileCollection(tile.file);
+    if (!tileCollection) {
+      console.warn(
+        "[Overture Viewport API] Generated tile is missing or invalid; falling back to GeoJSON index.",
+        { tile: tile.id },
+      );
       return null;
     }
 
-    for (const feature of features) {
-      const featureBounds = getCoordinateBounds(
-        getGeometryCoordinates(feature),
-      );
+    candidateFeatureCount += tileCollection.features.length;
+    if (tileCollection.cacheHit) tileCacheHits += 1;
 
-      // Tiles are deliberately coarse; keep the API contract exact by
-      // filtering each candidate against the requested viewport as well.
-      if (!featureBounds || !intersects(featureBounds, viewport)) {
+    for (const indexedFeature of tileCollection.features) {
+      // Tile bounds are intentionally coarse. Apply viewport bounds before
+      // returning candidates and deduplicate copies that cross tile borders.
+      if (
+        !indexedFeature.bounds ||
+        !intersects(indexedFeature.bounds, viewport)
+      ) {
         continue;
       }
 
-      const identity = getFeatureIdentity(feature);
-      if (!featureMap.has(identity)) featureMap.set(identity, feature);
+      if (!featureMap.has(indexedFeature.identity)) {
+        featureMap.set(indexedFeature.identity, indexedFeature.feature);
+      }
     }
   }
 
-  if (parsedManifest.oversizedFile) {
-    const oversizedFeatures = await readCollection(parsedManifest.oversizedFile);
-    if (!oversizedFeatures) {
-      console.warn("[Overture Viewport API] Oversized feature sidecar is missing or invalid; falling back to GeoJSON index.");
+  if (manifest.oversizedFile) {
+    const oversizedCollection = await readCachedTileCollection(
+      manifest.oversizedFile,
+    );
+    if (!oversizedCollection) {
+      console.warn(
+        "[Overture Viewport API] Oversized feature sidecar is missing or invalid; falling back to GeoJSON index.",
+      );
       return null;
     }
 
-    for (const feature of oversizedFeatures) {
-      const featureBounds = getCoordinateBounds(getGeometryCoordinates(feature));
-      if (featureBounds && intersects(featureBounds, viewport)) {
-        const identity = getFeatureIdentity(feature);
-        if (!featureMap.has(identity)) featureMap.set(identity, feature);
+    candidateFeatureCount += oversizedCollection.features.length;
+    if (oversizedCollection.cacheHit) tileCacheHits += 1;
+
+    for (const indexedFeature of oversizedCollection.features) {
+      if (
+        indexedFeature.bounds &&
+        intersects(indexedFeature.bounds, viewport) &&
+        !featureMap.has(indexedFeature.identity)
+      ) {
+        featureMap.set(indexedFeature.identity, indexedFeature.feature);
         oversizedFeatureCount += 1;
       }
     }
@@ -430,9 +587,11 @@ async function queryGeneratedTiles(
 
   return {
     features: [...featureMap.values()],
-    totalFeatureCount: parsedManifest.sourceFeatureCount,
+    totalFeatureCount: manifest.sourceFeatureCount,
     tileCount: selectedTiles.length,
     oversizedFeatureCount,
+    candidateFeatureCount,
+    tileCacheHits,
   };
 }
 
@@ -505,6 +664,8 @@ export async function GET(request: Request): Promise<Response> {
       totalFeatures: totalFeatureCount,
       returnedFeatures: matchingFeatures.length,
       selectedTiles: tileResult?.tileCount ?? 0,
+      candidateFeatures: tileResult?.candidateFeatureCount ?? 0,
+      tileCacheHits: tileResult?.tileCacheHits ?? 0,
       oversizedFeatures: tileResult?.oversizedFeatureCount ?? 0,
       buildings: buildingCount,
       buildingParts: partCount,
@@ -521,6 +682,10 @@ export async function GET(request: Request): Promise<Response> {
           ? "generated-tiles"
           : "indexed-geojson",
         "X-Building-Tile-Count": String(tileResult?.tileCount ?? 0),
+        "X-Building-Candidate-Feature-Count": String(
+          tileResult?.candidateFeatureCount ?? 0,
+        ),
+        "X-Building-Tile-Cache-Hits": String(tileResult?.tileCacheHits ?? 0),
         "X-Building-Count": String(buildingCount),
         "X-Building-Parent-Count": String(parentCount),
         "X-Building-Part-Count": String(partCount),

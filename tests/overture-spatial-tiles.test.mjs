@@ -20,7 +20,6 @@ const generatedPath = path.join(
   "spatial-tiles",
 );
 const manifestPath = path.join(generatedPath, "manifest.json");
-const tilesPath = path.join(generatedPath, "tiles");
 
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);

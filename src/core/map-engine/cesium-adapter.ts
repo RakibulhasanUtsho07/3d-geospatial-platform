@@ -250,9 +250,8 @@ export class CesiumAdapter implements MapEngine {
         viewport: requestedBounds,
       });
 
-      const response = await fetch(endpoint, {
-        cache: "no-store",
-      });
+      // Respect the endpoint's short private HTTP cache when revisiting a viewport.
+      const response = await fetch(endpoint);
 
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as
@@ -266,6 +265,16 @@ export class CesiumAdapter implements MapEngine {
       }
 
       const geoJson: unknown = await response.json();
+
+      console.info("[Overture] Viewport API response received.", {
+        dataSource: response.headers.get("X-Building-Data-Source"),
+        selectedTiles: response.headers.get("X-Building-Tile-Count"),
+        candidateFeatures: response.headers.get(
+          "X-Building-Candidate-Feature-Count",
+        ),
+        returnedFeatures: response.headers.get("X-Building-Feature-Count"),
+        tileCacheHits: response.headers.get("X-Building-Tile-Cache-Hits"),
+      });
 
       if (
         !this.viewer ||

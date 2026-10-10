@@ -48,3 +48,39 @@ jobs:
 
       - name: Build production app
         run: npm run build
+
+      - name: Verify viewport API against the production server
+        env:
+          GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
+        run: |
+          ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          node --input-type=module <<'NODE'
+          const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
+          const deadline = Date.now() + 60000;
+          let ready = false;
+
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(endpoint);
+              await response.arrayBuffer();
+              if (response.status === 400) {
+                ready = true;
+                break;
+              }
+            } catch {
+              // The production server is still starting.
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+
+          if (!ready) {
+            console.error("Next.js production server did not become ready.");
+            process.exit(1);
+          }
+          NODE
+
+          npm run test:geospatial-api
