@@ -40,5 +40,8 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Build Overture spatial tiles
+        run: npm run build:geospatial-tiles
+
       - name: Build production app
         run: npm run build
