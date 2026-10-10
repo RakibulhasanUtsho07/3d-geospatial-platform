@@ -16,6 +16,8 @@ export interface RoadFeature {
   lanes: number | null;
   maxSpeed: string | null;
   widthMeters: number;
+  widthSource: "tagged" | "lanes-estimate" | "highway-class-estimate";
+  layer: number | null;
   bridge: boolean;
   tunnel: boolean;
   oneway: boolean;
