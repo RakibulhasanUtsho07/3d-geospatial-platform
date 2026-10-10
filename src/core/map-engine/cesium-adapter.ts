@@ -18,6 +18,7 @@ import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import type {
+  BuildingStyleAssignment,
   CameraTarget,
   MapEngine,
   MapEngineCapabilities,
@@ -66,7 +67,10 @@ type BuildingLodRecord = {
   baseHeight: number;
   topHeight: number;
   visualStyle: BuildingVisualStyle;
+  /** Baseline render style, which may be an explicitly saved research profile. */
   baseVisualStyle: BuildingVisualStyle;
+  /** Source metadata-driven style to return to when a saved assignment is removed. */
+  sourceVisualStyle: BuildingVisualStyle;
   wallPositions: CesiumCartesian3[] | null;
   center: CesiumCartesian3 | null;
   isPart: boolean;
@@ -182,6 +186,7 @@ export class CesiumAdapter implements MapEngine {
   >();
 
   private buildingLodRecords: BuildingLodRecord[] = [];
+  private readonly buildingStyleAssignments = new Map<string, BuildingStyleAssignment>();
   private cameraMoveEndUnsubscribe: (() => void) | null = null;
   private lastLodOrigin: CesiumCartesian3 | null = null;
   private lastLodBudget: number | null = null;
@@ -548,11 +553,14 @@ export class CesiumAdapter implements MapEngine {
 
             const heightInfo = this.getBuildingHeight(properties);
             const topHeight = heightInfo.baseHeight + heightInfo.meters;
-            const visualStyle = resolveBuildingVisualStyle(
+            const sourceVisualStyle = resolveBuildingVisualStyle(
               properties,
               entity.id,
               heightInfo.meters,
             );
+            const visualStyle =
+              this.buildingStyleAssignments.get(entity.id)?.style ??
+              sourceVisualStyle;
             const hierarchy = polygon.hierarchy?.getValue(time);
 
             let wallPositions: CesiumCartesian3[] | null = null;
@@ -587,6 +595,7 @@ export class CesiumAdapter implements MapEngine {
               topHeight,
               visualStyle,
               baseVisualStyle: visualStyle,
+              sourceVisualStyle,
               wallPositions,
               center,
               isPart: role === "building_part",
@@ -1924,6 +1933,73 @@ export class CesiumAdapter implements MapEngine {
     }
   }
 
+  setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void {
+    this.buildingStyleAssignments.clear();
+    for (const assignment of assignments) {
+      if (
+        !assignment ||
+        typeof assignment.featureId !== "string" ||
+        !assignment.featureId.trim() ||
+        !assignment.style ||
+        !/^#[0-9a-f]{6}$/i.test(assignment.style.facadeColor) ||
+        !/^#[0-9a-f]{6}$/i.test(assignment.style.roofColor) ||
+        !/^#[0-9a-f]{6}$/i.test(assignment.style.accentColor)
+      ) {
+        continue;
+      }
+      this.buildingStyleAssignments.set(assignment.featureId, assignment);
+    }
+
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+
+    const selectedEntity = this.selectedBuilding;
+    this.restoreSelectedBuilding();
+    this.selectedBuilding = selectedEntity;
+    const dataSource = this.overtureBuildings;
+    dataSource?.entities.suspendEvents();
+
+    try {
+      for (const record of this.buildingLodRecords) {
+        const assignment = this.buildingStyleAssignments.get(record.entity.id);
+        const nextBaseline = assignment?.style ?? record.sourceVisualStyle;
+        const baselineChanged =
+          JSON.stringify(nextBaseline) !== JSON.stringify(record.baseVisualStyle);
+        const previewWasActive =
+          JSON.stringify(record.visualStyle) !== JSON.stringify(record.baseVisualStyle);
+
+        record.baseVisualStyle = nextBaseline;
+        if (!baselineChanged && !previewWasActive) continue;
+
+        // A saved assignment supersedes a temporary preview. Removing it
+        // returns to the style derived from the building's source tags.
+        record.visualStyle = nextBaseline;
+        record.polygonStyleCache = null;
+        record.detailedWall = null;
+        record.roofEquipmentBox = null;
+        record.roofEquipmentPosition = null;
+        record.entity.wall = undefined;
+        record.entity.box = undefined;
+        record.entity.position = undefined;
+
+        if (record.entity === selectedEntity || record.isDetailed) {
+          this.applyDetailedBuildingStyle(record, Cesium);
+        } else {
+          this.applyLightweightBuildingStyle(record, Cesium);
+        }
+      }
+    } finally {
+      dataSource?.entities.resumeEvents();
+    }
+
+    if (selectedEntity) {
+      const selectedRecord = this.buildingLodRecords.find((record) => record.entity === selectedEntity);
+      if (selectedRecord) this.applySelectionHighlight(selectedEntity, Cesium);
+    }
+    viewer.scene.requestRender();
+  }
+
   previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean {
     const viewer = this.viewer;
     const Cesium = this.cesium;
@@ -2357,6 +2433,7 @@ export class CesiumAdapter implements MapEngine {
     this.cameraMoveEndUnsubscribe = null;
 
     this.featureSelectionListeners.clear();
+    this.buildingStyleAssignments.clear();
     this.placeSelectionListeners.clear();
     this.propertySelectionListeners.clear();
     this.nearbyPlaceByEntityId.clear();
