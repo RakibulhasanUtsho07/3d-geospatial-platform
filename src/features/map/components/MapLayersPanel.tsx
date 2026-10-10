@@ -11,7 +11,9 @@ interface MapLayersPanelProps {
 function getLayerDescription(layerId: MapLayerId): string {
   switch (layerId) {
     case "base-imagery":
-      return "OpenStreetMap streets and place labels";
+      return "OpenStreetMap raster map and place labels";
+    case "roads":
+      return "Detailed OpenStreetMap road centerlines, tagged names and estimated-width ground corridors";
     case "overture-buildings":
       return "Extruded building footprints with adaptive detail";
     case "nearby-places":
