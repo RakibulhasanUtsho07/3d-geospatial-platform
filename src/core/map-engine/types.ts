@@ -49,6 +49,7 @@ export type MapEngineCapabilities = {
 
 export const MAP_LAYER_IDS = {
   baseImagery: "base-imagery",
+  roads: "roads",
   overtureBuildings: "overture-buildings",
   nearbyPlaces: "nearby-places",
   propertyListings: "property-listings",
