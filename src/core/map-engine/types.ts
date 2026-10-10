@@ -17,6 +17,17 @@ import type { BuildingVisualStyle } from "../buildings/building-style";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 
+export interface BuildingStyleAssignment {
+  featureId: string;
+  referenceId: string;
+  referenceTitle: string;
+  sourceUrl: string;
+  license?: string | null;
+  usageStatus: string;
+  assignedAt: string;
+  style: BuildingVisualStyle;
+}
+
 export interface MapFeatureSelection {
   source:
     | "cesium-ion-osm-buildings"
@@ -81,6 +92,7 @@ export interface MapEngine {
   ): () => void;
 
   clearFeatureSelection(): void;
+  setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void;
   previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean;
   destroy(): void;
   resize(): void;
