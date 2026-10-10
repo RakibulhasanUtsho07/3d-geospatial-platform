@@ -8,6 +8,7 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Overture-derived building footprints rendered as extruded 3D geometry.
 - Camera-aware viewport requests with bounded feature budgets, spatially sampled results, response caching, request cancellation, and adaptive facade-detail budgets.
 - Click-to-select building details, geographic coordinates, source attributes, and a camera-focus action.
+- Bounded building-discovery search across source names, attributes, categories, and Overture IDs; selecting a result moves the camera to its geographic center.
 - A map-layer panel to show or hide the OpenStreetMap street imagery and the Overture 3D building layer independently.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 
@@ -18,7 +19,7 @@ The displayed facade details are procedural visualizations. They are illustrativ
 - **Next.js App Router + TypeScript** for the application and server API routes.
 - **CesiumJS** for the 3D globe, camera, imagery, geometry, and picking.
 - **GeoJSON + Overture-derived pilot data** for the current building dataset.
-- **Node.js test runner** for the pure policy, spatial-tile, cache, and API integration tests.
+- **Node.js test runner** for the pure policy, spatial-tile, cache, search, and API integration tests.
 
 Keep each responsibility behind a focused module; the Cesium-specific implementation lives behind the map-engine contract.
 
@@ -33,7 +34,7 @@ npm run dev
 
 Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script prepares the Cesium static assets automatically.
 
-If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings.geojson`, then run the tile build command below.
+If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
 
 ## Geospatial data pipeline
 
@@ -55,6 +56,7 @@ npm run test:lod-budget
 npm run test:viewport-selection
 npm run test:viewport-cache
 npm run test:viewport-load-policy
+npm run test:building-search
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
@@ -67,7 +69,7 @@ npm run dev
 npm run test:geospatial-api
 ```
 
-CI also starts the production server and verifies the viewport endpoint against the built app.
+CI also starts the production server and verifies the viewport and building-search endpoints against the built app.
 
 ## API routes
 
@@ -75,8 +77,9 @@ CI also starts the production server and verifies the viewport endpoint against 
 - `POST /api/geospatial/buildings` — legacy OSM building query with a bounds payload.
 - `GET /api/geospatial/overture-buildings` — pilot building collection.
 - `GET /api/geospatial/overture-buildings/viewport?west=…&south=…&east=…&north=…&limit=…` — viewport-specific building data.
+- `GET /api/geospatial/overture-buildings/search?q=…&limit=8` — bounded search through names, source attributes, categories, and feature identifiers. Queries must be 2–100 characters; results are capped at 20.
 
-The viewport endpoint validates coordinate bounds and feature limits. Responses include diagnostic headers for data source, tile count, candidate/matched/returned features, truncation, sampling strategy, and cache activity.
+The viewport endpoint validates coordinate bounds and feature limits. Responses include diagnostic headers for data source, tile count, candidate/matched/returned features, truncation, sampling strategy, and cache activity. The search API caches a compact search index in memory and returns only summary fields needed by the map UI.
 
 ## Current pilot limitations
 

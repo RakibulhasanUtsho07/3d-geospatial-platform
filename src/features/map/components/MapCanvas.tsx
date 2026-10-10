@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
+import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type {
   MapFeatureSelection,
   MapLayer,
 } from "@/core/map-engine/types";
 
+import BuildingSearchPanel from "./BuildingSearchPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
@@ -209,12 +211,42 @@ export default function MapCanvas() {
     setLayers(engine.getLayers());
   }
 
+  function focusSearchResult(result: BuildingSearchResult) {
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+
+    engine.flyTo({
+      destination: {
+        longitude: result.longitude,
+        latitude: result.latitude,
+        height: Math.max(
+          180,
+          Math.min((result.heightMeters ?? 24) * 8, 1400),
+        ),
+      },
+      heading: 0,
+      pitch: -42,
+      roll: 0,
+      durationMs: 1200,
+    });
+  }
+
   return (
     <div className="relative h-full min-h-[600px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       {/* This ref belongs to the same component as the initialization effect. */}
       <div
         ref={containerRef}
         className="absolute inset-0"
+      />
+
+      <BuildingSearchPanel
+        disabled={status !== "ready"}
+        onSelect={focusSearchResult}
       />
 
       {layers.length > 0 && (

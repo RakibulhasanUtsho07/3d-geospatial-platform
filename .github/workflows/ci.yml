@@ -52,6 +52,9 @@ jobs:
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
+      - name: Test building search index
+        run: npm run test:building-search
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 

@@ -177,3 +177,47 @@ test("viewport API rejects malformed and out-of-range feature limits", async (co
     assert.match(body.error, /feature limit/i);
   }
 });
+
+
+test("building search API rejects a query that is too short", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const response = await fetch(
+    baseUrl + "/api/geospatial/overture-buildings/search?q=x",
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.match(body.error, /between 2 and 100 characters/i);
+});
+
+test("building search API enforces a bounded result limit", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const query = new URLSearchParams({ q: "example", limit: "21" });
+  const response = await fetch(
+    baseUrl + "/api/geospatial/overture-buildings/search?" + query,
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.match(body.error, /limit.*between 1 and 20/i);
+});
+
+test("building search API returns a valid empty result envelope for unmatched queries", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const searchText = "zz-search-no-match-9f81a6c3";
+  const query = new URLSearchParams({ q: searchText, limit: "3" });
+  const response = await fetch(
+    baseUrl + "/api/geospatial/overture-buildings/search?" + query,
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.query, searchText);
+  assert.equal(body.limit, 3);
+  assert.equal(body.returnedCount, 0);
+  assert.equal(body.totalMatches, 0);
+  assert.deepEqual(body.results, []);
+});

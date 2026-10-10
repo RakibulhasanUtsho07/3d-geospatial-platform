@@ -25,7 +25,7 @@ export default function MapLayersPanel({
   return (
     <aside
       aria-label="Map layers"
-      className="absolute left-4 top-4 z-20 w-[min(290px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 text-white shadow-2xl backdrop-blur-xl"
+      className="absolute bottom-4 left-4 z-20 w-[min(290px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 text-white shadow-2xl backdrop-blur-xl"
     >
       <div className="border-b border-white/10 px-4 py-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
