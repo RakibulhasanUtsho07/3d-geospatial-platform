@@ -10,6 +10,7 @@ import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type {
+  BuildingStyleAssignment,
   MapFeatureSelection,
   MapLayer,
 } from "@/core/map-engine/types";
@@ -32,6 +33,7 @@ interface StylePreviewRequest {
 interface MapCanvasProps {
   onSelectedFeatureChange?: (feature: MapFeatureSelection | null) => void;
   stylePreviewRequest?: StylePreviewRequest | null;
+  styleAssignments?: BuildingStyleAssignment[];
   onStylePreviewResult?: (applied: boolean, request: StylePreviewRequest) => void;
 }
 
@@ -50,6 +52,7 @@ const DHAKA_CAMERA_ORIENTATION = {
 export default function MapCanvas({
   onSelectedFeatureChange,
   stylePreviewRequest,
+  styleAssignments = [],
   onStylePreviewResult,
 }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -196,6 +199,35 @@ export default function MapCanvas({
       engine.destroy();
     };
   }, [retryKey]);
+
+  useEffect(() => {
+    engineRef.current?.setBuildingStyleAssignments(styleAssignments);
+
+    setSelectedFeature((current) => {
+      if (!current) return current;
+      const featureId = current.properties.overture_feature_id;
+      const selectedId = typeof featureId === "string" ? featureId : String(featureId ?? "");
+      const assignment = styleAssignments.find((item) => item.featureId === selectedId);
+      const properties = { ...current.properties };
+      delete properties.architecture_profile_id;
+      delete properties.architecture_profile_title;
+      delete properties.architecture_profile_source;
+      delete properties.architecture_profile_license;
+      delete properties.architecture_profile_confidence;
+
+      if (assignment) {
+        properties.architecture_profile_id = assignment.referenceId;
+        properties.architecture_profile_title = assignment.referenceTitle;
+        properties.architecture_profile_source = assignment.sourceUrl;
+        properties.architecture_profile_license = assignment.license ?? "Not recorded";
+        properties.architecture_profile_confidence = "User-confirmed visual association; not survey-verified";
+      }
+
+      const updated = { ...current, properties };
+      onSelectedFeatureChangeRef.current?.(updated);
+      return updated;
+    });
+  }, [styleAssignments]);
 
   useEffect(() => {
     if (!stylePreviewRequest) return;
