@@ -44,7 +44,9 @@ type BuildingHeight = {
   source:
     | "overture-height"
     | "floor-estimate"
-    | "fallback-estimate";
+    | "fallback-estimate"
+    | "reference-reported-height"
+    | "reference-reported-floors";
 };
 
 type BuildingPolygonLodStyleCache = {
@@ -64,6 +66,7 @@ type BuildingPolygonLodStyleCache = {
 type BuildingLodRecord = {
   entity: CesiumEntity;
   heightInfo: BuildingHeight;
+  sourceHeightInfo: BuildingHeight;
   baseHeight: number;
   topHeight: number;
   visualStyle: BuildingVisualStyle;
@@ -551,16 +554,19 @@ export class CesiumAdapter implements MapEngine {
               continue;
             }
 
-            const heightInfo = this.getBuildingHeight(properties);
-            const topHeight = heightInfo.baseHeight + heightInfo.meters;
+            const sourceHeightInfo = this.getBuildingHeight(properties);
+            const savedStyleAssignment = this.buildingStyleAssignments.get(entity.id);
             const sourceVisualStyle = resolveBuildingVisualStyle(
               properties,
               entity.id,
-              heightInfo.meters,
+              sourceHeightInfo.meters,
             );
-            const visualStyle =
-              this.buildingStyleAssignments.get(entity.id)?.style ??
-              sourceVisualStyle;
+            const visualStyle = savedStyleAssignment?.style ?? sourceVisualStyle;
+            const heightInfo = this.getResearchAdjustedBuildingHeight(
+              sourceHeightInfo,
+              savedStyleAssignment?.style,
+            );
+            const topHeight = heightInfo.baseHeight + heightInfo.meters;
             const hierarchy = polygon.hierarchy?.getValue(time);
 
             let wallPositions: CesiumCartesian3[] | null = null;
@@ -591,6 +597,7 @@ export class CesiumAdapter implements MapEngine {
             const record: BuildingLodRecord = {
               entity,
               heightInfo,
+              sourceHeightInfo,
               baseHeight: heightInfo.baseHeight,
               topHeight,
               visualStyle,
@@ -1741,6 +1748,39 @@ export class CesiumAdapter implements MapEngine {
     };
   }
 
+  private getResearchAdjustedBuildingHeight(
+    sourceHeight: BuildingHeight,
+    style: BuildingVisualStyle | null | undefined,
+  ): BuildingHeight {
+    if (
+      style &&
+      Number.isFinite(style.reportedHeightMeters) &&
+      (style.reportedHeightMeters as number) >= 3 &&
+      (style.reportedHeightMeters as number) <= 300
+    ) {
+      return {
+        meters: style.reportedHeightMeters as number,
+        baseHeight: sourceHeight.baseHeight,
+        source: "reference-reported-height",
+      };
+    }
+
+    if (
+      style &&
+      Number.isInteger(style.reportedFloorCount) &&
+      (style.reportedFloorCount as number) >= 1 &&
+      (style.reportedFloorCount as number) <= 100
+    ) {
+      return {
+        meters: Math.min(300, Math.max(3, (style.reportedFloorCount as number) * 3)),
+        baseHeight: sourceHeight.baseHeight,
+        source: "reference-reported-floors",
+      };
+    }
+
+    return sourceHeight;
+  }
+
   private isUnderground(
     properties: BuildingProperties,
   ): boolean {
@@ -1923,6 +1963,13 @@ export class CesiumAdapter implements MapEngine {
       this.cesium
     ) {
       selectedRecord.visualStyle = selectedRecord.baseVisualStyle;
+      selectedRecord.heightInfo = this.getResearchAdjustedBuildingHeight(
+        selectedRecord.sourceHeightInfo,
+        selectedRecord.baseVisualStyle,
+      );
+      selectedRecord.baseHeight = selectedRecord.heightInfo.baseHeight;
+      selectedRecord.topHeight = selectedRecord.heightInfo.baseHeight + selectedRecord.heightInfo.meters;
+      this.renderedBuildingMetadata.set(selectedRecord.entity.id, selectedRecord.heightInfo);
       selectedRecord.polygonStyleCache = null;
       selectedRecord.detailedWall = null;
       selectedRecord.roofEquipmentBox = null;
@@ -1975,12 +2022,24 @@ export class CesiumAdapter implements MapEngine {
           JSON.stringify(nextBaseline) !== JSON.stringify(record.baseVisualStyle);
         const previewWasActive =
           JSON.stringify(record.visualStyle) !== JSON.stringify(record.baseVisualStyle);
+        const nextHeightInfo = this.getResearchAdjustedBuildingHeight(
+          record.sourceHeightInfo,
+          nextBaseline,
+        );
+        const heightChanged =
+          nextHeightInfo.meters !== record.heightInfo.meters ||
+          nextHeightInfo.baseHeight !== record.heightInfo.baseHeight ||
+          nextHeightInfo.source !== record.heightInfo.source;
 
         record.baseVisualStyle = nextBaseline;
-        if (!baselineChanged && !previewWasActive) continue;
+        record.heightInfo = nextHeightInfo;
+        record.baseHeight = nextHeightInfo.baseHeight;
+        record.topHeight = nextHeightInfo.baseHeight + nextHeightInfo.meters;
+        this.renderedBuildingMetadata.set(record.entity.id, nextHeightInfo);
+        if (!baselineChanged && !previewWasActive && !heightChanged) continue;
 
         // A saved assignment supersedes a temporary preview. Removing it
-        // returns to the style derived from the building's source tags.
+        // returns to the source Overture height/floor estimate.
         record.visualStyle = nextBaseline;
         record.polygonStyleCache = null;
         record.detailedWall = null;
@@ -2019,6 +2078,13 @@ export class CesiumAdapter implements MapEngine {
     // Restore any highlighted material before invalidating the cached graphics.
     this.restoreSelectedBuilding();
     record.visualStyle = style ?? record.baseVisualStyle;
+    record.heightInfo = this.getResearchAdjustedBuildingHeight(
+      record.sourceHeightInfo,
+      record.visualStyle,
+    );
+    record.baseHeight = record.heightInfo.baseHeight;
+    record.topHeight = record.heightInfo.baseHeight + record.heightInfo.meters;
+    this.renderedBuildingMetadata.set(record.entity.id, record.heightInfo);
     record.polygonStyleCache = null;
     record.detailedWall = null;
     record.roofEquipmentBox = null;
@@ -2310,6 +2376,14 @@ export class CesiumAdapter implements MapEngine {
           selectedProperties.architecture_profile_license = savedArchitectureProfile.license ?? "Not recorded";
           selectedProperties.architecture_profile_confidence =
             "User-confirmed visual association; not survey-verified";
+          selectedProperties.architecture_profile_reported_floor_count =
+            savedArchitectureProfile.style.reportedFloorCount;
+          selectedProperties.architecture_profile_reported_height_m =
+            savedArchitectureProfile.style.reportedHeightMeters;
+          selectedProperties.architecture_profile_reported_building_area_sqm =
+            savedArchitectureProfile.style.reportedBuildingAreaSqM;
+          selectedProperties.architecture_profile_reported_metadata =
+            savedArchitectureProfile.reportedBuildingMetadata ?? {};
         }
 
         const names = properties.names;
