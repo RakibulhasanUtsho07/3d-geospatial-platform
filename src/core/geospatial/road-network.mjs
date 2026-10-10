@@ -88,7 +88,7 @@ export function buildOverpassRoadQuery(request) {
     "[out:json][timeout:20][bbox:" + request.south + "," + request.west + "," + request.north + "," + request.east + "];",
     'way["highway"~"^(' + highwayPattern + ')$"];',
     "out body geom;",
-  ].join("\\n");
+  ].join("\n");
 }
 
 function isRecord(value) {
@@ -106,13 +106,13 @@ function finiteNumber(value) {
 
 function safeText(value, max = 180) {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "");
+  const normalized = value.trim().replace(/[\u0000-\u001f\u007f]/g, "");
   return normalized ? normalized.slice(0, max) : null;
 }
 
 function parseWidth(value) {
   if (typeof value !== "string" && typeof value !== "number") return null;
-  const match = String(value).trim().match(/^(\\d+(?:\\.\\d+)?)\\s*(?:m|meter|meters)?$/i);
+  const match = String(value).trim().match(/^(\d+(?:\.\d+)?)\s*(?:m|meter|meters)?$/i);
   if (!match) return null;
   const width = Number(match[1]);
   return Number.isFinite(width) && width >= 0.8 && width <= 60 ? width : null;
