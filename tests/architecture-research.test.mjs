@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createArchitectureStylePreview,
   filterArchitectureReferences,
+  resolveArchitectureMediaPreview,
   parseArchitectureResearchParams,
   summarizeArchitectureReferences,
 } from "../src/core/geospatial/architecture-research.mjs";
@@ -169,4 +170,46 @@ test("maps biophilic references into brick, balcony, greenery and roof-garden fe
   assert.equal(style.greenery, true);
   assert.equal(style.roofDetail, "roof-garden");
   assert.equal(style.balconyProjectionMeters, 1.6);
+});
+
+test("resolves only reuse-aware Commons image previews and validated YouTube embeds", () => {
+  const commons = resolveArchitectureMediaPreview({
+    id: "R02",
+    mediaType: "image",
+    title: "Mugda facade",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Symmetrical_blue_and_yellow_facade_of_a_building_at_Mugda_in_Dhaka.jpg",
+    license: "CC BY-SA 4.0 International",
+    usageStatus: "open-licence-candidate; re-check",
+  });
+  assert.equal(commons.mediaPreviewKind, "image");
+  assert.match(commons.mediaPreviewUrl, /Special:FilePath/);
+  assert.match(commons.mediaPreviewUrl, /width=720/);
+
+  const video = resolveArchitectureMediaPreview({
+    id: "V02",
+    mediaType: "video",
+    title: "Old Dhaka walking tour",
+    sourceUrl: "https://www.youtube.com/watch?v=TRiPqruKoGE",
+    license: "Standard YouTube viewing",
+    usageStatus: "viewing/reference only; reuse not established",
+  });
+  assert.equal(video.mediaPreviewKind, "video");
+  assert.equal(video.mediaPreviewUrl, "https://www.youtube-nocookie.com/embed/TRiPqruKoGE");
+
+  const rightsUnclear = resolveArchitectureMediaPreview({
+    id: "R18",
+    mediaType: "image",
+    sourceUrl: "https://www.jagonews24.com/photo/bangladesh/photo-feature/1471",
+    license: "Not established",
+    usageStatus: "research-only",
+  });
+  assert.deepEqual(rightsUnclear, { mediaPreviewUrl: null, mediaPreviewKind: null });
+
+  const unsafeHost = resolveArchitectureMediaPreview({
+    id: "V99",
+    mediaType: "video",
+    sourceUrl: "https://evil.example/watch?v=TRiPqruKoGE",
+    usageStatus: "viewing/reference only",
+  });
+  assert.deepEqual(unsafeHost, { mediaPreviewUrl: null, mediaPreviewKind: null });
 });
