@@ -125,38 +125,71 @@ export function summarizeArchitectureReferences(references) {
 }
 
 export function createArchitectureStylePreview(reference) {
-  const family = String(reference?.designProfile?.styleFamily ?? "").toLowerCase();
-  const palette = Array.isArray(reference?.designProfile?.colorPalette)
-    ? reference.designProfile.colorPalette
-    : [];
-  const facade = palette.find((swatch) => typeof swatch?.hex === "string")?.hex ?? "#D9DFE0";
-  const roof = palette.find((swatch) => /roof|concrete|stone|trim/i.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? "")))?.hex
-    ?? palette[1]?.hex
-    ?? "#A9AFB2";
-  const accent = palette.find((swatch) => /green|plant|metal|window|balcony|ochre/i.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? "")))?.hex
-    ?? palette[2]?.hex
-    ?? "#91A8B5";
+  const profile = reference?.designProfile ?? {};
+  const family = String(profile.styleFamily ?? "").toLowerCase();
+  const facadeFeatures = Array.isArray(profile.facadeFeatures) ? profile.facadeFeatures : [];
+  const roofFeatures = Array.isArray(profile.roofFeatures) ? profile.roofFeatures : [];
+  const features = facadeFeatures.join(" ").toLowerCase();
+  const roofDescription = roofFeatures.join(" ").toLowerCase();
+  const colors = Array.isArray(profile.colorPalette) ? profile.colorPalette : [];
+  const colorBy = (pattern, fallback) => colors.find((swatch) =>
+    pattern.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? ""))
+  )?.hex ?? fallback;
+  const facade = colors.find((swatch) => /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? "")))?.hex ?? "#D9DFE0";
+  const roof = colorBy(/roof|concrete|stone|trim|shadow/, colors[1]?.hex ?? "#A9AFB2");
+  const accent = colorBy(/green|plant|metal|window|balcony|ochre|yellow|wood/, colors[2]?.hex ?? "#91A8B5");
   let pattern = "urban-grid";
-  if (/heritage|historic|courtyard|old-dhaka|mansion/.test(family)) {
+  if (/heritage|historic|courtyard|old-dhaka|mansion/.test(family) || /arched|corinthian|fluted columns|ornamental|tracery/.test(features)) {
     pattern = "heritage-arches";
-  } else if (/biophilic|climate-responsive|green-facade|vine/.test(family)) {
+  } else if (/biophilic|climate-responsive|green-facade|vine/.test(family) || /planter|creeper|vine|potted plants|green screen/.test(features)) {
     pattern = "biophilic-balcony";
-  } else if (/painted|blue-ochre|mugda/.test(family)) {
+  } else if (/painted|blue-ochre|mugda/.test(family) || /blue\/yellow|blue\/yellow|yellow facade zoning|symmetrical bay rhythm/.test(features)) {
     pattern = "painted-balcony";
-  } else if (/modernist|brick/.test(family)) {
+  } else if (/modernist|brick/.test(family) || /fair-faced brick|exposed brick/.test(features)) {
     pattern = "brick-modernist";
-  } else if (/apartment|residential|balcony/.test(family)) {
+  } else if (/apartment|residential|balcony|tower/.test(family) || /balcon/.test(features)) {
     pattern = "balcony";
-  } else if (/glass/.test(family)) {
+  } else if (/glass/.test(family) || /glass/.test(features)) {
     pattern = "vertical-glass";
   }
+
+  const materialPattern =
+    /brick|masonry|terracotta|fair-faced-red-brick|brick-cladding/.test(family + " " + features) ? "brick"
+      : /weathered|aged-plaster/.test(family + " " + features) ? "weathered"
+        : /white.*glass|glass.*white|vertical-glass/.test(family) ? "glass"
+          : /light-stone|stone-like|stone/.test(family + " " + features) ? "stone"
+            : /painted-mid-rise|blue.*yellow/.test(family + " " + features) ? "painted"
+              : "plaster";
+
+  const hasArches = /arched|arches|arch openings/.test(features);
+  const hasColumns = /column|corinthian|fluted|pilaster/.test(features);
+  const hasVines = /planter|creeper|vine|green screen|potted plant|landscaped/.test(features);
+  const hasLouvres = /louvre|louver|sunshade|sun-shading|vertical shade/.test(features);
+  const hasGrilles = /grille|grilled|grill/.test(features);
+  const hasBalconies = /balcon|terrace/.test(features);
+  const hasRoofGarden = /garden|green zone|green roof|landscaped terrace/.test(roofDescription + " " + String(profile.reconstructionUse ?? "").toLowerCase());
+  const hasRoofTerrace = /terrace|deck|seating/.test(roofDescription);
+  const isVideoContext = reference?.mediaType === "video";
+
   return {
     id: "research-preview-" + String(reference?.id ?? "unknown"),
     facadeColor: facade,
     roofColor: roof,
     accentColor: accent,
     pattern,
-    roofDetail: "none",
-    repeatWidthMeters: 6.2,
+    roofDetail: hasRoofGarden ? "roof-garden" : hasRoofTerrace ? "roof-terrace" : "none",
+    repeatWidthMeters: /high-rise|tower|condominium/.test(family) ? 8.5 : 6.2,
+    materialPattern,
+    windowFrameColor: colorBy(/frame|trim|ornamental|aged-plaster|off-white/, "#E5DED0"),
+    slabColor: colorBy(/concrete|slab|trim|stone/, accent),
+    windowBayCount: /mansion|rose-garden|palace/.test(family) ? 3 : /mid-rise|tower|condominium/.test(family) ? 4 : 3,
+    decorativeColumns: hasColumns,
+    verticalLouvres: hasLouvres,
+    greenery: hasVines,
+    grilles: hasGrilles,
+    groundFloorArches: hasArches && /ground-floor|veranda|entrance arches/.test(features),
+    upperFloorPattern: hasArches && /upper-level openings|upper.*window/.test(features) ? "heritage-arches" : "urban-grid",
+    balconyProjectionMeters: hasBalconies ? (/wide|deep|stacked|staggered|cantilever/.test(features) ? 1.6 : 0.9) : undefined,
+    fullHeightTexture: !isVideoContext,
   };
 }
