@@ -32,7 +32,7 @@ test("builds a scoped Overpass highway query with geometry", () => {
   assert.match(query, /way\["highway"~/);
   assert.match(query, /90\.4/);
   assert.match(query, /out body geom/);
-  assert.match(query, /out body geom 900;/);
+  assert.match(query, /out body geom\\(23\\.74,90\\.4,23\\.76,90\\.42\\) 900;/);
   assert.doesNotMatch(query, /building/);
 });
 
