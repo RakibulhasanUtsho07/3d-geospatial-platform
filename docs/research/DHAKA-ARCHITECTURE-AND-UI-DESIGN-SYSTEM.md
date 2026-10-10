@@ -147,9 +147,10 @@ Use a restrained **blue + white + light-grey** interface for search/discovery an
 - Main text: #0F172A
 - Secondary text: #475569
 - Border: #CBD5E1
-- Primary blue: #2563EB
+- Primary blue: #2563EB (button text #FFFFFF)
 - Hover blue: #1D4ED8
-- Cyan accent: #0891B2
+- Cyan accent for highlights: #0891B2
+- Accent action with white text: #0E7490
 - Keyboard focus: #0EA5E9
 - Success: #15803D
 - Warning/estimated: #B45309
@@ -162,8 +163,8 @@ Use a restrained **blue + white + light-grey** interface for search/discovery an
 - Main text: #F8FAFC
 - Secondary text: #CBD5E1
 - Border: #334155
-- Primary blue: #60A5FA
-- Cyan accent: #22D3EE
+- Primary blue: #60A5FA (button text #0B1220, not white)
+- Cyan accent: #22D3EE (use dark text on cyan buttons)
 - Keyboard focus: #38BDF8
 - Success: #4ADE80
 - Warning/estimated: #FBBF24
