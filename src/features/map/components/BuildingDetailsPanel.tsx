@@ -276,6 +276,8 @@ export default function BuildingDetailsPanel({
       ([key, value]) =>
         value !== undefined &&
         key !== "display_name" &&
+        key !== "source_rendered_height_m" &&
+        key !== "source_height_source" &&
         !key.startsWith("_render"),
     )
     .sort(([leftKey], [rightKey]) => {
