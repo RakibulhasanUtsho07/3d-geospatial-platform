@@ -1,6 +1,13 @@
 export type FacadePattern = "balcony" | "vertical-glass" | "urban-grid" | "compact" | "heritage-arches" | "painted-balcony" | "biophilic-balcony" | "brick-modernist";
 
-export type RoofDetail = "water-tank" | "hvac-unit" | "none";
+export type RoofDetail =
+  | "water-tank"
+  | "hvac-unit"
+  | "roof-garden"
+  | "roof-terrace"
+  | "none";
+
+export type FacadeMaterialPattern = "brick" | "plaster" | "glass" | "stone" | "weathered" | "painted";
 
 export type BuildingVisualStyle = {
   id: string;
@@ -10,6 +17,19 @@ export type BuildingVisualStyle = {
   pattern: FacadePattern;
   roofDetail: RoofDetail;
   repeatWidthMeters: number;
+  /** Extra details are evidence-led; absent flags leave the procedural default unchanged. */
+  materialPattern?: FacadeMaterialPattern;
+  windowFrameColor?: string;
+  slabColor?: string;
+  windowBayCount?: number;
+  decorativeColumns?: boolean;
+  verticalLouvres?: boolean;
+  greenery?: boolean;
+  grilles?: boolean;
+  groundFloorArches?: boolean;
+  upperFloorPattern?: FacadePattern;
+  balconyProjectionMeters?: number;
+  fullHeightTexture?: boolean;
 };
 
 type BuildingProperties = Record<string, unknown>;
@@ -323,6 +343,34 @@ export function resolveBuildingVisualStyle(
   const facadeColor = explicitFacade ?? palette.facade;
   const roofColor = explicitRoof ?? palette.roof;
 
+  const facadeMaterial = readText(properties, [
+    "facade_material",
+    "facade:material",
+    "building:material",
+    "material",
+  ]);
+  const facadeColourTag = readText(properties, ["facade:colour", "building:colour", "facade_color"]);
+  const isBrick = /brick|masonry|terracotta/.test(facadeMaterial);
+  const materialPattern: FacadeMaterialPattern | undefined =
+    isBrick ? "brick"
+      : /glass|glazing/.test(facadeMaterial) ? "glass"
+        : /stone|granite|marble/.test(facadeMaterial) ? "stone"
+          : /plaster|stucco|render|concrete/.test(facadeMaterial) ? "plaster"
+            : /paint/.test(facadeColourTag) ? "painted"
+              : undefined;
+
+  const sourceFeatures = readText(properties, [
+    "facade_features",
+    "architecture_features",
+    "feature_description",
+  ]);
+  const sourceRoof = readText(properties, [
+    "roof_features",
+    "roof:shape",
+    "roof_material",
+    "roof:material",
+  ]);
+
   return {
     id: palette.id,
     facadeColor,
@@ -334,8 +382,20 @@ export function resolveBuildingVisualStyle(
       seed >>> 3,
       researchPalette?.pattern,
     ),
-    roofDetail: chooseRoofDetail(properties, heightMeters, seed >>> 5),
+    roofDetail: /roof.?garden|rooftop.?garden|green.?roof/.test(sourceRoof)
+      ? "roof-garden"
+      : /roof.?terrace|roof.?deck|terrace/.test(sourceRoof)
+        ? "roof-terrace"
+        : chooseRoofDetail(properties, heightMeters, seed >>> 5),
     repeatWidthMeters: heightMeters >= 60 ? 8.5 : heightMeters >= 24 ? 7.2 : 6.2,
+    materialPattern,
+    windowFrameColor: /white|ivory|cream/.test(facadeColourTag) ? "#EDE8DE" : undefined,
+    slabColor: explicitAccent ?? palette.accent,
+    windowBayCount: /heritage|historic|courtyard|mansion/.test(normalizedStyleHint(properties)) ? 3 : heightMeters >= 45 ? 4 : 3,
+    decorativeColumns: /column|pilaster|corinthian|fluted/.test(sourceFeatures),
+    verticalLouvres: /louvre|louver|sun.?shade|vertical.?shade/.test(sourceFeatures),
+    greenery: /planter|creeper|vine|green.?screen|biophilic|landscaped/.test(sourceFeatures),
+    grilles: /grille|grill|security.?bar/.test(sourceFeatures),
   };
 }
 
@@ -434,117 +494,246 @@ function drawBalcony(
  * Generate a cached, repeatable facade tile. It is deliberately procedural:
  * no network images or external texture assets are required.
  */
-export function createBuildingFacadeTexture(
-  style: BuildingVisualStyle,
-): HTMLCanvasElement | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  const cacheKey = [
-    style.id,
-    style.facadeColor,
-    style.accentColor,
-    style.pattern,
-  ].join(":");
-  const cached = textureCache.get(cacheKey);
-
-  if (cached) {
-    return cached;
-  }
-
+function drawFacadeTile(style: BuildingVisualStyle): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
   canvas.width = 192;
-  // One texture tile represents approximately one 3 m floor.
   canvas.height = 96;
-
   const context = canvas.getContext("2d");
+  if (!context) return null;
 
-  if (!context) {
-    return null;
-  }
+  const facade = style.facadeColor;
+  const slab = style.slabColor ?? style.accentColor;
+  const frame = style.windowFrameColor ?? "#e4e8e8";
+  const bays = Math.max(2, Math.min(5, Math.round(style.windowBayCount ?? 3)));
 
-  context.fillStyle = style.facadeColor;
+  context.fillStyle = facade;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Per-floor slab bands and fine architectural reveals.
-  context.fillStyle = style.accentColor;
+  // Materials are procedural and generated locally: no unlicensed external
+  // image textures are copied into the project.
+  if (style.materialPattern === "brick") {
+    context.fillStyle = "rgba(54, 37, 28, 0.28)";
+    for (let y = 7; y < canvas.height; y += 12) {
+      context.fillRect(0, y, canvas.width, 1.5);
+      const offset = Math.floor(y / 12) % 2 === 0 ? 0 : 14;
+      for (let x = offset; x < canvas.width; x += 28) context.fillRect(x, y - 11, 1, 11);
+    }
+    context.fillStyle = "rgba(255, 220, 195, 0.14)";
+    for (let y = 10; y < canvas.height; y += 24) context.fillRect(0, y, canvas.width, 1);
+  } else if (style.materialPattern === "weathered") {
+    context.fillStyle = "rgba(103, 82, 51, 0.12)";
+    for (const [x, y, w, h] of [[12, 12, 20, 4], [118, 26, 25, 6], [42, 72, 35, 5], [150, 81, 18, 3]]) {
+      context.fillRect(x, y, w, h);
+    }
+    context.fillStyle = "rgba(245, 227, 190, 0.14)";
+    context.fillRect(0, 22, canvas.width, 2);
+    context.fillRect(0, 66, canvas.width, 2);
+  } else if (style.materialPattern === "stone") {
+    context.strokeStyle = "rgba(75, 82, 83, 0.22)";
+    context.lineWidth = 1;
+    for (let y = 12; y < canvas.height; y += 24) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(canvas.width, y);
+      context.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 24) {
+      const offset = Math.floor(y / 24) % 2 ? 24 : 0;
+      for (let x = offset; x < canvas.width; x += 48) context.fillRect(x, y, 1, 24);
+    }
+  } else if (style.materialPattern === "glass") {
+    context.fillStyle = "rgba(219, 241, 249, 0.18)";
+    context.fillRect(0, 0, 10, canvas.height);
+    for (let x = 38; x < canvas.width; x += 58) context.fillRect(x, 7, 2, 82);
+  }
+
+  context.fillStyle = slab;
   context.fillRect(0, 0, canvas.width, 5);
   context.fillRect(0, 90, canvas.width, 6);
-
-  context.fillStyle = "rgba(255, 255, 255, 0.38)";
+  context.fillStyle = "rgba(255, 255, 255, 0.32)";
   context.fillRect(0, 6, canvas.width, 2);
 
-  const frameColor = "#e4e8e8";
+  const bayWidth = (canvas.width - 20) / bays;
+  const windowWidth = Math.max(19, Math.min(45, bayWidth * 0.72));
+  const windowHeight = style.pattern === "vertical-glass" ? 75 : 51;
+  const windowX = (index: number) => 10 + index * bayWidth + (bayWidth - windowWidth) / 2;
+  const drawWindowBays = (withBalcony: boolean) => {
+    for (let index = 0; index < bays; index += 1) {
+      const x = windowX(index);
+      drawWindow(context, x, style.pattern === "vertical-glass" ? 10 : 12, windowWidth, windowHeight, frame);
+      if (withBalcony) {
+        drawBalcony(context, x - 2, 63, windowWidth + 4, slab);
+      }
+    }
+  };
 
   if (style.pattern === "heritage-arches") {
-    for (const x of [18, 76, 134]) {
-      drawArchedWindow(context, x, 11, 40, 75, "#e3d6c1");
+    for (let index = 0; index < bays; index += 1) {
+      const x = windowX(index);
+      drawArchedWindow(context, x, 11, windowWidth, 75, frame);
     }
     context.fillStyle = style.accentColor;
     context.fillRect(0, 9, canvas.width, 3);
     context.fillRect(0, 88, canvas.width, 4);
   } else if (style.pattern === "painted-balcony") {
-    for (const x of [13, 106]) {
-      drawWindow(context, x, 10, 69, 49, frameColor);
-      drawBalcony(context, x - 2, 62, 73, style.accentColor);
-    }
+    // Symmetrical colour zoning echoes the Mugda reference; it remains a
+    // visual profile, not a claim that the selected building is that house.
     context.fillStyle = style.accentColor;
-    context.fillRect(0, 5, canvas.width, 4);
+    context.fillRect(0, 7, 9, 81);
+    context.fillRect(canvas.width - 9, 7, 9, 81);
+    context.fillRect(canvas.width * 0.48, 7, 8, 81);
+    drawWindowBays(true);
   } else if (style.pattern === "biophilic-balcony") {
-    for (const x of [13, 106]) {
-      drawWindow(context, x, 10, 69, 49, frameColor);
-      drawBalcony(context, x - 2, 62, 73, "#b5b0a5");
-    }
-    context.fillStyle = style.accentColor;
-    for (const x of [30, 55, 125, 155]) {
-      context.fillRect(x, 62, 5, 5);
-      context.fillRect(x + 1, 67, 2, 18);
-    }
+    drawWindowBays(true);
   } else if (style.pattern === "brick-modernist") {
-    for (const x of [22, 90, 146]) {
-      drawWindow(context, x, 16, 30, 68, "#d4c8b8");
+    for (let index = 0; index < bays; index += 1) {
+      const x = windowX(index);
+      drawWindow(context, x, 14, windowWidth * 0.78, 68, frame);
     }
-    context.fillStyle = style.accentColor;
-    context.fillRect(0, 15, canvas.width, 4);
+    context.fillStyle = slab;
+    context.fillRect(0, 14, canvas.width, 4);
     context.fillRect(0, 84, canvas.width, 5);
   } else if (style.pattern === "vertical-glass") {
-    for (const x of [12, 72, 132]) {
-      drawWindow(context, x, 11, 48, 75, frameColor);
+    for (let index = 0; index < bays; index += 1) {
+      drawWindow(context, windowX(index), 10, windowWidth, 75, frame);
     }
-
     context.fillStyle = style.accentColor;
-    for (const x of [7, 66, 126, 185]) {
-      context.fillRect(x, 8, 4, 81);
-    }
+    for (let x = 6; x < canvas.width; x += 48) context.fillRect(x, 8, 4, 81);
   } else if (style.pattern === "balcony") {
-    for (const x of [13, 106]) {
-      drawWindow(context, x, 10, 69, 49, frameColor);
-      drawBalcony(context, x - 2, 62, 73, style.accentColor);
-    }
+    drawWindowBays(true);
   } else if (style.pattern === "urban-grid") {
-    for (const x of [12, 72, 132]) {
-      drawWindow(context, x, 15, 46, 66, frameColor);
+    for (let index = 0; index < bays; index += 1) {
+      drawWindow(context, windowX(index), 15, windowWidth, 66, frame);
     }
   } else {
-    for (const x of [15, 74, 133]) {
-      drawWindow(context, x, 23, 43, 57, frameColor);
+    drawWindowBays(false);
+  }
+
+  if (style.decorativeColumns) {
+    context.fillStyle = frame;
+    for (const x of [7, canvas.width - 11]) {
+      context.fillRect(x, 10, 4, 76);
+      context.fillRect(x - 2, 10, 8, 4);
+      context.fillRect(x - 2, 83, 8, 4);
     }
   }
 
-  // Slim vertical joints keep the surface from looking like one flat slab.
-  context.fillStyle = "rgba(65, 78, 82, 0.14)";
+  if (style.verticalLouvres) {
+    context.fillStyle = slab;
+    for (const x of [2, 6, 10, canvas.width - 14, canvas.width - 10, canvas.width - 6]) {
+      context.fillRect(x, 11, 2, 74);
+    }
+  }
+
+  if (style.grilles) {
+    context.strokeStyle = "#41464B";
+    context.lineWidth = 1.3;
+    for (let x = 16; x < canvas.width; x += 12) {
+      context.beginPath();
+      context.moveTo(x, 14);
+      context.lineTo(x, 82);
+      context.stroke();
+    }
+  }
+
+  if (style.greenery || style.pattern === "biophilic-balcony") {
+    context.fillStyle = "#456F43";
+    context.fillRect(0, 61, canvas.width, 4);
+    for (const x of [23, 47, 77, 118, 148, 171]) {
+      context.beginPath();
+      context.moveTo(x, 62);
+      context.bezierCurveTo(x - 2, 68, x + 5, 74, x + 2, 84);
+      context.lineWidth = 2.5;
+      context.strokeStyle = "#3F7546";
+      context.stroke();
+      context.fillStyle = "#5D8D50";
+      context.beginPath();
+      context.ellipse(x - 3, 71, 3, 1.5, -0.5, 0, Math.PI * 2);
+      context.fill();
+      context.beginPath();
+      context.ellipse(x + 3, 78, 3, 1.5, 0.5, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  // Subtle joints preserve perceived scale without turning a wall into a flat slab.
+  context.fillStyle = "rgba(45, 56, 61, 0.13)";
   context.fillRect(0, 7, 2, 82);
   context.fillRect(canvas.width - 2, 7, 2, 82);
+  return canvas;
+}
+
+/**
+ * Generate cached facade materials from the building's source attributes or
+ * from a selected reference's architectural feature profile.
+ *
+ * A full-height texture is used only for the single selected preview so
+ * ground-floor arch treatment and upper-floor fenestration can differ. Normal
+ * background buildings retain the low-memory repeating-floor texture.
+ */
+export function createBuildingFacadeTexture(
+  style: BuildingVisualStyle,
+  buildingHeightMeters = 3,
+): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  const fullHeight = style.fullHeightTexture === true && buildingHeightMeters <= 90;
+  const floorCount = fullHeight
+    ? Math.max(1, Math.min(30, Math.round(buildingHeightMeters / 3)))
+    : 1;
+  const cacheKey = [
+    style.id,
+    style.facadeColor,
+    style.roofColor,
+    style.accentColor,
+    style.pattern,
+    style.materialPattern ?? "",
+    style.windowFrameColor ?? "",
+    style.slabColor ?? "",
+    style.windowBayCount ?? "",
+    style.decorativeColumns ?? "",
+    style.verticalLouvres ?? "",
+    style.greenery ?? "",
+    style.grilles ?? "",
+    style.groundFloorArches ?? "",
+    style.upperFloorPattern ?? "",
+    style.balconyProjectionMeters ?? "",
+    fullHeight ? floorCount : "repeat",
+  ].join(":");
+
+  const cached = textureCache.get(cacheKey);
+  if (cached) return cached;
+
+  const tile = drawFacadeTile(style);
+  if (!tile) return null;
+
+  let texture = tile;
+  if (fullHeight && floorCount > 1) {
+    texture = document.createElement("canvas");
+    texture.width = tile.width;
+    texture.height = tile.height * floorCount;
+    const context = texture.getContext("2d");
+    if (!context) return null;
+
+    for (let floor = 0; floor < floorCount; floor += 1) {
+      let floorStyle = style;
+      if (style.groundFloorArches && floor === 0) {
+        floorStyle = { ...style, pattern: "heritage-arches", groundFloorArches: false };
+      } else if (floor > 0 && style.upperFloorPattern) {
+        floorStyle = { ...style, pattern: style.upperFloorPattern, groundFloorArches: false };
+      }
+      const floorTexture = floorStyle === style ? tile : drawFacadeTile(floorStyle);
+      if (!floorTexture) continue;
+      // The canvas is ordered bottom-to-top by floor; the wall shader may flip
+      // the texture coordinate, so the ground/upper-floor split is approximate.
+      context.drawImage(floorTexture, 0, texture.height - (floor + 1) * tile.height);
+    }
+  }
 
   if (textureCache.size >= 48) {
     const oldestKey = textureCache.keys().next().value;
-
-    if (oldestKey) {
-      textureCache.delete(oldestKey);
-    }
+    if (oldestKey) textureCache.delete(oldestKey);
   }
-
-  textureCache.set(cacheKey, canvas);
-  return canvas;
+  textureCache.set(cacheKey, texture);
+  return texture;
 }
