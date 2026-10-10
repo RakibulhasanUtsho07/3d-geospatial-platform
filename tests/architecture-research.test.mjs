@@ -130,9 +130,43 @@ test("builds temporary facade preview styles from researched architecture palett
   assert.equal(heritage.pattern, "heritage-arches");
   assert.equal(heritage.facadeColor, "#C5B18C");
   assert.equal(heritage.roofDetail, "none");
+  assert.equal(heritage.materialPattern, "weathered");
+  assert.equal(heritage.groundFloorArches, true);
+  assert.equal(heritage.fullHeightTexture, true);
+  assert.equal(heritage.greenery, false);
 
   const painted = createArchitectureStylePreview(references[0]);
   assert.equal(painted.pattern, "painted-balcony");
   assert.equal(painted.facadeColor, "#2F6C96");
+  assert.equal(painted.materialPattern, "painted");
+  assert.equal(painted.windowBayCount, 3);
   assert.match(painted.id, /^research-preview-/);
+});
+
+test("maps biophilic references into brick, balcony, greenery and roof-garden features", () => {
+  const biophilic = {
+    id: "R23",
+    mediaType: "image",
+    designProfile: {
+      styleFamily: "Gulshan-climate-responsive-residence",
+      colorPalette: [
+        { name: "warm-brick", hex: "#A5543A" },
+        { name: "fair-faced-concrete", hex: "#B5B0A6" },
+        { name: "glass-muted-blue", hex: "#91A6AE" },
+        { name: "cascading-green", hex: "#3F7746" },
+      ],
+      facadeFeatures: ["integrated planter beds", "hanging creepers", "wide balconies", "large openings"],
+      roofFeatures: ["rooftop garden and landscaped terraces"],
+      siteContext: ["Gulshan"],
+      locationPrecision: "city-level",
+      paletteConfidence: "estimated",
+      reconstructionUse: "facade preview",
+    },
+  };
+  const style = createArchitectureStylePreview(biophilic);
+  assert.equal(style.pattern, "biophilic-balcony");
+  assert.equal(style.materialPattern, "brick");
+  assert.equal(style.greenery, true);
+  assert.equal(style.roofDetail, "roof-garden");
+  assert.equal(style.balconyProjectionMeters, 1.6);
 });
