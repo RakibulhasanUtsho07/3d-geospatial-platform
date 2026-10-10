@@ -32,6 +32,13 @@ The initial detailed-facade budget is `MAX_DETAILED_FACADES = 650`. The dataset 
 - Procedural facade textures are stylized placeholders, not real photographs. They do not recover the true window count, balcony layout, floor plan, or architectural details of an individual property.
 - Overture building parts can improve shape segmentation when the source data contains them, but coverage is incomplete.
 
+## Second visual pass
+
+- The procedural facade canvas now uses a single approximately 3 m floor tile, so vertical repetition is tied to the estimated building height rather than a multi-floor texture tile.
+- Facade patterns continue to distinguish balcony, vertical-glass, urban-grid, and compact styles; window layout and accents vary deterministically per feature.
+- Selected detailed buildings may receive a small rooftop water-tank or HVAC-like silhouette based on broad building-use/height hints. These details are illustrative and intentionally sparse; source data does not confirm the real rooftop equipment.
+- Roof equipment is only attached within the detailed-facade path, keeping the rest of the city lightweight.
+
 ## Next improvements
 
 1. Add explicit LOD tiers based on camera distance and device capability.
