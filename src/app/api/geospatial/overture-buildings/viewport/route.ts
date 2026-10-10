@@ -396,6 +396,16 @@ async function queryGeneratedTiles(
     }
 
     for (const feature of features) {
+      const featureBounds = getCoordinateBounds(
+        getGeometryCoordinates(feature),
+      );
+
+      // Tiles are deliberately coarse; keep the API contract exact by
+      // filtering each candidate against the requested viewport as well.
+      if (!featureBounds || !intersects(featureBounds, viewport)) {
+        continue;
+      }
+
       const identity = getFeatureIdentity(feature);
       if (!featureMap.has(identity)) featureMap.set(identity, feature);
     }
