@@ -4,6 +4,7 @@ import {
   resolveBuildingVisualStyle,
 } from "../buildings/building-style";
 import type { BuildingVisualStyle } from "../buildings/building-style";
+import { getViewportFeatureLimit } from "./viewport-budget.mjs";
 
 import type {
   CameraTarget,
@@ -114,9 +115,12 @@ export class CesiumAdapter implements MapEngine {
   private lastLodBudget: number | null = null;
 
   private loadedViewportBounds: ViewportBounds | null = null;
+  // null means the uncapped full pilot dataset is loaded.
+  private loadedViewportFeatureLimit: number | null = null;
   private hasLoadedBuildings = false;
   private viewportLoadInProgress = false;
   private pendingViewportBounds: ViewportBounds | null = null;
+  private pendingViewportFeatureLimit: number | null = null;
 
   async initialize(container: HTMLElement): Promise<void> {
     if (this.viewer && !this.viewer.isDestroyed()) {
@@ -229,9 +233,14 @@ export class CesiumAdapter implements MapEngine {
     requestedBounds: ViewportBounds | null =
       this.getPaddedViewportBounds(viewer, Cesium),
   ): Promise<void> {
+    const requestedFeatureLimit = requestedBounds
+      ? getViewportFeatureLimit(viewer.camera.positionCartographic.height)
+      : null;
+
     if (this.viewportLoadInProgress) {
       if (requestedBounds) {
         this.pendingViewportBounds = requestedBounds;
+        this.pendingViewportFeatureLimit = requestedFeatureLimit;
       }
       return;
     }
@@ -244,7 +253,10 @@ export class CesiumAdapter implements MapEngine {
       const endpoint = requestedBounds
         ? this.getViewportEndpoint(
             requestedBounds,
-            this.getViewportFeatureLimit(viewer),
+            requestedFeatureLimit ??
+              getViewportFeatureLimit(
+                viewer.camera.positionCartographic.height,
+              ),
           )
         : "/api/geospatial/overture-buildings";
 
@@ -490,6 +502,7 @@ export class CesiumAdapter implements MapEngine {
       }
 
       this.loadedViewportBounds = requestedBounds;
+      this.loadedViewportFeatureLimit = requestedFeatureLimit;
       this.hasLoadedBuildings = true;
       this.lastLodOrigin = null;
       this.lastLodBudget = null;
@@ -544,12 +557,20 @@ export class CesiumAdapter implements MapEngine {
       this.viewportLoadInProgress = false;
 
       const pendingBounds = this.pendingViewportBounds;
+      const pendingFeatureLimit = this.pendingViewportFeatureLimit;
       this.pendingViewportBounds = null;
+      this.pendingViewportFeatureLimit = null;
+      const requiredFeatureLimit =
+        pendingFeatureLimit ??
+        getViewportFeatureLimit(viewer.camera.positionCartographic.height);
 
       if (
         completedSuccessfully &&
         pendingBounds &&
-        !this.isViewportCoveredByLoadedData(pendingBounds)
+        !this.isViewportCoveredByLoadedData(
+          pendingBounds,
+          requiredFeatureLimit,
+        )
       ) {
         void this.loadOvertureBuildings(
           viewer,
@@ -624,17 +645,6 @@ export class CesiumAdapter implements MapEngine {
     return padded;
   }
 
-  private getViewportFeatureLimit(viewer: CesiumViewer): number {
-    const height = viewer.camera.positionCartographic.height;
-
-    if (height >= 25_000) return 500;
-    if (height >= 12_000) return 900;
-    if (height >= 6_000) return 1_400;
-    if (height >= 2_500) return 2_000;
-
-    return 3_000;
-  }
-
   private getViewportEndpoint(
     bounds: ViewportBounds,
     featureLimit: number,
@@ -666,6 +676,7 @@ export class CesiumAdapter implements MapEngine {
 
   private isViewportCoveredByLoadedData(
     bounds: ViewportBounds,
+    requiredFeatureLimit: number,
   ): boolean {
     if (!this.hasLoadedBuildings) {
       return false;
@@ -676,7 +687,15 @@ export class CesiumAdapter implements MapEngine {
       return true;
     }
 
-    return this.boundsContain(this.loadedViewportBounds, bounds);
+    if (!this.boundsContain(this.loadedViewportBounds, bounds)) {
+      return false;
+    }
+
+    // Re-fetch when a closer camera view needs a larger response budget.
+    return (
+      this.loadedViewportFeatureLimit !== null &&
+      this.loadedViewportFeatureLimit >= requiredFeatureLimit
+    );
   }
 
   private handleCameraMoveEnd(
@@ -698,12 +717,22 @@ export class CesiumAdapter implements MapEngine {
       return;
     }
 
+    const requiredFeatureLimit = getViewportFeatureLimit(
+      viewer.camera.positionCartographic.height,
+    );
+
     if (this.viewportLoadInProgress) {
       this.pendingViewportBounds = requestedBounds;
+      this.pendingViewportFeatureLimit = requiredFeatureLimit;
       return;
     }
 
-    if (!this.isViewportCoveredByLoadedData(requestedBounds)) {
+    if (
+      !this.isViewportCoveredByLoadedData(
+        requestedBounds,
+        requiredFeatureLimit,
+      )
+    ) {
       void this.loadOvertureBuildings(
         viewer,
         Cesium,
@@ -1458,9 +1487,11 @@ export class CesiumAdapter implements MapEngine {
     this.renderedBuildingMetadata.clear();
     this.buildingLodRecords = [];
     this.loadedViewportBounds = null;
+    this.loadedViewportFeatureLimit = null;
     this.hasLoadedBuildings = false;
     this.viewportLoadInProgress = false;
     this.pendingViewportBounds = null;
+    this.pendingViewportFeatureLimit = null;
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 
