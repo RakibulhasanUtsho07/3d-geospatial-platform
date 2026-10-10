@@ -1625,7 +1625,7 @@ export class CesiumAdapter implements MapEngine {
   private getEntityFromPick(
     picked: unknown,
     Cesium: CesiumModule,
-    dataSource: CesiumDataSource,
+    dataSource: Pick<CesiumDataSource, "entities">,
   ): CesiumEntity | null {
     if (!picked || typeof picked !== "object") {
       return null;
