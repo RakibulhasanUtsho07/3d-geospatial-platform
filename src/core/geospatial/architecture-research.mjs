@@ -193,7 +193,7 @@ export function createArchitectureStylePreview(reference) {
   const roofEvidence = roofDescription + " " + buildingMetadataText;
   const colors = Array.isArray(profile.colorPalette) ? profile.colorPalette : [];
   const paletteNames = colors.map((swatch) => String(swatch?.name ?? "")).join(" ").toLowerCase();
-  const materialHints = family + " " + features + " " + paletteNames;
+  const materialHints = (family + " " + features + " " + paletteNames).replace(/[_\\s]+/g, "-");
   const colorBy = (pattern, fallback) => colors.find((swatch) =>
     pattern.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? ""))
   )?.hex ?? fallback;
