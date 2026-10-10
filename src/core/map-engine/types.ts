@@ -16,6 +16,7 @@ export type CameraTarget = {
 import type { BuildingVisualStyle } from "../buildings/building-style";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
+import type { RoadFeature } from "../geospatial/road-network.mjs";
 
 export interface BuildingStyleAssignment {
   featureId: string;
@@ -95,6 +96,7 @@ export interface MapEngine {
   clearFeatureSelection(): void;
   setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void;
   previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean;
+  onRoadSelected(listener: (road: RoadFeature | null) => void): () => void;
   destroy(): void;
   resize(): void;
 
