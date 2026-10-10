@@ -15,6 +15,8 @@ export interface ArchitectureResearchReference {
   mediaType: ArchitectureResearchMediaType;
   title: string;
   sourceUrl: string;
+  mediaPreviewUrl?: string | null;
+  mediaPreviewKind?: "image" | "video" | null;
   sourceName?: string | null;
   author?: string | null;
   capturedAt?: string | null;
