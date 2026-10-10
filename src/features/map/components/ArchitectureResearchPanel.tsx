@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import Image from "next/image";
 
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingStyleAssignment } from "@/core/map-engine/types";
@@ -330,9 +331,12 @@ export default function ArchitectureResearchPanel({
                     <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 block overflow-hidden rounded-lg border border-slate-200 bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={"Open original image source for " + reference.title}>
                       {/* Direct third-party Commons preview; image bytes are never copied into this repository. */}
                       <div className="relative aspect-[4/3] w-full bg-slate-100">
-                        <img
+                        <Image
                           src={reference.mediaPreviewUrl}
                           alt={"Reference image preview: " + reference.title}
+                          width={720}
+                          height={540}
+                          unoptimized
                           loading="lazy"
                           className="h-full w-full object-contain"
                           referrerPolicy="no-referrer"
@@ -360,7 +364,7 @@ export default function ArchitectureResearchPanel({
                   )}
                   {reference.mediaPreviewKind === "image" && reference.mediaPreviewUrl && (
                     <p className="mt-1 text-[10px] leading-4 text-slate-500">
-                      External Commons preview · {reference.author ? "Creator: " + reference.author + " · " : ""}{reference.license ?? "Licence not recorded"}. The original source page remains the attribution/licence authority.
+                      External Commons preview · {reference.author ? "Creator: " + reference.author + " · " : ""}{reference.attributionText ? reference.attributionText + " · " : ""}{reference.license ?? "Licence not recorded"}. The original source page remains the attribution/licence authority.
                     </p>
                   )}
                   {reference.mediaPreviewKind === "video" && (
