@@ -87,6 +87,8 @@ const TILE_DIRECTORY = resolve(
 );
 const TILE_MANIFEST_FILE = resolve(TILE_DIRECTORY, "manifest.json");
 const MAX_VIEWPORT_SPAN_DEGREES = 2;
+const DEFAULT_VIEWPORT_FEATURE_LIMIT = 2500;
+const MAX_VIEWPORT_FEATURE_LIMIT = 5000;
 const MAX_CACHED_TILE_FILES = 64;
 
 let indexedDatasetPromise: Promise<IndexedDataset> | null = null;
@@ -305,6 +307,30 @@ function parseViewportBounds(
   }
 
   return { bounds };
+}
+
+function parseFeatureLimit(
+  requestUrl: URL,
+): { limit: number } | { error: string } {
+  const rawLimit = requestUrl.searchParams.get("limit");
+
+  if (rawLimit === null) {
+    return { limit: DEFAULT_VIEWPORT_FEATURE_LIMIT };
+  }
+
+  const limit = Number(rawLimit);
+
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > MAX_VIEWPORT_FEATURE_LIMIT
+  ) {
+    return {
+      error: `Feature limit must be an integer between 1 and ${MAX_VIEWPORT_FEATURE_LIMIT}.`,
+    };
+  }
+
+  return { limit };
 }
 
 function intersects(
@@ -604,6 +630,116 @@ function getRenderRole(feature: unknown): string {
   return typeof role === "string" ? role : "unknown";
 }
 
+
+function selectViewportFeatures(
+  features: unknown[],
+  viewport: ViewportBounds,
+  limit: number,
+): unknown[] {
+  if (features.length <= limit) {
+    return features;
+  }
+
+  const columns = Math.ceil(Math.sqrt(limit));
+  const rows = Math.ceil(limit / columns);
+  const cellWidth = (viewport.east - viewport.west) / columns;
+  const cellHeight = (viewport.north - viewport.south) / rows;
+
+  type Candidate = {
+    feature: unknown;
+    priority: number;
+    distance: number;
+  };
+
+  const buckets = new Map<number, Candidate[]>();
+
+  for (const feature of features) {
+    const bounds = getFeatureBounds(feature);
+    if (!bounds) continue;
+
+    const longitude = (bounds.west + bounds.east) / 2;
+    const latitude = (bounds.south + bounds.north) / 2;
+
+    const column = Math.max(
+      0,
+      Math.min(
+        columns - 1,
+        Math.floor((longitude - viewport.west) / cellWidth),
+      ),
+    );
+    const row = Math.max(
+      0,
+      Math.min(
+        rows - 1,
+        Math.floor((latitude - viewport.south) / cellHeight),
+      ),
+    );
+
+    const cellKey = row * columns + column;
+    const cellCenterLongitude =
+      viewport.west + (column + 0.5) * cellWidth;
+    const cellCenterLatitude =
+      viewport.south + (row + 0.5) * cellHeight;
+
+    const role = getRenderRole(feature);
+    const priority =
+      role === "building_part" ? 0 :
+      role === "building" ? 1 :
+      2;
+
+    const longitudeDistance =
+      (longitude - cellCenterLongitude) *
+      Math.cos((cellCenterLatitude * Math.PI) / 180);
+    const latitudeDistance = latitude - cellCenterLatitude;
+
+    const candidate: Candidate = {
+      feature,
+      priority,
+      distance:
+        longitudeDistance * longitudeDistance +
+        latitudeDistance * latitudeDistance,
+    };
+
+    const bucket = buckets.get(cellKey);
+    if (bucket) {
+      bucket.push(candidate);
+    } else {
+      buckets.set(cellKey, [candidate]);
+    }
+  }
+
+  const orderedBuckets = [...buckets.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, bucket]) =>
+      bucket.sort(
+        (left, right) =>
+          left.priority - right.priority ||
+          left.distance - right.distance,
+      ),
+    );
+
+  const selected: unknown[] = [];
+  let depth = 0;
+
+  while (selected.length < limit) {
+    let foundCandidate = false;
+
+    for (const bucket of orderedBuckets) {
+      const candidate = bucket[depth];
+      if (!candidate) continue;
+
+      selected.push(candidate.feature);
+      foundCandidate = true;
+      if (selected.length >= limit) break;
+    }
+
+    if (!foundCandidate) break;
+    depth += 1;
+  }
+
+  return selected;
+}
+
 export async function GET(request: Request): Promise<Response> {
   const parsedBounds = parseViewportBounds(new URL(request.url));
 
@@ -615,6 +751,16 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const viewport = parsedBounds.bounds;
+  const parsedLimit = parseFeatureLimit(new URL(request.url));
+
+  if ("error" in parsedLimit) {
+    return NextResponse.json(
+      { error: parsedLimit.error },
+      { status: 400 },
+    );
+  }
+
+  const featureLimit = parsedLimit.limit;
 
   try {
     const tileResult = await queryGeneratedTiles(viewport);
@@ -630,13 +776,19 @@ export async function GET(request: Request): Promise<Response> {
     const totalFeatureCount = tileResult
       ? tileResult.totalFeatureCount
       : dataset?.indexedFeatures.length ?? 0;
+    const matchedFeatureCount = matchingFeatures.length;
+    const limitedFeatures = selectViewportFeatures(
+      matchingFeatures,
+      viewport,
+      featureLimit,
+    );
 
     let buildingCount = 0;
     let parentCount = 0;
     let partCount = 0;
     let unknownRoleCount = 0;
 
-    for (const feature of matchingFeatures) {
+    for (const feature of limitedFeatures) {
       switch (getRenderRole(feature)) {
         case "building":
           buildingCount += 1;
@@ -656,13 +808,16 @@ export async function GET(request: Request): Promise<Response> {
     const viewportCollection = {
       type: "FeatureCollection",
       ...(dataset?.collection ?? {}),
-      features: matchingFeatures,
+      features: limitedFeatures,
     };
 
     console.info("[Overture Viewport API] Viewport ready.", {
       source: tileResult ? "generated-tiles" : "indexed-geojson",
       totalFeatures: totalFeatureCount,
-      returnedFeatures: matchingFeatures.length,
+      matchedFeatures: matchedFeatureCount,
+      returnedFeatures: limitedFeatures.length,
+      featureLimit,
+      truncated: matchedFeatureCount > limitedFeatures.length,
       selectedTiles: tileResult?.tileCount ?? 0,
       candidateFeatures: tileResult?.candidateFeatureCount ?? 0,
       tileCacheHits: tileResult?.tileCacheHits ?? 0,
@@ -676,7 +831,12 @@ export async function GET(request: Request): Promise<Response> {
       headers: {
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
         "X-Building-Dataset": "overture-3d-pilot",
-        "X-Building-Feature-Count": String(matchingFeatures.length),
+        "X-Building-Feature-Count": String(limitedFeatures.length),
+        "X-Building-Matched-Feature-Count": String(matchedFeatureCount),
+        "X-Building-Feature-Limit": String(featureLimit),
+        "X-Building-Truncated": String(
+          matchedFeatureCount > limitedFeatures.length,
+        ),
         "X-Building-Total-Feature-Count": String(totalFeatureCount),
         "X-Building-Data-Source": tileResult
           ? "generated-tiles"
