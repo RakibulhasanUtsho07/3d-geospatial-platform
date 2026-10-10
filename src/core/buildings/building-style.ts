@@ -1,4 +1,4 @@
-export type FacadePattern = "balcony" | "vertical-glass" | "urban-grid" | "compact";
+export type FacadePattern = "balcony" | "vertical-glass" | "urban-grid" | "compact" | "heritage-arches" | "painted-balcony" | "biophilic-balcony" | "brick-modernist";
 
 export type RoofDetail = "water-tank" | "hvac-unit" | "none";
 
@@ -45,6 +45,138 @@ const HIGH_RISE_PALETTES: StylePalette[] = [
 ];
 
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+const NAMED_SOURCE_COLORS: Record<string, string> = {
+  white: "#FFFFFF",
+  ivory: "#EEE5D6",
+  cream: "#E7D2BD",
+  beige: "#D9CBB9",
+  grey: "#A9AFB2",
+  gray: "#A9AFB2",
+  "light gray": "#D9DFE0",
+  "light grey": "#D9DFE0",
+  "dark gray": "#454D52",
+  "dark grey": "#454D52",
+  black: "#24292D",
+  red: "#B94B3A",
+  brown: "#8B5E45",
+  brick: "#9A4D34",
+  blue: "#2F6C96",
+  yellow: "#D8B044",
+  green: "#47744D",
+  tan: "#C7B59C",
+};
+
+type ResearchPalette = StylePalette & { pattern: FacadePattern };
+
+function normalizedStyleHint(properties: BuildingProperties): string {
+  return readText(properties, [
+    "architecture_style",
+    "style_family",
+    "facade_style",
+    "design_family",
+    "render_style_family",
+  ]).replace(/[_:]+/g, "-");
+}
+
+function resolveResearchPalette(
+  properties: BuildingProperties,
+): ResearchPalette | null {
+  const family = normalizedStyleHint(properties);
+  const material = readText(properties, [
+    "facade_material",
+    "facade:material",
+    "building:material",
+    "material",
+  ]);
+
+  if (/old-dhaka|heritage|historic|courtyard|mansion/.test(family)) {
+    return {
+      id: "research-heritage-courtyard",
+      facade: "#c5b18c",
+      roof: "#696357",
+      accent: "#9b543c",
+      pattern: "heritage-arches",
+    };
+  }
+
+  if (/biophilic|climate-responsive|green-facade|vine/.test(family)) {
+    return {
+      id: "research-brick-biophilic",
+      facade: "#a35338",
+      roof: "#b5b0a5",
+      accent: "#3b7544",
+      pattern: "biophilic-balcony",
+    };
+  }
+
+  if (/painted.*blue.*ochre|blue.*ochre|mugda-painted/.test(family)) {
+    return {
+      id: "research-painted-blue-ochre",
+      facade: "#2f6c96",
+      roof: "#bcb7a9",
+      accent: "#d8b044",
+      pattern: "painted-balcony",
+    };
+  }
+
+  if (/modernist|brick-house|fair-faced-brick/.test(family)) {
+    return {
+      id: "research-brick-modernist",
+      facade: "#9a4d34",
+      roof: "#b5b0a5",
+      accent: "#c7c1b4",
+      pattern: "brick-modernist",
+    };
+  }
+
+  if (/contemporary-white-glass|white-glass-apartment/.test(family)) {
+    return {
+      id: "research-contemporary-white-glass",
+      facade: "#f1f0ea",
+      roof: "#c9c9c1",
+      accent: "#91a8b5",
+      pattern: "vertical-glass",
+    };
+  }
+
+  // A sourced brick-material attribute can influence the procedural facade,
+  // but it does not imply a named building or a heritage/biophilic style.
+  if (/brick|terracotta/.test(material)) {
+    return {
+      id: "source-material-brick",
+      facade: "#a35338",
+      roof: "#a7a69e",
+      accent: "#c7b5a0",
+      pattern: "brick-modernist",
+    };
+  }
+
+  return null;
+}
+
+function normalizeSourceColor(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase().replace(/_/g, " ");
+  if (HEX_COLOR.test(normalized)) {
+    if (normalized.length === 4) {
+      return "#" + normalized.slice(1).split("").map((digit) => digit + digit).join("");
+    }
+    return normalized;
+  }
+  return NAMED_SOURCE_COLORS[normalized] ?? null;
+}
+
+function firstSourceColor(
+  properties: BuildingProperties,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const color = normalizeSourceColor(properties[key]);
+    if (color) return color;
+  }
+  return null;
+}
 const textureCache = new Map<string, HTMLCanvasElement>();
 
 function stableHash(value: string): number {
@@ -86,7 +218,9 @@ function choosePattern(
   properties: BuildingProperties,
   heightMeters: number,
   seed: number,
+  researchPattern?: FacadePattern,
 ): FacadePattern {
+  if (researchPattern) return researchPattern;
   const use = readText(properties, [
     "subtype",
     "class",
@@ -167,26 +301,84 @@ export function resolveBuildingVisualStyle(
       : heightMeters >= 24
         ? MID_RISE_PALETTES
         : LOW_RISE_PALETTES;
-  const palette = palettes[seed % palettes.length];
+  const researchPalette = resolveResearchPalette(properties);
+  const palette = researchPalette ?? palettes[seed % palettes.length];
 
-  const explicitFacade = properties.facade_color;
-  const explicitRoof = properties.roof_color;
-  const facadeColor = validColor(explicitFacade)
-    ? explicitFacade
-    : palette.facade;
-  const roofColor = validColor(explicitRoof)
-    ? explicitRoof
-    : palette.roof;
+  const explicitFacade = firstSourceColor(properties, [
+    "facade_color",
+    "facade:colour",
+    "facade_colour",
+    "building:colour",
+    "building:color",
+    "building_color",
+    "building_colour",
+  ]);
+  const explicitRoof = firstSourceColor(properties, [
+    "roof_color",
+    "roof:colour",
+    "roof_colour",
+    "building:roof:colour",
+  ]);
+  const explicitAccent = firstSourceColor(properties, [
+    "facade_accent_color",
+    "facade_accent_colour",
+    "facade_accent:colour",
+  ]);
+  const facadeColor = explicitFacade ?? palette.facade;
+  const roofColor = explicitRoof ?? palette.roof;
 
   return {
     id: palette.id,
     facadeColor,
     roofColor,
-    accentColor: palette.accent,
-    pattern: choosePattern(properties, heightMeters, seed >>> 3),
+    accentColor: explicitAccent ?? palette.accent,
+    pattern: choosePattern(
+      properties,
+      heightMeters,
+      seed >>> 3,
+      researchPalette?.pattern,
+    ),
     roofDetail: chooseRoofDetail(properties, heightMeters, seed >>> 5),
     repeatWidthMeters: heightMeters >= 60 ? 8.5 : heightMeters >= 24 ? 7.2 : 6.2,
   };
+}
+
+function drawArchedWindow(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  frameColor: string,
+): void {
+  const springLine = y + width * 0.34;
+  context.fillStyle = frameColor;
+  context.beginPath();
+  context.moveTo(x, y + height);
+  context.lineTo(x, springLine);
+  context.quadraticCurveTo(x + width / 2, y - width * 0.24, x + width, springLine);
+  context.lineTo(x + width, y + height);
+  context.closePath();
+  context.fill();
+
+  const inset = Math.max(3, Math.round(width * 0.09));
+  const innerX = x + inset;
+  const innerWidth = width - inset * 2;
+  const innerSpring = springLine + inset;
+  context.fillStyle = "#203b4a";
+  context.beginPath();
+  context.moveTo(innerX, y + height - inset);
+  context.lineTo(innerX, innerSpring);
+  context.quadraticCurveTo(innerX + innerWidth / 2, y + inset, innerX + innerWidth, innerSpring);
+  context.lineTo(innerX + innerWidth, y + height - inset);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "rgba(198, 226, 239, 0.5)";
+  context.fillRect(innerX + 2, innerSpring + 3, Math.max(2, innerWidth * 0.1), Math.max(3, height * 0.24));
+  context.fillStyle = frameColor;
+  context.fillRect(x + width * 0.5 - 1, innerSpring, 2, height - (innerSpring - y));
+  context.fillRect(innerX, y + height * 0.68, innerWidth, 2);
 }
 
 function drawWindow(
@@ -289,7 +481,38 @@ export function createBuildingFacadeTexture(
 
   const frameColor = "#e4e8e8";
 
-  if (style.pattern === "vertical-glass") {
+  if (style.pattern === "heritage-arches") {
+    for (const x of [18, 76, 134]) {
+      drawArchedWindow(context, x, 11, 40, 75, "#e3d6c1");
+    }
+    context.fillStyle = style.accentColor;
+    context.fillRect(0, 9, canvas.width, 3);
+    context.fillRect(0, 88, canvas.width, 4);
+  } else if (style.pattern === "painted-balcony") {
+    for (const x of [13, 106]) {
+      drawWindow(context, x, 10, 69, 49, frameColor);
+      drawBalcony(context, x - 2, 62, 73, style.accentColor);
+    }
+    context.fillStyle = style.accentColor;
+    context.fillRect(0, 5, canvas.width, 4);
+  } else if (style.pattern === "biophilic-balcony") {
+    for (const x of [13, 106]) {
+      drawWindow(context, x, 10, 69, 49, frameColor);
+      drawBalcony(context, x - 2, 62, 73, "#b5b0a5");
+    }
+    context.fillStyle = style.accentColor;
+    for (const x of [30, 55, 125, 155]) {
+      context.fillRect(x, 62, 5, 5);
+      context.fillRect(x + 1, 67, 2, 18);
+    }
+  } else if (style.pattern === "brick-modernist") {
+    for (const x of [22, 90, 146]) {
+      drawWindow(context, x, 16, 30, 68, "#d4c8b8");
+    }
+    context.fillStyle = style.accentColor;
+    context.fillRect(0, 15, canvas.width, 4);
+    context.fillRect(0, 84, canvas.width, 5);
+  } else if (style.pattern === "vertical-glass") {
     for (const x of [12, 72, 132]) {
       drawWindow(context, x, 11, 48, 75, frameColor);
     }
