@@ -22,6 +22,7 @@ import PropertyListingsPanel from "./PropertyListingsPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
+import RoadDetailsPanel from "./RoadDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
 
@@ -123,6 +124,7 @@ export default function MapCanvas({
         setSelectedRoad(road);
         if (road) {
           setSelectedFeature(null);
+          onSelectedFeatureChangeRef.current?.(null);
           setSelectedPlace(null);
           setSelectedProperty(null);
           engine.setNavigationPath(null, null);
@@ -135,6 +137,7 @@ export default function MapCanvas({
         if (place) {
           setSelectedRoad(null);
           setSelectedFeature(null);
+          onSelectedFeatureChangeRef.current?.(null);
           setSelectedProperty(null);
           engine.setNavigationPath(null, null);
         }
@@ -349,6 +352,7 @@ export default function MapCanvas({
 
   function goHomeToDhaka() {
     engineRef.current?.setNavigationPath(null, null);
+    setSelectedRoad(null);
     setSelectedProperty(null);
     engineRef.current?.flyTo({
       destination: DHAKA_CAMERA_TARGET,
@@ -503,7 +507,9 @@ export default function MapCanvas({
     engine.clearFeatureSelection();
     engine.setNavigationPath(null, null);
     setSelectedProperty(null);
+    setSelectedRoad(null);
     setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
 
     engine.flyTo({
       destination: {
@@ -620,6 +626,14 @@ export default function MapCanvas({
           feature={selectedFeature}
           onClose={closeBuildingDetails}
           onFocus={focusSelectedBuilding}
+        />
+      )}
+
+      {status === "ready" && selectedRoad && (
+        <RoadDetailsPanel
+          road={selectedRoad}
+          onClose={closeRoadDetails}
+          onFocus={focusSelectedRoad}
         />
       )}
     </div>
