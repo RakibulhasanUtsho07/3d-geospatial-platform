@@ -88,6 +88,7 @@ After pulling the branch, run:
 ```powershell
 npm run lint
 npm run build:geospatial-tiles
+npm run test:geospatial-tiles
 npm run build
 npm run dev
 ```

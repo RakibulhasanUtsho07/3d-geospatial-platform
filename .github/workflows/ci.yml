@@ -43,5 +43,8 @@ jobs:
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
+      - name: Test generated spatial tiles
+        run: npm run test:geospatial-tiles
+
       - name: Build production app
         run: npm run build
