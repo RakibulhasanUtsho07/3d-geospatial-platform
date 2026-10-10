@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
+import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
@@ -22,6 +23,18 @@ import BuildingDetailsPanel from "./BuildingDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
 
+interface StylePreviewRequest {
+  revision: number;
+  style: BuildingVisualStyle | null;
+  title?: string;
+}
+
+interface MapCanvasProps {
+  onSelectedFeatureChange?: (feature: MapFeatureSelection | null) => void;
+  stylePreviewRequest?: StylePreviewRequest | null;
+  onStylePreviewResult?: (applied: boolean, request: StylePreviewRequest) => void;
+}
+
 const DHAKA_CAMERA_TARGET = {
   longitude: 90.41,
   latitude: 23.78,
@@ -34,8 +47,14 @@ const DHAKA_CAMERA_ORIENTATION = {
   roll: 0,
 };
 
-export default function MapCanvas() {
+export default function MapCanvas({
+  onSelectedFeatureChange,
+  stylePreviewRequest,
+  onStylePreviewResult,
+}: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const onSelectedFeatureChangeRef = useRef(onSelectedFeatureChange);
+  const onStylePreviewResultRef = useRef(onStylePreviewResult);
   const cameraRef = useRef<CameraController | null>(null);
   const engineRef = useRef<CesiumAdapter | null>(null);
 
@@ -49,6 +68,14 @@ export default function MapCanvas() {
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[] | null>(null);
   const [layers, setLayers] = useState<MapLayer[]>([]);
   const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    onSelectedFeatureChangeRef.current = onSelectedFeatureChange;
+  }, [onSelectedFeatureChange]);
+
+  useEffect(() => {
+    onStylePreviewResultRef.current = onStylePreviewResult;
+  }, [onStylePreviewResult]);
 
   useEffect(() => {
     const mapContainer = containerRef.current;
@@ -74,6 +101,7 @@ export default function MapCanvas() {
       (feature) => {
         if (!cancelled) {
           setSelectedFeature(feature);
+          onSelectedFeatureChangeRef.current?.(feature);
           if (feature) {
             setSelectedPlace(null);
             setSelectedProperty(null);
@@ -101,6 +129,7 @@ export default function MapCanvas() {
         setStatus("loading");
         setErrorMessage(null);
         setSelectedFeature(null);
+        onSelectedFeatureChangeRef.current?.(null);
         setSelectedPlace(null);
         setSelectedProperty(null);
         setNearbyPlaces(null);
@@ -168,10 +197,17 @@ export default function MapCanvas() {
     };
   }, [retryKey]);
 
+  useEffect(() => {
+    if (!stylePreviewRequest) return;
+    const applied = engineRef.current?.previewSelectedBuildingStyle(stylePreviewRequest.style) ?? false;
+    onStylePreviewResultRef.current?.(applied, stylePreviewRequest);
+  }, [stylePreviewRequest]);
+
   function retryMap() {
     setErrorMessage(null);
     setStatus("loading");
     setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
     setSelectedPlace(null);
     setSelectedProperty(null);
     setNearbyPlaces(null);
@@ -182,6 +218,7 @@ export default function MapCanvas() {
   function closeBuildingDetails() {
     engineRef.current?.clearFeatureSelection();
     setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
   }
 
   function goHomeToDhaka() {
