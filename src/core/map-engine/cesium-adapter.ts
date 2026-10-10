@@ -65,6 +65,7 @@ type BuildingLodRecord = {
   baseHeight: number;
   topHeight: number;
   visualStyle: BuildingVisualStyle;
+  baseVisualStyle: BuildingVisualStyle;
   wallPositions: CesiumCartesian3[] | null;
   center: CesiumCartesian3 | null;
   isPart: boolean;
@@ -575,6 +576,7 @@ export class CesiumAdapter implements MapEngine {
               baseHeight: heightInfo.baseHeight,
               topHeight,
               visualStyle,
+              baseVisualStyle: visualStyle,
               wallPositions,
               center,
               isPart: role === "building_part",
@@ -1596,10 +1598,11 @@ export class CesiumAdapter implements MapEngine {
 
   private restoreSelectedBuilding(): void {
     const building = this.selectedBuilding;
-
+    const selectedRecord = this.buildingLodRecords.find(
+      (record) => record.entity === building,
+    );
     const originalRoof = this.selectedBuildingOriginalMaterial;
-    const originalWall =
-      this.selectedBuildingOriginalWallMaterial;
+    const originalWall = this.selectedBuildingOriginalWallMaterial;
 
     if (building?.polygon && originalRoof !== null) {
       building.polygon.material = originalRoof;
@@ -1612,6 +1615,60 @@ export class CesiumAdapter implements MapEngine {
     this.selectedBuilding = null;
     this.selectedBuildingOriginalMaterial = null;
     this.selectedBuildingOriginalWallMaterial = null;
+
+    // A preview is a temporary visual treatment. Restore the source-driven
+    // style when the selected building is cleared or another feature is picked.
+    if (
+      selectedRecord &&
+      selectedRecord.visualStyle !== selectedRecord.baseVisualStyle &&
+      this.cesium
+    ) {
+      selectedRecord.visualStyle = selectedRecord.baseVisualStyle;
+      selectedRecord.polygonStyleCache = null;
+      selectedRecord.detailedWall = null;
+      selectedRecord.roofEquipmentBox = null;
+      selectedRecord.roofEquipmentPosition = null;
+      selectedRecord.entity.wall = undefined;
+      selectedRecord.entity.box = undefined;
+      selectedRecord.entity.position = undefined;
+
+      if (selectedRecord.isDetailed) {
+        this.applyDetailedBuildingStyle(selectedRecord, this.cesium);
+      } else {
+        this.applyLightweightBuildingStyle(selectedRecord, this.cesium);
+      }
+      this.viewer?.scene.requestRender();
+    }
+  }
+
+  previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    const selected = this.selectedBuilding;
+    if (!viewer || !Cesium || viewer.isDestroyed() || !selected) return false;
+
+    const record = this.buildingLodRecords.find((item) => item.entity === selected);
+    if (!record) return false;
+
+    // Restore any highlighted material before invalidating the cached graphics.
+    this.restoreSelectedBuilding();
+    record.visualStyle = style ?? record.baseVisualStyle;
+    record.polygonStyleCache = null;
+    record.detailedWall = null;
+    record.roofEquipmentBox = null;
+    record.roofEquipmentPosition = null;
+    record.entity.wall = undefined;
+    record.entity.box = undefined;
+    record.entity.position = undefined;
+
+    this.selectedBuilding = record.entity;
+    if (record.isDetailed) {
+      this.applyDetailedBuildingStyle(record, Cesium);
+    } else {
+      this.applyLightweightBuildingStyle(record, Cesium);
+    }
+    viewer.scene.requestRender();
+    return true;
   }
 
   clearFeatureSelection(): void {
