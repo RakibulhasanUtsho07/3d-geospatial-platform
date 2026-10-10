@@ -120,9 +120,10 @@ test("categorizes clinics as medical centres and filters unrequested features", 
   const places = normalizeOverpassElements([
     { type: "node", id: 21, lat: 23.78, lon: 90.41, tags: { amenity: "clinic", name: "Family Clinic" } },
     { type: "node", id: 22, lat: 23.781, lon: 90.411, tags: { amenity: "pharmacy", name: "Not requested" } },
-    { type: "node", id: 23, lat: 23.782, lon: 90.412, tags: { healthcare: "doctor", name: "Doctor" } },
+    { type: "node", id: 23, lat: 23.782, lon: 90.412, tags: { healthcare: "doctor", name: "Doctor", website: "javascript:alert(1)" } },
   ], query);
   assert.deepEqual(places.map((place) => place.category), ["medical_center", "medical_center"]);
+  assert.equal(places[1].website, null, "unsafe script URL must never be exposed as a clickable link");
 });
 
 test("deduplicates OSM elements, sorts nearest first and enforces result limits", () => {
