@@ -294,3 +294,10 @@ More photos, a high-resolution image or a GPS tag do not by themselves prove ide
 - Mapillary licensing: https://help.mapillary.com/hc/en-us/articles/115001770409-CC-BY-SA-license-for-open-data
 
 **Maintenance rule:** Keep source facts, observations, guesses, colour estimates and rendering decisions distinct in both data and UI. Update this guide when individual references are re-checked.
+
+
+### Location coordinates added after cross-checking map/source pages
+- **Rose Garden Palace:** 23.71836, 90.4264 is listed for the named landmark by Mapcarta/OSM. Store it as a landmark-feature point, not as survey-grade facade coordinates: https://mapcarta.com/W439770540
+- **Shakhari Bazar locality centre:** 23.71016, 90.40881 is a neighbourhood/quarter reference point, not a particular house: https://mapcarta.com/N393920647
+- **Tantibazar locality centre:** 23.71215, 90.40788 is a locality reference point, not a particular house: https://mapcarta.com/N393921256
+- **Beauty Boarding:** two public secondary pages surfaced conflicting coordinate candidates (23.7063, 90.4131 and 23.73339, 90.4157) even though descriptions point to Bangla Bazar/Shree Shash Lane. This has been saved as a coordinate conflict, not resolved by choosing one value. Do not pin the building automatically until its address and OSM footprint are reconciled.
