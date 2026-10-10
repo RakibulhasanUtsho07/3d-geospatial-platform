@@ -105,7 +105,7 @@ test("filters by neighbourhood, style family, media type and reuse status", () =
   };
   assert.deepEqual(filterArchitectureReferences(references, base).map((reference) => reference.id), ["R18"]);
   assert.deepEqual(filterArchitectureReferences(references, { ...base, area: "mugda", style: "painted", usage: "open" }).map((reference) => reference.id), ["R02"]);
-  assert.deepEqual(filterArchitectureReferences(references, { ...base, mediaType: "video" }).map((reference) => reference.id), []);
+  assert.deepEqual(filterArchitectureReferences(references, { ...base, mediaType: "video" }).map((reference) => reference.id), ["V02"]);
 });
 
 test("search includes design features and palette hex codes", () => {
