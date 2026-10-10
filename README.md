@@ -64,6 +64,7 @@ npm run test:building-search
 npm run test:footprint-area
 npm run test:nearby-places
 npm run test:property-listings
+npm run test:street-imagery
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
@@ -87,6 +88,7 @@ CI also starts the production server and verifies the viewport endpoint, nearby-
 - `GET /api/geospatial/overture-buildings/search?q=…&limit=8` — bounded search through names, source attributes, categories, and feature identifiers. Queries must be 2–100 characters; results are capped at 20.
 - `GET /api/geospatial/nearby-places?lat=…&lon=…&radius=800&categories=pharmacy,hospital&limit=100` — nearby pharmacies, hospitals, clinics, supermarkets, and markets. Radius is capped at 1.5 km and results at 150.
 - `GET /api/geospatial/properties?lat=…&lon=…&radius=5000&minRent=15000&maxRent=45000&minBedrooms=2&type=apartment&furnishing=all&limit=50` — bounded demo-property discovery with rent, type, bedroom, furnishing, text and radius filters. Saved-only queries accept a browser-provided `savedIds` list.
+- `GET /api/geospatial/street-imagery?lat=…&lon=…&radius=250&limit=25` — on-demand public KartaView street-image reference discovery for a selected building. Search radius is capped at 500 m and results at 50.
 
 The viewport endpoint validates coordinate bounds and feature limits. Responses include diagnostic headers for data source, tile count, candidate/matched/returned features, truncation, sampling strategy, and cache activity. The search API caches a compact search index in memory and returns only summary fields needed by the map UI.
 
@@ -94,6 +96,6 @@ Nearby-place results come from the public OpenStreetMap Overpass API and are cac
 
 ## Current pilot limitations
 
-This is not yet a production property marketplace. The property API currently returns clearly labelled illustrative seed records for prototyping; they are not real offers and have no verified prices, owner information, or live availability. Saved listings are stored in the current browser only. Road-network routing, room and floor-plan modeling, indoor furniture configuration and AI interior design still need dedicated data sources and feature modules. Service matching is limited to mapped OpenStreetMap objects returned by the latest nearby query; straight-line distances are not walking or driving routes. The current building dataset and visual quality remain a Dhaka-focused technical pilot.
+This is not yet a production property marketplace. The property API currently returns clearly labelled illustrative seed records for prototyping; they are not real offers and have no verified prices, owner information, or live availability. Saved listings are stored in the current browser only. Road-network routing, room and floor-plan modeling, indoor furniture configuration and AI interior design still need dedicated data sources and feature modules. Service matching is limited to mapped OpenStreetMap objects returned by the latest nearby query; straight-line distances are not walking or driving routes. The current building dataset and visual quality remain a Dhaka-focused technical pilot. Public street-imagery discovery can show nearby KartaView references for a selected building, but it does not guarantee city-wide or exact-building coverage and does not automatically reconstruct architecture. See [Street Imagery and Reconstruction](docs/STREET-IMAGERY-AND-RECONSTRUCTION.md) for licence, confidence and photogrammetry notes.
 
 For more detail on tile generation, endpoint validation, diagnostics, and manual map checks, see [the Geospatial Tile Pipeline guide](docs/GEOSPATIAL-TILE-PIPELINE.md).

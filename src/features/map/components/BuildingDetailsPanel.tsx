@@ -2,6 +2,7 @@
 
 import { SQUARE_METERS_TO_SQUARE_FEET } from "@/core/geospatial/footprint-area.mjs";
 import type { MapFeatureSelection } from "@/core/map-engine/types";
+import StreetImageryPanel from "./StreetImageryPanel";
 
 interface BuildingDetailsPanelProps {
   feature: MapFeatureSelection | null;
@@ -341,6 +342,19 @@ export default function BuildingDetailsPanel({
             </p>
           )}
         </section>
+
+        {(feature.focusCoordinates ?? feature.coordinates) && (
+          <StreetImageryPanel
+            key={[
+              feature.source,
+              (feature.focusCoordinates ?? feature.coordinates)!.latitude.toFixed(5),
+              (feature.focusCoordinates ?? feature.coordinates)!.longitude.toFixed(5),
+            ].join(":")}
+            latitude={(feature.focusCoordinates ?? feature.coordinates)!.latitude}
+            longitude={(feature.focusCoordinates ?? feature.coordinates)!.longitude}
+            buildingLabel={name}
+          />
+        )}
 
         <p className="text-xs leading-5 text-slate-500">
           Height may be sourced from Overture attributes or estimated from floor

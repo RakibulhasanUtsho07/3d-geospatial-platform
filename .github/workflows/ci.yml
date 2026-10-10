@@ -64,6 +64,9 @@ jobs:
       - name: Test property listing filters and nearby-service matching
         run: npm run test:property-listings
 
+      - name: Test street imagery validation and reference normalization
+        run: npm run test:street-imagery
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
@@ -119,6 +122,14 @@ jobs:
           );
           if (properties.status !== 400) {
             console.error("Property endpoint should reject a request without coordinates.");
+            process.exit(1);
+          }
+
+          const streetImagery = await fetch(
+            "http://127.0.0.1:3000/api/geospatial/street-imagery",
+          );
+          if (streetImagery.status !== 400) {
+            console.error("Street imagery endpoint should reject a request without coordinates.");
             process.exit(1);
           }
 
