@@ -38,6 +38,15 @@ npm run dev
 
 Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script prepares the Cesium static assets automatically.
 
+### Road geometry and architecture research implementation
+
+- The default **Detailed OSM roads** layer draws viewport-clipped vector road geometry from OpenStreetMap, with mapped road names/classes, tagged or estimated width, surface colours, bridge/tunnel hints and an OSM way details panel. If width or elevation tags are absent, those visual properties are estimates, not a survey.
+- Select an Overture building, then use **Dhaka Architecture Library** to inspect source images (Wikimedia Commons previews only for CC BY/CC BY-SA candidate records) and embedded YouTube street-context videos. Source pages with unclear image reuse rights remain link-only.
+- **Apply & save to this building** saves a chosen facade/roof profile against the selected Overture feature ID in this browser. Named research may affect procedural wall texture and, where metadata is unambiguous, rendered height/storey estimate; source-reported built area and metadata are shown separately in Building Details. This is a user-confirmed visual association, not automatically verified identity or a photogrammetry model.
+- Broad skyline, panorama and multi-building-cluster references are blocked from assignment to an individual footprint. Mixed-wing house descriptions are not collapsed into one floor count.
+- Saved assignments live in browser local storage; they are not shared with other devices/users and are not uploaded to a persistent server database.
+
+
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
 
 ## Geospatial data pipeline
