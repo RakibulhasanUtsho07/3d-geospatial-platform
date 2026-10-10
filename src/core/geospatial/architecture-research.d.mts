@@ -78,7 +78,19 @@ export interface ArchitectureStylePreview {
   roofColor: string;
   accentColor: string;
   pattern: ArchitecturePreviewPattern;
-  roofDetail: "water-tank" | "hvac-unit" | "none";
+  roofDetail: "water-tank" | "hvac-unit" | "roof-garden" | "roof-terrace" | "none";
+  materialPattern?: "brick" | "plaster" | "glass" | "stone" | "weathered" | "painted";
+  windowFrameColor?: string;
+  slabColor?: string;
+  windowBayCount?: number;
+  decorativeColumns?: boolean;
+  verticalLouvres?: boolean;
+  greenery?: boolean;
+  grilles?: boolean;
+  groundFloorArches?: boolean;
+  upperFloorPattern?: ArchitecturePreviewPattern;
+  balconyProjectionMeters?: number;
+  fullHeightTexture?: boolean;
   repeatWidthMeters: number;
 }
 
