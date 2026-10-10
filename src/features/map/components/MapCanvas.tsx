@@ -15,7 +15,7 @@ type MapStatus = "loading" | "ready" | "error";
 const DHAKA_CAMERA_TARGET = {
   longitude: 90.41,
   latitude: 23.78,
-  height: 1800,
+  height: 950,
 };
 
 const DHAKA_CAMERA_ORIENTATION = {
