@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  canAssignArchitectureReference,
   createArchitectureStylePreview,
   filterArchitectureReferences,
   resolveArchitectureMediaPreview,
@@ -212,4 +213,35 @@ test("resolves only reuse-aware Commons image previews and validated YouTube emb
     usageStatus: "viewing/reference only",
   });
   assert.deepEqual(unsafeHost, { mediaPreviewUrl: null, mediaPreviewKind: null });
+});
+
+test("blocks single-building assignment for skyline, panoramic and cluster-only context", () => {
+  assert.equal(canAssignArchitectureReference({
+    id: "R01",
+    mediaType: "image",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Dhaka_skyline.jpg",
+    designProfile: {
+      styleFamily: "dense-high-rise-residential-context",
+      reconstructionUse: "urban density template; individual facades not matched",
+    },
+    buildingMatchConfidence: "viewpoint-level, not building centroids",
+  }), false);
+
+  assert.equal(canAssignArchitectureReference({
+    id: "R19",
+    mediaType: "image",
+    sourceUrl: "https://example.org/rose-garden",
+    designProfile: {
+      styleFamily: "formal-heritage-mansion-garden",
+      reconstructionUse: "manual facade profile",
+    },
+    buildingMatchConfidence: "named landmark; footprint still needs validation",
+  }), true);
+
+  assert.equal(canAssignArchitectureReference({
+    id: "V03",
+    mediaType: "video",
+    sourceUrl: "https://www.youtube.com/watch?v=orB6n7bX-uk",
+    designProfile: { styleFamily: "Old-Dhaka-dense-market-street" },
+  }), false);
 });
