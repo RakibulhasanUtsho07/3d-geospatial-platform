@@ -30,6 +30,10 @@ export type BuildingVisualStyle = {
   upperFloorPattern?: FacadePattern;
   balconyProjectionMeters?: number;
   fullHeightTexture?: boolean;
+  /** Source-reported dimensions used only after explicit reference assignment. */
+  reportedFloorCount?: number;
+  reportedHeightMeters?: number;
+  reportedBuildingAreaSqM?: number;
 };
 
 type BuildingProperties = Record<string, unknown>;
