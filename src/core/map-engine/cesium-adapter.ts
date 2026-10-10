@@ -45,6 +45,13 @@ type BuildingLodRecord = {
   isDetailed: boolean;
 };
 
+type ViewportBounds = {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+};
+
 type FeatureSelectionListener = (
   feature: MapFeatureSelection | null,
 ) => void;
@@ -65,6 +72,9 @@ const ROOF_OUTLINE_COLOR = "#586978";
 const BATCH_SIZE = 200;
 const MAX_DETAILED_FACADES = 650;
 const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
+const VIEWPORT_PADDING_FACTOR = 0.4;
+const VIEWPORT_MIN_PADDING_DEGREES = 0.004;
+const MAX_VIEWPORT_SPAN_DEGREES = 1.8;
 
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
@@ -102,6 +112,11 @@ export class CesiumAdapter implements MapEngine {
   private cameraMoveEndUnsubscribe: (() => void) | null = null;
   private lastLodOrigin: CesiumCartesian3 | null = null;
   private lastLodBudget: number | null = null;
+
+  private loadedViewportBounds: ViewportBounds | null = null;
+  private hasLoadedBuildings = false;
+  private viewportLoadInProgress = false;
+  private pendingViewportBounds: ViewportBounds | null = null;
 
   async initialize(container: HTMLElement): Promise<void> {
     if (this.viewer && !this.viewer.isDestroyed()) {
@@ -178,6 +193,12 @@ export class CesiumAdapter implements MapEngine {
 
     this.installFeaturePicking(viewer, Cesium);
 
+    this.cameraMoveEndUnsubscribe?.();
+    this.cameraMoveEndUnsubscribe =
+      viewer.camera.moveEnd.addEventListener(() => {
+        this.handleCameraMoveEnd(viewer, Cesium);
+      });
+
     viewer.scene.requestRender();
 
     /*
@@ -205,14 +226,33 @@ export class CesiumAdapter implements MapEngine {
   private async loadOvertureBuildings(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
+    requestedBounds: ViewportBounds | null =
+      this.getPaddedViewportBounds(viewer, Cesium),
   ): Promise<void> {
-    try {
-      console.info("[Overture] Fetching pilot dataset...");
+    if (this.viewportLoadInProgress) {
+      if (requestedBounds) {
+        this.pendingViewportBounds = requestedBounds;
+      }
+      return;
+    }
 
-      const response = await fetch(
-        "/api/geospatial/overture-buildings",
-        { cache: "no-store" },
-      );
+    this.viewportLoadInProgress = true;
+    let completedSuccessfully = false;
+    let stagedDataSource: CesiumDataSource | null = null;
+
+    try {
+      const endpoint = requestedBounds
+        ? this.getViewportEndpoint(requestedBounds)
+        : "/api/geospatial/overture-buildings";
+
+      console.info("[Overture] Fetching building viewport...", {
+        endpoint,
+        viewport: requestedBounds,
+      });
+
+      const response = await fetch(endpoint, {
+        cache: "no-store",
+      });
 
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as
@@ -257,10 +297,13 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
-      dataSource.name = "Overture 3D Pilot Buildings";
-      // Keep the layer hidden until all base building styles are ready.
+      dataSource.name = requestedBounds
+        ? "Overture 3D Viewport Buildings"
+        : "Overture 3D Pilot Buildings";
+      // Stage the next viewport invisibly so the current view stays usable.
       dataSource.show = false;
       await viewer.dataSources.add(dataSource);
+      stagedDataSource = dataSource;
 
       if (
         !this.viewer ||
@@ -270,8 +313,6 @@ export class CesiumAdapter implements MapEngine {
         viewer.dataSources.remove(dataSource, true);
         return;
       }
-
-      this.overtureBuildings = dataSource;
 
       const time = Cesium.JulianDate.now();
       const entities = [...dataSource.entities.values];
@@ -383,7 +424,6 @@ export class CesiumAdapter implements MapEngine {
 
             this.applyLightweightBuildingStyle(record, Cesium);
             lodRecords.push(record);
-            this.renderedBuildingMetadata.set(entity.id, heightInfo);
             renderedExtrusions += 1;
 
             if (record.isPart) {
@@ -412,7 +452,28 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
+      const previousDataSource = this.overtureBuildings;
+
+      // Invalidate any selection owned by the outgoing viewport before swapping.
+      this.restoreSelectedBuilding();
+      this.selectedBuilding = null;
+      this.selectedBuildingOriginalMaterial = null;
+      this.selectedBuildingOriginalWallMaterial = null;
+      this.emitFeatureSelection(null);
+
+      this.overtureBuildings = dataSource;
       this.buildingLodRecords = lodRecords;
+      this.renderedBuildingMetadata.clear();
+
+      for (const record of lodRecords) {
+        this.renderedBuildingMetadata.set(
+          record.entity.id,
+          record.heightInfo,
+        );
+      }
+
+      this.loadedViewportBounds = requestedBounds;
+      this.hasLoadedBuildings = true;
       this.lastLodOrigin = null;
       this.lastLodBudget = null;
 
@@ -422,19 +483,16 @@ export class CesiumAdapter implements MapEngine {
       dataSource.show = true;
       viewer.scene.requestRender();
 
-      this.cameraMoveEndUnsubscribe?.();
-      this.cameraMoveEndUnsubscribe =
-        viewer.camera.moveEnd.addEventListener(() => {
-          if (
-            this.viewer === viewer &&
-            !viewer.isDestroyed()
-          ) {
-            this.updateBuildingLod(viewer, Cesium);
-          }
-        });
+      if (previousDataSource && previousDataSource !== dataSource) {
+        viewer.dataSources.remove(previousDataSource, true);
+      }
 
-      console.info("[Overture] Pilot dataset rendered.", {
-        totalFeatures: entities.length,
+      stagedDataSource = null;
+      completedSuccessfully = true;
+
+      console.info("[Overture] Building viewport rendered.", {
+        returnedFeatures: entities.length,
+        viewport: requestedBounds,
         renderedBuildings,
         renderedParts,
         renderedExtrusions,
@@ -455,8 +513,180 @@ export class CesiumAdapter implements MapEngine {
           : String(error),
       );
 
+      if (
+        stagedDataSource &&
+        this.viewer === viewer &&
+        !viewer.isDestroyed() &&
+        this.overtureBuildings !== stagedDataSource
+      ) {
+        viewer.dataSources.remove(stagedDataSource, true);
+      }
+
       throw error;
+    } finally {
+      this.viewportLoadInProgress = false;
+
+      const pendingBounds = this.pendingViewportBounds;
+      this.pendingViewportBounds = null;
+
+      if (
+        completedSuccessfully &&
+        pendingBounds &&
+        !this.isViewportCoveredByLoadedData(pendingBounds)
+      ) {
+        void this.loadOvertureBuildings(
+          viewer,
+          Cesium,
+          pendingBounds,
+        ).catch((error: unknown) => {
+          console.error(
+            "[Overture] Follow-up viewport load failed:",
+            error instanceof Error ? error.message : String(error),
+          );
+        });
+      }
     }
+  }
+
+  private getPaddedViewportBounds(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): ViewportBounds | null {
+    let rectangle: import("cesium").Rectangle | undefined;
+
+    try {
+      rectangle = viewer.camera.computeViewRectangle(
+        viewer.scene.globe.ellipsoid,
+      );
+    } catch {
+      return null;
+    }
+
+    if (!rectangle) {
+      return null;
+    }
+
+    const west = Cesium.Math.toDegrees(rectangle.west);
+    const south = Cesium.Math.toDegrees(rectangle.south);
+    const east = Cesium.Math.toDegrees(rectangle.east);
+    const north = Cesium.Math.toDegrees(rectangle.north);
+
+    // A rectangle crossing the antimeridian cannot be expressed by this
+    // viewport endpoint's simple west < east contract; use the full fallback.
+    if (
+      ![west, south, east, north].every(Number.isFinite) ||
+      west >= east ||
+      south >= north
+    ) {
+      return null;
+    }
+
+    const longitudePadding = Math.max(
+      (east - west) * VIEWPORT_PADDING_FACTOR,
+      VIEWPORT_MIN_PADDING_DEGREES,
+    );
+    const latitudePadding = Math.max(
+      (north - south) * VIEWPORT_PADDING_FACTOR,
+      VIEWPORT_MIN_PADDING_DEGREES,
+    );
+
+    const padded: ViewportBounds = {
+      west: Math.max(-180, west - longitudePadding),
+      south: Math.max(-85, south - latitudePadding),
+      east: Math.min(180, east + longitudePadding),
+      north: Math.min(85, north + latitudePadding),
+    };
+
+    if (
+      padded.east - padded.west > MAX_VIEWPORT_SPAN_DEGREES ||
+      padded.north - padded.south > MAX_VIEWPORT_SPAN_DEGREES
+    ) {
+      return null;
+    }
+
+    return padded;
+  }
+
+  private getViewportEndpoint(bounds: ViewportBounds): string {
+    const params = new URLSearchParams({
+      west: bounds.west.toFixed(6),
+      south: bounds.south.toFixed(6),
+      east: bounds.east.toFixed(6),
+      north: bounds.north.toFixed(6),
+    });
+
+    return `/api/geospatial/overture-buildings/viewport?${params.toString()}`;
+  }
+
+  private boundsContain(
+    outer: ViewportBounds,
+    inner: ViewportBounds,
+  ): boolean {
+    const epsilon = 0.00002;
+
+    return (
+      inner.west >= outer.west - epsilon &&
+      inner.south >= outer.south - epsilon &&
+      inner.east <= outer.east + epsilon &&
+      inner.north <= outer.north + epsilon
+    );
+  }
+
+  private isViewportCoveredByLoadedData(
+    bounds: ViewportBounds,
+  ): boolean {
+    if (!this.hasLoadedBuildings) {
+      return false;
+    }
+
+    // A null loaded bound means the full pilot dataset is active.
+    if (this.loadedViewportBounds === null) {
+      return true;
+    }
+
+    return this.boundsContain(this.loadedViewportBounds, bounds);
+  }
+
+  private handleCameraMoveEnd(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): void {
+    if (
+      this.viewer !== viewer ||
+      viewer.isDestroyed()
+    ) {
+      return;
+    }
+
+    const requestedBounds = this.getPaddedViewportBounds(viewer, Cesium);
+
+    if (!requestedBounds) {
+      // Very wide views use the compatible full-dataset fallback.
+      this.updateBuildingLod(viewer, Cesium);
+      return;
+    }
+
+    if (this.viewportLoadInProgress) {
+      this.pendingViewportBounds = requestedBounds;
+      return;
+    }
+
+    if (!this.isViewportCoveredByLoadedData(requestedBounds)) {
+      void this.loadOvertureBuildings(
+        viewer,
+        Cesium,
+        requestedBounds,
+      ).catch((error: unknown) => {
+        console.error(
+          "[Overture] Viewport refresh failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+
+      return;
+    }
+
+    this.updateBuildingLod(viewer, Cesium);
   }
 
   private getDetailedFacadeBudget(cameraHeightMeters: number): number {
@@ -1195,6 +1425,10 @@ export class CesiumAdapter implements MapEngine {
     this.featureSelectionListeners.clear();
     this.renderedBuildingMetadata.clear();
     this.buildingLodRecords = [];
+    this.loadedViewportBounds = null;
+    this.hasLoadedBuildings = false;
+    this.viewportLoadInProgress = false;
+    this.pendingViewportBounds = null;
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 

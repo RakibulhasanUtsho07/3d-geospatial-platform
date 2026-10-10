@@ -23,7 +23,9 @@ Palette and pattern selection are deterministic. The same feature ID should reta
 
 ## Performance controls and camera-aware LOD
 
-The map starts by styling the full Overture pilot with lightweight polygon extrusions in batches. It then promotes only a bounded set of buildings near the live view center to textured facades. The detail budget is selected from camera altitude:
+The map requests only the geographic viewport plus a safety margin from the Overture viewport API. The server indexes feature bounding boxes once per process and returns footprints intersecting that rectangle. The client stages each replacement viewport invisibly, builds lightweight polygon extrusions in batches, promotes nearby buildings to textured facades, and swaps the datasource once styling is ready. If the map moves beyond the loaded rectangle, a new viewport is requested; moving within the loaded margin does not trigger another data request.
+
+The detail budget is selected from camera altitude:
 
 | Camera height | Detailed facade budget |
 | --- | ---: |
@@ -35,7 +37,17 @@ The map starts by styling the full Overture pilot with lightweight polygon extru
 
 After a camera move ends, the adapter picks the center of the current view on the ellipsoid, ranks eligible building footprints by distance, and updates only those whose LOD tier changed. The camera origin is only recomputed once the view center has moved by a small threshold, preventing unnecessary re-styling after tiny movements. A selected building is kept in the detailed tier while its details panel is open.
 
-The LOD budget is a performance heuristic rather than a device benchmark. Tune it after measuring frame rate, memory, and visual quality on target hardware. This is client-side entity LOD; the pilot data is still loaded as GeoJSON and is not yet streamed as tiled city geometry.
+The LOD budget is a performance heuristic rather than a device benchmark. Tune it after measuring frame rate, memory, and visual quality on target hardware. Viewport delivery reduces the amount of GeoJSON sent to the browser, but the server still indexes the pilot GeoJSON in memory and each requested feature is returned with its complete geometry. This is viewport-windowed GeoJSON delivery, not yet a streamed 3D Tiles tileset.
+
+## Viewport endpoint contract
+
+`GET /api/geospatial/overture-buildings/viewport?west=...&south=...&east=...&north=...`
+
+- All four bounds are required. Longitude must be in `[-180, 180]`, latitude in `[-85, 85]`, west must be less than east, and south must be less than north.
+- The requested rectangle is capped at 2 degrees per axis; for wider views, the map retains the full-dataset endpoint as a compatibility fallback.
+- A feature is returned when its geometry bounding box intersects the request rectangle. Geometry is not clipped, so buildings that cross a viewport edge remain intact.
+- Response headers report the returned feature count and the total indexed pilot feature count.
+- The index is cached in the API module after the first successful read. It must be rebuilt when the underlying pilot file is changed during a long-lived server process.
 
 ## Important data limitations
 
