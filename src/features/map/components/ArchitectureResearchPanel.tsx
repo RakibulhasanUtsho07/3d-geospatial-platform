@@ -90,7 +90,7 @@ function videoIdFromEmbedUrl(value: string | null | undefined): string | null {
   if (!value) return null;
   try {
     const url = new URL(value);
-    const match = url.pathname.match(/^\\/embed\\/([A-Za-z0-9_-]{11})$/);
+    const match = url.pathname.match(/^\/embed\/([A-Za-z0-9_-]{11})$/);
     return url.protocol === "https:" && url.hostname === "www.youtube-nocookie.com" ? match?.[1] ?? null : null;
   } catch {
     return null;
@@ -355,6 +355,16 @@ export default function ArchitectureResearchPanel({
                         />
                       </div>
                     </div>
+                  )}
+                  {reference.mediaPreviewKind === "image" && reference.mediaPreviewUrl && (
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                      External Commons preview · {reference.author ? "Creator: " + reference.author + " · " : ""}{reference.license ?? "Licence not recorded"}. The original source page remains the attribution/licence authority.
+                    </p>
+                  )}
+                  {reference.mediaPreviewKind === "video" && (
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                      Embedded from YouTube for street-context review only. Do not download/extract frames or reuse them as building textures without permission.
+                    </p>
                   )}
                   {reference.mediaType === "image" && !reference.mediaPreviewUrl && (
                     <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 flex aspect-[4/1] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 text-xs font-medium text-blue-800 underline underline-offset-4">
