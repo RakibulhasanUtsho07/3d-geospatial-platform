@@ -61,8 +61,26 @@ export declare function searchPropertyListings(request: PropertySearchRequest): 
   radiusMeters: number;
   results: PropertyListing[];
 };
+export type NearbyServiceMatch = {
+  id: string;
+  name: string;
+  category: string;
+  categoryLabel: string;
+  latitude: number;
+  longitude: number;
+  distanceFromPropertyMeters: number;
+};
+
 export declare function matchNearbyServices(
   property: Pick<PropertyListing, "latitude" | "longitude">,
-  places: Array<{ category: string; latitude: number; longitude: number; [key: string]: unknown }>,
+  places: Array<{
+    id: string;
+    name: string;
+    category: string;
+    categoryLabel: string;
+    latitude: number;
+    longitude: number;
+    [key: string]: unknown;
+  }>,
   maxDistanceMeters?: number,
-): Array<Record<string, unknown> & { category: string; distanceFromPropertyMeters: number }>;
+): NearbyServiceMatch[];
