@@ -67,6 +67,7 @@ npm run test:property-listings
 npm run test:street-imagery
 npm run test:architecture-research
 npm run test:road-network
+npm run test:building-style
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
