@@ -73,6 +73,9 @@ jobs:
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
 
+      - name: Test source-derived building facade styles
+        run: npm run test:building-style
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
