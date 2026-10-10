@@ -1183,7 +1183,9 @@
           "central fountain and pond",
           "colourful glass details on staircase",
           "large hall"
-        ]
+        ],
+        "reportedStoreys": 2,
+        "reportedHeightFeet": 45
       },
       "license": "Not established",
       "attributionText": null,
@@ -1782,7 +1784,8 @@
           "L-shaped ground-floor volume",
           "square upper-floor volume",
           "two roof terraces"
-        ]
+        ],
+        "reportedStoreys": 2
       },
       "license": "Not established for reproduced project imagery",
       "attributionText": null,
