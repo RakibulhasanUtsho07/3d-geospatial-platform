@@ -1142,12 +1142,28 @@
         "siteContext": [
           "Shree Shash/Shash Lane, Old Dhaka per article"
         ],
-        "locationPrecision": "named site/street in article; footprint still needs validation",
+        "locationPrecision": "street/landmark text is reported by the Jago News feature, but public secondary coordinate sources conflict; keep map match unresolved",
         "paletteConfidence": "medium visual estimate",
         "reconstructionUse": "heritage courtyard-style procedural family; media research-only"
       },
       "locationConfidence": "named site/street in article; footprint still needs validation",
-      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling",
+      "coordinateConflictDetected": true,
+      "coordinateCandidates": [
+        {
+          "latitude": 23.7063,
+          "longitude": 90.4131,
+          "sourceUrl": "https://webfiddle.net/21ideas-org/en.wikipedia.org/wiki/Beauty_Boarding",
+          "meaning": "coordinate transcribed by a Wikipedia mirror; location says Bangla Bazar, Old Dhaka"
+        },
+        {
+          "latitude": 23.73339,
+          "longitude": 90.4157,
+          "sourceUrl": "https://bangladesh.worldplaces.me/review/90854224-beauty-boarding.html",
+          "meaning": "third-party place listing coordinate"
+        }
+      ],
+      "coordinateConfidence": "low/conflicting candidates; do not auto-pin until reconciled against OpenStreetMap and the exact Shree Shash Lane address"
     },
     {
       "id": "R19",
@@ -1218,7 +1234,12 @@
         "reconstructionUse": "high-priority landmark model reference, but current survey/footprint needed; media research-only"
       },
       "locationConfidence": "named landmark; authoritative address but footprint not linked in this catalogue",
-      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling"
+      "paletteMethod": "estimated reference palette from visible source preview and/or written material description; not calibrated pixel sampling",
+      "latitude": 23.71836,
+      "longitude": 90.4264,
+      "coordinateMeaning": "OSM-mapped named-landmark feature point for Rose Garden Palace, not an independently surveyed entrance point",
+      "coordinateSource": "https://mapcarta.com/W439770540",
+      "coordinateConfidence": "medium for named landmark point; verify against exact Overture footprint before mesh attachment"
     },
     {
       "id": "R20",
