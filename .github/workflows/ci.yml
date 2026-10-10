@@ -40,6 +40,9 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Test camera-aware viewport feature budget
+        run: npm run test:viewport-budget
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
