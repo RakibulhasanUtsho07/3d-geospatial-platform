@@ -4,6 +4,7 @@ import catalogueJson from "../../../../../data/research/dhaka-building-reference
 import {
   filterArchitectureReferences,
   parseArchitectureResearchParams,
+  resolveArchitectureMediaPreview,
   summarizeArchitectureReferences,
 } from "@/core/geospatial/architecture-research.mjs";
 import type { ArchitectureResearchReference } from "@/core/geospatial/architecture-research.mjs";
@@ -24,7 +25,12 @@ export function GET(request: Request): Response {
 
   const filtered = filterArchitectureReferences(references, parsed.value);
   const summary = summarizeArchitectureReferences(references);
-  const results = filtered.slice(0, parsed.value.limit);
+  const results = filtered
+    .slice(0, parsed.value.limit)
+    .map((reference) => ({
+      ...reference,
+      ...resolveArchitectureMediaPreview(reference),
+    }));
 
   return NextResponse.json(
     {
