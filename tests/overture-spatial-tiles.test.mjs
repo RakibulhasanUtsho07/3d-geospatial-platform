@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +39,7 @@ function getFeatureIdentity(feature) {
     }
   }
 
-  return `sha256-fallback:${JSON.stringify(feature)}`;
+  return `sha256:${createHash("sha256").update(JSON.stringify(feature)).digest("hex")}`;
 }
 
 function getGeometryBounds(geometry) {
