@@ -47,8 +47,10 @@ test("normalizes roads with source names, road class, surface and inferred width
   assert.equal(normalized[0].name, "Main Road");
   assert.equal(normalized[0].roadClass, "arterial");
   assert.equal(normalized[0].widthMeters, 6);
+  assert.equal(normalized[0].widthSource, "lanes-estimate");
   assert.equal(normalized[0].surface, "asphalt");
   assert.equal(normalized[1].widthMeters, 4.25);
+  assert.equal(normalized[1].widthSource, "tagged");
   assert.equal(normalized[0].license, "ODbL 1.0");
 });
 
@@ -66,7 +68,10 @@ test("ignores malformed, duplicate and out-of-view road ways", () => {
 
 test("uses explicit OSM width ahead of typical road-class widths", () => {
   const [road] = normalizeOverpassRoadElements([
-    { type: "way", id: 50, tags: { highway: "residential", width: "5.5 m" }, geometry: [{ lon: 90.405, lat: 23.75 }, { lon: 90.406, lat: 23.751 }] },
+    { type: "way", id: 50, tags: { highway: "residential", width: "5.5 m", layer: "1", bridge: "yes" }, geometry: [{ lon: 90.405, lat: 23.75 }, { lon: 90.406, lat: 23.751 }] },
   ], defaultBounds);
   assert.equal(road.widthMeters, 5.5);
+  assert.equal(road.widthSource, "tagged");
+  assert.equal(road.layer, 1);
+  assert.equal(road.bridge, true);
 });
