@@ -211,7 +211,7 @@ export default function BuildingDetailsPanel({
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        {(height !== null || floorCount !== null) && (
+        {(height !== null || floorCount !== null || footprintAreaM2 !== null) && (
           <section
             aria-label="Building summary"
             className="grid grid-cols-2 gap-2"
