@@ -6,6 +6,7 @@ import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingStyleAssignment } from "@/core/map-engine/types";
 
 import {
+  canAssignArchitectureReference,
   createArchitectureStylePreview,
 } from "@/core/geospatial/architecture-research.mjs";
 import type {
@@ -303,7 +304,8 @@ export default function ArchitectureResearchPanel({
               const observations = (reference.designProfile.facadeFeatures ?? []).slice(0, 4);
               const roofObservations = (reference.designProfile.roofFeatures ?? []).slice(0, 2);
               const siteObservations = (reference.designProfile.siteContext ?? []).slice(0, 2);
-              const renderProfile = reference.mediaType === "image"
+              const assignableFacade = canAssignArchitectureReference(reference);
+              const renderProfile = assignableFacade
                 ? createArchitectureStylePreview(reference)
                 : null;
               const renderFlags = renderProfile ? [
@@ -428,6 +430,12 @@ export default function ArchitectureResearchPanel({
                     </div>
                   )}
 
+                  {!assignableFacade && reference.mediaType === "image" && (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-700">Context image only</p>
+                      <p className="mt-1 text-[11px] leading-4 text-slate-600">This is a panorama, skyline, or building-cluster reference. It is useful for neighbourhood context but not specific enough to assign to one mapped facade.</p>
+                    </div>
+                  )}
                   {reference.mediaType === "video" && (
                     <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-2.5">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-900">Video-derived context only</p>
@@ -448,19 +456,19 @@ export default function ArchitectureResearchPanel({
                   </div>
 
                   <div className="mt-auto space-y-3 pt-4">
-                    <button type="button" disabled={!canPreview || reference.mediaType === "video"}
+                    <button type="button" disabled={!canPreview || !assignableFacade}
                       onClick={() => onAssign(reference, createArchitectureStylePreview(reference))}
-                      title={reference.mediaType === "video" ? "Video references cannot be assigned as building facade profiles." : "Save this researched facade profile to the currently selected building ID."}
+                      title={!assignableFacade ? "This record is context-only or lacks an individual-building facade; it cannot be assigned to a single footprint." : "Save this researched facade profile to the currently selected building ID."}
                       className="w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
-                      {reference.mediaType === "video"
-                        ? "Video context only"
+                      {!assignableFacade
+                        ? (reference.mediaType === "video" ? "Video context only" : "Context only — no building match")
                         : selectedAssignment?.referenceId === reference.id
                           ? "Update saved profile"
                           : "Apply & save to this building"}
                     </button>
-                    <button type="button" disabled={!canPreview || reference.mediaType === "video"}
+                    <button type="button" disabled={!canPreview || !assignableFacade}
                       onClick={() => onPreview(createArchitectureStylePreview(reference), reference.title)}
-                      title={reference.mediaType === "video" ? "Video references are for street context, not direct facade styling." : undefined}
+                      title={!assignableFacade ? "This source is useful for city/street context, not as a single-building facade preview." : undefined}
                       className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
                       Preview temporarily
                     </button>
