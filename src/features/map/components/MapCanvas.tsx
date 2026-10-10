@@ -9,6 +9,7 @@ import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
+import type { RoadFeature } from "@/core/geospatial/road-network.mjs";
 import type {
   BuildingStyleAssignment,
   MapFeatureSelection,
@@ -69,6 +70,7 @@ export default function MapCanvas({
   const [selectedFeature, setSelectedFeature] =
     useState<MapFeatureSelection | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<NearbyPlace | null>(null);
+  const [selectedRoad, setSelectedRoad] = useState<RoadFeature | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<PropertyListing | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[] | null>(null);
   const [layers, setLayers] = useState<MapLayer[]>([]);
@@ -108,6 +110,7 @@ export default function MapCanvas({
           setSelectedFeature(feature);
           onSelectedFeatureChangeRef.current?.(feature);
           if (feature) {
+            setSelectedRoad(null);
             setSelectedPlace(null);
             setSelectedProperty(null);
             engine.setNavigationPath(null, null);
@@ -115,10 +118,22 @@ export default function MapCanvas({
         }
       },
     );
+    const unsubscribeRoadSelection = engine.onRoadSelected((road) => {
+      if (!cancelled) {
+        setSelectedRoad(road);
+        if (road) {
+          setSelectedFeature(null);
+          setSelectedPlace(null);
+          setSelectedProperty(null);
+          engine.setNavigationPath(null, null);
+        }
+      }
+    });
     const unsubscribePlaceSelection = engine.onPlaceSelected((place) => {
       if (!cancelled) {
         setSelectedPlace(place);
         if (place) {
+          setSelectedRoad(null);
           setSelectedFeature(null);
           setSelectedProperty(null);
           engine.setNavigationPath(null, null);
@@ -126,7 +141,10 @@ export default function MapCanvas({
       }
     });
     const unsubscribePropertySelection = engine.onPropertySelected((property) => {
-      if (!cancelled && property) focusProperty(property);
+      if (!cancelled && property) {
+        setSelectedRoad(null);
+        focusProperty(property);
+      }
     });
 
     async function initialize(container: HTMLDivElement) {
@@ -135,6 +153,7 @@ export default function MapCanvas({
         setErrorMessage(null);
         setSelectedFeature(null);
         onSelectedFeatureChangeRef.current?.(null);
+        setSelectedRoad(null);
         setSelectedPlace(null);
         setSelectedProperty(null);
         setNearbyPlaces(null);
@@ -186,6 +205,7 @@ export default function MapCanvas({
       cancelled = true;
 
       unsubscribeSelection();
+      unsubscribeRoadSelection();
       unsubscribePlaceSelection();
       unsubscribePropertySelection();
 
@@ -295,6 +315,7 @@ export default function MapCanvas({
     setStatus("loading");
     setSelectedFeature(null);
     onSelectedFeatureChangeRef.current?.(null);
+    setSelectedRoad(null);
     setSelectedPlace(null);
     setSelectedProperty(null);
     setNearbyPlaces(null);
@@ -306,6 +327,24 @@ export default function MapCanvas({
     engineRef.current?.clearFeatureSelection();
     setSelectedFeature(null);
     onSelectedFeatureChangeRef.current?.(null);
+  }
+
+  function closeRoadDetails() {
+    setSelectedRoad(null);
+    engineRef.current?.clearFeatureSelection();
+  }
+
+  function focusSelectedRoad() {
+    if (!selectedRoad || selectedRoad.coordinates.length === 0) return;
+    const middle = selectedRoad.coordinates[Math.floor(selectedRoad.coordinates.length / 2)];
+    if (!middle || middle.length < 2) return;
+    engineRef.current?.flyTo({
+      destination: { longitude: middle[0], latitude: middle[1], height: 190 },
+      heading: 0,
+      pitch: -48,
+      roll: 0,
+      durationMs: 850,
+    });
   }
 
   function goHomeToDhaka() {
