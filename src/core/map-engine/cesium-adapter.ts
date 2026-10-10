@@ -1559,6 +1559,12 @@ export class CesiumAdapter implements MapEngine {
       this.nearbyPlaceByEntityId.set(entityId, place);
     }
 
+    // A successful search should make its markers visible immediately;
+    // the layer panel can turn them off again without discarding results.
+    this.layerVisibility.set(
+      MAP_LAYER_IDS.nearbyPlaces,
+      places.length > 0,
+    );
     dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.nearbyPlaces);
     viewer.scene.requestRender();
   }
