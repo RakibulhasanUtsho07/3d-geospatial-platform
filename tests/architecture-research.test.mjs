@@ -253,6 +253,7 @@ test("derives reported geometry only when source metadata has an unambiguous flo
     },
   });
   assert.equal(jcx.reportedFloorCount, 10);
+  assert.equal(jcx.roofDetail, "roof-garden");
 
   const complexWings = createArchitectureStylePreview({
     id: "R08",
