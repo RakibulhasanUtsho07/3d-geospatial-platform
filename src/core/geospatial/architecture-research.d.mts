@@ -94,6 +94,9 @@ export interface ArchitectureStylePreview {
   upperFloorPattern?: ArchitecturePreviewPattern;
   balconyProjectionMeters?: number;
   fullHeightTexture?: boolean;
+  reportedFloorCount?: number;
+  reportedHeightMeters?: number;
+  reportedBuildingAreaSqM?: number;
   repeatWidthMeters: number;
 }
 
