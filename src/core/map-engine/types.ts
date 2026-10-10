@@ -25,6 +25,9 @@ export interface MapFeatureSelection {
     latitude: number;
     height: number;
   } | null;
+
+  /** Building-center coordinates for camera focus, when geometry permits. */
+  focusCoordinates?: GeoCoordinate | null;
 }
 
 export type MapEngineCapabilities = {

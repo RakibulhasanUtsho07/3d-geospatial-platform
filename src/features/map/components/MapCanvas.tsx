@@ -148,6 +148,46 @@ export default function MapCanvas() {
     });
   }
 
+  function focusSelectedBuilding() {
+    if (!selectedFeature) {
+      return;
+    }
+
+    const target =
+      selectedFeature.focusCoordinates ?? selectedFeature.coordinates;
+
+    if (!target) {
+      return;
+    }
+
+    const rawHeight = selectedFeature.properties.rendered_height_m;
+    const parsedHeight =
+      typeof rawHeight === "number"
+        ? rawHeight
+        : typeof rawHeight === "string"
+          ? Number.parseFloat(rawHeight)
+          : Number.NaN;
+    const buildingHeight = Number.isFinite(parsedHeight)
+      ? parsedHeight
+      : 24;
+    const clearance = Math.max(
+      120,
+      Math.min(buildingHeight * 1.5, 900),
+    );
+
+    cameraRef.current?.focus({
+      destination: {
+        longitude: target.longitude,
+        latitude: target.latitude,
+        height: (target.height ?? 0) + clearance,
+      },
+      heading: 0,
+      pitch: -48,
+      roll: 0,
+      durationMs: 1000,
+    });
+  }
+
   return (
     <div className="relative h-full min-h-[600px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       {/* This ref belongs to the same component as the initialization effect. */}
@@ -212,6 +252,7 @@ export default function MapCanvas() {
         <BuildingDetailsPanel
           feature={selectedFeature}
           onClose={closeBuildingDetails}
+          onFocus={focusSelectedBuilding}
         />
       )}
     </div>

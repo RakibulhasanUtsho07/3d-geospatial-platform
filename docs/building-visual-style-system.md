@@ -39,6 +39,13 @@ The initial detailed-facade budget is `MAX_DETAILED_FACADES = 650`. The dataset 
 - Selected detailed buildings may receive a small rooftop water-tank or HVAC-like silhouette based on broad building-use/height hints. These details are illustrative and intentionally sparse; source data does not confirm the real rooftop equipment.
 - Roof equipment is only attached within the detailed-facade path, keeping the rest of the city lightweight.
 
+## Building selection and camera focus
+
+- Clicking an Overture building highlights the selected footprint and exposes the source attributes in the details panel.
+- The selection event carries both the clicked surface coordinate and a footprint-center focus coordinate when the polygon geometry is available.
+- “Focus on building” moves the camera toward the footprint center and adds a clearance based on the rendered height estimate.
+- The panel distinguishes source-provided height from a floor-derived estimate or a fallback estimate. Procedural facades and rooftop silhouettes remain visual approximations, not verified property details.
+
 ## Next improvements
 
 1. Add explicit LOD tiers based on camera distance and device capability.

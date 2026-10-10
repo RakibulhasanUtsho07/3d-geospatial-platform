@@ -1001,10 +1001,39 @@ export class CesiumAdapter implements MapEngine {
           );
         }
 
+        let focusCoordinates: MapFeatureSelection["focusCoordinates"] = null;
+
+        try {
+          const hierarchy = entity.polygon.hierarchy?.getValue(
+            Cesium.JulianDate.now(),
+          );
+
+          if (hierarchy && hierarchy.positions.length >= 3) {
+            const bounds = Cesium.BoundingSphere.fromPoints(
+              hierarchy.positions,
+            );
+            const center = Cesium.Cartographic.fromCartesian(
+              bounds.center,
+            );
+
+            focusCoordinates = {
+              longitude: Cesium.Math.toDegrees(center.longitude),
+              latitude: Cesium.Math.toDegrees(center.latitude),
+              height: heightInfo.baseHeight + heightInfo.meters,
+            };
+          }
+        } catch (error: unknown) {
+          console.debug(
+            "[Map] Could not calculate building focus coordinates:",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+
         this.emitFeatureSelection({
           source: "overture-local-buildings",
           properties: selectedProperties,
           coordinates,
+          focusCoordinates,
         });
 
         viewer.scene.requestRender();
