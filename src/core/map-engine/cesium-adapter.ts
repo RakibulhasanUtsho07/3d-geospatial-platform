@@ -2370,6 +2370,13 @@ export class CesiumAdapter implements MapEngine {
 
         const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
         if (savedArchitectureProfile) {
+          const sourceGeometryHeight = this.buildingLodRecords.find(
+            (record) => record.entity === entity,
+          )?.sourceHeightInfo;
+          selectedProperties.source_rendered_height_m =
+            sourceGeometryHeight?.meters ?? heightInfo.meters;
+          selectedProperties.source_height_source =
+            sourceGeometryHeight?.source ?? heightInfo.source;
           selectedProperties.architecture_profile_id = savedArchitectureProfile.referenceId;
           selectedProperties.architecture_profile_title = savedArchitectureProfile.referenceTitle;
           selectedProperties.architecture_profile_source = savedArchitectureProfile.sourceUrl;
