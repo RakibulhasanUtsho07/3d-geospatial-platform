@@ -526,6 +526,56 @@ export class CesiumAdapter implements MapEngine {
               }),
             });
 
+            /*
+             * Add sparse rooftop silhouettes only to detailed buildings.
+             * These are illustrative placeholders, not surveyed roof assets.
+             */
+            if (
+              visualStyle.roofDetail !== "none" &&
+              (this.hashEntityId(entity.id) % 5 === 0 || isPart)
+            ) {
+              const center = wallPositions
+                .slice(0, -1)
+                .reduce(
+                  (sum, position) =>
+                    Cesium.Cartesian3.add(sum, position, sum),
+                  new Cesium.Cartesian3(0, 0, 0),
+                );
+              const vertexCount = Math.max(1, wallPositions.length - 1);
+              Cesium.Cartesian3.divideByScalar(center, vertexCount, center);
+              const centerCartographic =
+                Cesium.Cartographic.fromCartesian(center);
+              const equipmentHeight =
+                visualStyle.roofDetail === "water-tank" ? 1.8 : 1.2;
+              const equipmentWidth =
+                visualStyle.roofDetail === "water-tank" ? 1.6 : 2.4;
+              const roofPosition = Cesium.Cartesian3.fromRadians(
+                centerCartographic.longitude,
+                centerCartographic.latitude,
+                topHeight + equipmentHeight / 2,
+              );
+
+              entity.position = new Cesium.ConstantPositionProperty(roofPosition);
+              entity.box = new Cesium.BoxGraphics({
+                dimensions: new Cesium.Cartesian3(
+                  equipmentWidth,
+                  equipmentWidth,
+                  equipmentHeight,
+                ),
+                material:
+                  Cesium.Color.fromCssColorString(
+                    visualStyle.roofDetail === "water-tank"
+                      ? "#657b89"
+                      : "#aeb8bf",
+                  ) ?? Cesium.Color.GRAY,
+                outline: new Cesium.ConstantProperty(true),
+                outlineColor: new Cesium.ConstantProperty(
+                  Cesium.Color.fromCssColorString("#4d5b64") ??
+                    Cesium.Color.DARKGRAY,
+                ),
+              });
+            }
+
             // Keep the polygon as the roof instead of another extrusion.
             polygon.height =
               new Cesium.ConstantProperty(topHeight);
@@ -611,6 +661,14 @@ export class CesiumAdapter implements MapEngine {
 
       throw error;
     }
+  }
+
+  private hashEntityId(value: string): number {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash;
   }
 
   private getFacadeRepeat(
