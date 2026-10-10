@@ -1315,18 +1315,14 @@ export class CesiumAdapter implements MapEngine {
     // Capture the unhighlighted materials only once per selection. LOD
     // transitions must not accidentally save the cyan highlight as original.
     this.selectedBuildingOriginalMaterial = entity.polygon.material;
-    this.selectedBuildingOriginalWallMaterial =
-      entity.wall?.material ?? null;
+    // Preserve the facade texture so researched source/material colours and
+    // temporary design previews remain visible while the building is selected.
+    this.selectedBuildingOriginalWallMaterial = null;
 
+    // A translucent roof tint signals selection without replacing the facade.
     entity.polygon.material = new Cesium.ColorMaterialProperty(
-      Cesium.Color.CYAN.withAlpha(0.98),
+      Cesium.Color.CYAN.withAlpha(0.42),
     );
-
-    if (entity.wall) {
-      entity.wall.material = new Cesium.ColorMaterialProperty(
-        Cesium.Color.CYAN.withAlpha(0.98),
-      );
-    }
   }
 
   private hashEntityId(value: string): number {
