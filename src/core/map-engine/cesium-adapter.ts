@@ -1658,7 +1658,9 @@ export class CesiumAdapter implements MapEngine {
     record.entity.position = undefined;
 
     this.selectedBuilding = record.entity;
-    if (record.isDetailed) {
+    if (record.wallPositions && record.wallPositions.length >= 4) {
+      // A selected feature may get detail beyond the normal camera budget so
+      // the previewed window/balcony/arch pattern is actually visible.
       this.applyDetailedBuildingStyle(record, Cesium);
     } else {
       this.applyLightweightBuildingStyle(record, Cesium);
