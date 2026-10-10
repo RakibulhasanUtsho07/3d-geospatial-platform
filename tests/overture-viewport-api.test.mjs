@@ -110,3 +110,65 @@ test("repeated viewport requests reuse parsed tile data", async (context) => {
     "expected a repeated request to hit the in-memory tile cache",
   );
 });
+
+
+test("viewport API caps response features and reports truncation diagnostics", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const query = new URLSearchParams({
+    west: "90.405",
+    south: "23.775",
+    east: "90.415",
+    north: "23.785",
+    limit: "500",
+  });
+
+  const response = await fetch(
+    baseUrl + viewportPath + "?" + query,
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.ok(Array.isArray(body.features));
+  assert.ok(body.features.length <= 500);
+
+  assert.equal(
+    response.headers.get("X-Building-Feature-Limit"),
+    "500",
+  );
+
+  const matched = Number(
+    response.headers.get("X-Building-Matched-Feature-Count"),
+  );
+  const returned = Number(
+    response.headers.get("X-Building-Feature-Count"),
+  );
+
+  assert.ok(Number.isInteger(matched) && matched >= returned);
+  assert.equal(returned, body.features.length);
+  assert.equal(
+    response.headers.get("X-Building-Truncated"),
+    String(matched > returned),
+  );
+});
+
+test("viewport API rejects feature limits above the supported maximum", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const query = new URLSearchParams({
+    west: "90.405",
+    south: "23.775",
+    east: "90.415",
+    north: "23.785",
+    limit: "5001",
+  });
+
+  const response = await fetch(
+    baseUrl + viewportPath + "?" + query,
+  );
+
+  assert.equal(response.status, 400);
+
+  const body = await response.json();
+  assert.match(body.error, /feature limit/i);
+});
