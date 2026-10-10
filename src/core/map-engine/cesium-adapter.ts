@@ -1460,7 +1460,10 @@ export class CesiumAdapter implements MapEngine {
     this.prepareSelectedBuildingForLodTransition(record);
 
     if (!record.detailedWall) {
-      const facadeTexture = createBuildingFacadeTexture(record.visualStyle);
+      const facadeTexture = createBuildingFacadeTexture(
+        record.visualStyle,
+        record.heightInfo.meters,
+      );
       if (!facadeTexture) {
         this.applyLightweightBuildingStyle(record, Cesium);
         return;
@@ -1479,6 +1482,7 @@ export class CesiumAdapter implements MapEngine {
             record.heightInfo.meters,
             Cesium,
             record.visualStyle.repeatWidthMeters,
+            record.visualStyle.fullHeightTexture === true,
           ),
           // The canvas already carries the palette; avoid tinting its glass.
           color: Cesium.Color.WHITE,
@@ -1515,19 +1519,28 @@ export class CesiumAdapter implements MapEngine {
     entity.box = undefined;
     entity.position = undefined;
 
+    const isRoofGarden = record.visualStyle.roofDetail === "roof-garden";
+    const isRoofTerrace = record.visualStyle.roofDetail === "roof-terrace";
     const shouldShowRoofEquipment =
-      record.visualStyle.roofDetail !== "none" &&
-      (this.hashEntityId(entity.id) % 5 === 0 || record.isPart);
+      isRoofGarden ||
+      isRoofTerrace ||
+      (record.visualStyle.roofDetail !== "none" &&
+        (this.hashEntityId(entity.id) % 5 === 0 || record.isPart));
 
     if (shouldShowRoofEquipment) {
       if (!record.roofEquipmentBox || !record.roofEquipmentPosition) {
         const centerCartographic = Cesium.Cartographic.fromCartesian(
           record.center ?? wallPositions[0],
         );
-        const equipmentHeight =
-          record.visualStyle.roofDetail === "water-tank" ? 1.8 : 1.2;
-        const equipmentWidth =
-          record.visualStyle.roofDetail === "water-tank" ? 1.6 : 2.4;
+        const roofRadius = record.center
+          ? Cesium.Cartesian3.distance(record.center, wallPositions[0])
+          : 4;
+        const equipmentHeight = isRoofGarden ? 0.22
+          : isRoofTerrace ? 0.12
+            : record.visualStyle.roofDetail === "water-tank" ? 1.8 : 1.2;
+        const equipmentWidth = isRoofGarden || isRoofTerrace
+          ? Math.max(4, Math.min(18, roofRadius * 1.25))
+          : record.visualStyle.roofDetail === "water-tank" ? 1.6 : 2.4;
         const roofPosition = Cesium.Cartesian3.fromRadians(
           centerCartographic.longitude,
           centerCartographic.latitude,
@@ -1544,9 +1557,13 @@ export class CesiumAdapter implements MapEngine {
           ),
           material:
             Cesium.Color.fromCssColorString(
-              record.visualStyle.roofDetail === "water-tank"
-                ? "#657b89"
-                : "#aeb8bf",
+              isRoofGarden
+                ? "#47744D"
+                : isRoofTerrace
+                  ? "#B5B0A5"
+                  : record.visualStyle.roofDetail === "water-tank"
+                    ? "#657b89"
+                    : "#aeb8bf",
             ) ?? Cesium.Color.GRAY,
           outline: new Cesium.ConstantProperty(true),
           outlineColor: new Cesium.ConstantProperty(
@@ -1605,6 +1622,7 @@ export class CesiumAdapter implements MapEngine {
     height: number,
     Cesium: CesiumModule,
     repeatWidthMeters = 6,
+    fullHeightTexture = false,
   ): CesiumCartesian2 {
     let perimeter = 0;
 
@@ -1621,7 +1639,9 @@ export class CesiumAdapter implements MapEngine {
 
     return new Cesium.Cartesian2(
       Math.min(64, Math.max(1, perimeter / repeatWidthMeters)),
-      Math.min(80, Math.max(1, height / 3)),
+      fullHeightTexture && height <= 90
+        ? 1
+        : Math.min(80, Math.max(1, height / 3)),
     );
   }
 
