@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import type { BuildingVisualStyle } from "@/core/buildings/building-style";
+
 import type {
   ArchitectureResearchReference,
   ArchitectureResearchSummary,
@@ -25,6 +27,14 @@ type Filters = {
   mediaType: "all" | "image" | "video";
   usage: "all" | "open" | "research-only";
 };
+
+interface ArchitectureResearchPanelProps {
+  canPreview: boolean;
+  isPreviewActive: boolean;
+  previewTitle: string | null;
+  onPreview: (style: BuildingVisualStyle, title: string) => void;
+  onResetPreview: () => void;
+}
 
 const DEFAULT_FILTERS: Filters = {
   query: "",
@@ -69,6 +79,41 @@ function formatMetadata(metadata: Record<string, unknown> | undefined): string[]
     .map(([key, value]) => readableName(key) + ": " + String(value));
 }
 
+function createPreviewStyle(reference: ArchitectureResearchReference): BuildingVisualStyle {
+  const family = reference.designProfile.styleFamily.toLowerCase();
+  const palette = reference.designProfile.colorPalette;
+  const facade = palette[0]?.hex ?? "#D9DFE0";
+  const roof = palette.find((swatch) => /roof|concrete|stone|trim/i.test(swatch.name))?.hex
+    ?? palette[1]?.hex
+    ?? "#A9AFB2";
+  const accent = palette.find((swatch) => /green|plant|metal|window|balcony|ochre/i.test(swatch.name))?.hex
+    ?? palette[2]?.hex
+    ?? "#91A8B5";
+  let pattern: BuildingVisualStyle["pattern"] = "urban-grid";
+  if (/heritage|historic|courtyard|old-dhaka|mansion/.test(family)) {
+    pattern = "heritage-arches";
+  } else if (/biophilic|climate-responsive|green-facade|vine/.test(family)) {
+    pattern = "biophilic-balcony";
+  } else if (/painted|blue-ochre|mugda/.test(family)) {
+    pattern = "painted-balcony";
+  } else if (/modernist|brick/.test(family)) {
+    pattern = "brick-modernist";
+  } else if (/apartment|residential|balcony/.test(family)) {
+    pattern = "balcony";
+  } else if (/glass/.test(family)) {
+    pattern = "vertical-glass";
+  }
+  return {
+    id: "research-preview-" + reference.id,
+    facadeColor: facade,
+    roofColor: roof,
+    accentColor: accent,
+    pattern,
+    roofDetail: "none",
+    repeatWidthMeters: 6.2,
+  };
+}
+
 function locationMapUrl(reference: ArchitectureResearchReference): string | null {
   if (
     typeof reference.latitude !== "number" ||
@@ -84,7 +129,13 @@ function locationMapUrl(reference: ArchitectureResearchReference): string | null
     + "#map=" + zoom + "/" + reference.latitude + "/" + reference.longitude;
 }
 
-export default function ArchitectureResearchPanel() {
+export default function ArchitectureResearchPanel({
+  canPreview,
+  isPreviewActive,
+  previewTitle,
+  onPreview,
+  onResetPreview,
+}: ArchitectureResearchPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -164,10 +215,18 @@ export default function ArchitectureResearchPanel() {
             Browse source-linked building references, estimated facade colours, location confidence and reuse rights.
           </p>
         </div>
-        <button type="button" onClick={() => setIsOpen((value) => !value)} aria-expanded={isOpen}
-          className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
-          {isOpen ? "Hide library" : "Browse research"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isPreviewActive && (
+            <button type="button" onClick={onResetPreview}
+              className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100">
+              Reset 3D preview
+            </button>
+          )}
+          <button type="button" onClick={() => setIsOpen((value) => !value)} aria-expanded={isOpen}
+            className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+            {isOpen ? "Hide library" : "Browse research"}
+          </button>
+        </div>
       </div>
 
       {!isOpen && (
@@ -216,6 +275,15 @@ export default function ArchitectureResearchPanel() {
               <button type="button" onClick={resetFilters} className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100">Reset</button>
             </div>
           </form>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+            <p className="text-xs leading-5 text-slate-600">
+              {canPreview
+                ? "A building is selected on the map. You can apply a temporary visual style inspired by a source reference."
+                : "Select a building on the 3D map first to enable temporary facade-style previews."}
+            </p>
+            {isPreviewActive && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-900">Preview active{previewTitle ? ": " + previewTitle : ""}</span>}
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 sm:px-6">
             <p className="text-sm font-semibold text-slate-800">
@@ -270,9 +338,16 @@ export default function ArchitectureResearchPanel() {
                     <p className={"mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-medium " + usageClass(reference.usageStatus)}>{labelForUsage(reference.usageStatus)}</p>
                   </div>
 
-                  <div className="mt-auto flex flex-wrap gap-3 pt-4 text-xs font-semibold">
+                  <div className="mt-auto space-y-3 pt-4">
+                    <button type="button" disabled={!canPreview}
+                      onClick={() => onPreview(createPreviewStyle(reference), reference.title)}
+                      className="w-full rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
+                      Preview style on selected building
+                    </button>
+                    <div className="flex flex-wrap gap-3 text-xs font-semibold">
                     <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Open source ↗</a>
                     {mapUrl && <a href={mapUrl} target="_blank" rel="noreferrer" className="text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950">Open map point ↗</a>}
+                    </div>
                   </div>
                 </li>
               );
