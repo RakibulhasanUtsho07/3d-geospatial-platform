@@ -938,7 +938,7 @@ export class CesiumAdapter implements MapEngine {
         ) ?? Cesium.Color.LIGHTGRAY;
         const roadwayWidth = Math.max(1.1, Math.min(24, road.widthMeters));
         const safeName = road.name
-          ? road.name.replace(/[<>\\u0000-\\u001f\\u007f]/g, "").slice(0, 140)
+          ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
           : null;
 
         dataSource.entities.add({
