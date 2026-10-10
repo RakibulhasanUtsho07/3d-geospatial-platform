@@ -3,7 +3,7 @@
   "catalogueId": "dhaka-building-image-video-research",
   "researchedAt": "2026-10-10",
   "purpose": "Reference catalogue for the 3D Geospatial Platform's building visualisation and future reconstruction work.",
-  "completeness": "Curated starter set only; not a complete inventory of Dhaka buildings.",
+  "completeness": "Expanded curated starter set; not a complete inventory of Dhaka buildings and not a uniform reusable-media collection.",
   "assetPolicy": "Store source metadata and links only. Do not bundle or redistribute media unless its individual licence/permission is checked.",
   "references": [
     {
@@ -20,8 +20,16 @@
       "attributionText": "Yahya / Wikimedia Commons; link source and CC BY-SA 3.0 licence",
       "usageStatus": "open-licence-candidate; verify page at reuse time",
       "buildingMatchConfidence": "low-to-medium for individual footprints; contextual skyline only",
-      "observedFeatures": ["high-rise residential massing", "relative building heights", "dense urban context"],
-      "limitations": ["single viewpoint", "individual buildings not all identified", "no exact dimensions or floor plans"]
+      "observedFeatures": [
+        "high-rise residential massing",
+        "relative building heights",
+        "dense urban context"
+      ],
+      "limitations": [
+        "single viewpoint",
+        "individual buildings not all identified",
+        "no exact dimensions or floor plans"
+      ]
     },
     {
       "id": "R02",
@@ -37,8 +45,15 @@
       "attributionText": "A S M Jobaer / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
       "usageStatus": "open-licence-candidate; preserve attribution and ShareAlike obligations",
       "buildingMatchConfidence": "medium for visible facade features; exact footprint coordinates not recorded",
-      "observedFeatures": ["repeating window bays", "repeating balconies", "blue and yellow facade colour zones"],
-      "limitations": ["single near-frontal view", "hidden elevations not visible"]
+      "observedFeatures": [
+        "repeating window bays",
+        "repeating balconies",
+        "blue and yellow facade colour zones"
+      ],
+      "limitations": [
+        "single near-frontal view",
+        "hidden elevations not visible"
+      ]
     },
     {
       "id": "R03",
@@ -54,8 +69,12 @@
       "attributionText": "Sezan123 / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
       "usageStatus": "open-licence-candidate; inspect the actual image and licence page again before reuse",
       "buildingMatchConfidence": "low until visual identity and footprint match are checked",
-      "observedFeatures": ["Uttara-area built-environment reference"],
-      "limitations": ["file title alone does not verify building identity, use, storey count or exact location"]
+      "observedFeatures": [
+        "Uttara-area built-environment reference"
+      ],
+      "limitations": [
+        "file title alone does not verify building identity, use, storey count or exact location"
+      ]
     },
     {
       "id": "R04",
@@ -70,8 +89,17 @@
       "attributionText": null,
       "usageStatus": "research-only; do not download, republish or train on media without rights clearance",
       "buildingMatchConfidence": "medium for broad facade/street appearance; low for matching the advertised flat to the visible exterior",
-      "observedFeatures": ["multi-storey apartment frontage", "balcony metal grilles", "repeating floor openings", "narrow street", "overhead utilities"],
-      "limitations": ["listing metadata is not independently verified measurement", "image reuse rights not established"]
+      "observedFeatures": [
+        "multi-storey apartment frontage",
+        "balcony metal grilles",
+        "repeating floor openings",
+        "narrow street",
+        "overhead utilities"
+      ],
+      "limitations": [
+        "listing metadata is not independently verified measurement",
+        "image reuse rights not established"
+      ]
     },
     {
       "id": "R05",
@@ -86,8 +114,15 @@
       "attributionText": null,
       "usageStatus": "research-only; do not bundle or redistribute listing media without permission",
       "buildingMatchConfidence": "medium for visible street character; low for exact material/dimension claims",
-      "observedFeatures": ["tree-lined street", "brick-like facade finish", "projecting balconies", "concrete edge details"],
-      "limitations": ["photo alone cannot verify construction materials or exact building identity"]
+      "observedFeatures": [
+        "tree-lined street",
+        "brick-like facade finish",
+        "projecting balconies",
+        "concrete edge details"
+      ],
+      "limitations": [
+        "photo alone cannot verify construction materials or exact building identity"
+      ]
     },
     {
       "id": "R06",
@@ -102,8 +137,16 @@
       "attributionText": null,
       "usageStatus": "research-only; do not copy into app or training corpus without permission",
       "buildingMatchConfidence": "low for individual building identity",
-      "observedFeatures": ["dense mid-rise blocks", "varied rooftop treatment", "narrow inter-block gaps", "scattered green pockets"],
-      "limitations": ["editorial context image", "no exact geolocation for visible buildings"]
+      "observedFeatures": [
+        "dense mid-rise blocks",
+        "varied rooftop treatment",
+        "narrow inter-block gaps",
+        "scattered green pockets"
+      ],
+      "limitations": [
+        "editorial context image",
+        "no exact geolocation for visible buildings"
+      ]
     },
     {
       "id": "R07",
@@ -118,8 +161,16 @@
       "attributionText": null,
       "usageStatus": "research-only; linked photography licence must be cleared separately",
       "buildingMatchConfidence": "medium for visible stylistic features",
-      "observedFeatures": ["historic red-brick frontage", "repeated arched openings", "ornamental brick details", "decorative parapet"],
-      "limitations": ["not a surveyed drawing", "precise age and dimensions need authoritative evidence"]
+      "observedFeatures": [
+        "historic red-brick frontage",
+        "repeated arched openings",
+        "ornamental brick details",
+        "decorative parapet"
+      ],
+      "limitations": [
+        "not a surveyed drawing",
+        "precise age and dimensions need authoritative evidence"
+      ]
     },
     {
       "id": "R08",
@@ -134,14 +185,25 @@
         "period": "late 19th century",
         "storeys": "two-storey main house; three-storey southern wing",
         "courtyards": 3,
-        "features": ["fluted Corinthian columns", "coloured sash windows", "courtyard-based massing"]
+        "features": [
+          "fluted Corinthian columns",
+          "coloured sash windows",
+          "courtyard-based massing"
+        ]
       },
       "license": "Not established",
       "attributionText": null,
       "usageStatus": "research-only; linked photography licence must be cleared separately",
       "buildingMatchConfidence": "medium for article-reported features; dimensions are not surveyed",
-      "observedFeatures": ["courtyard voids", "asymmetric wings", "arcaded/columned edges", "heritage window pattern"],
-      "limitations": ["avoid inferring full geometry from a single image"]
+      "observedFeatures": [
+        "courtyard voids",
+        "asymmetric wings",
+        "arcaded/columned edges",
+        "heritage window pattern"
+      ],
+      "limitations": [
+        "avoid inferring full geometry from a single image"
+      ]
     },
     {
       "id": "R09",
@@ -161,8 +223,14 @@
       "attributionText": null,
       "usageStatus": "research-only; studio project imagery needs separate permission for reuse",
       "buildingMatchConfidence": "medium for design brief; visualizations may differ from as-built conditions",
-      "observedFeatures": ["projecting/terraced balconies", "designed roof terrace", "articulated contemporary facade"],
-      "limitations": ["design renderings are not necessarily surveyed as-built geometry"]
+      "observedFeatures": [
+        "projecting/terraced balconies",
+        "designed roof terrace",
+        "articulated contemporary facade"
+      ],
+      "limitations": [
+        "design renderings are not necessarily surveyed as-built geometry"
+      ]
     },
     {
       "id": "V01",
@@ -177,8 +245,422 @@
       "attributionText": null,
       "usageStatus": "watch/reference only; do not download, re-host, extract frames or use as a training dataset without rights clearance",
       "buildingMatchConfidence": "contextual overview, not an individual-building record",
-      "observedFeatures": ["historic street and building context", "potential named heritage structures for follow-up"],
-      "limitations": ["documentary video is not necessarily a calibrated overlapping photogrammetry sequence"]
+      "observedFeatures": [
+        "historic street and building context",
+        "potential named heritage structures for follow-up"
+      ],
+      "limitations": [
+        "documentary video is not necessarily a calibrated overlapping photogrammetry sequence"
+      ]
+    },
+    {
+      "id": "R10",
+      "mediaType": "image",
+      "title": "Red Rocket - panoramio (Gulshan-1 view)",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red_Rocket_-_panoramio.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Sabbir Sohan",
+      "capturedAt": "2015-07-23",
+      "locationText": "Gulshan-1, Dhaka",
+      "latitude": 23.777357,
+      "longitude": 90.413239,
+      "originalDimensions": "9728x4864",
+      "license": "CC BY-SA 3.0 Unported",
+      "attributionText": "Sabbir Sohan / Wikimedia Commons; link source and CC BY-SA 3.0; mark changes and follow ShareAlike",
+      "usageStatus": "open-licence candidate; re-check original page and exact depicted building before reuse",
+      "buildingMatchConfidence": "medium for viewpoint location; low for per-building identity without visual georeferencing",
+      "observedFeatures": [
+        "wide urban/residential-commercial skyline context",
+        "possible tower massing and spacing"
+      ],
+      "limitations": [
+        "title and tags do not by themselves establish which exact facade is shown",
+        "single panorama does not supply side elevations"
+      ]
+    },
+    {
+      "id": "R11",
+      "mediaType": "image",
+      "title": "Tall Building in Dhaka City",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tall_Building_in_Dhaka_City.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "S.M.M.Musabbir Uddin",
+      "capturedAt": "2017-12-16",
+      "locationText": "Dhaka; exact neighbourhood not recorded in file description",
+      "originalDimensions": "960x720",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "S.M.M.Musabbir Uddin / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; re-check original page before use",
+      "buildingMatchConfidence": "low for footprint identity; city-level tall-building visual reference",
+      "observedFeatures": [
+        "single tall-building reference",
+        "potential height-to-width proportion comparison"
+      ],
+      "limitations": [
+        "location says only Dhaka",
+        "image resolution is modest and one viewpoint cannot reveal other elevations"
+      ]
+    },
+    {
+      "id": "R12",
+      "mediaType": "image",
+      "title": "ক্রমবিকাশমান ঢাকা স্কাইলাইন (Gradually developing Dhaka skyline)",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:ক্রমবিকাশমান_ঢাকা_স্কাইলাইন.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Sajibur",
+      "capturedAt": "2014-10-25",
+      "locationText": "Dhaka skyline; exact viewpoint not recorded",
+      "originalDimensions": "1920x1935",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "Sajibur / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; re-check original page before reuse",
+      "buildingMatchConfidence": "low for individual properties; contextual skyline record",
+      "observedFeatures": [
+        "city-scale building-height variation",
+        "high-rise growth/context"
+      ],
+      "limitations": [
+        "not a survey and cannot be used to estimate any named building's dimensions"
+      ]
+    },
+    {
+      "id": "R13",
+      "mediaType": "image",
+      "title": "Apartment buildings in Dhaka (Flickr photo 30569828554)",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Apartment_buildings_in_Dhaka_(30569828554).jpg",
+      "sourceName": "Wikimedia Commons (originally Flickr)",
+      "author": "Francisco Anzola",
+      "capturedAt": "2016-12-02",
+      "locationText": "Photo viewpoint in Dhaka",
+      "latitude": 23.717992,
+      "longitude": 90.404548,
+      "originalDimensions": "6016x3841",
+      "license": "CC BY 2.0 Generic",
+      "attributionText": "Francisco Anzola / Wikimedia Commons; link source and CC BY 2.0 licence; note modifications",
+      "usageStatus": "open-licence candidate; coordinate is the camera viewpoint, not an individual building centroid",
+      "buildingMatchConfidence": "medium for viewpoint geolocation; individual facade-to-footprint matches need checking",
+      "observedFeatures": [
+        "multi-building residential context",
+        "inter-building proximity and relative massing"
+      ],
+      "limitations": [
+        "single panorama/view",
+        "camera coordinate does not identify every visible building"
+      ]
+    },
+    {
+      "id": "R14",
+      "mediaType": "image",
+      "title": "Concord Apartment Buildings, Ajimpur, Dhaka, Bangladesh",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Concord_Apartment_Buildings,_Ajimpur,_Dhaka,_Bangladesh.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Tanvir Rahat",
+      "capturedAt": "2022-05-20",
+      "locationText": "Azimpur/Lalbagh area; described as near Lalbagh Kella Road",
+      "originalDimensions": "3000x4000 (EXIF records 4000x3000 before rotation)",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "Tanvir Rahat / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; capture time comes from EXIF and upload date is 2023-07-17; re-check page before use",
+      "buildingMatchConfidence": "medium for the photographed complex; exact footprint mapping is not stored",
+      "observedFeatures": [
+        "large multi-storey development",
+        "vertical repetition and unfinished/under-construction appearance as visible at capture time"
+      ],
+      "limitations": [
+        "do not repeat legal or project-status claims in the uploader description as verified facts",
+        "construction status may have changed since capture"
+      ]
+    },
+    {
+      "id": "R15",
+      "mediaType": "image",
+      "title": "A beautiful architecture beside the Dhanmondi Lake, Dhaka, Bangladesh",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:A_beautiful_architecture_beside_the_Dhanmondi_Lake_,_Dhaka_,_Bangladesh.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Tanvir Rahat",
+      "capturedAt": "2023-05-08",
+      "locationText": "Beside Dhanmondi Lake, Dhaka; exact plot not established",
+      "originalDimensions": "2464x3280",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "Tanvir Rahat / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; verify actual depicted structure and location against the original image",
+      "buildingMatchConfidence": "low-to-medium for exact building identity",
+      "observedFeatures": [
+        "lake-edge architectural/context reference",
+        "potential facade and surrounding landscape relationship"
+      ],
+      "limitations": [
+        "title alone does not establish building name or surveyed geometry"
+      ]
+    },
+    {
+      "id": "R16",
+      "mediaType": "image",
+      "title": "In Banani Model Town 02 — modern private building",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:In_Banani_Model_Town_02.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Kritzolina",
+      "capturedAt": "2020-03-06",
+      "locationText": "Banani Model Town, Dhaka",
+      "originalDimensions": "2592x3888",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "Kritzolina / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; review image to choose suitable facade features; follow ShareAlike for distributed adaptations",
+      "buildingMatchConfidence": "medium for neighbourhood class; exact property coordinates not recorded",
+      "observedFeatures": [
+        "modern private residential building",
+        "potential facade-bay and balcony reference"
+      ],
+      "limitations": [
+        "single photograph does not define rear/side elevations or floor plans"
+      ]
+    },
+    {
+      "id": "R17",
+      "mediaType": "image",
+      "title": "A house in Banani Model Town, Dhaka 02",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:A_house_in_Banani_Model_Town,_Dhaka_02.jpg",
+      "sourceName": "Wikimedia Commons",
+      "author": "Kritzolina",
+      "capturedAt": "2020-02-25",
+      "locationText": "Banani Model Town, Dhaka",
+      "originalDimensions": "3888x2592",
+      "license": "CC BY-SA 4.0 International",
+      "attributionText": "Kritzolina / Wikimedia Commons; link source and CC BY-SA 4.0 licence",
+      "usageStatus": "open-licence candidate; re-check original file page and attribution before reuse",
+      "buildingMatchConfidence": "medium for neighbourhood; exact property coordinates and link to R16 are unverified",
+      "observedFeatures": [
+        "house-scale residential architecture",
+        "useful contrast with apartment-tower massing"
+      ],
+      "limitations": [
+        "do not assume this is the same building as other Banani photos without visual matching"
+      ]
+    },
+    {
+      "id": "R18",
+      "mediaType": "image",
+      "title": "Beauty Boarding heritage building photo feature",
+      "sourceUrl": "https://www.jagonews24.com/photo/bangladesh/photo-feature/1471",
+      "sourceName": "Jago News 24",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Shree Shash Lane, Old Dhaka (location reported by the feature)",
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only; do not download, republish, train on or bundle the article photo without permission",
+      "buildingMatchConfidence": "medium for general heritage-building identity; no survey geometry",
+      "observedFeatures": [
+        "two-storey courtyard-facing facade",
+        "arched ground-level openings/veranda",
+        "upper-level openings and a planted central courtyard as shown in the image"
+      ],
+      "limitations": [
+        "news photo copyright applies unless terms/permission say otherwise",
+        "one view cannot reconstruct hidden wings or exact room dimensions"
+      ]
+    },
+    {
+      "id": "R19",
+      "mediaType": "image",
+      "title": "Rose Garden Palace, Tikatuli",
+      "sourceUrl": "https://online92.thedailystar.net/news/bangladesh/news/rose-garden-palace-where-legacy-blooms-4142916",
+      "sourceName": "The Daily Star",
+      "author": "Sukanta Halder (photography credited in article)",
+      "capturedAt": null,
+      "locationText": "KM Das Lane, Tikatuli, Old Dhaka",
+      "reportedBuildingMetadata": {
+        "reportedConstructionYear": 1931,
+        "architecturalDescription": "article describes a Greek-style mansion",
+        "reportedElements": [
+          "white mansion",
+          "sculptures and garden",
+          "central fountain and pond",
+          "colourful glass details on staircase",
+          "large hall"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only; article photo reuse permission not established",
+      "buildingMatchConfidence": "high for named landmark from article; medium for architectural details reported in prose",
+      "observedFeatures": [
+        "formal mansion massing",
+        "building-to-garden relationship",
+        "decorative architectural details"
+      ],
+      "limitations": [
+        "article is not a measured survey; dimensions and plans remain unknown"
+      ]
+    },
+    {
+      "id": "R20",
+      "mediaType": "image",
+      "title": "The last of Dhaka's '70s era duplexes",
+      "sourceUrl": "https://www.tbsnews.net/features/panorama/last-dhakas-70s-era-duplexes-1028486",
+      "sourceName": "The Business Standard",
+      "author": "Mehedi Hasan (photography credited in article)",
+      "capturedAt": null,
+      "locationText": "Examples discussed include Khilgaon and older residential areas including Dhanmondi, Malibagh, Moghbazar, Shantinagar, Agargaon, Gulshan and Banani",
+      "reportedBuildingMetadata": {
+        "era": "1970s–1980s duplex residences",
+        "reportingIncludes": [
+          "U-shaped home and courtyard in Khilgaon",
+          "two-storey homes",
+          "flat roofs and boxy massing",
+          "large grilled windows",
+          "concrete and exposed brick",
+          "vertical louvres and horizontal sunshades"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "research-only; article images require permission for reuse",
+      "buildingMatchConfidence": "medium for a typology from the feature; not a city-wide rule",
+      "observedFeatures": [
+        "low-rise/duplex massing",
+        "front/back open areas",
+        "courtyard/tree integration",
+        "large grilled windows and shading elements"
+      ],
+      "limitations": [
+        "feature examples are selective and some buildings may have been demolished or altered"
+      ]
+    },
+    {
+      "id": "R21",
+      "mediaType": "image",
+      "title": "Apartment building project Sakoon, Bashundhara",
+      "sourceUrl": "https://www.studio16architectsbd.com/project-apartment-sakoon-bashundhara",
+      "sourceName": "Studio 16 Architects",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Plot 1716–1717, Road 40, Block L, Bashundhara Residential Area, Dhaka",
+      "reportedBuildingMetadata": {
+        "storeys": 8,
+        "plotSize": "6 katha (as reported by project page)",
+        "apartments": 14,
+        "features": [
+          "ground-floor parking and entrance lobby",
+          "balconies to north and south",
+          "large windows",
+          "white walls and glass",
+          "rooftop shared space and green zone"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "architecture-study reference only; do not reuse studio imagery without permission",
+      "buildingMatchConfidence": "medium for design intent and architect-reported programme; as-built condition not independently verified",
+      "observedFeatures": [
+        "repeating residential floor plates",
+        "balcony and window rhythm",
+        "shared rooftop space",
+        "ground-floor parking/lobby distinction"
+      ],
+      "limitations": [
+        "designer's web description is not a measured drawing or independent as-built survey"
+      ]
+    },
+    {
+      "id": "R22",
+      "mediaType": "image",
+      "title": "Nest Florence contemporary apartment project",
+      "sourceUrl": "https://wedesignstudiobd.com/portfolio/florence/",
+      "sourceName": "WeDesign Studio",
+      "author": null,
+      "capturedAt": null,
+      "locationText": "Bashundhara, Dhaka",
+      "reportedBuildingMetadata": {
+        "storeys": 9,
+        "plotSize": "5 katha (as reported by studio)",
+        "features": [
+          "clean facade lines",
+          "expansive windows",
+          "natural light",
+          "shared lobby and rooftop terrace"
+        ]
+      },
+      "license": "Not established",
+      "attributionText": null,
+      "usageStatus": "architecture-study reference only; project render/image reuse needs permission",
+      "buildingMatchConfidence": "medium for design brief; visualization may differ from as-built structure",
+      "observedFeatures": [
+        "contemporary multi-storey residential facade",
+        "large openings",
+        "roof terrace and lobby as distinct zones"
+      ],
+      "limitations": [
+        "do not infer hidden elevations or exact floor geometry from marketing renders"
+      ]
+    },
+    {
+      "id": "V02",
+      "mediaType": "video",
+      "title": "Walking Tour Old Town | Heritage Old Dhaka",
+      "sourceUrl": "https://www.youtube.com/watch?v=TRiPqruKoGE",
+      "sourceName": "Street tube (YouTube)",
+      "author": "Street tube",
+      "capturedAt": null,
+      "locationText": "Old Dhaka / Old Town (broad description)",
+      "license": "Standard YouTube viewing; reuse/derivative rights not established",
+      "attributionText": null,
+      "usageStatus": "viewing/reference only; do not download or extract frames without permission",
+      "buildingMatchConfidence": "contextual tour; individual building coordinates are not supplied",
+      "observedFeatures": [
+        "heritage street character",
+        "street widths and building adjacency",
+        "potential discovery lead for further landmark research"
+      ],
+      "limitations": [
+        "camera path is not a calibrated photogrammetry capture; overlapping imagery and camera pose metadata are not established"
+      ]
+    },
+    {
+      "id": "V03",
+      "mediaType": "video",
+      "title": "4K/60fps — Lost in Old Dhaka, Bangladesh (Walking Tour)",
+      "sourceUrl": "https://www.youtube.com/watch?v=orB6n7bX-uk",
+      "sourceName": "Global Stroll (YouTube)",
+      "author": "Global Stroll",
+      "capturedAt": null,
+      "locationText": "Old Dhaka; walking tour through alleys and market streets",
+      "license": "Standard YouTube viewing; reuse/derivative rights not established",
+      "attributionText": null,
+      "usageStatus": "viewing/reference only; do not download or extract frames into the product without permission",
+      "buildingMatchConfidence": "contextual urban morphology reference rather than named-building dataset",
+      "observedFeatures": [
+        "narrow lanes",
+        "adjacent facades",
+        "street-level market context",
+        "crowded heritage-district urban fabric"
+      ],
+      "limitations": [
+        "not a calibrated capture sequence; people/private spaces may appear and should not be republished without review"
+      ]
+    },
+    {
+      "id": "V04",
+      "mediaType": "video",
+      "title": "Walking in the Rain in Dhaka, Bangladesh — City Ambience (4K)",
+      "sourceUrl": "https://www.youtube.com/watch?v=vm8t_cW2xD0",
+      "sourceName": "Urban Ambience (YouTube video; metadata discovered via an Invidious mirror)",
+      "author": "Urban Ambience",
+      "capturedAt": "2026-03-09 (publication date from indexed metadata)",
+      "locationText": "Gulshan, Kamal Ataturk Avenue, Gulshan-2 residential streets and route towards Banani; location sequence per video description",
+      "license": "Standard YouTube viewing; reuse/derivative rights not established",
+      "attributionText": null,
+      "usageStatus": "viewing/reference only; do not download or extract frames without permission",
+      "buildingMatchConfidence": "medium for broad street-route metadata; exact building IDs not supplied",
+      "observedFeatures": [
+        "modern residential-street setting",
+        "road-to-building setbacks",
+        "trees and street landscaping",
+        "day/rain ambience and changing visibility"
+      ],
+      "limitations": [
+        "weather and moving-camera footage are contextual references; no exact building measurements or photogrammetry guarantee"
+      ]
     }
   ],
   "derivedArchitectureNotes": {
@@ -187,21 +669,25 @@
       "rectangular massing and repeated floor bands",
       "metal grille treatment on some balconies",
       "stronger colour zones on some facades",
-      "rooftop/parapet features should be modelled only when visible or sourced"
+      "rooftop/parapet features should be modelled only when visible or sourced",
+      "A Commons photo has a camera viewpoint coordinate (23.717992, 90.404548) but this coordinate must not be mistaken for the centroid of every building visible in the image.",
+      "Some open-licensed reference images are high resolution (e.g. Banani Model Town facade/house views and Azimpur apartment photo); inspect the full-resolution original before estimating bays or roof elements."
     ],
     "contemporaryPatterns": [
       "terraced/projecting balconies",
       "sun-shading fins",
       "rooftop gardens and greenery",
       "varied facade textures",
-      "setbacks and better-defined shared/open space"
+      "setbacks and better-defined shared/open space",
+      "Architect-reported 8–9 storey Bashundhara projects can be used to formulate test variants for floor repetition, north/south balconies, lobby/parking ground floors, large windows and shared roof amenities; treat promotional descriptions as design intent rather than survey truth."
     ],
     "heritagePatterns": [
       "arched openings",
       "decorative parapets and brick details",
       "columns and arcades",
       "courtyard voids",
-      "wings with different heights"
+      "wings with different heights",
+      "Beauty Boarding and Rose Garden illustrate distinct courtyard/heritage cases: arched veranda/courtyard composition versus formal mansion-and-garden composition. Keep them as separate style families."
     ],
     "modelConfidenceRule": "A single image supports facade-level guesses only. GPS proximity does not prove a building match. Multi-view reconstruction requires adequate overlapping views of the same building, varied useful camera angles and review; three images or positions alone are not sufficient evidence.",
     "requiredProvenanceFields": [
@@ -218,6 +704,11 @@
       "modifications",
       "buildingMatchConfidence",
       "usageStatus"
+    ],
+    "typologyCautions": [
+      "1970s–1980s duplex descriptions are historical typology evidence, not a claim that all current houses in the named neighbourhoods share these features.",
+      "Commercial real-estate project pages and rendered visuals are not open-licensed by default; keep them research-only unless permissions are confirmed.",
+      "Open licences differ: CC BY 2.0 requires attribution; CC BY-SA files additionally require compatible ShareAlike distribution for adaptations. Preserve each file's own licence and source."
     ]
   }
 }
