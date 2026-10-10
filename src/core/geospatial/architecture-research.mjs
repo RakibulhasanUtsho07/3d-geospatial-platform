@@ -199,3 +199,64 @@ export function createArchitectureStylePreview(reference) {
     fullHeightTexture: !isVideoContext,
   };
 }
+
+export function resolveArchitectureMediaPreview(reference) {
+  if (!reference || typeof reference !== "object" || typeof reference.sourceUrl !== "string") {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+
+  let source;
+  try {
+    source = new URL(reference.sourceUrl);
+  } catch {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+  if (source.protocol !== "https:" || source.username || source.password) {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+
+  if (reference.mediaType === "video") {
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(source.hostname)) {
+      return { mediaPreviewUrl: null, mediaPreviewKind: null };
+    }
+    const videoId = source.searchParams.get("v");
+    if (!videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+      return { mediaPreviewUrl: null, mediaPreviewKind: null };
+    }
+    return {
+      mediaPreviewUrl: "https://www.youtube-nocookie.com/embed/" + videoId,
+      mediaPreviewKind: "video",
+    };
+  }
+
+  if (reference.mediaType !== "image") {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+  const usageStatus = stringValue(reference.usageStatus).toLowerCase();
+  const license = stringValue(reference.license).toLowerCase();
+  if (
+    source.hostname !== "commons.wikimedia.org" ||
+    !source.pathname.startsWith("/wiki/File:") ||
+    !usageStatus.includes("open-licence-candidate") ||
+    !/cc by(?:-sa)?(?:\\s|$)/i.test(license)
+  ) {
+    // Only previews from the catalogue's explicit Wikimedia Commons, open-
+    // licence candidate set are embedded. Other photos remain source links.
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+
+  let filename;
+  try {
+    filename = decodeURIComponent(source.pathname.slice("/wiki/File:".length));
+  } catch {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+  if (!filename || filename.length > 240 || filename.includes("/") || filename.includes("\\\\")) {
+    return { mediaPreviewUrl: null, mediaPreviewKind: null };
+  }
+
+  return {
+    mediaPreviewUrl: "https://commons.wikimedia.org/wiki/Special:FilePath/" + encodeURIComponent(filename) + "?width=720",
+    mediaPreviewKind: "image",
+  };
+}
