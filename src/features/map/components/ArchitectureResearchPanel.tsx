@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
+import type { BuildingStyleAssignment } from "@/core/map-engine/types";
 
 import {
   createArchitectureStylePreview,
@@ -35,7 +36,10 @@ interface ArchitectureResearchPanelProps {
   canPreview: boolean;
   isPreviewActive: boolean;
   previewTitle: string | null;
+  selectedAssignment: BuildingStyleAssignment | null;
   onPreview: (style: BuildingVisualStyle, title: string) => void;
+  onAssign: (reference: ArchitectureResearchReference, style: BuildingVisualStyle) => void;
+  onRemoveAssignment: () => void;
   onResetPreview: () => void;
 }
 
@@ -101,7 +105,10 @@ export default function ArchitectureResearchPanel({
   canPreview,
   isPreviewActive,
   previewTitle,
+  selectedAssignment,
   onPreview,
+  onAssign,
+  onRemoveAssignment,
   onResetPreview,
 }: ArchitectureResearchPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -184,6 +191,12 @@ export default function ArchitectureResearchPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {selectedAssignment && (
+            <button type="button" onClick={onRemoveAssignment}
+              className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100">
+              Remove saved profile
+            </button>
+          )}
           {isPreviewActive && (
             <button type="button" onClick={onResetPreview}
               className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100">
@@ -311,6 +324,9 @@ export default function ArchitectureResearchPanel({
                     ))}
                   </div>
                   <p className="mt-1 text-[10px] leading-4 text-amber-700">Estimated visual palette · {reference.designProfile.paletteConfidence}</p>
+                  {selectedAssignment?.referenceId === reference.id && (
+                    <p className="mt-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">Saved on selected building</p>
+                  )}
 
                   {observations.length > 0 && (
                     <div className="mt-3">
@@ -369,10 +385,20 @@ export default function ArchitectureResearchPanel({
 
                   <div className="mt-auto space-y-3 pt-4">
                     <button type="button" disabled={!canPreview || reference.mediaType === "video"}
+                      onClick={() => onAssign(reference, createArchitectureStylePreview(reference))}
+                      title={reference.mediaType === "video" ? "Video references cannot be assigned as building facade profiles." : "Save this researched facade profile to the currently selected building ID."}
+                      className="w-full rounded-lg bg-emerald-700 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
+                      {reference.mediaType === "video"
+                        ? "Video context only"
+                        : selectedAssignment?.referenceId === reference.id
+                          ? "Update saved profile"
+                          : "Apply & save to this building"}
+                    </button>
+                    <button type="button" disabled={!canPreview || reference.mediaType === "video"}
                       onClick={() => onPreview(createArchitectureStylePreview(reference), reference.title)}
                       title={reference.mediaType === "video" ? "Video references are for street context, not direct facade styling." : undefined}
-                      className="w-full rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
-                      {reference.mediaType === "video" ? "Video context only" : "Preview style on selected building"}
+                      className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
+                      Preview temporarily
                     </button>
                     <div className="flex flex-wrap gap-3 text-xs font-semibold">
                     <a href={reference.sourceUrl} target="_blank" rel="noreferrer" className="text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">Open source ↗</a>
