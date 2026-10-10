@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 
+import {
+  createArchitectureStylePreview,
+} from "@/core/geospatial/architecture-research.mjs";
 import type {
   ArchitectureResearchReference,
   ArchitectureResearchSummary,
@@ -77,41 +80,6 @@ function formatMetadata(metadata: Record<string, unknown> | undefined): string[]
     )
     .slice(0, 4)
     .map(([key, value]) => readableName(key) + ": " + String(value));
-}
-
-function createPreviewStyle(reference: ArchitectureResearchReference): BuildingVisualStyle {
-  const family = reference.designProfile.styleFamily.toLowerCase();
-  const palette = reference.designProfile.colorPalette;
-  const facade = palette[0]?.hex ?? "#D9DFE0";
-  const roof = palette.find((swatch) => /roof|concrete|stone|trim/i.test(swatch.name))?.hex
-    ?? palette[1]?.hex
-    ?? "#A9AFB2";
-  const accent = palette.find((swatch) => /green|plant|metal|window|balcony|ochre/i.test(swatch.name))?.hex
-    ?? palette[2]?.hex
-    ?? "#91A8B5";
-  let pattern: BuildingVisualStyle["pattern"] = "urban-grid";
-  if (/heritage|historic|courtyard|old-dhaka|mansion/.test(family)) {
-    pattern = "heritage-arches";
-  } else if (/biophilic|climate-responsive|green-facade|vine/.test(family)) {
-    pattern = "biophilic-balcony";
-  } else if (/painted|blue-ochre|mugda/.test(family)) {
-    pattern = "painted-balcony";
-  } else if (/modernist|brick/.test(family)) {
-    pattern = "brick-modernist";
-  } else if (/apartment|residential|balcony/.test(family)) {
-    pattern = "balcony";
-  } else if (/glass/.test(family)) {
-    pattern = "vertical-glass";
-  }
-  return {
-    id: "research-preview-" + reference.id,
-    facadeColor: facade,
-    roofColor: roof,
-    accentColor: accent,
-    pattern,
-    roofDetail: "none",
-    repeatWidthMeters: 6.2,
-  };
 }
 
 function locationMapUrl(reference: ArchitectureResearchReference): string | null {
@@ -340,7 +308,7 @@ export default function ArchitectureResearchPanel({
 
                   <div className="mt-auto space-y-3 pt-4">
                     <button type="button" disabled={!canPreview}
-                      onClick={() => onPreview(createPreviewStyle(reference), reference.title)}
+                      onClick={() => onPreview(createArchitectureStylePreview(reference), reference.title)}
                       className="w-full rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
                       Preview style on selected building
                     </button>
