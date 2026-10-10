@@ -79,12 +79,10 @@ function readableName(value: string): string {
 }
 
 function removeGeometryOverride(style: BuildingVisualStyle): BuildingVisualStyle {
-  const {
-    reportedFloorCount: _reportedFloorCount,
-    reportedHeightMeters: _reportedHeightMeters,
-    reportedBuildingAreaSqM: _reportedBuildingAreaSqM,
-    ...visualOnlyStyle
-  } = style;
+  const visualOnlyStyle = { ...style };
+  delete visualOnlyStyle.reportedFloorCount;
+  delete visualOnlyStyle.reportedHeightMeters;
+  delete visualOnlyStyle.reportedBuildingAreaSqM;
   return visualOnlyStyle;
 }
 
