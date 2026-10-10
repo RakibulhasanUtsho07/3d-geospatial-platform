@@ -15,6 +15,7 @@ import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
+import type { RoadFeature } from "../geospatial/road-network.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import type {
   CameraTarget,
@@ -132,6 +133,11 @@ export class CesiumAdapter implements MapEngine {
     | import("cesium").ImageryLayer
     | null = null;
 
+  private roadNetworkDataSource: import("cesium").CustomDataSource | null = null;
+  private roadRequestAbortController: AbortController | null = null;
+  private activeRoadRequestKey: string | null = null;
+  private loadedRoadBounds: ViewportBounds | null = null;
+
   private overtureBuildings: CesiumDataSource | null = null;
   private nearbyPlacesDataSource: import("cesium").CustomDataSource | null = null;
   private readonly nearbyPlaceByEntityId = new Map<string, NearbyPlace>();
@@ -147,6 +153,7 @@ export class CesiumAdapter implements MapEngine {
 
   private readonly layerVisibility = new Map<MapLayerId, boolean>([
     [MAP_LAYER_IDS.baseImagery, true],
+    [MAP_LAYER_IDS.roads, true],
     [MAP_LAYER_IDS.overtureBuildings, true],
     [MAP_LAYER_IDS.nearbyPlaces, false],
     [MAP_LAYER_IDS.propertyListings, false],
@@ -284,6 +291,9 @@ export class CesiumAdapter implements MapEngine {
       viewer.camera.moveEnd.addEventListener(() => {
         this.handleCameraMoveEnd(viewer, Cesium);
       });
+
+    // Load a bounded vector road corridor layer independently from building LOD.
+    void this.loadRoadNetwork(viewer, Cesium);
 
     viewer.scene.requestRender();
 
@@ -753,6 +763,263 @@ export class CesiumAdapter implements MapEngine {
     }
   }
 
+  private getRoadViewportBounds(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): ViewportBounds {
+    const viewBounds = this.getPaddedViewportBounds(viewer, Cesium);
+    let west: number;
+    let south: number;
+    let east: number;
+    let north: number;
+
+    if (viewBounds) {
+      ({ west, south, east, north } = viewBounds);
+    } else {
+      const centre = this.getGroundCenter() ?? {
+        longitude: DHAKA_CAMERA.longitude,
+        latitude: DHAKA_CAMERA.latitude,
+        height: 0,
+      };
+      west = centre.longitude - 0.015;
+      east = centre.longitude + 0.015;
+      south = centre.latitude - 0.012;
+      north = centre.latitude + 0.012;
+    }
+
+    // Bound the public Overpass request to a local view. Wide city views still
+    // show a detailed central road window; zoom in to progressively load more.
+    const centreLon = (west + east) / 2;
+    const centreLat = (south + north) / 2;
+    const halfLon = Math.min((east - west) / 2, 0.017);
+    const halfLat = Math.min((north - south) / 2, 0.017);
+    return {
+      west: Number((centreLon - halfLon).toFixed(6)),
+      south: Number((centreLat - halfLat).toFixed(6)),
+      east: Number((centreLon + halfLon).toFixed(6)),
+      north: Number((centreLat + halfLat).toFixed(6)),
+    };
+  }
+
+  private roadBoundsContain(
+    outer: ViewportBounds,
+    inner: ViewportBounds,
+  ): boolean {
+    const padding = 0.0008;
+    return inner.west >= outer.west - padding
+      && inner.south >= outer.south - padding
+      && inner.east <= outer.east + padding
+      && inner.north <= outer.north + padding;
+  }
+
+  private async loadRoadNetwork(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): Promise<void> {
+    if (
+      this.viewer !== viewer ||
+      viewer.isDestroyed() ||
+      !this.isLayerVisible(MAP_LAYER_IDS.roads)
+    ) {
+      return;
+    }
+
+    const bounds = this.getRoadViewportBounds(viewer, Cesium);
+    if (
+      this.loadedRoadBounds &&
+      this.roadBoundsContain(this.loadedRoadBounds, bounds)
+    ) {
+      return;
+    }
+
+    const requestKey = [
+      bounds.west.toFixed(4),
+      bounds.south.toFixed(4),
+      bounds.east.toFixed(4),
+      bounds.north.toFixed(4),
+    ].join("|");
+    if (this.activeRoadRequestKey === requestKey) return;
+
+    // Camera moves can supersede an in-flight public road query; keep only the
+    // newest viewport request and retain the old rendered roads until success.
+    this.roadRequestAbortController?.abort();
+    const controller = new AbortController();
+    this.roadRequestAbortController = controller;
+    this.activeRoadRequestKey = requestKey;
+
+    const params = new URLSearchParams({
+      west: String(bounds.west),
+      south: String(bounds.south),
+      east: String(bounds.east),
+      north: String(bounds.north),
+      limit: "1000",
+    });
+
+    try {
+      const response = await fetch(
+        "/api/geospatial/roads?" + params.toString(),
+        {
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(25_000),
+          ]),
+        },
+      );
+
+      const payload = await response.json() as {
+        error?: string;
+        results?: RoadFeature[];
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Road network query failed.");
+      }
+      if (!Array.isArray(payload.results)) {
+        throw new Error("Road network API returned invalid GeoJSON-like results.");
+      }
+      if (
+        this.viewer !== viewer ||
+        viewer.isDestroyed() ||
+        this.roadRequestAbortController !== controller ||
+        !this.isLayerVisible(MAP_LAYER_IDS.roads)
+      ) {
+        return;
+      }
+
+      let dataSource = this.roadNetworkDataSource;
+      if (!dataSource) {
+        dataSource = new Cesium.CustomDataSource("OpenStreetMap detailed road network");
+        await viewer.dataSources.add(dataSource);
+        if (
+          this.viewer !== viewer ||
+          viewer.isDestroyed() ||
+          this.roadRequestAbortController !== controller
+        ) {
+          viewer.dataSources.remove(dataSource, true);
+          return;
+        }
+        this.roadNetworkDataSource = dataSource;
+      }
+
+      dataSource.entities.removeAll();
+      const labelCandidates = payload.results
+        .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
+        .slice(0, 40);
+      const labelIds = new Set(labelCandidates.map((road) => road.id));
+
+      const roadColors: Record<RoadFeature["roadClass"], string> = {
+        arterial: "#E0A65D",
+        collector: "#D6DEE6",
+        local: "#F3F5F7",
+        path: "#9BA99F",
+      };
+
+      for (const road of payload.results) {
+        if (
+          !road ||
+          !Array.isArray(road.coordinates) ||
+          road.coordinates.length < 2 ||
+          !Number.isFinite(road.widthMeters)
+        ) {
+          continue;
+        }
+
+        const positions = Cesium.Cartesian3.fromDegreesArray(
+          road.coordinates.flatMap(([longitude, latitude]) => [longitude, latitude]),
+        );
+        if (positions.length < 2) continue;
+
+        const centerIndex = Math.min(
+          road.coordinates.length - 1,
+          Math.floor(road.coordinates.length / 2),
+        );
+        const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
+        const roadColor = Cesium.Color.fromCssColorString(
+          roadColors[road.roadClass] ?? roadColors.local,
+        ) ?? Cesium.Color.LIGHTGRAY;
+        const roadwayWidth = Math.max(1.1, Math.min(24, road.widthMeters));
+        const safeName = road.name
+          ? road.name.replace(/[<>\\u0000-\\u001f\\u007f]/g, "").slice(0, 140)
+          : null;
+
+        dataSource.entities.add({
+          id: road.id,
+          name: safeName ?? road.highway + " road",
+          position: labelIds.has(road.id)
+            ? Cesium.Cartesian3.fromDegrees(labelLongitude, labelLatitude, 1)
+            : undefined,
+          corridor: {
+            positions,
+            width: roadwayWidth,
+            height: 0,
+            cornerType: Cesium.CornerType.ROUNDED,
+            material: new Cesium.ColorMaterialProperty(
+              roadColor.withAlpha(road.roadClass === "path" ? 0.72 : 0.9),
+            ),
+            outline: true,
+            outlineColor: new Cesium.ConstantProperty(
+              Cesium.Color.fromCssColorString("#44515E")?.withAlpha(0.56) ?? Cesium.Color.GRAY,
+            ),
+            outlineWidth: 1,
+          },
+          label: labelIds.has(road.id) && safeName
+            ? {
+                text: safeName,
+                font: "11px sans-serif",
+                fillColor: Cesium.Color.WHITE,
+                outlineColor: Cesium.Color.fromCssColorString("#25313D") ?? Cesium.Color.BLACK,
+                outlineWidth: 3,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                showBackground: true,
+                backgroundColor: Cesium.Color.fromCssColorString("#293746")?.withAlpha(0.82) ?? Cesium.Color.BLACK,
+                pixelOffset: new Cesium.Cartesian2(0, -4),
+                scaleByDistance: new Cesium.NearFarScalar(150, 1, 1800, 0.35),
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5500),
+                disableDepthTestDistance: 1800,
+              }
+            : undefined,
+        });
+
+        // A thin centre highlight improves road hierarchy at ground-level zoom;
+        // physical-width corridor geometry remains the controlling road surface.
+        if (road.roadClass === "arterial" && road.widthMeters >= 5) {
+          dataSource.entities.add({
+            id: road.id + "-centre-line",
+            name: (safeName ?? "Road") + " centre detail",
+            polyline: {
+              positions,
+              width: 1.2,
+              material: Cesium.Color.WHITE.withAlpha(0.58),
+              clampToGround: true,
+            },
+          });
+        }
+      }
+
+      dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.roads);
+      this.loadedRoadBounds = bounds;
+      viewer.scene.requestRender();
+      console.info("[Roads] Vector road viewport rendered.", {
+        requested: bounds,
+        returnedWays: payload.results.length,
+        labelledRoads: labelCandidates.length,
+        attribution: "© OpenStreetMap contributors",
+      });
+    } catch (error: unknown) {
+      if (
+        !(typeof error === "object" && error !== null && "name" in error && error.name === "AbortError") &&
+        this.viewer === viewer &&
+        !viewer.isDestroyed()
+      ) {
+        console.warn("[Roads] Detailed road layer could not refresh.", error instanceof Error ? error.message : String(error));
+      }
+    } finally {
+      if (this.roadRequestAbortController === controller) {
+        this.roadRequestAbortController = null;
+        this.activeRoadRequestKey = null;
+      }
+    }
+  }
+
   private getPaddedViewportBounds(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
@@ -887,13 +1154,13 @@ export class CesiumAdapter implements MapEngine {
     viewer: CesiumViewer,
     Cesium: CesiumModule,
   ): void {
-    if (
-      this.viewer !== viewer ||
-      viewer.isDestroyed() ||
-      !this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings)
-    ) {
-      return;
+    if (this.viewer !== viewer || viewer.isDestroyed()) return;
+
+    if (this.isLayerVisible(MAP_LAYER_IDS.roads)) {
+      void this.loadRoadNetwork(viewer, Cesium);
     }
+
+    if (!this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings)) return;
 
     const requestedBounds = this.getPaddedViewportBounds(viewer, Cesium);
 
@@ -2086,6 +2353,11 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodBudget = null;
 
     this.baseImageryLayer = null;
+    this.roadRequestAbortController?.abort();
+    this.roadRequestAbortController = null;
+    this.activeRoadRequestKey = null;
+    this.loadedRoadBounds = null;
+    this.roadNetworkDataSource = null;
     this.overtureBuildings = null;
     this.nearbyPlacesDataSource = null;
     this.propertyListingsDataSource = null;
@@ -2316,6 +2588,11 @@ export class CesiumAdapter implements MapEngine {
         visible: this.isLayerVisible(MAP_LAYER_IDS.baseImagery),
       },
       {
+        id: MAP_LAYER_IDS.roads,
+        name: "Detailed OSM roads",
+        visible: this.isLayerVisible(MAP_LAYER_IDS.roads),
+      },
+      {
         id: MAP_LAYER_IDS.overtureBuildings,
         name: "Overture 3D buildings",
         visible: this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
@@ -2340,6 +2617,15 @@ export class CesiumAdapter implements MapEngine {
       if (this.baseImageryLayer) {
         this.baseImageryLayer.show = visible;
       }
+    } else if (layerId === MAP_LAYER_IDS.roads) {
+      if (this.roadNetworkDataSource) {
+        this.roadNetworkDataSource.show = visible;
+      }
+      if (!visible) {
+        this.roadRequestAbortController?.abort();
+        this.roadRequestAbortController = null;
+        this.activeRoadRequestKey = null;
+      }
     } else if (layerId === MAP_LAYER_IDS.overtureBuildings) {
       if (this.overtureBuildings) {
         this.overtureBuildings.show = visible;
@@ -2363,6 +2649,12 @@ export class CesiumAdapter implements MapEngine {
 
     const viewer = this.viewer;
     if (!viewer || viewer.isDestroyed()) {
+      return;
+    }
+
+    if (layerId === MAP_LAYER_IDS.roads && visible && this.cesium && this.viewer) {
+      void this.loadRoadNetwork(this.viewer, this.cesium);
+      viewer.scene.requestRender();
       return;
     }
 
