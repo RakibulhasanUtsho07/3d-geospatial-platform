@@ -123,3 +123,40 @@ export function summarizeArchitectureReferences(references) {
     areas: [...areaSet].sort((a, b) => a.localeCompare(b)),
   };
 }
+
+export function createArchitectureStylePreview(reference) {
+  const family = String(reference?.designProfile?.styleFamily ?? "").toLowerCase();
+  const palette = Array.isArray(reference?.designProfile?.colorPalette)
+    ? reference.designProfile.colorPalette
+    : [];
+  const facade = palette.find((swatch) => typeof swatch?.hex === "string")?.hex ?? "#D9DFE0";
+  const roof = palette.find((swatch) => /roof|concrete|stone|trim/i.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? "")))?.hex
+    ?? palette[1]?.hex
+    ?? "#A9AFB2";
+  const accent = palette.find((swatch) => /green|plant|metal|window|balcony|ochre/i.test(String(swatch?.name ?? "")) && /^#[0-9a-f]{6}$/i.test(String(swatch?.hex ?? "")))?.hex
+    ?? palette[2]?.hex
+    ?? "#91A8B5";
+  let pattern = "urban-grid";
+  if (/heritage|historic|courtyard|old-dhaka|mansion/.test(family)) {
+    pattern = "heritage-arches";
+  } else if (/biophilic|climate-responsive|green-facade|vine/.test(family)) {
+    pattern = "biophilic-balcony";
+  } else if (/painted|blue-ochre|mugda/.test(family)) {
+    pattern = "painted-balcony";
+  } else if (/modernist|brick/.test(family)) {
+    pattern = "brick-modernist";
+  } else if (/apartment|residential|balcony/.test(family)) {
+    pattern = "balcony";
+  } else if (/glass/.test(family)) {
+    pattern = "vertical-glass";
+  }
+  return {
+    id: "research-preview-" + String(reference?.id ?? "unknown"),
+    facadeColor: facade,
+    roofColor: roof,
+    accentColor: accent,
+    pattern,
+    roofDetail: "none",
+    repeatWidthMeters: 6.2,
+  };
+}
