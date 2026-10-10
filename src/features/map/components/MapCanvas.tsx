@@ -636,6 +636,14 @@ export default function MapCanvas({
           onFocus={focusSelectedRoad}
         />
       )}
+
+      {status === "ready" && selectedRoad && (
+        <RoadDetailsPanel
+          road={selectedRoad}
+          onClose={closeRoadDetails}
+          onFocus={focusSelectedRoad}
+        />
+      )}
     </div>
   );
 }
