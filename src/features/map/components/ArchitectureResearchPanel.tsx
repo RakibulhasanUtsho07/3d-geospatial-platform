@@ -208,7 +208,7 @@ export default function ArchitectureResearchPanel({
 
       {isOpen && (
         <div className="border-t border-slate-200">
-          <form onSubmit={submitFilters} className="grid gap-3 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-6 sm:px-6">
+          <form onSubmit={submitFilters} className="grid gap-3 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 sm:px-6">
             <label className="min-w-0 text-xs font-medium text-slate-700">
               Search styles, features, colours
               <input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
