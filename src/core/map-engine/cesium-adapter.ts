@@ -11,7 +11,7 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
-import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
+import { AHSAN_MANZIL_CAMERA, SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -104,7 +104,7 @@ type FeatureSelectionListener = (
   feature: MapFeatureSelection | null,
 ) => void;
 
-const INITIAL_CAMERA = SHAT_GOMBUJ_CAMERA;
+const INITIAL_CAMERA = AHSAN_MANZIL_CAMERA;
 
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
