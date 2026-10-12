@@ -82,6 +82,18 @@ jobs:
       - name: Test heritage model GLBs, parameters and map navigation
         run: npm run test:heritage-model
 
+      - name: Upload generated Ahsan Manzil GLB assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-generated-glb
+          path: |
+            public/models/ahsan-manzil-lod1.glb
+            public/models/ahsan-manzil-lod2.glb
+            public/models/ahsan-manzil-lod3.glb
+            public/models/ahsan-manzil.glb
+          if-no-files-found: error
+          retention-days: 2
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 

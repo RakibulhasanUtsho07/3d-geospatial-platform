@@ -91,10 +91,17 @@
         }
       },
       "modelAxes": {
-        "value": "GLB Y-up; +X east-west long axis; +Z south / river-front",
+        "value": "GLB Y-up; +X east-west long axis; +Z south / river-front face",
         "confidence": "[E]",
         "source": "Procedural model coordinate convention",
-        "note": "Cesium loader explicitly specifies upAxis=Y and forwardAxis=X. Exact azimuth still requires footprint measurement."
+        "note": "Cesium Model loader uses upAxis=Y and forwardAxis=Z. Exact azimuth remains to be measured from footprint imagery."
+      },
+      "facadeTreatment": {
+        "glazedDoorBayInterval": 4,
+        "confidence": "[E]",
+        "stoneInlayBandWidthMeters": 0.08,
+        "stoneInlayConfidence": "[?]",
+        "note": "Door bay placements and inlay width remain provisional."
       }
     }
   ]

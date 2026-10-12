@@ -65,7 +65,7 @@ test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provision
   assert.ok(mapCanvas.includes("SHAT_GOMBUJ_CAMERA_TARGET"));
   assert.ok(controls.includes("Fly to Ahsan Manzil"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
-  assert.ok(adapter.includes("forwardAxis: Cesium.Axis.X"));
+  assert.ok(adapter.includes("forwardAxis: Cesium.Axis.Z"));
 });
 
 test("camera-distance LOD selection follows tagged rendering thresholds", async () => {

@@ -297,6 +297,26 @@
         "confidence": "[E]",
         "source": "Procedural pediment proxy",
         "note": "Absolute top of the triangular pediment. Recalibrate against a rectified south facade."
+      },
+      "doorBayInterval": {
+        "value": 4,
+        "unit": "bays",
+        "confidence": "[E]",
+        "source": "Procedural modeling default until a rectified facade image is counted",
+        "note": "Every fourth exterior bay is treated as a glazed door in LOD2/LOD3; actual count and placement require photo calibration."
+      },
+      "stoneInlayBandWidth": {
+        "value": 0.08,
+        "unit": "m",
+        "confidence": "[?]",
+        "source": "Procedural placeholder for the stone inlay described in the heritage brief",
+        "note": "Band width and exact stone pattern are unknown; replace after close-up door photographs."
+      },
+      "doorGlazingPattern": {
+        "value": "simple multi-panel colored glazing with vertical center stile",
+        "confidence": "[?]",
+        "source": "Placeholder derived from documented colored-glass doors",
+        "note": "Do not treat panel count/color pattern as verified."
       }
     },
     "stair": {

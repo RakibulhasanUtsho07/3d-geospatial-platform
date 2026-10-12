@@ -537,7 +537,7 @@ export class CesiumAdapter implements MapEngine {
         // The procedural GLB is Y-up, with +X along the east-west long axis
         // and +Z toward the south / river-front facade.
         upAxis: Cesium.Axis.Y,
-        forwardAxis: Cesium.Axis.X,
+        forwardAxis: Cesium.Axis.Z,
       });
 
       if (

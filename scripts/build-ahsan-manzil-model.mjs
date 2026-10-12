@@ -28,6 +28,8 @@ const DIM = {
   porticoWidth: V("facade", "porticoWidth"),
   porticoDepth: V("facade", "porticoDepth"),
   pedimentPeak: V("facade", "pedimentPeakHeightAboveGround"),
+  doorBayInterval: V("facade", "doorBayInterval"),
+  stoneInlayBandWidth: V("facade", "stoneInlayBandWidth"),
   stairRun: V("stair", "runLength"),
   stairWidth: V("stair", "width"),
   stairRiser: V("stair", "riserHeight"),
@@ -136,7 +138,7 @@ function buildGlb(lod) {
       quad(node,p0,p1,p2,p3,key);
     }
   }
-  function fillFacadeArch(node, cx, base, surfaceZ, side, width, height, wallThickness, detail) {
+  function fillFacadeArch(node, cx, base, surfaceZ, side, width, height, wallThickness, detail, isDoor = false) {
     const radius=width/2,stem=height-radius,spring=base+stem;
     const glassZ=surfaceZ-side*(wallThickness-.09);
     box(node,cx,base+stem/2,glassZ,width,stem,.05,"glass");
@@ -169,6 +171,21 @@ function buildGlb(lod) {
       box(node,cx,base+stem*.52,mullionZ,.045,stem*.88,.04,"trim");
       box(node,cx,base+stem*.28,mullionZ,width*.82,.04,.04,"trim");
       box(node,cx,base+stem*.70,mullionZ,width*.82,.04,.04,"trim");
+    }
+    if(isDoor && detail>=1){
+      const inlay= DIM.stoneInlayBandWidth;
+      const stoneZ=surfaceZ+side*.07;
+      for(const jamb of [-1,1]){
+        box(node,cx+jamb*(radius+inlay/2+.08),base+stem/2,stoneZ,inlay,stem,.14,"marble");
+      }
+      box(node,cx,base+.045,stoneZ,width+2*(inlay+.08),.09,.16,"marble");
+      if(detail===2){
+        // Extra narrow divisions suggest coloured glazed door panels.
+        const paneW=width/3;
+        for(const j of [-1,1]){
+          box(node,cx+j*paneW,base+stem/2,stoneZ+side*.10,.035,stem*.9,.035,"trim");
+        }
+      }
     }
   }
   function fillFacetedArch(node,cx,base,cz,angle,width,height,wallDepth,detail){
@@ -223,7 +240,7 @@ function buildGlb(lod) {
           if(floor.height>floor.crown){
             box(node,cx,floor.base+floor.crown+(floor.height-floor.crown)/2,wallCenter,w,floor.height-floor.crown,thickness,"pink");
           }
-          fillFacadeArch(node,cx,floor.base,surface,side,w,floor.crown,thickness,lod===3?2:lod===2?1:0);
+          fillFacadeArch(node,cx,floor.base,surface,side,w,floor.crown,thickness,lod===3?2:lod===2?1:0,((i+1)%Math.max(1,Math.round(DIM.doorBayInterval))===0));
           if(lod===3 && i%2===0){
             const px=x0+(i+1)*pitch-.11;
             box(node,px,floor.base+floor.height/2,surface+side*.10,.22,floor.height-.18,.20,"trim");
@@ -385,7 +402,18 @@ function buildGlb(lod) {
 
   // Broad garden-to-river stair rises to the upper portal.
   const stair=byName.Stair_S,steps=lod===1?8:lod===2?20:DIM.stepCount;
-  const run=DIM.stairRun,stepDepth=run/steps,rise=ffBase/steps;
+  const run=DIM.stairRun;
+  const stepDepth=lod===3?DIM.stairTread:run/steps;
+  const rise=lod===3?DIM.stairRiser:ffBase/steps;
+  if(lod===3){
+    const modeledRun=steps*stepDepth,modeledRise=steps*rise;
+    if(Math.abs(modeledRun-run)>.05){
+      console.warn("[Heritage model] Stair tread total differs from runLength:",{modeledRun,run});
+    }
+    if(Math.abs(modeledRise-ffBase)>.05){
+      console.warn("[Heritage model] Stair riser total differs from the first-floor portal elevation:",{modeledRise,portalHeight:ffBase});
+    }
+  }
   for(let i=0;i<steps;i++){
     const top=(i+1)*rise,z=half+run-stepDepth*(i+.5);
     box(stair,domeX,top/2,z,DIM.stairWidth,top,stepDepth,"marble");
