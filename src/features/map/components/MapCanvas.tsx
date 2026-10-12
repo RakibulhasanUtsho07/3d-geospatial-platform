@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
-import { SHAT_GOMBUJ_CAMERA_TARGET, SHAT_GOMBUJ_CAMERA_ORIENTATION, AHSAN_MANZIL_GEOREFERENCE } from "@/core/geospatial/heritage-landmarks.mjs";
+import { AHSAN_MANZIL_CAMERA_TARGET, AHSAN_MANZIL_CAMERA_ORIENTATION } from "@/core/geospatial/heritage-landmarks.mjs";
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
@@ -159,19 +159,16 @@ export default function MapCanvas({
 
         setLayers(engine.getLayers());
 
-        /*
-         * Explicitly position the camera over Shat Gombuj Mosque after
-         * initialization. No San Francisco/debug target remains.
-         */
+        /* Open the map directly over Ahsan Manzil after viewer initialization. */
         engine.flyTo({
-          destination: SHAT_GOMBUJ_CAMERA_TARGET,
-          ...SHAT_GOMBUJ_CAMERA_ORIENTATION,
+          destination: AHSAN_MANZIL_CAMERA_TARGET,
+          ...AHSAN_MANZIL_CAMERA_ORIENTATION,
           durationMs: 800,
         });
 
         setStatus("ready");
 
-        console.info("[MapCanvas] Shat Gombuj Mosque map is ready.");
+        console.info("[MapCanvas] Ahsan Manzil 3D map is ready.");
       } catch (error: unknown) {
         console.error(
           "[MapCanvas] Map initialization failed:",
@@ -339,13 +336,13 @@ export default function MapCanvas({
     });
   }
 
-  function goHomeToShatGombuj() {
+  function goHomeToAhsanManzil() {
     engineRef.current?.setNavigationPath(null, null);
     setSelectedRoad(null);
     setSelectedProperty(null);
     engineRef.current?.flyTo({
-      destination: SHAT_GOMBUJ_CAMERA_TARGET,
-      ...SHAT_GOMBUJ_CAMERA_ORIENTATION,
+      destination: AHSAN_MANZIL_CAMERA_TARGET,
+      ...AHSAN_MANZIL_CAMERA_ORIENTATION,
       durationMs: 1000,
     });
   }
@@ -362,14 +359,8 @@ export default function MapCanvas({
     setSelectedPlace(null);
     setSelectedProperty(null);
     engine.flyTo({
-      destination: {
-        longitude: AHSAN_MANZIL_GEOREFERENCE.longitude,
-        latitude: AHSAN_MANZIL_GEOREFERENCE.latitude,
-        height: 700,
-      },
-      heading: 0,
-      pitch: -55,
-      roll: 0,
+      destination: AHSAN_MANZIL_CAMERA_TARGET,
+      ...AHSAN_MANZIL_CAMERA_ORIENTATION,
       durationMs: 1300,
     });
   }
@@ -584,7 +575,7 @@ export default function MapCanvas({
 
       <MapControls
         disabled={status !== "ready"}
-        onHome={goHomeToShatGombuj}
+        onHome={goHomeToAhsanManzil}
         onAhsanManzil={goToAhsanManzil}
         onZoomIn={() => cameraRef.current?.zoomIn()}
         onZoomOut={() => cameraRef.current?.zoomOut()}
@@ -603,7 +594,7 @@ export default function MapCanvas({
             <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
 
             <p className="text-sm font-medium text-white">
-              Loading Shat Gombuj 3D map
+              Loading Ahsan Manzil 3D map
             </p>
 
             <p className="mt-1 text-xs text-zinc-400">
