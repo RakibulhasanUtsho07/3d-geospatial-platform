@@ -53,4 +53,9 @@ test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provision
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
+  assert.match(adapter, /ahsan-manzil\\.manifest\\.json/);
+  const manifest = JSON.parse(await readFile(path.join(root, "public/models/ahsan-manzil.manifest.json"), "utf8"));
+  const entry = manifest.entries.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
+  assert.equal(entry.assets.default.uri, "/models/ahsan-manzil-lod3.glb");
+  assert.deepEqual(entry.nodes, requiredNodes);
 });

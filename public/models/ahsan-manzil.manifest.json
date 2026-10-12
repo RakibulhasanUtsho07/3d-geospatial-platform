@@ -1,0 +1,70 @@
+{
+  "manifestVersion": "1.0.0",
+  "schema": "3d-geospatial-platform/heritage-building-model",
+  "coordinateReferenceSystem": "EPSG:4326",
+  "entries": [
+    {
+      "id": "ahsan-manzil-kumartuli-dhaka",
+      "featureType": "heritage-building",
+      "displayName": "Ahsan Manzil (Pink Palace)",
+      "displayNameBn": "আহসান মঞ্জিল",
+      "location": {
+        "longitude": 90.40606,
+        "latitude": 23.7086,
+        "confidence": "[C]",
+        "note": "Provisional anchor supplied in heritage brief; use traced footprint centre for final placement."
+      },
+      "orientation": {
+        "longAxisAzimuthDegrees": 90,
+        "confidence": "[E]",
+        "note": "Approximate east-west orientation; confirm against imagery."
+      },
+      "units": "meters",
+      "localCoordinateFrame": {
+        "xAxis": "east",
+        "yAxis": "up",
+        "zAxis": "south / river-front",
+        "verticalDatum": "natural ground at 0 m"
+      },
+      "assets": {
+        "lod1": {
+          "uri": "/models/ahsan-manzil-lod1.glb",
+          "lod": 1,
+          "purpose": "massing"
+        },
+        "lod2": {
+          "uri": "/models/ahsan-manzil-lod2.glb",
+          "lod": 2,
+          "purpose": "roofline, parapet, dome and simplified facade detail"
+        },
+        "lod3": {
+          "uri": "/models/ahsan-manzil-lod3.glb",
+          "lod": 3,
+          "purpose": "detailed exterior facade"
+        },
+        "default": {
+          "uri": "/models/ahsan-manzil-lod3.glb",
+          "lod": 3
+        }
+      },
+      "nodes": [
+        "Plinth",
+        "Rangmahal_GF",
+        "Rangmahal_FF",
+        "Portico_S",
+        "Portico_N",
+        "Stair_S",
+        "Veranda_S",
+        "Veranda_N",
+        "Parapet",
+        "Dome_Drum",
+        "Dome",
+        "Finial",
+        "Andarmahal"
+      ],
+      "parameterConfig": "/data/heritage/ahsan-manzil.parameters.json",
+      "deviationReport": "/docs/heritage/ahsan-manzil-deviation-report.md",
+      "status": "provisional-not-survey-verified"
+    }
+  ]
+}

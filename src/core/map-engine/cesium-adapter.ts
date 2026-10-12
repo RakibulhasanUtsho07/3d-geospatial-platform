@@ -129,7 +129,6 @@ function isAbortError(error: unknown): boolean {
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
   private cesium: CesiumModule | null = null;
-  private heritageModel: import("cesium").Model | null = null;
 
   private baseImageryLayer:
     | import("cesium").ImageryLayer
@@ -398,6 +397,26 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
   ): Promise<void> {
     try {
+      const defaultModelUrl = "/models/ahsan-manzil-lod3.glb";
+      let modelUrl = defaultModelUrl;
+
+      // Prefer the platform manifest, but preserve map startup if it is unavailable.
+      try {
+        const response = await fetch("/models/ahsan-manzil.manifest.json");
+        if (response.ok) {
+          const manifest = await response.json() as {
+            entries?: Array<{ id?: string; assets?: { default?: { uri?: unknown } } }>;
+          };
+          const entry = manifest.entries?.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
+          const candidate = entry?.assets?.default?.uri;
+          if (typeof candidate === "string" && candidate.startsWith("/models/") && !candidate.includes("..")) {
+            modelUrl = candidate;
+          }
+        }
+      } catch {
+        // The default bundled GLB remains the fallback if the manifest request fails.
+      }
+
       const origin = Cesium.Cartesian3.fromDegrees(
         AHSAN_MANZIL_GEOREFERENCE.longitude,
         AHSAN_MANZIL_GEOREFERENCE.latitude,
@@ -405,7 +424,7 @@ export class CesiumAdapter implements MapEngine {
       );
       const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(origin);
       const model = await Cesium.Model.fromGltfAsync({
-        url: "/models/ahsan-manzil-lod3.glb",
+        url: modelUrl,
         modelMatrix,
       });
 
@@ -2724,7 +2743,6 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodBudget = null;
 
     this.baseImageryLayer = null;
-    this.heritageModel = null; // viewer.destroy() disposes scene primitives.
     this.roadRequestAbortController?.abort();
     this.roadRequestAbortController = null;
     this.activeRoadRequestKey = null;
