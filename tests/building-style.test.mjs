@@ -12,7 +12,7 @@ test("uses source-tagged facade and roof colours instead of random generic palet
     "facade_features": "symmetrical blue and yellow facade with balconies",
   }, "osm-way-42", 24);
 
-  assert.equal(style.facadeColor, "#2f6c96");
+  assert.equal(style.facadeColor, "#2F6C96");
   assert.equal(style.roofColor, "#d8b044");
   assert.equal(style.pattern, "painted-balcony");
   assert.equal(style.materialPattern, "brick");
@@ -51,5 +51,5 @@ test("normalizes common named source colour values", () => {
   }, "named-colour-building", 12);
 
   assert.equal(style.facadeColor, "#2f6c96");
-  assert.equal(style.roofColor, "#ffffff");
+  assert.equal(style.roofColor, "#FFFFFF");
 });
