@@ -141,7 +141,7 @@ test("builds temporary facade preview styles from researched architecture palett
   assert.equal(painted.pattern, "painted-balcony");
   assert.equal(painted.facadeColor, "#2F6C96");
   assert.equal(painted.materialPattern, "painted");
-  assert.equal(painted.windowBayCount, 3);
+  assert.equal(painted.windowBayCount, 4);
   assert.match(painted.id, /^research-preview-/);
 });
 
