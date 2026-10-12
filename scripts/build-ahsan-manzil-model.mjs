@@ -35,6 +35,7 @@ const DIM = {
   stepCount: V("stair", "stepCount"),
   peak: V("dome", "peakHeight"),
   drumHeight: V("dome", "drumHeight"),
+  finialHeight: V("dome", "finialHeight"),
   drumWidth: V("dome", "drumWidth"),
   drumOpeningCount: V("dome", "drumOpeningCount"),
   drumOpeningWidth: V("dome", "drumOpeningWidth"),
@@ -126,7 +127,7 @@ function buildGlb(lod) {
       quad(node,point(radius+thickness,a),point(radius+thickness,b),point(radius,b),point(radius,a),key);
     }
   }
-  function facetedArchBand(node, cx, cy, cz, angle, spring, radius, thickness, key, segments=12) {
+  function facetedArchBand(node, cx, cz, angle, spring, radius, thickness, key, segments=12) {
     const tx=-Math.sin(angle),tz=Math.cos(angle),nx=Math.cos(angle),nz=Math.sin(angle);
     for(let i=0;i<segments;i++){
       const a=Math.PI*i/segments,b=Math.PI*(i+1)/segments;
@@ -200,7 +201,7 @@ function buildGlb(lod) {
       box(node,ox,base+.06,oz,width+.16,.12,.12,"trim");
       box(node,cx+tx*(-radius-.05)+nx*.035,base+stem/2,cz+tz*(-radius-.05)+nz*.035,.1,stem,.12,"trim");
       box(node,cx+tx*(radius+.05)+nx*.035,base+stem/2,cz+tz*(radius+.05)+nz*.035,.1,stem,.12,"trim");
-      facetedArchBand(node,cx,base,cz,angle,spring,radius+.02,.085,"trim",detail===2?16:10);
+      facetedArchBand(node,cx,cz,angle,spring,radius+.02,.085,"trim",detail===2?16:10);
     }
   }
   function addFacadeSection(nodeName, x0, x1, bays, floors, lod) {
@@ -359,7 +360,7 @@ function buildGlb(lod) {
     if(lod===1){
       box(byName[name],domeX,gfBase+gfHeight/2,z,width,gfHeight,.5,"pink");
     }else{
-      const span=width/3,top=gfBase+DIM.facadePorticoHeight||gfBase+gfHeight;
+      const span=width/3;
       for(let i=0;i<=3;i++){
         const x=domeX-width/2+i*span;
         verticalCylinder(byName[name],x,gfBase,gfBase+gfHeight,faceZ,.25,"trim",12);
@@ -413,7 +414,6 @@ function buildGlb(lod) {
       verticalCylinder(n.Dome_Drum,vx,drumWallBottom,drumTop,vz,.12,"trim",8);
     }
   }
-  const domeBodyHeight=DIM.peak-DIM.roofline-DIM.drumHeight-DIM.finialHeight;
   const domeProfile=DIM.domeRings.map(([radius,height])=>[radius,height]);
   addDomeProfile(n.Dome,domeX,0,drumTop,domeProfile,lod===1?10:lod===2?18:28,"pink");
   if(lod===3){
