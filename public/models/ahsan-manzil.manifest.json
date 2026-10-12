@@ -12,7 +12,7 @@
         "longitude": 90.40606,
         "latitude": 23.7086,
         "confidence": "[C]",
-        "note": "Provisional anchor supplied in heritage brief; use traced footprint centre for final placement."
+        "note": "Supplied anchor agrees closely with Wikipedia's published coordinates but is not a traced footprint centroid; final placement remains [C]."
       },
       "orientation": {
         "longAxisAzimuthDegrees": 90,
@@ -84,6 +84,12 @@
             "confidence": "[E]"
           }
         }
+      },
+      "modelAxes": {
+        "value": "GLB Y-up; +X east-west long axis; +Z south / river-front",
+        "confidence": "[E]",
+        "source": "Procedural model coordinate convention",
+        "note": "Cesium loader explicitly specifies upAxis=Y and forwardAxis=X. Exact azimuth still requires footprint measurement."
       }
     }
   ]

@@ -11,7 +11,7 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
-import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE } from "../geospatial/heritage-landmarks.mjs";
+import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -528,6 +528,10 @@ export class CesiumAdapter implements MapEngine {
       model = await Cesium.Model.fromGltfAsync({
         url: modelUrl,
         modelMatrix,
+        // The procedural GLB is Y-up, with +X along the east-west long axis
+        // and +Z toward the south / river-front facade.
+        upAxis: Cesium.Axis.Y,
+        forwardAxis: Cesium.Axis.X,
       });
 
       if (

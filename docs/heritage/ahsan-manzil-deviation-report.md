@@ -21,7 +21,7 @@ Required GLB node names: `Plinth`, `Rangmahal_GF`, `Rangmahal_FF`, `Portico_S`, 
 - Units: meters. GLB local axes: X east-west, Y up, +Z south/river-front. Natural ground is Y=0; plinth top is Y=1.0 m.
 - The current anchor is 23.7086, 90.40606 [C]. It has **not** been proven to be the traced footprint centroid.
 - Long-axis rotation is approximately 90° [E]. It needs measurement from satellite/OSM geometry.
-- Model loads only when the view centre and camera height meet a distance threshold; it unloads after moving outside all thresholds. The threshold values are editable [E] parameters. LOD switching is functional in the adapter; browser/build validation is still required.
+- Model loads only when view-centre distance and camera height meet the selected LOD threshold; it unloads outside all thresholds. The loader explicitly aligns GLB Y-up and +X long axis to the georeferenced east-west model frame. The threshold values are editable [E] parameters. Browser/build validation is still required.
 
 ## Parameter register
 
@@ -112,3 +112,5 @@ Trace the footprint and centroid → measure the real long-axis azimuth → rect
 - **Ahsan Manzil — Bangladesh Parjatan Corporation** — https://parjatan.portal.gov.bd/pages/static-pages/6922ddbe933eb65569e16134
 - **Historic Mosque City of Bagerhat — UNESCO World Heritage Centre** — https://whc.unesco.org/en/list/321/
 - **Historic Mosque City of Bagerhat — UNESCO geographic information** — https://whc.unesco.org/document/216536
+- **Ahsan Manzil — Wikipedia** — https://en.wikipedia.org/wiki/Ahsan_Manzil — Coordinates near 23.7085972 N, 90.4060583 E agree closely with supplied anchor. Anchor still remains [C] until footprint polygon centroid is traced.
+- **A Palace on the River: Ahsan Manzil — The Daily Star, Adnan Zillur Morshed** — https://www.thedailystar.net/slow-reads/focus/news/palace-the-river-ahsan-manzil-1598293

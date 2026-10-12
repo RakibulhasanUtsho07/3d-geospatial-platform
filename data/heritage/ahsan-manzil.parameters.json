@@ -35,6 +35,27 @@
       "id": "unesco-coordinates",
       "title": "Historic Mosque City of Bagerhat — UNESCO geographic information",
       "url": "https://whc.unesco.org/document/216536"
+    },
+    {
+      "id": "wikipedia-ahsan-manzil",
+      "title": "Ahsan Manzil — Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Ahsan_Manzil",
+      "supports": [
+        "approximate site coordinate",
+        "east Rangmahal / west Andarmahal orientation",
+        "architectural form"
+      ],
+      "note": "Coordinates near 23.7085972 N, 90.4060583 E agree closely with supplied anchor. Anchor still remains [C] until footprint polygon centroid is traced."
+    },
+    {
+      "id": "daily-star-adnan-zillur-morshed",
+      "title": "A Palace on the River: Ahsan Manzil — The Daily Star, Adnan Zillur Morshed",
+      "url": "https://www.thedailystar.net/slow-reads/focus/news/palace-the-river-ahsan-manzil-1598293",
+      "supports": [
+        "architectural description",
+        "riverfront/site context",
+        "historic building form"
+      ]
     }
   ],
   "georeference": {
@@ -42,15 +63,15 @@
       "value": 23.7086,
       "unit": "degrees_north",
       "confidence": "[C]",
-      "source": "User-supplied anchor; alternate map listings conflict",
-      "note": "Shift to traced footprint centroid before calling final."
+      "source": "User-supplied anchor; Wikipedia coordinates (23.7085972 N, 90.4060583 E) agree closely; alternate listings reported in the brief conflict",
+      "note": "Retain [C] until the outline is traced and the origin is moved to the actual footprint centroid."
     },
     "longitude": {
       "value": 90.40606,
       "unit": "degrees_east",
       "confidence": "[C]",
-      "source": "User-supplied anchor; alternate map listings conflict",
-      "note": "Shift to traced footprint centroid before calling final."
+      "source": "User-supplied anchor; Wikipedia coordinates (23.7085972 N, 90.4060583 E) agree closely; alternate listings reported in the brief conflict",
+      "note": "Retain [C] until the outline is traced and the origin is moved to the actual footprint centroid."
     },
     "longAxisAzimuthDegrees": {
       "value": 90,
