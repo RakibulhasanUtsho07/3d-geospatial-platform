@@ -433,7 +433,7 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
-      this.heritageModel = viewer.scene.primitives.add(model);
+      viewer.scene.primitives.add(model);
       viewer.scene.requestRender();
       console.info("[Heritage] Ahsan Manzil LOD3 loaded at provisional [C] anchor.", {
         latitude: AHSAN_MANZIL_GEOREFERENCE.latitude,
