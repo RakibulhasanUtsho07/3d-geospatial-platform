@@ -183,14 +183,17 @@ export default function MapPage() {
   const selectedBuildingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    let assignments: BuildingStyleAssignment[] = [];
-    try {
-      assignments = parseSavedAssignments(window.localStorage.getItem(ASSIGNMENT_STORAGE_KEY));
-    } catch {
-      assignments = [];
-    }
-    setSavedAssignments(assignments);
-    setAssignmentsLoaded(true);
+    const frame = window.requestAnimationFrame(() => {
+      let assignments: BuildingStyleAssignment[] = [];
+      try {
+        assignments = parseSavedAssignments(window.localStorage.getItem(ASSIGNMENT_STORAGE_KEY));
+      } catch {
+        assignments = [];
+      }
+      setSavedAssignments(assignments);
+      setAssignmentsLoaded(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
