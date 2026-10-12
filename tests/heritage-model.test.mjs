@@ -59,6 +59,13 @@ test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provision
   const entry = manifest.entries.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
   assert.equal(entry.assets.default.uri, "/models/ahsan-manzil-lod3.glb");
   assert.deepEqual(entry.nodes, requiredNodes);
+  const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
+  const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
+  assert.ok(mapCanvas.includes("function goToAhsanManzil()"));
+  assert.ok(mapCanvas.includes("SHAT_GOMBUJ_CAMERA_TARGET"));
+  assert.ok(controls.includes("Fly to Ahsan Manzil"));
+  assert.ok(adapter.includes("selectAhsanManzilLod"));
+  assert.ok(adapter.includes("forwardAxis: Cesium.Axis.X"));
 });
 
 test("camera-distance LOD selection follows tagged rendering thresholds", async () => {

@@ -3,6 +3,7 @@
 type MapControlsProps = {
   disabled: boolean;
   onHome: () => void;
+  onAhsanManzil: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onRotateLeft: () => void;
@@ -42,6 +43,7 @@ function ControlButton({
 export default function MapControls({
   disabled,
   onHome,
+  onAhsanManzil,
   onZoomIn,
   onZoomOut,
   onRotateLeft,
@@ -117,6 +119,17 @@ export default function MapControls({
           onClick={onResetOrientation}
         />
       </div>
+
+      <button
+        type="button"
+        aria-label="Fly to Ahsan Manzil"
+        title="Fly to Ahsan Manzil"
+        disabled={disabled}
+        onClick={onAhsanManzil}
+        className="rounded-xl border border-white/10 bg-zinc-950/85 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-2xl backdrop-blur-xl transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Ahsan Manzil
+      </button>
     </div>
   );
 }

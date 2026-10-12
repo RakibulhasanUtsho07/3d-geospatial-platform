@@ -447,7 +447,13 @@ export class CesiumAdapter implements MapEngine {
       return;
     }
 
-    if (this.heritageModelLod === desiredLod && this.heritageModel) return;
+    if (this.heritageModelLod === desiredLod && this.heritageModel) {
+      if (this.heritageModelLoadingLod !== null) {
+        this.heritageModelLoadToken += 1;
+        this.heritageModelLoadingLod = null;
+      }
+      return;
+    }
     if (this.heritageModelLoadingLod === desiredLod) return;
 
     const loadToken = ++this.heritageModelLoadToken;
