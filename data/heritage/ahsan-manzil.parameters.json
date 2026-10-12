@@ -276,6 +276,27 @@
         "value": "dark rose/amber panels with simple mullions",
         "confidence": "[?]",
         "source": "Placeholder; exact pattern unknown"
+      },
+      "porticoWidth": {
+        "value": 16,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder until elevation is measured",
+        "note": "Width of the central projecting portico/pediment proxy."
+      },
+      "porticoDepth": {
+        "value": 4,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder until footprint/photo calibration",
+        "note": "Projection depth of the central portico."
+      },
+      "pedimentPeakHeightAboveGround": {
+        "value": 8.35,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural pediment proxy",
+        "note": "Absolute top of the triangular pediment. Recalibrate against a rectified south facade."
       }
     },
     "stair": {
@@ -307,6 +328,13 @@
         "value": "simple low side rails",
         "confidence": "[?]",
         "source": "Stylized placeholder"
+      },
+      "runLength": {
+        "value": 16,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder",
+        "note": "Horizontal garden run from the upper portal toward the river; not site-surveyed."
       }
     },
     "dome": {
@@ -345,6 +373,71 @@
         "confidence": "[V]",
         "source": "Supplied brief",
         "note": "Curvature and ribs remain stylized."
+      },
+      "drumOpeningCount": {
+        "value": 4,
+        "unit": "openings",
+        "confidence": "[?]",
+        "source": "Placeholder on north and south drum faces",
+        "note": "Two arched openings on each of the north and south drum faces; count needs elevation imagery."
+      },
+      "drumOpeningWidth": {
+        "value": 0.95,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder",
+        "note": "Width of each drum arch opening."
+      },
+      "drumOpeningCrownHeight": {
+        "value": 2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder",
+        "note": "Opening height to arch crown, pending elevation photo."
+      },
+      "profileRings": {
+        "value": [
+          [
+            6.9,
+            0
+          ],
+          [
+            6.7,
+            0.35
+          ],
+          [
+            6.1,
+            1.1
+          ],
+          [
+            5.4,
+            2
+          ],
+          [
+            4.55,
+            2.9
+          ],
+          [
+            3.55,
+            3.8
+          ],
+          [
+            2.55,
+            4.65
+          ],
+          [
+            1.55,
+            5.45
+          ],
+          [
+            0.28,
+            6.53
+          ]
+        ],
+        "unit": "[radius_m, height_above_dome_base_m] pairs",
+        "confidence": "[E]",
+        "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
+        "note": "Control points are illustrative; replace with samples from a rectified elevation photo."
       }
     },
     "materials": {

@@ -83,6 +83,11 @@
             "maxCameraHeightMeters": 2500,
             "confidence": "[E]"
           }
+        },
+        "modelGenerator": {
+          "script": "scripts/build-ahsan-manzil-model.mjs",
+          "command": "npm run build:heritage-model",
+          "status": "procedural source-controlled generator; photogrammetry/survey not claimed"
         }
       },
       "modelAxes": {
