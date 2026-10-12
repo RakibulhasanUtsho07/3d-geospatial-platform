@@ -11,7 +11,7 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
-import { SHAT_GOMBUJ_CAMERA } from "../geospatial/heritage-landmarks.mjs";
+import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -129,6 +129,7 @@ function isAbortError(error: unknown): boolean {
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
   private cesium: CesiumModule | null = null;
+  private heritageModel: import("cesium").Model | null = null;
 
   private baseImageryLayer:
     | import("cesium").ImageryLayer
@@ -246,6 +247,7 @@ export class CesiumAdapter implements MapEngine {
     });
 
     this.viewer = viewer;
+    this.addHeritageLandmarkMarkers(viewer, Cesium);
 
     // Set the default heritage landmark immediately; do not wait for building data.
     viewer.camera.setView({
@@ -296,8 +298,9 @@ export class CesiumAdapter implements MapEngine {
         this.handleCameraMoveEnd(viewer, Cesium);
       });
 
-    // Load a bounded vector road corridor layer independently from building LOD.
+    // Load road geometry and the heritage model in the background; keep map startup responsive.
     void this.loadRoadNetwork(viewer, Cesium);
+    void this.loadAhsanManzilModel(viewer, Cesium);
 
     viewer.scene.requestRender();
 
@@ -323,6 +326,107 @@ export class CesiumAdapter implements MapEngine {
         }
       },
     );
+  }
+
+
+  private addHeritageLandmarkMarkers(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): void {
+    viewer.entities.add({
+      id: "heritage-shat-gombuj-mosque",
+      position: Cesium.Cartesian3.fromDegrees(
+        SHAT_GOMBUJ_CAMERA.longitude,
+        SHAT_GOMBUJ_CAMERA.latitude,
+        4,
+      ),
+      point: {
+        pixelSize: 10,
+        color: Cesium.Color.fromCssColorString("#F59E0B"),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+      },
+      label: {
+        text: "Shat Gombuj Mosque · ষাট গম্বুজ মসজিদ",
+        font: "14px sans-serif",
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 3,
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 50000),
+      },
+      properties: {
+        heritageLandmarkId: "shat-gombuj-mosque",
+        confidence: "[V]",
+        source: "UNESCO published location",
+      },
+    });
+
+    viewer.entities.add({
+      id: "heritage-ahsan-manzil-model-anchor",
+      position: Cesium.Cartesian3.fromDegrees(
+        AHSAN_MANZIL_GEOREFERENCE.longitude,
+        AHSAN_MANZIL_GEOREFERENCE.latitude,
+        1,
+      ),
+      label: {
+        text: "Ahsan Manzil · provisional model anchor",
+        font: "13px sans-serif",
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        fillColor: Cesium.Color.fromCssColorString("#FFF7F7"),
+        outlineColor: Cesium.Color.fromCssColorString("#7F1D1D"),
+        outlineWidth: 3,
+        pixelOffset: new Cesium.Cartesian2(0, -16),
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 35000),
+      },
+      properties: {
+        heritageLandmarkId: "ahsan-manzil",
+        confidence: AHSAN_MANZIL_GEOREFERENCE.anchorConfidence,
+      },
+    });
+  }
+
+  private async loadAhsanManzilModel(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): Promise<void> {
+    try {
+      const origin = Cesium.Cartesian3.fromDegrees(
+        AHSAN_MANZIL_GEOREFERENCE.longitude,
+        AHSAN_MANZIL_GEOREFERENCE.latitude,
+        0,
+      );
+      const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(origin);
+      const model = await Cesium.Model.fromGltfAsync({
+        url: "/models/ahsan-manzil-lod3.glb",
+        modelMatrix,
+      });
+
+      if (this.viewer !== viewer || viewer.isDestroyed()) {
+        model.destroy();
+        return;
+      }
+
+      this.heritageModel = viewer.scene.primitives.add(model);
+      viewer.scene.requestRender();
+      console.info("[Heritage] Ahsan Manzil LOD3 loaded at provisional [C] anchor.", {
+        latitude: AHSAN_MANZIL_GEOREFERENCE.latitude,
+        longitude: AHSAN_MANZIL_GEOREFERENCE.longitude,
+        axisConfidence: AHSAN_MANZIL_GEOREFERENCE.axisConfidence,
+      });
+    } catch (error: unknown) {
+      console.warn(
+        "[Heritage] Ahsan Manzil model could not be loaded; the map remains usable.",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   private async loadOvertureBuildings(
@@ -2620,6 +2724,7 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodBudget = null;
 
     this.baseImageryLayer = null;
+    this.heritageModel = null; // viewer.destroy() disposes scene primitives.
     this.roadRequestAbortController?.abort();
     this.roadRequestAbortController = null;
     this.activeRoadRequestKey = null;
