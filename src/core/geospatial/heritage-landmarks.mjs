@@ -13,6 +13,26 @@ export const SHAT_GOMBUJ_CAMERA = Object.freeze({
   ...SHAT_GOMBUJ_CAMERA_TARGET,
   ...SHAT_GOMBUJ_CAMERA_ORIENTATION,
 });
+
+/**
+ * Default landing camera for the map. The anchor is provisional until the
+ * actual building footprint is traced against verified imagery.
+ */
+export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
+  longitude: 90.40606,
+  latitude: 23.70860,
+  height: 700,
+});
+export const AHSAN_MANZIL_CAMERA_ORIENTATION = Object.freeze({
+  heading: 0,
+  pitch: -55,
+  roll: 0,
+});
+export const AHSAN_MANZIL_CAMERA = Object.freeze({
+  ...AHSAN_MANZIL_CAMERA_TARGET,
+  ...AHSAN_MANZIL_CAMERA_ORIENTATION,
+});
+
 export const AHSAN_MANZIL_GEOREFERENCE = Object.freeze({
   longitude: 90.40606,
   latitude: 23.70860,
