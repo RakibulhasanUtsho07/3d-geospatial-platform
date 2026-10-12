@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
+import { SHAT_GOMBUJ_CAMERA_TARGET, SHAT_GOMBUJ_CAMERA_ORIENTATION } from "@/core/geospatial/heritage-landmarks.mjs";
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
@@ -40,18 +41,6 @@ interface MapCanvasProps {
   styleAssignments?: BuildingStyleAssignment[];
   onStylePreviewResult?: (applied: boolean, request: StylePreviewRequest) => void;
 }
-
-const DHAKA_CAMERA_TARGET = {
-  longitude: 90.41,
-  latitude: 23.78,
-  height: 950,
-};
-
-const DHAKA_CAMERA_ORIENTATION = {
-  heading: 0,
-  pitch: -55,
-  roll: 0,
-};
 
 export default function MapCanvas({
   onSelectedFeatureChange,
@@ -171,18 +160,18 @@ export default function MapCanvas({
         setLayers(engine.getLayers());
 
         /*
-         * Explicitly position the camera over Dhaka after
+         * Explicitly position the camera over Shat Gombuj Mosque after
          * initialization. No San Francisco/debug target remains.
          */
         engine.flyTo({
-          destination: DHAKA_CAMERA_TARGET,
-          ...DHAKA_CAMERA_ORIENTATION,
+          destination: SHAT_GOMBUJ_CAMERA_TARGET,
+          ...SHAT_GOMBUJ_CAMERA_ORIENTATION,
           durationMs: 800,
         });
 
         setStatus("ready");
 
-        console.info("[MapCanvas] Dhaka map is ready.");
+        console.info("[MapCanvas] Shat Gombuj Mosque map is ready.");
       } catch (error: unknown) {
         console.error(
           "[MapCanvas] Map initialization failed:",
@@ -350,13 +339,13 @@ export default function MapCanvas({
     });
   }
 
-  function goHomeToDhaka() {
+  function goHomeToShatGombuj() {
     engineRef.current?.setNavigationPath(null, null);
     setSelectedRoad(null);
     setSelectedProperty(null);
     engineRef.current?.flyTo({
-      destination: DHAKA_CAMERA_TARGET,
-      ...DHAKA_CAMERA_ORIENTATION,
+      destination: SHAT_GOMBUJ_CAMERA_TARGET,
+      ...SHAT_GOMBUJ_CAMERA_ORIENTATION,
       durationMs: 1000,
     });
   }
@@ -571,7 +560,7 @@ export default function MapCanvas({
 
       <MapControls
         disabled={status !== "ready"}
-        onHome={goHomeToDhaka}
+        onHome={goHomeToShatGombuj}
         onZoomIn={() => cameraRef.current?.zoomIn()}
         onZoomOut={() => cameraRef.current?.zoomOut()}
         onRotateLeft={() => cameraRef.current?.rotateLeft()}

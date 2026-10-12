@@ -11,6 +11,7 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
+import { SHAT_GOMBUJ_CAMERA } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -103,14 +104,7 @@ type FeatureSelectionListener = (
   feature: MapFeatureSelection | null,
 ) => void;
 
-const DHAKA_CAMERA = {
-  longitude: 90.41,
-  latitude: 23.78,
-  height: 950,
-  heading: 0,
-  pitch: -55,
-  roll: 0,
-};
+const INITIAL_CAMERA = SHAT_GOMBUJ_CAMERA;
 
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
@@ -253,17 +247,17 @@ export class CesiumAdapter implements MapEngine {
 
     this.viewer = viewer;
 
-    // Set Dhaka immediately. Do not wait for any building data.
+    // Set the default heritage landmark immediately; do not wait for building data.
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(
-        DHAKA_CAMERA.longitude,
-        DHAKA_CAMERA.latitude,
-        DHAKA_CAMERA.height,
+        INITIAL_CAMERA.longitude,
+        INITIAL_CAMERA.latitude,
+        INITIAL_CAMERA.height,
       ),
       orientation: {
-        heading: Cesium.Math.toRadians(DHAKA_CAMERA.heading),
-        pitch: Cesium.Math.toRadians(DHAKA_CAMERA.pitch),
-        roll: Cesium.Math.toRadians(DHAKA_CAMERA.roll),
+        heading: Cesium.Math.toRadians(INITIAL_CAMERA.heading),
+        pitch: Cesium.Math.toRadians(INITIAL_CAMERA.pitch),
+        roll: Cesium.Math.toRadians(INITIAL_CAMERA.roll),
       },
     });
 
@@ -795,8 +789,8 @@ export class CesiumAdapter implements MapEngine {
       ({ west, south, east, north } = viewBounds);
     } else {
       const centre = this.getGroundCenter() ?? {
-        longitude: DHAKA_CAMERA.longitude,
-        latitude: DHAKA_CAMERA.latitude,
+        longitude: INITIAL_CAMERA.longitude,
+        latitude: INITIAL_CAMERA.latitude,
         height: 0,
       };
       west = centre.longitude - 0.015;

@@ -1,0 +1,403 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ahsan-manzil-kumartuli-dhaka",
+  "name": "Ahsan Manzil (Pink Palace)",
+  "status": "provisional-parametric-exterior-model",
+  "units": "meters",
+  "confidenceLegend": {
+    "[V]": "Verified in published heritage/tourism sources listed below.",
+    "[C]": "Conflicting sources; resolve with footprint trace or imagery.",
+    "[E]": "Estimate/placeholder; retain as an editable parameter.",
+    "[?]": "Unknown; default exists only to keep the model buildable."
+  },
+  "sources": [
+    {
+      "id": "tourism-board",
+      "title": "Ahsan Manzil — Bangladesh Tourism Board",
+      "url": "https://beautifulbangladesh.gov.bd/cat/heritage/3"
+    },
+    {
+      "id": "tourism-dome",
+      "title": "Ahsan Manzil: an aristocracy of the ancient era — Bangladesh Tourism Board",
+      "url": "https://beautifulbangladesh.gov.bd/newsletter/single/479"
+    },
+    {
+      "id": "parjatan",
+      "title": "Ahsan Manzil — Bangladesh Parjatan Corporation",
+      "url": "https://parjatan.portal.gov.bd/pages/static-pages/6922ddbe933eb65569e16134"
+    },
+    {
+      "id": "unesco",
+      "title": "Historic Mosque City of Bagerhat — UNESCO World Heritage Centre",
+      "url": "https://whc.unesco.org/en/list/321/"
+    },
+    {
+      "id": "unesco-coordinates",
+      "title": "Historic Mosque City of Bagerhat — UNESCO geographic information",
+      "url": "https://whc.unesco.org/document/216536"
+    }
+  ],
+  "georeference": {
+    "latitude": {
+      "value": 23.7086,
+      "unit": "degrees_north",
+      "confidence": "[C]",
+      "source": "User-supplied anchor; alternate map listings conflict",
+      "note": "Shift to traced footprint centroid before calling final."
+    },
+    "longitude": {
+      "value": 90.40606,
+      "unit": "degrees_east",
+      "confidence": "[C]",
+      "source": "User-supplied anchor; alternate map listings conflict",
+      "note": "Shift to traced footprint centroid before calling final."
+    },
+    "longAxisAzimuthDegrees": {
+      "value": 90,
+      "unit": "degrees",
+      "confidence": "[E]",
+      "source": "Approximate east-west direction in supplied brief",
+      "note": "Measure from satellite/OSM imagery."
+    },
+    "axes": {
+      "value": "X east-west; Y up; +Z south / river-front",
+      "confidence": "[E]",
+      "source": "Local model coordinate convention"
+    },
+    "riverFacade": {
+      "value": "south",
+      "confidence": "[V]",
+      "source": "Bangladesh Tourism Board and supplied brief"
+    },
+    "rearFacade": {
+      "value": "north",
+      "confidence": "[V]",
+      "source": "Supplied brief"
+    },
+    "units": {
+      "value": "meters",
+      "confidence": "[V]",
+      "source": "User request"
+    }
+  },
+  "parameters": {
+    "footprint": {
+      "overallLength": {
+        "value": 125.4,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Bangladesh Tourism Board / Parjatan",
+        "note": "Working dimension pending footprint trace."
+      },
+      "overallDepth": {
+        "value": 28.75,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Bangladesh Tourism Board",
+        "note": "Working dimension; resolve against satellite/plan."
+      },
+      "rangmahalBlockLength": {
+        "value": 55.8,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "183 ft hypothesis in supplied brief",
+        "note": "Assumes this dimension is the eastern dome block."
+      },
+      "andarmahalBlockLength": {
+        "value": 69.6,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "125.4 m minus 55.8 m",
+        "note": "Derived remainder, not independently surveyed."
+      },
+      "interiorGridEW": {
+        "value": 4,
+        "unit": "bays",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Recorded separately; not treated as exterior opening count."
+      },
+      "interiorGridNS": {
+        "value": 5,
+        "unit": "bays",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Recorded separately; not treated as exterior opening count."
+      },
+      "exteriorBayCount": {
+        "value": 24,
+        "unit": "bays per long facade",
+        "confidence": "[E]",
+        "source": "Procedural placeholder",
+        "note": "Replace by counting openings on rectified elevation photos."
+      },
+      "averageBayPitch": {
+        "value": 5.225,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "125.4 m / 24 estimated bays",
+        "note": "Section pitch differs slightly to fit assumed Rangmahal/Andarmahal split."
+      }
+    },
+    "vertical": {
+      "naturalGround": {
+        "value": 0,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Supplied coordinate convention"
+      },
+      "plinthHeight": {
+        "value": 1,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "alternatePlinth": {
+        "value": 1.2,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Alternative value in supplied brief",
+        "note": "Not used in current model."
+      },
+      "groundFloorClearHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "firstFloorClearHeight": {
+        "value": 5.8,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "slabThickness": {
+        "value": 0.4,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "wallThickness": {
+        "value": 0.78,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board",
+        "note": "Used as facade reveal-depth proxy."
+      },
+      "parapetHeight": {
+        "value": 1,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "rooflineHeight": {
+        "value": 13.6,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Calculated vertical stack including slabs and parapet",
+        "note": "Derived, not surveyed."
+      },
+      "porticoHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board"
+      }
+    },
+    "facade": {
+      "openingsHead": {
+        "value": "semicircular arches",
+        "confidence": "[V]",
+        "source": "Supplied brief"
+      },
+      "gfOpeningWidth": {
+        "value": 1.2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "gfOpeningCrownHeight": {
+        "value": 3.2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "ffOpeningWidth": {
+        "value": 1.3,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "ffOpeningCrownHeight": {
+        "value": 3.8,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "verandaArchSpan": {
+        "value": 3.3,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Midpoint of supplied 3.0–3.5 m range"
+      },
+      "pilasterOrder": {
+        "value": "simplified Corinthian-type",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Fine capital and fluting geometry simplified."
+      },
+      "capitalFluting": {
+        "value": "smooth simplified capital",
+        "confidence": "[?]",
+        "source": "Placeholder; needs close-up"
+      },
+      "coloredGlazing": {
+        "value": "dark rose/amber panels with simple mullions",
+        "confidence": "[?]",
+        "source": "Placeholder; exact pattern unknown"
+      }
+    },
+    "stair": {
+      "riserHeight": {
+        "value": 0.16,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "treadDepth": {
+        "value": 0.4,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder"
+      },
+      "stepCount": {
+        "value": 40,
+        "unit": "steps",
+        "confidence": "[?]",
+        "source": "Derived from 6.4 m rise / 0.16 m riser"
+      },
+      "width": {
+        "value": 12,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Portal-width approximation"
+      },
+      "sideRail": {
+        "value": "simple low side rails",
+        "confidence": "[?]",
+        "source": "Stylized placeholder"
+      }
+    },
+    "dome": {
+      "peakHeight": {
+        "value": 27.13,
+        "unit": "m above ground",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board heritage newsletter"
+      },
+      "drumHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied placeholder"
+      },
+      "bodyHeight": {
+        "value": 6.53,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Derived to meet 27.13 m peak with 13.6 m roofline and 2 m finial"
+      },
+      "finialHeight": {
+        "value": 2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied placeholder"
+      },
+      "drumWidth": {
+        "value": 14,
+        "unit": "m",
+        "confidence": "[?]",
+        "source": "Placeholder; calibrate from elevation photo"
+      },
+      "profile": {
+        "value": "square base room → octagonal drum → lotus-bud dome → finial",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Curvature and ribs remain stylized."
+      }
+    },
+    "materials": {
+      "facadePink": {
+        "value": "#E7A3AE",
+        "confidence": "[E]",
+        "source": "Supplied placeholder",
+        "note": "Not sampled from color-managed daylight photography."
+      },
+      "trimOffWhite": {
+        "value": "#F4EDE0",
+        "confidence": "[E]",
+        "source": "Supplied placeholder"
+      },
+      "glass": {
+        "value": "#583943",
+        "confidence": "[?]",
+        "source": "Generic dark glazing proxy"
+      },
+      "roof": {
+        "value": "#D28E98",
+        "confidence": "[?]",
+        "source": "Placeholder; roof covering material unknown"
+      },
+      "verandaFloor": {
+        "value": "#EFE6D5",
+        "confidence": "[V]",
+        "source": "Supplied brief; light marble proxy"
+      }
+    },
+    "roof": {
+      "covering": {
+        "value": "flat roof behind parapet; covering material unknown",
+        "confidence": "[?]",
+        "source": "Supplied brief"
+      },
+      "structure": {
+        "value": "timber/iron beams, interior only",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Not included in exterior mesh."
+      }
+    }
+  },
+  "modelAssets": {
+    "lod1": "/models/ahsan-manzil-lod1.glb",
+    "lod2": "/models/ahsan-manzil-lod2.glb",
+    "lod3": "/models/ahsan-manzil-lod3.glb",
+    "defaultRuntimeAsset": "/models/ahsan-manzil-lod3.glb",
+    "units": "meters",
+    "note": "Provisional procedural geometry, not photogrammetry/survey."
+  },
+  "requiredNodeNames": [
+    "Plinth",
+    "Rangmahal_GF",
+    "Rangmahal_FF",
+    "Portico_S",
+    "Portico_N",
+    "Stair_S",
+    "Veranda_S",
+    "Veranda_N",
+    "Parapet",
+    "Dome_Drum",
+    "Dome",
+    "Finial",
+    "Andarmahal"
+  ],
+  "calibrationBacklog": [
+    "Trace OSM/satellite footprint and shift origin to footprint centre.",
+    "Measure the exact long-axis azimuth.",
+    "Rectify south elevation using 5.0 m / 5.8 m floor heights and 27.13 m dome peak.",
+    "Recount facade openings; revise estimated bay count/pitch and opening dimensions.",
+    "Calibrate drum width, dome profile, portico width and staircase.",
+    "Sample pink and trim colors from daylight photos.",
+    "Replace generic east/west elevations, glazing and capital details from photos."
+  ]
+}
