@@ -106,6 +106,14 @@ type FeatureSelectionListener = (
 
 const INITIAL_CAMERA = SHAT_GOMBUJ_CAMERA;
 
+// Only load the heritage building when the user is close enough for the model
+// to be visible/useful. Distances are view-centre to the provisional anchor.
+const HERITAGE_LOD_THRESHOLDS = Object.freeze({
+  lod3: { maxDistanceMeters: 2_000, maxCameraHeightMeters: 2_500 },
+  lod2: { maxDistanceMeters: 6_500, maxCameraHeightMeters: 8_000 },
+  lod1: { maxDistanceMeters: 18_000, maxCameraHeightMeters: 20_000 },
+});
+
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
 
@@ -129,6 +137,12 @@ function isAbortError(error: unknown): boolean {
 export class CesiumAdapter implements MapEngine {
   private viewer: CesiumViewer | null = null;
   private cesium: CesiumModule | null = null;
+  private heritageModel: import("cesium").Model | null = null;
+  private heritageModelLod: 1 | 2 | 3 | null = null;
+  private heritageModelLoadingLod: 1 | 2 | 3 | null = null;
+  private heritageModelLoadToken = 0;
+  private heritageManifestAssets: Record<string, string> | null = null;
+  private heritageManifestPromise: Promise<Record<string, string>> | null = null;
 
   private baseImageryLayer:
     | import("cesium").ImageryLayer
@@ -297,9 +311,9 @@ export class CesiumAdapter implements MapEngine {
         this.handleCameraMoveEnd(viewer, Cesium);
       });
 
-    // Load road geometry and the heritage model in the background; keep map startup responsive.
+    // Start without the distant Old Dhaka mesh; evaluate it against the current view.
+    this.updateHeritageModelLod(viewer, Cesium);
     void this.loadRoadNetwork(viewer, Cesium);
-    void this.loadAhsanManzilModel(viewer, Cesium);
 
     viewer.scene.requestRender();
 
@@ -392,30 +406,138 @@ export class CesiumAdapter implements MapEngine {
     });
   }
 
+
+  private getHeritageModelLod(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): 1 | 2 | 3 | null {
+    const groundCenter = this.getGroundCenter();
+    const cameraPosition = viewer.camera.positionCartographic;
+    const center = groundCenter ?? {
+      longitude: Cesium.Math.toDegrees(cameraPosition.longitude),
+      latitude: Cesium.Math.toDegrees(cameraPosition.latitude),
+      height: 0,
+    };
+    const height = cameraPosition.height;
+
+    const viewPoint = Cesium.Cartesian3.fromDegrees(
+      center.longitude,
+      center.latitude,
+      0,
+    );
+    const anchor = Cesium.Cartesian3.fromDegrees(
+      AHSAN_MANZIL_GEOREFERENCE.longitude,
+      AHSAN_MANZIL_GEOREFERENCE.latitude,
+      0,
+    );
+    const distanceMeters = Cesium.Cartesian3.distance(viewPoint, anchor);
+
+    if (
+      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod3.maxDistanceMeters &&
+      height <= HERITAGE_LOD_THRESHOLDS.lod3.maxCameraHeightMeters
+    ) return 3;
+    if (
+      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod2.maxDistanceMeters &&
+      height <= HERITAGE_LOD_THRESHOLDS.lod2.maxCameraHeightMeters
+    ) return 2;
+    if (
+      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod1.maxDistanceMeters &&
+      height <= HERITAGE_LOD_THRESHOLDS.lod1.maxCameraHeightMeters
+    ) return 1;
+    return null;
+  }
+
+  private updateHeritageModelLod(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): void {
+    if (this.viewer !== viewer || viewer.isDestroyed()) return;
+
+    const desiredLod = this.getHeritageModelLod(viewer, Cesium);
+    if (desiredLod === null) {
+      // Invalidate in-flight loads before removing the currently visible model.
+      this.heritageModelLoadToken += 1;
+      this.heritageModelLoadingLod = null;
+      if (this.heritageModel) {
+        viewer.scene.primitives.remove(this.heritageModel);
+        this.heritageModel = null;
+        this.heritageModelLod = null;
+        viewer.scene.requestRender();
+      }
+      return;
+    }
+
+    if (this.heritageModelLod === desiredLod && this.heritageModel) return;
+    if (this.heritageModelLoadingLod === desiredLod) return;
+
+    const loadToken = ++this.heritageModelLoadToken;
+    this.heritageModelLoadingLod = desiredLod;
+    void this.loadAhsanManzilModel(viewer, Cesium, desiredLod, loadToken);
+  }
+
+  private async getHeritageManifestAssets(): Promise<Record<string, string>> {
+    if (this.heritageManifestAssets) return this.heritageManifestAssets;
+    if (this.heritageManifestPromise) return this.heritageManifestPromise;
+
+    this.heritageManifestPromise = (async () => {
+      const fallback: Record<string, string> = {
+        "1": "/models/ahsan-manzil-lod1.glb",
+        "2": "/models/ahsan-manzil-lod2.glb",
+        "3": "/models/ahsan-manzil-lod3.glb",
+      };
+      try {
+        const response = await fetch("/models/ahsan-manzil.manifest.json");
+        if (!response.ok) return fallback;
+        const manifest = await response.json() as {
+          entries?: Array<{
+            id?: string;
+            assets?: Record<string, { uri?: unknown; lod?: unknown }>;
+          }>;
+        };
+        const entry = manifest.entries?.find(
+          (item) => item.id === "ahsan-manzil-kumartuli-dhaka",
+        );
+        if (!entry?.assets) return fallback;
+
+        const result = { ...fallback };
+        for (const key of ["lod1", "lod2", "lod3", "default"]) {
+          const asset = entry.assets[key];
+          if (
+            asset &&
+            typeof asset.uri === "string" &&
+            asset.uri.startsWith("/models/") &&
+            !asset.uri.includes("..")
+          ) {
+            const lod = key === "default" ? 3 : Number(key.slice(3));
+            result[String(lod)] = asset.uri;
+          }
+        }
+        this.heritageManifestAssets = result;
+        return result;
+      } catch {
+        return fallback;
+      }
+    })();
+
+    try {
+      const assets = await this.heritageManifestPromise;
+      this.heritageManifestAssets = assets;
+      return assets;
+    } finally {
+      this.heritageManifestPromise = null;
+    }
+  }
+
   private async loadAhsanManzilModel(
     viewer: CesiumViewer,
     Cesium: CesiumModule,
+    lod: 1 | 2 | 3,
+    loadToken: number,
   ): Promise<void> {
+    let model: import("cesium").Model | null = null;
     try {
-      const defaultModelUrl = "/models/ahsan-manzil-lod3.glb";
-      let modelUrl = defaultModelUrl;
-
-      // Prefer the platform manifest, but preserve map startup if it is unavailable.
-      try {
-        const response = await fetch("/models/ahsan-manzil.manifest.json");
-        if (response.ok) {
-          const manifest = await response.json() as {
-            entries?: Array<{ id?: string; assets?: { default?: { uri?: unknown } } }>;
-          };
-          const entry = manifest.entries?.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
-          const candidate = entry?.assets?.default?.uri;
-          if (typeof candidate === "string" && candidate.startsWith("/models/") && !candidate.includes("..")) {
-            modelUrl = candidate;
-          }
-        }
-      } catch {
-        // The default bundled GLB remains the fallback if the manifest request fails.
-      }
+      const assets = await this.getHeritageManifestAssets();
+      const modelUrl = assets[String(lod)] ?? "/models/ahsan-manzil-lod3.glb";
 
       const origin = Cesium.Cartesian3.fromDegrees(
         AHSAN_MANZIL_GEOREFERENCE.longitude,
@@ -423,24 +545,40 @@ export class CesiumAdapter implements MapEngine {
         0,
       );
       const modelMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(origin);
-      const model = await Cesium.Model.fromGltfAsync({
+      model = await Cesium.Model.fromGltfAsync({
         url: modelUrl,
         modelMatrix,
       });
 
-      if (this.viewer !== viewer || viewer.isDestroyed()) {
-        model.destroy();
+      if (
+        this.viewer !== viewer ||
+        viewer.isDestroyed() ||
+        loadToken !== this.heritageModelLoadToken
+      ) {
+        if (model && !model.isDestroyed()) model.destroy();
         return;
       }
 
+      if (this.heritageModel) {
+        viewer.scene.primitives.remove(this.heritageModel);
+      }
       viewer.scene.primitives.add(model);
+      this.heritageModel = model;
+      this.heritageModelLod = lod;
+      this.heritageModelLoadingLod = null;
       viewer.scene.requestRender();
-      console.info("[Heritage] Ahsan Manzil LOD3 loaded at provisional [C] anchor.", {
+      console.info("[Heritage] Ahsan Manzil LOD loaded at provisional [C] anchor.", {
+        lod,
+        modelUrl,
         latitude: AHSAN_MANZIL_GEOREFERENCE.latitude,
         longitude: AHSAN_MANZIL_GEOREFERENCE.longitude,
         axisConfidence: AHSAN_MANZIL_GEOREFERENCE.axisConfidence,
       });
     } catch (error: unknown) {
+      if (loadToken === this.heritageModelLoadToken) {
+        this.heritageModelLoadingLod = null;
+      }
+      if (model && !model.isDestroyed()) model.destroy();
       console.warn(
         "[Heritage] Ahsan Manzil model could not be loaded; the map remains usable.",
         error instanceof Error ? error.message : String(error),
@@ -1313,6 +1451,8 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
   ): void {
     if (this.viewer !== viewer || viewer.isDestroyed()) return;
+
+    this.updateHeritageModelLod(viewer, Cesium);
 
     if (this.isLayerVisible(MAP_LAYER_IDS.roads)) {
       void this.loadRoadNetwork(viewer, Cesium);
@@ -2710,6 +2850,12 @@ export class CesiumAdapter implements MapEngine {
 
   destroy(): void {
     this.restoreSelectedBuilding();
+    this.heritageModelLoadToken += 1;
+    this.heritageModel = null;
+    this.heritageModelLod = null;
+    this.heritageModelLoadingLod = null;
+    this.heritageManifestAssets = null;
+    this.heritageManifestPromise = null;
 
     // Prevent requests from surviving a retry or component unmount.
     this.viewportRequestAbortController?.abort();
