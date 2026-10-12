@@ -46,12 +46,16 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
   }
 });
 
-test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provisional anchor", async () => {
+test("the map opens at Ahsan Manzil and retains both heritage landmark anchors", async () => {
   const landmarks = await readFile(path.join(root, "src/core/geospatial/heritage-landmarks.mjs"), "utf8");
+  assert.match(landmarks, /export const AHSAN_MANZIL_CAMERA_TARGET/);
+  assert.match(landmarks, /longitude: 90\.40606/);
+  assert.match(landmarks, /latitude: 23\.70860/);
   assert.match(landmarks, /longitude: 89\.7417917/);
   assert.match(landmarks, /latitude: 22\.6744861/);
   assert.match(landmarks, /anchorConfidence: "\[C\]"/);
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
+  assert.match(adapter, /const INITIAL_CAMERA = AHSAN_MANZIL_CAMERA/);
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
   assert.ok(adapter.includes("ahsan-manzil.manifest.json"));
@@ -62,12 +66,13 @@ test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provision
   const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
   const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
   assert.ok(mapCanvas.includes("function goToAhsanManzil()"));
-  assert.ok(mapCanvas.includes("SHAT_GOMBUJ_CAMERA_TARGET"));
+  assert.ok(mapCanvas.includes("AHSAN_MANZIL_CAMERA_TARGET"));
+  assert.ok(mapCanvas.includes("function goHomeToAhsanManzil()"));
+  assert.ok(mapCanvas.includes("Loading Ahsan Manzil 3D map"));
   assert.ok(controls.includes("Fly to Ahsan Manzil"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
   assert.ok(adapter.includes("forwardAxis: Cesium.Axis.Z"));
 });
-
 test("camera-distance LOD selection follows tagged rendering thresholds", async () => {
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   const p = config.parameters.runtimeLod;
