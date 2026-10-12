@@ -76,6 +76,12 @@ jobs:
       - name: Test source-derived building facade styles
         run: npm run test:building-style
 
+      - name: Generate parametric Ahsan Manzil LOD assets
+        run: npm run build:heritage-model
+
+      - name: Test heritage model GLBs, parameters and map navigation
+        run: npm run test:heritage-model
+
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles
 
