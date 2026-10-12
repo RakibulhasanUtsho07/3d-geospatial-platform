@@ -2,7 +2,6 @@ const MIN_SPAN_DEGREES = 0.0005;
 const MAX_SPAN_DEGREES = 0.05;
 const MAX_ROAD_FEATURES = 1200;
 const DEFAULT_ROAD_FEATURES = 900;
-const EARTH_RADIUS_METERS = 6_371_008.8;
 
 const ROAD_WIDTHS = Object.freeze({
   motorway: 11,
