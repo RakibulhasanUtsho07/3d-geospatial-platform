@@ -483,7 +483,7 @@ export default function ArchitectureResearchPanel({
                           : "Apply & save to this building"}
                     </button>
                     <button type="button" disabled={!canPreview || !assignableFacade}
-                      onClick={() => previewReference(reference)
+                      onClick={() => previewReference(reference)}
                       title={!assignableFacade ? "This source is useful for city/street context, not as a single-building facade preview." : undefined}
                       className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
                       Preview temporarily
