@@ -106,14 +106,6 @@ type FeatureSelectionListener = (
 
 const INITIAL_CAMERA = SHAT_GOMBUJ_CAMERA;
 
-// Only load the heritage building when the user is close enough for the model
-// to be visible/useful. Distances are view-centre to the provisional anchor.
-const HERITAGE_LOD_THRESHOLDS = Object.freeze({
-  lod3: { maxDistanceMeters: 2_000, maxCameraHeightMeters: 2_500 },
-  lod2: { maxDistanceMeters: 6_500, maxCameraHeightMeters: 8_000 },
-  lod1: { maxDistanceMeters: 18_000, maxCameraHeightMeters: 20_000 },
-});
-
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
 
@@ -432,19 +424,7 @@ export class CesiumAdapter implements MapEngine {
     );
     const distanceMeters = Cesium.Cartesian3.distance(viewPoint, anchor);
 
-    if (
-      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod3.maxDistanceMeters &&
-      height <= HERITAGE_LOD_THRESHOLDS.lod3.maxCameraHeightMeters
-    ) return 3;
-    if (
-      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod2.maxDistanceMeters &&
-      height <= HERITAGE_LOD_THRESHOLDS.lod2.maxCameraHeightMeters
-    ) return 2;
-    if (
-      distanceMeters <= HERITAGE_LOD_THRESHOLDS.lod1.maxDistanceMeters &&
-      height <= HERITAGE_LOD_THRESHOLDS.lod1.maxCameraHeightMeters
-    ) return 1;
-    return null;
+    return selectAhsanManzilLod(distanceMeters, height);
   }
 
   private updateHeritageModelLod(

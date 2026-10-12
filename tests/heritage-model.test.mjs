@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { AHSAN_MANZIL_LOD_THRESHOLDS, selectAhsanManzilLod } from "../src/core/geospatial/heritage-landmarks.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredNodes = [
@@ -58,4 +59,20 @@ test("the map camera defaults to Shat Gombuj and Ahsan Manzil uses the provision
   const entry = manifest.entries.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
   assert.equal(entry.assets.default.uri, "/models/ahsan-manzil-lod3.glb");
   assert.deepEqual(entry.nodes, requiredNodes);
+});
+
+test("camera-distance LOD selection follows tagged rendering thresholds", async () => {
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  const p = config.parameters.runtimeLod;
+  assert.equal(p.lod1MaxDistance.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod1.maxDistanceMeters);
+  assert.equal(p.lod1MaxCameraHeight.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod1.maxCameraHeightMeters);
+  assert.equal(p.lod2MaxDistance.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod2.maxDistanceMeters);
+  assert.equal(p.lod2MaxCameraHeight.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod2.maxCameraHeightMeters);
+  assert.equal(p.lod3MaxDistance.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod3.maxDistanceMeters);
+  assert.equal(p.lod3MaxCameraHeight.value, AHSAN_MANZIL_LOD_THRESHOLDS.lod3.maxCameraHeightMeters);
+  assert.equal(selectAhsanManzilLod(400, 250), 3);
+  assert.equal(selectAhsanManzilLod(4_000, 6_000), 2);
+  assert.equal(selectAhsanManzilLod(10_000, 18_000), 1);
+  assert.equal(selectAhsanManzilLod(20_000, 1_000), null);
+  assert.equal(selectAhsanManzilLod(-1, 100), null);
 });

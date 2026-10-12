@@ -366,6 +366,50 @@
         "source": "Supplied brief",
         "note": "Not included in exterior mesh."
       }
+    },
+    "runtimeLod": {
+      "lod1MaxDistance": {
+        "value": 18000,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show only when the view centre is within 18 km and camera height is at most 20 km."
+      },
+      "lod1MaxCameraHeight": {
+        "value": 20000,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      },
+      "lod2MaxDistance": {
+        "value": 6500,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show when closer than this and camera height is at most 8 km unless LOD3 threshold is met."
+      },
+      "lod2MaxCameraHeight": {
+        "value": 8000,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      },
+      "lod3MaxDistance": {
+        "value": 2000,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show detail mesh when closer than this and camera height is at most 2.5 km."
+      },
+      "lod3MaxCameraHeight": {
+        "value": 2500,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      }
     }
   },
   "modelAssets": {

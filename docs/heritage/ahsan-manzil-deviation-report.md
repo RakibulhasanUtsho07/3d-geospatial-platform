@@ -1,27 +1,33 @@
 # Ahsan Manzil exterior model — parameter-by-parameter deviation report
 
-**Status:** Provisional parametric exterior reconstruction. The supplied assets are procedural meshes and are **not** a photogrammetry scan, surveyed model, or pixel-perfect reconstruction.
+**Status:** Provisional parametric exterior reconstruction. These procedural meshes are not a survey, point-cloud or photogrammetry model and are not claimed to be pixel-perfect.
 
 ## Deliverables
 
 | Asset | Purpose |
 |---|---|
 | `public/models/ahsan-manzil-lod1.glb` | Low-detail massing |
-| `public/models/ahsan-manzil-lod2.glb` | Massing, roof/parapet, dome and simplified facade rhythm |
-| `public/models/ahsan-manzil-lod3.glb` | Facade openings, simplified trim/pilasters, veranda arcades, porticos, staircase, dome ribs and finial |
+| `public/models/ahsan-manzil-lod2.glb` | Roofline, parapet, dome and simplified facade rhythm |
+| `public/models/ahsan-manzil-lod3.glb` | Openings, simplified trim/pilasters, porticos, veranda arcades, staircase, dome ribs and finial |
 | `public/models/ahsan-manzil.glb` | Convenience alias of LOD3 |
-| `public/models/ahsan-manzil.manifest.json` | Runtime model manifest consumed by the Cesium adapter |
-| `data/heritage/ahsan-manzil.parameters.json` | Parameter registry with confidence and source metadata |
+| `public/models/ahsan-manzil.manifest.json` | Runtime building manifest and LOD thresholds |
+| `data/heritage/ahsan-manzil.parameters.json` | Tagged parameter registry |
+| `tests/heritage-model.test.mjs` | GLB header/node and parameter/LOD integrity tests |
 
-All LODs provide the semantic node names requested: `Plinth`, `Rangmahal_GF`, `Rangmahal_FF`, `Portico_S`, `Portico_N`, `Stair_S`, `Veranda_S`, `Veranda_N`, `Parapet`, `Dome_Drum`, `Dome`, `Finial`, `Andarmahal`.
+Required GLB node names: `Plinth`, `Rangmahal_GF`, `Rangmahal_FF`, `Portico_S`, `Portico_N`, `Stair_S`, `Veranda_S`, `Veranda_N`, `Parapet`, `Dome_Drum`, `Dome`, `Finial`, `Andarmahal`.
 
-Local units are meters. Geometry uses local X east-west, Y up, +Z south/river-front; natural ground is y=0. The location and orientation remain provisional as noted below.
+## Coordinate and LOD rules
+
+- Units: meters. GLB local axes: X east-west, Y up, +Z south/river-front. Natural ground is Y=0; plinth top is Y=1.0 m.
+- The current anchor is 23.7086, 90.40606 [C]. It has **not** been proven to be the traced footprint centroid.
+- Long-axis rotation is approximately 90° [E]. It needs measurement from satellite/OSM geometry.
+- Model loads only when the view centre and camera height meet a distance threshold; it unloads after moving outside all thresholds. The threshold values are editable [E] parameters. LOD switching is functional in the adapter; browser/build validation is still required.
 
 ## Parameter register
 
-Every parameter from `georeference` and `parameters` in the JSON is included here. [V] verified, [C] conflicting, [E] estimate/placeholder, [?] unknown.
+Each georeference/architectural/rendering parameter below includes the current value, confidence tag, source and note. [V] verified, [C] conflicting, [E] estimate/placeholder, [?] unknown.
 
-| Parameter | Tag | Current/final model value | Source | Note / deviation |
+| Parameter | Tag | Current value | Source | Notes / deviation |
 |---|---|---|---|---|
 | Georeference.latitude | [C] | 23.7086 degrees_north | User-supplied anchor; alternate map listings conflict | Shift to traced footprint centroid before calling final. |
 | Georeference.longitude | [C] | 90.40606 degrees_east | User-supplied anchor; alternate map listings conflict | Shift to traced footprint centroid before calling final. |
@@ -75,36 +81,29 @@ Every parameter from `georeference` and `parameters` in the JSON is included her
 | materials.verandaFloor | [V] | #EFE6D5 | Supplied brief; light marble proxy |  |
 | roof.covering | [?] | flat roof behind parapet; covering material unknown | Supplied brief |  |
 | roof.structure | [V] | timber/iron beams, interior only | Supplied brief | Not included in exterior mesh. |
+| runtimeLod.lod1MaxDistance | [E] | 18000 m from view centre to provisional anchor | Rendering heuristic in heritage-landmarks.mjs | Show only when the view centre is within 18 km and camera height is at most 20 km. |
+| runtimeLod.lod1MaxCameraHeight | [E] | 20000 m | Rendering heuristic in heritage-landmarks.mjs | Rendering threshold, not a building measurement. |
+| runtimeLod.lod2MaxDistance | [E] | 6500 m from view centre to provisional anchor | Rendering heuristic in heritage-landmarks.mjs | Show when closer than this and camera height is at most 8 km unless LOD3 threshold is met. |
+| runtimeLod.lod2MaxCameraHeight | [E] | 8000 m | Rendering heuristic in heritage-landmarks.mjs | Rendering threshold, not a building measurement. |
+| runtimeLod.lod3MaxDistance | [E] | 2000 m from view centre to provisional anchor | Rendering heuristic in heritage-landmarks.mjs | Show detail mesh when closer than this and camera height is at most 2.5 km. |
+| runtimeLod.lod3MaxCameraHeight | [E] | 2500 m | Rendering heuristic in heritage-landmarks.mjs | Rendering threshold, not a building measurement. |
 
-## Runtime manifest summary
+## Known deviations / calibration backlog
 
-| Field | Current value | Confidence |
-|---|---|---|
-| Model ID | `ahsan-manzil-kumartuli-dhaka` | — |
-| Display name | Ahsan Manzil (Pink Palace) (আহসান মঞ্জিল) | — |
-| Anchor | 23.7086, 90.40606 | [C] |
-| Long-axis azimuth | 90° | [E] |
-| Default asset | `/models/ahsan-manzil-lod3.glb` | LOD3 |
-| Unit | meters | — |
-| Status | provisional-not-survey-verified | Not survey-verified |
-
-## Known deviations and unverified items
-
-1. **Footprint not traced:** the anchor point is from the provided brief, not a verified footprint centroid. Final location must be corrected after tracing OSM/satellite imagery.
-2. **Orientation estimated:** a due east-west long axis is used as a placeholder. Measure the true azimuth from the traced footprint.
-3. **Block split is a hypothesis:** the 55.8 m Rangmahal dimension has not been confirmed from a plan; Andarmahal length is the derived remainder.
-4. **Exterior opening rhythm is estimated:** the 24-bay placeholder is independent of the specified 4 × 5 interior structural grid. Recount facade arches/openings from a perspective-rectified photo.
-5. **Details are procedural:** capitals, fluting, arch profiles, colored glazing, stair rails, and dome ribs are simplified geometry rather than measured historic mouldings.
-6. **Dome profile needs calibration:** the finial peak is constrained to 27.13 m, but drum diameter, curvature, and exact drum opening rhythm remain estimated/unknown.
-7. **Colors are placeholders:** pink, trim and roof colors have not been sampled from color-managed daylight imagery.
-8. **Exterior-only scope:** interior timber/iron structure, interior stairs and tiled rooms are not in this GLB.
-9. **Map placement:** the model loads at its provisional [C] anchor; Shat Gombuj Mosque is the map's default camera target, so the Ahsan Manzil mesh will be visible after navigating back to Old Dhaka.
-10. **LOD semantics:** three mesh assets are shipped. The current adapter loads LOD3 by default; automatic camera-distance swapping between the three assets is not yet implemented.
-11. **No survey-grade claims:** there is no point cloud, photogrammetry, measured plan, orthophoto rectification or onsite ground-truth validation in this pass.
+1. **Footprint not traced:** final width/depth edges, building centroid and exact OSM/satellite alignment remain pending. The supplied anchor is provisional.
+2. **Orientation approximate:** due east-west is a modeling default, not a measured azimuth.
+3. **Block split is a hypothesis:** the 55.8 m Rangmahal length assumes the 183 ft source applies to the eastern dome block; Andarmahal length is derived from the remainder.
+4. **Facade rhythm estimated:** the exterior 24-bay count is an estimate and is not inferred from the separately reported 4 × 5 interior grid.
+5. **Ornament is stylized:** Corinthian-type capitals, fluting, glass patterns, railing, moulding and arch geometry are simplified proxies.
+6. **Dome profile constrained at peak:** 27.13 m is the scale target; drum width, drum openings and dome curvature are not elevation-photo calibrated.
+7. **Colors not sampled:** pink and trim colors remain uncalibrated placeholders.
+8. **Exterior only:** interior wooden staircase, timber/iron roof structure and white/green/yellow tile floors are not modeled in this exterior LOD set.
+9. **LOD parameters estimated:** render thresholds tune performance; they do not describe a historical property of the palace.
+10. **No local runtime verification yet:** GLB assets and code are committed, but a local `npm run test:heritage-model`, `npm run lint` and `npm run build` are required before claiming the complete branch is validated.
 
 ## Calibration order
 
-Trace footprint and centroid → measure azimuth → rectify south elevation against the 5.0 m and 5.8 m storey heights and the 27.13 m dome peak → count openings and bays → replace [E]/[?] parameters → adjust sampled materials → regenerate the assets → inspect placement and facade details in Cesium.
+Trace the footprint and centroid → measure the real long-axis azimuth → rectify the south facade against 5.0 m / 5.8 m storey heights and 27.13 m dome peak → count openings and pitches → overwrite [E]/[?] parameters → daylight-sample materials → regenerate and inspect all LODs in Cesium.
 
 ## Source register
 

@@ -21,3 +21,39 @@ export const AHSAN_MANZIL_GEOREFERENCE = Object.freeze({
   axisConfidence: "[E]",
   note: "Provisional anchor and approximate east-west alignment; trace the footprint and calibrate against elevation imagery before claiming survey accuracy.",
 });
+
+/**
+ * Estimated camera-distance LOD thresholds. These are rendering parameters,
+ * not historic-building facts; mirrored with confidence tags in the parameter JSON.
+ */
+export const AHSAN_MANZIL_LOD_THRESHOLDS = Object.freeze({
+  lod3: Object.freeze({ maxDistanceMeters: 2_000, maxCameraHeightMeters: 2_500 }),
+  lod2: Object.freeze({ maxDistanceMeters: 6_500, maxCameraHeightMeters: 8_000 }),
+  lod1: Object.freeze({ maxDistanceMeters: 18_000, maxCameraHeightMeters: 20_000 }),
+});
+
+export function selectAhsanManzilLod(distanceMeters, cameraHeightMeters) {
+  if (
+    !Number.isFinite(distanceMeters) ||
+    !Number.isFinite(cameraHeightMeters) ||
+    distanceMeters < 0 ||
+    cameraHeightMeters < 0
+  ) return null;
+
+  if (
+    distanceMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod3.maxDistanceMeters &&
+    cameraHeightMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod3.maxCameraHeightMeters
+  ) return 3;
+
+  if (
+    distanceMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod2.maxDistanceMeters &&
+    cameraHeightMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod2.maxCameraHeightMeters
+  ) return 2;
+
+  if (
+    distanceMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod1.maxDistanceMeters &&
+    cameraHeightMeters <= AHSAN_MANZIL_LOD_THRESHOLDS.lod1.maxCameraHeightMeters
+  ) return 1;
+
+  return null;
+}

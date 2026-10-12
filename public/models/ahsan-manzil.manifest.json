@@ -64,7 +64,27 @@
       ],
       "parameterConfig": "/data/heritage/ahsan-manzil.parameters.json",
       "deviationReport": "/docs/heritage/ahsan-manzil-deviation-report.md",
-      "status": "provisional-not-survey-verified"
+      "status": "provisional-not-survey-verified",
+      "rendering": {
+        "strategy": "camera-distance-and-height thresholds; out-of-range models are unloaded",
+        "thresholds": {
+          "lod1": {
+            "maxDistanceMeters": 18000,
+            "maxCameraHeightMeters": 20000,
+            "confidence": "[E]"
+          },
+          "lod2": {
+            "maxDistanceMeters": 6500,
+            "maxCameraHeightMeters": 8000,
+            "confidence": "[E]"
+          },
+          "lod3": {
+            "maxDistanceMeters": 2000,
+            "maxCameraHeightMeters": 2500,
+            "confidence": "[E]"
+          }
+        }
+      }
     }
   ]
 }
