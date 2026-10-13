@@ -86,9 +86,10 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.stair.treadDepth.value, 0.34);
   assert.equal(config.parameters.stair.runLength.value, 9.52);
   assert.equal(config.parameters.materials.facadePink.value, "#E1917D");
-  assert.equal(config.parameters.materials.trimOffWhite.value, "#E99C8A");
+  assert.equal(config.parameters.materials.trimOffWhite.value, "#ECAE9B");
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
+  assert.equal(config.parameters.materials.glass.value, "#392B27");
   assert.equal(config.parameters.dome.drumOpeningCount.value, 8);
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);
