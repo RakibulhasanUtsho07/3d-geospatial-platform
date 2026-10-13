@@ -329,6 +329,23 @@ function buildGlb(lod) {
       box(node,cx+tx*(-radius-.05)+nx*.035,base+stem/2,cz+tz*(-radius-.05)+nz*.035,.1,stem,.12,"trim");
       box(node,cx+tx*(radius+.05)+nx*.035,base+stem/2,cz+tz*(radius+.05)+nz*.035,.1,stem,.12,"trim");
       facetedArchBand(node,cx,cz,angle,spring,radius+.02,.085,"trim",detail===2?16:10);
+
+      // End elevations use the same dark recess and green shutter treatment as
+      // the HTML side windows, so a 360-degree orbit doesn't reveal plain glass.
+      const panelX=zcX+nx*.055,panelZ=zcZ+nz*.055;
+      const shutterWidth=width*.76,shutterHeight=stem*.62;
+      const shutterBase=base+stem*.08;
+      orientedBoxXZ(node,panelX,shutterBase+shutterHeight/2,panelZ,
+        shutterWidth,shutterHeight,.055,angle,"#45674D");
+      if(detail===2){
+        for(let slat=0;slat<5;slat++){
+          const along=(slat-2)*shutterWidth*.19;
+          orientedBoxXZ(node,panelX+tx*along,shutterBase+shutterHeight/2,
+            panelZ+tz*along,.035,shutterHeight*.94,.035,angle,"#ECAE9B");
+        }
+        orientedBoxXZ(node,panelX,shutterBase+shutterHeight*.52,
+          panelZ,shutterWidth*.98,.045,.035,angle,"#392B27");
+      }
     }
   }
   function addFacadeSection(nodeName, x0, x1, bays, floors, lod, centerZ = 0, depth = DIM.depth) {
