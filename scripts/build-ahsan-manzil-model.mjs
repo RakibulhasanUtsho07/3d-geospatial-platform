@@ -12,6 +12,9 @@ const DIM = {
   length: V("footprint", "overallLength"),
   depth: V("footprint", "overallDepth"),
   rangmahalLength: V("footprint", "rangmahalBlockLength"),
+  andarDepth: V("footprint", "andarmahalDepth"),
+  andarCenterZ: V("footprint", "andarmahalNorthOffset"),
+  andarBayCount: V("footprint", "andarmahalBayCount"),
   ground: V("vertical", "naturalGround"),
   plinth: V("vertical", "plinthHeight"),
   gf: V("vertical", "groundFloorClearHeight"),
@@ -279,16 +282,16 @@ function buildGlb(lod) {
       facetedArchBand(node,cx,cz,angle,spring,radius+.02,.085,"trim",detail===2?16:10);
     }
   }
-  function addFacadeSection(nodeName, x0, x1, bays, floors, lod) {
-    const node=byName[nodeName], half=DIM.depth/2, thickness=DIM.wall;
+  function addFacadeSection(nodeName, x0, x1, bays, floors, lod, centerZ = 0, depth = DIM.depth) {
+    const node=byName[nodeName], half=depth/2, thickness=DIM.wall;
     const pitch=(x1-x0)/bays;
     for(const floor of floors){
       if(lod===1){
-        box(node,(x0+x1)/2,floor.base+floor.height/2,0,x1-x0,floor.height,DIM.depth,"pink");
+        box(node,(x0+x1)/2,floor.base+floor.height/2,centerZ,x1-x0,floor.height,depth,"pink");
         continue;
       }
       for(const side of [-1,1]){
-        const surface=side*half,wallCenter=surface-side*thickness/2;
+        const surface=centerZ+side*half,wallCenter=surface-side*thickness/2;
         for(let i=0;i<bays;i++){
           const cx=x0+(i+.5)*pitch;
           const w=Math.min(floor.width,pitch-.35),pierWidth=Math.max(.12,(pitch-w)/2);
@@ -311,8 +314,8 @@ function buildGlb(lod) {
       }
       // Low-width end piers close the junction between adjacent wing meshes.
       // The actual short-end elevations are modelled separately by addEndFacade().
-      box(node,x0+.2,floor.base+floor.height/2,0,.4,floor.height,DIM.depth,"pink");
-      box(node,x1-.2,floor.base+floor.height/2,0,.4,floor.height,DIM.depth,"pink");
+      box(node,x0+.2,floor.base+floor.height/2,centerZ,.4,floor.height,depth,"pink");
+      box(node,x1-.2,floor.base+floor.height/2,centerZ,.4,floor.height,depth,"pink");
     }
   }
   /**
@@ -320,23 +323,23 @@ function buildGlb(lod) {
    * The end faces were previously almost absent, so orbiting the palace exposed
    * empty-looking sides. The angle keeps the reveals recessed toward the interior.
    */
-  function addEndFacade(nodeName, edgeX, outwardSide, floors, bays, lod) {
+  function addEndFacade(nodeName, edgeX, outwardSide, floors, bays, lod, centerZ = 0, depth = DIM.depth) {
     const node = byName[nodeName];
-    const pitch = DIM.depth / bays;
+    const pitch = depth / bays;
     const angle = outwardSide > 0 ? 0 : Math.PI;
     const wallCenter = edgeX - outwardSide * DIM.wall / 2;
 
     for (const floor of floors) {
       if (lod === 1) {
         orientedBoxXZ(
-          node, wallCenter, floor.base + floor.height / 2, 0,
-          DIM.depth, floor.height, DIM.wall, angle, "pink",
+          node, wallCenter, floor.base + floor.height / 2, centerZ,
+          depth, floor.height, DIM.wall, angle, "pink",
         );
         continue;
       }
 
       for (let i = 0; i < bays; i++) {
-        const cz = -half + (i + 0.5) * pitch;
+        const cz = centerZ - half + (i + 0.5) * pitch;
         const width = Math.min(floor.width, pitch - 0.35);
         const pierWidth = Math.max(0.12, (pitch - width) / 2);
 
@@ -373,13 +376,13 @@ function buildGlb(lod) {
 
       // Continuous end-wall belt courses connect both storeys visually.
       orientedBoxXZ(
-        node, edgeX + outwardSide * 0.06, floor.base + 0.12, 0,
-        DIM.depth, 0.24, 0.16, angle, "roof",
+        node, edgeX + outwardSide * 0.06, floor.base + 0.12, centerZ,
+        depth, 0.24, 0.16, angle, "roof",
       );
       orientedBoxXZ(
         node, edgeX + outwardSide * 0.08,
         floor.base + floor.height - 0.12, 0,
-        DIM.depth, 0.24, 0.18, angle, "trim",
+        depth, 0.24, 0.18, angle, "trim",
       );
     }
   }
@@ -468,32 +471,41 @@ function buildGlb(lod) {
   }
 
   const n=byName,L=DIM.length,D=DIM.depth,half=D/2,xMin=-L/2,xMax=L/2;
-  // The published description places the dome over the round room dividing
-  // the two principal palace halves. Center that joint on the footprint origin.
-  const rangLength=DIM.rangmahalLength,split=0,domeX=(split+xMax)/2;
+  // The 183 ft source applies to the symmetric Rangmahal frontage. Keep the
+  // 125.4 m reported total extent by adjoining a provisional rear-set Andarmahal
+  // block to its west; this stepped plan remains [E] until a north-up footprint
+  // trace resolves the conflict between published overall dimensions.
+  const rangLength=DIM.rangmahalLength, split=0, domeX=(split+xMax)/2;
+  const andarLength=L-rangLength, andarCenterX=(xMin+split)/2;
+  const andarDepth=DIM.andarDepth, andarCenterZ=DIM.andarCenterZ;
   const plinthTop=DIM.ground+DIM.plinth;
   const gfBase=plinthTop,gfHeight=DIM.gf;
   const ffBase=gfBase+gfHeight+DIM.slab,ffHeight=DIM.ff;
   const roofTop=DIM.roofline-DIM.parapet;
-  const rangBays=Math.max(2,Math.round(rangLength/(L/V("footprint","exteriorBayCount"))));
-  const andarBays=Math.max(2,V("footprint","exteriorBayCount")-rangBays);
+  const rangBays=V("footprint","exteriorBayCount");
+  const andarBays=DIM.andarBayCount;
   const gf={base:gfBase,height:gfHeight,width:DIM.windowGF,crown:DIM.crownGF};
   const ff={base:ffBase,height:ffHeight,width:DIM.windowFF,crown:DIM.crownFF};
 
-  box(n.Plinth,0,DIM.ground+DIM.plinth/2,0,L,DIM.plinth,D,"roof");
+  box(n.Plinth,(split+xMax)/2,DIM.ground+DIM.plinth/2,0,rangLength,DIM.plinth,D,"roof");
+  box(n.Plinth,andarCenterX,DIM.ground+DIM.plinth/2,andarCenterZ,andarLength,DIM.plinth,andarDepth,"roof");
+
   addFacadeSection("Rangmahal_GF",split,xMax,rangBays,[gf],lod);
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
-  addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod);
+  addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);
 
-  // Close the east and west ends with matching arches rather than thin blank caps.
-  addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod);
+  // Model the short elevations of both blocks, including the exposed Rangmahal
+  // west end beside the rear-set Andarmahal junction.
+  addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);
+  addEndFacade("Rangmahal_GF", split, -1, [gf], 6, lod);
+  addEndFacade("Rangmahal_FF", split, -1, [ff], 6, lod);
   addEndFacade("Rangmahal_GF", xMax, 1, [gf], 6, lod);
   addEndFacade("Rangmahal_FF", xMax, 1, [ff], 6, lod);
 
   box(n.Rangmahal_GF,(split+xMax)/2,gfBase+gfHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
   box(n.Rangmahal_FF,(split+xMax)/2,ffBase+ffHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
-  box(n.Andarmahal,(xMin+split)/2,gfBase+gfHeight+DIM.slab/2,0,xMin*-1+split,DIM.slab,D,"marble");
-  box(n.Andarmahal,(xMin+split)/2,ffBase+ffHeight+DIM.slab/2,0,xMin*-1+split,DIM.slab,D,"marble");
+  box(n.Andarmahal,andarCenterX,gfBase+gfHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
+  box(n.Andarmahal,andarCenterX,ffBase+ffHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
 
   // Roof deck below parapet; structure is only represented as exterior massing.
   box(n.Parapet,0,roofTop-.08,0,L,.16,D,"roof");
