@@ -256,6 +256,75 @@ function buildGlb(lod) {
       box(node,x1-.2,floor.base+floor.height/2,0,.4,floor.height,DIM.depth,"pink");
     }
   }
+  /**
+   * Build the two short end elevations with real recessed arched openings.
+   * The end faces were previously almost absent, so orbiting the palace exposed
+   * empty-looking sides. The angle keeps the reveals recessed toward the interior.
+   */
+  function addEndFacade(nodeName, edgeX, outwardSide, floors, bays, lod) {
+    const node = byName[nodeName];
+    const pitch = DIM.depth / bays;
+    const angle = outwardSide > 0 ? 0 : Math.PI;
+    const wallCenter = edgeX - outwardSide * DIM.wall / 2;
+
+    for (const floor of floors) {
+      if (lod === 1) {
+        orientedBoxXZ(
+          node, wallCenter, floor.base + floor.height / 2, 0,
+          DIM.depth, floor.height, DIM.wall, angle, "pink",
+        );
+        continue;
+      }
+
+      for (let i = 0; i < bays; i++) {
+        const cz = -half + (i + 0.5) * pitch;
+        const width = Math.min(floor.width, pitch - 0.35);
+        const pierWidth = Math.max(0.12, (pitch - width) / 2);
+
+        orientedBoxXZ(
+          node, wallCenter, floor.base + floor.height / 2,
+          cz - width / 2 - pierWidth / 2,
+          pierWidth, floor.height, DIM.wall, angle, "pink",
+        );
+        orientedBoxXZ(
+          node, wallCenter, floor.base + floor.height / 2,
+          cz + width / 2 + pierWidth / 2,
+          pierWidth, floor.height, DIM.wall, angle, "pink",
+        );
+        if (floor.height > floor.crown) {
+          orientedBoxXZ(
+            node, wallCenter,
+            floor.base + floor.crown + (floor.height - floor.crown) / 2,
+            cz, width, floor.height - floor.crown, DIM.wall, angle, "pink",
+          );
+        }
+
+        fillFacetedArch(
+          node, edgeX, floor.base, cz, angle, width, floor.crown,
+          DIM.wall, lod === 3 ? 2 : 1,
+        );
+
+        if (lod === 3) {
+          orientedBoxXZ(
+            node, edgeX + outwardSide * 0.06, floor.base + 0.13, cz,
+            width + 0.18, 0.14, 0.14, angle, "trim",
+          );
+        }
+      }
+
+      // Continuous end-wall belt courses connect both storeys visually.
+      orientedBoxXZ(
+        node, edgeX + outwardSide * 0.06, floor.base + 0.12, 0,
+        DIM.depth, 0.24, 0.16, angle, "roof",
+      );
+      orientedBoxXZ(
+        node, edgeX + outwardSide * 0.08,
+        floor.base + floor.height - 0.12, 0,
+        DIM.depth, 0.24, 0.18, angle, "trim",
+      );
+    }
+  }
+
   function addDomeProfile(node,cx,cz,baseY,profile,segments,key){
     const rings=profile.map(([radius,height])=>Array.from({length:segments},(_,i)=>{
       const a=2*Math.PI*i/segments;
@@ -314,7 +383,9 @@ function buildGlb(lod) {
   }
 
   const n=byName,L=DIM.length,D=DIM.depth,half=D/2,xMin=-L/2,xMax=L/2;
-  const rangLength=DIM.rangmahalLength,split=xMax-rangLength,domeX=(split+xMax)/2;
+  // The published description places the dome over the round room dividing
+  // the two principal palace halves. Center that joint on the footprint origin.
+  const rangLength=L/2,split=0,domeX=0;
   const plinthTop=DIM.ground+DIM.plinth;
   const gfBase=plinthTop,gfHeight=DIM.gf;
   const ffBase=gfBase+gfHeight+DIM.slab,ffHeight=DIM.ff;
@@ -328,6 +399,11 @@ function buildGlb(lod) {
   addFacadeSection("Rangmahal_GF",split,xMax,rangBays,[gf],lod);
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
   addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod);
+
+  // Close the east and west ends with matching arches rather than thin blank caps.
+  addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod);
+  addEndFacade("Rangmahal_GF", xMax, 1, [gf], 6, lod);
+  addEndFacade("Rangmahal_FF", xMax, 1, [ff], 6, lod);
 
   box(n.Rangmahal_GF,(split+xMax)/2,gfBase+gfHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
   box(n.Rangmahal_FF,(split+xMax)/2,ffBase+ffHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
@@ -344,6 +420,24 @@ function buildGlb(lod) {
     }
   }
   box(n.Parapet,0,roofTop+DIM.parapet/2,0,.4,DIM.parapet,D,"pink");
+
+  // Small roofline pinnacles reinforce the palace silhouette at wing breaks
+  // and corners; they remain a low-poly hint rather than invented sculpture.
+  if (lod === 3) {
+    for (const side of [-1, 1]) {
+      for (const x of [xMin + 2.2, -L / 4, L / 4, xMax - 2.2]) {
+        const z = side * (half - 0.32);
+        const base = roofTop + DIM.parapet;
+        box(n.Parapet, x, base + 0.18, z, 1.15, 0.36, 0.92, "trim");
+        verticalCylinder(n.Parapet, x, base + 0.32, base + 0.88, z, 0.13, "trim", 8);
+        addDomeProfile(
+          n.Parapet, x, z, base + 0.72,
+          [[0.30, 0], [0.24, 0.20], [0.16, 0.42], [0.06, 0.62], [0.006, 0.82]],
+          8, "roof",
+        );
+      }
+    }
+  }
 
   // Recessed north/south verandas with a true opening rhythm based on the estimated 3.3 m span.
   const verandaCount=Math.max(8,Math.round(L/DIM.verandaSpan)),verandaPitch=L/verandaCount;
@@ -366,6 +460,28 @@ function buildGlb(lod) {
             archBand(byName[name],x,spring,z,verandaPitch/2,.10,"trim",12);
           }
         }
+      }
+    }
+  }
+
+  // Dark, thin balustrades at the upper veranda edge add depth when viewed
+  // obliquely. Keep this detail only in LOD3 to protect distant-view performance.
+  if (lod === 3) {
+    const railBase = ffBase + 0.22;
+    const railTop = ffBase + 1.12;
+    const balusterCount = Math.ceil(L / 0.85);
+    for (const side of [-1, 1]) {
+      const railZ = side * (half + 2.26);
+      barBetween(byName[side === 1 ? "Veranda_S" : "Veranda_N"],
+        [xMin, railBase, railZ], [xMax, railBase, railZ], 0.11, "rail");
+      barBetween(byName[side === 1 ? "Veranda_S" : "Veranda_N"],
+        [xMin, railTop, railZ], [xMax, railTop, railZ], 0.11, "rail");
+      for (let i = 0; i <= balusterCount; i++) {
+        const x = xMin + (L * i / balusterCount);
+        verticalCylinder(
+          byName[side === 1 ? "Veranda_S" : "Veranda_N"],
+          x, railBase, railTop, railZ, 0.035, "rail", 6,
+        );
       }
     }
   }
