@@ -513,13 +513,51 @@ function buildGlb(lod) {
         const cx=domeX-width/2+(i+.5)*span;
         archBand(byName[name],cx,spring,faceZ,span/2,.15,"trim",16);
       }
+      // Ground-floor portico roof / first-floor porch deck.
       box(byName[name],domeX,gfBase+gfHeight-.06,faceZ,width+.5,.3,.8,"pink");
-      const pedimentBase=gfBase+gfHeight+.3,pedimentTop=DIM.pedimentPeak;
-      const frontZ=faceZ+side*.45;
-      triangle(byName[name],[domeX-width/2-.7,pedimentBase,frontZ],[domeX+width/2+.7,pedimentBase,frontZ],[domeX,pedimentTop,frontZ],"pink");
-      if(lod===3){
-        box(byName[name],domeX,pedimentBase+.10,frontZ,width+.5,.2,.14,"trim");
-        for(let i=0;i<3;i++)box(byName[name],domeX+(i-1)*3.7,(pedimentBase+pedimentTop)/2,frontZ+side*.04,.10,pedimentTop-pedimentBase-.3,.12,"trim");
+
+      // Upper-storey triple-arched loggia. The former model stopped at the
+      // ground-floor arches, which made the most recognizable central facade
+      // feel incomplete in both frontal and orbit views.
+      const upperBase = ffBase;
+      const upperTop = ffBase + ffHeight;
+      const upperSpring = upperTop - span / 2;
+      if (lod >= 2) {
+        for (let i = 0; i <= 3; i++) {
+          const x = domeX - width / 2 + i * span;
+          verticalCylinder(
+            byName[name], x, upperBase, upperTop, faceZ, .22, "trim",
+            lod === 3 ? 16 : 10,
+          );
+          box(byName[name], x, upperBase + .12, faceZ, .58, .24, .58, "trim");
+          box(byName[name], x, upperTop - .12, faceZ, .68, .24, .68, "trim");
+          if (lod === 3) {
+            // Light impost/capital bands emphasize the upper arcade rhythm.
+            box(byName[name], x, upperSpring, faceZ + side * .035, .82, .18, .80, "marble");
+          }
+        }
+        for (let i = 0; i < 3; i++) {
+          const cx = domeX - width / 2 + (i + .5) * span;
+          archBand(byName[name], cx, upperSpring, faceZ, span / 2, .17, "trim", lod === 3 ? 20 : 12);
+        }
+        box(byName[name], domeX, upperTop - .06, faceZ, width + .65, .28, .76, "trim");
+      }
+
+      // The pediment belongs above the upper loggia, not midway up the facade.
+      const pedimentBase = upperTop + .28;
+      const pedimentTop = Math.max(DIM.pedimentPeak, pedimentBase + 1.2);
+      const frontZ = faceZ + side * .45;
+      const pedimentLeft = [domeX - width / 2 - .7, pedimentBase, frontZ];
+      const pedimentRight = [domeX + width / 2 + .7, pedimentBase, frontZ];
+      const pedimentApex = [domeX, pedimentTop, frontZ];
+      triangle(byName[name], pedimentLeft, pedimentRight, pedimentApex, "pink");
+      if (lod === 3) {
+        // Moulded triangular outline and a restrained central relief panel.
+        barBetween(byName[name], pedimentLeft, pedimentRight, .22, "trim");
+        barBetween(byName[name], pedimentLeft, pedimentApex, .18, "trim");
+        barBetween(byName[name], pedimentApex, pedimentRight, .18, "trim");
+        box(byName[name], domeX, pedimentBase + .42, frontZ + side * .09, 2.7, .55, .16, "trim");
+        box(byName[name], domeX, pedimentBase + .42, frontZ + side * .18, 1.65, .25, .08, "roof");
       }
     }
   }
