@@ -292,11 +292,11 @@
         "note": "Projection depth of the central portico."
       },
       "pedimentPeakHeightAboveGround": {
-        "value": 8.35,
+        "value": 15.2,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural pediment proxy",
-        "note": "Absolute top of the triangular pediment. Recalibrate against a rectified south facade."
+        "source": "Approximate exterior-photo proportion for the roof pediment above the first-floor triple-arched loggia",
+        "note": "Updated from the earlier too-low 8.35 m placeholder so the triangular pediment sits above the upper-storey arcade; calibrate against a rectified front elevation."
       },
       "doorBayInterval": {
         "value": 4,
