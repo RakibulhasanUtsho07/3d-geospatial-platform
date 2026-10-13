@@ -49,6 +49,11 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
 test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
   assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
+  assert.ok(builder.includes("const split = xMin + andarLength;"));
+  assert.ok(builder.includes("const domeX = (split + xMax) / 2;"));
+  assert.ok(builder.includes("const stairTopZ = half + 0.04;"));
+  assert.ok(builder.includes("The projecting triple-arched portico is an open"));
+  assert.ok(builder.includes("Recessed timber door with an arched glazed head"));
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes("function fillRectLouverWindow("));
@@ -76,6 +81,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.trimOffWhite.value, "#E99C8A");
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
+  assert.equal(config.parameters.dome.drumOpeningCount.value, 8);
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);
   assert.equal(config.parameters.runtimeCamera.frontCameraRangeMeters.value, AHSAN_MANZIL_CAMERA_RANGE_METERS);
