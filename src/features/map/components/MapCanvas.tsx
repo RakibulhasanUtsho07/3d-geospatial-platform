@@ -407,7 +407,7 @@ export default function MapCanvas({
     setSelectedRoad(null);
     setSelectedPlace(null);
     setSelectedProperty(null);
-    engine.startAhsanManzilOrbitTour();
+    engine.startAhsanManzilOrbitTour(() => setOrbitTourActive(false));
     setOrbitTourActive(true);
   }
 
