@@ -517,7 +517,7 @@ function buildGlb(lod) {
       const outB = [cx + outer * Math.cos(b), y, cz + outer * Math.sin(b)];
       const inA = [cx + inner * Math.cos(a), y, cz + inner * Math.sin(a)];
       const inB = [cx + inner * Math.cos(b), y, cz + inner * Math.sin(b)];
-      quad(node, outA, outB, inB, inA, key);
+      quad(node, outA, inA, inB, outB, key);
     }
   }
   function horizontalEllipse(node, cx, y, cz, radiusX, radiusZ, key, segments = 36) {
