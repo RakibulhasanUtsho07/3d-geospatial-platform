@@ -71,6 +71,10 @@ const COLORS = {
   sceneWater: "#75B5D2",
   scenePath: "#D9CDB8",
   sceneWhite: "#F3D2C5",
+  sceneMosqueWall: "#E7DFD0",
+  sceneMosqueTrim: "#F1E9DD",
+  sceneMosqueDome: "#F0E7DA",
+  sceneStableRoof: "#8B5545",
   sceneWood: "#705039",
   sceneTree0: "#507D43",
   sceneTree1: "#62894C",
@@ -1009,26 +1013,26 @@ function buildGlb(lod) {
   const siteShiftX = V("runtimeCamera", "frontFocusOffsetEastMeters");
   // Keep the land and river planes contiguous (rather than coplanar/overlapping)
   // and slightly above the globe's anchor surface so Cesium terrain does not hide them.
-  horizontalPlane(byName.Site_Ground, siteShiftX, 0.015, -15, 440, 270, "sceneGrass");
+  horizontalPlane(byName.Site_Ground, siteShiftX, 0.015, 0, 440, 300, "sceneGrass");
   horizontalPlane(byName.Site_River, siteShiftX, 0.005, 205, 440, 170, "sceneWater");
   horizontalPlane(byName.Site_Approach, siteShiftX, 0.025, 63, 8, 58, "scenePath");
 
   // Family mosque, represented by the same illustrative massing used in the HTML.
   const mosque = byName.Site_Family_Mosque;
-  siteBox(mosque,14,5.2,11,siteShiftX+64,0,-5,"sceneWhite");
-  siteBox(mosque,14.5,.35,11.5,siteShiftX+64,5.2,-5,"sceneTrim");
+  siteBox(mosque,14,5.2,11,siteShiftX+64,0,-5,"sceneMosqueWall");
+  siteBox(mosque,14.5,.35,11.5,siteShiftX+64,5.2,-5,"sceneMosqueTrim");
   for (const [offset, radius] of [[-4.5,1.5],[0,2.25],[4.5,1.5]]) {
     ellipsoid(mosque,siteShiftX+64+offset,6.2,-5,radius,radius*.7,radius,
-      "sceneWhite",lod===3?18:lod===2?12:8,lod===3?10:6);
+      "sceneMosqueDome",lod===3?18:lod===2?12:8,lod===3?10:6);
   }
   for (const offset of [-4.5,4.5]) {
-    siteBox(mosque,.65,8,.65,siteShiftX+64+offset,0,-5,"sceneWhite");
+    siteBox(mosque,.65,8,.65,siteShiftX+64+offset,0,-5,"sceneMosqueWall");
   }
 
   // Small stable/service building and the shallow oval pond behind the palace.
   const stable = byName.Site_Stable;
   siteBox(stable,25,3.4,8,siteShiftX-70,0,-32,"sceneStone");
-  siteBox(stable,26,.4,8,siteShiftX-70,3.4,-32,"sceneDark");
+  siteBox(stable,26,.4,8,siteShiftX-70,3.4,-32,"sceneStableRoof");
   horizontalEllipse(byName.Site_Pond,siteShiftX-100,.02,-34,8,5,"sceneWater",lod===3?40:24);
 
   // Deterministic tree placement mirrors the reference HTML output.
