@@ -15,17 +15,17 @@ export const SHAT_GOMBUJ_CAMERA = Object.freeze({
 });
 
 /**
- * Default landing camera for the map. The anchor is provisional until the
- * actual building footprint is traced against verified imagery.
+ * Ahsan Manzil's provisional world anchor. The viewer uses this as a target
+ * for a bounding-sphere camera, not as the camera's own position.
  */
 export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
   longitude: 90.40606,
   latitude: 23.70860,
-  height: 700,
+  height: 10,
 });
 export const AHSAN_MANZIL_CAMERA_ORIENTATION = Object.freeze({
   heading: 0,
-  pitch: -55,
+  pitch: -22,
   roll: 0,
 });
 export const AHSAN_MANZIL_CAMERA = Object.freeze({
