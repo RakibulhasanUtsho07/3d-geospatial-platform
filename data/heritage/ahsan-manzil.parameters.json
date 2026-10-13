@@ -475,38 +475,74 @@
             0
           ],
           [
-            3.94,
-            0.72
+            3.9922,
+            0.4131
           ],
           [
-            3.76,
-            1.49
+            3.9686,
+            0.8263
           ],
           [
-            3.46,
-            2.26
+            3.9291,
+            1.2394
           ],
           [
-            3.11,
-            3.25
+            3.873,
+            1.6525
           ],
           [
-            2.16,
-            4.95
+            3.7997,
+            2.0656
           ],
           [
-            1.15,
-            5.95
+            3.7081,
+            2.4788
           ],
           [
-            0.28,
-            6.53
+            3.5969,
+            2.8919
+          ],
+          [
+            3.4641,
+            3.305
+          ],
+          [
+            3.3072,
+            3.7181
+          ],
+          [
+            3.1225,
+            4.1313
+          ],
+          [
+            2.9047,
+            4.5444
+          ],
+          [
+            2.6458,
+            4.9575
+          ],
+          [
+            2.3319,
+            5.3706
+          ],
+          [
+            1.9364,
+            5.7838
+          ],
+          [
+            1.3919,
+            6.1969
+          ],
+          [
+            0,
+            6.61
           ]
         ],
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
         "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
-        "note": "Updated to a smoother hemispherical silhouette sampled from the improved Three.js reference scene (4.0 m radius, approximately 6.61 m rise); remains an estimate pending rectified elevation measurements."
+        "note": "Profile samples approximate the stretched hemispherical SphereGeometry in the reference Three.js HTML scene (4.0 m base radius, 6.61 m rise). These are visual estimates, not survey-measured heritage dimensions."
       }
     },
     "materials": {
