@@ -507,30 +507,47 @@ function buildGlb(lod) {
   box(n.Andarmahal,andarCenterX,gfBase+gfHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
   box(n.Andarmahal,andarCenterX,ffBase+ffHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
 
-  // Roof deck below parapet; structure is only represented as exterior massing.
-  box(n.Parapet,0,roofTop-.08,0,L,.16,D,"roof");
+  // Separate roof decks preserve the stepped/L-shaped footprint: the main
+  // Rangmahal faces the river, while Andarmahal is set back to the north.
+  const rangCenterX = (split + xMax) / 2;
+  box(n.Parapet,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
+  box(n.Parapet,andarCenterX,roofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
+
   for(const side of [-1,1]){
-    box(n.Parapet,0,roofTop+DIM.parapet/2,side*(half-.12),L,DIM.parapet,.4,"pink");
+    const rangZ=side*(half-.12);
+    box(n.Parapet,rangCenterX,roofTop+DIM.parapet/2,rangZ,rangLength,DIM.parapet,.4,"pink");
     if(lod===3)for(let i=0;i<62;i++){
-      const x=xMin+(i+.5)*L/62;
+      const x=split+(i+.5)*rangLength/62;
       box(n.Parapet,x,roofTop+DIM.parapet*.54,side*(half-.31),.30,DIM.parapet*.55,.20,"trim");
     }
-  }
-  // Close both short roof edges as well as the two long parapet runs so
-  // elevated and rear three-quarter views do not reveal a roof with missing sides.
-  for (const side of [-1, 1]) {
-    box(
-      n.Parapet, side * (L / 2 - 0.2),
-      roofTop + DIM.parapet / 2, 0,
-      0.4, DIM.parapet, D, "pink",
-    );
+
+    const andarZ=andarCenterZ+side*(andarDepth/2-.12);
+    box(n.Parapet,andarCenterX,roofTop+DIM.parapet/2,andarZ,andarLength,DIM.parapet,.4,"pink");
+    if(lod===3)for(let i=0;i<28;i++){
+      const x=xMin+(i+.5)*andarLength/28;
+      box(n.Parapet,x,roofTop+DIM.parapet*.54,andarCenterZ+side*(andarDepth/2-.31),.30,DIM.parapet*.55,.20,"trim");
+    }
   }
 
-  // Small roofline pinnacles reinforce the palace silhouette at wing breaks
-  // and corners; they remain a low-poly hint rather than invented sculpture.
+  // Close exposed roof edges only: east end of Rangmahal, west end of Andarmahal,
+  // and the step where the river-facing Rangmahal projects south of Andarmahal.
+  for (const [x,zCenter,depth] of [
+    [xMax-.2,0,D],
+    [split+.2,D/4,D/2],
+    [xMin+.2,andarCenterZ,andarDepth],
+  ]) {
+    box(n.Parapet,x,roofTop+DIM.parapet/2,zCenter,.4,DIM.parapet,depth,"pink");
+  }
+
+  // Small roofline pinnacles reinforce the main Rangmahal's symmetric silhouette.
   if (lod === 3) {
     for (const side of [-1, 1]) {
-      for (const x of [xMin + 2.2, -L / 4, L / 4, xMax - 2.2]) {
+      for (const x of [
+        split + 2.2,
+        split + rangLength * .25,
+        split + rangLength * .75,
+        xMax - 2.2,
+      ]) {
         const z = side * (half - 0.32);
         const base = roofTop + DIM.parapet;
         box(n.Parapet, x, base + 0.18, z, 1.15, 0.36, 0.92, "trim");
@@ -549,24 +566,29 @@ function buildGlb(lod) {
     }
   }
 
-  // Recessed north/south verandas with a true opening rhythm based on the estimated 3.3 m span.
-  const verandaCount=Math.max(8,Math.round(L/DIM.verandaSpan)),verandaPitch=L/verandaCount;
+  // South veranda follows the 62.7 m Rangmahal facade; the north veranda follows
+  // the rear edge of both blocks, with the columns kept aligned along the facade.
   for(const [name,side] of [["Veranda_S",1],["Veranda_N",-1]]){
-    const z=side*(half+1.22);
-    box(byName[name],0,gfBase+.12,z,L,.24,2.44,"marble");
-    box(byName[name],0,ffBase+.12,z,L,.24,2.44,"marble");
+    const verandaStart = side===1 ? split : xMin;
+    const verandaLength = side===1 ? rangLength : L;
+    const verandaCenterX = verandaStart + verandaLength/2;
+    const verandaCount=Math.max(8,Math.round(verandaLength/DIM.verandaSpan));
+    const verandaPitch=verandaLength/verandaCount;
+    const z=side===1 ? half+1.22 : -(half+1.22);
+    box(byName[name],verandaCenterX,gfBase+.12,z,verandaLength,.24,2.44,"marble");
+    box(byName[name],verandaCenterX,ffBase+.12,z,verandaLength,.24,2.44,"marble");
     if(lod>=2){
       for(const [base,h] of [[gfBase,gfHeight],[ffBase,ffHeight]]){
         const spring=base+h-verandaPitch/2;
         for(let i=0;i<=verandaCount;i++){
-          const x=xMin+i*verandaPitch;
+          const x=verandaStart+i*verandaPitch;
           verticalCylinder(byName[name],x,base,base+h,z,.18,"trim",8);
           box(byName[name],x,base+.13,z,.48,.26,.48,"trim");
           box(byName[name],x,base+h-.12,z,.48,.24,.48,"trim");
         }
         if(lod===3){
           for(let i=0;i<verandaCount;i++){
-            const x=xMin+(i+.5)*verandaPitch;
+            const x=verandaStart+(i+.5)*verandaPitch;
             archBand(byName[name],x,spring,z,verandaPitch/2,.10,"trim",12);
           }
         }
@@ -574,24 +596,24 @@ function buildGlb(lod) {
     }
   }
 
-  // Dark, thin balustrades at the upper veranda edge add depth when viewed
-  // obliquely. Keep this detail only in LOD3 to protect distant-view performance.
+  // Upper veranda balustrades: the public south-facing balcony belongs to
+  // Rangmahal; the north/rear railing spans the full back edge.
   if (lod === 3) {
     const railBase = ffBase + 0.22;
     const railTop = railBase + DIM.balustradeHeight;
-    const balusterCount = Math.ceil(L / DIM.balusterSpacing);
     for (const side of [-1, 1]) {
-      const railZ = side * (half + 2.26);
-      barBetween(byName[side === 1 ? "Veranda_S" : "Veranda_N"],
-        [xMin, railBase, railZ], [xMax, railBase, railZ], 0.11, "rail");
-      barBetween(byName[side === 1 ? "Veranda_S" : "Veranda_N"],
-        [xMin, railTop, railZ], [xMax, railTop, railZ], 0.11, "rail");
+      const railStart = side===1 ? split : xMin;
+      const railLength = side===1 ? rangLength : L;
+      const railZ = side===1 ? half + 2.26 : -(half + 2.26);
+      const balusterCount = Math.ceil(railLength / DIM.balusterSpacing);
+      const node = byName[side === 1 ? "Veranda_S" : "Veranda_N"];
+      barBetween(node,
+        [railStart, railBase, railZ], [railStart+railLength, railBase, railZ], 0.11, "rail");
+      barBetween(node,
+        [railStart, railTop, railZ], [railStart+railLength, railTop, railZ], 0.11, "rail");
       for (let i = 0; i <= balusterCount; i++) {
-        const x = xMin + (L * i / balusterCount);
-        verticalCylinder(
-          byName[side === 1 ? "Veranda_S" : "Veranda_N"],
-          x, railBase, railTop, railZ, 0.035, "rail", 6,
-        );
+        const x = railStart + (railLength * i / balusterCount);
+        verticalCylinder(node,x,railBase,railTop,railZ,.035,"rail",6);
       }
     }
   }
