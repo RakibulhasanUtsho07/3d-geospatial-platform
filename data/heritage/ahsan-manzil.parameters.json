@@ -118,18 +118,18 @@
         "note": "Working dimension; resolve against satellite/plan."
       },
       "rangmahalBlockLength": {
-        "value": 62.7,
+        "value": 55.8,
         "unit": "m",
         "confidence": "[C]",
-        "source": "Working half-length derived from the 125.4 m overall length and the published description that the central round room divides two equal palace halves",
-        "note": "Set to half the overall length so the central dome/round room is aligned with the central joint; confirm by footprint tracing."
+        "source": "183 ft (55.8 m) whole front facade width reported in the architectural article by Adnan Zillur Morshed / The Daily Star",
+        "note": "Use as the provisional river-facing Rangmahal length; resolve conflict with the 125.4 m overall length by tracing the footprint and don't treat this as surveyed."
       },
       "andarmahalBlockLength": {
-        "value": 62.7,
+        "value": 69.6,
         "unit": "m",
         "confidence": "[E]",
-        "source": "125.4 m overall length divided into two equal halves per published architectural description",
-        "note": "Derived working value; the footprint and central joint still require georeferenced plan/elevation calibration."
+        "source": "125.4 m overall extent minus the 55.8 m Rangmahal frontage working hypothesis",
+        "note": "Derived west/rear Andarmahal length for the provisional stepped plan. The actual historic footprint needs north-up trace/plan confirmation."
       },
       "interiorGridEW": {
         "value": 4,
@@ -153,11 +153,11 @@
         "note": "This replaces the earlier uniform 24-bay assumption. Verify each bay from a straight-on elevation before treating the count as fixed."
       },
       "averageBayPitch": {
-        "value": 4.18,
+        "value": 3.72,
         "unit": "m",
         "confidence": "[E]",
-        "source": "62.7 m Rangmahal river-front width / 15 estimated bays",
-        "note": "Derived pitch for the provisional 2 + 4 + 3 + 4 + 2 facade rhythm."
+        "source": "55.8 m Rangmahal river-front width / 15 estimated bays",
+        "note": "Derived pitch for the provisional 2 + 4 + 3 + 4 + 2 facade rhythm; reconcile with the initial generic 4.5-5.5 m estimate using a straight-on elevation."
       },
       "andarmahalDepth": {
         "value": 14.375,
@@ -299,11 +299,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 20,
+        "value": 16.5,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder until elevation is measured",
-        "note": "Widened procedural central portico to improve proportional match to reference facade; calibrate against a rectified elevation."
+        "source": "Single south-elevation reference image, ±20% estimate",
+        "note": "Working projection width for the central three-arch pavilion; recalibrate by counting its three arches from a straight-on photo."
       },
       "porticoDepth": {
         "value": 4,
@@ -614,11 +614,11 @@
     },
     "runtimeCamera": {
       "frontFocusOffsetEastMeters": {
-        "value": 31.35,
+        "value": 34.8,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Half of the provisional 62.7 m Rangmahal river-front width",
-        "note": "Offsets the perspective camera target east of the provisional total-footprint origin so the symmetrical south facade/dome axis is centred. It is a view parameter, not a survey adjustment to the building anchor."
+        "source": "Centre of the provisional 55.8 m Rangmahal frontage when the 125.4 m overall footprint extents are centred at the georeference origin: (125.4 - 55.8)/2 + 55.8/2 = 34.8 m",
+        "note": "Offsets the perspective camera target to the dome/main-entrance axis for frontal and orbit views; it does not move the model anchor."
       },
       "frontCameraRangeMeters": {
         "value": 160,
@@ -649,11 +649,11 @@
         "note": "One revolution is approximately 36 seconds; pause with Stop tour."
       },
       "frontBoundingSphereRadiusMeters": {
-        "value": 98,
+        "value": 105,
         "unit": "m",
         "confidence": "[E]",
         "source": "Camera composition estimate for the offset front target and rear-set Andarmahal",
-        "note": "Slightly wider than half the overall 125.4 m extent so all wings remain visible while looking from the Rangmahal centre."
+        "note": "Camera framing radius large enough to keep the stepped west/rear Andarmahal, south-facing Rangmahal, and 27.13 m dome within the oblique inspection composition."
       },
       "footprintBoundingSphereRadiusMeters": {
         "value": 72,
