@@ -46,7 +46,23 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
   }
 });
 
-test("the map opens at Ahsan Manzil and retains both heritage landmark anchors", async () => {
+test("the model is centred, closed on the short ends, and has veranda detail", async () => {
+  const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
+  assert.match(builder, /const rangLength=DIM\.rangmahalLength,split=0,domeX=0/);
+  assert.ok(builder.includes("function addEndFacade("));
+  assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod)'));
+  assert.ok(builder.includes("Dark, thin balustrades at the upper veranda edge"));
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
+  assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 62.7);
+  assert.equal(config.parameters.facade.porticoWidth.value, 20);
+  assert.equal(config.parameters.stair.width.value, 22);
+  assert.ok(config.parameters.facade.balustradeHeight);
+  assert.ok(config.parameters.facade.balusterSpacing);
+  assert.ok(config.parameters.facade.rooflinePinnacleHeight);
+});
+
+test("the map opens centred on Ahsan Manzil and has true orbit controls", async () => {
   const landmarks = await readFile(path.join(root, "src/core/geospatial/heritage-landmarks.mjs"), "utf8");
   assert.match(landmarks, /export const AHSAN_MANZIL_CAMERA_TARGET/);
   assert.match(landmarks, /longitude: 90\.40606/);
@@ -55,7 +71,10 @@ test("the map opens at Ahsan Manzil and retains both heritage landmark anchors",
   assert.match(landmarks, /latitude: 22\.6744861/);
   assert.match(landmarks, /anchorConfidence: "\[C\]"/);
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
-  assert.match(adapter, /const INITIAL_CAMERA = AHSAN_MANZIL_CAMERA/);
+  assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
+  assert.ok(adapter.includes("orbitAhsanManzil(stepDegrees: number)"));
+  assert.ok(adapter.includes("flyToBoundingSphere"));
+  assert.ok(adapter.includes("new Cesium.BoundingSphere(center, 72)"));
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
   assert.ok(adapter.includes("ahsan-manzil.manifest.json"));
@@ -66,10 +85,12 @@ test("the map opens at Ahsan Manzil and retains both heritage landmark anchors",
   const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
   const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
   assert.ok(mapCanvas.includes("function goToAhsanManzil()"));
-  assert.ok(mapCanvas.includes("AHSAN_MANZIL_CAMERA_TARGET"));
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
   assert.ok(mapCanvas.includes("function goHomeToAhsanManzil()"));
-  assert.ok(mapCanvas.includes("Loading Ahsan Manzil 3D map"));
-  assert.ok(controls.includes("Fly to Ahsan Manzil"));
+  assert.ok(mapCanvas.includes("onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}"));
+  assert.ok(mapCanvas.includes("onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}"));
+  assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees left"));
+  assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees right"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
   assert.ok(adapter.includes("forwardAxis: Cesium.Axis.Z"));
 });
