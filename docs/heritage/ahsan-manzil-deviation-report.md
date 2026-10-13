@@ -24,6 +24,7 @@ Build assets with `npm run build:heritage-model`. All models include nodes `Plin
 - The initial map view and Home control focus Ahsan Manzil. Dedicated left/right Orbit controls rotate the camera around the building in 45-degree increments while framing the full palace.
 - The central round room/dome is aligned with the origin, between two 62.7 m working halves derived from the published 125.4 m overall length and description of two equal palace halves. This is an explicit improvement to the earlier visibly off-centre dome/stair/portico.
 - The east and west short elevations now include recessed arched openings and storey belt courses; LOD3 also includes upper-veranda balustrades and stylized roofline pinnacles.
+- The central portico now continues through the upper storey with a second triple-arched loggia, capitals/impost bands, cornice and a triangular pediment above it; the pediment peak is parameterized at 15.2 m [E] pending a rectified facade.
 - LOD model loading/unloading uses camera distance and camera altitude thresholds [E] to avoid loading detailed geometry when the view is in Bagerhat or far from Old Dhaka.
 - The Cesium loader sets Y-up and Z-forward for the generated GLB; the model uses a local east-north-up reference frame with south as its +Z face.
 
@@ -72,7 +73,7 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | facade.balustradeHeight | [E] | 0.9 m | Visible upper-veranda guardrail proportion in exterior photographs | Approximate guardrail height above veranda floor. |
 | facade.balusterSpacing | [E] | 0.85 m | Procedural rendering parameter | Approximate post interval; replace after elevation/photo calibration. |
 | facade.rooflinePinnacleHeight | [E] | 1.5 m | Visible small roofline finials/pinnacles in exterior photographs | Stylized height above parapet; not a measured ornamental profile. |
-| facade.pedimentPeakHeightAboveGround | [E] | 8.35 m | Procedural pediment proxy | Absolute top of the triangular pediment. Recalibrate against a rectified south facade. |
+| facade.pedimentPeakHeightAboveGround | [E] | 15.2 m | Approximate exterior-photo proportion for the roof pediment above the first-floor triple-arched loggia | Updated from the earlier too-low placeholder; recalibrate against a rectified south facade. |
 | facade.doorBayInterval | [E] | 4 bays | Procedural modeling default until a rectified facade image is counted | Every fourth exterior bay is treated as a glazed door in LOD2/LOD3; actual count and placement require photo calibration. |
 | facade.stoneInlayBandWidth | [?] | 0.08 m | Procedural placeholder for the stone inlay described in the heritage brief | Band width and exact stone pattern are unknown; replace after close-up door photographs. |
 | facade.doorGlazingPattern | [?] | simple multi-panel colored glazing with vertical center stile | Placeholder derived from documented colored-glass doors | Do not treat panel count/color pattern as verified. |
