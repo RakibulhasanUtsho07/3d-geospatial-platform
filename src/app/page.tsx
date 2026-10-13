@@ -18,12 +18,18 @@ export default function HomePage() {
           standards-based architecture.
         </p>
 
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/map"
             className="inline-flex rounded-xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black transition hover:bg-zinc-200"
           >
             Open 3D Map
+          </Link>
+          <Link
+            href="/heritage/ahsan-manzil.html"
+            className="inline-flex rounded-xl border border-rose-300/30 bg-rose-300/10 px-5 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-300/20"
+          >
+            Explore Ahsan Manzil 3D
           </Link>
         </div>
       </section>
