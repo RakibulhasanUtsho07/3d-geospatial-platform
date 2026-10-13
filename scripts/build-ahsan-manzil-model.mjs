@@ -27,6 +27,9 @@ const DIM = {
   verandaSpan: V("facade", "verandaArchSpan"),
   porticoWidth: V("facade", "porticoWidth"),
   porticoDepth: V("facade", "porticoDepth"),
+  balustradeHeight: V("facade", "balustradeHeight"),
+  balusterSpacing: V("facade", "balusterSpacing"),
+  pinnacleHeight: V("facade", "rooflinePinnacleHeight"),
   pedimentPeak: V("facade", "pedimentPeakHeightAboveGround"),
   doorBayInterval: V("facade", "doorBayInterval"),
   stoneInlayBandWidth: V("facade", "stoneInlayBandWidth"),
@@ -385,7 +388,7 @@ function buildGlb(lod) {
   const n=byName,L=DIM.length,D=DIM.depth,half=D/2,xMin=-L/2,xMax=L/2;
   // The published description places the dome over the round room dividing
   // the two principal palace halves. Center that joint on the footprint origin.
-  const rangLength=L/2,split=0,domeX=0;
+  const rangLength=DIM.rangmahalLength,split=0,domeX=0;
   const plinthTop=DIM.ground+DIM.plinth;
   const gfBase=plinthTop,gfHeight=DIM.gf;
   const ffBase=gfBase+gfHeight+DIM.slab,ffHeight=DIM.ff;
@@ -429,10 +432,15 @@ function buildGlb(lod) {
         const z = side * (half - 0.32);
         const base = roofTop + DIM.parapet;
         box(n.Parapet, x, base + 0.18, z, 1.15, 0.36, 0.92, "trim");
-        verticalCylinder(n.Parapet, x, base + 0.32, base + 0.88, z, 0.13, "trim", 8);
+        verticalCylinder(
+          n.Parapet, x, base + 0.28 * DIM.pinnacleHeight,
+          base + 0.64 * DIM.pinnacleHeight, z, 0.13, "trim", 8,
+        );
         addDomeProfile(
-          n.Parapet, x, z, base + 0.72,
-          [[0.30, 0], [0.24, 0.20], [0.16, 0.42], [0.06, 0.62], [0.006, 0.82]],
+          n.Parapet, x, z, base + 0.45 * DIM.pinnacleHeight,
+          [[0.30, 0], [0.24, 0.20 * DIM.pinnacleHeight],
+            [0.16, 0.42 * DIM.pinnacleHeight], [0.06, 0.62 * DIM.pinnacleHeight],
+            [0.006, 0.82 * DIM.pinnacleHeight]],
           8, "roof",
         );
       }
@@ -468,8 +476,8 @@ function buildGlb(lod) {
   // obliquely. Keep this detail only in LOD3 to protect distant-view performance.
   if (lod === 3) {
     const railBase = ffBase + 0.22;
-    const railTop = ffBase + 1.12;
-    const balusterCount = Math.ceil(L / 0.85);
+    const railTop = railBase + DIM.balustradeHeight;
+    const balusterCount = Math.ceil(L / DIM.balusterSpacing);
     for (const side of [-1, 1]) {
       const railZ = side * (half + 2.26);
       barBetween(byName[side === 1 ? "Veranda_S" : "Veranda_N"],
