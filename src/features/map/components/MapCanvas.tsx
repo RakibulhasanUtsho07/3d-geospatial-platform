@@ -573,7 +573,7 @@ export default function MapCanvas({
         onTiltUp={() => cameraRef.current?.tiltUp()}
         onTiltDown={() => cameraRef.current?.tiltDown()}
         onResetOrientation={() =>
-          cameraRef.current?.resetOrientation()
+          engineRef.current?.focusAhsanManzil(650)
         }
       />
 
