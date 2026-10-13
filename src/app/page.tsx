@@ -25,12 +25,6 @@ export default function HomePage() {
           >
             Open 3D Map
           </Link>
-          <Link
-            href="/heritage/ahsan-manzil.html"
-            className="inline-flex rounded-xl border border-rose-300/30 bg-rose-300/10 px-5 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-300/20"
-          >
-            Explore Ahsan Manzil 3D
-          </Link>
         </div>
       </section>
     </main>
