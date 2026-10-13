@@ -680,29 +680,46 @@ function buildGlb(lod) {
   box(n.Parapet,andarCenterX,roofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
 
   for(const side of [-1,1]){
-    const rangZ=side*(half-.12);
-    box(n.Parapet,rangCenterX,roofTop+DIM.parapet/2,rangZ,rangLength,DIM.parapet,.4,"pink");
-    if(lod===3)for(let i=0;i<62;i++){
-      const x=split+(i+.5)*rangLength/62;
-      box(n.Parapet,x,roofTop+DIM.parapet*.54,side*(half-.31),.30,DIM.parapet*.55,.20,"trim");
-    }
-
-    const andarZ=andarCenterZ+side*(andarDepth/2-.12);
-    box(n.Parapet,andarCenterX,roofTop+DIM.parapet/2,andarZ,andarLength,DIM.parapet,.4,"pink");
-    if(lod===3)for(let i=0;i<28;i++){
-      const x=xMin+(i+.5)*andarLength/28;
-      box(n.Parapet,x,roofTop+DIM.parapet*.54,andarCenterZ+side*(andarDepth/2-.31),.30,DIM.parapet*.55,.20,"trim");
+    const rangZ=side*(half+.12);
+    const andarZ=andarCenterZ+side*(andarDepth/2+.12);
+    if(lod<3){
+      // Low-detail LODs keep a compact silhouette from neighbourhood scale.
+      box(n.Parapet,rangCenterX,roofTop+DIM.parapet/2,side*(half-.12),rangLength,DIM.parapet,.4,"pink");
+      box(n.Parapet,andarCenterX,roofTop+DIM.parapet/2,andarCenterZ+side*(andarDepth/2-.12),andarLength,DIM.parapet,.4,"pink");
+    }else{
+      // LOD3 uses the open baluster parapet from the HTML scene instead of
+      // a solid pink wall, which was making the roof read as a block.
+      box(n.Parapet,rangCenterX,roofTop+.71,rangZ,rangLength,.18,.42,"sceneTrim");
+      box(n.Parapet,andarCenterX,roofTop+.71,andarZ,andarLength,.18,.42,"sceneTrim");
+      for(let i=0;i<=28;i++){
+        const x=split+rangLength*i/28;
+        siteFrustum(n.Parapet,x,rangZ,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
+      }
+      for(let i=0;i<=34;i++){
+        const x=xMin+andarLength*i/34;
+        siteFrustum(n.Parapet,x,andarZ,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
+      }
     }
   }
 
-  // Close exposed roof edges only: east end of Rangmahal, west end of Andarmahal,
-  // and the step where the river-facing Rangmahal projects south of Andarmahal.
-  for (const [x,zCenter,depth] of [
-    [xMax-.2,0,D],
-    [split+.2,D/4,D/2],
-    [xMin+.2,andarCenterZ,andarDepth],
-  ]) {
-    box(n.Parapet,x,roofTop+DIM.parapet/2,zCenter,.4,DIM.parapet,depth,"pink");
+  // Short-end roof rails are open in the detailed model, as in the HTML scene.
+  // Distant LODs retain simple solid returns to avoid expensive tiny balusters.
+  const endRails=[
+    {x:xMax+.12,z:0,depth:D},
+    {x:split-.12,z:D/4,depth:D/2},
+    {x:xMin-.12,z:andarCenterZ,depth:andarDepth},
+  ];
+  for (const edge of endRails) {
+    if(lod<3){
+      box(n.Parapet,edge.x,roofTop+DIM.parapet/2,edge.z,.4,DIM.parapet,edge.depth,"pink");
+    }else{
+      box(n.Parapet,edge.x,roofTop+.71,edge.z,.42,.18,edge.depth,"sceneTrim");
+      const count=Math.max(4,Math.ceil(edge.depth/2));
+      for(let i=0;i<=count;i++){
+        const z=edge.z-edge.depth/2+edge.depth*i/count;
+        siteFrustum(n.Parapet,edge.x,z,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
+      }
+    }
   }
 
   // Small roofline pinnacles reinforce the main Rangmahal's symmetric silhouette.
@@ -905,7 +922,7 @@ function buildGlb(lod) {
   const rise=lod===3?DIM.stairRiser:ffBase/steps;
   const stairBaseWidth = DIM.stairWidth;
   const stairTopWidth = DIM.stairWidthTop;
-  const stairTopZ = half + 0.04; // upper tread meets the recessed upper-portal threshold
+  const stairTopZ = half + 2.7; // matches the reference scene's projecting upper stair landing
   if(lod===3){
     const modeledRun=steps*stepDepth,modeledRise=steps*rise;
     if(Math.abs(modeledRun-run)>.05){
