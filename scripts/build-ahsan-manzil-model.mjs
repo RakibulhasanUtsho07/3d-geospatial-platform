@@ -37,6 +37,7 @@ const DIM = {
   stairWidth: V("stair", "width"),
   stairRiser: V("stair", "riserHeight"),
   stairTread: V("stair", "treadDepth"),
+  stairWidthTop: V("stair", "topWidth"),
   stepCount: V("stair", "stepCount"),
   peak: V("dome", "peakHeight"),
   drumHeight: V("dome", "drumHeight"),
@@ -55,6 +56,8 @@ const COLORS = {
   marble: V("materials", "verandaFloor"),
   rail: "#6D444A",
   gold: "#B58B55",
+  stair: V("materials", "stairStone"),
+  wood: V("materials", "doorWood"),
 };
 const REQUIRED_NODES = config.requiredNodeNames;
 
@@ -191,7 +194,36 @@ function buildGlb(lod) {
         );
       }
     }
-    if(detail===2){
+    if (isDoor && detail >= 1) {
+      // Recessed wooden double-door leaf; the historic glazing is represented
+      // only by small upper panels because its exact pattern remains unknown.
+      const doorZ = glassZ + side * 0.055;
+      box(node, cx, base + stem / 2, doorZ, width * 0.88, stem * 0.90, 0.06, "wood");
+      box(node, cx, base + stem * 0.12, doorZ + side * 0.045, width * 0.92, 0.10, 0.05, "trim");
+      if (detail === 2) {
+        const paneWidth = width / 3 - 0.07;
+        const paneY = base + stem * 0.68;
+        const paneHeight = stem * 0.34;
+        for (let pane = 0; pane < 3; pane++) {
+          box(
+            node,
+            cx + (pane - 1) * width / 3,
+            paneY,
+            doorZ + side * 0.045,
+            paneWidth,
+            paneHeight,
+            0.045,
+            ["#A76E62", "#D4A77B", "#9A7A67"][pane],
+          );
+        }
+        // Timber rails and stiles remain visible around the coloured panes.
+        for (const x of [-1, 0, 1]) {
+          box(node, cx + x * width / 3, paneY, doorZ + side * 0.075, 0.045, paneHeight + 0.06, 0.045, "wood");
+        }
+        box(node, cx, base + stem * 0.50, doorZ + side * 0.075, width * 0.86, 0.05, 0.045, "wood");
+      }
+    }
+    if(detail===2 && !isDoor){
       // Window muntins sit just proud of the actual glazing, inside the reveal.
       const mullionZ=glassZ+side*.09;
       box(node,cx,base+stem*.52,mullionZ,.045,stem*.88,.04,"trim");
@@ -412,7 +444,7 @@ function buildGlb(lod) {
   const n=byName,L=DIM.length,D=DIM.depth,half=D/2,xMin=-L/2,xMax=L/2;
   // The published description places the dome over the round room dividing
   // the two principal palace halves. Center that joint on the footprint origin.
-  const rangLength=DIM.rangmahalLength,split=0,domeX=0;
+  const rangLength=DIM.rangmahalLength,split=0,domeX=(split+xMax)/2;
   const plinthTop=DIM.ground+DIM.plinth;
   const gfBase=plinthTop,gfHeight=DIM.gf;
   const ffBase=gfBase+gfHeight+DIM.slab,ffHeight=DIM.ff;
@@ -599,6 +631,9 @@ function buildGlb(lod) {
   const run=DIM.stairRun;
   const stepDepth=lod===3?DIM.stairTread:run/steps;
   const rise=lod===3?DIM.stairRiser:ffBase/steps;
+  const stairBaseWidth = DIM.stairWidth;
+  const stairTopWidth = DIM.stairWidthTop;
+  const stairTopZ = half + DIM.porticoDepth + 0.18;
   if(lod===3){
     const modeledRun=steps*stepDepth,modeledRise=steps*rise;
     if(Math.abs(modeledRun-run)>.05){
@@ -609,16 +644,38 @@ function buildGlb(lod) {
     }
   }
   for(let i=0;i<steps;i++){
-    const top=(i+1)*rise,z=half+run-stepDepth*(i+.5);
-    box(stair,domeX,top/2,z,DIM.stairWidth,top,stepDepth,"marble");
+    const t = steps <= 1 ? 1 : i / (steps - 1);
+    const top=(i+1)*rise;
+    const z=stairTopZ+run-stepDepth*(i+.5);
+    const width=stairBaseWidth+(stairTopWidth-stairBaseWidth)*t;
+    box(stair,domeX,top/2,z,width,top,stepDepth,"stair");
   }
   if(lod>=2){
-    for(const x of [domeX-DIM.stairWidth/2-.18,domeX+DIM.stairWidth/2+.18]){
-      const outerZ=half+run,innerZ=half;
-      barBetween(stair,[x,.35,outerZ],[x,ffBase+.25,innerZ],.14,"rail");
-      for(let i=1;i<10;i++){
-        const t=i/10,z=outerZ+(innerZ-outerZ)*t,y=.35+(ffBase+.25-.35)*t;
-        verticalCylinder(stair,x-.05,y-.08,y+.08,z,.055,"trim",8);
+    // Tapered cheek balustrades follow the stair and connect to the portal.
+    for(const side of [-1,1]){
+      const lowerX=domeX+side*(stairBaseWidth/2+.2);
+      const upperX=domeX+side*(stairTopWidth/2+.2);
+      const lowerZ=stairTopZ+run;
+      const upperZ=stairTopZ;
+      barBetween(stair,[lowerX,.35,lowerZ],[upperX,ffBase+.25,upperZ],lod===3?.24:.16,"rail");
+      barBetween(stair,[lowerX,.70,lowerZ],[upperX,ffBase+.55,upperZ],.10,"trim");
+      for(let i=1;i<12;i++){
+        const t=i/12;
+        const x=lowerX+(upperX-lowerX)*t;
+        const z=lowerZ+(upperZ-lowerZ)*t;
+        const y=.35+(ffBase+.25-.35)*t;
+        verticalCylinder(stair,x,y,y+.48,z,.045,"rail",6);
+      }
+    }
+    if(lod===3){
+      // Paired low lamp posts anchor the broad stair to the garden.
+      for(const side of [-1,1]){
+        const x=domeX+side*(stairBaseWidth/2+1.1),z=stairTopZ+run+.35;
+        box(stair,x,.18,z,.62,.36,.62,"trim");
+        verticalCylinder(stair,x,.36,1.05,z,.13,"rail",10);
+        box(stair,x,1.12,z,.48,.20,.48,"trim");
+        verticalCylinder(stair,x,1.22,1.72,z,.18,"trim",10);
+        addDomeProfile(stair,x,z,1.68,[[.19,0],[.14,.12],[.07,.24],[.006,.34]],10,"gold");
       }
     }
   }
