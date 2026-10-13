@@ -552,8 +552,10 @@ function buildGlb(lod) {
   // Model the short elevations of both blocks, including the exposed Rangmahal
   // west end beside the rear-set Andarmahal junction.
   addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);
-  addEndFacade("Rangmahal_GF", split, -1, [gf], 6, lod);
-  addEndFacade("Rangmahal_FF", split, -1, [ff], 6, lod);
+  // Only the south half of the Rangmahal west end is exposed; its north
+  // half joins the set-back Andarmahal instead of double-stacking two walls.
+  addEndFacade("Rangmahal_GF", split, -1, [gf], 6, lod, D / 4, D / 2);
+  addEndFacade("Rangmahal_FF", split, -1, [ff], 6, lod, D / 4, D / 2);
   addEndFacade("Rangmahal_GF", xMax, 1, [gf], 6, lod);
   addEndFacade("Rangmahal_FF", xMax, 1, [ff], 6, lod);
 
