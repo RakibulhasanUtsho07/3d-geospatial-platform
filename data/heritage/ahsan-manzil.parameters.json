@@ -624,7 +624,7 @@
         "value": 160,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Camera-framing estimate for the 62.7 m river-facing facade and 27.13 m dome peak",
+        "source": "Camera-framing estimate for the 55.8 m river-facing facade and 27.13 m dome peak",
         "note": "Designed to show the full facade and dome with a useful screen size; tune after a browser screenshot on the target display."
       },
       "footprintCameraRangeMeters": {
