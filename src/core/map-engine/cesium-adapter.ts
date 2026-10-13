@@ -3093,6 +3093,24 @@ export class CesiumAdapter implements MapEngine {
     this.flyToAhsanManzilOrbit(durationMs, "front");
   }
 
+  /** Match the rear-facing camera preset in the reference HTML scene. */
+  focusAhsanManzilRear(durationMs = 850): void {
+    this.stopAhsanManzilOrbitTour();
+    this.ahsanManzilOrbitHeadingDegrees = 0;
+    this.ahsanManzilOrbitPitchDegrees = -18;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
+    this.flyToAhsanManzilOrbit(durationMs, "front");
+  }
+
+  /** Match the east/west side camera preset in the reference HTML scene. */
+  focusAhsanManzilSide(durationMs = 850): void {
+    this.stopAhsanManzilOrbitTour();
+    this.ahsanManzilOrbitHeadingDegrees = 90;
+    this.ahsanManzilOrbitPitchDegrees = -18;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
+    this.flyToAhsanManzilOrbit(durationMs, "front");
+  }
+
   /**
    * Frame the entire provisional palace footprint in a 3D oblique view.
    * Use this instead of the closer facade view before orbiting the model.
