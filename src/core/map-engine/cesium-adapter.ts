@@ -131,7 +131,8 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadingLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadToken = 0;
-  private ahsanManzilOrbitHeadingDegrees = 0;
+  // Heading 180 approaches from the south/river-facing facade.
+  private ahsanManzilOrbitHeadingDegrees = 180;
   private ahsanManzilOrbitPitchDegrees = -22;
   private ahsanManzilOrbitRangeMeters = 190;
   private heritageManifestAssets: Record<string, string> | null = null;
@@ -3064,7 +3065,7 @@ export class CesiumAdapter implements MapEngine {
    * for keeping the long facade, stairs, and dome in view at once.
    */
   focusAhsanManzil(durationMs = 1200): void {
-    this.ahsanManzilOrbitHeadingDegrees = 0;
+    this.ahsanManzilOrbitHeadingDegrees = 180;
     this.ahsanManzilOrbitPitchDegrees = -22;
     this.ahsanManzilOrbitRangeMeters = 190;
     this.flyToAhsanManzilOrbit(durationMs);
