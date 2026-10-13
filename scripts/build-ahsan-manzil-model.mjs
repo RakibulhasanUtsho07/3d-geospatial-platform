@@ -302,7 +302,7 @@ function buildGlb(lod) {
             box(node,cx,floor.base+floor.crown+(floor.height-floor.crown)/2,wallCenter,w,floor.height-floor.crown,thickness,"pink");
           }
           fillFacadeArch(node,cx,floor.base,surface,side,w,floor.crown,thickness,lod===3?2:lod===2?1:0,((i+1)%Math.max(1,Math.round(DIM.doorBayInterval))===0));
-          if(lod===3 && i%2===0){
+          if(lod===3 && i < bays - 1){
             const px=x0+(i+1)*pitch-.11;
             box(node,px,floor.base+floor.height/2,surface+side*.10,.22,floor.height-.18,.20,"trim");
             box(node,px,floor.base+.14,surface+side*.12,.42,.24,.24,"trim");
@@ -326,6 +326,7 @@ function buildGlb(lod) {
   function addEndFacade(nodeName, edgeX, outwardSide, floors, bays, lod, centerZ = 0, depth = DIM.depth) {
     const node = byName[nodeName];
     const pitch = depth / bays;
+    const halfDepth = depth / 2;
     const angle = outwardSide > 0 ? 0 : Math.PI;
     const wallCenter = edgeX - outwardSide * DIM.wall / 2;
 
@@ -339,7 +340,7 @@ function buildGlb(lod) {
       }
 
       for (let i = 0; i < bays; i++) {
-        const cz = centerZ - half + (i + 0.5) * pitch;
+        const cz = centerZ - halfDepth + (i + 0.5) * pitch;
         const width = Math.min(floor.width, pitch - 0.35);
         const pierWidth = Math.max(0.12, (pitch - width) / 2);
 
@@ -381,7 +382,7 @@ function buildGlb(lod) {
       );
       orientedBoxXZ(
         node, edgeX + outwardSide * 0.08,
-        floor.base + floor.height - 0.12, 0,
+        floor.base + floor.height - 0.12, centerZ,
         depth, 0.24, 0.18, angle, "trim",
       );
     }
@@ -426,7 +427,6 @@ function buildGlb(lod) {
     const spring=openingBottom+archHeight-width/2;
     const crown=spring+width/2;
     const sidePier=Math.max(.12,(faceLength-width)/2);
-    const openingMid=(openingBottom+crown)/2;
 
     for(const side of [-1,1]){
       orientedBoxXZ(
