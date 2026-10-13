@@ -205,12 +205,32 @@ function buildGlb(lod) {
         box(node, cx, base + stem * 0.50, doorZ + side * 0.075, width * 0.86, 0.05, 0.045, "wood");
       }
     }
+    if (!isDoor && detail >= 1) {
+      // The reference Three.js scene uses dark green shutters rather than
+      // plain pale glazing. Keep the shutters recessed inside the arch and
+      // add individual timber/painted slats at the highest LOD.
+      const shutterZ = glassZ + side * 0.105;
+      const shutterWidth = width * 0.76;
+      const shutterHeight = stem * 0.62;
+      const shutterBase = base + stem * 0.08;
+      box(node, cx, shutterBase + shutterHeight / 2, shutterZ,
+        shutterWidth, shutterHeight, 0.055, "#45674D");
+      if (detail === 2) {
+        for (let slat = 0; slat < 5; slat++) {
+          const x = cx - shutterWidth * 0.38 + slat * shutterWidth * 0.19;
+          box(node, x, shutterBase + shutterHeight / 2,
+            shutterZ + side * 0.04, 0.035, shutterHeight * 0.94, 0.035, "#E99C8A");
+        }
+        box(node, cx, shutterBase + shutterHeight * 0.52,
+          shutterZ + side * 0.055, shutterWidth * 0.98, 0.045, 0.035, "#392B27");
+      }
+    }
     if(detail===2 && !isDoor){
-      // Window muntins sit just proud of the actual glazing, inside the reveal.
+      // Traditional narrow muntins and transom divisions remain visible above
+      // the shutter panel so the opening reads as an arched sash, not a solid box.
       const mullionZ=glassZ+side*.09;
-      box(node,cx,base+stem*.52,mullionZ,.045,stem*.88,.04,"trim");
-      box(node,cx,base+stem*.28,mullionZ,width*.82,.04,.04,"trim");
-      box(node,cx,base+stem*.70,mullionZ,width*.82,.04,.04,"trim");
+      box(node,cx,base+stem*.82,mullionZ,.045,stem*.24,.04,"trim");
+      box(node,cx,base+stem*.76,mullionZ,width*.72,.04,.04,"trim");
     }
     if(isDoor && detail>=1){
       const inlay= DIM.stoneInlayBandWidth;
