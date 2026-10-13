@@ -370,11 +370,11 @@
         "note": "28 risers at 0.23 m give approximately 6.44 m rise to the upper portal."
       },
       "treadDepth": {
-        "value": 0.57,
+        "value": 0.34,
         "unit": "m",
         "confidence": "[E]",
         "source": "16 m total stair run / 28 steps",
-        "note": "Working tread depth chosen so the modeled treads fill the declared run."
+        "note": "Matched to the reference HTML stair geometry (0.34 m per tread); visual estimate pending survey."
       },
       "stepCount": {
         "value": 28,
@@ -396,11 +396,11 @@
         "source": "Stylized placeholder"
       },
       "runLength": {
-        "value": 16,
+        "value": 9.52,
         "unit": "m",
         "confidence": "[E]",
         "source": "Procedural placeholder",
-        "note": "Horizontal garden run from the upper portal toward the river; not site-surveyed."
+        "note": "Matched to the reference HTML: 28 steps × 0.34 m tread depth = 9.52 m horizontal run. Visual estimate; verify against measured site drawings."
       },
       "topWidth": {
         "value": 13.5,
