@@ -935,7 +935,7 @@ function buildGlb(lod) {
   for(let i=0;i<steps;i++){
     const t = steps <= 1 ? 1 : i / (steps - 1);
     const top=(i+1)*rise;
-    const z=stairTopZ+run-stepDepth*(i+.5);
+    const z=stairTopZ+stepDepth*(steps-1-i);
     const width=stairBaseWidth+(stairTopWidth-stairBaseWidth)*t;
     box(stair,domeX,top/2,z,width,top,stepDepth,"stair");
   }
