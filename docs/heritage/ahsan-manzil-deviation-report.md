@@ -42,8 +42,8 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | Georeference.units | [V] | meters | User request |  |
 | footprint.overallLength | [C] | 125.4 m | Bangladesh Tourism Board / Parjatan | Working dimension pending footprint trace. |
 | footprint.overallDepth | [C] | 28.75 m | Bangladesh Tourism Board | Working dimension; resolve against satellite/plan. |
-| footprint.rangmahalBlockLength | [C] | 55.8 m | 183 ft hypothesis in supplied brief | Assumes this dimension is the eastern dome block. |
-| footprint.andarmahalBlockLength | [E] | 69.6 m | 125.4 m minus 55.8 m | Derived remainder, not independently surveyed. |
+| footprint.rangmahalBlockLength | [C] | 62.7 m | Half of the 125.4 m overall length; central round-room/equal-halves description | Working eastern half so the dome/round room can sit at the central joint; confirm by footprint tracing. |
+| footprint.andarmahalBlockLength | [E] | 62.7 m | 125.4 m / 2, using the published equal-halves description | Derived working western half; not independently surveyed. |
 | footprint.interiorGridEW | [V] | 4 bays | Supplied brief | Recorded separately; not treated as exterior opening count. |
 | footprint.interiorGridNS | [V] | 5 bays | Supplied brief | Recorded separately; not treated as exterior opening count. |
 | footprint.exteriorBayCount | [E] | 24 bays per long facade | Procedural placeholder | Replace by counting openings on rectified elevation photos. |
@@ -67,8 +67,11 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | facade.pilasterOrder | [V] | simplified Corinthian-type | Supplied brief | Fine capital and fluting geometry simplified. |
 | facade.capitalFluting | [?] | smooth simplified capital | Placeholder; needs close-up |  |
 | facade.coloredGlazing | [?] | dark rose/amber panels with simple mullions | Placeholder; exact pattern unknown |  |
-| facade.porticoWidth | [E] | 16 m | Procedural placeholder until elevation is measured | Width of the central projecting portico/pediment proxy. |
-| facade.porticoDepth | [E] | 4 m | Procedural placeholder until footprint/photo calibration | Projection depth of the central portico. |
+| facade.porticoWidth | [E] | 20 m | Exterior photo proportion | Widened central portico proxy; calibrate against a rectified elevation. |
+| facade.porticoDepth | [E] | 4 m | Procedural placeholder until footprint/photo calibration | Projection depth of the central portico. | 
+| facade.balustradeHeight | [E] | 0.9 m | Visible upper-veranda guardrail proportion in exterior photographs | Approximate guardrail height above veranda floor. |
+| facade.balusterSpacing | [E] | 0.85 m | Procedural rendering parameter | Approximate post interval; replace after elevation/photo calibration. |
+| facade.rooflinePinnacleHeight | [E] | 1.5 m | Visible small roofline finials/pinnacles in exterior photographs | Stylized height above parapet; not a measured ornamental profile. |
 | facade.pedimentPeakHeightAboveGround | [E] | 8.35 m | Procedural pediment proxy | Absolute top of the triangular pediment. Recalibrate against a rectified south facade. |
 | facade.doorBayInterval | [E] | 4 bays | Procedural modeling default until a rectified facade image is counted | Every fourth exterior bay is treated as a glazed door in LOD2/LOD3; actual count and placement require photo calibration. |
 | facade.stoneInlayBandWidth | [?] | 0.08 m | Procedural placeholder for the stone inlay described in the heritage brief | Band width and exact stone pattern are unknown; replace after close-up door photographs. |
@@ -76,7 +79,7 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | stair.riserHeight | [E] | 0.16 m | Supplied brief |  |
 | stair.treadDepth | [E] | 0.4 m | Procedural placeholder |  |
 | stair.stepCount | [?] | 40 steps | Derived from 6.4 m rise / 0.16 m riser |  |
-| stair.width | [E] | 12 m | Portal-width approximation |  |
+| stair.width | [E] | 22 m | Approximate front-elevation proportion from public exterior photographs | Widened so the broad stair reads proportionately against the central portal; trace before survey-grade claims. |
 | stair.sideRail | [?] | simple low side rails | Stylized placeholder |  |
 | stair.runLength | [E] | 16 m | Procedural placeholder | Horizontal garden run from the upper portal toward the river; not site-surveyed. |
 | dome.peakHeight | [V] | 27.13 m above ground | Bangladesh Tourism Board heritage newsletter |  |
