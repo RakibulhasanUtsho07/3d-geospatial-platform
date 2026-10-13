@@ -789,7 +789,7 @@ function buildGlb(lod) {
   const rise=lod===3?DIM.stairRiser:ffBase/steps;
   const stairBaseWidth = DIM.stairWidth;
   const stairTopWidth = DIM.stairWidthTop;
-  const stairTopZ = half + DIM.porticoDepth + 0.18;
+  const stairTopZ = half + 0.04; // upper tread meets the recessed upper-portal threshold
   if(lod===3){
     const modeledRun=steps*stepDepth,modeledRise=steps*rise;
     if(Math.abs(modeledRun-run)>.05){
