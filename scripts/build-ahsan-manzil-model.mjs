@@ -175,28 +175,7 @@ function buildGlb(lod) {
       box(node,cx+radius+.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       archBand(node,cx,spring,trimZ,radius+.02,.085,"trim",detail===2?16:10);
     }
-    if (isDoor && detail === 2) {
-      // Muted stained-glass panels are a visual approximation only; the exact
-      // historic colours/pattern remain unverified. Keep them on the recessed
-      // glazing plane rather than floating out on the exterior stone face.
-      const paneWidth = width / 3 - 0.055;
-      const paneHeight = Math.max(0.35, stem * 0.84);
-      const paneY = base + stem / 2;
-      const paneZ = glassZ + side * 0.045;
-      const paneColors = ["#713F54", "#B78350", "#536C62"];
-      for (let pane = 0; pane < 3; pane++) {
-        box(
-          node,
-          cx + (pane - 1) * width / 3,
-          paneY,
-          paneZ,
-          paneWidth,
-          paneHeight,
-          0.05,
-          paneColors[pane],
-        );
-      }
-    }
+    // Door glazing is modelled on the wooden leaf below, inside the reveal.
     if (isDoor && detail >= 1) {
       // Recessed wooden double-door leaf; the historic glazing is represented
       // only by small upper panels because its exact pattern remains unknown.
@@ -317,6 +296,12 @@ function buildGlb(lod) {
         const surface=centerZ+side*half,wallCenter=surface-side*thickness/2;
         for(let i=0;i<bays;i++){
           const cx=x0+(i+.5)*pitch;
+          // Keep the projecting triple-arched portico open instead of stacking
+          // a flat facade behind it. Upper portal doors are placed separately.
+          if (
+            nodeName.startsWith("Rangmahal") &&
+            Math.abs(cx - (x0 + x1) / 2) < DIM.porticoWidth / 2 + pitch * 0.05
+          ) continue;
           const w=Math.min(floor.width,pitch-.35),pierWidth=Math.max(.12,(pitch-w)/2);
           // Two separate piers leave an actual opening instead of painting glass onto a solid wall.
           box(node,cx-w/2-pierWidth/2,floor.base+floor.height/2,wallCenter,pierWidth,floor.height,thickness,"pink");
@@ -686,7 +671,7 @@ function buildGlb(lod) {
   // Matching south (river-front) and north (rear) triple-arched porticos.
   for(const [name,side] of [["Portico_S",1],["Portico_N",-1]]){
     const width=DIM.porticoWidth,depth=DIM.porticoDepth,z=side*(half+depth/2+.18),faceZ=z+side*depth/2;
-    box(byName[name],domeX,gfBase+gfHeight+.12,side*(half+depth/2),width,.24,depth,"marble");
+    box(byName[name],domeX,ffBase-.15,side*(half+depth/2),width,.30,depth,"marble");
     if(lod===1){
       box(byName[name],domeX,gfBase+gfHeight/2,z,width,gfHeight,.5,"pink");
     }else{
@@ -703,7 +688,7 @@ function buildGlb(lod) {
         archBand(byName[name],cx,spring,faceZ,span/2,.15,"trim",16);
       }
       // Ground-floor portico roof / first-floor porch deck.
-      box(byName[name],domeX,gfBase+gfHeight-.06,faceZ,width+.5,.3,.8,"pink");
+      box(byName[name],domeX,ffBase-.15,faceZ,width+.5,.3,.8,"pink");
 
       // Upper-storey triple-arched loggia. The former model stopped at the
       // ground-floor arches, which made the most recognizable central facade
@@ -730,6 +715,13 @@ function buildGlb(lod) {
           archBand(byName[name], cx, upperSpring, faceZ, span / 2, .17, "trim", lod === 3 ? 20 : 12);
         }
         box(byName[name], domeX, upperTop - .06, faceZ, width + .65, .28, .76, "trim");
+
+        // Recessed timber door with an arched glazed head behind the centre
+        // upper arch. Side arches remain visually open.
+        fillFacadeArch(
+          byName[name], domeX, upperBase, side * half, side,
+          3.8, 4.2, DIM.wall, lod === 3 ? 2 : lod === 2 ? 1 : 0, true,
+        );
 
         if (lod === 3) {
           // Balcony rails are segmented at the centre so the main doorway remains clear.
