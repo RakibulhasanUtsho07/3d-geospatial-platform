@@ -4,6 +4,8 @@ type MapControlsProps = {
   disabled: boolean;
   onHome: () => void;
   onAhsanManzil: () => void;
+  onOrbitLeft: () => void;
+  onOrbitRight: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onRotateLeft: () => void;
@@ -44,6 +46,8 @@ export default function MapControls({
   disabled,
   onHome,
   onAhsanManzil,
+  onOrbitLeft,
+  onOrbitRight,
   onZoomIn,
   onZoomOut,
   onRotateLeft,
@@ -126,10 +130,26 @@ export default function MapControls({
         title="Fly to Ahsan Manzil"
         disabled={disabled}
         onClick={onAhsanManzil}
-        className="rounded-xl border border-white/10 bg-zinc-950/85 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-2xl backdrop-blur-xl transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-xl border border-rose-200/20 bg-rose-950/90 px-3 py-2 text-xs font-semibold text-rose-50 shadow-2xl backdrop-blur-xl transition hover:bg-rose-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Ahsan Manzil
       </button>
+
+      <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl" aria-label="Orbit around Ahsan Manzil">
+        <ControlButton
+          label="Orbit Ahsan Manzil 45 degrees left"
+          symbol="↶"
+          disabled={disabled}
+          onClick={onOrbitLeft}
+        />
+        <span className="px-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">Orbit</span>
+        <ControlButton
+          label="Orbit Ahsan Manzil 45 degrees right"
+          symbol="↷"
+          disabled={disabled}
+          onClick={onOrbitRight}
+        />
+      </div>
     </div>
   );
 }
