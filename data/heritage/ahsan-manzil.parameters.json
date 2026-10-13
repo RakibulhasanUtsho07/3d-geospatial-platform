@@ -611,6 +611,43 @@
         "source": "Rendering heuristic in heritage-landmarks.mjs",
         "note": "Rendering threshold, not a building measurement."
       }
+    },
+    "runtimeCamera": {
+      "frontFocusOffsetEastMeters": {
+        "value": 31.35,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Half of the provisional 62.7 m Rangmahal river-front width",
+        "note": "Offsets the perspective camera target east of the provisional total-footprint origin so the symmetrical south facade/dome axis is centred. It is a view parameter, not a survey adjustment to the building anchor."
+      },
+      "frontCameraRangeMeters": {
+        "value": 160,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera-framing estimate for the 62.7 m river-facing facade and 27.13 m dome peak",
+        "note": "Designed to show the full facade and dome with a useful screen size; tune after a browser screenshot on the target display."
+      },
+      "footprintCameraRangeMeters": {
+        "value": 205,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera-framing estimate for the provisional 125.4 m overall footprint",
+        "note": "Used by the north-up Top view to fit the complete footprint with margins; tune after footprint trace."
+      },
+      "orbitPitchDegrees": {
+        "value": -18,
+        "unit": "degrees",
+        "confidence": "[E]",
+        "source": "Visual camera framing estimate",
+        "note": "Low oblique angle for the front view and guided 360-degree orbit; not a building measurement."
+      },
+      "orbitDegreesPerSecond": {
+        "value": 10,
+        "unit": "degrees_per_second",
+        "confidence": "[E]",
+        "source": "Usability choice for the guided 360-degree inspection camera",
+        "note": "One revolution is approximately 36 seconds; pause with Stop tour."
+      }
     }
   },
   "modelAssets": {
