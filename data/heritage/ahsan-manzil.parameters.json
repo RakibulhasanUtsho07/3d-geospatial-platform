@@ -668,11 +668,11 @@
         "note": "Used for the whole-model oblique view, all manual orbit steps, guided 360-degree tour, and north-up Top view so the 125.4 m stepped footprint stays inside frame."
       },
       "orbitPitchDegrees": {
-        "value": -24,
+        "value": -14,
         "unit": "degrees",
         "confidence": "[E]",
         "source": "Visual camera framing estimate",
-        "note": "Oblique camera angle chosen to keep facade detail, dome profile, stairs and side depth visible during the orbit; not a building measurement."
+        "note": "Matches the low oblique hero angle in the reference Three.js HTML scene; camera framing preference, not a measured heritage parameter."
       },
       "orbitDegreesPerSecond": {
         "value": 8,
