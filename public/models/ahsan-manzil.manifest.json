@@ -102,6 +102,31 @@
         "stoneInlayBandWidthMeters": 0.08,
         "stoneInlayConfidence": "[?]",
         "note": "Door bay placements and inlay width remain provisional."
+      },
+      "contextNodes": [
+        "Site_Ground",
+        "Site_River",
+        "Site_Approach",
+        "Site_Pond",
+        "Site_Family_Mosque",
+        "Site_Stable",
+        "Site_Trees",
+        "Site_Context_Blocks"
+      ],
+      "siteContext": {
+        "source": "Ahsan Manzil reference Three.js HTML scene",
+        "includes": [
+          "ground plane",
+          "Buriganga river plane",
+          "approach path",
+          "pond",
+          "illustrative family mosque",
+          "stable/service building",
+          "70 deterministic tree placements",
+          "contextual Old Dhaka building blocks"
+        ],
+        "confidence": "[E]",
+        "note": "Illustrative surrounding geometry copied from the reference scene; the water, tree, mosque and neighbourhood placements are visual context rather than surveyed site assets."
       }
     }
   ]
