@@ -43,6 +43,12 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
     for (const required of requiredNodes) {
       assert.ok(nodes.includes(required), "LOD" + lod + " is missing " + required);
     }
+    for (const contextNode of [
+      "Site_Ground", "Site_River", "Site_Approach", "Site_Pond",
+      "Site_Family_Mosque", "Site_Stable", "Site_Trees", "Site_Context_Blocks",
+    ]) {
+      assert.ok(nodes.includes(contextNode), "LOD" + lod + " is missing reference scene context " + contextNode);
+    }
   }
 });
 
@@ -51,7 +57,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
   assert.ok(builder.includes("const split = xMin + andarLength;"));
   assert.ok(builder.includes("const domeX = (split + xMax) / 2;"));
-  assert.ok(builder.includes("const stairTopZ = half + 0.04;"));
+  assert.ok(builder.includes("const stairTopZ = half + 2.7;"));
   assert.ok(builder.includes("The projecting triple-arched portico is an open"));
   assert.ok(builder.includes("Recessed timber door with an arched glazed head"));
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
@@ -77,7 +83,8 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.stair.topWidth.value, 13.5);
   assert.equal(config.parameters.stair.stepCount.value, 28);
   assert.equal(config.parameters.stair.riserHeight.value, 0.23);
-  assert.equal(config.parameters.stair.treadDepth.value, 0.57);
+  assert.equal(config.parameters.stair.treadDepth.value, 0.34);
+  assert.equal(config.parameters.stair.runLength.value, 9.52);
   assert.equal(config.parameters.materials.facadePink.value, "#E1917D");
   assert.equal(config.parameters.materials.trimOffWhite.value, "#E99C8A");
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
