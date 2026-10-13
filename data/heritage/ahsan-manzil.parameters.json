@@ -553,15 +553,16 @@
         "note": "Warm salmon pink. Sample a colour-managed daylight photo for final calibrated RGB."
       },
       "trimOffWhite": {
-        "value": "#E99C8A",
+        "value": "#ECAE9B",
         "confidence": "[E]",
         "source": "User-supplied daylight photo estimate",
-        "note": "Trim stays in the same pink family as the body; the earlier off-white trim was incorrect."
+        "note": "Matched to the warm peach trim in the reference Three.js HTML scene; visual estimate, not a colour-calibrated heritage survey."
       },
       "glass": {
-        "value": "#583943",
-        "confidence": "[?]",
-        "source": "Generic dark glazing proxy"
+        "value": "#392B27",
+        "confidence": "[E]",
+        "source": "Dark recessed opening colour sampled from the reference HTML scene palette",
+        "note": "Use a near-charcoal brown for recessed arched openings beneath the green shutters."
       },
       "roof": {
         "value": "#CC8274",
