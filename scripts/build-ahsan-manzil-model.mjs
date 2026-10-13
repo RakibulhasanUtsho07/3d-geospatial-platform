@@ -409,36 +409,62 @@ function buildGlb(lod) {
   function drumFaceWall(node,theta,faceLength,apothem,baseY,topY,cx,cz,lod){
     const tx=-Math.sin(theta),tz=Math.cos(theta),nx=Math.cos(theta),nz=Math.sin(theta);
     const centerX=cx+nx*apothem,centerZ=cz+nz*apothem,depth=.58,height=topY-baseY;
-    const isFrontBack=Math.abs(Math.abs(Math.sin(theta))-1)<.001;
-    const openCount=isFrontBack?Math.max(0,Math.floor(DIM.drumOpeningCount/2)):0;
-    if(!openCount||lod===1){
+    if(lod===1){
       orientedBoxXZ(node,centerX,(baseY+topY)/2,centerZ,faceLength,height,depth,theta,"pink");
       return;
     }
-    const width=Math.min(DIM.drumOpeningWidth,faceLength*.28);
-    const crown=Math.min(DIM.drumOpeningHeight,height-.6);
-    const offsets=openCount===1?[0]:[-1.1,1.1];
-    const holeIntervals=offsets.map(u=>[u-width/2,u+width/2]);
-    const ranges=[-faceLength/2,...holeIntervals.flat(),faceLength/2].sort((a,b)=>a-b);
-    const unique=ranges.filter((v,i)=>i===0||Math.abs(v-ranges[i-1])>.001);
-    for(let i=0;i<unique.length-1;i++){
-      const a=unique[i],b=unique[i+1],mid=(a+b)/2;
-      const overlaps=holeIntervals.some(([l,r])=>mid>l&&mid<r);
-      if(!overlaps){
-        orientedBoxXZ(node,centerX+tx*mid,(baseY+topY)/2,centerZ+tz*mid,b-a,height,depth,theta,"pink");
-      }else{
-        const openingBottom=baseY+.6,openingTop=openingBottom+crown;
-        if(openingBottom>baseY){
-          orientedBoxXZ(node,centerX+tx*mid,(baseY+openingBottom)/2,centerZ+tz*mid,b-a,openingBottom-baseY,depth,theta,"pink");
-        }
-        if(topY>openingTop){
-          orientedBoxXZ(node,centerX+tx*mid,(openingTop+topY)/2,centerZ+tz*mid,b-a,topY-openingTop,depth,theta,"pink");
-        }
+
+    // Eight open arched bays create the documented columned/fenestrated drum.
+    // Do not fill these openings with glass: the upper rotunda must read as a
+    // colonnade when viewed from the front, rear, and all diagonal angles.
+    const width=Math.min(DIM.drumOpeningWidth,faceLength*.64);
+    const archHeight=Math.min(DIM.drumOpeningHeight,height-1.15);
+    const openingBottom=baseY+.48;
+    const spring=openingBottom+archHeight-width/2;
+    const crown=spring+width/2;
+    const sidePier=Math.max(.12,(faceLength-width)/2);
+    const openingMid=(openingBottom+crown)/2;
+
+    for(const side of [-1,1]){
+      orientedBoxXZ(
+        node,centerX+tx*side*(width/2+sidePier/2),(baseY+topY)/2,
+        centerZ+tz*side*(width/2+sidePier/2),
+        sidePier,height,depth,theta,"pink",
+      );
+    }
+    if(openingBottom>baseY){
+      orientedBoxXZ(
+        node,centerX,(baseY+openingBottom)/2,centerZ,
+        width,openingBottom-baseY,depth,theta,"pink",
+      );
+    }
+    if(topY>crown){
+      orientedBoxXZ(
+        node,centerX,(crown+topY)/2,centerZ,
+        width,topY-crown,depth,theta,"pink",
+      );
+    }
+
+    // A narrow moulded arch ring frames the void. Spring posts sit at the
+    // opening jambs, while the eight octagon-corner columns are added outside.
+    facetedArchBand(node,centerX,centerZ,theta,spring,width/2,.16,"trim",lod===3?20:12);
+    if(lod===3){
+      for(const u of [-width/2,width/2]){
+        verticalCylinder(
+          node,centerX+tx*u,openingBottom,spring,centerZ+tz*u,.105,"trim",10,
+        );
       }
     }
-    for(const [left,right] of holeIntervals){
-      fillFacetedArch(node,centerX+tx*((left+right)/2),baseY+.6,centerZ+tz*((left+right)/2),theta,width,crown,depth,lod===3?2:1);
-    }
+
+    // Continuous base and crown courses visually tie all eight drum faces together.
+    orientedBoxXZ(
+      node,centerX,baseY+.12,centerZ,
+      faceLength+.20,.24,depth+.20,theta,"trim",
+    );
+    orientedBoxXZ(
+      node,centerX,topY-.10,centerZ,
+      faceLength+.35,.22,depth+.35,theta,"trim",
+    );
   }
 
   const n=byName,L=DIM.length,D=DIM.depth,half=D/2,xMin=-L/2,xMax=L/2;
