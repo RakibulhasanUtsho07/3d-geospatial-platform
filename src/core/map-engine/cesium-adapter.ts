@@ -11,7 +11,7 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
-import { AHSAN_MANZIL_CAMERA, SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
+import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -104,8 +104,6 @@ type FeatureSelectionListener = (
   feature: MapFeatureSelection | null,
 ) => void;
 
-const INITIAL_CAMERA = AHSAN_MANZIL_CAMERA;
-
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
 
@@ -133,6 +131,9 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadingLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadToken = 0;
+  private ahsanManzilOrbitHeadingDegrees = 0;
+  private ahsanManzilOrbitPitchDegrees = -22;
+  private ahsanManzilOrbitRangeMeters = 190;
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
 
@@ -254,19 +255,23 @@ export class CesiumAdapter implements MapEngine {
     this.viewer = viewer;
     this.addHeritageLandmarkMarkers(viewer, Cesium);
 
-    // Set the default heritage landmark immediately; do not wait for building data.
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(
-        INITIAL_CAMERA.longitude,
-        INITIAL_CAMERA.latitude,
-        INITIAL_CAMERA.height,
+    // Start with an actual target-centred perspective on the palace, rather
+    // than a camera placed directly over the pin and looking past the building.
+    const ahsanManzilCenter = Cesium.Cartesian3.fromDegrees(
+      AHSAN_MANZIL_GEOREFERENCE.longitude,
+      AHSAN_MANZIL_GEOREFERENCE.latitude,
+      10,
+    );
+    viewer.camera.lookAt(
+      ahsanManzilCenter,
+      new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
+        Cesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
+        this.ahsanManzilOrbitRangeMeters,
       ),
-      orientation: {
-        heading: Cesium.Math.toRadians(INITIAL_CAMERA.heading),
-        pitch: Cesium.Math.toRadians(INITIAL_CAMERA.pitch),
-        roll: Cesium.Math.toRadians(INITIAL_CAMERA.roll),
-      },
-    });
+    );
+    // Release lookAt's local transform so regular Cesium navigation remains free.
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
 
     try {
       const imageryProvider =
@@ -3051,6 +3056,49 @@ export class CesiumAdapter implements MapEngine {
       },
       duration: durationMs / 1000,
     });
+  }
+
+  /**
+   * Smoothly frame the entire palace from its river-facing south facade.
+   * A bounding sphere is much more reliable than an arbitrary camera altitude
+   * for keeping the long facade, stairs, and dome in view at once.
+   */
+  focusAhsanManzil(durationMs = 1200): void {
+    this.ahsanManzilOrbitHeadingDegrees = 0;
+    this.ahsanManzilOrbitPitchDegrees = -22;
+    this.ahsanManzilOrbitRangeMeters = 190;
+    this.flyToAhsanManzilOrbit(durationMs);
+  }
+
+  /** Orbit around the palace centre in fixed angular steps, keeping it framed. */
+  orbitAhsanManzil(stepDegrees: number): void {
+    if (!Number.isFinite(stepDegrees)) return;
+    this.ahsanManzilOrbitHeadingDegrees =
+      ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
+    this.flyToAhsanManzilOrbit(650);
+  }
+
+  private flyToAhsanManzilOrbit(durationMs: number): void {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+
+    const center = Cesium.Cartesian3.fromDegrees(
+      AHSAN_MANZIL_GEOREFERENCE.longitude,
+      AHSAN_MANZIL_GEOREFERENCE.latitude,
+      10,
+    );
+    // Radius covers the 125.4 m long footprint plus the dome and ornamental roofline.
+    const bounds = new Cesium.BoundingSphere(center, 72);
+    viewer.camera.flyToBoundingSphere(bounds, {
+      duration: Math.max(0, durationMs) / 1000,
+      offset: new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
+        Cesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
+        this.ahsanManzilOrbitRangeMeters,
+      ),
+    });
+    viewer.scene.requestRender();
   }
 
   getState(): MapEngineState {
