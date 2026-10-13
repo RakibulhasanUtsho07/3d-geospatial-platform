@@ -133,8 +133,11 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLoadToken = 0;
   // Heading 180 approaches from the south/river-facing facade.
   private ahsanManzilOrbitHeadingDegrees = 180;
-  private ahsanManzilOrbitPitchDegrees = -22;
-  private ahsanManzilOrbitRangeMeters = 190;
+  private ahsanManzilOrbitPitchDegrees = -18;
+  private ahsanManzilOrbitRangeMeters = 205;
+  private ahsanManzilOrbitFrame: number | null = null;
+  private ahsanManzilOrbitTourActive = false;
+  private ahsanManzilOrbitLastTimestamp: number | null = null;
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
 
@@ -2845,6 +2848,7 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    this.stopAhsanManzilOrbitTour();
     this.restoreSelectedBuilding();
     this.heritageModelLoadToken += 1;
     this.heritageModel = null;
@@ -3064,19 +3068,94 @@ export class CesiumAdapter implements MapEngine {
    * A bounding sphere is much more reliable than an arbitrary camera altitude
    * for keeping the long facade, stairs, and dome in view at once.
    */
+  /** Fit the complete stepped palace footprint from the river-facing side. */
   focusAhsanManzil(durationMs = 1200): void {
+    this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees = 180;
-    this.ahsanManzilOrbitPitchDegrees = -22;
-    this.ahsanManzilOrbitRangeMeters = 190;
+    this.ahsanManzilOrbitPitchDegrees = -18;
+    this.ahsanManzilOrbitRangeMeters = 205;
     this.flyToAhsanManzilOrbit(durationMs);
   }
 
-  /** Orbit around the palace centre in fixed angular steps, keeping it framed. */
+  /** North-up orthographic-like view for checking the full footprint and orientation. */
+  focusAhsanManzilTopDown(durationMs = 850): void {
+    this.stopAhsanManzilOrbitTour();
+    this.ahsanManzilOrbitHeadingDegrees = 0;
+    this.ahsanManzilOrbitPitchDegrees = -88.5;
+    this.ahsanManzilOrbitRangeMeters = 205;
+    this.flyToAhsanManzilOrbit(durationMs);
+  }
+
+  /** Orbit around the overall footprint in fixed angular steps, keeping it framed. */
   orbitAhsanManzil(stepDegrees: number): void {
     if (!Number.isFinite(stepDegrees)) return;
+    this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees =
       ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
     this.flyToAhsanManzilOrbit(650);
+  }
+
+  /** Start a smooth 360-degree guided orbit around the whole palace. */
+  startAhsanManzilOrbitTour(): void {
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed() || this.ahsanManzilOrbitTourActive) return;
+
+    this.ahsanManzilOrbitTourActive = true;
+    this.ahsanManzilOrbitLastTimestamp = null;
+    const center = Cesium.Cartesian3.fromDegrees(
+      AHSAN_MANZIL_GEOREFERENCE.longitude,
+      AHSAN_MANZIL_GEOREFERENCE.latitude,
+      10,
+    );
+
+    const tick = (timestamp: number) => {
+      if (!this.ahsanManzilOrbitTourActive) return;
+      const activeViewer = this.viewer;
+      const activeCesium = this.cesium;
+      if (!activeViewer || !activeCesium || activeViewer.isDestroyed()) {
+        this.stopAhsanManzilOrbitTour();
+        return;
+      }
+
+      if (this.ahsanManzilOrbitLastTimestamp !== null) {
+        const elapsed = Math.min(50, Math.max(0, timestamp - this.ahsanManzilOrbitLastTimestamp));
+        // A complete lap takes about 36 seconds: slow enough to inspect details.
+        this.ahsanManzilOrbitHeadingDegrees =
+          (this.ahsanManzilOrbitHeadingDegrees + elapsed * 0.01) % 360;
+      }
+      this.ahsanManzilOrbitLastTimestamp = timestamp;
+
+      activeViewer.camera.lookAt(
+        center,
+        new activeCesium.HeadingPitchRange(
+          activeCesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
+          activeCesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
+          this.ahsanManzilOrbitRangeMeters,
+        ),
+      );
+      activeViewer.scene.requestRender();
+      this.ahsanManzilOrbitFrame = requestAnimationFrame(tick);
+    };
+
+    this.ahsanManzilOrbitFrame = requestAnimationFrame(tick);
+  }
+
+  /** Stop guided orbit while preserving the current view. */
+  stopAhsanManzilOrbitTour(): void {
+    this.ahsanManzilOrbitTourActive = false;
+    this.ahsanManzilOrbitLastTimestamp = null;
+    if (this.ahsanManzilOrbitFrame !== null && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this.ahsanManzilOrbitFrame);
+    }
+    this.ahsanManzilOrbitFrame = null;
+
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (viewer && Cesium && !viewer.isDestroyed()) {
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      viewer.scene.requestRender();
+    }
   }
 
   private flyToAhsanManzilOrbit(durationMs: number): void {
@@ -3089,7 +3168,7 @@ export class CesiumAdapter implements MapEngine {
       AHSAN_MANZIL_GEOREFERENCE.latitude,
       10,
     );
-    // Radius covers the 125.4 m long footprint plus the dome and ornamental roofline.
+    // A 72 m bounding sphere fits the reported 125.4 m total footprint and dome.
     const bounds = new Cesium.BoundingSphere(center, 72);
     viewer.camera.flyToBoundingSphere(bounds, {
       duration: Math.max(0, durationMs) / 1000,
