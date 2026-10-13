@@ -61,8 +61,31 @@ const COLORS = {
   gold: "#B58B55",
   stair: V("materials", "stairStone"),
   wood: V("materials", "doorWood"),
+  sceneTrim: "#ECAE9B",
+  sceneStone: "#B89A86",
+  sceneDark: "#392B27",
+  sceneGreen: "#45674D",
+  sceneStep: "#6E625A",
+  sceneDome: "#E4A18D",
+  sceneGrass: "#8CA878",
+  sceneWater: "#75B5D2",
+  scenePath: "#D9CDB8",
+  sceneWhite: "#F3D2C5",
+  sceneWood: "#705039",
+  sceneTree0: "#507D43",
+  sceneTree1: "#62894C",
+  sceneTree2: "#3F703D",
+  sceneTree3: "#78925A",
+  sceneBlock0: "#CFC3B0",
+  sceneBlock1: "#BFB3A0",
+  sceneBlock2: "#D8D0C2",
+  sceneBlock3: "#A89C8C",
 };
 const REQUIRED_NODES = config.requiredNodeNames;
+const SITE_CONTEXT_NODES = [
+  "Site_Ground", "Site_River", "Site_Approach", "Site_Pond",
+  "Site_Family_Mosque", "Site_Stable", "Site_Trees", "Site_Context_Blocks",
+];
 
 function color(key) {
   const hex = COLORS[key] || key;
@@ -80,7 +103,7 @@ function normalize(vector) {
 }
 
 function buildGlb(lod) {
-  const nodes = REQUIRED_NODES.map((name) => ({ name, positions: [], normals: [], colors: [] }));
+  const nodes = [...REQUIRED_NODES, ...SITE_CONTEXT_NODES].map((name) => ({ name, positions: [], normals: [], colors: [] }));
   const byName = Object.fromEntries(nodes.map((node) => [node.name, node]));
   function triangle(node, a, b, c, key) {
     const normal = normalize(cross(sub(b, a), sub(c, a)));
@@ -479,6 +502,61 @@ function buildGlb(lod) {
     }
     const q=(a,b,c,d)=>quad(node,corners[a],corners[b],corners[c],corners[d],key);
     q(0,2,3,1);q(4,5,7,6);q(0,1,5,4);q(2,6,7,3);q(0,4,6,2);q(1,3,7,5);
+  }
+  function horizontalPlane(node, cx, y, cz, width, depth, key) {
+    const x0 = cx - width / 2, x1 = cx + width / 2;
+    const z0 = cz - depth / 2, z1 = cz + depth / 2;
+    // Winding faces upward so the site surface is visible from the map camera.
+    quad(node, [x0,y,z0], [x0,y,z1], [x1,y,z1], [x1,y,z0], key);
+  }
+  function horizontalEllipse(node, cx, y, cz, radiusX, radiusZ, key, segments = 36) {
+    const center = [cx, y, cz];
+    for (let i = 0; i < segments; i++) {
+      const a = 2 * Math.PI * i / segments;
+      const b = 2 * Math.PI * (i + 1) / segments;
+      const p0 = [cx + radiusX * Math.cos(a), y, cz + radiusZ * Math.sin(a)];
+      const p1 = [cx + radiusX * Math.cos(b), y, cz + radiusZ * Math.sin(b)];
+      triangle(node, center, p1, p0, key);
+    }
+  }
+  function ellipsoid(node, cx, cy, cz, rx, ry, rz, key, segments = 16, rings = 8) {
+    const grid = [];
+    for (let j = 0; j <= rings; j++) {
+      const latitude = -Math.PI / 2 + Math.PI * j / rings;
+      const cosLatitude = Math.cos(latitude), sinLatitude = Math.sin(latitude);
+      grid.push(Array.from({ length: segments }, (_, i) => {
+        const longitude = 2 * Math.PI * i / segments;
+        return [
+          cx + rx * cosLatitude * Math.cos(longitude),
+          cy + ry * sinLatitude,
+          cz + rz * cosLatitude * Math.sin(longitude),
+        ];
+      }));
+    }
+    for (let j = 0; j < rings; j++) {
+      for (let i = 0; i < segments; i++) {
+        const next = (i + 1) % segments;
+        // Latitude-first order produces outward-facing triangles.
+        quad(node, grid[j][i], grid[j + 1][i], grid[j + 1][next], grid[j][next], key);
+      }
+    }
+  }
+  function siteBox(node, width, height, depth, cx, baseY, cz, key) {
+    box(node, cx, baseY + height / 2, cz, width, height, depth, key);
+  }
+  function siteFrustum(node, cx, cz, y0, y1, bottomRadius, topRadius, key, segments = 8) {
+    const lower = [], upper = [];
+    for (let i = 0; i < segments; i++) {
+      const a = 2 * Math.PI * i / segments;
+      lower.push([cx + bottomRadius * Math.cos(a), y0, cz + bottomRadius * Math.sin(a)]);
+      upper.push([cx + topRadius * Math.cos(a), y1, cz + topRadius * Math.sin(a)]);
+    }
+    for (let i = 0; i < segments; i++) {
+      const next = (i + 1) % segments;
+      quad(node, lower[i], lower[next], upper[next], upper[i], key);
+      triangle(node, [cx,y0,cz], lower[next], lower[i], key);
+      triangle(node, [cx,y1,cz], upper[i], upper[next], key);
+    }
   }
   function drumFaceWall(node,theta,faceLength,apothem,baseY,topY,cx,cz,lod){
     const tx=-Math.sin(theta),tz=Math.cos(theta),nx=Math.cos(theta),nz=Math.sin(theta);
@@ -892,6 +970,77 @@ function buildGlb(lod) {
   verticalCylinder(n.Finial,domeX,finialBase,finialBase+.9,0,.12,"trim",12);
   verticalCylinder(n.Finial,domeX,finialBase+.55,finialBase+.85,0,.24,"gold",12);
   addDomeProfile(n.Finial,domeX,0,finialBase,[[.24,0],[.18,.2],[.11,.55],[.04,.95],[.004,DIM.finialHeight]],12,"gold");
+
+  // Port the surrounding site from the reference Three.js scene into the same
+  // georeferenced GLB, so the in-map model includes its ground, approach, water,
+  // pond, family mosque, trees and contextual Old Dhaka blocks—not only the palace.
+  // The reference HTML has its Rangmahal centered at x=0; shift its site context
+  // east by the same 34.8 m camera/footprint offset used by the existing map model.
+  const siteShiftX = V("runtimeCamera", "frontFocusOffsetEastMeters");
+  horizontalPlane(byName.Site_Ground, siteShiftX, -0.15, 0, 440, 300, "sceneGrass");
+  horizontalPlane(byName.Site_River, siteShiftX, -0.22, 205, 440, 170, "sceneWater");
+  horizontalPlane(byName.Site_Approach, siteShiftX, -0.10, 63, 8, 58, "scenePath");
+
+  // Family mosque, represented by the same illustrative massing used in the HTML.
+  const mosque = byName.Site_Family_Mosque;
+  siteBox(mosque,14,5.2,11,siteShiftX+64,0,-5,"sceneWhite");
+  siteBox(mosque,14.5,.35,11.5,siteShiftX+64,5.2,-5,"sceneTrim");
+  for (const [offset, radius] of [[-4.5,1.5],[0,2.25],[4.5,1.5]]) {
+    ellipsoid(mosque,siteShiftX+64+offset,6.2,-5,radius,radius*.7,radius,
+      "sceneWhite",lod===3?18:lod===2?12:8,lod===3?10:6);
+  }
+  for (const offset of [-4.5,4.5]) {
+    siteBox(mosque,.65,8,.65,siteShiftX+64+offset,0,-5,"sceneWhite");
+  }
+
+  // Small stable/service building and the shallow oval pond behind the palace.
+  const stable = byName.Site_Stable;
+  siteBox(stable,25,3.4,8,siteShiftX-70,0,-32,"sceneStone");
+  siteBox(stable,26,.4,8,siteShiftX-70,3.4,-32,"sceneDark");
+  horizontalEllipse(byName.Site_Pond,siteShiftX-100,.02,-34,8,5,"sceneWater",lod===3?40:24);
+
+  // Deterministic tree placement mirrors the reference HTML output.
+  const siteRandom = (() => {
+    let state = 24591;
+    return () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646;
+  })();
+  const trees = byName.Site_Trees;
+  const treeColors = ["sceneTree0","sceneTree1","sceneTree2","sceneTree3"];
+  const treeSegments = lod===3?12:lod===2?8:6;
+  for (let i = 0; i < 70; i++) {
+    const x = (siteRandom() - .5) * 210;
+    const z = -55 + siteRandom() * 118;
+    if (Math.abs(x) < 38 && z > -20 && z < 42) continue;
+    const worldX = x + siteShiftX;
+    siteFrustum(trees,worldX,z,0,3.6,.30,.18,"sceneWood",7);
+    const rx = 1.6 + siteRandom() * 1.2;
+    const ry = 1.8 + siteRandom() * 1.5;
+    const rz = 1.6 + siteRandom() * 1.2;
+    const crownY = 4.2 + siteRandom() * 1.2;
+    ellipsoid(trees,worldX,crownY,z,rx,ry,rz,treeColors[i%4],treeSegments,Math.max(4,Math.round(treeSegments*.6)));
+  }
+
+  // Neighbouring Old Dhaka blocks in the northern/rear context.
+  const blocks = byName.Site_Context_Blocks;
+  const blockPalette = ["sceneBlock0","sceneBlock1","sceneBlock2","sceneBlock3"];
+  for (let i = 0; i < 26; i++) {
+    const x = -125 + i * 9.5;
+    const z = -67 - siteRandom() * 16;
+    const width = 5 + siteRandom() * 4;
+    const height = 6 + siteRandom() * 10;
+    const depth = 5 + siteRandom() * 4;
+    siteBox(blocks,width,height,depth,siteShiftX+x,0,z,blockPalette[i%4]);
+  }
+  for (const side of [-1,1]) {
+    for (let j = 0; j < 6; j++) {
+      const x = side * (103 + siteRandom() * 13);
+      const z = -40 + j * 13;
+      const width = 6 + siteRandom() * 3;
+      const height = 6 + siteRandom() * 8;
+      const depth = 7 + siteRandom() * 3;
+      siteBox(blocks,width,height,depth,siteShiftX+x,0,z,blockPalette[j%3]);
+    }
+  }
 
   // Every LOD carries the full semantic node list, so viewer integrations remain stable.
   for(const node of nodes){
