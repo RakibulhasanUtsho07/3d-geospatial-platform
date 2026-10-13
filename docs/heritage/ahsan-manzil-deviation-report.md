@@ -27,6 +27,7 @@ Build assets with `npm run build:heritage-model`. All models include nodes `Plin
 - The exposed Rangmahal west end is modelled only where it is visible beside the rear-set Andarmahal; short-end walls and the north/south parapets follow the stepped plan rather than occupying the same volume twice.
 - LOD3 includes recessed arches/pilasters, timber-and-glass portal door, upper louvered end windows, small upper-arch balustrades, central balcony/oculus/pinnacles, an eight-sided open drum, stair cheek rails/lamp posts, and the salmon-pink palette. The precise historical mouldings, glazing pattern, colours, and bay counts remain [E]/[?].
 - The central portico continues through the upper storey with a second triple-arched loggia and a triangular pediment above it; the pediment peak is parameterized at 15.2 m [E] pending a rectified facade.
+- Camera presets are intentionally split: Front frames the south-facing Rangmahal; Full model and every manual orbit step frame the complete stepped footprint; Top view shows the north-up plan; the guided 360° tour revolves around the footprint centre at a 205 m range. The tour pauses on direct pointer, touch, or wheel input so users can take control.
 - LOD model loading/unloading uses camera distance and camera altitude thresholds [E] to avoid loading detailed geometry when the view is in Bagerhat or far from Old Dhaka.
 - The Cesium loader sets Y-up and Z-forward for the generated GLB; the model uses a local east-north-up reference frame with south as its +Z face.
 
@@ -115,12 +116,12 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | runtimeLod.lod3MaxDistance | [E] | 2000 m from view centre to provisional anchor | Rendering heuristic in heritage-landmarks.mjs | Show detail mesh when closer than this and camera height is at most 2.5 km. |
 | runtimeLod.lod3MaxCameraHeight | [E] | 2500 m | Rendering heuristic in heritage-landmarks.mjs | Rendering threshold, not a building measurement. |
 | runtimeCamera.frontFocusOffsetEastMeters | [E] | 34.8 m | Centreline of the 55.8 m Rangmahal front, relative to overall-footprint centre | View-only offset; it does not move the georeferenced model anchor. |
-| runtimeCamera.frontCameraRangeMeters | [E] | 160 m | Camera-framing estimate for full 55.8 m facade and dome | Adjust after viewing on the intended display size. |
-| runtimeCamera.footprintCameraRangeMeters | [E] | 205 m | Camera-framing estimate for 125.4 m overall extent | North-up Top view range; tune after top-down screenshot. |
-| runtimeCamera.orbitPitchDegrees | [E] | -18 degrees | Oblique-view estimate | Low camera pitch intended to show roof, facade and front stair during a guided orbit. |
-| runtimeCamera.orbitDegreesPerSecond | [E] | 10 degrees/second | Camera interaction choice | A lap takes about 36 seconds. |
-| runtimeCamera.frontBoundingSphereRadiusMeters | [E] | 105 m | Whole-building framing estimate from the shifted front target | Keeps rear-set Andarmahal inside the oblique composition. |
-| runtimeCamera.footprintBoundingSphereRadiusMeters | [E] | 72 m | Whole-footprint framing estimate | Used for the top-down camera. |
+| runtimeCamera.frontCameraRangeMeters | [E] | 112 m | Camera-framing estimate for the 55.8 m south-facing Rangmahal, projecting portico, dome and ceremonial stair | This is the focused facade view; use Full model or the guided tour for the entire stepped footprint. |
+| runtimeCamera.footprintCameraRangeMeters | [E] | 205 m | Camera-framing estimate for the 125.4 m stepped overall extent | Used by Full model, manual orbit steps, guided 360° tour and north-up Top view to keep Andarmahal and Rangmahal inside frame. |
+| runtimeCamera.orbitPitchDegrees | [E] | -24 degrees | Oblique-view estimate | Keeps the upper dome/drum and the side depth visible without flattening the facade. |
+| runtimeCamera.orbitDegreesPerSecond | [E] | 8 degrees/second | Camera interaction choice | A lap takes about 45 seconds, giving more time to inspect the side and rear elevations. |
+| runtimeCamera.frontBoundingSphereRadiusMeters | [E] | 50 m | Focused framing estimate around the south-facing Rangmahal, central portico, dome and stair | Rear-set Andarmahal is intentionally covered by the separate overall-footprint camera sphere. |
+| runtimeCamera.footprintBoundingSphereRadiusMeters | [E] | 72 m | Whole-footprint framing estimate | Used for Full model, manual orbit steps, guided 360° tour and Top view. |
 
 ## Deviations and remaining calibration work
 
