@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
 import { CesiumAdapter } from "@/core/map-engine";
-import { AHSAN_MANZIL_CAMERA_TARGET, AHSAN_MANZIL_CAMERA_ORIENTATION } from "@/core/geospatial/heritage-landmarks.mjs";
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
@@ -159,12 +158,8 @@ export default function MapCanvas({
 
         setLayers(engine.getLayers());
 
-        /* Open the map directly over Ahsan Manzil after viewer initialization. */
-        engine.flyTo({
-          destination: AHSAN_MANZIL_CAMERA_TARGET,
-          ...AHSAN_MANZIL_CAMERA_ORIENTATION,
-          durationMs: 800,
-        });
+        /* Start with a centred, target-framed view that shows the entire palace. */
+        engine.focusAhsanManzil(650);
 
         setStatus("ready");
 
@@ -340,11 +335,7 @@ export default function MapCanvas({
     engineRef.current?.setNavigationPath(null, null);
     setSelectedRoad(null);
     setSelectedProperty(null);
-    engineRef.current?.flyTo({
-      destination: AHSAN_MANZIL_CAMERA_TARGET,
-      ...AHSAN_MANZIL_CAMERA_ORIENTATION,
-      durationMs: 1000,
-    });
+    engineRef.current?.focusAhsanManzil(850);
   }
 
   function goToAhsanManzil() {
@@ -358,11 +349,7 @@ export default function MapCanvas({
     setSelectedRoad(null);
     setSelectedPlace(null);
     setSelectedProperty(null);
-    engine.flyTo({
-      destination: AHSAN_MANZIL_CAMERA_TARGET,
-      ...AHSAN_MANZIL_CAMERA_ORIENTATION,
-      durationMs: 1300,
-    });
+    engine.focusAhsanManzil(1100);
   }
 
   function focusSelectedBuilding() {
@@ -581,6 +568,8 @@ export default function MapCanvas({
         onZoomOut={() => cameraRef.current?.zoomOut()}
         onRotateLeft={() => cameraRef.current?.rotateLeft()}
         onRotateRight={() => cameraRef.current?.rotateRight()}
+        onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}
+        onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}
         onTiltUp={() => cameraRef.current?.tiltUp()}
         onTiltDown={() => cameraRef.current?.tiltDown()}
         onResetOrientation={() =>
