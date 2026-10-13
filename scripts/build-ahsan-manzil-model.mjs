@@ -509,6 +509,17 @@ function buildGlb(lod) {
     // Winding faces upward so the site surface is visible from the map camera.
     quad(node, [x0,y,z0], [x0,y,z1], [x1,y,z1], [x1,y,z0], key);
   }
+  function horizontalRing(node, cx, cz, y, radius, width, key, segments = 48) {
+    const outer = radius + width / 2, inner = Math.max(.001, radius - width / 2);
+    for (let i = 0; i < segments; i++) {
+      const a = 2 * Math.PI * i / segments, b = 2 * Math.PI * (i + 1) / segments;
+      const outA = [cx + outer * Math.cos(a), y, cz + outer * Math.sin(a)];
+      const outB = [cx + outer * Math.cos(b), y, cz + outer * Math.sin(b)];
+      const inA = [cx + inner * Math.cos(a), y, cz + inner * Math.sin(a)];
+      const inB = [cx + inner * Math.cos(b), y, cz + inner * Math.sin(b)];
+      quad(node, outA, outB, inB, inA, key);
+    }
+  }
   function horizontalEllipse(node, cx, y, cz, radiusX, radiusZ, key, segments = 36) {
     const center = [cx, y, cz];
     for (let i = 0; i < segments; i++) {
@@ -955,16 +966,18 @@ function buildGlb(lod) {
     }
   }
   const domeProfile=DIM.domeRings.map(([radius,height])=>[radius,height]);
-  addDomeProfile(n.Dome,domeX,0,drumTop,domeProfile,lod===1?10:lod===2?18:28,"pink");
+  const domeRadius=Math.max(...domeProfile.map(([radius])=>radius));
+  const domeRise=Math.max(...domeProfile.map(([,height])=>height));
+  // Match the smooth, vertically stretched hemispherical dome in the HTML scene.
+  addDomeProfile(n.Dome,domeX,0,drumTop,domeProfile,lod===1?12:lod===2?20:36,"sceneDome");
   if(lod===3){
-    for(let i=0;i<8;i++){
-      const angle=2*Math.PI*i/8;
-      for(let j=0;j<domeProfile.length-1;j++){
-        const [r0,h0]=domeProfile[j],[r1,h1]=domeProfile[j+1];
-        barBetween(n.Dome,[domeX+r0*Math.cos(angle),drumTop+h0,r0*Math.sin(angle)],[domeX+r1*Math.cos(angle),drumTop+h1,r1*Math.sin(angle)],.10,"trim");
-      }
+    // The HTML reference has four horizontal torus mouldings rather than
+    // radial ribs. Thin annular bands reproduce that recognizable silhouette.
+    for(const phi of [.35,.68,1.0,1.28]){
+      horizontalRing(n.Dome,domeX,0,drumTop+domeRise*Math.sin(phi),
+        domeRadius*Math.cos(phi),.15,"sceneTrim",48);
     }
-    verticalCylinder(n.Dome,domeX,drumTop+.08,drumTop+.20,0,Math.max(...domeProfile.map(x=>x[0])),"trim",28);
+    horizontalRing(n.Dome,domeX,0,drumTop+.16,domeRadius,.14,"sceneTrim",48);
   }
   const finialBase=DIM.peak-DIM.finialHeight;
   verticalCylinder(n.Finial,domeX,finialBase,finialBase+.9,0,.12,"trim",12);
@@ -977,9 +990,11 @@ function buildGlb(lod) {
   // The reference HTML has its Rangmahal centered at x=0; shift its site context
   // east by the same 34.8 m camera/footprint offset used by the existing map model.
   const siteShiftX = V("runtimeCamera", "frontFocusOffsetEastMeters");
-  horizontalPlane(byName.Site_Ground, siteShiftX, -0.15, 0, 440, 300, "sceneGrass");
-  horizontalPlane(byName.Site_River, siteShiftX, -0.22, 205, 440, 170, "sceneWater");
-  horizontalPlane(byName.Site_Approach, siteShiftX, -0.10, 63, 8, 58, "scenePath");
+  // Keep the land and river planes contiguous (rather than coplanar/overlapping)
+  // and slightly above the globe's anchor surface so Cesium terrain does not hide them.
+  horizontalPlane(byName.Site_Ground, siteShiftX, 0.015, -15, 440, 270, "sceneGrass");
+  horizontalPlane(byName.Site_River, siteShiftX, 0.005, 205, 440, 170, "sceneWater");
+  horizontalPlane(byName.Site_Approach, siteShiftX, 0.025, 63, 8, 58, "scenePath");
 
   // Family mosque, represented by the same illustrative massing used in the HTML.
   const mosque = byName.Site_Family_Mosque;
