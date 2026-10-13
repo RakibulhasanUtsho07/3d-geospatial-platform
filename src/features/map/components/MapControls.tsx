@@ -6,6 +6,9 @@ type MapControlsProps = {
   onAhsanManzil: () => void;
   onOrbitLeft: () => void;
   onOrbitRight: () => void;
+  onTopDown: () => void;
+  onToggleOrbitTour: () => void;
+  orbitTourActive: boolean;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onRotateLeft: () => void;
@@ -48,6 +51,9 @@ export default function MapControls({
   onAhsanManzil,
   onOrbitLeft,
   onOrbitRight,
+  onTopDown,
+  onToggleOrbitTour,
+  orbitTourActive,
   onZoomIn,
   onZoomOut,
   onRotateLeft,
@@ -149,6 +155,29 @@ export default function MapControls({
           disabled={disabled}
           onClick={onOrbitRight}
         />
+      </div>
+
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
+        <button
+          type="button"
+          aria-label="North-up top-down view of Ahsan Manzil"
+          title="North-up top view"
+          disabled={disabled}
+          onClick={onTopDown}
+          className="rounded-lg px-3 py-2 text-xs font-semibold text-zinc-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Top view
+        </button>
+        <button
+          type="button"
+          aria-label={orbitTourActive ? "Stop 360 degree Ahsan Manzil tour" : "Start 360 degree Ahsan Manzil tour"}
+          title={orbitTourActive ? "Stop 360° tour" : "Start smooth 360° tour"}
+          disabled={disabled}
+          onClick={onToggleOrbitTour}
+          className={`rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-40 ${orbitTourActive ? "border-rose-300/30 bg-rose-900 text-rose-50 hover:bg-rose-800" : "border-rose-200/20 bg-rose-950/90 text-rose-50 hover:bg-rose-900/90"}`}
+        >
+          {orbitTourActive ? "Stop tour" : "360° tour"}
+        </button>
       </div>
     </div>
   );
