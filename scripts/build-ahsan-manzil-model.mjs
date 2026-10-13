@@ -651,8 +651,8 @@ function buildGlb(lod) {
   const gf={base:gfBase,height:gfHeight,width:DIM.windowGF,crown:DIM.crownGF};
   const ff={base:ffBase,height:ffHeight,width:DIM.windowFF,crown:DIM.crownFF};
 
-  box(n.Plinth,(split+xMax)/2,DIM.ground+DIM.plinth/2,0,rangLength,DIM.plinth,D,"roof");
-  box(n.Plinth,andarCenterX,DIM.ground+DIM.plinth/2,andarCenterZ,andarLength,DIM.plinth,andarDepth,"roof");
+  box(n.Plinth,(split+xMax)/2,DIM.ground+DIM.plinth/2,0,rangLength,DIM.plinth,D,"sceneStone");
+  box(n.Plinth,andarCenterX,DIM.ground+DIM.plinth/2,andarCenterZ,andarLength,DIM.plinth,andarDepth,"sceneStone");
 
   addFacadeSection("Rangmahal_GF",split,xMax,rangBays,[gf],lod);
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
