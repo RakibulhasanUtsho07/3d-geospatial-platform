@@ -26,6 +26,7 @@
     "test:architecture-research": "node --test tests/architecture-research.test.mjs",
     "test:road-network": "node --test tests/road-network.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
+    "pretest:heritage-model": "npm run build:heritage-model",
     "test:heritage-model": "node --test tests/heritage-model.test.mjs",
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs"
   },
