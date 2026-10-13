@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { AHSAN_MANZIL_LOD_THRESHOLDS, selectAhsanManzilLod } from "../src/core/geospatial/heritage-landmarks.mjs";
+import { AHSAN_MANZIL_LOD_THRESHOLDS, AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, AHSAN_MANZIL_CAMERA_RANGE_METERS, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS, AHSAN_MANZIL_ORBIT_PITCH_DEGREES, AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND, AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS, AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS, selectAhsanManzilLod } from "../src/core/geospatial/heritage-landmarks.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredNodes = [
@@ -46,61 +46,87 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
   }
 });
 
-test("the model is centred, closed on the short ends, and has veranda detail", async () => {
+test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
-  assert.match(builder, /const rangLength=DIM\.rangmahalLength,split=0,domeX=0/);
-  assert.ok(builder.includes("function addEndFacade("));
-  assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod)'));
-  assert.ok(builder.includes("Dark, thin balustrades at the upper veranda edge"));
+  assert.ok(builder.includes("const rangLength=DIM.rangmahalLength, split=0, domeX=(split+xMax)/2;"));
+  assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
+  assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);'));
+  assert.ok(builder.includes("function fillRectLouverWindow("));
   assert.ok(builder.includes("Upper-storey triple-arched loggia."));
-  assert.ok(builder.includes("const pedimentBase = upperTop + .28;"));
-  assert.ok(builder.includes("both short roof edges"));
-  assert.ok(builder.includes('paneColors = ["#713F54", "#B78350", "#536C62"]'));
-  assert.ok(builder.includes("const mullionZ=glassZ+side*.09;"));
+  assert.ok(builder.includes("Eight open arched bays"));
+  assert.ok(builder.includes("addFacadeDisk("));
+  assert.ok(builder.includes("const stairBaseWidth = DIM.stairWidth;"));
+  assert.ok(builder.includes('box(stair,domeX,top/2,z,width,top,stepDepth,"stair")'));
+  assert.ok(builder.includes("Upper veranda balustrades"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
   assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
   assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 62.7);
+  assert.equal(config.parameters.footprint.exteriorBayCount.value, 15);
+  assert.equal(config.parameters.footprint.andarmahalDepth.value, 14.375);
+  assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
+  assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
   assert.equal(config.parameters.facade.porticoWidth.value, 20);
-  assert.equal(config.parameters.stair.width.value, 22);
-  assert.ok(config.parameters.facade.balustradeHeight);
-  assert.ok(config.parameters.facade.balusterSpacing);
-  assert.ok(config.parameters.facade.rooflinePinnacleHeight);
+  assert.equal(config.parameters.stair.width.value, 16.5);
+  assert.equal(config.parameters.stair.topWidth.value, 13.5);
+  assert.equal(config.parameters.stair.stepCount.value, 28);
+  assert.equal(config.parameters.stair.riserHeight.value, 0.23);
+  assert.equal(config.parameters.stair.treadDepth.value, 0.57);
+  assert.equal(config.parameters.materials.facadePink.value, "#E1917D");
+  assert.equal(config.parameters.materials.trimOffWhite.value, "#E99C8A");
+  assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
+  assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
+  assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
+  assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 31.35);
+  assert.equal(config.parameters.runtimeCamera.frontCameraRangeMeters.value, AHSAN_MANZIL_CAMERA_RANGE_METERS);
+  assert.equal(config.parameters.runtimeCamera.footprintCameraRangeMeters.value, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS);
+  assert.equal(config.parameters.runtimeCamera.orbitPitchDegrees.value, AHSAN_MANZIL_ORBIT_PITCH_DEGREES);
+  assert.equal(config.parameters.runtimeCamera.orbitDegreesPerSecond.value, AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND);
+  assert.equal(config.parameters.runtimeCamera.frontBoundingSphereRadiusMeters.value, AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS);
+  assert.equal(config.parameters.runtimeCamera.footprintBoundingSphereRadiusMeters.value, AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS);
 });
 
-test("the map opens centred on Ahsan Manzil and has true orbit controls", async () => {
+test("the map opens on the river-facing facade and provides whole-footprint and guided-orbit views", async () => {
   const landmarks = await readFile(path.join(root, "src/core/geospatial/heritage-landmarks.mjs"), "utf8");
-  assert.match(landmarks, /export const AHSAN_MANZIL_CAMERA_TARGET/);
+  assert.ok(landmarks.includes("AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS"));
+  assert.match(landmarks, /AHSAN_MANZIL_ANCHOR_LONGITUDE = 90\.40606/);
+  assert.match(landmarks, /AHSAN_MANZIL_ANCHOR_LATITUDE = 23\.70860/);
   assert.match(landmarks, /longitude: 90\.40606/);
-  assert.match(landmarks, /latitude: 23\.70860/);
-  assert.match(landmarks, /longitude: 89\.7417917/);
-  assert.match(landmarks, /latitude: 22\.6744861/);
   assert.match(landmarks, /anchorConfidence: "\[C\]"/);
+  assert.equal(AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, 31.35);
+
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
   assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
+  assert.ok(adapter.includes("focusAhsanManzilTopDown(durationMs = 850)"));
+  assert.ok(adapter.includes("startAhsanManzilOrbitTour(): void"));
+  assert.ok(adapter.includes("stopAhsanManzilOrbitTour(): void"));
   assert.ok(adapter.includes("orbitAhsanManzil(stepDegrees: number)"));
   assert.ok(adapter.includes("flyToBoundingSphere"));
-  assert.ok(adapter.includes("new Cesium.BoundingSphere(center, 72)"));
-  assert.ok(adapter.includes("ahsanManzilOrbitHeadingDegrees = 180"));
+  assert.ok(adapter.includes("AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS"));
+  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS"));
+  assert.ok(adapter.includes("AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND"));
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
   assert.ok(adapter.includes("ahsan-manzil.manifest.json"));
+
   const manifest = JSON.parse(await readFile(path.join(root, "public/models/ahsan-manzil.manifest.json"), "utf8"));
   const entry = manifest.entries.find((item) => item.id === "ahsan-manzil-kumartuli-dhaka");
   assert.equal(entry.assets.default.uri, "/models/ahsan-manzil-lod3.glb");
   assert.deepEqual(entry.nodes, requiredNodes);
+
   const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
   const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
-  assert.ok(mapCanvas.includes("function goToAhsanManzil()"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
-  assert.ok(mapCanvas.includes("function goHomeToAhsanManzil()"));
-  assert.ok(mapCanvas.includes("onRotateLeft={() => engineRef.current?.orbitAhsanManzil(-15)}"));
-  assert.ok(mapCanvas.includes("onRotateRight={() => engineRef.current?.orbitAhsanManzil(15)}"));
-  assert.ok(mapCanvas.includes("onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}"));
-  assert.ok(mapCanvas.includes("onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}"));
-  assert.ok(mapCanvas.includes("engineRef.current?.focusAhsanManzil(650)"));
-  assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees left"));
-  assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees right"));
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzilTopDown(850)"));
+  assert.ok(mapCanvas.includes("engine.startAhsanManzilOrbitTour()"));
+  assert.ok(mapCanvas.includes("engine.stopAhsanManzilOrbitTour()"));
+  assert.ok(mapCanvas.includes("onRotateLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-15); }}"));
+  assert.ok(mapCanvas.includes("onRotateRight={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(15); }}"));
+  assert.ok(mapCanvas.includes("onOrbitLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-45); }}"));
+  assert.ok(mapCanvas.includes("onOrbitRight={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(45); }}"));
+  assert.ok(controls.includes("Top view"));
+  assert.ok(controls.includes("360° tour"));
+  assert.ok(controls.includes("Stop tour"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
   assert.ok(adapter.includes("forwardAxis: Cesium.Axis.Z"));
 });
