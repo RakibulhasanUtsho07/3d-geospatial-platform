@@ -52,7 +52,10 @@ test("the model is centred, closed on the short ends, and has veranda detail", a
   assert.ok(builder.includes("function addEndFacade("));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod)'));
   assert.ok(builder.includes("Dark, thin balustrades at the upper veranda edge"));
+  assert.ok(builder.includes("Upper-storey triple-arched loggia."));
+  assert.ok(builder.includes("const pedimentBase = upperTop + .28;"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
   assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
   assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 62.7);
   assert.equal(config.parameters.facade.porticoWidth.value, 20);
