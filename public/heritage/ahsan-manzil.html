@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1018">
+  <title>Ahsan Manzil | Heritage 3D Viewer</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#090f17;--panel:rgba(15,24,35,.88);--line:rgba(255,255,255,.13);--text:#f5f7fa;--muted:#a7b3c2;--accent:#e7a08d}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 50% 25%,#263340 0,#101923 42%,var(--bg) 100%);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    body{min-height:100vh;display:flex;flex-direction:column}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px clamp(16px,4vw,48px);border-bottom:1px solid var(--line);background:#080d14aa;backdrop-filter:blur(14px)}
+    .brand{display:flex;align-items:center;gap:12px}.mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#f0b29f,#a84e61);display:grid;place-items:center;color:#25151a;font-weight:900;font-size:18px}.eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(23px,3vw,36px);line-height:1.12;margin:5px 0 0;letter-spacing:-.035em}.topbar a{color:var(--muted);text-decoration:none;border:1px solid var(--line);padding:8px 12px;border-radius:10px}.topbar a:hover{color:white;border-color:#e7a08d}
+    main{width:min(1440px,100%);margin:0 auto;padding:clamp(16px,3vw,36px);flex:1;display:flex;flex-direction:column;gap:16px}.intro{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap}.intro p{margin:8px 0 0;color:var(--muted);max-width:720px}.pill{border:1px solid #e7a08d55;background:#e7a08d12;color:#f3c2b2;border-radius:999px;padding:6px 10px;font-size:11px;white-space:nowrap}
+    .viewer{position:relative;min-height:58vh;height:min(72vh,780px);border:1px solid var(--line);border-radius:22px;overflow:hidden;background:linear-gradient(180deg,#b9c4cb 0%,#dce0df 58%,#9fae9d 100%);box-shadow:0 24px 80px #0005}
+    model-viewer{width:100%;height:100%;min-height:420px;--poster-color:transparent;--progress-bar-color:#b4485c;--progress-mask:#111a24;color:#17212b;outline:none}
+    .loading{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:#26333c;font-weight:600}.loading span{background:#ffffffbb;padding:10px 14px;border-radius:12px;backdrop-filter:blur(10px)}
+    .controls{position:absolute;left:14px;right:14px;top:14px;display:flex;gap:7px;flex-wrap:wrap;z-index:2;pointer-events:none}.controls button{pointer-events:auto;border:1px solid #ffffff45;background:#101923df;color:#f5f7fa;padding:9px 12px;border-radius:10px;font:inherit;font-size:12px;cursor:pointer;backdrop-filter:blur(12px);transition:transform .18s,border-color .18s}.controls button:hover{transform:translateY(-1px);border-color:#e7a08d}.controls button[aria-pressed=true]{background:#b4485c;border-color:#b4485c}
+    .viewer-note{position:absolute;right:14px;bottom:14px;max-width:280px;background:#101923d9;color:#e7edf2;border:1px solid #ffffff22;border-radius:12px;padding:10px 12px;font-size:11px;backdrop-filter:blur(12px)}
+    .info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.info article{border:1px solid var(--line);border-radius:14px;background:#ffffff06;padding:15px}.info h2{font-size:12px;margin:0 0 5px;color:#efb7a5;letter-spacing:.04em}.info p{margin:0;color:var(--muted);font-size:12px}.foot{color:#7f8d9d;font-size:11px;text-align:center;padding:8px 0 0}
+    @media(max-width:680px){.topbar{align-items:flex-start}.topbar a{font-size:11px}.viewer{height:66vh;min-height:500px}.info{grid-template-columns:1fr}.viewer-note{left:14px;right:auto;max-width:calc(100% - 28px);bottom:14px}.controls{right:8px;left:8px;top:8px}.controls button{padding:7px 9px;font-size:11px}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="mark">A</div><div><div class="eyebrow">Heritage landmark · Dhaka, Bangladesh</div><h1>Ahsan Manzil</h1></div></div>
+    <a href="/">← Back to platform</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div><div class="eyebrow">Interactive architectural model</div><p>Explore the repository's Ahsan Manzil GLB model with orbit, zoom, preset viewpoints, and an automated 360° inspection mode.</p></div>
+      <span class="pill">3D MODEL · GLB</span>
+    </section>
+    <section class="viewer" aria-label="Interactive Ahsan Manzil 3D model">
+      <div class="controls" aria-label="Camera controls">
+        <button data-orbit="0deg 72deg 105%" aria-pressed="true">Front</button>
+        <button data-orbit="180deg 72deg 105%">Rear</button>
+        <button data-orbit="90deg 72deg 115%">Side</button>
+        <button data-orbit="0deg 8deg 145%">Top</button>
+        <button id="fit">Fit model</button>
+        <button id="rotate" aria-pressed="false">▶ 360° tour</button>
+      </div>
+      <div class="loading" id="loading"><span>Loading 3D model…</span></div>
+      <model-viewer id="model" src="/models/ahsan-manzil.glb" alt="Three-dimensional model of Ahsan Manzil in Dhaka, Bangladesh" camera-controls touch-action="pan-y" interaction-prompt="auto" shadow-intensity="1.1" shadow-softness="0.8" exposure="1" environment-image="neutral" camera-orbit="0deg 72deg 105%" min-camera-orbit="auto 5deg auto" max-camera-orbit="auto 175deg auto" field-of-view="35deg" loading="eager" reveal="auto" ar-modes="webxr scene-viewer quick-look">
+        <button slot="ar-button" style="position:absolute;bottom:16px;left:16px;border-radius:10px;border:0;padding:10px 14px;background:#101923;color:white">View in AR</button>
+      </model-viewer>
+      <div class="viewer-note">Drag to orbit · Scroll/pinch to zoom · Right-drag to pan. Use the 360° tour for continuous rotation.</div>
+    </section>
+    <section class="info">
+      <article><h2>Camera control</h2><p>Choose front, rear, side, or top views, then freely orbit and zoom around the model.</p></article>
+      <article><h2>Model source</h2><p>Uses the existing <code>public/models/ahsan-manzil.glb</code> asset generated by the repository's heritage-model pipeline.</p></article>
+      <article><h2>Accuracy note</h2><p>This is a visualization asset, not a survey-certified reconstruction. Verify architectural dimensions against measured references before analytical use.</p></article>
+    </section>
+    <div class="foot">3D Geospatial Platform · Heritage Viewer</div>
+  </main>
+  <script>
+    const model=document.querySelector('#model');
+    const loading=document.querySelector('#loading');
+    const rotate=document.querySelector('#rotate');
+    model.addEventListener('load',()=>loading.hidden=true);
+    model.addEventListener('error',()=>{loading.hidden=false;loading.innerHTML='<span>Model failed to load. Check that /models/ahsan-manzil.glb is available.</span>'});
+    document.querySelectorAll('[data-orbit]').forEach(button=>button.addEventListener('click',()=>{
+      model.removeAttribute('auto-rotate');
+      rotate.setAttribute('aria-pressed','false');rotate.textContent='▶ 360° tour';
+      document.querySelectorAll('[data-orbit]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+      model.cameraOrbit=button.dataset.orbit;model.jumpCameraToGoal();
+    }));
+    document.querySelector('#fit').addEventListener('click',()=>{model.cameraTarget='auto';model.cameraOrbit='0deg 72deg 105%';model.fieldOfView='35deg';model.jumpCameraToGoal()});
+    rotate.addEventListener('click',()=>{const active=rotate.getAttribute('aria-pressed')!=='true';rotate.setAttribute('aria-pressed',String(active));rotate.textContent=active?'■ Stop tour':'▶ 360° tour';if(active)model.setAttribute('auto-rotate','');else model.removeAttribute('auto-rotate')});
+  </script>
+</body>
+</html>
