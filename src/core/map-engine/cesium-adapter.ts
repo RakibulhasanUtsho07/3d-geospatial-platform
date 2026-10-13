@@ -143,8 +143,8 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadingLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadToken = 0;
-  // Heading 180 approaches from the south/river-facing facade.
-  private ahsanManzilOrbitHeadingDegrees = 180;
+  // Heading 157 approaches from the south-east, matching the reference HTML hero view.
+  private ahsanManzilOrbitHeadingDegrees = 157;
   private ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
   private ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
   private ahsanManzilOrbitFrame: number | null = null;
@@ -3087,7 +3087,7 @@ export class CesiumAdapter implements MapEngine {
   /** Fit the complete stepped palace footprint from the river-facing side. */
   focusAhsanManzil(durationMs = 1200): void {
     this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 180;
+    this.ahsanManzilOrbitHeadingDegrees = 157;
     this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "front");
@@ -3096,8 +3096,8 @@ export class CesiumAdapter implements MapEngine {
   /** Match the rear-facing camera preset in the reference HTML scene. */
   focusAhsanManzilRear(durationMs = 850): void {
     this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 0;
-    this.ahsanManzilOrbitPitchDegrees = -18;
+    this.ahsanManzilOrbitHeadingDegrees = 9;
+    this.ahsanManzilOrbitPitchDegrees = -9;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "front");
   }
@@ -3105,8 +3105,8 @@ export class CesiumAdapter implements MapEngine {
   /** Match the east/west side camera preset in the reference HTML scene. */
   focusAhsanManzilSide(durationMs = 850): void {
     this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 90;
-    this.ahsanManzilOrbitPitchDegrees = -18;
+    this.ahsanManzilOrbitHeadingDegrees = 83;
+    this.ahsanManzilOrbitPitchDegrees = -10;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "front");
   }
@@ -3117,8 +3117,8 @@ export class CesiumAdapter implements MapEngine {
    */
   focusAhsanManzilWhole(durationMs = 900): void {
     this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 205;
-    this.ahsanManzilOrbitPitchDegrees = -26;
+    this.ahsanManzilOrbitHeadingDegrees = 145;
+    this.ahsanManzilOrbitPitchDegrees = -19;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "footprint");
   }
@@ -3151,7 +3151,7 @@ export class CesiumAdapter implements MapEngine {
 
     this.ahsanManzilOrbitTourActive = true;
     this.ahsanManzilOrbitStoppedCallback = onStopped ?? null;
-    this.ahsanManzilOrbitHeadingDegrees = 180;
+    this.ahsanManzilOrbitHeadingDegrees = 157;
     this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
     this.ahsanManzilOrbitLastTimestamp = null;
