@@ -150,6 +150,7 @@ export class CesiumAdapter implements MapEngine {
   private ahsanManzilOrbitFrame: number | null = null;
   private ahsanManzilOrbitTourActive = false;
   private ahsanManzilOrbitLastTimestamp: number | null = null;
+  private ahsanManzilOrbitInputUnsubscribe: (() => void) | null = null;
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
 
@@ -271,12 +272,12 @@ export class CesiumAdapter implements MapEngine {
     this.viewer = viewer;
     this.addHeritageLandmarkMarkers(viewer, Cesium);
 
-    // Start with an actual target-centred perspective on the palace, rather
-    // than a camera placed directly over the pin and looking past the building.
+    // Start directly on the river-facing Rangmahal facade. The separate
+    // Full model / Top view presets frame the entire stepped footprint.
     const ahsanManzilCenter = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_GEOREFERENCE.longitude,
-      AHSAN_MANZIL_GEOREFERENCE.latitude,
-      10,
+      AHSAN_MANZIL_CAMERA_TARGET.longitude,
+      AHSAN_MANZIL_CAMERA_TARGET.latitude,
+      AHSAN_MANZIL_CAMERA_TARGET.height,
     );
     viewer.camera.lookAt(
       ahsanManzilCenter,
@@ -3089,6 +3090,18 @@ export class CesiumAdapter implements MapEngine {
     this.flyToAhsanManzilOrbit(durationMs, "front");
   }
 
+  /**
+   * Frame the entire provisional palace footprint in a 3D oblique view.
+   * Use this instead of the closer facade view before orbiting the model.
+   */
+  focusAhsanManzilWhole(durationMs = 900): void {
+    this.stopAhsanManzilOrbitTour();
+    this.ahsanManzilOrbitHeadingDegrees = 205;
+    this.ahsanManzilOrbitPitchDegrees = -26;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
+    this.flyToAhsanManzilOrbit(durationMs, "footprint");
+  }
+
   /** North-up orthographic-like view for checking the full footprint and orientation. */
   focusAhsanManzilTopDown(durationMs = 850): void {
     this.stopAhsanManzilOrbitTour();
@@ -3098,15 +3111,15 @@ export class CesiumAdapter implements MapEngine {
     this.flyToAhsanManzilOrbit(durationMs, "footprint");
   }
 
-  /** Orbit around the overall footprint in fixed angular steps, keeping it framed. */
+  /** Orbit around the complete stepped footprint while keeping every wing visible. */
   orbitAhsanManzil(stepDegrees: number): void {
     if (!Number.isFinite(stepDegrees)) return;
     this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees =
       ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
     this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(650, "front");
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
+    this.flyToAhsanManzilOrbit(650, "footprint");
   }
 
   /** Start a smooth 360-degree guided orbit around the whole palace. */
@@ -3118,13 +3131,28 @@ export class CesiumAdapter implements MapEngine {
     this.ahsanManzilOrbitTourActive = true;
     this.ahsanManzilOrbitHeadingDegrees = 180;
     this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
     this.ahsanManzilOrbitLastTimestamp = null;
+    viewer.camera.cancelFlight();
+    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     const center = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_CAMERA_TARGET.longitude,
-      AHSAN_MANZIL_CAMERA_TARGET.latitude,
-      AHSAN_MANZIL_CAMERA_TARGET.height,
+      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude,
+      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.latitude,
+      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.height,
     );
+
+    // Any direct mouse/touch interaction pauses the guided tour so the user
+    // can take over instead of fighting an always-moving camera.
+    const canvas = viewer.scene.canvas;
+    const stopForUserInput = () => this.stopAhsanManzilOrbitTour();
+    canvas.addEventListener("pointerdown", stopForUserInput, { passive: true });
+    canvas.addEventListener("wheel", stopForUserInput, { passive: true });
+    canvas.addEventListener("touchstart", stopForUserInput, { passive: true });
+    this.ahsanManzilOrbitInputUnsubscribe = () => {
+      canvas.removeEventListener("pointerdown", stopForUserInput);
+      canvas.removeEventListener("wheel", stopForUserInput);
+      canvas.removeEventListener("touchstart", stopForUserInput);
+    };
 
     const tick = (timestamp: number) => {
       if (!this.ahsanManzilOrbitTourActive) return;
@@ -3166,6 +3194,8 @@ export class CesiumAdapter implements MapEngine {
       cancelAnimationFrame(this.ahsanManzilOrbitFrame);
     }
     this.ahsanManzilOrbitFrame = null;
+    this.ahsanManzilOrbitInputUnsubscribe?.();
+    this.ahsanManzilOrbitInputUnsubscribe = null;
 
     const viewer = this.viewer;
     const Cesium = this.cesium;
