@@ -621,46 +621,46 @@
         "note": "Offsets the perspective camera target to the dome/main-entrance axis for frontal and orbit views; it does not move the model anchor."
       },
       "frontCameraRangeMeters": {
-        "value": 160,
+        "value": 112,
         "unit": "m",
         "confidence": "[E]",
         "source": "Camera-framing estimate for the 55.8 m river-facing facade and 27.13 m dome peak",
-        "note": "Designed to show the full facade and dome with a useful screen size; tune after a browser screenshot on the target display."
+        "note": "Focused river-front view for the 55.8 m Rangmahal, central portico, dome and stair; use the separate Full model / Top view presets for the complete stepped footprint."
       },
       "footprintCameraRangeMeters": {
         "value": 205,
         "unit": "m",
         "confidence": "[E]",
         "source": "Camera-framing estimate for the provisional 125.4 m overall footprint",
-        "note": "Used by the north-up Top view to fit the complete footprint with margins; tune after footprint trace."
+        "note": "Used for the whole-model oblique view, all manual orbit steps, guided 360-degree tour, and north-up Top view so the 125.4 m stepped footprint stays inside frame."
       },
       "orbitPitchDegrees": {
-        "value": -18,
+        "value": -24,
         "unit": "degrees",
         "confidence": "[E]",
         "source": "Visual camera framing estimate",
-        "note": "Low oblique angle for the front view and guided 360-degree orbit; not a building measurement."
+        "note": "Oblique camera angle chosen to keep facade detail, dome profile, stairs and side depth visible during the orbit; not a building measurement."
       },
       "orbitDegreesPerSecond": {
-        "value": 10,
+        "value": 8,
         "unit": "degrees_per_second",
         "confidence": "[E]",
         "source": "Usability choice for the guided 360-degree inspection camera",
-        "note": "One revolution is approximately 36 seconds; pause with Stop tour."
+        "note": "One guided revolution takes about 45 seconds, allowing time to inspect facade and side details."
       },
       "frontBoundingSphereRadiusMeters": {
-        "value": 105,
+        "value": 50,
         "unit": "m",
         "confidence": "[E]",
         "source": "Camera composition estimate for the offset front target and rear-set Andarmahal",
-        "note": "Camera framing radius large enough to keep the stepped west/rear Andarmahal, south-facing Rangmahal, and 27.13 m dome within the oblique inspection composition."
+        "note": "Focused frontal composition around the Rangmahal, projecting portico, dome and central stair. The whole rear-set Andarmahal is framed by the separate 72 m overall-footprint sphere."
       },
       "footprintBoundingSphereRadiusMeters": {
         "value": 72,
         "unit": "m",
         "confidence": "[E]",
         "source": "Bounding-sphere estimate for the 125.4 m overall footprint",
-        "note": "Used by north-up Top view to fit the complete stepped footprint with margins."
+        "note": "Encloses the whole 125.4 m stepped plan, including the west/rear Andarmahal offset and the river-facing front stair, for full-model and top-down views."
       }
     }
   },
