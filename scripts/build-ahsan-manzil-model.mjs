@@ -423,7 +423,15 @@ function buildGlb(lod) {
       box(n.Parapet,x,roofTop+DIM.parapet*.54,side*(half-.31),.30,DIM.parapet*.55,.20,"trim");
     }
   }
-  box(n.Parapet,0,roofTop+DIM.parapet/2,0,.4,DIM.parapet,D,"pink");
+  // Close both short roof edges as well as the two long parapet runs so
+  // elevated and rear three-quarter views do not reveal a roof with missing sides.
+  for (const side of [-1, 1]) {
+    box(
+      n.Parapet, side * (L / 2 - 0.12),
+      roofTop + DIM.parapet / 2, 0,
+      0.4, DIM.parapet, D, "pink",
+    );
+  }
 
   // Small roofline pinnacles reinforce the palace silhouette at wing breaks
   // and corners; they remain a low-poly hint rather than invented sculpture.
