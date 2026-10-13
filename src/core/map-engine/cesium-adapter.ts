@@ -11,7 +11,13 @@ import {
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
 import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
-import { SHAT_GOMBUJ_CAMERA, AHSAN_MANZIL_GEOREFERENCE, selectAhsanManzilLod } from "../geospatial/heritage-landmarks.mjs";
+import {
+  SHAT_GOMBUJ_CAMERA,
+  AHSAN_MANZIL_CAMERA_TARGET,
+  AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET,
+  AHSAN_MANZIL_GEOREFERENCE,
+  selectAhsanManzilLod,
+} from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
@@ -3074,7 +3080,7 @@ export class CesiumAdapter implements MapEngine {
     this.ahsanManzilOrbitHeadingDegrees = 180;
     this.ahsanManzilOrbitPitchDegrees = -18;
     this.ahsanManzilOrbitRangeMeters = 205;
-    this.flyToAhsanManzilOrbit(durationMs);
+    this.flyToAhsanManzilOrbit(durationMs, "front");
   }
 
   /** North-up orthographic-like view for checking the full footprint and orientation. */
@@ -3083,7 +3089,7 @@ export class CesiumAdapter implements MapEngine {
     this.ahsanManzilOrbitHeadingDegrees = 0;
     this.ahsanManzilOrbitPitchDegrees = -88.5;
     this.ahsanManzilOrbitRangeMeters = 205;
-    this.flyToAhsanManzilOrbit(durationMs);
+    this.flyToAhsanManzilOrbit(durationMs, "footprint");
   }
 
   /** Orbit around the overall footprint in fixed angular steps, keeping it framed. */
@@ -3092,7 +3098,7 @@ export class CesiumAdapter implements MapEngine {
     this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees =
       ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
-    this.flyToAhsanManzilOrbit(650);
+    this.flyToAhsanManzilOrbit(650, "front");
   }
 
   /** Start a smooth 360-degree guided orbit around the whole palace. */
@@ -3104,9 +3110,9 @@ export class CesiumAdapter implements MapEngine {
     this.ahsanManzilOrbitTourActive = true;
     this.ahsanManzilOrbitLastTimestamp = null;
     const center = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_GEOREFERENCE.longitude,
-      AHSAN_MANZIL_GEOREFERENCE.latitude,
-      10,
+      AHSAN_MANZIL_CAMERA_TARGET.longitude,
+      AHSAN_MANZIL_CAMERA_TARGET.latitude,
+      AHSAN_MANZIL_CAMERA_TARGET.height,
     );
 
     const tick = (timestamp: number) => {
@@ -3158,18 +3164,25 @@ export class CesiumAdapter implements MapEngine {
     }
   }
 
-  private flyToAhsanManzilOrbit(durationMs: number): void {
+  private flyToAhsanManzilOrbit(
+    durationMs: number,
+    target: "front" | "footprint" = "front",
+  ): void {
     const viewer = this.viewer;
     const Cesium = this.cesium;
     if (!viewer || !Cesium || viewer.isDestroyed()) return;
 
+    const focus = target === "front"
+      ? AHSAN_MANZIL_CAMERA_TARGET
+      : AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET;
     const center = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_GEOREFERENCE.longitude,
-      AHSAN_MANZIL_GEOREFERENCE.latitude,
-      10,
+      focus.longitude,
+      focus.latitude,
+      focus.height,
     );
-    // A 72 m bounding sphere fits the reported 125.4 m total footprint and dome.
-    const bounds = new Cesium.BoundingSphere(center, 72);
+    // The front target is offset to the dome axis, so a wider sphere keeps
+    // the west-set-back Andarmahal in the same camera composition.
+    const bounds = new Cesium.BoundingSphere(center, target === "front" ? 98 : 72);
     viewer.camera.flyToBoundingSphere(bounds, {
       duration: Math.max(0, durationMs) / 1000,
       offset: new Cesium.HeadingPitchRange(
