@@ -8,7 +8,7 @@
 |---|---|
 | `public/models/ahsan-manzil-lod1.glb` | Low-detail massing |
 | `public/models/ahsan-manzil-lod2.glb` | Roofline, parapet, dome and simplified facade rhythm |
-| `public/models/ahsan-manzil-lod3.glb` | Openings, trim/pilasters, porticos, end elevations, upper-veranda balustrades, roofline pinnacles, staircase, drum, dome ribs and finial |
+| `public/models/ahsan-manzil-lod3.glb` | Recessed openings, improved mullions and illustrative stained-glass door panels, trim/pilasters, two-storey triple-arched portico, end elevations, upper-veranda balustrades, roofline pinnacles, staircase, drum, dome ribs and finial |
 | `public/models/ahsan-manzil.glb` | Convenience alias of LOD3 |
 | `public/models/ahsan-manzil.manifest.json` | Runtime building manifest / LOD parameters |
 | `data/heritage/ahsan-manzil.parameters.json` | Confidence-tagged parameter source |
@@ -25,6 +25,7 @@ Build assets with `npm run build:heritage-model`. All models include nodes `Plin
 - The central round room/dome is aligned with the origin, between two 62.7 m working halves derived from the published 125.4 m overall length and description of two equal palace halves. This is an explicit improvement to the earlier visibly off-centre dome/stair/portico.
 - The east and west short elevations now include recessed arched openings and storey belt courses; LOD3 also includes upper-veranda balustrades and stylized roofline pinnacles.
 - The central portico now continues through the upper storey with a second triple-arched loggia, capitals/impost bands, cornice and a triangular pediment above it; the pediment peak is parameterized at 15.2 m [E] pending a rectified facade.
+- Window muntins and illustrative muted rose/amber/green glazing panels are now positioned on the recessed glazing plane rather than the outer wall face. The precise historic glass pattern and colour palette remain [?].
 - LOD model loading/unloading uses camera distance and camera altitude thresholds [E] to avoid loading detailed geometry when the view is in Bagerhat or far from Old Dhaka.
 - The Cesium loader sets Y-up and Z-forward for the generated GLB; the model uses a local east-north-up reference frame with south as its +Z face.
 
