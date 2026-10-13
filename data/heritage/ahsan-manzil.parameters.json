@@ -448,11 +448,11 @@
         "note": "Curvature and ribs remain stylized."
       },
       "drumOpeningCount": {
-        "value": 4,
-        "unit": "openings",
-        "confidence": "[?]",
-        "source": "Placeholder on north and south drum faces",
-        "note": "Two arched openings on each of the north and south drum faces; count needs elevation imagery."
+        "value": 8,
+        "unit": "open bays around octagonal drum",
+        "confidence": "[E]",
+        "source": "Reference-image interpretation of an open/fenestrated octagonal drum",
+        "note": "The procedural LOD2/LOD3 currently creates one open arched bay on each of the eight drum faces; verify from oblique and elevation photographs."
       },
       "drumOpeningWidth": {
         "value": 2.7,
