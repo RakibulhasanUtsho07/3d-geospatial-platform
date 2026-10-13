@@ -15,24 +15,42 @@ export const SHAT_GOMBUJ_CAMERA = Object.freeze({
 });
 
 /**
- * Ahsan Manzil's provisional world anchor. The viewer uses this as a target
- * for a bounding-sphere camera, not as the camera's own position.
+ * Ahsan Manzil's provisional world anchor. The viewer uses these as camera
+ * targets, not as the camera's own positions. The front offset is [E] and is
+ * kept separate from the provisional georeference so it never silently moves
+ * the building or changes its claimed geographic accuracy.
  */
-// Front-camera target is shifted east to the centre of the 62.7 m Rangmahal
-// frontage, while the georeference below remains the provisional full-footprint origin.
+export const AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS = 31.35;
+const AHSAN_MANZIL_ANCHOR_LONGITUDE = 90.40606;
+const AHSAN_MANZIL_ANCHOR_LATITUDE = 23.70860;
+const METERS_PER_LONGITUDE_DEGREE = 111_319.49 * Math.cos(
+  (AHSAN_MANZIL_ANCHOR_LATITUDE * Math.PI) / 180,
+);
+const AHSAN_MANZIL_FRONT_LONGITUDE = Number((
+  AHSAN_MANZIL_ANCHOR_LONGITUDE +
+  AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS / METERS_PER_LONGITUDE_DEGREE
+).toFixed(6));
+
+export const AHSAN_MANZIL_CAMERA_RANGE_METERS = 160;
+export const AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS = 205;
+export const AHSAN_MANZIL_ORBIT_PITCH_DEGREES = -18;
+export const AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND = 10;
+export const AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS = 98;
+export const AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS = 72;
+
 export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
-  longitude: 90.406368,
-  latitude: 23.70860,
+  longitude: AHSAN_MANZIL_FRONT_LONGITUDE,
+  latitude: AHSAN_MANZIL_ANCHOR_LATITUDE,
   height: 10,
 });
 export const AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET = Object.freeze({
-  longitude: 90.40606,
-  latitude: 23.70860,
+  longitude: AHSAN_MANZIL_ANCHOR_LONGITUDE,
+  latitude: AHSAN_MANZIL_ANCHOR_LATITUDE,
   height: 10,
 });
 export const AHSAN_MANZIL_CAMERA_ORIENTATION = Object.freeze({
   heading: 180,
-  pitch: -18,
+  pitch: AHSAN_MANZIL_ORBIT_PITCH_DEGREES,
   roll: 0,
 });
 export const AHSAN_MANZIL_CAMERA = Object.freeze({
