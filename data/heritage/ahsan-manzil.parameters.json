@@ -153,11 +153,32 @@
         "note": "This replaces the earlier uniform 24-bay assumption. Verify each bay from a straight-on elevation before treating the count as fixed."
       },
       "averageBayPitch": {
-        "value": 5.225,
+        "value": 4.18,
         "unit": "m",
         "confidence": "[E]",
-        "source": "125.4 m / 24 estimated bays",
-        "note": "Section pitch differs slightly to fit assumed Rangmahal/Andarmahal split."
+        "source": "62.7 m Rangmahal river-front width / 15 estimated bays",
+        "note": "Derived pitch for the provisional 2 + 4 + 3 + 4 + 2 facade rhythm."
+      },
+      "andarmahalDepth": {
+        "value": 14.375,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Half of the 28.75 m overall depth, using the single-photo hypothesis that Andarmahal is set back to the north of the river-facing Rangmahal block",
+        "note": "This stepped/L-shaped plan is a provisional interpretation intended to reconcile the 56–62 m river-front Rangmahal width with the reported 125.4 m total extent. Verify from a north-up satellite trace or measured plan before survey-grade use."
+      },
+      "andarmahalNorthOffset": {
+        "value": -7.1875,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Derived from the provisional 14.375 m Andarmahal depth and the 28.75 m overall depth",
+        "note": "Centers the Andarmahal on the rear/north half of the total footprint so the public south-facing Rangmahal facade remains near 62.7 m wide. This is a modeling hypothesis, not a verified site measurement."
+      },
+      "andarmahalBayCount": {
+        "value": 8,
+        "unit": "bays",
+        "confidence": "[E]",
+        "source": "Procedural approximation for the older adjoining Andarmahal block",
+        "note": "Keep separate from the 15-bay Rangmahal south-elevation composition; replace from a straight-on photo."
       }
     },
     "vertical": {
@@ -434,18 +455,18 @@
         "note": "Two arched openings on each of the north and south drum faces; count needs elevation imagery."
       },
       "drumOpeningWidth": {
-        "value": 0.95,
+        "value": 2.7,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder",
-        "note": "Width of each drum arch opening."
+        "source": "Reference-photo estimate for an open eight-sided colonnaded drum",
+        "note": "Widened from narrow window slits to represent open arched colonnade bays; calibrate against an elevation photo."
       },
       "drumOpeningCrownHeight": {
-        "value": 2,
+        "value": 2.8,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder",
-        "note": "Opening height to arch crown, pending elevation photo."
+        "source": "Reference-photo estimate for open arched drum bays",
+        "note": "Approximate crown height within the 5 m drum; final dimensions require rectified imagery."
       },
       "profileRings": {
         "value": [
