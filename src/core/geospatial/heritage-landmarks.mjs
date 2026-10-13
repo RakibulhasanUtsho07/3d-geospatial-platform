@@ -20,7 +20,7 @@ export const SHAT_GOMBUJ_CAMERA = Object.freeze({
  * kept separate from the provisional georeference so it never silently moves
  * the building or changes its claimed geographic accuracy.
  */
-export const AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS = 31.35;
+export const AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS = 34.8;
 const AHSAN_MANZIL_ANCHOR_LONGITUDE = 90.40606;
 const AHSAN_MANZIL_ANCHOR_LATITUDE = 23.70860;
 const METERS_PER_LONGITUDE_DEGREE = 111_319.49 * Math.cos(
@@ -35,7 +35,7 @@ export const AHSAN_MANZIL_CAMERA_RANGE_METERS = 160;
 export const AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS = 205;
 export const AHSAN_MANZIL_ORBIT_PITCH_DEGREES = -18;
 export const AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND = 10;
-export const AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS = 98;
+export const AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS = 105;
 export const AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS = 72;
 
 export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
