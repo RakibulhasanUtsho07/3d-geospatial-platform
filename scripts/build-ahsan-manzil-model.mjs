@@ -169,8 +169,31 @@ function buildGlb(lod) {
       box(node,cx+radius+.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       archBand(node,cx,spring,trimZ,radius+.02,.085,"trim",detail===2?16:10);
     }
+    if (isDoor && detail === 2) {
+      // Muted stained-glass panels are a visual approximation only; the exact
+      // historic colours/pattern remain unverified. Keep them on the recessed
+      // glazing plane rather than floating out on the exterior stone face.
+      const paneWidth = width / 3 - 0.055;
+      const paneHeight = Math.max(0.35, stem * 0.84);
+      const paneY = base + stem / 2;
+      const paneZ = glassZ + side * 0.045;
+      const paneColors = ["#713F54", "#B78350", "#536C62"];
+      for (let pane = 0; pane < 3; pane++) {
+        box(
+          node,
+          cx + (pane - 1) * width / 3,
+          paneY,
+          paneZ,
+          paneWidth,
+          paneHeight,
+          0.05,
+          paneColors[pane],
+        );
+      }
+    }
     if(detail===2){
-      const mullionZ=surfaceZ+side*.11;
+      // Window muntins sit just proud of the actual glazing, inside the reveal.
+      const mullionZ=glassZ+side*.09;
       box(node,cx,base+stem*.52,mullionZ,.045,stem*.88,.04,"trim");
       box(node,cx,base+stem*.28,mullionZ,width*.82,.04,.04,"trim");
       box(node,cx,base+stem*.70,mullionZ,width*.82,.04,.04,"trim");
