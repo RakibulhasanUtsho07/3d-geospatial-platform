@@ -54,6 +54,7 @@ test("the model is centred, closed on the short ends, and has veranda detail", a
   assert.ok(builder.includes("Dark, thin balustrades at the upper veranda edge"));
   assert.ok(builder.includes("Upper-storey triple-arched loggia."));
   assert.ok(builder.includes("const pedimentBase = upperTop + .28;"));
+  assert.ok(builder.includes("both short roof edges"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
   assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
@@ -78,6 +79,7 @@ test("the map opens centred on Ahsan Manzil and has true orbit controls", async 
   assert.ok(adapter.includes("orbitAhsanManzil(stepDegrees: number)"));
   assert.ok(adapter.includes("flyToBoundingSphere"));
   assert.ok(adapter.includes("new Cesium.BoundingSphere(center, 72)"));
+  assert.ok(adapter.includes("ahsanManzilOrbitHeadingDegrees = 180"));
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
   assert.ok(adapter.includes("ahsan-manzil.manifest.json"));
@@ -92,6 +94,7 @@ test("the map opens centred on Ahsan Manzil and has true orbit controls", async 
   assert.ok(mapCanvas.includes("function goHomeToAhsanManzil()"));
   assert.ok(mapCanvas.includes("onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}"));
   assert.ok(mapCanvas.includes("onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}"));
+  assert.ok(mapCanvas.includes("engineRef.current?.focusAhsanManzil(650)"));
   assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees left"));
   assert.ok(controls.includes("Orbit Ahsan Manzil 45 degrees right"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
