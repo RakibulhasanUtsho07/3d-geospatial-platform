@@ -55,6 +55,8 @@ test("the model is centred, closed on the short ends, and has veranda detail", a
   assert.ok(builder.includes("Upper-storey triple-arched loggia."));
   assert.ok(builder.includes("const pedimentBase = upperTop + .28;"));
   assert.ok(builder.includes("both short roof edges"));
+  assert.ok(builder.includes('paneColors = ["#713F54", "#B78350", "#536C62"]'));
+  assert.ok(builder.includes("const mullionZ=glassZ+side*.09;"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
   assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
@@ -92,6 +94,8 @@ test("the map opens centred on Ahsan Manzil and has true orbit controls", async 
   assert.ok(mapCanvas.includes("function goToAhsanManzil()"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
   assert.ok(mapCanvas.includes("function goHomeToAhsanManzil()"));
+  assert.ok(mapCanvas.includes("onRotateLeft={() => engineRef.current?.orbitAhsanManzil(-15)}"));
+  assert.ok(mapCanvas.includes("onRotateRight={() => engineRef.current?.orbitAhsanManzil(15)}"));
   assert.ok(mapCanvas.includes("onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}"));
   assert.ok(mapCanvas.includes("onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}"));
   assert.ok(mapCanvas.includes("engineRef.current?.focusAhsanManzil(650)"));
