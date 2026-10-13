@@ -118,18 +118,18 @@
         "note": "Working dimension; resolve against satellite/plan."
       },
       "rangmahalBlockLength": {
-        "value": 55.8,
+        "value": 62.7,
         "unit": "m",
         "confidence": "[C]",
-        "source": "183 ft hypothesis in supplied brief",
-        "note": "Assumes this dimension is the eastern dome block."
+        "source": "Working half-length derived from the 125.4 m overall length and the published description that the central round room divides two equal palace halves",
+        "note": "Set to half the overall length so the central dome/round room is aligned with the central joint; confirm by footprint tracing."
       },
       "andarmahalBlockLength": {
-        "value": 69.6,
+        "value": 62.7,
         "unit": "m",
         "confidence": "[E]",
-        "source": "125.4 m minus 55.8 m",
-        "note": "Derived remainder, not independently surveyed."
+        "source": "125.4 m overall length divided into two equal halves per published architectural description",
+        "note": "Derived working value; the footprint and central joint still require georeferenced plan/elevation calibration."
       },
       "interiorGridEW": {
         "value": 4,
@@ -278,11 +278,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 16,
+        "value": 20,
         "unit": "m",
         "confidence": "[E]",
         "source": "Procedural placeholder until elevation is measured",
-        "note": "Width of the central projecting portico/pediment proxy."
+        "note": "Widened procedural central portico to improve proportional match to reference facade; calibrate against a rectified elevation."
       },
       "porticoDepth": {
         "value": 4,
@@ -317,6 +317,27 @@
         "confidence": "[?]",
         "source": "Placeholder derived from documented colored-glass doors",
         "note": "Do not treat panel count/color pattern as verified."
+      },
+      "balustradeHeight": {
+        "value": 0.9,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visible upper-veranda guardrail proportion in exterior photographs",
+        "note": "Approximate top rail height above the veranda floor; not measured from a survey."
+      },
+      "balusterSpacing": {
+        "value": 0.85,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural rendering parameter chosen to keep an even, readable upper-veranda balustrade",
+        "note": "Approximate post interval; replace after elevation/photo calibration."
+      },
+      "rooflinePinnacleHeight": {
+        "value": 1.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visible small roofline finials/pinnacles in exterior photographs",
+        "note": "Stylized height above the parapet; ornamental profile is illustrative and not a measured moulding."
       }
     },
     "stair": {
@@ -339,10 +360,11 @@
         "source": "Derived from 6.4 m rise / 0.16 m riser"
       },
       "width": {
-        "value": 12,
+        "value": 22,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Portal-width approximation"
+        "source": "Approximate front-elevation proportion from public exterior photographs",
+        "note": "Widened from the earlier narrow placeholder so the broad principal stair visually relates to the central portal; trace before survey-grade claims."
       },
       "sideRail": {
         "value": "simple low side rails",
