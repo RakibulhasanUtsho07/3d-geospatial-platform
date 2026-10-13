@@ -433,14 +433,14 @@ function buildGlb(lod) {
         const base = roofTop + DIM.parapet;
         box(n.Parapet, x, base + 0.18, z, 1.15, 0.36, 0.92, "trim");
         verticalCylinder(
-          n.Parapet, x, base + 0.28 * DIM.pinnacleHeight,
-          base + 0.64 * DIM.pinnacleHeight, z, 0.13, "trim", 8,
+          n.Parapet, x, base + 0.18 * DIM.pinnacleHeight,
+          base + 0.50 * DIM.pinnacleHeight, z, 0.13, "trim", 8,
         );
         addDomeProfile(
-          n.Parapet, x, z, base + 0.45 * DIM.pinnacleHeight,
-          [[0.30, 0], [0.24, 0.20 * DIM.pinnacleHeight],
-            [0.16, 0.42 * DIM.pinnacleHeight], [0.06, 0.62 * DIM.pinnacleHeight],
-            [0.006, 0.82 * DIM.pinnacleHeight]],
+          n.Parapet, x, z, base + 0.50 * DIM.pinnacleHeight,
+          [[0.30, 0], [0.24, 0.12 * DIM.pinnacleHeight],
+            [0.16, 0.24 * DIM.pinnacleHeight], [0.06, 0.38 * DIM.pinnacleHeight],
+            [0.006, 0.50 * DIM.pinnacleHeight]],
           8, "roof",
         );
       }
