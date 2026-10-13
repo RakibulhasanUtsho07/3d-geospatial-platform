@@ -119,6 +119,8 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
   assert.ok(adapter.includes("focusAhsanManzilWhole(durationMs = 900)"));
   assert.ok(adapter.includes("focusAhsanManzilTopDown(durationMs = 850)"));
+  assert.ok(adapter.includes("focusAhsanManzilRear(durationMs = 850)"));
+  assert.ok(adapter.includes("focusAhsanManzilSide(durationMs = 850)"));
   assert.ok(adapter.includes("startAhsanManzilOrbitTour(onStopped?: () => void): void"));
   assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude"));
   assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS"));
@@ -144,6 +146,8 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilWhole(900)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilTopDown(850)"));
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzilRear(850)"));
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzilSide(850)"));
   assert.ok(mapCanvas.includes("engine.startAhsanManzilOrbitTour(() => setOrbitTourActive(false))"));
   assert.ok(mapCanvas.includes("engine.stopAhsanManzilOrbitTour()"));
   assert.ok(mapCanvas.includes("onRotateLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-15); }}"));
@@ -152,6 +156,8 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.ok(mapCanvas.includes("onOrbitRight={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(45); }}"));
   assert.ok(controls.includes("Full model"));
   assert.ok(controls.includes("Top view"));
+  assert.ok(controls.includes("Rear"));
+  assert.ok(controls.includes("Side"));
   assert.ok(controls.includes("360° tour"));
   assert.ok(controls.includes("Stop tour"));
   assert.ok(adapter.includes("selectAhsanManzilLod"));
