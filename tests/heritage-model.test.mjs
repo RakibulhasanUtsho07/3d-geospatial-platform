@@ -85,6 +85,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);
   assert.equal(config.parameters.runtimeCamera.frontCameraRangeMeters.value, AHSAN_MANZIL_CAMERA_RANGE_METERS);
+  assert.equal(config.parameters.runtimeCamera.frontCameraRangeMeters.value, 112);
   assert.equal(config.parameters.runtimeCamera.footprintCameraRangeMeters.value, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS);
   assert.equal(config.parameters.runtimeCamera.orbitPitchDegrees.value, AHSAN_MANZIL_ORBIT_PITCH_DEGREES);
   assert.equal(config.parameters.runtimeCamera.orbitDegreesPerSecond.value, AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND);
@@ -101,15 +102,20 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.match(landmarks, /anchorConfidence: "\[C\]"/);
   assert.equal(AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, 34.8);
   assert.ok(AHSAN_MANZIL_CAMERA_TARGET.longitude > AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude);
-  assert.ok(AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS >= AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS + 62.7);
+  assert.ok(AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS >= 48);
+  assert.ok(AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS < AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS + 62.7);
   assert.equal(Number(((AHSAN_MANZIL_CAMERA_TARGET.longitude - AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude) * 111319.49 * Math.cos((23.7086 * Math.PI) / 180)).toFixed(1)), 34.8);
 
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
   assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
+  assert.ok(adapter.includes("focusAhsanManzilWhole(durationMs = 900)"));
   assert.ok(adapter.includes("focusAhsanManzilTopDown(durationMs = 850)"));
   assert.ok(adapter.includes("startAhsanManzilOrbitTour(): void"));
+  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude"));
+  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS"));
   assert.ok(adapter.includes("stopAhsanManzilOrbitTour(): void"));
   assert.ok(adapter.includes("orbitAhsanManzil(stepDegrees: number)"));
+  assert.ok(adapter.includes('this.flyToAhsanManzilOrbit(650, "footprint")'));
   assert.ok(adapter.includes("flyToBoundingSphere"));
   assert.ok(adapter.includes("AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS"));
   assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS"));
@@ -126,6 +132,7 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
   const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
   assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzilWhole(900)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilTopDown(850)"));
   assert.ok(mapCanvas.includes("engine.startAhsanManzilOrbitTour()"));
   assert.ok(mapCanvas.includes("engine.stopAhsanManzilOrbitTour()"));
@@ -133,6 +140,7 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.ok(mapCanvas.includes("onRotateRight={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(15); }}"));
   assert.ok(mapCanvas.includes("onOrbitLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-45); }}"));
   assert.ok(mapCanvas.includes("onOrbitRight={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(45); }}"));
+  assert.ok(controls.includes("Full model"));
   assert.ok(controls.includes("Top view"));
   assert.ok(controls.includes("360° tour"));
   assert.ok(controls.includes("Stop tour"));
