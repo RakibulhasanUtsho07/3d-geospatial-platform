@@ -18,14 +18,21 @@ export const SHAT_GOMBUJ_CAMERA = Object.freeze({
  * Ahsan Manzil's provisional world anchor. The viewer uses this as a target
  * for a bounding-sphere camera, not as the camera's own position.
  */
+// Front-camera target is shifted east to the centre of the 62.7 m Rangmahal
+// frontage, while the georeference below remains the provisional full-footprint origin.
 export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
+  longitude: 90.406368,
+  latitude: 23.70860,
+  height: 10,
+});
+export const AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET = Object.freeze({
   longitude: 90.40606,
   latitude: 23.70860,
   height: 10,
 });
 export const AHSAN_MANZIL_CAMERA_ORIENTATION = Object.freeze({
   heading: 180,
-  pitch: -22,
+  pitch: -18,
   roll: 0,
 });
 export const AHSAN_MANZIL_CAMERA = Object.freeze({
