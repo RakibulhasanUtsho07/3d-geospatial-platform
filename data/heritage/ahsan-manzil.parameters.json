@@ -647,6 +647,20 @@
         "confidence": "[E]",
         "source": "Usability choice for the guided 360-degree inspection camera",
         "note": "One revolution is approximately 36 seconds; pause with Stop tour."
+      },
+      "frontBoundingSphereRadiusMeters": {
+        "value": 98,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera composition estimate for the offset front target and rear-set Andarmahal",
+        "note": "Slightly wider than half the overall 125.4 m extent so all wings remain visible while looking from the Rangmahal centre."
+      },
+      "footprintBoundingSphereRadiusMeters": {
+        "value": 72,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Bounding-sphere estimate for the 125.4 m overall footprint",
+        "note": "Used by north-up Top view to fit the complete stepped footprint with margins."
       }
     }
   },
