@@ -146,11 +146,11 @@
         "note": "Recorded separately; not treated as exterior opening count."
       },
       "exteriorBayCount": {
-        "value": 24,
+        "value": 15,
         "unit": "bays per long facade",
         "confidence": "[E]",
-        "source": "Procedural placeholder",
-        "note": "Replace by counting openings on rectified elevation photos."
+        "source": "One south-elevation reference photo; provisional symmetric composition 2 + 4 + 3 + 4 + 2",
+        "note": "This replaces the earlier uniform 24-bay assumption. Verify each bay from a straight-on elevation before treating the count as fixed."
       },
       "averageBayPitch": {
         "value": 5.225,
@@ -295,8 +295,8 @@
         "value": 15.2,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Approximate exterior-photo proportion for the roof pediment above the first-floor triple-arched loggia",
-        "note": "Updated from the earlier too-low 8.35 m placeholder so the triangular pediment sits above the upper-storey arcade; calibrate against a rectified front elevation."
+        "source": "Approximate reference-photo proportion for the central pediment above the upper triple-arched loggia",
+        "note": "Maintain the apex below the 27.13 m [V] dome peak; calibrate against a rectified front elevation."
       },
       "doorBayInterval": {
         "value": 4,
@@ -342,29 +342,32 @@
     },
     "stair": {
       "riserHeight": {
-        "value": 0.16,
+        "value": 0.23,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Supplied brief"
+        "source": "Single reference photo, ±20% estimate",
+        "note": "28 risers at 0.23 m give approximately 6.44 m rise to the upper portal."
       },
       "treadDepth": {
-        "value": 0.4,
+        "value": 0.57,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder"
+        "source": "16 m total stair run / 28 steps",
+        "note": "Working tread depth chosen so the modeled treads fill the declared run."
       },
       "stepCount": {
-        "value": 40,
+        "value": 28,
         "unit": "steps",
-        "confidence": "[?]",
-        "source": "Derived from 6.4 m rise / 0.16 m riser"
+        "confidence": "[E]",
+        "source": "Single front reference photo estimate (25–30 steps)",
+        "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 22,
+        "value": 16.5,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Approximate front-elevation proportion from public exterior photographs",
-        "note": "Widened from the earlier narrow placeholder so the broad principal stair visually relates to the central portal; trace before survey-grade claims."
+        "source": "Single front reference photo estimate",
+        "note": "Approximate clear width at the garden-facing base of the stair."
       },
       "sideRail": {
         "value": "simple low side rails",
@@ -377,6 +380,13 @@
         "confidence": "[E]",
         "source": "Procedural placeholder",
         "note": "Horizontal garden run from the upper portal toward the river; not site-surveyed."
+      },
+      "topWidth": {
+        "value": 13.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Single front reference photo estimate",
+        "note": "Approximate clear width at the upper portal; the stair tapers from 16.5 m at the base."
       }
     },
     "dome": {
@@ -484,15 +494,16 @@
     },
     "materials": {
       "facadePink": {
-        "value": "#E7A3AE",
+        "value": "#E1917D",
         "confidence": "[E]",
-        "source": "Supplied placeholder",
-        "note": "Not sampled from color-managed daylight photography."
+        "source": "User-supplied daylight photo estimate",
+        "note": "Warm salmon pink. Sample a colour-managed daylight photo for final calibrated RGB."
       },
       "trimOffWhite": {
-        "value": "#F4EDE0",
+        "value": "#E99C8A",
         "confidence": "[E]",
-        "source": "Supplied placeholder"
+        "source": "User-supplied daylight photo estimate",
+        "note": "Trim stays in the same pink family as the body; the earlier off-white trim was incorrect."
       },
       "glass": {
         "value": "#583943",
@@ -500,14 +511,27 @@
         "source": "Generic dark glazing proxy"
       },
       "roof": {
-        "value": "#D28E98",
-        "confidence": "[?]",
-        "source": "Placeholder; roof covering material unknown"
+        "value": "#CC8274",
+        "confidence": "[E]",
+        "source": "User-supplied daylight photo estimate",
+        "note": "Muted rose roof/parapet proxy; calibrate from reference imagery."
       },
       "verandaFloor": {
         "value": "#EFE6D5",
         "confidence": "[V]",
         "source": "Supplied brief; light marble proxy"
+      },
+      "stairStone": {
+        "value": "#6E625A",
+        "confidence": "[E]",
+        "source": "User-supplied reference photo estimate",
+        "note": "Dark grey-brown stone for the ceremonial exterior stair treads."
+      },
+      "doorWood": {
+        "value": "#6B4A32",
+        "confidence": "[E]",
+        "source": "User-supplied reference photo estimate",
+        "note": "Brown wood for the central glazed doors and timber shutter details."
       }
     },
     "roof": {
