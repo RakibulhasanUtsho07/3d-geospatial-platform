@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { AHSAN_MANZIL_LOD_THRESHOLDS, AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, AHSAN_MANZIL_CAMERA_RANGE_METERS, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS, AHSAN_MANZIL_ORBIT_PITCH_DEGREES, AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND, AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS, AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS, selectAhsanManzilLod } from "../src/core/geospatial/heritage-landmarks.mjs";
+import { AHSAN_MANZIL_LOD_THRESHOLDS, AHSAN_MANZIL_CAMERA_TARGET, AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET, AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, AHSAN_MANZIL_CAMERA_RANGE_METERS, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS, AHSAN_MANZIL_ORBIT_PITCH_DEGREES, AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND, AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS, AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS, selectAhsanManzilLod } from "../src/core/geospatial/heritage-landmarks.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredNodes = [
@@ -48,7 +48,7 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
 
 test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
-  assert.ok(builder.includes("const rangLength=DIM.rangmahalLength, split=0, domeX=(split+xMax)/2;"));
+  assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes("function fillRectLouverWindow("));
@@ -60,13 +60,13 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Upper veranda balustrades"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
-  assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 62.7);
-  assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 62.7);
+  assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 55.8);
+  assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 69.6);
   assert.equal(config.parameters.footprint.exteriorBayCount.value, 15);
   assert.equal(config.parameters.footprint.andarmahalDepth.value, 14.375);
   assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
   assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
-  assert.equal(config.parameters.facade.porticoWidth.value, 20);
+  assert.equal(config.parameters.facade.porticoWidth.value, 16.5);
   assert.equal(config.parameters.stair.width.value, 16.5);
   assert.equal(config.parameters.stair.topWidth.value, 13.5);
   assert.equal(config.parameters.stair.stepCount.value, 28);
@@ -77,7 +77,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
-  assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 31.35);
+  assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);
   assert.equal(config.parameters.runtimeCamera.frontCameraRangeMeters.value, AHSAN_MANZIL_CAMERA_RANGE_METERS);
   assert.equal(config.parameters.runtimeCamera.footprintCameraRangeMeters.value, AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS);
   assert.equal(config.parameters.runtimeCamera.orbitPitchDegrees.value, AHSAN_MANZIL_ORBIT_PITCH_DEGREES);
@@ -93,7 +93,10 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.match(landmarks, /AHSAN_MANZIL_ANCHOR_LATITUDE = 23\.70860/);
   assert.match(landmarks, /longitude: 90\.40606/);
   assert.match(landmarks, /anchorConfidence: "\[C\]"/);
-  assert.equal(AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, 31.35);
+  assert.equal(AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS, 34.8);
+  assert.ok(AHSAN_MANZIL_CAMERA_TARGET.longitude > AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude);
+  assert.ok(AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS >= AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS + 62.7);
+  assert.equal(Number(((AHSAN_MANZIL_CAMERA_TARGET.longitude - AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude) * 111319.49 * Math.cos((23.7086 * Math.PI) / 180)).toFixed(1)), 34.8);
 
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
   assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
