@@ -566,8 +566,8 @@ export default function MapCanvas({
         onAhsanManzil={goToAhsanManzil}
         onZoomIn={() => cameraRef.current?.zoomIn()}
         onZoomOut={() => cameraRef.current?.zoomOut()}
-        onRotateLeft={() => cameraRef.current?.rotateLeft()}
-        onRotateRight={() => cameraRef.current?.rotateRight()}
+        onRotateLeft={() => engineRef.current?.orbitAhsanManzil(-15)}
+        onRotateRight={() => engineRef.current?.orbitAhsanManzil(15)}
         onOrbitLeft={() => engineRef.current?.orbitAhsanManzil(-45)}
         onOrbitRight={() => engineRef.current?.orbitAhsanManzil(45)}
         onTiltUp={() => cameraRef.current?.tiltUp()}
