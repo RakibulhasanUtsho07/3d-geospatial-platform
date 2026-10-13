@@ -151,6 +151,7 @@ export class CesiumAdapter implements MapEngine {
   private ahsanManzilOrbitTourActive = false;
   private ahsanManzilOrbitLastTimestamp: number | null = null;
   private ahsanManzilOrbitInputUnsubscribe: (() => void) | null = null;
+  private ahsanManzilOrbitStoppedCallback: (() => void) | null = null;
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
 
@@ -2861,6 +2862,8 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    // Do not schedule React state updates during component teardown.
+    this.ahsanManzilOrbitStoppedCallback = null;
     this.stopAhsanManzilOrbitTour();
     this.restoreSelectedBuilding();
     this.heritageModelLoadToken += 1;
@@ -3123,12 +3126,13 @@ export class CesiumAdapter implements MapEngine {
   }
 
   /** Start a smooth 360-degree guided orbit around the whole palace. */
-  startAhsanManzilOrbitTour(): void {
+  startAhsanManzilOrbitTour(onStopped?: () => void): void {
     const viewer = this.viewer;
     const Cesium = this.cesium;
     if (!viewer || !Cesium || viewer.isDestroyed() || this.ahsanManzilOrbitTourActive) return;
 
     this.ahsanManzilOrbitTourActive = true;
+    this.ahsanManzilOrbitStoppedCallback = onStopped ?? null;
     this.ahsanManzilOrbitHeadingDegrees = 180;
     this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
     this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
@@ -3188,6 +3192,7 @@ export class CesiumAdapter implements MapEngine {
 
   /** Stop guided orbit while preserving the current view. */
   stopAhsanManzilOrbitTour(): void {
+    const wasActive = this.ahsanManzilOrbitTourActive;
     this.ahsanManzilOrbitTourActive = false;
     this.ahsanManzilOrbitLastTimestamp = null;
     if (this.ahsanManzilOrbitFrame !== null && typeof cancelAnimationFrame === "function") {
@@ -3196,6 +3201,8 @@ export class CesiumAdapter implements MapEngine {
     this.ahsanManzilOrbitFrame = null;
     this.ahsanManzilOrbitInputUnsubscribe?.();
     this.ahsanManzilOrbitInputUnsubscribe = null;
+    const onStopped = this.ahsanManzilOrbitStoppedCallback;
+    this.ahsanManzilOrbitStoppedCallback = null;
 
     const viewer = this.viewer;
     const Cesium = this.cesium;
@@ -3203,6 +3210,7 @@ export class CesiumAdapter implements MapEngine {
       viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       viewer.scene.requestRender();
     }
+    if (wasActive) onStopped?.();
   }
 
   private flyToAhsanManzilOrbit(
