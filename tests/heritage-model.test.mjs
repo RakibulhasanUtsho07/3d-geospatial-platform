@@ -57,6 +57,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes("function fillRectLouverWindow("));
+  assert.ok(builder.includes('"#45674D"'), "LOD3 facade includes green shutter details from the reference scene");
   assert.ok(builder.includes("Upper-storey triple-arched loggia."));
   assert.ok(builder.includes("Eight open arched bays"));
   assert.ok(builder.includes("addFacadeDisk("));
