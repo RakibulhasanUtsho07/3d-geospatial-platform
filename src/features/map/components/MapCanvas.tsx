@@ -378,6 +378,34 @@ export default function MapCanvas({
     engine.focusAhsanManzilWhole(900);
   }
 
+  function goToAhsanManzilRear() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    stopOrbitTourForManualControl();
+    engine.setNavigationPath(null, null);
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
+    setSelectedRoad(null);
+    setSelectedPlace(null);
+    setSelectedProperty(null);
+    engine.focusAhsanManzilRear(850);
+  }
+
+  function goToAhsanManzilSide() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    stopOrbitTourForManualControl();
+    engine.setNavigationPath(null, null);
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
+    setSelectedRoad(null);
+    setSelectedPlace(null);
+    setSelectedProperty(null);
+    engine.focusAhsanManzilSide(850);
+  }
+
   function goToAhsanManzilTopDown() {
     const engine = engineRef.current;
     if (!engine) return;
@@ -624,6 +652,8 @@ export default function MapCanvas({
         onHome={goHomeToAhsanManzil}
         onAhsanManzil={goToAhsanManzil}
         onWholeModel={goToAhsanManzilWhole}
+        onRearView={goToAhsanManzilRear}
+        onSideView={goToAhsanManzilSide}
         onZoomIn={() => { stopOrbitTourForManualControl(); cameraRef.current?.zoomIn(); }}
         onZoomOut={() => { stopOrbitTourForManualControl(); cameraRef.current?.zoomOut(); }}
         onRotateLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-15); }}
