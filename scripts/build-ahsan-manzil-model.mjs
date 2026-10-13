@@ -525,8 +525,13 @@ function buildGlb(lod) {
   // 125.4 m reported total extent by adjoining a provisional rear-set Andarmahal
   // block to its west; this stepped plan remains [E] until a north-up footprint
   // trace resolves the conflict between published overall dimensions.
-  const rangLength=DIM.rangmahalLength, split=0, domeX=(split+xMax)/2;
-  const andarLength=L-rangLength, andarCenterX=(xMin+split)/2;
+  const rangLength = DIM.rangmahalLength;
+  const andarLength = L - rangLength;
+  // Centre the overall extents at x=0 but keep the shorter Rangmahal frontage
+  // at the east/south-facing end; the west Andarmahal occupies the remainder.
+  const split = xMin + andarLength;
+  const domeX = (split + xMax) / 2;
+  const andarCenterX = (xMin + split) / 2;
   const andarDepth=DIM.andarDepth, andarCenterZ=DIM.andarCenterZ;
   const plinthTop=DIM.ground+DIM.plinth;
   const gfBase=plinthTop,gfHeight=DIM.gf;
