@@ -24,7 +24,7 @@ export const AHSAN_MANZIL_CAMERA_TARGET = Object.freeze({
   height: 10,
 });
 export const AHSAN_MANZIL_CAMERA_ORIENTATION = Object.freeze({
-  heading: 0,
+  heading: 180,
   pitch: -22,
   roll: 0,
 });
