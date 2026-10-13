@@ -427,7 +427,7 @@ function buildGlb(lod) {
   // elevated and rear three-quarter views do not reveal a roof with missing sides.
   for (const side of [-1, 1]) {
     box(
-      n.Parapet, side * (L / 2 - 0.12),
+      n.Parapet, side * (L / 2 - 0.2),
       roofTop + DIM.parapet / 2, 0,
       0.4, DIM.parapet, D, "pink",
     );
