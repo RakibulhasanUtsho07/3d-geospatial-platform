@@ -388,6 +388,27 @@ function buildGlb(lod) {
     }
   }
 
+  function addFacadeDisk(node,cx,cy,z,radius,key,side=1,segments=32){
+    const center=[cx,cy,z];
+    for(let i=0;i<segments;i++){
+      const a=2*Math.PI*i/segments,b=2*Math.PI*(i+1)/segments;
+      const p0=[cx+radius*Math.cos(a),cy+radius*Math.sin(a),z];
+      const p1=[cx+radius*Math.cos(b),cy+radius*Math.sin(b),z];
+      if(side>0) triangle(node,center,p0,p1,key);
+      else triangle(node,center,p1,p0,key);
+    }
+  }
+  function addFacadeRing(node,cx,cy,z,outerRadius,innerRadius,key,side=1,segments=32){
+    for(let i=0;i<segments;i++){
+      const a=2*Math.PI*i/segments,b=2*Math.PI*(i+1)/segments;
+      const out0=[cx+outerRadius*Math.cos(a),cy+outerRadius*Math.sin(a),z];
+      const out1=[cx+outerRadius*Math.cos(b),cy+outerRadius*Math.sin(b),z];
+      const in0=[cx+innerRadius*Math.cos(a),cy+innerRadius*Math.sin(a),z];
+      const in1=[cx+innerRadius*Math.cos(b),cy+innerRadius*Math.sin(b),z];
+      if(side>0) quad(node,out0,out1,in1,in0,key);
+      else quad(node,out1,out0,in0,in1,key);
+    }
+  }
   function addDomeProfile(node,cx,cz,baseY,profile,segments,key){
     const rings=profile.map(([radius,height])=>Array.from({length:segments},(_,i)=>{
       const a=2*Math.PI*i/segments;
@@ -665,6 +686,27 @@ function buildGlb(lod) {
           archBand(byName[name], cx, upperSpring, faceZ, span / 2, .17, "trim", lod === 3 ? 20 : 12);
         }
         box(byName[name], domeX, upperTop - .06, faceZ, width + .65, .28, .76, "trim");
+
+        if (lod === 3) {
+          // Balcony rails are segmented at the centre so the main doorway remains clear.
+          const balconyZ = faceZ + side * .38;
+          const balconyBottom = upperBase + .25;
+          const balconyTop = upperBase + .98;
+          const segments = [
+            [domeX - width / 2 + .34, domeX - span / 2 - .28],
+            [domeX + span / 2 + .28, domeX + width / 2 - .34],
+          ];
+          for (const [left, right] of segments) {
+            if (right <= left) continue;
+            barBetween(byName[name],[left,balconyBottom,balconyZ],[right,balconyBottom,balconyZ],.09,"rail");
+            barBetween(byName[name],[left,balconyTop,balconyZ],[right,balconyTop,balconyZ],.09,"rail");
+            const count=Math.max(2,Math.ceil((right-left)/.48));
+            for(let i=0;i<=count;i++){
+              const x=left+(right-left)*i/count;
+              verticalCylinder(byName[name],x,balconyBottom,balconyTop,balconyZ,.035,"trim",6);
+            }
+          }
+        }
       }
 
       // The pediment belongs above the upper loggia, not midway up the facade.
@@ -676,12 +718,30 @@ function buildGlb(lod) {
       const pedimentApex = [domeX, pedimentTop, frontZ];
       triangle(byName[name], pedimentLeft, pedimentRight, pedimentApex, "pink");
       if (lod === 3) {
-        // Moulded triangular outline and a restrained central relief panel.
+        // Moulded triangular outline and restrained central relief.
         barBetween(byName[name], pedimentLeft, pedimentRight, .22, "trim");
         barBetween(byName[name], pedimentLeft, pedimentApex, .18, "trim");
         barBetween(byName[name], pedimentApex, pedimentRight, .18, "trim");
         box(byName[name], domeX, pedimentBase + .42, frontZ + side * .09, 2.7, .55, .16, "trim");
         box(byName[name], domeX, pedimentBase + .42, frontZ + side * .18, 1.65, .25, .08, "roof");
+
+        // Circular oculus on the temple-front pediment; the exact diameter is [E].
+        const oculusY=pedimentBase+(pedimentTop-pedimentBase)*.60;
+        const oculusZ=frontZ+side*.12;
+        addFacadeDisk(byName[name],domeX,oculusY,oculusZ,.38,"glass",side,32);
+        addFacadeRing(byName[name],domeX,oculusY,oculusZ+side*.015,.58,.41,"trim",side,32);
+
+        // Small corner pinnacles frame the central pavilion without replacing the main dome.
+        for(const pinSide of [-1,1]){
+          const px=domeX+pinSide*(width/2+.95);
+          const pz=frontZ+side*.05;
+          box(byName[name],px,pedimentBase+.18,pz,.72,.36,.72,"trim");
+          verticalCylinder(byName[name],px,pedimentBase+.36,pedimentTop+.42,pz,.12,"trim",8);
+          addDomeProfile(
+            byName[name],px,pz,pedimentTop+.30,
+            [[.22,0],[.16,.16],[.09,.33],[.006,.58]],8,"roof",
+          );
+        }
       }
     }
   }
