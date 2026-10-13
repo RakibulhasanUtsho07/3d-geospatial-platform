@@ -15,6 +15,12 @@ import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
   AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET,
+  AHSAN_MANZIL_CAMERA_RANGE_METERS,
+  AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS,
+  AHSAN_MANZIL_ORBIT_PITCH_DEGREES,
+  AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND,
+  AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS,
+  AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS,
   AHSAN_MANZIL_GEOREFERENCE,
   selectAhsanManzilLod,
 } from "../geospatial/heritage-landmarks.mjs";
@@ -139,8 +145,8 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLoadToken = 0;
   // Heading 180 approaches from the south/river-facing facade.
   private ahsanManzilOrbitHeadingDegrees = 180;
-  private ahsanManzilOrbitPitchDegrees = -18;
-  private ahsanManzilOrbitRangeMeters = 205;
+  private ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
+  private ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
   private ahsanManzilOrbitFrame: number | null = null;
   private ahsanManzilOrbitTourActive = false;
   private ahsanManzilOrbitLastTimestamp: number | null = null;
@@ -3078,8 +3084,8 @@ export class CesiumAdapter implements MapEngine {
   focusAhsanManzil(durationMs = 1200): void {
     this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees = 180;
-    this.ahsanManzilOrbitPitchDegrees = -18;
-    this.ahsanManzilOrbitRangeMeters = 205;
+    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "front");
   }
 
@@ -3088,7 +3094,7 @@ export class CesiumAdapter implements MapEngine {
     this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees = 0;
     this.ahsanManzilOrbitPitchDegrees = -88.5;
-    this.ahsanManzilOrbitRangeMeters = 205;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(durationMs, "footprint");
   }
 
@@ -3098,6 +3104,8 @@ export class CesiumAdapter implements MapEngine {
     this.stopAhsanManzilOrbitTour();
     this.ahsanManzilOrbitHeadingDegrees =
       ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
+    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.flyToAhsanManzilOrbit(650, "front");
   }
 
@@ -3108,6 +3116,9 @@ export class CesiumAdapter implements MapEngine {
     if (!viewer || !Cesium || viewer.isDestroyed() || this.ahsanManzilOrbitTourActive) return;
 
     this.ahsanManzilOrbitTourActive = true;
+    this.ahsanManzilOrbitHeadingDegrees = 180;
+    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
+    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
     this.ahsanManzilOrbitLastTimestamp = null;
     const center = Cesium.Cartesian3.fromDegrees(
       AHSAN_MANZIL_CAMERA_TARGET.longitude,
@@ -3128,7 +3139,7 @@ export class CesiumAdapter implements MapEngine {
         const elapsed = Math.min(50, Math.max(0, timestamp - this.ahsanManzilOrbitLastTimestamp));
         // A complete lap takes about 36 seconds: slow enough to inspect details.
         this.ahsanManzilOrbitHeadingDegrees =
-          (this.ahsanManzilOrbitHeadingDegrees + elapsed * 0.01) % 360;
+          (this.ahsanManzilOrbitHeadingDegrees + elapsed * AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND / 1000) % 360;
       }
       this.ahsanManzilOrbitLastTimestamp = timestamp;
 
@@ -3182,7 +3193,12 @@ export class CesiumAdapter implements MapEngine {
     );
     // The front target is offset to the dome axis, so a wider sphere keeps
     // the west-set-back Andarmahal in the same camera composition.
-    const bounds = new Cesium.BoundingSphere(center, target === "front" ? 98 : 72);
+    const bounds = new Cesium.BoundingSphere(
+      center,
+      target === "front"
+        ? AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS
+        : AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS,
+    );
     viewer.camera.flyToBoundingSphere(bounds, {
       duration: Math.max(0, durationMs) / 1000,
       offset: new Cesium.HeadingPitchRange(
