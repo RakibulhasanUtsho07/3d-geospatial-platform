@@ -1011,8 +1011,9 @@ function buildGlb(lod) {
   // The reference HTML has its Rangmahal centered at x=0; shift its site context
   // east by the same 34.8 m camera/footprint offset used by the existing map model.
   const siteShiftX = V("runtimeCamera", "frontFocusOffsetEastMeters");
-  // Keep the land and river planes contiguous (rather than coplanar/overlapping)
-  // and slightly above the globe's anchor surface so Cesium terrain does not hide them.
+  // Reproduce the HTML shoreline: the 440×300 m grass plane overlaps the near
+  // 30 m of the river plane, but sits 1 cm higher so the two surfaces do not z-fight.
+  // Keep both just above the local anchor surface for Cesium visibility.
   horizontalPlane(byName.Site_Ground, siteShiftX, 0.015, 0, 440, 300, "sceneGrass");
   horizontalPlane(byName.Site_River, siteShiftX, 0.005, 205, 440, 170, "sceneWater");
   horizontalPlane(byName.Site_Approach, siteShiftX, 0.025, 63, 8, 58, "scenePath");
