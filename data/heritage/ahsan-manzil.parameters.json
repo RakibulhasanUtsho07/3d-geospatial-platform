@@ -471,36 +471,32 @@
       "profileRings": {
         "value": [
           [
-            6.9,
+            4,
             0
           ],
           [
-            6.7,
-            0.35
+            3.94,
+            0.72
           ],
           [
-            6.1,
-            1.1
+            3.76,
+            1.49
           ],
           [
-            5.4,
-            2
+            3.46,
+            2.26
           ],
           [
-            4.55,
-            2.9
+            3.11,
+            3.25
           ],
           [
-            3.55,
-            3.8
+            2.16,
+            4.95
           ],
           [
-            2.55,
-            4.65
-          ],
-          [
-            1.55,
-            5.45
+            1.15,
+            5.95
           ],
           [
             0.28,
@@ -510,7 +506,7 @@
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
         "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
-        "note": "Control points are illustrative; replace with samples from a rectified elevation photo."
+        "note": "Updated to a smoother hemispherical silhouette sampled from the improved Three.js reference scene (4.0 m radius, approximately 6.61 m rise); remains an estimate pending rectified elevation measurements."
       }
     },
     "materials": {
