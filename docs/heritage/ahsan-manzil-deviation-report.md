@@ -8,7 +8,7 @@
 |---|---|
 | `public/models/ahsan-manzil-lod1.glb` | Low-detail massing |
 | `public/models/ahsan-manzil-lod2.glb` | Roofline, parapet, dome and simplified facade rhythm |
-| `public/models/ahsan-manzil-lod3.glb` | Openings, trim/pilasters, porticos, verandas, glazed doors, staircase, drum, dome ribs and finial |
+| `public/models/ahsan-manzil-lod3.glb` | Openings, trim/pilasters, porticos, end elevations, upper-veranda balustrades, roofline pinnacles, staircase, drum, dome ribs and finial |
 | `public/models/ahsan-manzil.glb` | Convenience alias of LOD3 |
 | `public/models/ahsan-manzil.manifest.json` | Runtime building manifest / LOD parameters |
 | `data/heritage/ahsan-manzil.parameters.json` | Confidence-tagged parameter source |
@@ -21,7 +21,9 @@ Build assets with `npm run build:heritage-model`. All models include nodes `Plin
 
 - GLB units are meters, Y is up, X is the approximate east-west long axis, and +Z is the south/river-front side. Natural ground is Y=0; plinth top is Y=1.0 m.
 - The provisional anchor is 23.7086, 90.40606 [C]; it is not yet proven to be the traced footprint centroid.
-- The initial map view and Home control focus Shat Gombuj Mosque. A visible Ahsan Manzil shortcut flies to the palace anchor.
+- The initial map view and Home control focus Ahsan Manzil. Dedicated left/right Orbit controls rotate the camera around the building in 45-degree increments while framing the full palace.
+- The central round room/dome is aligned with the origin, between two 62.7 m working halves derived from the published 125.4 m overall length and description of two equal palace halves. This is an explicit improvement to the earlier visibly off-centre dome/stair/portico.
+- The east and west short elevations now include recessed arched openings and storey belt courses; LOD3 also includes upper-veranda balustrades and stylized roofline pinnacles.
 - LOD model loading/unloading uses camera distance and camera altitude thresholds [E] to avoid loading detailed geometry when the view is in Bagerhat or far from Old Dhaka.
 - The Cesium loader sets Y-up and Z-forward for the generated GLB; the model uses a local east-north-up reference frame with south as its +Z face.
 
@@ -104,12 +106,12 @@ Every geographic and model parameter from the JSON is listed below with its conf
 ## Deviations and remaining calibration work
 
 1. Footprint polygon, building centroid and exact azimuth still need tracing from satellite imagery/OSM. Anchor stays [C], rotation [E].
-2. Rangmahal length 55.8 m is the unverified 183 ft hypothesis; Andarmahal length is the derived remainder.
+2. The current model sets Rangmahal and Andarmahal to two 62.7 m halves so the dome/round room and main stair align with the central joint described in heritage references. This is a provisional equal-half interpretation until a georeferenced footprint or floor plan is traced.
 3. The 24-bay exterior rhythm is provisional and intentionally distinct from the 4 × 5 reported interior grid.
 4. Door positions use every fourth facade bay [E]; stone-inlay width and colored-glazing pattern are [?]. Replace from close-up photographs.
-5. Capitals, fluting, arch molds, stone patterns and dome ribs are stylized, not measured historic mouldings.
+5. Capitals, fluting, arch moulds, stone patterns, roofline pinnacles and dome ribs are stylized, not measured historic mouldings. Short-end opening rhythm and balustrade spacing are estimates.
 6. Dome apex is constrained to 27.13 m [V], while drum width/openings and the ring profile still need a rectified elevation photo.
-7. The facade pink/trim samples have not been calibrated from color-managed daylight photography.
+7. The facade pink/trim samples have not been calibrated from color-managed daylight photography; visual colors are still approximate.
 8. Interior wooden staircase, timber/iron roof structure, and interior tile floors are outside the exterior LODs.
 9. LOD distance/altitude cut-offs are render-performance heuristics [E].
 10. Local visual comparison with rectified photos has not been performed. After regenerating assets, test in browser and recalibrate all [E]/[?] values.
