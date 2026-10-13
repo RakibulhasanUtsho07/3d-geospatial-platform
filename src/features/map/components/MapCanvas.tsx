@@ -364,6 +364,20 @@ export default function MapCanvas({
     engine.focusAhsanManzil(1100);
   }
 
+  function goToAhsanManzilWhole() {
+    const engine = engineRef.current;
+    if (!engine) return;
+    stopOrbitTourForManualControl();
+    engine.setNavigationPath(null, null);
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
+    setSelectedRoad(null);
+    setSelectedPlace(null);
+    setSelectedProperty(null);
+    engine.focusAhsanManzilWhole(900);
+  }
+
   function goToAhsanManzilTopDown() {
     const engine = engineRef.current;
     if (!engine) return;
@@ -609,6 +623,7 @@ export default function MapCanvas({
         disabled={status !== "ready"}
         onHome={goHomeToAhsanManzil}
         onAhsanManzil={goToAhsanManzil}
+        onWholeModel={goToAhsanManzilWhole}
         onZoomIn={() => { stopOrbitTourForManualControl(); cameraRef.current?.zoomIn(); }}
         onZoomOut={() => { stopOrbitTourForManualControl(); cameraRef.current?.zoomOut(); }}
         onRotateLeft={() => { stopOrbitTourForManualControl(); engineRef.current?.orbitAhsanManzil(-15); }}
