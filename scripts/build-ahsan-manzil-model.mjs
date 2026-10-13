@@ -249,6 +249,29 @@ function buildGlb(lod) {
       }
     }
   }
+  function fillRectLouverWindow(node,cx,base,surfaceZ,side,width,height,wallThickness,detail){
+    const paneZ=surfaceZ-side*(wallThickness-.09);
+    const frameZ=surfaceZ+side*.055;
+    box(node,cx,base+height/2,paneZ,width*.86,height*.9,.055,"glass");
+    if(detail>=1){
+      // Recessed reveal and pink-family rectangular casing.
+      for(const x of [cx-width/2,cx+width/2]){
+        box(node,x,base+height/2,frameZ,.10,height+.08,.12,"trim");
+      }
+      box(node,cx,base+.05,frameZ,width+.18,.10,.14,"trim");
+      box(node,cx,base+height,frameZ,width+.22,.12,.14,"trim");
+      // Wooden horizontal louvers remain visible over the dark glazing.
+      for(let i=1;i<=5;i++){
+        const y=base+height*(.18+i*.115);
+        box(node,cx,y,frameZ+side*.045,width*.80,.055,.055,"wood");
+      }
+      box(node,cx,base+height+.16,frameZ+side*.12,width+.34,.14,.48,"trim");
+      for(const support of [-1,1]){
+        box(node,cx+support*(width/2+.08),base+height+.045,frameZ+side*.12,.08,.20,.35,"trim");
+      }
+    }
+  }
+
   function fillFacetedArch(node,cx,base,cz,angle,width,height,wallDepth,detail){
     const radius=width/2,stem=height-radius,spring=base+stem;
     const tx=-Math.sin(angle),tz=Math.cos(angle),nx=Math.cos(angle),nz=Math.sin(angle);
@@ -301,7 +324,28 @@ function buildGlb(lod) {
           if(floor.height>floor.crown){
             box(node,cx,floor.base+floor.crown+(floor.height-floor.crown)/2,wallCenter,w,floor.height-floor.crown,thickness,"pink");
           }
-          fillFacadeArch(node,cx,floor.base,surface,side,w,floor.crown,thickness,lod===3?2:lod===2?1:0,((i+1)%Math.max(1,Math.round(DIM.doorBayInterval))===0));
+          const detail = lod===3 ? 2 : lod===2 ? 1 : 0;
+          const endPavilionBay = nodeName !== "Andarmahal" && (i < 2 || i >= bays - 2);
+          const upperStorey = floor.base > DIM.ground + DIM.plinth + DIM.gf / 2;
+          const scheduledDoor = ((i+1)%Math.max(1,Math.round(DIM.doorBayInterval))===0);
+          const isDoor = endPavilionBay && !upperStorey ? true : scheduledDoor;
+          if (endPavilionBay && upperStorey && lod >= 2) {
+            fillRectLouverWindow(node,cx,floor.base,surface,side,w,floor.crown,thickness,detail);
+          } else {
+            fillFacadeArch(node,cx,floor.base,surface,side,w,floor.crown,thickness,detail,isDoor);
+          }
+          if(lod===3 && upperStorey && !endPavilionBay && !isDoor){
+            // Low iron/stone balustrade visible inside the upper-storey arches.
+            const railZ=surface+side*.15;
+            const railBottom=floor.base+.22,railTop=floor.base+.88;
+            const left=cx-w/2+.08,right=cx+w/2-.08;
+            barBetween(node,[left,railBottom,railZ],[right,railBottom,railZ],.055,"rail");
+            barBetween(node,[left,railTop,railZ],[right,railTop,railZ],.055,"rail");
+            for(let j=1;j<=3;j++){
+              const x=left+(right-left)*j/4;
+              verticalCylinder(node,x,railBottom,railTop,railZ,.025,"trim",6);
+            }
+          }
           if(lod===3 && i < bays - 1){
             const px=x0+(i+1)*pitch-.11;
             box(node,px,floor.base+floor.height/2,surface+side*.10,.22,floor.height-.18,.20,"trim");
