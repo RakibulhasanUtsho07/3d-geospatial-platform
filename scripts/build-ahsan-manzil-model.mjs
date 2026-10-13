@@ -254,7 +254,8 @@ function buildGlb(lod) {
         box(node,(x0+x1)/2,floor.base+.12,surface+side*.08,x1-x0,.24,.16,"roof");
         box(node,(x0+x1)/2,floor.base+floor.height-.12,surface+side*.10,x1-x0,.24,.20,"trim");
       }
-      // Plain end elevations stay generic until photographs are supplied.
+      // Low-width end piers close the junction between adjacent wing meshes.
+      // The actual short-end elevations are modelled separately by addEndFacade().
       box(node,x0+.2,floor.base+floor.height/2,0,.4,floor.height,DIM.depth,"pink");
       box(node,x1-.2,floor.base+floor.height/2,0,.4,floor.height,DIM.depth,"pink");
     }
