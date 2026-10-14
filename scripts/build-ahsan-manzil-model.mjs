@@ -360,7 +360,8 @@ function buildGlb(lod) {
         const surface=centerZ+side*half,wallCenter=surface-side*thickness/2;
         for(let i=0;i<bays;i++){
           const cx=x0+(i+.5)*pitch;
-          // Keep the projecting triple-arched portico open instead of stacking
+          // The projecting triple-arched portico is an open architectural volume.
+       // Keep the projecting triple-arched portico open instead of stacking
           // a flat facade behind it. Upper portal doors are placed separately.
           if (
             nodeName.startsWith("Rangmahal") &&
