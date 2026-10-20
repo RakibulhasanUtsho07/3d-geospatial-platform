@@ -84,7 +84,7 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
  const result=await runColmapReconstruction({
   workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"successful-job",sourceIds:["view-1","view-2","view-3"],
   upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,quality:"LOW",
-  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,
+  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input),
  });
  assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
