@@ -312,12 +312,20 @@ export function planBuildingGeneration(requestValue) {
   }
 
   if (authorizedImages.length === 0 && actualVideos.length === 0) {
+    const hasTextBrief = Boolean(request.building.designBrief || request.building.architecturalStyle);
+    const hasAuthorizedStyleImages = refs.some((ref) => ref.kind === "image" && ref.purpose === "style-reference" && ref.permission === "authorized");
+    if (hasTextBrief && request.quality === "reference-assisted") {
+      stages.push("submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
+      qualityNotes.push("The architectural brief/style will be sent to text-to-3D. AI-created geometry is a visual candidate; supplied measurements are applied during later alignment and must be reviewed.");
+      if (hasAuthorizedStyleImages) warnings.push("Authorized style-reference images are not fed into the text-only endpoint in this pass; the prompt route uses text fields only.");
+      return { strategy: "parametric-plus-ai-text", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
+    }
     warnings.push("No reference is explicitly authorized for external generation.");
     if (canGenerateParametricBase) {
       stages.push("generate-parametric-base", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
       return { strategy: "parametric-only", stages, canGenerateParametricBase, externalProviderRequired: false, blocked: false, warnings, missingInputs, qualityNotes };
     }
-    missingInputs.push("Authorize source media for external processing or supply a measured footprint and height strategy.");
+    missingInputs.push("Authorize source media or provide a written architectural brief plus an explicit external-processing approval.");
     return { strategy: "needs-more-inputs", stages: [...stages, "admin-review"], canGenerateParametricBase, externalProviderRequired: true, blocked: true, warnings, missingInputs, qualityNotes };
   }
 
