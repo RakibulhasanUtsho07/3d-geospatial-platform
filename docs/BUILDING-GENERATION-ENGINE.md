@@ -1,6 +1,6 @@
 # Building Generation Engine
 
-Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, image-quality preflight, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, and a TripoSR single-image preview adapter are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
+Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, image-quality preflight, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, TripoSR single-image preview, and shared GLB integrity/geometry QA are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
 
 ## 1. Baseline input → 3D model
 
@@ -10,6 +10,16 @@ Status: deterministic procedural generation, source-aware BuildingSpec validatio
 npm run test:building-generation
 npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
 ~~~
+
+## 2. GLB structure and geometry QA
+
+The shared glb-geometry-qa.mjs analyser reads the GLB 2.0 header/chunks and validates its embedded buffer structure. For supported triangle primitives it checks that vertex positions are finite, byte ranges/strides are valid, index values stay inside the POSITION accessor, and triangle counts are well formed. It reports mesh/primitive/vertex/triangle counts, zero-area/degenerate triangles, material/texture/image counts, external URIs, and model-space bounds. The procedural, COLMAP and single-image AI routes attach this report to their generation report.
+
+~~~powershell
+npm run test:glb-geometry-qa
+~~~
+
+A report with warnings is a manual-review signal, not an automatic rejection or a proof that the mesh matches the real building. Current QA does not calculate watertightness, connected-component quality, facade accuracy, camera calibration, true metric scale, or WGS84 registration. GLB bounds are model-space values unless independent scale calibration is available.
 
 ## 2. Local image, video and floor-plan intake
 

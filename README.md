@@ -15,9 +15,9 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Filterable **illustrative demo property listings** with rent, bedrooms, property type, furnishing, area and radius filters; browser-local saved favourites persist between visits.
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
-- A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output and source/confidence QA report.
+- A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output, and source/confidence + geometry-integrity QA reports.
 - Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
-- Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion and an FFmpeg-based image-quality preflight (resolution, blur heuristic, luminance, contrast and near-duplicate views).
+- Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion, an FFmpeg-based image-quality preflight, and a shared GLB integrity/geometry QA report for procedural, photogrammetry, and single-image AI outputs.
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
 
@@ -57,6 +57,7 @@ If the app reports that the Overture pilot dataset is missing, ensure the source
 The engine supports three routes: information/measurements → deterministic procedural GLB; approved multi-view images/video frames → COLMAP textured reconstruction candidate; and one approved image → TripoSR AI-proposed preview. Each route retains source provenance, confidence labels and a QA report.
 
 ~~~powershell
+npm run test:glb-geometry-qa
 npm run test:building-generation
 npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
 npm run test:building-media

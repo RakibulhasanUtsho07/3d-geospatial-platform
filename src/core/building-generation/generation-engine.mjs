@@ -1,5 +1,6 @@
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { generateProceduralGlb } from "./procedural-glb.mjs";
+import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 const VISUAL = new Set(["image","video","video-frame"]);
 export function planGeneration(rawSpec) {
   const {spec}=normalizeBuildingSpec(rawSpec), visual=spec.sources.filter(s=>VISUAL.has(s.kind)), approved=visual.filter(s=>s.licence&&s.licence.toLowerCase()!=="unknown"&&s.usageStatus==="approved"), located=visual.filter(s=>s.location).length;
@@ -17,5 +18,11 @@ export function planGeneration(rawSpec) {
 }
 export function generateBuildingModel(rawSpec) {
   const plan=planGeneration(rawSpec), generated=generateProceduralGlb(rawSpec);
-  return {...generated,report:{...generated.report,sourceRoute:plan.sourceRoute,strategyPlan:plan,warnings:[...new Set([...plan.warnings,...generated.report.warnings])],reviewRequired:plan.reviewRequired||generated.report.reviewRequired}};
+  const geometryQuality=analyzeGlbQuality(generated.glb);
+  const qualityWarnings=geometryQuality.warnings.map(warning=>"GLB geometry QA: "+warning+".");
+  return {...generated,report:{
+    ...generated.report,sourceRoute:plan.sourceRoute,strategyPlan:plan,geometryQuality,
+    warnings:[...new Set([...plan.warnings,...generated.report.warnings,...qualityWarnings])],
+    reviewRequired:plan.reviewRequired||generated.report.reviewRequired||geometryQuality.warnings.length>0
+  }};
 }
