@@ -24,9 +24,6 @@ function readHexColour(value, fallback) {
   ];
 }
 
-function cross(a, b, c) {
-  return (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0]);
-}
 
 function signedArea(points) {
   let area = 0;
