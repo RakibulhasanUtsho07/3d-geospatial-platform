@@ -57,6 +57,59 @@ function normalizeFootprint(value) {
   if (!hasWidth && !result.polygonXYMeters) throw new TypeError("footprint needs width/depth or polygonXYMeters.");
   return result;
 }
+function normalizeArchitecturalFeatures(value, dimensions) {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new TypeError("architecturalFeatures must be an object.");
+  const result = {};
+  if (value.windowStyle !== undefined) {
+    if (!["rectangular", "arched"].includes(value.windowStyle)) throw new TypeError("windowStyle must be rectangular or arched.");
+    result.windowStyle = value.windowStyle;
+  }
+  if (value.entranceStyle !== undefined) {
+    if (!["single-door", "double-door", "arched"].includes(value.entranceStyle)) throw new TypeError("entranceStyle is unsupported.");
+    result.entranceStyle = value.entranceStyle;
+  }
+
+  if (value.balconies !== undefined) {
+    if (!isRecord(value.balconies)) throw new TypeError("balconies must be an object.");
+    const balconies = value.balconies;
+    const enabled = balconies.enabled === undefined ? true : balconies.enabled;
+    if (typeof enabled !== "boolean") throw new TypeError("balconies.enabled must be a boolean.");
+    const count = balconies.count === undefined ? 1 : finite(balconies.count, "balconies.count", 1, 4);
+    if (!Number.isInteger(count)) throw new TypeError("balconies.count must be an integer.");
+    const widthRatio = balconies.widthRatio === undefined ? 0.72 : finite(balconies.widthRatio, "balconies.widthRatio", 0.2, 0.95);
+    const depthMeters = balconies.depthMeters === undefined ? 1.2 : finite(balconies.depthMeters, "balconies.depthMeters", 0.5, 4);
+    const railing = balconies.railing === undefined ? true : balconies.railing;
+    if (typeof railing !== "boolean") throw new TypeError("balconies.railing must be a boolean.");
+    const normalized = { enabled, count, widthRatio, depthMeters, railing };
+    if (balconies.floors !== undefined) {
+      if (!Array.isArray(balconies.floors) || balconies.floors.length > 200) throw new TypeError("balconies.floors must be an array of 1-based storey numbers.");
+      const floors = balconies.floors.map((floor, index) => {
+        const value = finite(floor, "balconies.floors[" + index + "]", 2, 200);
+        if (!Number.isInteger(value)) throw new TypeError("balconies.floors values must be integers.");
+        if (dimensions.aboveGroundFloors !== undefined && value > dimensions.aboveGroundFloors) {
+          throw new RangeError("A balcony storey cannot exceed aboveGroundFloors.");
+        }
+        return value;
+      });
+      if (new Set(floors).size !== floors.length) throw new TypeError("balconies.floors must not contain duplicates.");
+      normalized.floors = floors;
+    }
+    result.balconies = normalized;
+  }
+
+  if (value.columns !== undefined) {
+    if (!isRecord(value.columns)) throw new TypeError("columns must be an object.");
+    const frontCount = value.columns.frontCount === undefined ? 0 : finite(value.columns.frontCount, "columns.frontCount", 0, 20);
+    if (!Number.isInteger(frontCount)) throw new TypeError("columns.frontCount must be an integer.");
+    const normalized = { frontCount };
+    if (value.columns.widthMeters !== undefined) normalized.widthMeters = finite(value.columns.widthMeters, "columns.widthMeters", 0.12, 1.5);
+    if (value.columns.heightMeters !== undefined) normalized.heightMeters = finite(value.columns.heightMeters, "columns.heightMeters", 2, 30);
+    result.columns = normalized;
+  }
+  return result;
+}
+
 function normalizeReference(value, index) {
   if (!isRecord(value)) throw new TypeError("reference " + index + " must be an object.");
   if (typeof value.id !== "string" || !ID_PATTERN.test(value.id)) throw new TypeError("reference " + index + " has an invalid id.");
@@ -130,6 +183,8 @@ export function normalizeBuildingGenerationRequest(value) {
   const facadeColours = normalizeTextArray(value.building.facadeColours, "facadeColours");
   if (facadeMaterials !== undefined) building.facadeMaterials = facadeMaterials;
   if (facadeColours !== undefined) building.facadeColours = facadeColours;
+  const architecturalFeatures = normalizeArchitecturalFeatures(value.building.architecturalFeatures, dimensions);
+  if (architecturalFeatures !== undefined) building.architecturalFeatures = architecturalFeatures;
 
   if (!Array.isArray(value.references) || value.references.length > 100) throw new TypeError("references must be an array with at most 100 items.");
   const references = value.references.map(normalizeReference);
