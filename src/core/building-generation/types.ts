@@ -22,6 +22,29 @@ export type BuildingDimensions = {
   basementFloors?: number;
 };
 
+export type BalconyFeatureSpec = {
+  enabled?: boolean;
+  /** Storey numbers are 1-based. By default balconies are placed from storey 2 upwards. */
+  floors?: number[];
+  count?: number;
+  widthRatio?: number;
+  depthMeters?: number;
+  railing?: boolean;
+};
+
+export type ColumnFeatureSpec = {
+  frontCount: number;
+  widthMeters?: number;
+  heightMeters?: number;
+};
+
+export type BuildingArchitecturalFeatures = {
+  windowStyle?: "rectangular" | "arched";
+  entranceStyle?: "single-door" | "double-door" | "arched";
+  balconies?: BalconyFeatureSpec;
+  columns?: ColumnFeatureSpec;
+};
+
 export type BuildingGenerationReference = {
   id: string;
   kind: BuildingReferenceKind;
@@ -52,6 +75,7 @@ export type BuildingGenerationRequest = {
     roofType?: string;
     facadeMaterials?: string[];
     facadeColours?: string[];
+    architecturalFeatures?: BuildingArchitecturalFeatures;
   };
   references: BuildingGenerationReference[];
   quality: BuildingGenerationQuality;
