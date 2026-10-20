@@ -177,7 +177,8 @@ test("routes an approved written architectural brief to text-to-3D when no photo
   assert.equal(plan.strategy, "parametric-plus-ai-text");
   assert.equal(plan.externalProviderRequired, true);
   assert.equal(plan.blocked, false);
-  assert.ok(plan.stages.includes("submit-ai-generation"));
+  assert.ok(plan.stages.includes("submit-text-to-model"));
+  assert.ok(plan.stages.includes("poll-text-to-model"));
   assert.ok(plan.stages.includes("align-to-authoritative-dimensions"));
 });
 
