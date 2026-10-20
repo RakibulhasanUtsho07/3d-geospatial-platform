@@ -35,6 +35,29 @@ function createUploadTracker() {
   return { uploadedReferences: [] };
 }
 
+function deriveAlignmentTarget(building) {
+  const footprint = building.footprint;
+  const dimensions = building.dimensions ?? {};
+  let width;
+  let depth;
+  if (Number.isFinite(footprint?.widthMeters) && Number.isFinite(footprint?.depthMeters)) {
+    width = footprint.widthMeters;
+    depth = footprint.depthMeters;
+  } else if (Array.isArray(footprint?.polygonXYMeters) && footprint.polygonXYMeters.length >= 3) {
+    const xs = footprint.polygonXYMeters.map((point) => point[0]);
+    const ys = footprint.polygonXYMeters.map((point) => point[1]);
+    width = Math.max(...xs) - Math.min(...xs);
+    depth = Math.max(...ys) - Math.min(...ys);
+  }
+  const height = dimensions.totalHeightMeters ?? (
+    Number.isFinite(dimensions.aboveGroundFloors) && Number.isFinite(dimensions.floorToFloorHeightMeters)
+      ? dimensions.aboveGroundFloors * dimensions.floorToFloorHeightMeters
+      : undefined
+  );
+  if (![width, depth, height].every((value) => Number.isFinite(value) && value >= 0.5 && value <= 1000)) return null;
+  return { footprintWidthMeters: width, footprintDepthMeters: depth, totalHeightMeters: height };
+}
+
 async function resolveProviderToken(reference, { tripoClient, loadAsset, uploadedReferences, signal }) {
   if (reference.providerFileToken) return reference.providerFileToken;
   if (typeof loadAsset !== "function" || typeof tripoClient.uploadImage !== "function") {
@@ -237,7 +260,14 @@ export function createBuildingGenerationEngine({
     fail("provider-task-attempt-limit", "Provider task exceeded the configured polling attempt limit.");
   }
 
-  async function validateAndStoreProviderOutput(task, { signal, maxBytes = 100 * 1024 * 1024, downloadTimeoutMs = 60_000 } = {}) {
+  async function validateAndStoreProviderOutput(task, {
+    signal,
+    maxBytes = 100 * 1024 * 1024,
+    downloadTimeoutMs = 60_000,
+    alignmentTarget = null,
+    alignmentMode = "uniform-fit",
+    generationContext = null,
+  } = {}) {
     if (!task || task.status !== "success") fail("provider-task-not-successful", "Only successful provider tasks can produce a candidate model.");
     if (!task.modelUrl) fail("provider-output-missing-model", "The provider task succeeded but did not return a model URL.");
     if (typeof storeGeneratedCandidate !== "function") {
@@ -255,17 +285,45 @@ export function createBuildingGenerationEngine({
     } catch (error) {
       fail("provider-output-validation-failed", "Provider output was not accepted: " + (error instanceof Error ? error.message : String(error)));
     }
+
+    let candidateGlb = downloaded.glb;
+    let validation = downloaded.validation;
+    let alignment = null;
+    const warnings = [...validation.warnings];
+    if (alignmentTarget) {
+      try {
+        const aligned = alignGeneratedGlbToDimensions(candidateGlb, { ...alignmentTarget, mode: alignmentMode, maxBytes });
+        candidateGlb = aligned.glb;
+        validation = aligned.validation;
+        alignment = aligned.alignment;
+        warnings.push(...alignment.warnings);
+      } catch (error) {
+        fail("provider-output-alignment-failed", "Generated model did not pass dimension alignment: " + (error instanceof Error ? error.message : String(error)));
+      }
+    } else {
+      warnings.push("No authoritative footprint plus height is available; provider model scale remains unaligned and must be measured during Admin review.");
+    }
+
+    const inputSummary = generationContext ? {
+      requestId: generationContext.requestId,
+      quality: generationContext.quality,
+      building: generationContext.building,
+      referenceIds: generationContext.referenceIds ?? [],
+      strategy: generationContext.strategy,
+    } : undefined;
     const generationMetadata = {
       taskId: task.taskId,
       provider: "tripo",
-      outputValidation: downloaded.validation,
+      outputValidation: validation,
       provenance: "external-ai-candidate",
+      ...(inputSummary ? { inputSummary } : {}),
+      ...(alignment ? { alignment } : {}),
     };
     let stored;
     try {
       stored = await storeGeneratedCandidate({
         taskId: task.taskId,
-        bytes: downloaded.glb,
+        bytes: candidateGlb,
         contentType: "model/gltf-binary",
         metadata: generationMetadata,
       });
@@ -275,24 +333,47 @@ export function createBuildingGenerationEngine({
     if (!stored || typeof stored.assetId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(stored.assetId)) {
       fail("candidate-storage-failed", "Private candidate storage did not return a valid internal asset ID.");
     }
+    warnings.push("AI-generated geometry is a candidate. Admin review is required before the model can be published to the map.");
     return {
       status: "needs-admin-review",
       taskId: task.taskId,
       assetId: stored.assetId,
-      validation: downloaded.validation,
-      warnings: [...downloaded.validation.warnings, "AI-generated geometry is a candidate. Align against known footprint/height and review before map publication."],
+      validation,
+      alignment,
+      warnings: [...new Set(warnings)],
     };
   }
-
   async function generateAndStoreReferenceCandidate(requestValue, {
     selectedVideoFrameIds = [],
     signal,
     pollOptions = {},
     downloadOptions = {},
   } = {}) {
-    const submitted = await submitReferenceCandidate(requestValue, { selectedVideoFrameIds, signal });
+    const { request } = analyze(requestValue);
+    const submitted = await submitReferenceCandidate(request, { selectedVideoFrameIds, signal });
     const completed = await waitForProviderTask(submitted.taskId, { ...pollOptions, signal });
-    const stored = await validateAndStoreProviderOutput(completed, { ...downloadOptions, signal });
+    const safeBuildingSummary = {
+      name: request.building.name,
+      buildingType: request.building.buildingType,
+      architecturalStyle: request.building.architecturalStyle,
+      dimensions: request.building.dimensions,
+      footprint: request.building.footprint,
+      roofType: request.building.roofType,
+      facadeMaterials: request.building.facadeMaterials,
+      facadeColours: request.building.facadeColours,
+    };
+    const stored = await validateAndStoreProviderOutput(completed, {
+      ...downloadOptions,
+      signal,
+      alignmentTarget: deriveAlignmentTarget(request.building),
+      generationContext: {
+        requestId: request.requestId,
+        quality: request.quality,
+        building: safeBuildingSummary,
+        referenceIds: request.references.map((reference) => reference.id),
+        strategy: submitted.strategy,
+      },
+    });
     return { ...stored, strategy: submitted.strategy, plan: submitted.plan, uploadedReferences: submitted.uploadedReferences ?? [] };
   }
 
