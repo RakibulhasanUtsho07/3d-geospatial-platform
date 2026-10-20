@@ -688,6 +688,9 @@ export function generateParametricBuildingGlb(requestValue) {
       footprintWidthMeters: footprint.widthMeters,
       footprintDepthMeters: footprint.depthMeters,
       footprintAreaSquareMeters: footprint.areaSquareMeters,
+      roofType: roofMode,
+      requestedRoofType: building.roofType ?? "flat",
+      architecturalFeatures,
       generationNotes: warnings,
       disclaimer: "Procedural visual shell only; facade panels do not create interior openings and this is not construction-ready BIM.",
     },
@@ -720,6 +723,8 @@ export function generateParametricBuildingGlb(requestValue) {
       footprintAreaSquareMeters: footprint.areaSquareMeters,
       materialCount: materials.length,
       primitiveCount: primitives.length,
+      roofType: roofMode,
+      architecturalFeatures,
       warnings,
     },
   };
