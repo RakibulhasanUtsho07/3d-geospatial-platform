@@ -12,11 +12,28 @@ export type GlbValidationResult = {
   bounds: { min: [number, number, number]; max: [number, number, number] } | null;
   warnings: string[];
 };
+export type GlbAlignmentMode = "uniform-fit" | "fit-dimensions";
+export type GlbAlignmentResult = {
+  mode: GlbAlignmentMode;
+  targetDimensions: { width: number; height: number; depth: number };
+  sourceDimensions: { width: number; height: number; depth: number };
+  finalDimensions: { width: number; height: number; depth: number };
+  scale: [number, number, number];
+  translation: [number, number, number];
+  warnings: string[];
+};
 export declare function inspectGeneratedGlb(value: Buffer | Uint8Array, options?: {
   maxBytes?: number;
   maxJsonChunkBytes?: number;
   maxVertices?: number;
 }): GlbValidationResult;
+export declare function alignGeneratedGlbToDimensions(value: Buffer | Uint8Array, options: {
+  footprintWidthMeters: number;
+  footprintDepthMeters: number;
+  totalHeightMeters: number;
+  mode?: GlbAlignmentMode;
+  maxBytes?: number;
+}): { glb: Buffer; validation: GlbValidationResult; alignment: GlbAlignmentResult };
 export declare function downloadGeneratedGlb(value: string, options?: {
   fetchImpl?: typeof fetch;
   allowedHosts?: readonly string[];
