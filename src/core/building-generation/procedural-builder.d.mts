@@ -10,6 +10,8 @@ export declare function generateParametricBuildingGlb(request: BuildingGeneratio
     footprintWidthMeters: number;
     footprintDepthMeters: number;
     footprintAreaSquareMeters: number;
+    roofType: string;
+    architecturalFeatures?: BuildingGenerationRequest["building"]["architecturalFeatures"];
     materialCount: number;
     primitiveCount: number;
     warnings: string[];
