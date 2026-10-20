@@ -2,6 +2,7 @@ export type TripoTaskStatus = "queued" | "running" | "success" | "failed" | "can
 export type TripoTaskResult = { taskId: string; status: TripoTaskStatus; progress: number | null; type?: string; modelUrl?: string; previewUrl?: string; message?: string };
 export declare function createTripoGenerationClient(options?: { apiKey?: string; fetchImpl?: typeof fetch; model?: string }): {
   uploadImage(options: { bytes: Uint8Array; filename?: string; contentType?: "image/jpeg" | "image/png"; signal?: AbortSignal }): Promise<{ fileToken: string }>;
+  submitText(options: { prompt: string; negativePrompt?: string; signal?: AbortSignal }): Promise<{ taskId: string; stage: "text-to-model" }>;
   submitImage(options: { input: string; texture?: boolean; pbr?: boolean; signal?: AbortSignal }): Promise<{ taskId: string }>;
   submitImageToMultiview(options: { input: string; signal?: AbortSignal }): Promise<{ taskId: string; stage: "image-to-multiview" }>;
   submitMultiviewFromTask(options: { sourceTaskId: string; texture?: boolean; pbr?: boolean; signal?: AbortSignal }): Promise<{ taskId: string; stage: "multiview-to-model" }>;
