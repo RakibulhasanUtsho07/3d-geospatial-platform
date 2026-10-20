@@ -37,11 +37,23 @@ npm run prepare:building-spec -- <workspaceRoot> <base-spec.json> <sourceId1,sou
 ~~~
 
 
+
+### Image-set quality preflight
+
+The media-quality-preflight module decodes each selected JPEG/PNG into a tiny 64×64 grayscale sample via FFmpeg and records original dimensions, Laplacian sharpness heuristic, luminance/contrast signals and an 8×8 average perceptual hash. Exact content duplicates are detected by existing SHA-256 records; similar image hashes are reported as possible near-duplicates. Large images above the safety dimension/pixel-count limits are not decoded. These scores are quality hints, not learned image understanding and not proof of a correct camera pose.
+
+~~~powershell
+npm run test:media-quality-preflight
+npm run assess:building-media -- <workspaceRoot> <buildingId> <sourceId1,sourceId2,sourceId3>
+~~~
+
+A report is written beside the selected source metadata. The ready flag requires at least three distinct files, successful quality decoding and rights-reviewed/known-licence records. It does not prove the views show the same building or adequately overlap; the COLMAP worker still requires explicit identity and overlap confirmation. It requires FFmpeg to be installed and available on PATH (or pass --ffmpeg).
+
 ## 3. COLMAP multi-view reconstruction and GLB conversion
 
 **colmap-worker.mjs** stages only explicitly selected sources whose file SHA-256 matches their metadata and BuildingSpec. At least three distinct JPEG/PNG images or extracted video frames are required. GPS tags are useful for georeferencing but are not required for COLMAP to estimate a local multi-view model. Every selected source must have a known licence, usageStatus: approved, and matching assetId. The operator must explicitly confirm same-building identity and adequate view overlap, and choose a source up-axis.
 
-The worker executes colmap automatic_reconstructor and colmap mesh_texturer as child processes without shell interpolation. **textured-ply-to-glb.mjs** converts ASCII or binary little-endian textured PLY triangles and an embedded PNG texture into one self-contained GLB. COLMAP must be installed on the worker host; real GPU/CPU reconstruction is not run in CI. CI tests the PLY converter and worker orchestration using a deterministic mock process.
+The worker automatically runs the image-set quality preflight before staging files, and fails closed if image decoding or minimum rights/reconstruction readiness checks fail. Heuristic warnings remain in the job report. It then executes colmap automatic_reconstructor and colmap mesh_texturer as child processes without shell interpolation. **textured-ply-to-glb.mjs** converts ASCII or binary little-endian textured PLY triangles and an embedded PNG texture into one self-contained GLB. COLMAP must be installed on the worker host; real GPU/CPU reconstruction is not run in CI. CI tests the PLY converter and worker orchestration using a deterministic mock process.
 
 ~~~powershell
 npm run test:colmap-worker

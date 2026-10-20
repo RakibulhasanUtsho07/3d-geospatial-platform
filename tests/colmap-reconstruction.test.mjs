@@ -11,7 +11,8 @@ import { generateBuildingAsset } from "../src/core/building-generation/generatio
 import { ingestMediaFile, toBuildingSpecSource } from "../src/core/building-generation/media-intake.mjs";
 
 async function workspace(t){const root=await mkdtemp(path.join(os.tmpdir(),"building-recon-"));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
-const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(40,9)]);
+function pngBytes(width=1024,height=768,tail=9){const b=Buffer.alloc(64,tail);Buffer.from([137,80,78,71,13,10,26,10]).copy(b,0);b.writeUInt32BE(13,8);b.write("IHDR",12,"ascii");b.writeUInt32BE(width,16);b.writeUInt32BE(height,20);b[24]=8;b[25]=2;b[26]=0;b[27]=0;b[28]=0;return b;}
+const png=pngBytes();
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 function asciiPly(withUv=true){
  const props="property float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\n";
@@ -31,6 +32,10 @@ function mockedColmapSpawn(_executable,args){
  const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
  queueMicrotask(async()=>{
   try{
+   if(args.includes("rawvideo")){
+    const sample=Buffer.alloc(64*64);for(let y=0;y<64;y++)for(let x=0;x<64;x++)sample[y*64+x]=(x<32?24:232);
+    child.stdout.end(sample,()=>child.emit("close",0,null));return;
+   }
    if(args[0]==="automatic_reconstructor"){
     const workspacePath=args[args.indexOf("--workspace_path")+1],out=path.join(workspacePath,"dense","0");
     await mkdir(out,{recursive:true});await writeFile(path.join(out,"meshed-poisson.ply"),asciiPly(false));
@@ -42,6 +47,10 @@ function mockedColmapSpawn(_executable,args){
   }catch(error){child.stderr.write(error.message);child.emit("close",1,null);}
  });
  return child;
+}
+function failingColmapSpawn(_executable,args){
+ if(args.includes("rawvideo"))return mockedColmapSpawn(_executable,args);
+ throw new Error("missing COLMAP binary");
 }
 async function setupApprovedViews(t,root,buildingId="demo-build"){
  const dir=path.join(root,"uploads");await mkdir(dir,{recursive:true});const sources=[];
@@ -91,7 +100,7 @@ test("fails closed when COLMAP cannot start and preserves failure diagnostics",a
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  await assert.rejects(runColmapReconstruction({
   workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"missing-colmap",sourceIds:["view-1","view-2","view-3"],
-  upAxis:"Z",upAxisReviewed:false,matchConfirmed:true,overlapReviewed:true,colmapPath:"colmap-does-not-exist",timeoutMs:5000,
+  upAxis:"Z",upAxisReviewed:false,matchConfirmed:true,overlapReviewed:true,colmapPath:"colmap-does-not-exist",timeoutMs:5000,spawnImpl:failingColmapSpawn,
  }),/Could not start/);
  const report=JSON.parse(await readFile(path.join(root,".building-engine","jobs",buildingSpec.id,"missing-colmap","report.json"),"utf8"));
  assert.equal(report.status,"failed");assert.match(report.failureMessage,/Could not start/);

@@ -112,9 +112,9 @@ export async function runColmapReconstruction(options){
   report.stagedImages=staged;report.progress="reconstruction";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const colmapPath=options.colmapPath||process.env.COLMAP_BIN||"colmap",spawnImpl=options.spawnImpl;
   const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
-  const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
+  const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={...report.timingsMs,reconstruction:Date.now()-reconstructStart};
   const inputMesh=await locateMesh(outputJobDir),denseWorkspace=path.dirname(inputMesh),texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
-  const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
+  const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs={...report.timingsMs,texturing:Date.now()-textureStart};
   const texturedMesh=path.join(texturedDir,"mesh.ply"),texturePath=path.join(texturedDir,"texture.png");
   if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
   const modelPath=path.join(outputJobDir,"model.glb"),converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});

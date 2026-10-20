@@ -12,6 +12,7 @@ on:
       - feat/colmap-reconstruction-worker
       - feat/single-image-3d-worker
       - feat/media-source-review-flow
+      - feat/media-quality-preflight
   pull_request:
     branches:
       - main
@@ -58,6 +59,9 @@ jobs:
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
+
+      - name: Test local image quality preflight and COLMAP input gates
+        run: npm run test:media-quality-preflight
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
