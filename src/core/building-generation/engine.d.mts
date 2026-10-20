@@ -50,9 +50,12 @@ export type StoredGeneratedCandidate = {
   generationStages?: string[];
 };
 
+export declare function buildArchitecturalTextPrompt(request: unknown): string;
+
 export declare function createBuildingGenerationEngine(options?: {
   tripoClient?: {
     uploadImage(options: { bytes: Uint8Array; filename?: string; contentType?: "image/jpeg" | "image/png"; signal?: AbortSignal }): Promise<{ fileToken: string }>;
+    submitText?(options: { prompt: string; negativePrompt?: string; signal?: AbortSignal }): Promise<{ taskId: string; stage: "text-to-model" }>;
     submitImage(options: { input: string; texture?: boolean; pbr?: boolean; signal?: AbortSignal }): Promise<{ taskId: string }>;
     submitImageToMultiview?(options: { input: string; signal?: AbortSignal }): Promise<{ taskId: string; stage: "image-to-multiview" }>;
     submitMultiviewFromTask?(options: { sourceTaskId: string; texture?: boolean; pbr?: boolean; signal?: AbortSignal }): Promise<{ taskId: string; stage: "multiview-to-model" }>;
@@ -75,6 +78,7 @@ export declare function createBuildingGenerationEngine(options?: {
       alignment?: GlbAlignmentResult;
       taskIds?: string[];
       generationStages?: string[];
+      prompt?: string;
     };
   }) => Promise<{ assetId: string }>;
   fetchImpl?: typeof fetch;
@@ -87,7 +91,7 @@ export declare function createBuildingGenerationEngine(options?: {
   analyze(request: unknown): BuildingGenerationAnalysis;
   generateProceduralCandidate(request: unknown): ProceduralBuildingCandidate;
   prepareVideoFrames(request: unknown, options: { videoReferenceId: string; signal?: AbortSignal; extractionOptions?: VideoFrameExtractionOptions }): Promise<PreparedVideoFrames>;
-  submitReferenceCandidate(request: unknown, options?: { selectedVideoFrameIds?: string[]; signal?: AbortSignal }): Promise<{ strategy: string; taskId: string; stage?: string; plan: BuildingGenerationPlan; uploadedReferences?: Array<{ referenceId: string; providerFileToken: string }> }>;
+  submitReferenceCandidate(request: unknown, options?: { selectedVideoFrameIds?: string[]; signal?: AbortSignal }): Promise<{ strategy: string; taskId: string; stage?: string; prompt?: string; plan: BuildingGenerationPlan; uploadedReferences?: Array<{ referenceId: string; providerFileToken: string }> }>;
   waitForProviderTask(taskId: string, options?: { signal?: AbortSignal; timeoutMs?: number; pollIntervalMs?: number; maxAttempts?: number; sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void> }): Promise<TripoTaskResult>;
   validateAndStoreProviderOutput(task: TripoTaskResult, options?: { signal?: AbortSignal; maxBytes?: number; downloadTimeoutMs?: number; alignmentTarget?: { footprintWidthMeters: number; footprintDepthMeters: number; totalHeightMeters: number } | null; alignmentMode?: GlbAlignmentMode; generationContext?: { requestId: string; quality: string; building: unknown; referenceIds: string[]; strategy: string; taskIds?: string[]; generationStages?: string[] } }): Promise<StoredGeneratedCandidate>;
   generateAndStoreReferenceCandidate(request: unknown, options?: {
