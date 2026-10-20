@@ -85,6 +85,7 @@ export type BuildingGenerationRequest = {
 export type GenerationStrategy =
   | "parametric-only"
   | "parametric-plus-ai-image"
+  | "parametric-plus-ai-text"
   | "parametric-plus-ai-image-multiview"
   | "parametric-plus-ai-multiview"
   | "video-keyframes-then-ai"
