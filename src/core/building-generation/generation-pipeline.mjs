@@ -7,7 +7,10 @@ export async function generateBuildingAsset(rawSpec, options = {}) {
   if (!["auto", "procedural", "photogrammetry", "single-image-ai"].includes(strategy)) throw new TypeError("strategy must be auto, procedural, photogrammetry or single-image-ai");
   const plan = planGeneration(rawSpec);
   const shouldRunPhotogrammetry = strategy === "photogrammetry" || (strategy === "auto" && options.enablePhotogrammetry === true && plan.sourceRoute === "multiview-photogrammetry-candidate");
-  if (strategy === "photogrammetry" && plan.sourceRoute !== "multiview-photogrammetry-candidate") throw new TypeError("photogrammetry strategy requires at least three licence-approved, geolocated visual references; current route is " + plan.sourceRoute);
+  const selectedViews = options.reconstruction?.sourceIds;
+  if (strategy === "photogrammetry" && (plan.visualReferences.licenceApproved < 3 || !Array.isArray(selectedViews) || selectedViews.length < 3)) {
+    throw new TypeError("photogrammetry strategy requires at least three selected image/video-frame sources with known licences and approved reuse status; source planner route is " + plan.sourceRoute);
+  }
   if (shouldRunPhotogrammetry) {
     const result = await runColmapReconstruction({ ...options.reconstruction, buildingId: plan.buildingId, buildingSpec: rawSpec });
     return { mode: "photogrammetry", plan, ...result, warning: "This GLB is a reconstructed candidate, not yet registered to ground-control coordinates or approved for public map placement." };
