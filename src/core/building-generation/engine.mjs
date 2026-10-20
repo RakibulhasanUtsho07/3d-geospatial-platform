@@ -19,7 +19,7 @@ function fail(code, message, plan = null) {
 
 function clampPromptSegment(value, maxLength) {
   if (typeof value !== "string") return "";
-  return value.replace(/[\\r\\n\\t]+/g, " ").replace(/\\s{2,}/g, " ").trim().slice(0, maxLength);
+  return value.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().slice(0, maxLength);
 }
 
 /** Create a provider prompt from admin-authored fields without inventing missing measurements. */
@@ -61,7 +61,7 @@ export function buildArchitecturalTextPrompt(requestValue) {
     const next = prompt ? prompt + " " + part : part;
     if (next.length <= 1024) { prompt = next; continue; }
     const remaining = 1024 - prompt.length - (prompt ? 1 : 0);
-    if (remaining > 40 && part.startsWith("Architectural brief: ")) prompt = prompt + (prompt ? " " : "") + part.slice(0, remaining).replace(/[\\s.,;:-]+$/, "") + ".";
+    if (remaining > 40 && part.startsWith("Architectural brief: ")) prompt = prompt + (prompt ? " " : "") + part.slice(0, remaining).replace(/[\s.,;:-]+$/, "") + ".";
     break;
   }
   if (!prompt.trim()) fail("text-prompt-empty", "The architectural information did not produce a usable text-to-3D prompt.");
@@ -368,6 +368,7 @@ export function createBuildingGenerationEngine({
       outputValidation: validation,
       provenance: "external-ai-candidate",
       ...(inputSummary ? { inputSummary } : {}),
+      ...(typeof generationContext?.prompt === "string" ? { prompt: generationContext.prompt } : {}),
       ...(alignment ? { alignment } : {}),
       ...(Array.isArray(generationContext?.taskIds) ? { taskIds: generationContext.taskIds } : { taskIds: [task.taskId] }),
       ...(Array.isArray(generationContext?.generationStages) ? { generationStages: generationContext.generationStages } : { generationStages: ["direct-3d-generation"] }),
