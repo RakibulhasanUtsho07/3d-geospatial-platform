@@ -24,6 +24,19 @@ function readHexColour(value, fallback) {
   ];
 }
 
+function facadeMaterialProfile(value) {
+  const name = typeof value === "string" && value.trim() ? value.trim() : "plaster";
+  const normalized = name.toLowerCase();
+  if (/brick|terracotta/.test(normalized)) return { name, recognized: true, color: [0.62, 0.31, 0.22, 1], metallic: 0, roughness: 0.92 };
+  if (/wood|timber/.test(normalized)) return { name, recognized: true, color: [0.43, 0.28, 0.16, 1], metallic: 0, roughness: 0.78 };
+  if (/concrete|cement/.test(normalized)) return { name, recognized: true, color: [0.67, 0.66, 0.63, 1], metallic: 0, roughness: 0.9 };
+  if (/stone|marble/.test(normalized)) return { name, recognized: true, color: [0.78, 0.75, 0.69, 1], metallic: 0, roughness: 0.84 };
+  if (/glass|curtain.?wall/.test(normalized)) return { name, recognized: true, color: [0.38, 0.58, 0.67, 1], metallic: 0.12, roughness: 0.26 };
+  if (/aluminium|aluminum|steel|metal/.test(normalized)) return { name, recognized: true, color: [0.49, 0.53, 0.56, 1], metallic: 0.6, roughness: 0.42 };
+  if (/plaster|stucco|paint|lime/.test(normalized)) return { name, recognized: true, color: [...PALETTE.facade], metallic: 0, roughness: 0.9 };
+  return { name, recognized: false, color: [...PALETTE.facade], metallic: 0, roughness: 0.9 };
+}
+
 
 function signedArea(points) {
   let area = 0;
@@ -218,17 +231,26 @@ export function generateParametricBuildingGlb(requestValue) {
   }
 
   const colors = Array.isArray(building.facadeColours) ? building.facadeColours : [];
-  const facadeColor = readHexColour(colors.find((color) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)), PALETTE.facade);
+  const sourceMaterials = Array.isArray(building.facadeMaterials) ? building.facadeMaterials : [];
+  const facadeProfile = facadeMaterialProfile(sourceMaterials[0]);
+  const suppliedFacadeColour = colors.find((color) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color));
+  const facadeColor = suppliedFacadeColour ? readHexColour(suppliedFacadeColour, PALETTE.facade) : [...facadeProfile.color];
   const trimColor = readHexColour(colors.find((color, index) => index > 0 && typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)), PALETTE.trim);
+  if (!facadeProfile.recognized) {
+    warnings.push("Facade material \"" + facadeProfile.name + "\" is not mapped in the procedural material palette; simplified plaster shading was used.");
+  } else if (!suppliedFacadeColour && !/plaster|stucco|paint|lime/i.test(facadeProfile.name)) {
+    warnings.push("Facade color was derived from the simplified \"" + facadeProfile.name + "\" material palette because no explicit facade colour was supplied.");
+  }
+  const safeMaterialName = facadeProfile.name.replace(/[<>\\"]/g, "").slice(0, 80);
   const materials = [
-    makeMaterial("Facade plaster", facadeColor),
+    makeMaterial(safeMaterialName + " facade", facadeColor, facadeProfile.metallic, facadeProfile.roughness),
     makeMaterial("Floor bands and window frames", trimColor),
     makeMaterial("Window glass", PALETTE.glass, 0.05, 0.3),
     makeMaterial("Roof", PALETTE.roof),
     makeMaterial("Entrance door", PALETTE.door),
     makeMaterial("Balcony concrete", [0.72, 0.70, 0.66, 1]),
     makeMaterial("Balcony railing metal", [0.22, 0.25, 0.27, 1], 0.45, 0.55),
-    makeMaterial("Facade columns", facadeColor),
+    makeMaterial("Facade columns", facadeColor, facadeProfile.metallic, facadeProfile.roughness),
   ];
   const meshes = materials.map(() => ({ positions: [], normals: [], indices: [] }));
 
