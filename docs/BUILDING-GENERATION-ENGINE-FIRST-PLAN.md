@@ -79,6 +79,8 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 - invalid units, dimensions, IDs and ambiguous views are rejected;
 - unapproved media is not silently sent to an external provider;
 - provider calls handle queued/running/success/failed/cancelled and bounded timeouts;
+- Single-image generation tracks both image-to-multiview and multiview-to-model tasks; it only chains from a successful source task with an accepted task type.
+- Candidate GLB output is downloaded immediately after success because provider output links are temporary; file size, host, redirect and geometry checks run before private storage.
 - retries are idempotent and failed tasks never replace an approved model;
 - known-size fixtures meet project-defined dimensional tolerances after export;
 - single-view outputs are explicitly approximate;
@@ -90,6 +92,10 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 - Tripo overview and asynchronous task lifecycle: https://developers.tripo3d.ai/en/docs/introduction
 - Tripo image-to-3D: https://developers.tripo3d.ai/en/docs/generation-image-to-model
 - Tripo multiview-to-3D: https://developers.tripo3d.ai/en/docs/generation-multiview-to-model
+- Tripo image-to-multiview (single photo to reference views): https://developers.tripo3d.ai/en/docs/generation-image-to-multiview
+- Tripo multiview-to-3D H Series (including a successful image-to-multiview task ID as input): https://developers.tripo3d.ai/en/docs/generation-multiview-to-model/standard
+- Tripo task query/status and output metadata: https://developers.tripo3d.ai/en/docs/task-query
+- Tripo quick start (download model output promptly after successful completion): https://developers.tripo3d.ai/en/docs/quick-start
 - Meshy image-to-3D alternative: https://docs.meshy.ai/en/api/image-to-3d
 - Meshy multi-image-to-3D alternative: https://docs.meshy.ai/en/api/multi-image-to-3d
 - COLMAP Structure-from-Motion and Multi-View Stereo: https://github.com/colmap/colmap/blob/main/doc/tutorial.rst
