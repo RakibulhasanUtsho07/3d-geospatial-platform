@@ -8,7 +8,7 @@ import {
   planBuildingGeneration,
 } from "./input-policy.mjs";
 import { generateParametricBuildingGlb } from "./procedural-builder.mjs";
-import { downloadGeneratedGlb } from "./glb-validation.mjs";
+import { alignGeneratedGlbToDimensions, downloadGeneratedGlb } from "./glb-validation.mjs";
 
 function fail(code, message, plan = null) {
   const error = new Error(message);
