@@ -78,6 +78,23 @@ export function createTripoGenerationClient({ apiKey, fetchImpl = fetch, model =
   }
 
   return Object.freeze({
+    async uploadImage({ bytes, filename = "building-reference.jpg", contentType = "image/jpeg", signal } = {}) {
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) throw new TypeError("Image bytes must be a non-empty Uint8Array.");
+      if (bytes.byteLength > 20 * 1024 * 1024) throw new RangeError("Tripo image uploads are limited to 20 MB.");
+      if (!["image/jpeg", "image/png"].includes(contentType)) throw new TypeError("Tripo file upload accepts only JPEG or PNG image bytes.");
+      if (typeof filename !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(filename) || filename.includes("..")) {
+        throw new TypeError("Upload filename must be a safe basename.");
+      }
+      const form = new FormData();
+      const imageBlob = new Blob([Uint8Array.from(bytes)], { type: contentType });
+      form.append("file", imageBlob, filename);
+      const data = await request("/files", { method: "POST", signal, body: form });
+      if (typeof data.file_token !== "string" || !FILE_TOKEN_PATTERN.test(data.file_token)) {
+        throw new Error("Tripo API returned an invalid file token.");
+      }
+      return { fileToken: data.file_token };
+    },
+
     async submitImage({ input, texture = true, pbr = true, signal } = {}) {
       const source = providerInput(input);
       const data = await request("/generation/image-to-model", {
