@@ -31,7 +31,8 @@ Store every important value as verified, derived, estimated, ai_proposed or unkn
 
 | Input evidence | Selected route | Limitation |
 |---|---|---|
-| Footprint + height/floors | Procedural base | Predictable dimensions; basic appearance until component families are added |
+| Footprint + height/floors | Procedural base | Predictable dimensions; the current procedural tier supports rectangular/polygon shells, facade material palettes, gable/hip roofs on rectangles and explicit balcony/column/window features |
+| Written architectural brief + measurements, with no building photo/video | Text-to-3D candidate -> GLB validation -> metric alignment | Prompt drives visual shape/material/style, but model geometry is approximate; measured footprint/height is aligned and reviewed afterward |
 | One authorized photo | Image -> generated multi-view references -> multiview-to-3D | The generated views are AI-inferred, not true measurements; hidden surfaces still need review |
 | Two or more authorized labelled views, including front + side/rear | Parametric base + multiview AI candidate | Better view coverage; still needs scale and geometry QA |
 | Video walkthrough | Extract candidate frames -> Admin labels/selects -> multiview AI or reconstruction check | A video file should not be sent directly to an image endpoint |
@@ -40,7 +41,7 @@ Store every important value as verified, derived, estimated, ai_proposed or unkn
 
 ## Provider adapter
 
-A thin server-side Tripo adapter is implemented behind a provider-replaceable module. For a single photo, the engine now prefers a two-stage task chain: `POST /generation/image-to-multiview` synthesizes front/left/back/right reference views; after that task succeeds, `POST /generation/multiview-to-model` consumes the source task ID to produce the 3D candidate. This matters because a single photo cannot directly reveal hidden sides. For multiple Admin-labelled views or selected video frames, the engine can submit those labelled views directly to multiview-to-model. All tasks are polled asynchronously, and source-task status/type is checked before chaining.
+A thin server-side Tripo adapter is implemented behind a provider-replaceable module. When an Admin approves a written architectural brief without source imagery, the engine can use `POST /generation/text-to-model` with a prompt composed from building type, style, height/floors, footprint, roof, facade materials/colours and structured features. The exact prompt is retained with the candidate provenance so later model differences are auditable. For a single photo, the engine now prefers a two-stage task chain: `POST /generation/image-to-multiview` synthesizes front/left/back/right reference views; after that task succeeds, `POST /generation/multiview-to-model` consumes the source task ID to produce the 3D candidate. This matters because a single photo cannot directly reveal hidden sides. For multiple Admin-labelled views or selected video frames, the engine can submit those labelled views directly to multiview-to-model. All tasks are polled asynchronously, and source-task status/type is checked before chaining.
 
 This is a pilot integration choice, not proof that Tripo is the best provider. Benchmark it on a small, representative dataset of Bangladeshi houses/apartments/heritage buildings against at least one alternative before production selection. Provider model identifiers, terms, quotas and prices must be checked again when enabling a real account.
 
@@ -62,8 +63,8 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 ## Implementation phases
 
 - **E0 — contracts and routing (implemented):** validate requests and return a transparent evidence-based plan.
-- **E1 — provider task adapter (implemented/tested with mocks):** upload image references, submit single-image-to-multiview and multiview-to-model tasks, query state and carry source-task lineage through a server-side secret. No real API key is configured; live provider generation/credit usage is not verified.
-- **E1b — first procedural GLB output (implemented/tested):** create a dimension-controlled visual shell with floors, floor bands, facade panels/windows, door, flat roof and optional parapet; includes GLB metadata and explicit assumption warnings.
+- **E1 — provider task adapter (implemented/tested with mocks):** upload image references, submit architecture text-to-model tasks, chain single-image-to-multiview into multiview-to-model, poll task states and carry source-task lineage through a server-side secret. No real API key is configured; live provider generation/credit usage is not verified.
+- **E1b — first procedural GLB output (implemented/tested):** create a dimension-controlled visual shell with floors, bands, window/entrance styles, flat/gable/hip roofs where supported, facade material palettes, explicit balconies/railings/columns; preserve requested/effective feature metadata and warnings for brief-derived assumptions.
 - **E2a — video keyframe extractor (implemented/tested with fake processes):** probe video duration, apply file-size/duration/frame/timeout limits, use FFmpeg without a shell, retain presentation timestamps where available and clean temp output on failure.
 - **E2b — video-to-reference orchestration (implemented/tested with adapters):** resolve a private source-video asset, extract frames, write them through a private asset callback, preserve parent video ID/timestamp/licence and return new frames with unknown view labels for Admin review.
 - **E2 — persistent job productionization:** Admin authorization, durable jobs, retries/idempotency, cancellation, audit, upload quotas and immutable model artifacts. Provider image upload to Tripo is implemented as an adapter, but the application-level private asset upload service is still an injected dependency.
@@ -91,6 +92,7 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 
 - Tripo overview and asynchronous task lifecycle: https://developers.tripo3d.ai/en/docs/introduction
 - Tripo image-to-3D: https://developers.tripo3d.ai/en/docs/generation-image-to-model
+- Tripo text-to-3D: https://developers.tripo3d.ai/en/docs/generation-text-to-model/standard
 - Tripo multiview-to-3D: https://developers.tripo3d.ai/en/docs/generation-multiview-to-model
 - Tripo image-to-multiview (single photo to reference views): https://developers.tripo3d.ai/en/docs/generation-image-to-multiview
 - Tripo multiview-to-3D H Series (including a successful image-to-multiview task ID as input): https://developers.tripo3d.ai/en/docs/generation-multiview-to-model/standard
@@ -126,7 +128,7 @@ Use `--force` only when intentionally overwriting the selected output file. This
 - `src/core/building-generation/input-policy.mjs` — validation and evidence-based route planning.
 - `src/core/building-generation/procedural-builder.mjs` — pure Node GLB exporter for the first procedural base tier.
 - `src/core/building-generation/providers/tripo-client.mjs` — asynchronous upload/image-to-multiview/multiview-to-model provider adapter.
-- `src/core/building-generation/engine.mjs` — route analysis, procedural candidates, protected image uploads, video-to-frame references, provider task polling, validated model download, optional dimension alignment and private candidate storage callback.
+- `src/core/building-generation/engine.mjs` — route analysis, prompt construction from written architecture inputs, procedural candidates, protected image uploads, video-to-frame references, provider task polling, validated model download, optional dimension alignment and private candidate storage callback.
 - `scripts/generate-building-model.mjs` — local CLI to generate a sample `.glb` from a JSON request.
 
 Still not implemented: protected Admin auth/API, durable job/database records, the real application private asset-store implementation, frame blur/duplicate scoring and Admin selection UI, long-running workers/queue/retries, full mesh repair/retopology and photogrammetry. Provider upload/download, FFmpeg orchestration, GLB validation, metric alignment and candidate storage are tested with mocked services, not live credentials or real footage. Dimension alignment uses the GLB scene bounding box; it does not infer floor layouts or guarantee architectural fidelity. The CLI/engine prototype is not yet a finished automatic reconstruction service.
