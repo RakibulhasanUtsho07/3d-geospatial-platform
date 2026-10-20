@@ -42,7 +42,7 @@ export function buildVideoFrameArgs({ inputPath, outputPattern, fps = 0.5, maxFr
   if (typeof outputPattern !== "string" || !outputPattern.trim() || !outputPattern.includes("%04d")) {
     throw new TypeError("outputPattern must include the %04d frame sequence placeholder.");
   }
-  finiteRange(fps, "fps", 0.1, 2);
+  finiteRange(fps, "fps", 0.0001, 2);
   positiveInteger(maxFrames, "maxFrames", 2, 120);
   positiveInteger(maxWidth, "maxWidth", 256, 4096);
   positiveInteger(jpegQuality, "jpegQuality", 2, 10);
@@ -189,6 +189,9 @@ export async function extractVideoKeyframes({
   if (durationSeconds > options.maxDurationSeconds) {
     throw new RangeError("Video duration " + durationSeconds.toFixed(2) + "s exceeds the configured limit of " + options.maxDurationSeconds + "s.");
   }
+  // Lower the sampling rate when needed so keyframes are distributed across the full clip,
+  // instead of hitting maxFrames near the beginning and ignoring the final portion.
+  const effectiveSamplingFps = Math.min(options.fps, (options.maxFrames - 1) / Math.max(0.01, durationSeconds * 0.98));
 
   const destination = resolve(outputDirectory);
   if (destination === absoluteInput || destination.startsWith(absoluteInput + sep)) {
@@ -200,7 +203,7 @@ export async function extractVideoKeyframes({
     const result = await runProcess(ffmpegPath, buildVideoFrameArgs({
       inputPath: absoluteInput,
       outputPattern,
-      fps: options.fps,
+      fps: effectiveSamplingFps,
       maxFrames: options.maxFrames,
       maxWidth: options.maxWidth,
       jpegQuality: options.jpegQuality,
@@ -211,7 +214,7 @@ export async function extractVideoKeyframes({
       .sort();
     if (filenames.length < 2) throw new Error("FFmpeg produced fewer than two usable keyframes.");
     if (filenames.length > options.maxFrames) throw new Error("FFmpeg produced more frames than the configured limit.");
-    const timestamps = parseFrameTimestamps(result.stderr, filenames.length, options.fps);
+    const timestamps = parseFrameTimestamps(result.stderr, filenames.length, effectiveSamplingFps);
     const frames = filenames.map((filename, index) => ({
       index,
       filename,
@@ -224,7 +227,8 @@ export async function extractVideoKeyframes({
       inputPath: absoluteInput,
       outputDirectory: destination,
       durationSeconds,
-      samplingFps: options.fps,
+      samplingFps: effectiveSamplingFps,
+      requestedSamplingFps: options.fps,
       frames,
       notes: [
         "Extracted frames are visual references, not automatically calibrated photogrammetry inputs.",
