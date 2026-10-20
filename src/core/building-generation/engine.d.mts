@@ -1,6 +1,6 @@
 import type { BuildingGenerationPlan, BuildingGenerationRequest } from "./types";
 import type { TripoTaskResult } from "./providers/tripo-client.mjs";
-import type { VideoFrameExtractionResult } from "./video-frame-extractor.mjs";
+import type { VideoFrameExtractionOptions, VideoFrameExtractionResult } from "./video-frame-extractor.mjs";
 
 export type BuildingGenerationAnalysis = {
   request: BuildingGenerationRequest;
@@ -43,12 +43,12 @@ export declare function createBuildingGenerationEngine(options?: {
   loadAsset?: (assetId: string) => Promise<{ bytes: Uint8Array; filename?: string; contentType: "image/jpeg" | "image/png" }>;
   resolveVideoAssetPath?: (assetId: string) => Promise<string>;
   storeFrameAsset?: (input: { path: string; filename: string; contentType: "image/jpeg"; sourceVideoAssetId: string; sourceVideoReferenceId: string; timestampSeconds: number }) => Promise<{ assetId: string }>;
-  extractVideo?: (options: { inputPath: string; outputDirectory: string; signal?: AbortSignal; fps?: number; maxFrames?: number; maxWidth?: number; jpegQuality?: number; maxInputBytes?: number; maxDurationSeconds?: number; timeoutMs?: number; ffmpegPath?: string; ffprobePath?: string }) => Promise<VideoFrameExtractionResult>;
+  extractVideo?: (options: { inputPath: string; outputDirectory: string; signal?: AbortSignal } & VideoFrameExtractionOptions) => Promise<VideoFrameExtractionResult>;
   createVideoWorkDirectory?: () => Promise<string>;
   removeVideoWorkDirectory?: (directory: string) => Promise<void>;
 }): {
   analyze(request: unknown): BuildingGenerationAnalysis;
   generateProceduralCandidate(request: unknown): ProceduralBuildingCandidate;
-  prepareVideoFrames(request: unknown, options: { videoReferenceId: string; signal?: AbortSignal; extractionOptions?: Partial<Pick<VideoFrameExtractionResult, "samplingFps">> & { fps?: number; maxFrames?: number; maxWidth?: number; jpegQuality?: number; maxInputBytes?: number; maxDurationSeconds?: number; timeoutMs?: number; ffmpegPath?: string; ffprobePath?: string } }): Promise<PreparedVideoFrames>;
+  prepareVideoFrames(request: unknown, options: { videoReferenceId: string; signal?: AbortSignal; extractionOptions?: VideoFrameExtractionOptions }): Promise<PreparedVideoFrames>;
   submitReferenceCandidate(request: unknown, options?: { selectedVideoFrameIds?: string[]; signal?: AbortSignal }): Promise<{ strategy: string; taskId: string; plan: BuildingGenerationPlan; uploadedReferences?: Array<{ referenceId: string; providerFileToken: string }> }>;
 };
