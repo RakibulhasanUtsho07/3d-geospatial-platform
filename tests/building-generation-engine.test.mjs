@@ -225,11 +225,21 @@ test("polls a successful AI task, validates its GLB, and stores an Admin-review 
   let downloads = 0;
   const engine = createBuildingGenerationEngine({
     tripoClient: {
-      async submitImage({ input }) { assert.equal(input, "file_front1234"); return { taskId: "task_engine123" }; },
+      async submitImageToMultiview({ input }) {
+        assert.equal(input, "file_front1234");
+        return { taskId: "task_views123", stage: "image-to-multiview" };
+      },
+      async submitMultiviewFromTask({ sourceTaskId }) {
+        assert.equal(sourceTaskId, "task_views123");
+        return { taskId: "task_engine123", stage: "multiview-to-model" };
+      },
       async getTask(taskId) {
         polls += 1;
+        if (taskId === "task_views123") {
+          return { taskId, status: "success", progress: 100, type: "generate_multiview_image" };
+        }
         assert.equal(taskId, "task_engine123");
-        if (polls === 1) return { taskId, status: "running", progress: 42 };
+        if (polls === 2) return { taskId, status: "running", progress: 42 };
         return { taskId, status: "success", progress: 100, modelUrl: "https://cdn.tripo3d.ai/output/building.glb" };
       },
     },
@@ -248,12 +258,14 @@ test("polls a successful AI task, validates its GLB, and stores an Admin-review 
     allowExternalProviderProcessing: true,
     references: [image("front", "front")],
   }, { pollOptions: { pollIntervalMs: 100, maxAttempts: 4 } });
-  assert.equal(polls, 2);
+  assert.equal(polls, 3);
   assert.equal(downloads, 1);
   assert.equal(result.status, "needs-admin-review");
   assert.equal(result.assetId, "draft-building-v1");
   assert.equal(result.taskId, "task_engine123");
-  assert.equal(result.strategy, "parametric-plus-ai-image");
+  assert.equal(result.strategy, "parametric-plus-ai-image-multiview");
+  assert.deepEqual(result.stageTaskIds, ["task_views123", "task_engine123"]);
+  assert.deepEqual(result.generationStages, ["image-to-multiview", "multiview-to-model"]);
   assert.equal(result.validation.valid, true);
   assert.equal(result.validation.contentType, "model/gltf-binary");
   assert.equal(result.alignment.mode, "uniform-fit");
@@ -265,6 +277,8 @@ test("polls a successful AI task, validates its GLB, and stores an Admin-review 
   assert.equal(saved.metadata.provenance, "external-ai-candidate");
   assert.equal(saved.metadata.inputSummary.requestId, "engine-test-1");
   assert.equal(saved.metadata.alignment.mode, "uniform-fit");
+  assert.deepEqual(saved.metadata.taskIds, ["task_views123", "task_engine123"]);
+  assert.deepEqual(saved.metadata.generationStages, ["image-to-multiview", "multiview-to-model"]);
   assert.equal(saved.bytes.toString("ascii", 0, 4), "glTF");
 });
 
