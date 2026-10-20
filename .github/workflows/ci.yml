@@ -8,6 +8,7 @@ on:
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
+      - feat/building-media-intake
   pull_request:
     branches:
       - main
@@ -48,6 +49,9 @@ jobs:
 
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
+
+      - name: Test local media intake and bounded video frame extraction
+        run: npm run test:building-media
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget

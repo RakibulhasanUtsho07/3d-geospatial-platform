@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Generated building-model artifacts (keep specs and test fixtures tracked)
 /artifacts/
+
+# Local source media, hashes, extracted video frames and job workspace
+/.building-engine/
