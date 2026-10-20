@@ -7,6 +7,7 @@ on:
       - dev
       - rakibul-hasan
       - feat/generated-building-model-layer
+      - feat/building-generation-engine-core
   pull_request:
     branches:
       - main
@@ -43,6 +44,12 @@ jobs:
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
+
+      - name: Test building generation input routing
+        run: npm run test:building-generation
+
+      - name: Test Tripo image and multiview provider adapter
+        run: npm run test:tripo-client
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
