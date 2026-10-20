@@ -278,10 +278,32 @@ export function planBuildingGeneration(requestValue) {
     return { strategy: "parametric-plus-ai-multiview", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
   }
 
+  if (authorizedActualImages.length > 1 && !hasMultipleAuthorizedViews) {
+    missingInputs.push("Multiple building photos are present but are not labelled as at least two distinct views (front/left/back/right). Label the views or select one image for the single-photo pipeline.");
+    return {
+      strategy: "needs-more-inputs",
+      stages: [...stages, "admin-review"],
+      canGenerateParametricBase,
+      externalProviderRequired: true,
+      blocked: true,
+      warnings, missingInputs, qualityNotes,
+    };
+  }
+
   if (authorizedImages.length > 0) {
-    stages.push(...(canGenerateParametricBase ? ["generate-parametric-base"] : []), "submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
-    qualityNotes.push("Single-view generation is an appearance candidate. Hidden/back-side geometry is inferred and must not be labelled verified.");
-    return { strategy: "parametric-plus-ai-image", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
+    stages.push(
+      ...(canGenerateParametricBase ? ["generate-parametric-base"] : []),
+      "submit-image-to-multiview",
+      "poll-image-to-multiview",
+      "submit-multiview-to-model",
+      "poll-multiview-to-model",
+      "align-to-authoritative-dimensions",
+      "mesh-cleanup-and-optimize",
+      "validate-glb",
+      "admin-review",
+    );
+    qualityNotes.push("Single-photo generation first synthesizes additional views. Those views are AI-inferred, not measured; hidden surfaces and dimensions must be reviewed.");
+    return { strategy: "parametric-plus-ai-image-multiview", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
   }
 
   if (canGenerateParametricBase) {
