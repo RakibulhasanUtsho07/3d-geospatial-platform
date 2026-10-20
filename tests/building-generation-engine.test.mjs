@@ -321,3 +321,26 @@ test("provider output outside the trusted CDN is rejected before download", asyn
   assert.equal(downloads, 0);
   assert.equal(stores, 0);
 });
+
+test("refuses to chain from a task with the wrong source type", async () => {
+  let secondStageCalled = false;
+  let downloads = 0;
+  let stores = 0;
+  const engine = createBuildingGenerationEngine({
+    tripoClient: {
+      async submitImageToMultiview() { return { taskId: "task_views123", stage: "image-to-multiview" }; },
+      async submitMultiviewFromTask() { secondStageCalled = true; return { taskId: "task_model123", stage: "multiview-to-model" }; },
+      async getTask(taskId) { return { taskId, status: "success", type: "image_to_model" }; },
+    },
+    fetchImpl: async () => { downloads += 1; return new Response("not a GLB"); },
+    storeGeneratedCandidate: async () => { stores += 1; return { assetId: "should-not-exist" }; },
+    sleepImpl: async () => {},
+  });
+  await assert.rejects(engine.generateAndStoreReferenceCandidate({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
+    references: [image("front", "front")],
+  }), (error) => error.code === "provider-source-task-type-invalid");
+  assert.equal(secondStageCalled, false);
+  assert.equal(downloads, 0);
+  assert.equal(stores, 0);
+});
