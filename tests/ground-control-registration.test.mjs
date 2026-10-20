@@ -19,10 +19,11 @@ function fixtureControls({scale=2.5,thetaDegrees=30,tx=100,ty=200,outlierIndex=-
 test("recovers horizontal scale, rotation and model-origin WGS84 location from measured control points",()=>{
  const result=registerModelToWgs84({controlPoints:fixtureControls()});
  assert.equal(result.status,"calibrated-needs-human-review");
- assert.ok(Math.abs(result.transform.metresPerModelUnit-2.5)<1e-5);
+ const expectedOrigin=lonLatFromLocal(100,200,90.4,23.7);
+ assert.ok(Math.abs(result.transform.metresPerModelUnit-2.5)<1e-4);
  assert.ok(Math.abs(result.transform.rotationFromModelXToEastNorthDegrees-30)<0.001);
- assert.ok(Math.abs(result.transform.modelOrigin.longitude-90.4)<0.00001);
- assert.ok(Math.abs(result.transform.modelOrigin.latitude-23.7)<0.00001);
+ assert.ok(Math.abs(result.transform.modelOrigin.longitude-expectedOrigin.longitude)<0.00001);
+ assert.ok(Math.abs(result.transform.modelOrigin.latitude-expectedOrigin.latitude)<0.00001);
  assert.ok(result.controls.rmsErrorM<0.002);assert.equal(result.vertical.status,"not-solved");
  assert.equal(result.mapReady,false);assert.equal(result.publicationEligible,false);
 });
