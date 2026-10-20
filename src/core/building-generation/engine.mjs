@@ -17,6 +17,57 @@ function fail(code, message, plan = null) {
   throw error;
 }
 
+function clampPromptSegment(value, maxLength) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[\\r\\n\\t]+/g, " ").replace(/\\s{2,}/g, " ").trim().slice(0, maxLength);
+}
+
+/** Create a provider prompt from admin-authored fields without inventing missing measurements. */
+export function buildArchitecturalTextPrompt(requestValue) {
+  const request = normalizeBuildingGenerationRequest(requestValue);
+  const building = request.building;
+  const dimensions = building.dimensions ?? {};
+  const parts = ["Exterior architectural 3D building model."];
+  parts.push("Building type: " + clampPromptSegment(building.buildingType, 100) + ".");
+  if (building.name) parts.push("Building name/context: " + clampPromptSegment(building.name, 100) + ".");
+  if (building.architecturalStyle) parts.push("Architectural style: " + clampPromptSegment(building.architecturalStyle, 140) + ".");
+  if (dimensions.totalHeightMeters !== undefined) parts.push("Target total height: " + dimensions.totalHeightMeters + " metres.");
+  if (dimensions.aboveGroundFloors !== undefined) parts.push("Above-ground storeys: " + dimensions.aboveGroundFloors + ".");
+  if (dimensions.floorToFloorHeightMeters !== undefined) parts.push("Floor-to-floor height: " + dimensions.floorToFloorHeightMeters + " metres.");
+  if (dimensions.basementFloors !== undefined && dimensions.basementFloors > 0) parts.push("Basement floors: " + dimensions.basementFloors + ".");
+  if (building.footprint?.widthMeters !== undefined && building.footprint?.depthMeters !== undefined) {
+    parts.push("Footprint target: " + building.footprint.widthMeters + " metres wide by " + building.footprint.depthMeters + " metres deep.");
+  } else if (building.footprint?.polygonXYMeters) {
+    parts.push("Use the supplied non-rectangular footprint as the plan outline; exact footprint alignment will be checked after generation.");
+  }
+  if (building.frontAzimuthDegrees !== undefined) parts.push("Front facade heading metadata: " + building.frontAzimuthDegrees + " degrees clockwise from north.");
+  if (building.roofType) parts.push("Roof type: " + clampPromptSegment(building.roofType, 80) + ".");
+  if (building.facadeMaterials?.length) parts.push("Facade material palette: " + building.facadeMaterials.map((v) => clampPromptSegment(v, 50)).join(", ") + ".");
+  if (building.facadeColours?.length) parts.push("Facade colours: " + building.facadeColours.map((v) => clampPromptSegment(v, 30)).join(", ") + ".");
+  const features = building.architecturalFeatures;
+  if (features?.windowStyle) parts.push("Window style: " + features.windowStyle + ".");
+  if (features?.entranceStyle) parts.push("Entrance style: " + features.entranceStyle + ".");
+  if (features?.balconies?.enabled) {
+    const balcony = features.balconies;
+    const floors = balcony.floors?.length ? " on storeys " + balcony.floors.join(", ") : " on upper storeys";
+    parts.push("Balconies: " + (balcony.count ?? 1) + " per front arrangement" + floors + ", approximate width ratio " + (balcony.widthRatio ?? 0.72) + ", depth " + (balcony.depthMeters ?? 1.2) + " metres, railing " + ((balcony.railing ?? true) ? "included" : "omitted") + ".");
+  }
+  if (features?.columns?.frontCount) parts.push("Front columns: " + features.columns.frontCount + ", width " + (features.columns.widthMeters ?? 0.28) + " metres.");
+  if (building.designBrief) parts.push("Architectural brief: " + clampPromptSegment(building.designBrief, 360) + ".");
+  parts.push("Create one coherent exterior building asset with connected roof and facade; no labels, watermarks, people, surrounding city or landscape.");
+
+  let prompt = "";
+  for (const part of parts) {
+    const next = prompt ? prompt + " " + part : part;
+    if (next.length <= 1024) { prompt = next; continue; }
+    const remaining = 1024 - prompt.length - (prompt ? 1 : 0);
+    if (remaining > 40 && part.startsWith("Architectural brief: ")) prompt = prompt + (prompt ? " " : "") + part.slice(0, remaining).replace(/[\\s.,;:-]+$/, "") + ".";
+    break;
+  }
+  if (!prompt.trim()) fail("text-prompt-empty", "The architectural information did not produce a usable text-to-3D prompt.");
+  return prompt;
+}
+
 function actualBuildingImages(request) {
   return request.references.filter((ref) =>
     ref.kind === "image" &&
@@ -385,6 +436,7 @@ export function createBuildingGenerationEngine({
       roofType: request.building.roofType,
       facadeMaterials: request.building.facadeMaterials,
       facadeColours: request.building.facadeColours,
+      architecturalFeatures: request.building.architecturalFeatures,
     };
     const stored = await validateAndStoreProviderOutput(completed, {
       ...downloadOptions,
@@ -423,6 +475,26 @@ export function createBuildingGenerationEngine({
     }
     if (!tripoClient) {
       fail("provider-not-configured", "No AI generation provider client is configured on the server.", plan);
+    }
+
+    if (plan.strategy === "parametric-plus-ai-text") {
+      if (typeof tripoClient.submitText !== "function") {
+        fail("text-provider-not-configured", "The configured provider does not support text-to-3D generation.", plan);
+      }
+      const prompt = buildArchitecturalTextPrompt(request);
+      const task = await tripoClient.submitText({
+        prompt,
+        negativePrompt: "text, logo, watermark, people, landscape, surrounding buildings, disconnected parts, floating geometry",
+        signal,
+      });
+      return {
+        strategy: "parametric-plus-ai-text",
+        ...task,
+        stage: "text-to-model",
+        prompt,
+        uploadedReferences: [],
+        plan,
+      };
     }
 
     const uploadTracker = createUploadTracker();
