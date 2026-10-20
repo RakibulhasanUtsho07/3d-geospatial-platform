@@ -51,6 +51,9 @@ jobs:
       - name: Test procedural building GLB output
         run: npm run test:procedural-builder
 
+      - name: Test building generation engine orchestration
+        run: npm run test:building-generation-engine
+
       - name: Test Tripo image and multiview provider adapter
         run: npm run test:tripo-client
 
