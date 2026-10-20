@@ -31,7 +31,8 @@
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
     "test:building-generation": "node --test tests/building-generation-policy.test.mjs",
-    "test:tripo-client": "node --test tests/tripo-client.test.mjs"
+    "test:tripo-client": "node --test tests/tripo-client.test.mjs",
+    "test:procedural-builder": "node --test tests/procedural-builder.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
