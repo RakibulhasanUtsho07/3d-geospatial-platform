@@ -37,7 +37,8 @@ test("routes rights-cleared front and side images to multiview AI plus a paramet
   });
   assert.equal(plan.strategy, "parametric-plus-ai-multiview");
   assert.equal(plan.canGenerateParametricBase, true);
-  assert.ok(plan.stages.includes("generate-parametric-base"));
+  assert.equal(plan.canGenerateParametricBase, true);
+  assert.ok(!plan.stages.includes("generate-parametric-base"), "the AI candidate route must not claim the separate procedural candidate has been generated");
   assert.ok(plan.stages.includes("submit-ai-generation"));
   assert.ok(plan.stages.includes("validate-glb"));
   assert.ok(plan.stages.includes("admin-review"));
