@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Generated Overture viewport tiles (rebuild with npm run build:geospatial-tiles)
 /data/overture/spatial-tiles/
+
+# Generated building-model artifacts (keep specs and test fixtures tracked)
+/artifacts/

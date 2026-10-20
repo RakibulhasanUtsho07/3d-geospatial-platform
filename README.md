@@ -15,6 +15,7 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Filterable **illustrative demo property listings** with rent, bedrooms, property type, furnishing, area and radius filters; browser-local saved favourites persist between visits.
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
+- A first deterministic Building Generation Engine slice: validated versioned BuildingSpec, procedural GLB output, and source/confidence QA report (media-to-geometry workers are still planned).
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
 
@@ -48,6 +49,17 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
+
+## Building Generation Engine (first slice)
+
+The current engine validates a versioned, source-aware BuildingSpec and generates a parametric GLB plus a JSON provenance/QA report. The initial mesh supports footprint-based walls, windows/frames, a door, repeated front balconies, flat/terrace roof cap and parapet. The schema is documented in [building-generation-spec.schema.json](building-generation-spec.schema.json).
+
+```powershell
+npm run test:building-generation
+npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
+```
+
+Important: the current generator records image/video references but does not automatically interpret them or reconstruct surfaces. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md) for confidence/source handling and the next media/BIM/photogrammetry worker milestones.
 
 ## Geospatial data pipeline
 

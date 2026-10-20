@@ -29,7 +29,9 @@
     "pretest:heritage-model": "npm run build:heritage-model",
     "test:heritage-model": "node --test tests/heritage-model.test.mjs",
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
-    "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs"
+    "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
+    "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
+    "generate:building-model": "node scripts/generate-building-model.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
