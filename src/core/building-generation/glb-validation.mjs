@@ -257,11 +257,10 @@ function validateMeshes(gltf, accessors, binaryBuffer, bufferViews, { maxVertice
 }
 
 /** Validate a self-contained glTF 2.0 binary asset before it enters private storage. */
-export function inspectGeneratedGlb(value, {
-  maxBytes = 100 * 1024 * 1024,
-  maxJsonChunkBytes = 16 * 1024 * 1024,
-  maxVertices = 5_000_000,
-} = {}) {
+export function inspectGeneratedGlb(value, options = {}) {
+  const maxBytes = options.maxBytes ?? (100 * 1024 * 1024);
+  const maxJsonChunkBytes = options.maxJsonChunkBytes ?? Math.min(16 * 1024 * 1024, maxBytes);
+  const maxVertices = options.maxVertices ?? 5_000_000;
   safeInteger(maxBytes, "maxBytes", 1024, 2 * 1024 * 1024 * 1024);
   safeInteger(maxJsonChunkBytes, "maxJsonChunkBytes", 1024, maxBytes);
   safeInteger(maxVertices, "maxVertices", 3, 20_000_000);
