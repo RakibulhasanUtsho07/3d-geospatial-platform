@@ -321,7 +321,11 @@ export function generateParametricBuildingGlb(requestValue) {
   }
 
   const points = footprint.points;
-  const roofDescription = typeof building.roofType === "string" ? building.roofType.toLowerCase().trim() : "flat";
+  const briefText = [building.architecturalStyle, building.designBrief].filter((value) => typeof value === "string").join(" ").toLowerCase();
+  const explicitlyRequestedRoof = typeof building.roofType === "string" ? building.roofType.toLowerCase().trim() : "";
+  const inferredRoof = /\bhip(?:ped)?\s+roof\b/.test(briefText) ? "hip" : /\bgable(?:d)?\s+roof\b|\bpitch(?:ed)?\s+roof\b/.test(briefText) ? "gable" : "";
+  const roofDescription = explicitlyRequestedRoof || inferredRoof || "flat";
+  if (!explicitlyRequestedRoof && inferredRoof) warnings.push("Roof type \"" + inferredRoof + "\" was inferred from the design brief; confirm it before approving the model.");
   const knownRoofType = /\bflat\b|\bparapet\b|\bhip(?:ped)?\b|\bgable(?:d)?\b|\bpitch(?:ed)?\b/.test(roofDescription);
   let roofMode = /\bhip(?:ped)?\b/.test(roofDescription) ? "hip" : /\bgable(?:d)?\b|\bpitch(?:ed)?\b/.test(roofDescription) ? "gable" : "flat";
   if (!knownRoofType) warnings.push("Requested roof type \"" + roofDescription + "\" is not implemented in this procedural tier; a flat roof was generated.");
@@ -335,9 +339,28 @@ export function generateParametricBuildingGlb(requestValue) {
     : 0;
   const mainHeight = totalHeight - parapetHeight - roofRise;
   const floorHeight = mainHeight / floorCount;
-  const architecturalFeatures = building.architecturalFeatures ?? {};
-  const windowStyle = architecturalFeatures.windowStyle ?? "rectangular";
-  const entranceStyle = architecturalFeatures.entranceStyle ?? "single-door";
+  const suppliedFeatures = building.architecturalFeatures ?? {};
+  const styleSuggestsArches = /\bmughal\b|\bcolonial\b|\bheritage\b|\bclassical\b|\bneoclassical\b|\barched windows?\b|\barchway\b/.test(briefText);
+  const windowStyle = suppliedFeatures.windowStyle ?? (styleSuggestsArches ? "arched" : "rectangular");
+  const entranceStyle = suppliedFeatures.entranceStyle ?? (styleSuggestsArches ? "arched" : "single-door");
+  const inferredBalconies = suppliedFeatures.balconies ?? (/\bbalcon(?:y|ies)\b/.test(briefText) ? { enabled: true } : undefined);
+  const inferredColumns = suppliedFeatures.columns ?? (/\bcolumns?\b|\bcolonnade\b/.test(briefText) ? { frontCount: 4 } : undefined);
+  const architecturalFeatures = {
+    ...suppliedFeatures,
+    windowStyle,
+    entranceStyle,
+    ...(inferredBalconies ? { balconies: { enabled: inferredBalconies.enabled ?? true, count: inferredBalconies.count ?? 1, widthRatio: inferredBalconies.widthRatio ?? 0.72, depthMeters: inferredBalconies.depthMeters ?? 1.2, railing: inferredBalconies.railing ?? true, ...(inferredBalconies.floors ? { floors: inferredBalconies.floors } : {}) } } : {}),
+    ...(inferredColumns ? { columns: { frontCount: inferredColumns.frontCount ?? 4, widthMeters: inferredColumns.widthMeters ?? 0.28, heightMeters: inferredColumns.heightMeters } } : {}),
+  };
+  if (styleSuggestsArches && (!suppliedFeatures.windowStyle || !suppliedFeatures.entranceStyle)) {
+    warnings.push("Arched window/entrance details were inferred from the architectural style or brief; verify the feature choice before approval.");
+  }
+  if (!suppliedFeatures.balconies && inferredBalconies) {
+    warnings.push("Balconies were inferred from the design brief and use default size/storey values; verify their location and dimensions.");
+  }
+  if (!suppliedFeatures.columns && inferredColumns) {
+    warnings.push("Front columns were inferred from the design brief and use a four-column default; verify the count and spacing.");
+  }
 
   // Outer shell walls and repeated horizontal floor bands.
   for (let edgeIndex = 0; edgeIndex < points.length; edgeIndex += 1) {
