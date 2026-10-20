@@ -59,7 +59,8 @@ function normalizeTask(data, expectedTaskId) {
     if (typeof data.output.model_url === "string" && data.output.model_url.startsWith("https://")) result.modelUrl = data.output.model_url;
     if (typeof data.output.rendered_image_url === "string" && data.output.rendered_image_url.startsWith("https://")) result.previewUrl = data.output.rendered_image_url;
   }
-  if (typeof data.message === "string") result.message = data.message.slice(0, 500);
+  const taskMessage = typeof data.message === "string" ? data.message : data.error_message;
+  if (typeof taskMessage === "string") result.message = taskMessage.slice(0, 500);
   return result;
 }
 
