@@ -9,6 +9,17 @@ import { reviewBuildingSource } from "../src/core/building-generation/source-wor
 
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(128,31)]);
+const EARTH_RADIUS_M=6378137;
+function makeControlPoints(){
+ const scale=2.5,theta=30*Math.PI/180,c=Math.cos(theta),s=Math.sin(theta),lon0=90.4,lat0=23.7,tx=100,ty=200;
+ return [[-10,-8],[10,-8],[10,8],[-10,8]].map(([modelX,modelZ],index)=>{
+  const east=scale*(c*modelX-s*modelZ)+tx,north=scale*(s*modelX+c*modelZ)+ty;
+  return {id:"workflow-gcp-"+(index+1),modelX,modelZ,
+   longitude:lon0+east/(EARTH_RADIUS_M*Math.cos(lat0*Math.PI/180))*180/Math.PI,
+   latitude:lat0+north/EARTH_RADIUS_M*180/Math.PI,
+   evidenceSourceId:"survey-control"};
+ });
+}
 async function workspace(t){
  const root=await mkdtemp(path.join(os.tmpdir(),"media-to-model-workflow-"));
  t.after(()=>rm(root,{recursive:true,force:true}));
@@ -46,6 +57,19 @@ test("runs information-only procedural generation without requiring a media view
  assert.equal(result.report.mode,"procedural");assert.equal(result.report.status,"completed-requires-review");
  assert.ok((await readFile(result.modelPath)).subarray(0,4).equals(Buffer.from([0x67,0x6c,0x54,0x46])));
  assert.deepEqual(result.report.inputs.selectedViewIds,[]);
+});
+test("attaches ground-control registration to the workflow report but still blocks auto-publication",async t=>{
+ const root=await workspace(t);
+ const result=await runMediaToModelWorkflow({
+  workspaceRoot:root,buildingSpec:fixture,jobId:"gcp-registered",strategy:"procedural",sources:[],
+  controlPoints:makeControlPoints(),maxGcpRmsErrorM:0.5,maxGcpResidualM:1,
+ });
+ const report=JSON.parse(await readFile(result.reportPath,"utf8"));
+ assert.equal(report.georeference.status,"calibrated-needs-human-review");
+ assert.ok(Math.abs(report.georeference.transform.metresPerModelUnit-2.5)<1e-5);
+ assert.ok(report.georeference.controls.rmsErrorM<0.002);
+ assert.equal(report.georeference.vertical.status,"not-solved");
+ assert.equal(report.mapReady,false);assert.equal(report.publicationEligible,false);
 });
 test("requires explicit rights attestation and a known licence before media ingestion",async t=>{
  const root=await workspace(t);await mkdir(path.join(root,"uploads"));await writeFile(path.join(root,"uploads","front.png"),png);

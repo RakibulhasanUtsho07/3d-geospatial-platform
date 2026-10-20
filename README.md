@@ -64,7 +64,9 @@ npm run build:building-from-media -- E:\Building-Engine-Workspace .\building-spe
 
 For a video input, use --source site-walk=uploads\site-walk.mp4 --licence "site-walk=CC BY 4.0" --confirm-rights; FFmpeg extracts a bounded set of child frame records. To preview one image using locally installed TripoSR, add --strategy single-image-ai --views front-photo --runner-script E:\Tools\TripoSR\run.py --confirm-single-view-inference --device cuda:0. To use COLMAP, provide 3+ selected overlapping views via --views front-photo,side-photo,site-walk-frame-000001, --strategy photogrammetry, --up-axis Z, and --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed; install COLMAP separately.
 
-The base BuildingSpec must already contain the building’s real footprint, location and whatever measured dimensions/style facts are available. Unknown facts stay unknown: an image/video is not silently treated as measured scale or as a precise WGS84 survey. The command writes the model, normalized BuildingSpec and workflow report under .building-engine/jobs/<buildingId>/<jobId>-workflow. Results remain review candidates, never auto-published to /map.
+The base BuildingSpec must already contain the building’s real footprint, location and whatever measured dimensions/style facts are available.
+For horizontal map alignment from measured survey/control points, place at least three non-collinear control points in JSON with each point's `modelX`, `modelZ` (coordinates in this exact exported GLB), `longitude` and `latitude`. Then pass `--control-points` to the unified command. The engine estimates model scale, rotation, WGS84 origin and fit residuals. The result is still `mapReady: false`: vertical elevation datum and human QA are separate requirements.
+ Unknown facts stay unknown: an image/video is not silently treated as measured scale or as a precise WGS84 survey. The command writes the model, normalized BuildingSpec and workflow report under .building-engine/jobs/<buildingId>/<jobId>-workflow. Results remain review candidates, never auto-published to /map.
 
 ~~~powershell
 npm run test:glb-geometry-qa
@@ -131,6 +133,7 @@ npm run test:building-generation
 npm run test:building-media
 npm run test:building-source-workflow
 npm run test:media-to-model-workflow
+npm run test:ground-control-registration
 npm run test:colmap-worker
 npm run test:single-image-3d
 npm run build:geospatial-tiles

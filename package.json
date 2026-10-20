@@ -44,7 +44,8 @@
     "test:image-quality-preflight": "node --test tests/image-quality-preflight.test.mjs",
     "test:glb-geometry-qa": "node --test tests/glb-geometry-qa.test.mjs",
     "test:media-to-model-workflow": "node --test tests/media-to-model-workflow.test.mjs",
-    "build:building-from-media": "node scripts/build-building-from-media.mjs"
+    "build:building-from-media": "node scripts/build-building-from-media.mjs",
+    "test:ground-control-registration": "node --test tests/ground-control-registration.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
