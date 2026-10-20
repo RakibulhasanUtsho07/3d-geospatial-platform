@@ -33,7 +33,8 @@
     "test:building-generation": "node --test tests/building-generation-policy.test.mjs",
     "test:tripo-client": "node --test tests/tripo-client.test.mjs",
     "test:procedural-builder": "node --test tests/procedural-builder.test.mjs",
-    "test:building-generation-engine": "node --test tests/building-generation-engine.test.mjs"
+    "test:building-generation-engine": "node --test tests/building-generation-engine.test.mjs",
+    "generate:building-model": "node scripts/generate-building-model.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
