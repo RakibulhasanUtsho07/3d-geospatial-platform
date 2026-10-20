@@ -53,25 +53,39 @@ If the app reports that the Overture pilot dataset is missing, ensure the source
 
 ## Building Generation Engine
 
-The engine now supports three distinct routes: source/measurement information → deterministic procedural GLB; approved overlapping multi-view photographs/video frames → COLMAP textured reconstruction candidate; and a single approved image → TripoSR AI-proposed mesh preview. Sources and confidence/QA reports are kept alongside each generated asset.
+The engine supports three routes: information/measurements → deterministic procedural GLB; approved multi-view images/video frames → COLMAP textured reconstruction candidate; and one approved image → TripoSR AI-proposed preview. Each route retains source provenance, confidence labels and a QA report.
 
 ~~~powershell
 npm run test:building-generation
 npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
 npm run test:building-media
 npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
+npm run test:building-source-workflow
 npm run test:colmap-worker
 npm run test:single-image-3d
-npm run test:single-image-3d
 ~~~
 
-For multi-view reconstruction, install COLMAP and use the command documented in the engine guide. For single-photo AI preview, install TripoSR and its Python/PyTorch dependencies separately; this repository intentionally does not bundle large ML weights or GPU-specific packages.
+**Review each source's rights and metadata.** This command records the operator's explicit licence/permission attestation; it does not prove copyright ownership for them:
 
 ~~~powershell
-npm run generate:building-from-image -- E:\Building-Engine-Workspace .\building-spec.json ai-preview-01 facade-photo --runner-script E:\Tools\TripoSR\run.py --confirm-single-view-inference --device cuda:0
+npm run review:building-source -- E:\Building-Engine-Workspace dhaka-demo front-photo --licence "CC BY 4.0" --confirm-rights --author "Photographer name" --attribution "Required credit and source"
 ~~~
 
-The source record in BuildingSpec must match an ingested image with a known licence and usageStatus: approved. TripoSR outputs are explicitly tagged ai-proposed, without measured scale or a solved WGS84 position. A single image cannot verify unseen sides, structural dimensions or room plans. Neither AI-preview nor photogrammetry output is automatically published to /map; both require QA and manual approval. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md).
+Once source records have been ingested (and the relevant rights reviewed), join their current SHA-256/asset IDs/licence/status into a valid BuildingSpec without hand-copying the source fields:
+
+~~~powershell
+npm run prepare:building-spec -- E:\Building-Engine-Workspace .\building-spec-base.json front-photo,walkthrough-01-frame-000001,walkthrough-01-frame-000002 .\building-spec-ready.json
+~~~
+
+For multi-view reconstruction, install COLMAP separately. If the selected views overlap and depict the same building, use the command documented in the engine guide. A minimum of three approved images can be reconstructed as a local mesh even when the images have no GPS tags; precise map placement still needs ground-control registration.
+
+For single-photo AI preview, install TripoSR and its Python/PyTorch dependencies separately:
+
+~~~powershell
+npm run generate:building-from-image -- E:\Building-Engine-Workspace .\building-spec-ready.json ai-preview-01 front-photo --runner-script E:\Tools\TripoSR\run.py --confirm-single-view-inference --device cuda:0
+~~~
+
+A single image cannot verify hidden sides, dimensions, room plans or real scale. COLMAP/AI outputs remain review-only (mapReady: false, publicationEligible: false); neither route publishes assets to /map. Read [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md) for limitations and QA gates.
 ## Geospatial data pipeline
 
 Generate the coarse spatial tiles and manifest from the pilot dataset:
@@ -102,6 +116,9 @@ npm run test:road-network
 npm run test:building-style
 npm run test:building-generation
 npm run test:building-media
+npm run test:building-source-workflow
+npm run test:colmap-worker
+npm run test:single-image-3d
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
