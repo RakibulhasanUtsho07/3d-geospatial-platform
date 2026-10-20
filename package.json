@@ -35,7 +35,8 @@
     "test:procedural-builder": "node --test tests/procedural-builder.test.mjs",
     "test:building-generation-engine": "node --test tests/building-generation-engine.test.mjs",
     "generate:building-model": "node scripts/generate-building-model.mjs",
-    "test:video-frame-extractor": "node --test tests/video-frame-extractor.test.mjs"
+    "test:video-frame-extractor": "node --test tests/video-frame-extractor.test.mjs",
+    "test:glb-validation": "node --test tests/glb-validation.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
