@@ -25,7 +25,29 @@
     "facadeColours": [
       "#E8E0D3",
       "#F7F2E8"
-    ]
+    ],
+    "architecturalFeatures": {
+      "windowStyle": "rectangular",
+      "entranceStyle": "double-door",
+      "balconies": {
+        "enabled": true,
+        "floors": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "count": 2,
+        "widthRatio": 0.72,
+        "depthMeters": 1.25,
+        "railing": true
+      },
+      "columns": {
+        "frontCount": 2,
+        "widthMeters": 0.3,
+        "heightMeters": 3.1
+      }
+    }
   },
   "references": [],
   "quality": "parametric-facade",
