@@ -11,6 +11,7 @@ on:
       - feat/building-media-intake
       - feat/colmap-reconstruction-worker
       - feat/single-image-3d-worker
+      - feat/media-source-review-flow
   pull_request:
     branches:
       - main
@@ -54,6 +55,9 @@ jobs:
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
+
+      - name: Test media source rights review and BuildingSpec preparation
+        run: npm run test:building-source-workflow
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker

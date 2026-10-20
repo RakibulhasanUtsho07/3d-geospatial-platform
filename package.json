@@ -37,7 +37,10 @@
     "test:colmap-worker": "node --test tests/colmap-reconstruction.test.mjs",
     "reconstruct:building-media": "node scripts/reconstruct-building-from-media.mjs",
     "test:single-image-3d": "node --test tests/single-image-3d-worker.test.mjs",
-    "generate:building-from-image": "node scripts/generate-building-from-image.mjs"
+    "generate:building-from-image": "node scripts/generate-building-from-image.mjs",
+    "review:building-source": "node scripts/review-building-source.mjs",
+    "prepare:building-spec": "node scripts/prepare-building-spec.mjs",
+    "test:building-source-workflow": "node --test tests/building-source-workflow.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

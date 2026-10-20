@@ -24,9 +24,22 @@ npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthr
 
 The default licence is unknown and default usage state is unreviewed. Review source ownership, licence and attribution before changing this state.
 
+### Source review and BuildingSpec source preparation
+
+The reviewBuildingSource function re-checks the stored SHA-256 before it marks a local media record as usageStatus approved. The command records the entered licence/permission basis, timestamp, attribution and optional capture metadata. This is an explicit operator attestation, not an independent copyright check. Only use --confirm-rights if you have verified the source rights yourself.
+
+The prepareBuildingSpecSources function re-hashes selected local assets and joins their current metadata into BuildingSpec.sources by source ID, preserving existing source/evidence records and validating the final spec. It prevents stale copied IDs or hashes from silently drifting away from source metadata.
+
+~~~powershell
+npm run test:building-source-workflow
+npm run review:building-source -- <workspaceRoot> <buildingId> <sourceId> --licence "CC BY 4.0" --confirm-rights --author "Author" --attribution "Required credit"
+npm run prepare:building-spec -- <workspaceRoot> <base-spec.json> <sourceId1,sourceId2,...> <output-spec.json>
+~~~
+
+
 ## 3. COLMAP multi-view reconstruction and GLB conversion
 
-**colmap-worker.mjs** stages only explicitly selected sources whose file SHA-256 matches their metadata and BuildingSpec. At least three distinct JPEG/PNG images or extracted video frames are required. Every selected source must have a known licence, usageStatus: approved, and matching assetId. The operator must explicitly confirm same-building identity and adequate view overlap, and choose a source up-axis.
+**colmap-worker.mjs** stages only explicitly selected sources whose file SHA-256 matches their metadata and BuildingSpec. At least three distinct JPEG/PNG images or extracted video frames are required. GPS tags are useful for georeferencing but are not required for COLMAP to estimate a local multi-view model. Every selected source must have a known licence, usageStatus: approved, and matching assetId. The operator must explicitly confirm same-building identity and adequate view overlap, and choose a source up-axis.
 
 The worker executes colmap automatic_reconstructor and colmap mesh_texturer as child processes without shell interpolation. **textured-ply-to-glb.mjs** converts ASCII or binary little-endian textured PLY triangles and an embedded PNG texture into one self-contained GLB. COLMAP must be installed on the worker host; real GPU/CPU reconstruction is not run in CI. CI tests the PLY converter and worker orchestration using a deterministic mock process.
 
