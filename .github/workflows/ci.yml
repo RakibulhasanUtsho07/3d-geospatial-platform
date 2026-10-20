@@ -40,6 +40,9 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Test generated model input policy
+        run: npm run test:generated-model-policy
+
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
 
