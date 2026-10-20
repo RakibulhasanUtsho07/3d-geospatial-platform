@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createBuildingGenerationEngine } from "../src/core/building-generation/engine.mjs";
+import { buildArchitecturalTextPrompt, createBuildingGenerationEngine } from "../src/core/building-generation/engine.mjs";
 
 const base = {
   schemaVersion: 1,
@@ -343,4 +343,72 @@ test("refuses to chain from a task with the wrong source type", async () => {
   assert.equal(secondStageCalled, false);
   assert.equal(downloads, 0);
   assert.equal(stores, 0);
+});
+
+test("builds a bounded prompt from only supplied architectural information", () => {
+  const prompt = buildArchitecturalTextPrompt({
+    ...base,
+    building: {
+      ...base.building,
+      architecturalStyle: "Contemporary Bangladeshi urban apartment",
+      roofType: "flat parapet",
+      facadeMaterials: ["brick", "concrete"],
+      facadeColours: ["#E8E0D3", "#F7F2E8"],
+      architecturalFeatures: {
+        windowStyle: "arched",
+        entranceStyle: "double-door",
+        balconies: { enabled: true, floors: [2, 3], count: 2, depthMeters: 1.2, railing: true },
+      },
+      designBrief: "Warm plaster facade, defined storey rhythm and two balconies on each upper floor.",
+    },
+  });
+  assert.ok(prompt.length <= 1024);
+  assert.match(prompt, /house/);
+  assert.match(prompt, /6.2 metres/);
+  assert.match(prompt, /10 metres wide by 8 metres deep/);
+  assert.match(prompt, /flat parapet/);
+  assert.match(prompt, /Balconies/);
+  assert.match(prompt, /arched/);
+  assert.match(prompt, /Warm plaster facade/);
+});
+
+test("generates, validates, aligns and stores a text-to-3D candidate from the written brief", async () => {
+  const { generateParametricBuildingGlb } = await import("../src/core/building-generation/procedural-builder.mjs");
+  const glb = generateParametricBuildingGlb(base).glb;
+  let submittedPrompt = "";
+  let saved;
+  let downloadCount = 0;
+  const engine = createBuildingGenerationEngine({
+    tripoClient: {
+      async submitText({ prompt, negativePrompt }) {
+        submittedPrompt = prompt;
+        assert.ok(negativePrompt.includes("watermark"));
+        return { taskId: "task_text123", stage: "text-to-model" };
+      },
+      async getTask(taskId) {
+        assert.equal(taskId, "task_text123");
+        return { taskId, status: "success", type: "text_to_model", progress: 100, modelUrl: "https://cdn.tripo3d.ai/output/text-building.glb" };
+      },
+    },
+    fetchImpl: async (url) => {
+      downloadCount += 1;
+      assert.equal(url, "https://cdn.tripo3d.ai/output/text-building.glb");
+      return new Response(glb, { status: 200 });
+    },
+    storeGeneratedCandidate: async (input) => { saved = input; return { assetId: "text-building-draft-1" }; },
+    sleepImpl: async () => {},
+  });
+  const result = await engine.generateAndStoreReferenceCandidate({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true, references: [],
+    building: { ...base.building, designBrief: "A compact two-storey house with warm plaster and a flat roof." },
+  });
+  assert.ok(submittedPrompt.includes("compact two-storey house"));
+  assert.equal(downloadCount, 1);
+  assert.equal(result.status, "needs-admin-review");
+  assert.equal(result.strategy, "parametric-plus-ai-text");
+  assert.equal(result.assetId, "text-building-draft-1");
+  assert.deepEqual(result.generationStages, ["text-to-model"]);
+  assert.deepEqual(result.stageTaskIds, ["task_text123"]);
+  assert.equal(saved.metadata.prompt, submittedPrompt);
+  assert.equal(saved.metadata.inputSummary.building.architecturalFeatures, undefined);
 });
