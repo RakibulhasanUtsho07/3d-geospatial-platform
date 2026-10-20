@@ -75,3 +75,37 @@ test("reports provider failures without exposing secret values in errors", async
   });
   await assert.rejects(client.submitImage({ input: "file_abcde" }), /Insufficient credits/);
 });
+
+test("uploads authorized JPEG/PNG bytes and returns a provider file token", async () => {
+  let request;
+  const client = createTripoGenerationClient({
+    apiKey: "test-secret",
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return fakeResponse(200, { code: 0, data: { file_token: "file_uploaded123" } });
+    },
+  });
+  const result = await client.uploadImage({
+    bytes: new Uint8Array([255, 216, 255, 217]),
+    filename: "front-view.jpg",
+    contentType: "image/jpeg",
+  });
+  assert.deepEqual(result, { fileToken: "file_uploaded123" });
+  assert.equal(request.url, "https://openapi.tripo3d.ai/v3/files");
+  assert.equal(request.init.method, "POST");
+  assert.equal(request.init.headers.Authorization, "Bearer test-secret");
+  assert.ok(request.init.body instanceof FormData);
+  const file = request.init.body.get("file");
+  assert.equal(file.name, "front-view.jpg");
+  assert.equal(file.type, "image/jpeg");
+  assert.equal(request.init.headers["Content-Type"], undefined);
+});
+
+test("rejects unsupported or oversized image uploads before making a request", async () => {
+  let called = false;
+  const client = createTripoGenerationClient({ apiKey: "test-secret", fetchImpl: async () => { called = true; throw new Error("should not call provider"); } });
+  await assert.rejects(client.uploadImage({ bytes: new Uint8Array([1]), contentType: "video/mp4" }), /JPEG or PNG/);
+  await assert.rejects(client.uploadImage({ bytes: new Uint8Array(20 * 1024 * 1024 + 1) }), /20 MB/);
+  await assert.rejects(client.uploadImage({ bytes: new Uint8Array([1]), filename: "../bad.jpg" }), /safe basename/);
+  assert.equal(called, false);
+});
