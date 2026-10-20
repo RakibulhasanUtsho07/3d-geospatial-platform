@@ -5,6 +5,30 @@ export type GeoCoordinate = {
   height?: number;
 };
 
+export type GeneratedModelAxis = "X" | "Y" | "Z";
+
+/** Declarative placement for one GLB-backed building/model in the current Cesium map. */
+export type GeneratedModelDefinition = {
+  /** Stable application ID, not a source URL or arbitrary external identifier. */
+  id: string;
+  name?: string;
+  /** Same-origin absolute asset path or HTTPS asset URL. */
+  url: string;
+  /** WGS84 position; height is metres above the configured ellipsoid/reference. */
+  position: GeoCoordinate;
+  headingDegrees?: number;
+  pitchDegrees?: number;
+  rollDegrees?: number;
+  scale?: number;
+  minimumPixelSize?: number;
+  maximumScale?: number;
+  show?: boolean;
+  upAxis?: GeneratedModelAxis;
+  forwardAxis?: GeneratedModelAxis;
+};
+
+export type GeneratedModelUpdate = Partial<Omit<GeneratedModelDefinition, "id">>;
+
 export type CameraTarget = {
   destination: GeoCoordinate;
   heading?: number;
@@ -94,6 +118,13 @@ export interface MapEngine {
   ): () => void;
 
   clearFeatureSelection(): void;
+  /** Add one validated GLB model to the existing map; duplicate IDs are rejected. */
+  addGeneratedModel(definition: GeneratedModelDefinition): Promise<void>;
+  /** Update an existing model. Asset replacement is staged before the old asset is removed. */
+  updateGeneratedModel(id: string, patch: GeneratedModelUpdate): Promise<void>;
+  setGeneratedModelVisibility(id: string, visible: boolean): boolean;
+  removeGeneratedModel(id: string): boolean;
+  getGeneratedModelIds(): string[];
   setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void;
   previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean;
   onRoadSelected(listener: (road: RoadFeature | null) => void): () => void;
