@@ -383,10 +383,12 @@ export function generateParametricBuildingGlb(requestValue) {
             [upperRight[0], rectangularTop - frame, upperRight[2]],
             [upperRight[0], rectangularTop, upperRight[2]],
             [upperLeft[0], rectangularTop, upperLeft[2]], normal);
-          const sideBottomLeft = [centerX - tangentX * halfWidth, bottom, centerZ - tangentZ * halfWidth];
-          const sideBottomRight = [centerX + tangentX * halfWidth, bottom, centerZ + tangentZ * halfWidth];
-          addQuad(1, sideBottomLeft, lowerLeft, upperLeft, [upperLeft[0] - tangentX * frame, rectangularTop, upperLeft[2] - tangentZ * frame], normal);
-          addQuad(1, lowerRight, sideBottomRight, [sideBottomRight[0], rectangularTop, sideBottomRight[2]], upperRight, normal);
+          const leftOuterBottom = [centerX - tangentX * (halfWidth + frame), bottom, centerZ - tangentZ * (halfWidth + frame)];
+          const leftOuterTop = [leftOuterBottom[0], rectangularTop, leftOuterBottom[2]];
+          const rightOuterBottom = [centerX + tangentX * (halfWidth + frame), bottom, centerZ + tangentZ * (halfWidth + frame)];
+          const rightOuterTop = [rightOuterBottom[0], rectangularTop, rightOuterBottom[2]];
+          addQuad(1, leftOuterBottom, lowerLeft, upperLeft, leftOuterTop, normal);
+          addQuad(1, lowerRight, rightOuterBottom, rightOuterTop, upperRight, normal);
           if (archHeight > 0) {
             const archCenter = [centerX, rectangularTop, centerZ];
             const segments = 10;
