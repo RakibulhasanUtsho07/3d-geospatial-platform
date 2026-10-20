@@ -1,6 +1,6 @@
 # Engine-first plan: information, photos and video to 3D building
 
-**Status:** first engine-core slice; not yet an end-user/Admin product. The provider client is mock-tested; real generation requires the Admin upload/job workflow and a server-side API key.
+**Status:** engine-core prototype. It now validates/normalizes requests, plans the evidence-based route, generates a parametric GLB from metric dimensions, offers a local CLI, and has a mocked Tripo image/multiview adapter. It is not yet a protected Admin product or a complete media-to-model worker pipeline.
 
 ## Decision
 
@@ -61,11 +61,12 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 
 ## Implementation phases
 
-- **E0 — contracts and routing:** validate requests and return a transparent plan without network or filesystem access. The first implementation slice adds this policy.
-- **E1 — async provider task adapter:** submit image/multiview tasks and query state through a server-side secret. Mocked tests cover request shape and failure cases; real credentials are not configured.
+- **E0 — contracts and routing (implemented):** validate requests and return a transparent evidence-based plan.
+- **E1 — provider task adapter (implemented/tested with mocks):** submit image/multiview tasks and query state through a server-side secret. No real API key is configured; live provider generation is not yet verified.
+- **E1b — first procedural GLB output (implemented/tested):** create an editable-by-recipe, dimension-controlled visual shell with floors, floor bands, facade panels/windows, door, flat roof and optional parapet; includes GLB metadata and explicit estimation warnings.
 - **E2 — upload and job persistence:** Admin authorization, private storage, provider file upload tokens, durable jobs, retries, cancellation and audit.
 - **E3 — video worker:** keyframe extraction, deduplication/blur scoring and view-selection workflow.
-- **E4 — procedural geometry worker:** generate a correctly dimensioned shell from footprint and height, then add reusable building families.
+- **E4 — procedural geometry worker (prototype exists; still needs production worker/persistent job integration):** expand beyond the current shell with tested building families, real opening geometry, richer roof families and detailed component controls.
 - **E5 — alignment and QA:** preserve authoritative dimensions, establish origin/heading/scale, validate GLB and create preview renders.
 - **E6 — provider benchmark:** compare the same inputs against Tripo and an alternative; score visual fidelity, footprint/height error, success rate, latency, cost and data policy.
 - **E7 — optional photogrammetry/BIM lanes:** COLMAP and source CAD/IFC support after the first one-building round trip works.
@@ -94,3 +95,30 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 - OWASP File Upload Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
 
 References checked on 20 October 2026. The core policy/provider adapter is not yet an end-to-end generator; protected uploads, persistent jobs, video decoding, procedural mesh generation and asset QA remain planned work.
+
+## Try the information-to-GLB prototype locally
+
+A sample BuildingGenerationRequest is included at `data/building-generation/examples/dhaka-apartment.json`. After pulling the feature branch/merge, run:
+
+```powershell
+npm run generate:building-model
+```
+
+This writes `artifacts/generated-building-draft.glb` (the CLI refuses to overwrite by default). Then open the GLB in Blender or another glTF viewer. To use another JSON spec:
+
+```powershell
+npm run generate:building-model -- --input data/building-generation/examples/dhaka-apartment.json --output artifacts/my-building.glb
+```
+
+Use `--force` only when intentionally overwriting the selected output file. This path produces a procedural base from information; it does not yet run AI image/video generation or assert photo-match accuracy.
+
+## Current engine modules
+
+- `src/core/building-generation/types.ts` — provider-neutral request/reference/plan types.
+- `src/core/building-generation/input-policy.mjs` — validation and evidence-based route planning.
+- `src/core/building-generation/procedural-builder.mjs` — pure Node GLB exporter for the first procedural base tier.
+- `src/core/building-generation/providers/tripo-client.mjs` — asynchronous image/multiview provider adapter.
+- `src/core/building-generation/engine.mjs` — orchestration facade for route analysis, procedural candidates and eligible provider task submission.
+- `scripts/generate-building-model.mjs` — local CLI to generate a sample `.glb` from a JSON request.
+
+Still not implemented: protected Admin auth/upload, durable job/database records, actual video decoding/frames, provider file-upload handling, downloaded/immutable AI artifact storage, geometric alignment/mesh cleanup, and live browser QA. Do not treat this prototype as a finished automatic reconstruction engine.
