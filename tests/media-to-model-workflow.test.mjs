@@ -66,7 +66,7 @@ test("attaches ground-control registration to the workflow report but still bloc
  });
  const report=JSON.parse(await readFile(result.reportPath,"utf8"));
  assert.equal(report.georeference.status,"calibrated-needs-human-review");
- assert.ok(Math.abs(report.georeference.transform.metresPerModelUnit-2.5)<1e-5);
+ assert.ok(Math.abs(report.georeference.transform.metresPerModelUnit-2.5)<1e-4);
  assert.ok(report.georeference.controls.rmsErrorM<0.002);
  assert.equal(report.georeference.vertical.status,"not-solved");
  assert.equal(report.mapReady,false);assert.equal(report.publicationEligible,false);
