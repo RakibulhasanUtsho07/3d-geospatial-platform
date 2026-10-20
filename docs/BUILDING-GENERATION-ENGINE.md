@@ -1,39 +1,62 @@
-# Building Generation Engine — first implementation slice
+# Building Generation Engine
 
-Status: deterministic procedural core and local media intake/video frame extraction implemented. Actual image understanding, photogrammetry reconstruction, AI vision, CAD/IFC/BIM import, persistent Admin workflow and 3D publishing are not implemented yet.
+Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, COLMAP orchestration and textured PLY-to-GLB conversion are implemented. Durable Admin workflow, AI vision, CAD/IFC/BIM import, georeferencing against control points and public publishing are not implemented yet.
 
-## What works now
+## 1. Baseline input → 3D model
 
-This slice validates a versioned BuildingSpec, converts the georeferenced footprint to local metres, makes a routing/review plan, generates an actual binary glTF 2.0 (.glb), and writes a JSON provenance/QA report. The deterministic mesh includes material-colored wall panels, repeated windows/frames, a front door, repeating balconies, roof cap and parapet. It keeps a compact no-new-dependency Node implementation so it can be tested in CI.
+**building-spec.mjs** validates BuildingSpec version 1.0.0, WGS84 footprint coordinates and building dimensions, style/material/window/door/balcony parameters, source metadata and confidence-linked evidence. **procedural-glb.mjs** generates a deterministic binary glTF (.glb) with walls, repeated windows/frames, a door, front balconies, roof cap and parapet. **generation-engine.mjs** writes a JSON QA/provenance report. The synthetic fixture is for tests only.
 
-Run:
-  npm run test:building-generation
-  npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
+~~~powershell
+npm run test:building-generation
+npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
+~~~
 
-The CLI writes the GLB and a sibling report JSON file. The tracked fixture is synthetic test data, not a survey or a model of a real property.
+## 2. Local image, video and floor-plan intake
 
-## Source evidence and confidence
+**media-intake.mjs** accepts JPEG, PNG, WebP, MP4/MOV, WebM/MKV and PDF files. It identifies the file from signatures rather than trusting extensions, enforces per-kind size limits, rejects source path traversal and symlinks, calculates SHA-256 and writes a content-addressed copy plus per-source JSON record under .building-engine/media/<buildingId>/. No remote URL is fetched. It is a local workspace adapter, not a production authenticated upload API or shared object store.
 
-The JSON schema file at repository root documents BuildingSpec version 1.0.0. Each evidence record refers to source IDs and uses one explicit confidence level: verified, derived, estimated, ai-proposed, or unknown. The validator checks values and source links; it does not independently prove the evidence is true. Preserve source URL, author, licence, attribution, capture location/time and reuse-review status before publishing derived assets.
+**video-frame-extractor.mjs** invokes FFmpeg with argument arrays (not a shell), bounded FPS (0.05–2), frame cap (1–500), output width and timeout. Extracted frames become child video-frame records referencing the parent video. Sampling times are approximate; frame extraction does not prove camera poses or photo overlap.
 
-## Media intake and video frames
+~~~powershell
+npm run test:building-media
+npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
+~~~
 
-`src/core/building-generation/media-intake.mjs` accepts local JPEG, PNG, WebP, MP4/MOV, WebM/MKV and PDF files. It checks signatures (not just filename extensions), enforces per-kind byte limits, rejects path traversal and source symlinks, computes SHA-256 and stores assets content-addressed under `.building-engine/media/<buildingId>/assets/`. A per-source JSON record stores relative path, byte count, hash, MIME type, provenance and reuse status. Unknown licence and unreviewed status are the defaults. This is a local workspace adapter, not a production upload API or a durable shared object store.
+The default licence is unknown and default usage state is unreviewed. Review source ownership, licence and attribution before changing this state.
 
-`video-frame-extractor.mjs` runs FFmpeg as a child process with an argument array (no shell), bounded FPS (0.05–2), frame cap (1–500), output width and timeout. It ingests extracted JPEGs as child `video-frame` sources and records approximate nominal sample times. It does not download remote URLs. Set up a separate workspace and run `npm run ingest:building-media -- <workspaceRoot> <buildingId> <sourceId> <relativeFilePath> [auto|image|video|floor-plan] [fps] [maxFrames]`. FFmpeg is required for video. The CLI defaults to unknown licence and unreviewed use; review each file's rights before publication.
+## 3. COLMAP multi-view reconstruction and GLB conversion
 
-The generator still does not infer geometry from image pixels, extract camera calibration, or reconstruct a mesh. It generates the baseline model from explicit BuildingSpec parameters. Three or more approved, geolocated frames are only a possible photogrammetry candidate, not a claim that views overlap, all show the same building, or a reconstruction has run.
+**colmap-worker.mjs** stages only explicitly selected sources whose file SHA-256 matches their metadata and BuildingSpec. At least three distinct JPEG/PNG images or extracted video frames are required. Every selected source must have a known licence, usageStatus: approved, and matching assetId. The operator must explicitly confirm same-building identity and adequate view overlap, and choose a source up-axis.
 
-A single exterior photo cannot reveal hidden sides, true measurements, interior rooms or the roof structure. A future approved media worker must validate rights and building identity, sample video with FFmpeg, assess blur/duplicates and camera poses, use a photogrammetry tool such as COLMAP or AliceVision for an eligible multiview set, calibrate scale with known dimensions, and pass mesh/texturing/coordinate QA before human approval.
+The worker executes colmap automatic_reconstructor and colmap mesh_texturer as child processes without shell interpolation. **textured-ply-to-glb.mjs** converts ASCII or binary little-endian textured PLY triangles and an embedded PNG texture into one self-contained GLB. COLMAP must be installed on the worker host; real GPU/CPU reconstruction is not run in CI. CI tests the PLY converter and worker orchestration using a deterministic mock process.
 
-## Next milestones
+~~~powershell
+npm run test:colmap-worker
+npm run reconstruct:building-media -- <workspaceRoot> <buildingSpec.json> <jobId> <sourceId1,sourceId2,sourceId3> <sourceUpAxis> --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed
+~~~
 
-1. Production media intake: replace the local workspace adapter with authenticated private uploads, quotas, retention rules and durable object storage.
-2. Image/video evidence: approved frame sampling is now present; add blur/duplicate checks, camera heading/location, same-building and overlap review.
-3. Photogrammetry worker: run COLMAP/AliceVision only for eligible approved multiview sets; calibrate scale, clean/texturize mesh and validate output.
-4. Strategy adapters: procedural, CAD/floor-plan, IFC/BIM, optional AI vision and photogrammetry jobs behind a common job contract.
-5. Geometry QA: scale/orientation/georeference checks, degenerate/watertightness checks and side-by-side reference review.
-6. Durable Admin workflow: server-side Admin authorization, database-backed versioned BuildingSpec, private storage, async jobs, draft/preview/publish/rollback.
-7. Same-map integration: load only reviewed/published GLBs in the existing /map with the generated model layer, without breaking Overture roads/buildings or Ahsan Manzil.
+### Mandatory output gates
 
-The existing GLB model-layer registry is currently in-memory only. It is not an asset database or authorization layer. Do not expose unauthenticated arbitrary model URL/upload/publish endpoints; a hidden UI is not access control.
+- **Rights and provenance:** source file bytes must match recorded SHA-256, usage must be approved and a known licence must be recorded.
+- **Identity/overlap:** manual confirmations are explicit but do not automatically prove these assumptions.
+- **Scale:** a known real-world baseline is required for a metric result. Without both modelDistanceUnits and realDistanceM, the output is a provisional-scale preview.
+- **Orientation:** up-axis is configured; heading, facade-front direction and vertical axis still require review.
+- **Georeference:** source GPS points are not a ground-control registration. Current report marks coordinate alignment as not-solved; the BuildingSpec location is only a placement hint.
+- **Human review:** worker status is completed-requires-review; report always sets mapReady=false and publicationEligible=false. It does not publish to /map.
+
+A single exterior photo cannot reveal hidden elevations, measured scale, floor plans or interior spaces. Multi-view photogrammetry also fails when images lack overlap, are blurry, show different buildings or have insufficient texture. A worker success is a candidate mesh, not proof of architectural accuracy.
+
+## 4. Strategy routing
+
+**generation-pipeline.mjs** retains deterministic procedural generation as default. Photogrammetry runs only when explicitly requested and the validated source set qualifies as a multi-view candidate. It does not silently infer missing geometry from media. BIM/IFC, CAD/floor-plan parsing and AI-based reference interpretation need separate adapters.
+
+## 5. Next milestones
+
+1. Image QA: blur/duplicate checks, frame sampling review, camera-pose quality and same-building/overlap assistance.
+2. Ground control: measured baseline inputs tied to named points, heading/front direction and horizontal/vertical datum registration.
+3. Mesh QA: scale/axis checks, degenerate triangles, holes/occlusion notes, texture quality and a side-by-side reference review report.
+4. Persistent Admin workflow: server-side authorization, database-backed versioned BuildingSpec, private object storage and durable async jobs.
+5. Publish integration: human approval, versioned GLB asset and rollback, then load only reviewed/published assets in existing /map without breaking Overture roads/buildings or Ahsan Manzil.
+6. Other source routes: CAD/DWG/vector floor-plan parser, IFC/BIM import and optionally AI-assisted visual attribute extraction with source/confidence tracking.
+
+The generated model registry already added to the map engine is in-memory only. This reconstruction worker is not an authorization layer or public upload endpoint. Do not expose unauthenticated model generation, arbitrary asset URLs or publishing controls.
