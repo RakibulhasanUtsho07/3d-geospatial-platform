@@ -61,6 +61,7 @@ export type BuildingGenerationRequest = {
 export type GenerationStrategy =
   | "parametric-only"
   | "parametric-plus-ai-image"
+  | "parametric-plus-ai-image-multiview"
   | "parametric-plus-ai-multiview"
   | "video-keyframes-then-ai"
   | "photogrammetry-candidate"
@@ -74,6 +75,10 @@ export type GenerationStage =
   | "generate-parametric-base"
   | "submit-ai-generation"
   | "poll-ai-task"
+  | "submit-image-to-multiview"
+  | "poll-image-to-multiview"
+  | "submit-multiview-to-model"
+  | "poll-multiview-to-model"
   | "reconstruct-photogrammetry"
   | "align-to-authoritative-dimensions"
   | "mesh-cleanup-and-optimize"
