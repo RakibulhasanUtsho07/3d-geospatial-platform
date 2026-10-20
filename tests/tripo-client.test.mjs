@@ -109,3 +109,47 @@ test("rejects unsupported or oversized image uploads before making a request", a
   await assert.rejects(client.uploadImage({ bytes: new Uint8Array([1]), filename: "../bad.jpg" }), /safe basename/);
   assert.equal(called, false);
 });
+
+test("starts the image-to-multiview task used for single-photo reconstruction", async () => {
+  let request;
+  const client = createTripoGenerationClient({
+    apiKey: "test-secret",
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return fakeResponse(200, { code: 0, data: { task_id: "task_views123" } });
+    },
+  });
+  const result = await client.submitImageToMultiview({ input: "file_front123", signal: undefined });
+  assert.deepEqual(result, { taskId: "task_views123", stage: "image-to-multiview" });
+  assert.equal(request.url, "https://openapi.tripo3d.ai/v3/generation/image-to-multiview");
+  assert.equal(JSON.parse(request.init.body).input, "file_front123");
+  assert.equal(request.init.headers.Authorization, "Bearer test-secret");
+});
+
+test("starts multiview 3D generation from a successful image-to-multiview task", async () => {
+  let request;
+  const client = createTripoGenerationClient({
+    apiKey: "test-secret",
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return fakeResponse(200, { code: 0, data: { task_id: "task_model123" } });
+    },
+  });
+  const result = await client.submitMultiviewFromTask({ sourceTaskId: "task_views123" });
+  assert.deepEqual(result, { taskId: "task_model123", stage: "multiview-to-model" });
+  assert.equal(request.url, "https://openapi.tripo3d.ai/v3/generation/multiview-to-model");
+  assert.deepEqual(JSON.parse(request.init.body).inputs, [{ task_id: "task_views123" }]);
+  assert.equal(JSON.parse(request.init.body).model, "v3.1-20260211");
+});
+
+test("preserves task type so the engine can verify image-to-multiview completion", async () => {
+  const client = createTripoGenerationClient({
+    apiKey: "test-secret",
+    fetchImpl: async () => fakeResponse(200, { code: 0, data: {
+      task_id: "task_views123", status: "success", progress: 100, type: "generate_multiview_image",
+    } }),
+  });
+  const task = await client.getTask("task_views123");
+  assert.equal(task.type, "generate_multiview_image");
+  assert.equal(task.status, "success");
+});
