@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { generateParametricBuildingGlb } from "../src/core/building-generation/procedural-builder.mjs";
-import { downloadGeneratedGlb, inspectGeneratedGlb } from "../src/core/building-generation/glb-validation.mjs";
+import { alignGeneratedGlbToDimensions, downloadGeneratedGlb, inspectGeneratedGlb } from "../src/core/building-generation/glb-validation.mjs";
 
 const request = {
   schemaVersion: 1,
@@ -155,4 +155,43 @@ test("rejects unsafe URLs, untrusted hosts, redirects and oversized downloads", 
     maxBytes: 1024,
     fetchImpl: async () => new Response(oversize, { status: 200 }),
   }), /size limit/i);
+});
+
+test("aligns a GLB using uniform-fit or an explicit non-uniform dimension fit", () => {
+  const glb = makeGlb();
+  const fitted = alignGeneratedGlbToDimensions(glb, {
+    footprintWidthMeters: 20, footprintDepthMeters: 14, totalHeightMeters: 10, mode: "fit-dimensions",
+  });
+  assert.equal(fitted.validation.valid, true);
+  assert.ok(Math.abs(fitted.alignment.finalDimensions.width - 20) < 1e-4);
+  assert.ok(Math.abs(fitted.alignment.finalDimensions.depth - 14) < 1e-4);
+  assert.ok(Math.abs(fitted.alignment.finalDimensions.height - 10) < 1e-4);
+  assert.ok(Math.abs(fitted.validation.bounds.min[1]) < 1e-5);
+  assert.ok(fitted.alignment.warnings.some((warning) => warning.toLowerCase().includes("non-uniform")));
+
+  const preserved = alignGeneratedGlbToDimensions(glb, {
+    footprintWidthMeters: 20, footprintDepthMeters: 14, totalHeightMeters: 10, mode: "uniform-fit",
+  });
+  assert.equal(preserved.alignment.scale[0], preserved.alignment.scale[1]);
+  assert.equal(preserved.alignment.scale[1], preserved.alignment.scale[2]);
+  assert.ok(preserved.alignment.finalDimensions.width <= 20.001);
+  assert.ok(preserved.alignment.finalDimensions.depth <= 14.001);
+  assert.ok(preserved.alignment.finalDimensions.height <= 10.001);
+});
+
+test("inspects world bounds after existing node transforms before dimension alignment", () => {
+  const { json, bin } = decodeChunks(makeGlb());
+  json.nodes[0].translation = [3, 2, -1];
+  json.nodes[0].scale = [2, 1, 0.5];
+  const transformed = encodeGlb(json, bin);
+  const source = inspectGeneratedGlb(transformed);
+  assert.ok(Math.abs(source.bounds.min[1] - 2) < 1e-5);
+  assert.ok(Math.abs(source.bounds.max[1] - 8) < 1e-5);
+  const aligned = alignGeneratedGlbToDimensions(transformed, {
+    footprintWidthMeters: 12, footprintDepthMeters: 9, totalHeightMeters: 7, mode: "fit-dimensions",
+  });
+  assert.ok(Math.abs(aligned.validation.bounds.min[1]) < 1e-5);
+  assert.ok(Math.abs(aligned.alignment.finalDimensions.width - 12) < 1e-4);
+  assert.ok(Math.abs(aligned.alignment.finalDimensions.depth - 9) < 1e-4);
+  assert.ok(Math.abs(aligned.alignment.finalDimensions.height - 7) < 1e-4);
 });
