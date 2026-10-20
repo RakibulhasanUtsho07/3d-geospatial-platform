@@ -1,3 +1,14 @@
+export type VideoFrameExtractionOptions = {
+  fps?: number;
+  maxFrames?: number;
+  maxWidth?: number;
+  jpegQuality?: number;
+  maxInputBytes?: number;
+  maxDurationSeconds?: number;
+  timeoutMs?: number;
+  ffmpegPath?: string;
+  ffprobePath?: string;
+};
 export type ExtractedVideoFrame = {
   index: number;
   filename: string;
@@ -15,21 +26,17 @@ export type VideoFrameExtractionResult = {
   notes: string[];
 };
 export declare function buildVideoProbeArgs(inputPath: string): string[];
-export declare function buildVideoFrameArgs(options: { inputPath: string; outputPattern: string; fps?: number; maxFrames?: number; maxWidth?: number; jpegQuality?: number }): string[];
+export declare function buildVideoFrameArgs(options: { inputPath: string; outputPattern: string } & VideoFrameExtractionOptions): string[];
 export declare function extractVideoKeyframes(options: {
   inputPath: string;
   outputDirectory: string;
-  ffmpegPath?: string;
-  ffprobePath?: string;
   spawnImpl?: typeof import("node:child_process").spawn;
   signal?: AbortSignal;
-  fps?: number;
-  maxFrames?: number;
-  maxWidth?: number;
-  jpegQuality?: number;
-  maxInputBytes?: number;
-  maxDurationSeconds?: number;
-  timeoutMs?: number;
-  io?: { stat: typeof import("node:fs/promises").stat; mkdir: typeof import("node:fs/promises").mkdir; readdir: typeof import("node:fs/promises").readdir; rm: typeof import("node:fs/promises").rm };
-}): Promise<VideoFrameExtractionResult>;
+  io?: {
+    stat: typeof import("node:fs/promises").stat;
+    mkdir: typeof import("node:fs/promises").mkdir;
+    readdir: typeof import("node:fs/promises").readdir;
+    rm: typeof import("node:fs/promises").rm;
+  };
+} & VideoFrameExtractionOptions): Promise<VideoFrameExtractionResult>;
 export declare const VIDEO_FRAME_EXTRACTOR_DEFAULTS: Readonly<{ fps: number; maxFrames: number; maxWidth: number; jpegQuality: number; maxInputBytes: number; maxDurationSeconds: number; timeoutMs: number }>;
