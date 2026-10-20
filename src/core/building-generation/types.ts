@@ -30,6 +30,10 @@ export type BuildingGenerationReference = {
   view?: BuildingReferenceView;
   assetId: string;
   providerFileToken?: string;
+  /** For a reviewed frame extracted from a video, points to the original video reference ID. */
+  derivedFromReferenceId?: string;
+  /** Source-video time in seconds for an extracted frame. */
+  timestampSeconds?: number;
   sourceLabel?: string;
   licence?: string;
 };
