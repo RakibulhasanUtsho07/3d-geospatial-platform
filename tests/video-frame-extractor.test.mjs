@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { buildVideoFrameArgs, buildVideoProbeArgs, extractVideoKeyframes } from "../src/core/building-generation/video-frame-extractor.mjs";
@@ -43,7 +43,7 @@ test("extracts bounded frames and returns FFmpeg presentation timestamps", async
         child.stdout.emit("data", "12.0\n");
       } else {
         const pattern = args.at(-1);
-        const directory = pattern.slice(0, pattern.lastIndexOf("/"));
+        const directory = dirname(pattern);
         await writeFile(join(directory, "frame_0000.jpg"), Buffer.from([1, 2, 3]));
         await writeFile(join(directory, "frame_0001.jpg"), Buffer.from([4, 5, 6]));
         child.stderr.emit("data", "pts_time:0.000000\npts_time:2.000000\n");
