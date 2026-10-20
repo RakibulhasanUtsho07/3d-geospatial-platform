@@ -299,8 +299,10 @@ export function generateParametricBuildingGlb(requestValue) {
   }
 
   const points = footprint.points;
-  const roofDescription = typeof building.roofType === "string" ? building.roofType.toLowerCase() : "flat";
-  let roofMode = /\bhip\b/.test(roofDescription) ? "hip" : /\bgable\b|\bpitched\b/.test(roofDescription) ? "gable" : "flat";
+  const roofDescription = typeof building.roofType === "string" ? building.roofType.toLowerCase().trim() : "flat";
+  const knownRoofType = /\bflat\b|\bparapet\b|\bhip(?:ped)?\b|\bgable(?:d)?\b|\bpitch(?:ed)?\b/.test(roofDescription);
+  let roofMode = /\bhip(?:ped)?\b/.test(roofDescription) ? "hip" : /\bgable(?:d)?\b|\bpitch(?:ed)?\b/.test(roofDescription) ? "gable" : "flat";
+  if (!knownRoofType) warnings.push("Requested roof type \"" + roofDescription + "\" is not implemented in this procedural tier; a flat roof was generated.");
   if (roofMode !== "flat" && !footprint.isRectangularInput) {
     warnings.push("Gable/hip roofs currently require a measured rectangular width/depth footprint; a flat roof was generated for this polygon footprint.");
     roofMode = "flat";
