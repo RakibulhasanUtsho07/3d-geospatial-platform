@@ -328,7 +328,7 @@ export function planBuildingGeneration(requestValue) {
   }
 
   if (hasMultipleAuthorizedViews) {
-    stages.push(...(canGenerateParametricBase ? ["generate-parametric-base"] : []), "submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
+    stages.push("submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
     qualityNotes.push("Multiview AI can improve appearance coverage, but generated geometry still needs footprint, scale and orientation QA.");
     return { strategy: "parametric-plus-ai-multiview", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
   }
