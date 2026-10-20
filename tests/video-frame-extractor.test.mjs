@@ -101,3 +101,38 @@ test("rejects too long videos before frame extraction", async () => {
   assert.equal(callCount, 1);
   await rm(root, { recursive: true, force: true });
 });
+
+test("samples a long video across the full duration when the frame cap is low", async () => {
+  const root = await mkdtemp(join(tmpdir(), "building-video-test-"));
+  const input = join(root, "long-tour.mp4");
+  const output = join(root, "frames");
+  await writeFile(input, Buffer.alloc(128, 1));
+  let ffmpegArgs;
+  const spawnImpl = (executable, args) => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = () => true;
+    queueMicrotask(async () => {
+      if (executable === "ffprobe") {
+        child.stdout.emit("data", "120\n");
+      } else {
+        ffmpegArgs = args;
+        const directory = dirname(args.at(-1));
+        await writeFile(join(directory, "frame_0000.jpg"), Buffer.from([1, 2, 3]));
+        await writeFile(join(directory, "frame_0001.jpg"), Buffer.from([4, 5, 6]));
+        child.stderr.emit("data", "pts_time:0.000000\npts_time:117.600000\n");
+      }
+      child.emit("close", 0, null);
+    });
+    return child;
+  };
+  const result = await extractVideoKeyframes({
+    inputPath: input, outputDirectory: output, spawnImpl, maxFrames: 2, fps: 0.5,
+  });
+  assert.ok(result.samplingFps > 0.008 && result.samplingFps < 0.01);
+  assert.equal(result.requestedSamplingFps, 0.5);
+  assert.ok(ffmpegArgs.some((argument) => argument.includes("fps=0.008")));
+  assert.ok(result.frames[1].timestampSeconds > 115);
+  await rm(root, { recursive: true, force: true });
+});
