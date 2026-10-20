@@ -6,6 +6,7 @@ on:
       - main
       - dev
       - rakibul-hasan
+      - feat/generated-building-model-layer
   pull_request:
     branches:
       - main
