@@ -97,6 +97,23 @@ export function createTripoGenerationClient({ apiKey, fetchImpl = fetch, model =
       return { fileToken: data.file_token };
     },
 
+    async submitText({ prompt, negativePrompt, signal } = {}) {
+      if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 1024) {
+        throw new TypeError("Text-to-3D prompt must contain 1 to 1024 characters.");
+      }
+      if (negativePrompt !== undefined && (typeof negativePrompt !== "string" || negativePrompt.length > 255)) {
+        throw new TypeError("negativePrompt must contain at most 255 characters.");
+      }
+      const body = { prompt: prompt.trim(), model };
+      if (negativePrompt !== undefined && negativePrompt.trim()) body.negative_prompt = negativePrompt.trim();
+      const data = await request("/generation/text-to-model", {
+        method: "POST", signal, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (typeof data.task_id !== "string" || !TASK_ID_PATTERN.test(data.task_id)) throw new Error("Tripo API did not return a valid text-to-model task ID.");
+      return { taskId: data.task_id, stage: "text-to-model" };
+    },
+
     async submitImage({ input, texture = true, pbr = true, signal } = {}) {
       const source = providerInput(input);
       const data = await request("/generation/image-to-model", {
