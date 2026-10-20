@@ -219,7 +219,7 @@ export function planBuildingGeneration(requestValue) {
       };
     }
     if (!enoughReconstructionViews && !actualVideos.length) {
-      missingInputs.push("For reconstruction, provide an overlapping, rights-cleared image set from multiple labelled views; a single image cannot recover hidden surfaces.");
+      missingInputs.push("For reconstruction, provide an overlapping image set from multiple labelled views with rights cleared; a single image cannot recover hidden surfaces.");
       return {
         strategy: canGenerateParametricBase ? "parametric-only" : "needs-more-inputs",
         stages: [...stages, ...(canGenerateParametricBase ? ["generate-parametric-base"] : []), "admin-review"],
