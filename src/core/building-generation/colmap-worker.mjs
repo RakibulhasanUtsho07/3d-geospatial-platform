@@ -4,6 +4,7 @@ import { copyFile, lstat, mkdir, readFile, realpath, stat, writeFile } from "nod
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
+import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_IMAGE_COUNT=120,MAX_TOTAL_INPUT_BYTES=500*1024*1024;
@@ -109,7 +110,24 @@ export async function runColmapReconstruction(options){
  const reportPath=path.join(outputJobDir,"report.json");
  try{
   for(const source of sources){const ext=source.record.mimeType==="image/png"?".png":".jpg",filename="view-"+String(source.index+1).padStart(4,"0")+ext,dest=path.join(realImagesDir,filename);await copyFile(source.absolute,dest);staged.push({sourceId:source.id,filename,sha256:source.record.sha256});}
-  report.stagedImages=staged;report.progress="reconstruction";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+  report.stagedImages=staged;report.progress="image-quality-preflight";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+  const qualityAnalyzer=options.qualityAnalyzer||((args)=>analyzeImageQuality({...args,ffmpegPath:options.ffmpegPath,spawnImpl:options.ffmpegSpawnImpl||options.spawnImpl,timeoutMs:options.imageQualityTimeoutMs}));
+  const qualityResults=[];
+  for(let start=0;start<sources.length;start+=4){
+   const batch=sources.slice(start,start+4);
+   const analysed=await Promise.all(batch.map(async source=>({
+    sourceId:source.id,
+    ...(await qualityAnalyzer({imagePath:path.join(realImagesDir,staged.find(item=>item.sourceId===source.id).filename),sourceId:source.id}))
+   })));
+   qualityResults.push(...analysed);
+  }
+  report.imageQualityPreflight={engine:"ffmpeg-grayscale-thumbnail-heuristics-v1",views:compareImageQuality(qualityResults,options.imageQualityThresholds),flaggedViewCount:0,nearDuplicatePairCount:0};
+  report.imageQualityPreflight.flaggedViewCount=report.imageQualityPreflight.views.filter(view=>view.warnings.length>0).length;
+  report.imageQualityPreflight.nearDuplicatePairCount=report.imageQualityPreflight.views.reduce((sum,view)=>sum+view.nearDuplicateIds.length,0)/2;
+  if(report.imageQualityPreflight.flaggedViewCount){
+   report.warnings.push(report.imageQualityPreflight.flaggedViewCount+" of "+sources.length+" input views triggered image-quality/near-duplicate heuristics; inspect flagged views before accepting the mesh.");
+  }
+  report.progress="reconstruction";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const colmapPath=options.colmapPath||process.env.COLMAP_BIN||"colmap",spawnImpl=options.spawnImpl;
   const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
   const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};

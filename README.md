@@ -16,7 +16,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 - A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output and source/confidence QA report.
-- Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg (photogrammetry is still a separate stage).
+- Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
+- Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion and an FFmpeg-based image-quality preflight (resolution, blur heuristic, luminance, contrast and near-duplicate views).
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
 
@@ -61,6 +62,7 @@ npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifa
 npm run test:building-media
 npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
 npm run test:building-source-workflow
+npm run test:image-quality-preflight
 npm run test:colmap-worker
 npm run test:single-image-3d
 ~~~

@@ -27,6 +27,10 @@ function glbJson(buffer){
  assert.equal(buffer.readUInt32LE(0),0x46546c67);assert.equal(buffer.readUInt32LE(4),2);assert.equal(buffer.readUInt32LE(8),buffer.length);
  const jsonLen=buffer.readUInt32LE(12);assert.equal(buffer.readUInt32LE(16),0x4e4f534a);return JSON.parse(buffer.subarray(20,20+jsonLen).toString("utf8").trim());
 }
+function mockImageQuality({sourceId}) {
+ const hashes={"view-1":"0000000000000000","view-2":"ffffffffffffffff","view-3":"aaaaaaaaaaaaaaaa"};
+ return {width:1280,height:720,sampleWidth:64,sampleHeight:64,meanLuminance:120,contrastStdDev:40,laplacianVariance:500,perceptualHash:hashes[sourceId]||"13579bdf2468ace0",warnings:[],thresholds:{},status:"basic-quality-check-passed",caveat:"test fixture"};
+}
 function mockedColmapSpawn(_executable,args){
  const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>{};
  queueMicrotask(async()=>{
@@ -71,18 +75,19 @@ test("converts binary little-endian PLY and rejects absent UVs or non-PNG textur
 });
 test("requires explicit operator review and approved asset provenance",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
- await assert.rejects(runColmapReconstruction({workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"job-1",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:false,overlapReviewed:true,spawnImpl:mockedColmapSpawn}),/must be explicitly confirmed/);
+ await assert.rejects(runColmapReconstruction({workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"job-1",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:false,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)}),/must be explicitly confirmed/);
  const unapproved={...buildingSpec,sources:buildingSpec.sources.map((s,i)=>i===0?{...s,usageStatus:"unreviewed"}:s)};
- await assert.rejects(runColmapReconstruction({workspaceRoot:root,buildingSpec:unapproved,buildingId:buildingSpec.id,jobId:"job-2",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn}),/approved/);
+ await assert.rejects(runColmapReconstruction({workspaceRoot:root,buildingSpec:unapproved,buildingId:buildingSpec.id,jobId:"job-2",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)}),/approved/);
 });
 test("runs mocked COLMAP reconstruction, converts texture atlas and marks model review-only",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  const result=await runColmapReconstruction({
   workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"successful-job",sourceIds:["view-1","view-2","view-3"],
   upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,quality:"LOW",
-  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,
+  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input),
  });
  assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
+ assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
  assert.equal(result.report.scaleCalibration.metresPerModelUnit,4);assert.ok(result.report.outputs.glb.bytes>100);
  assert.equal(glbJson(await readFile(result.modelPath)).asset.version,"2.0");
  assert.equal(JSON.parse(await readFile(result.reportPath,"utf8")).status,"completed-requires-review");
@@ -91,7 +96,7 @@ test("fails closed when COLMAP cannot start and preserves failure diagnostics",a
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  await assert.rejects(runColmapReconstruction({
   workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"missing-colmap",sourceIds:["view-1","view-2","view-3"],
-  upAxis:"Z",upAxisReviewed:false,matchConfirmed:true,overlapReviewed:true,colmapPath:"colmap-does-not-exist",timeoutMs:5000,
+  upAxis:"Z",upAxisReviewed:false,matchConfirmed:true,overlapReviewed:true,colmapPath:"colmap-does-not-exist",timeoutMs:5000,qualityAnalyzer:async input=>mockImageQuality(input),
  }),/Could not start/);
  const report=JSON.parse(await readFile(path.join(root,".building-engine","jobs",buildingSpec.id,"missing-colmap","report.json"),"utf8"));
  assert.equal(report.status,"failed");assert.match(report.failureMessage,/Could not start/);
@@ -101,10 +106,10 @@ test("strategy router defaults to procedural and gates the explicit photogrammet
  const route=await generateBuildingAsset(buildingSpec);
  assert.equal(route.mode,"procedural");assert.equal(route.report.photogrammetryCandidateNotRun,true);
  await assert.rejects(generateBuildingAsset({...buildingSpec,sources:buildingSpec.sources.slice(0,1)},{strategy:"photogrammetry",reconstruction:{
-  workspaceRoot:root,jobId:"not-eligible",sourceIds:["view-1"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn
+  workspaceRoot:root,jobId:"not-eligible",sourceIds:["view-1"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)
  }}),/photogrammetry strategy/);
  const result=await generateBuildingAsset(buildingSpec,{strategy:"photogrammetry",reconstruction:{
-  workspaceRoot:root,jobId:"routed-job",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn
+  workspaceRoot:root,jobId:"routed-job",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)
  }});
  assert.equal(result.mode,"photogrammetry");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
 });
