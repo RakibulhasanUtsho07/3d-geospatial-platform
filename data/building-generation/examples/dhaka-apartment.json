@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "requestId": "sample-dhaka-apartment",
+  "building": {
+    "name": "Dhaka Apartment Prototype",
+    "buildingType": "residential-apartment",
+    "architecturalStyle": "contemporary-bangladeshi-urban",
+    "designBrief": "A compact mid-rise residential apartment with a clear floor rhythm, balcony-friendly facade proportions, light warm plaster and a flat roof. This first output is a parametric massing/facade prototype, not a measured real property.",
+    "dimensions": {
+      "aboveGroundFloors": 5,
+      "floorToFloorHeightMeters": 3.1,
+      "totalHeightMeters": 15.5,
+      "basementFloors": 0
+    },
+    "footprint": {
+      "widthMeters": 18,
+      "depthMeters": 12
+    },
+    "frontAzimuthDegrees": 180,
+    "roofType": "flat parapet",
+    "facadeMaterials": [
+      "plaster",
+      "concrete"
+    ],
+    "facadeColours": [
+      "#E8E0D3",
+      "#F7F2E8"
+    ]
+  },
+  "references": [],
+  "quality": "parametric-facade",
+  "allowExternalProviderProcessing": false
+}
