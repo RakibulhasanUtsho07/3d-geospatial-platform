@@ -3350,7 +3350,7 @@ export class CesiumAdapter implements MapEngine {
     if (!viewer || !Cesium || viewer.isDestroyed()) throw new Error("The map must be initialized before adding a generated model.");
     if (this.generatedModels.has(normalized.id)) throw new Error("A generated model with ID \"" + normalized.id + "\" already exists.");
 
-    const record: GeneratedModelRecord = { definition: normalized, model: null, revision: 1 };
+    const record: GeneratedModelRecord = { definition: normalized, model: null, revision: 1, visibilityRevision: 0 };
     const revision = record.revision;
     this.generatedModels.set(normalized.id, record);
     let model: import("cesium").Model | null = null;
@@ -3379,6 +3379,7 @@ export class CesiumAdapter implements MapEngine {
     const Cesium = this.cesium;
     if (!viewer || !Cesium || viewer.isDestroyed()) throw new Error("The map must be initialized before updating a generated model.");
     const nextDefinition = normalizeGeneratedModelDefinition({ ...record.definition, ...patch, id });
+    const visibilityRevision = record.visibilityRevision;
     const revision = ++record.revision;
 
     if (record.model && nextDefinition.url === record.definition.url) {
@@ -3402,9 +3403,12 @@ export class CesiumAdapter implements MapEngine {
       replacement.show = false;
       viewer.scene.primitives.add(replacement);
       const previous = record.model;
+      const desiredShow = record.visibilityRevision !== visibilityRevision
+        ? (record.definition.show ?? true)
+        : (nextDefinition.show ?? true);
       record.model = replacement;
-      record.definition = nextDefinition;
-      replacement.show = nextDefinition.show ?? true;
+      record.definition = normalizeGeneratedModelDefinition({ ...nextDefinition, show: desiredShow });
+      replacement.show = desiredShow;
       if (previous && !previous.isDestroyed()) viewer.scene.primitives.remove(previous, true);
       viewer.scene.requestRender();
     } catch (error: unknown) {
@@ -3417,6 +3421,7 @@ export class CesiumAdapter implements MapEngine {
     const record = this.generatedModels.get(id);
     if (!record) return false;
     if (typeof visible !== "boolean") throw new TypeError("Model visibility must be a boolean.");
+    record.visibilityRevision += 1;
     record.definition = normalizeGeneratedModelDefinition({ ...record.definition, show: visible });
     if (record.model && !record.model.isDestroyed()) record.model.show = visible;
     if (this.viewer && !this.viewer.isDestroyed()) this.viewer.scene.requestRender();
