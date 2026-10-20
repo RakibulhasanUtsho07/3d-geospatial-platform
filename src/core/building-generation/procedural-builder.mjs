@@ -361,35 +361,57 @@ export function generateParametricBuildingGlb(requestValue) {
           const cx = a[0] + dx * t;
           const cz = a[1] + dz * t;
           const halfWidth = windowWidth / 2;
-          const halfHeight = (top - bottom) / 2;
-          const centerY = (top + bottom) / 2;
           const offset = 0.045;
           const centerX = cx + outwardX * offset;
           const centerZ = cz + outwardZ * offset;
-          const lowerLeft = [centerX - tangentX * halfWidth, centerY - halfHeight, centerZ - tangentZ * halfWidth];
-          const lowerRight = [centerX + tangentX * halfWidth, centerY - halfHeight, centerZ + tangentZ * halfWidth];
-          const upperRight = [centerX + tangentX * halfWidth, centerY + halfHeight, centerZ + tangentZ * halfWidth];
-          const upperLeft = [centerX - tangentX * halfWidth, centerY + halfHeight, centerZ - tangentZ * halfWidth];
-          addQuad(2, lowerLeft, lowerRight, upperRight, upperLeft, normal);
           const frame = 0.065;
-          // Top and bottom trim.
+          const archHeight = windowStyle === "arched" ? Math.min(halfWidth, (top - bottom) * 0.28) : 0;
+          const rectangularTop = top - archHeight;
+          const lowerLeft = [centerX - tangentX * halfWidth, bottom, centerZ - tangentZ * halfWidth];
+          const lowerRight = [centerX + tangentX * halfWidth, bottom, centerZ + tangentZ * halfWidth];
+          const upperRight = [centerX + tangentX * halfWidth, rectangularTop, centerZ + tangentZ * halfWidth];
+          const upperLeft = [centerX - tangentX * halfWidth, rectangularTop, centerZ - tangentZ * halfWidth];
+          addQuad(2, lowerLeft, lowerRight, upperRight, upperLeft, normal);
+          // Bottom, jamb and transom trim.
           addQuad(1,
             [lowerLeft[0], bottom, lowerLeft[2]],
             [lowerRight[0], bottom, lowerRight[2]],
             [lowerRight[0], bottom + frame, lowerRight[2]],
             [lowerLeft[0], bottom + frame, lowerLeft[2]], normal);
           addQuad(1,
-            [upperLeft[0], top - frame, upperLeft[2]],
-            [upperRight[0], top - frame, upperRight[2]],
-            [upperRight[0], top, upperRight[2]],
-            [upperLeft[0], top, upperLeft[2]], normal);
-          // Side trim.
+            [upperLeft[0], rectangularTop - frame, upperLeft[2]],
+            [upperRight[0], rectangularTop - frame, upperRight[2]],
+            [upperRight[0], rectangularTop, upperRight[2]],
+            [upperLeft[0], rectangularTop, upperLeft[2]], normal);
           const sideBottomLeft = [centerX - tangentX * halfWidth, bottom, centerZ - tangentZ * halfWidth];
           const sideBottomRight = [centerX + tangentX * halfWidth, bottom, centerZ + tangentZ * halfWidth];
-          const sideTopLeft = [centerX - tangentX * halfWidth, top, centerZ - tangentZ * halfWidth];
-          const sideTopRight = [centerX + tangentX * halfWidth, top, centerZ + tangentZ * halfWidth];
-          addQuad(1, sideBottomLeft, lowerLeft, upperLeft, sideTopLeft, normal);
-          addQuad(1, lowerRight, sideBottomRight, sideTopRight, upperRight, normal);
+          addQuad(1, sideBottomLeft, lowerLeft, upperLeft, [upperLeft[0] - tangentX * frame, rectangularTop, upperLeft[2] - tangentZ * frame], normal);
+          addQuad(1, lowerRight, sideBottomRight, [sideBottomRight[0], rectangularTop, sideBottomRight[2]], upperRight, normal);
+          if (archHeight > 0) {
+            const archCenter = [centerX, rectangularTop, centerZ];
+            const segments = 10;
+            let previousInner = null;
+            let previousOuter = null;
+            for (let segment = 0; segment <= segments; segment += 1) {
+              const angle = Math.PI - Math.PI * segment / segments;
+              const inner = [
+                centerX + tangentX * halfWidth * Math.cos(angle),
+                rectangularTop + archHeight * Math.sin(angle),
+                centerZ + tangentZ * halfWidth * Math.cos(angle),
+              ];
+              const outer = [
+                centerX + tangentX * (halfWidth + frame) * Math.cos(angle),
+                rectangularTop + (archHeight + frame) * Math.sin(angle),
+                centerZ + tangentZ * (halfWidth + frame) * Math.cos(angle),
+              ];
+              if (previousInner && previousOuter) {
+                addTriangle(2, archCenter, previousInner, inner, normal);
+                addQuad(1, previousOuter, outer, inner, previousInner, normal);
+              }
+              previousInner = inner;
+              previousOuter = outer;
+            }
+          }
         }
       }
     }
