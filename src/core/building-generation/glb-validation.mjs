@@ -38,6 +38,7 @@ function parseGlb(buffer, { maxBytes, maxJsonChunkBytes }) {
   let chunkIndex = 0;
   let jsonBuffer = null;
   let binaryBuffer = null;
+  const unknownChunkTypes = [];
   while (offset < buffer.length) {
     if (offset + 8 > buffer.length) throw new TypeError("GLB chunk header is truncated.");
     const chunkLength = buffer.readUInt32LE(offset);
@@ -54,6 +55,8 @@ function parseGlb(buffer, { maxBytes, maxJsonChunkBytes }) {
     } else if (chunkType === GLB_BIN_CHUNK) {
       if (binaryBuffer !== null) throw new TypeError("GLB must not contain more than one BIN chunk.");
       binaryBuffer = buffer.subarray(start, end);
+    } else {
+      unknownChunkTypes.push(chunkType);
     }
     offset = end;
     chunkIndex += 1;
@@ -69,7 +72,7 @@ function parseGlb(buffer, { maxBytes, maxJsonChunkBytes }) {
   if (!isRecord(gltf) || !isRecord(gltf.asset) || gltf.asset.version !== "2.0") {
     throw new TypeError("GLB must contain asset.version 2.0.");
   }
-  return { gltf, binaryBuffer, fileBytes: buffer.length, jsonChunkBytes: jsonBuffer.length };
+  return { gltf, binaryBuffer, fileBytes: buffer.length, jsonChunkBytes: jsonBuffer.length, unknownChunkTypes };
 }
 
 function validateSelfContainedBuffers(gltf, binaryBuffer) {
@@ -523,6 +526,9 @@ export function alignGeneratedGlbToDimensions(value, {
   ];
 
   const parsed = parseGlb(originalBuffer, { maxBytes, maxJsonChunkBytes: Math.min(16 * 1024 * 1024, maxBytes) });
+  if (parsed.unknownChunkTypes.length > 0) {
+    throw new TypeError("Cannot dimension-align a GLB containing unrecognized chunks; convert it to a standard self-contained GLB first.");
+  }
   const gltf = parsed.gltf;
   const nodes = Array.isArray(gltf.nodes) ? gltf.nodes : [];
   let scenes = Array.isArray(gltf.scenes) ? gltf.scenes : [];
