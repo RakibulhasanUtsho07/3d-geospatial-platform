@@ -10,6 +10,7 @@ on:
       - feat/building-generation-core
       - feat/building-media-intake
       - feat/colmap-reconstruction-worker
+      - feat/single-image-3d-worker
   pull_request:
     branches:
       - main
@@ -56,6 +57,9 @@ jobs:
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
+
+      - name: Test single-image AI-to-GLB preview worker
+        run: npm run test:single-image-3d
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
