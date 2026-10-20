@@ -31,7 +31,9 @@
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
     "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
-    "generate:building-model": "node scripts/generate-building-model.mjs"
+    "generate:building-model": "node scripts/generate-building-model.mjs",
+    "test:building-media": "node --test tests/media-pipeline.test.mjs",
+    "ingest:building-media": "node scripts/ingest-building-media.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

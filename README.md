@@ -15,7 +15,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Filterable **illustrative demo property listings** with rent, bedrooms, property type, furnishing, area and radius filters; browser-local saved favourites persist between visits.
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
-- A first deterministic Building Generation Engine slice: validated versioned BuildingSpec, procedural GLB output, and source/confidence QA report (media-to-geometry workers are still planned).
+- A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output and source/confidence QA report.
+- Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg (photogrammetry is still a separate stage).
 
 The displayed facade details are procedural visualizations. Building footprint area is approximated from the selected polygon with a local projection; gross floor area multiplies that estimate by the available floor count. These are not survey measurements, verified total floor areas, or individual flat sizes.
 
@@ -59,7 +60,14 @@ npm run test:building-generation
 npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
 ```
 
-Important: the current generator records image/video references but does not automatically interpret them or reconstruct surfaces. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md) for confidence/source handling and the next media/BIM/photogrammetry worker milestones.
+Media intake and video-frame extraction commands:
+
+```powershell
+npm run test:building-media
+npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
+```
+
+Create `E:\Building-Engine-Workspace\uploads` and put the local file there first. FFmpeg must be installed and available on `PATH` for video input. Intake stores a private copy below `.building-engine/media/` inside that workspace and writes JSON provenance records. Licences default to `unknown` and usage to `unreviewed` until explicitly confirmed. Images/videos are not yet interpreted into facade geometry; sampled frames are inputs for a future photogrammetry/reconstruction worker. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md).
 
 ## Geospatial data pipeline
 
@@ -89,6 +97,8 @@ npm run test:street-imagery
 npm run test:architecture-research
 npm run test:road-network
 npm run test:building-style
+npm run test:building-generation
+npm run test:building-media
 npm run build:geospatial-tiles
 npm run test:geospatial-tiles
 npm run build
