@@ -32,7 +32,7 @@ Store every important value as verified, derived, estimated, ai_proposed or unkn
 | Input evidence | Selected route | Limitation |
 |---|---|---|
 | Footprint + height/floors | Procedural base | Predictable dimensions; basic appearance until component families are added |
-| One authorized photo | Parametric base + image-to-3D candidate | Hidden sides are inferred |
+| One authorized photo | Image -> generated multi-view references -> multiview-to-3D | The generated views are AI-inferred, not true measurements; hidden surfaces still need review |
 | Two or more authorized labelled views, including front + side/rear | Parametric base + multiview AI candidate | Better view coverage; still needs scale and geometry QA |
 | Video walkthrough | Extract candidate frames -> Admin labels/selects -> multiview AI or reconstruction check | A video file should not be sent directly to an image endpoint |
 | Overlapping multi-view set + scale/georeference control | Photogrammetry candidate (COLMAP lane) | Requires cleanup, scale alignment and GLB export |
@@ -40,11 +40,11 @@ Store every important value as verified, derived, estimated, ai_proposed or unkn
 
 ## Provider adapter
 
-A thin server-side Tripo adapter is implemented behind a provider-replaceable module. Tripo documents image-to-3D and multiview-to-3D task endpoints, API-key authentication and an asynchronous task lifecycle. Its multiview endpoint expects named front/left/back/right views; front and at least one other view are required.
+A thin server-side Tripo adapter is implemented behind a provider-replaceable module. For a single photo, the engine now prefers a two-stage task chain: `POST /generation/image-to-multiview` synthesizes front/left/back/right reference views; after that task succeeds, `POST /generation/multiview-to-model` consumes the source task ID to produce the 3D candidate. This matters because a single photo cannot directly reveal hidden sides. For multiple Admin-labelled views or selected video frames, the engine can submit those labelled views directly to multiview-to-model. All tasks are polled asynchronously, and source-task status/type is checked before chaining.
 
 This is a pilot integration choice, not proof that Tripo is the best provider. Benchmark it on a small, representative dataset of Bangladeshi houses/apartments/heritage buildings against at least one alternative before production selection. Provider model identifiers, terms, quotas and prices must be checked again when enabling a real account.
 
-The adapter accepts provider-issued file tokens or public HTTPS asset URLs. A future protected upload worker must upload authorized files server-side and supply provider tokens. The browser must never receive the API key. Do not transmit research-only or unknown-permission images to a provider.
+The adapter uploads authorized JPEG/PNG image bytes to the provider using server-side credentials and passes provider file tokens instead of internal asset IDs. The browser must never receive the API key. Do not transmit research-only or unknown-permission images to a provider. The single-photo multiview path incurs an extra asynchronous provider task and may consume additional credits; no live account/credit usage has been tested here.
 
 ## Video path
 
@@ -62,7 +62,7 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 ## Implementation phases
 
 - **E0 — contracts and routing (implemented):** validate requests and return a transparent evidence-based plan.
-- **E1 — provider task adapter (implemented/tested with mocks):** submit image/multiview tasks and query state through a server-side secret. No real API key is configured; live provider generation is not yet verified.
+- **E1 — provider task adapter (implemented/tested with mocks):** upload image references, submit single-image-to-multiview and multiview-to-model tasks, query state and carry source-task lineage through a server-side secret. No real API key is configured; live provider generation/credit usage is not verified.
 - **E1b — first procedural GLB output (implemented/tested):** create a dimension-controlled visual shell with floors, floor bands, facade panels/windows, door, flat roof and optional parapet; includes GLB metadata and explicit assumption warnings.
 - **E2a — video keyframe extractor (implemented/tested with fake processes):** probe video duration, apply file-size/duration/frame/timeout limits, use FFmpeg without a shell, retain presentation timestamps where available and clean temp output on failure.
 - **E2b — video-to-reference orchestration (implemented/tested with adapters):** resolve a private source-video asset, extract frames, write them through a private asset callback, preserve parent video ID/timestamp/licence and return new frames with unknown view labels for Admin review.
@@ -119,7 +119,7 @@ Use `--force` only when intentionally overwriting the selected output file. This
 - `src/core/building-generation/types.ts` — provider-neutral request/reference/plan types.
 - `src/core/building-generation/input-policy.mjs` — validation and evidence-based route planning.
 - `src/core/building-generation/procedural-builder.mjs` — pure Node GLB exporter for the first procedural base tier.
-- `src/core/building-generation/providers/tripo-client.mjs` — asynchronous image/multiview provider adapter.
+- `src/core/building-generation/providers/tripo-client.mjs` — asynchronous upload/image-to-multiview/multiview-to-model provider adapter.
 - `src/core/building-generation/engine.mjs` — route analysis, procedural candidates, protected image uploads, video-to-frame references, provider task polling, validated model download, optional dimension alignment and private candidate storage callback.
 - `scripts/generate-building-model.mjs` — local CLI to generate a sample `.glb` from a JSON request.
 
