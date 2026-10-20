@@ -55,6 +55,7 @@ function normalizeTask(data, expectedTaskId) {
     status: data.status,
     progress: typeof data.progress === "number" && Number.isFinite(data.progress) ? Math.max(0, Math.min(100, data.progress)) : null,
   };
+  if (typeof data.type === "string") result.type = data.type;
   if (isRecord(data.output)) {
     if (typeof data.output.model_url === "string" && data.output.model_url.startsWith("https://")) result.modelUrl = data.output.model_url;
     if (typeof data.output.rendered_image_url === "string" && data.output.rendered_image_url.startsWith("https://")) result.previewUrl = data.output.rendered_image_url;
@@ -104,6 +105,26 @@ export function createTripoGenerationClient({ apiKey, fetchImpl = fetch, model =
       });
       if (typeof data.task_id !== "string" || !TASK_ID_PATTERN.test(data.task_id)) throw new Error("Tripo API did not return a valid task ID.");
       return { taskId: data.task_id };
+    },
+
+    async submitImageToMultiview({ input, signal } = {}) {
+      const source = providerInput(input);
+      const data = await request("/generation/image-to-multiview", {
+        method: "POST", signal, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input: source }),
+      });
+      if (typeof data.task_id !== "string" || !TASK_ID_PATTERN.test(data.task_id)) throw new Error("Tripo API did not return a valid image-to-multiview task ID.");
+      return { taskId: data.task_id, stage: "image-to-multiview" };
+    },
+
+    async submitMultiviewFromTask({ sourceTaskId, texture = true, pbr = true, signal } = {}) {
+      if (typeof sourceTaskId !== "string" || !TASK_ID_PATTERN.test(sourceTaskId)) throw new TypeError("sourceTaskId is invalid.");
+      const data = await request("/generation/multiview-to-model", {
+        method: "POST", signal, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputs: [{ task_id: sourceTaskId }], model, texture, pbr }),
+      });
+      if (typeof data.task_id !== "string" || !TASK_ID_PATTERN.test(data.task_id)) throw new Error("Tripo API did not return a valid multiview-to-model task ID.");
+      return { taskId: data.task_id, stage: "multiview-to-model" };
     },
 
     async submitMultiview({ views, texture = true, pbr = true, signal } = {}) {
