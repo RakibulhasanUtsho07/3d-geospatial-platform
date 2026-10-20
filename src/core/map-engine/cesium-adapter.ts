@@ -40,6 +40,8 @@ import type {
   MapLayer,
   MapLayerId,
   MapFeatureSelection,
+  GeneratedModelDefinition,
+  GeneratedModelUpdate,
 } from "./types";
 
 type CesiumModule = typeof import("cesium");
@@ -117,6 +119,13 @@ type FeatureSelectionListener = (
   feature: MapFeatureSelection | null,
 ) => void;
 
+type GeneratedModelRecord = {
+  definition: GeneratedModelDefinition;
+  model: import("cesium").Model | null;
+  revision: number;
+  visibilityRevision: number;
+};
+
 const WALL_OUTLINE_COLOR = "#526575";
 const ROOF_OUTLINE_COLOR = "#586978";
 
@@ -155,6 +164,7 @@ export class CesiumAdapter implements MapEngine {
   private ahsanManzilOrbitStoppedCallback: (() => void) | null = null;
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
+  private readonly generatedModels = new Map<string, GeneratedModelRecord>();
 
   private baseImageryLayer:
     | import("cesium").ImageryLayer
@@ -1064,8 +1074,8 @@ export class CesiumAdapter implements MapEngine {
       ({ west, south, east, north } = viewBounds);
     } else {
       const centre = this.getGroundCenter() ?? {
-        longitude: INITIAL_CAMERA.longitude,
-        latitude: INITIAL_CAMERA.latitude,
+        longitude: AHSAN_MANZIL_GEOREFERENCE.longitude,
+        latitude: AHSAN_MANZIL_GEOREFERENCE.latitude,
         height: 0,
       };
       west = centre.longitude - 0.015;
@@ -3409,7 +3419,7 @@ export class CesiumAdapter implements MapEngine {
       record.model = replacement;
       record.definition = normalizeGeneratedModelDefinition({ ...nextDefinition, show: desiredShow });
       replacement.show = desiredShow;
-      if (previous && !previous.isDestroyed()) viewer.scene.primitives.remove(previous, true);
+      if (previous && !previous.isDestroyed()) viewer.scene.primitives.remove(previous);
       viewer.scene.requestRender();
     } catch (error: unknown) {
       if (replacement && !replacement.isDestroyed() && record.model !== replacement) replacement.destroy();
@@ -3435,7 +3445,7 @@ export class CesiumAdapter implements MapEngine {
     this.generatedModels.delete(id);
     const viewer = this.viewer;
     if (record.model && !record.model.isDestroyed() && viewer && !viewer.isDestroyed()) {
-      viewer.scene.primitives.remove(record.model, true);
+      viewer.scene.primitives.remove(record.model);
       viewer.scene.requestRender();
     }
     return true;
