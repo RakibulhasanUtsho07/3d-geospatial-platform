@@ -9,7 +9,9 @@ function isRecord(value) {
 }
 
 function safeInteger(value, name, min, max) {
-  if (!Number.isInteger(value) || value < min || value > max) throw new RangeError(name + " is outside the supported range.");
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new RangeError(name + " is outside the supported range.");
+  }
   return value;
 }
 
@@ -19,7 +21,7 @@ function toBuffer(value) {
   throw new TypeError("GLB data must be a Buffer or Uint8Array.");
 }
 
-function getComponentCount(type) {
+function componentCountForType(type) {
   const result = TYPE_COMPONENTS.get(type);
   if (!result) throw new TypeError("Unsupported glTF accessor type: " + String(type));
   return result;
@@ -58,13 +60,16 @@ function parseGlb(buffer, { maxBytes, maxJsonChunkBytes }) {
   }
   if (offset !== buffer.length || jsonBuffer === null) throw new TypeError("GLB chunk table is incomplete.");
 
-  let jsonText = jsonBuffer.toString("utf8").replace(/ +$/, "");
   let gltf;
-  try { gltf = JSON.parse(jsonText); } catch { throw new TypeError("GLB JSON chunk is invalid."); }
+  try {
+    gltf = JSON.parse(jsonBuffer.toString("utf8").replace(/ +$/, ""));
+  } catch {
+    throw new TypeError("GLB JSON chunk is invalid.");
+  }
   if (!isRecord(gltf) || !isRecord(gltf.asset) || gltf.asset.version !== "2.0") {
     throw new TypeError("GLB must contain asset.version 2.0.");
   }
-  return { gltf, binaryBuffer, fileBytes: buffer.length };
+  return { gltf, binaryBuffer, fileBytes: buffer.length, jsonChunkBytes: jsonBuffer.length };
 }
 
 function validateSelfContainedBuffers(gltf, binaryBuffer) {
@@ -79,9 +84,13 @@ function validateSelfContainedBuffers(gltf, binaryBuffer) {
   if (binaryBuffer && (binaryBuffer.length < declaredLength || binaryBuffer.length - declaredLength > 3)) {
     throw new TypeError("GLB BIN chunk length does not match the embedded buffer.");
   }
+  if (views.length > 0 && (!binaryBuffer || declaredLength === 0)) {
+    throw new TypeError("GLB geometry requires a non-empty embedded BIN chunk.");
+  }
+
   for (const view of views) {
     if (!isRecord(view) || (view.buffer ?? 0) !== 0) throw new TypeError("GLB bufferView references an unsupported buffer.");
-    safeInteger(view.byteLength, "bufferView byteLength", 1, declaredLength);
+    safeInteger(view.byteLength, "bufferView byteLength", 1, Math.max(1, declaredLength));
     const byteOffset = view.byteOffset ?? 0;
     safeInteger(byteOffset, "bufferView byteOffset", 0, declaredLength);
     if (byteOffset + view.byteLength > declaredLength) throw new TypeError("GLB bufferView exceeds the embedded buffer.");
@@ -90,128 +99,185 @@ function validateSelfContainedBuffers(gltf, binaryBuffer) {
       if (view.byteStride % 4 !== 0) throw new TypeError("GLB bufferView byteStride must be four-byte aligned.");
     }
   }
-  const images = Array.isArray(gltf.images) ? gltf.images : [];
-  for (const image of images) {
+
+  for (const image of Array.isArray(gltf.images) ? gltf.images : []) {
     if (!isRecord(image)) throw new TypeError("GLB image definition is invalid.");
     if (typeof image.uri === "string" && !image.uri.startsWith("data:")) {
       throw new TypeError("External image URIs are not accepted; embed textures in the GLB.");
     }
-    if (image.bufferView !== undefined) safeInteger(image.bufferView, "image bufferView", 0, Math.max(0, views.length - 1));
+    if (image.bufferView !== undefined) {
+      safeInteger(image.bufferView, "image bufferView", 0, views.length - 1);
+    }
   }
   return { buffers, views, declaredLength };
 }
 
-function validateAccessors(gltf, binaryBuffer, bufferViews, { maxVertices }) {
+function collectPositionAccessorIds(gltf) {
+  if (!Array.isArray(gltf.meshes) || gltf.meshes.length === 0) {
+    throw new TypeError("GLB must contain at least one mesh.");
+  }
+  const positionIds = new Set();
+  for (const mesh of gltf.meshes) {
+    if (!isRecord(mesh) || !Array.isArray(mesh.primitives)) throw new TypeError("GLB mesh primitives are invalid.");
+    for (const primitive of mesh.primitives) {
+      if (!isRecord(primitive) || !isRecord(primitive.attributes) || !Number.isInteger(primitive.attributes.POSITION)) {
+        throw new TypeError("GLB triangle primitive is missing a POSITION accessor.");
+      }
+      positionIds.add(primitive.attributes.POSITION);
+    }
+  }
+  return positionIds;
+}
+
+function validateAccessors(gltf, binaryBuffer, bufferViews, positionIds, { maxVertices }) {
   const accessors = Array.isArray(gltf.accessors) ? gltf.accessors : [];
-  const positions = [];
+  if (accessors.length === 0) throw new TypeError("GLB must contain accessors for mesh geometry.");
+  if (!binaryBuffer) throw new TypeError("GLB mesh accessors require an embedded BIN chunk.");
+
+  let positionCount = 0;
+  const boundsMin = [Infinity, Infinity, Infinity];
+  const boundsMax = [-Infinity, -Infinity, -Infinity];
+
   for (let index = 0; index < accessors.length; index += 1) {
     const accessor = accessors[index];
     if (!isRecord(accessor)) throw new TypeError("GLB accessor " + index + " is invalid.");
     safeInteger(accessor.count, "accessor count", 1, maxVertices * 16);
     const componentBytes = COMPONENT_BYTES.get(accessor.componentType);
     if (!componentBytes) throw new TypeError("GLB accessor has an unsupported component type.");
-    const componentCount = getComponentCount(accessor.type);
-    const elementBytes = componentBytes * componentCount;
+    const components = componentCountForType(accessor.type);
+    const elementBytes = componentBytes * components;
     const byteOffset = accessor.byteOffset ?? 0;
     safeInteger(byteOffset, "accessor byteOffset", 0, Number.MAX_SAFE_INTEGER);
-    if (accessor.bufferView !== undefined) {
-      const viewIndex = safeInteger(accessor.bufferView, "accessor bufferView", 0, Math.max(0, bufferViews.length - 1));
-      const view = bufferViews[viewIndex];
-      const stride = view.byteStride ?? elementBytes;
-      if (stride < elementBytes) throw new TypeError("GLB accessor stride is smaller than its element size.");
-      const neededBytes = byteOffset + (accessor.count - 1) * stride + elementBytes;
-      if (neededBytes > view.byteLength) throw new TypeError("GLB accessor exceeds its bufferView.");
-    } else if (!isRecord(accessor.sparse)) {
-      throw new TypeError("GLB accessor must use a bufferView or sparse storage.");
+    if (accessor.sparse !== undefined) {
+      throw new TypeError("Sparse accessors are not accepted for generated building assets yet.");
     }
-    if (accessor.type === "VEC3" && accessor.componentType === 5126 && accessor.bufferView !== undefined) {
-      const view = bufferViews[accessor.bufferView];
-      const stride = view.byteStride ?? 12;
-      const start = view.byteOffset + byteOffset;
-      for (let item = 0; item < accessor.count; item += 1) {
-        const point = [0, 1, 2].map((axis) => binaryBuffer.readFloatLE(start + item * stride + axis * 4));
-        if (!point.every(Number.isFinite)) throw new TypeError("GLB POSITION accessor contains non-finite coordinates.");
-        positions.push(...point);
+    if (!Number.isInteger(accessor.bufferView)) throw new TypeError("GLB accessor must reference a bufferView.");
+    const viewIndex = safeInteger(accessor.bufferView, "accessor bufferView", 0, bufferViews.length - 1);
+    const view = bufferViews[viewIndex];
+    const stride = view.byteStride ?? elementBytes;
+    if (stride < elementBytes) throw new TypeError("GLB accessor stride is smaller than its element size.");
+    const absoluteStart = (view.byteOffset ?? 0) + byteOffset;
+    if (absoluteStart % componentBytes !== 0) throw new TypeError("GLB accessor data is not aligned for its component type.");
+    const neededBytes = byteOffset + (accessor.count - 1) * stride + elementBytes;
+    if (!Number.isSafeInteger(neededBytes) || neededBytes > view.byteLength) {
+      throw new TypeError("GLB accessor exceeds its bufferView.");
+    }
+
+    if (positionIds.has(index)) {
+      if (accessor.type !== "VEC3" || accessor.componentType !== 5126) {
+        throw new TypeError("GLB POSITION accessors must be FLOAT VEC3.");
       }
-      if (positions.length > maxVertices * 3) throw new RangeError("GLB exceeds the configured vertex limit.");
+      positionCount += accessor.count;
+      if (positionCount > maxVertices) throw new RangeError("GLB exceeds the configured total vertex limit.");
+      const start = (view.byteOffset ?? 0) + byteOffset;
+      for (let item = 0; item < accessor.count; item += 1) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          const value = binaryBuffer.readFloatLE(start + item * stride + axis * 4);
+          if (!Number.isFinite(value)) throw new TypeError("GLB POSITION accessor contains non-finite coordinates.");
+          if (value < boundsMin[axis]) boundsMin[axis] = value;
+          if (value > boundsMax[axis]) boundsMax[axis] = value;
+        }
+      }
     }
   }
-  return positions;
+
+  return {
+    accessors,
+    positionCount,
+    bounds: positionCount > 0 ? { min: boundsMin, max: boundsMax } : null,
+  };
 }
 
 function validateMeshes(gltf, accessors, binaryBuffer, bufferViews, { maxVertices }) {
-  const meshes = Array.isArray(gltf.meshes) ? gltf.meshes : [];
+  const meshes = gltf.meshes;
   const materials = Array.isArray(gltf.materials) ? gltf.materials : [];
   const nodes = Array.isArray(gltf.nodes) ? gltf.nodes : [];
   let primitiveCount = 0;
   let triangleCount = 0;
   let vertexCount = 0;
+
   for (const mesh of meshes) {
-    if (!isRecord(mesh) || !Array.isArray(mesh.primitives)) throw new TypeError("GLB mesh primitives are invalid.");
     for (const primitive of mesh.primitives) {
       primitiveCount += 1;
-      if (!isRecord(primitive) || !isRecord(primitive.attributes) || !Number.isInteger(primitive.attributes.POSITION)) {
-        throw new TypeError("GLB triangle primitive is missing a POSITION accessor.");
-      }
-      const positionIndex = safeInteger(primitive.attributes.POSITION, "POSITION accessor", 0, Math.max(0, accessors.length - 1));
+      const positionIndex = safeInteger(primitive.attributes.POSITION, "POSITION accessor", 0, accessors.length - 1);
       const positionAccessor = accessors[positionIndex];
-      if (positionAccessor.type !== "VEC3" || positionAccessor.componentType !== 5126) {
-        throw new TypeError("GLB POSITION accessors must be FLOAT VEC3.");
-      }
-      if (positionAccessor.count > maxVertices) throw new RangeError("GLB exceeds the configured vertex limit.");
       vertexCount += positionAccessor.count;
+      if (vertexCount > maxVertices) throw new RangeError("GLB exceeds the configured total vertex limit.");
+
       const mode = primitive.mode === undefined ? 4 : primitive.mode;
-      if (mode === 4) {
-        let indexCount = positionAccessor.count;
-        if (primitive.indices !== undefined) {
-          const indexAccessorIndex = safeInteger(primitive.indices, "indices accessor", 0, Math.max(0, accessors.length - 1));
-          const indexAccessor = accessors[indexAccessorIndex];
-          if (indexAccessor.type !== "SCALAR" || ![5121, 5123, 5125].includes(indexAccessor.componentType)) {
-            throw new TypeError("GLB primitive indices must use an unsigned scalar accessor.");
-          }
-          indexCount = indexAccessor.count;
-          const view = bufferViews[indexAccessor.bufferView];
-          const bytesPerIndex = COMPONENT_BYTES.get(indexAccessor.componentType);
-          const start = view.byteOffset + (indexAccessor.byteOffset ?? 0);
-          for (let i = 0; i < indexCount; i += 1) {
-            const position = start + i * bytesPerIndex;
-            const value = indexAccessor.componentType === 5121 ? binaryBuffer.readUInt8(position)
-              : indexAccessor.componentType === 5123 ? binaryBuffer.readUInt16LE(position) : binaryBuffer.readUInt32LE(position);
-            if (value >= positionAccessor.count) throw new TypeError("GLB primitive index exceeds its POSITION accessor.");
-          }
+      if (mode !== 4) throw new TypeError("Generated building meshes must use TRIANGLES primitives.");
+      let indexCount = positionAccessor.count;
+      if (primitive.indices !== undefined) {
+        const indexAccessorIndex = safeInteger(primitive.indices, "indices accessor", 0, accessors.length - 1);
+        const indexAccessor = accessors[indexAccessorIndex];
+        if (indexAccessor.type !== "SCALAR" || ![5121, 5123, 5125].includes(indexAccessor.componentType)) {
+          throw new TypeError("GLB primitive indices must use an unsigned scalar accessor.");
         }
-        if (indexCount % 3 !== 0) throw new TypeError("GLB triangle primitive index count must be divisible by three.");
-        triangleCount += indexCount / 3;
+        indexCount = indexAccessor.count;
+        const view = bufferViews[indexAccessor.bufferView];
+        const bytesPerIndex = COMPONENT_BYTES.get(indexAccessor.componentType);
+        const start = (view.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0);
+        for (let index = 0; index < indexCount; index += 1) {
+          const position = start + index * bytesPerIndex;
+          const value = indexAccessor.componentType === 5121 ? binaryBuffer.readUInt8(position)
+            : indexAccessor.componentType === 5123 ? binaryBuffer.readUInt16LE(position)
+              : binaryBuffer.readUInt32LE(position);
+          if (value >= positionAccessor.count) throw new TypeError("GLB primitive index exceeds its POSITION accessor.");
+        }
       }
-      if (primitive.material !== undefined) safeInteger(primitive.material, "primitive material", 0, Math.max(0, materials.length - 1));
+      if (indexCount < 3 || indexCount % 3 !== 0) {
+        throw new TypeError("GLB triangle primitive index count must be divisible by three.");
+      }
+      triangleCount += indexCount / 3;
+      if (primitive.material !== undefined) {
+        safeInteger(primitive.material, "primitive material", 0, materials.length - 1);
+      }
     }
   }
-  if (meshes.length === 0 || primitiveCount === 0 || triangleCount === 0 || vertexCount === 0) {
+
+  if (primitiveCount === 0 || triangleCount === 0 || vertexCount === 0) {
     throw new TypeError("GLB must contain at least one non-empty triangle mesh.");
   }
-  if (vertexCount > maxVertices) throw new RangeError("GLB exceeds the configured total vertex limit.");
+  for (const material of materials) {
+    if (!isRecord(material)) throw new TypeError("GLB material definition is invalid.");
+  }
+  for (const node of nodes) {
+    if (!isRecord(node)) throw new TypeError("GLB node definition is invalid.");
+    if (node.mesh !== undefined) safeInteger(node.mesh, "node mesh", 0, meshes.length - 1);
+    if (node.children !== undefined) {
+      if (!Array.isArray(node.children)) throw new TypeError("GLB node children must be an array.");
+      for (const child of node.children) safeInteger(child, "node child", 0, Math.max(0, nodes.length - 1));
+    }
+  }
+  for (const scene of Array.isArray(gltf.scenes) ? gltf.scenes : []) {
+    if (!isRecord(scene) || !Array.isArray(scene.nodes)) throw new TypeError("GLB scene definition is invalid.");
+    for (const nodeIndex of scene.nodes) safeInteger(nodeIndex, "scene node", 0, Math.max(0, nodes.length - 1));
+  }
   return { meshes, materials, nodes, primitiveCount, triangleCount, vertexCount };
 }
 
-/** Validate a self-contained glTF 2.0 binary asset before it enters the private asset store. */
-export function inspectGeneratedGlb(value, { maxBytes = 100 * 1024 * 1024, maxJsonChunkBytes = 16 * 1024 * 1024, maxVertices = 5_000_000 } = {}) {
+/** Validate a self-contained glTF 2.0 binary asset before it enters private storage. */
+export function inspectGeneratedGlb(value, {
+  maxBytes = 100 * 1024 * 1024,
+  maxJsonChunkBytes = 16 * 1024 * 1024,
+  maxVertices = 5_000_000,
+} = {}) {
   safeInteger(maxBytes, "maxBytes", 1024, 2 * 1024 * 1024 * 1024);
   safeInteger(maxJsonChunkBytes, "maxJsonChunkBytes", 1024, maxBytes);
   safeInteger(maxVertices, "maxVertices", 3, 20_000_000);
   const buffer = toBuffer(value);
   const parsed = parseGlb(buffer, { maxBytes, maxJsonChunkBytes });
   const storage = validateSelfContainedBuffers(parsed.gltf, parsed.binaryBuffer);
-  const positions = validateAccessors(parsed.gltf, parsed.binaryBuffer, storage.views, { maxVertices });
-  const meshes = validateMeshes(parsed.gltf, parsed.gltf.accessors ?? [], parsed.binaryBuffer, storage.views, { maxVertices });
-  const bounds = positions.length === 0 ? null : {
-    min: [0, 1, 2].map((axis) => Math.min(...positions.filter((_, index) => index % 3 === axis))),
-    max: [0, 1, 2].map((axis) => Math.max(...positions.filter((_, index) => index % 3 === axis))),
-  };
+  const positionIds = collectPositionAccessorIds(parsed.gltf);
+  const accessorInfo = validateAccessors(parsed.gltf, parsed.binaryBuffer, storage.views, positionIds, { maxVertices });
+  const meshes = validateMeshes(parsed.gltf, accessorInfo.accessors, parsed.binaryBuffer, storage.views, { maxVertices });
+  const bounds = accessorInfo.bounds;
+
   return {
     valid: true,
     contentType: "model/gltf-binary",
     bytes: buffer.length,
-    jsonChunkBytes: parsed.gltf ? undefined : undefined,
+    jsonChunkBytes: parsed.jsonChunkBytes,
     meshCount: meshes.meshes.length,
     primitiveCount: meshes.primitiveCount,
     triangleCount: meshes.triangleCount,
@@ -268,7 +334,9 @@ export async function downloadGeneratedGlb(value, {
   if (typeof value !== "string" || value.length > 4096) throw new TypeError("Generated model URL is invalid.");
   let url;
   try { url = new URL(value); } catch { throw new TypeError("Generated model URL must be absolute HTTPS."); }
-  if (url.protocol !== "https:" || !url.hostname || url.username || url.password) throw new TypeError("Generated model URL must be HTTPS without embedded credentials.");
+  if (url.protocol !== "https:" || !url.hostname || url.username || url.password) {
+    throw new TypeError("Generated model URL must be HTTPS without embedded credentials.");
+  }
   if (url.port && url.port !== "443") throw new TypeError("Generated model URL uses an unsupported port.");
   if (!Array.isArray(allowedHosts) || allowedHosts.length === 0 || !allowedHosts.every((host) => typeof host === "string" && host.trim())) {
     throw new TypeError("An explicit model-host allowlist is required.");
@@ -284,8 +352,15 @@ export async function downloadGeneratedGlb(value, {
   safeInteger(timeoutMs, "timeoutMs", 1000, 600_000);
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
-  const response = await fetchImpl(url.toString(), { method: "GET", redirect: "manual", signal: requestSignal, headers: { Accept: "model/gltf-binary, application/octet-stream" } });
-  if (response.status >= 300 && response.status < 400) throw new Error("Redirected model downloads are blocked; the provider URL must be direct.");
+  const response = await fetchImpl(url.toString(), {
+    method: "GET",
+    redirect: "manual",
+    signal: requestSignal,
+    headers: { Accept: "model/gltf-binary, application/octet-stream" },
+  });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error("Redirected model downloads are blocked; the provider URL must be direct.");
+  }
   if (!response.ok) throw new Error("Generated model download failed with HTTP " + response.status + ".");
   const glb = await readBoundedResponse(response, maxBytes);
   const validation = inspectGeneratedGlb(glb, { maxBytes });
