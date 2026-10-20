@@ -2,6 +2,9 @@
 export type {
   CameraTarget,
   GeoCoordinate,
+  GeneratedModelAxis,
+  GeneratedModelDefinition,
+  GeneratedModelUpdate,
   MapEngine,
   MapEngineCapabilities,
   MapEngineState,
