@@ -461,14 +461,62 @@ export function generateParametricBuildingGlb(requestValue) {
     addQuad(1, rightInner, br, tr, rightTop, normal);
   }
 
-  // Triangulated flat roof surface.
-  for (const triangle of triangulatePolygon(points)) {
-    let [a, b, c] = triangle.map((index) => points[index]);
-    const normalHint = [0, 1, 0];
-    const p0 = to3(a, totalHeight);
-    const p1 = to3(b, totalHeight);
-    const p2 = to3(c, totalHeight);
-    addTriangle(3, p0, p1, p2, normalHint);
+  // Roof geometry follows the requested type. Pitched roofs are currently limited to measured rectangles.
+  if (roofMode === "flat") {
+    for (const triangle of triangulatePolygon(points)) {
+      const [a, b, c] = triangle.map((index) => points[index]);
+      addTriangle(3, to3(a, mainHeight), to3(b, mainHeight), to3(c, mainHeight), [0, 1, 0]);
+    }
+  } else {
+    const halfWidth = footprint.widthMeters / 2;
+    const halfDepth = footprint.depthMeters / 2;
+    const wideAlongX = footprint.widthMeters >= footprint.depthMeters;
+    const eaveY = mainHeight;
+    const ridgeY = totalHeight;
+    const v = (x, y, z) => [x, y, z];
+
+    if (roofMode === "gable" && wideAlongX) {
+      // Ridge runs along X; the short end walls receive triangular gable faces.
+      addTriangle(0, v(-halfWidth, eaveY, -halfDepth), v(-halfWidth, eaveY, halfDepth), v(-halfWidth, ridgeY, 0), [-1, 0, 0]);
+      addTriangle(0, v(halfWidth, eaveY, halfDepth), v(halfWidth, eaveY, -halfDepth), v(halfWidth, ridgeY, 0), [1, 0, 0]);
+      addQuad(3, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), v(halfWidth, ridgeY, 0), v(-halfWidth, ridgeY, 0), [0, 1, -1]);
+      addQuad(3, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), v(-halfWidth, ridgeY, 0), v(halfWidth, ridgeY, 0), [0, 1, 1]);
+    } else if (roofMode === "gable") {
+      // Ridge runs along Z; the short end walls receive triangular gable faces.
+      addTriangle(0, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), v(0, ridgeY, -halfDepth), [0, 0, -1]);
+      addTriangle(0, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), v(0, ridgeY, halfDepth), [0, 0, 1]);
+      addQuad(3, v(-halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, -halfDepth), v(0, ridgeY, -halfDepth), v(0, ridgeY, halfDepth), [-1, 1, 0]);
+      addQuad(3, v(halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, halfDepth), v(0, ridgeY, halfDepth), v(0, ridgeY, -halfDepth), [1, 1, 0]);
+    } else if (wideAlongX) {
+      // Hip roof: long slopes meet a shorter ridge, and the two ends taper to it.
+      const ridgeHalfX = Math.max(0, halfWidth - halfDepth);
+      if (ridgeHalfX > 0.05) {
+        addQuad(3, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), v(ridgeHalfX, ridgeY, 0), v(-ridgeHalfX, ridgeY, 0), [0, 1, -1]);
+        addQuad(3, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), v(-ridgeHalfX, ridgeY, 0), v(ridgeHalfX, ridgeY, 0), [0, 1, 1]);
+        addTriangle(3, v(halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, halfDepth), v(ridgeHalfX, ridgeY, 0), [1, 1, 0]);
+        addTriangle(3, v(-halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, -halfDepth), v(-ridgeHalfX, ridgeY, 0), [-1, 1, 0]);
+      } else {
+        const apex = v(0, ridgeY, 0);
+        addTriangle(3, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), apex, [0, 1, -1]);
+        addTriangle(3, v(halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, halfDepth), apex, [1, 1, 0]);
+        addTriangle(3, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), apex, [0, 1, 1]);
+        addTriangle(3, v(-halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, -halfDepth), apex, [-1, 1, 0]);
+      }
+    } else {
+      const ridgeHalfZ = Math.max(0, halfDepth - halfWidth);
+      if (ridgeHalfZ > 0.05) {
+        addQuad(3, v(-halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, -halfDepth), v(0, ridgeY, -ridgeHalfZ), v(0, ridgeY, ridgeHalfZ), [-1, 1, 0]);
+        addQuad(3, v(halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, halfDepth), v(0, ridgeY, ridgeHalfZ), v(0, ridgeY, -ridgeHalfZ), [1, 1, 0]);
+        addTriangle(3, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), v(0, ridgeY, -ridgeHalfZ), [0, 1, -1]);
+        addTriangle(3, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), v(0, ridgeY, ridgeHalfZ), [0, 1, 1]);
+      } else {
+        const apex = v(0, ridgeY, 0);
+        addTriangle(3, v(-halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, -halfDepth), apex, [0, 1, -1]);
+        addTriangle(3, v(halfWidth, eaveY, -halfDepth), v(halfWidth, eaveY, halfDepth), apex, [1, 1, 0]);
+        addTriangle(3, v(halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, halfDepth), apex, [0, 1, 1]);
+        addTriangle(3, v(-halfWidth, eaveY, halfDepth), v(-halfWidth, eaveY, -halfDepth), apex, [-1, 1, 0]);
+      }
+    }
   }
 
   const binChunks = [];
