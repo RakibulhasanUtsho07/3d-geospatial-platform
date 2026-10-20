@@ -19,28 +19,52 @@ function actualBuildingImages(request) {
   );
 }
 
-function requireProviderToken(reference) {
-  if (!reference.providerFileToken) {
-    fail(
-      "provider-upload-required",
-      "Reference " + reference.id + " must be uploaded by the server-side asset uploader before provider generation."
-    );
-  }
-  return reference.providerFileToken;
+function safeUploadFilename(reference, asset) {
+  if (typeof asset.filename === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(asset.filename) && !asset.filename.includes("..")) return asset.filename;
+  const extension = asset.contentType === "image/png" ? ".png" : ".jpg";
+  return "reference-" + reference.id.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 60) + extension;
 }
 
-function viewMap(references) {
+function createUploadTracker() {
+  return { uploadedReferences: [] };
+}
+
+async function resolveProviderToken(reference, { tripoClient, loadAsset, uploadedReferences, signal }) {
+  if (reference.providerFileToken) return reference.providerFileToken;
+  if (typeof loadAsset !== "function" || typeof tripoClient.uploadImage !== "function") {
+    fail("provider-upload-required", "Reference " + reference.id + " needs a server-side asset reader and provider image uploader.");
+  }
+  let asset;
+  try {
+    asset = await loadAsset(reference.assetId);
+  } catch {
+    fail("source-asset-load-failed", "The protected source asset for reference " + reference.id + " could not be loaded.");
+  }
+  if (!asset || !(asset.bytes instanceof Uint8Array)) {
+    fail("source-asset-invalid", "The protected source asset reader must return image bytes as Uint8Array.");
+  }
+  const upload = await tripoClient.uploadImage({
+    bytes: asset.bytes,
+    filename: safeUploadFilename(reference, asset),
+    contentType: asset.contentType,
+    signal,
+  });
+  if (!upload || typeof upload.fileToken !== "string" || !/^file_[A-Za-z0-9_-]{4,240}$/.test(upload.fileToken)) {
+    fail("provider-upload-invalid", "The generation provider did not return a valid file token.");
+  }
+  uploadedReferences.push({ referenceId: reference.id, providerFileToken: upload.fileToken });
+  return upload.fileToken;
+}
+
+async function viewMap(references, uploadContext) {
   const result = {};
   for (const reference of references) {
     if (!["front", "left", "back", "right"].includes(reference.view)) continue;
-    if (result[reference.view]) {
-      fail("duplicate-view", "More than one selected reference is labelled " + reference.view + ".");
-    }
-    result[reference.view] = requireProviderToken(reference);
+    if (result[reference.view]) fail("duplicate-view", "More than one selected reference is labelled " + reference.view + ".");
+    result[reference.view] = await resolveProviderToken(reference, uploadContext);
   }
   if (!result.front) fail("front-view-required", "Multiview generation requires an Admin-reviewed front view.");
-  const count = Object.keys(result).length;
-  if (count < 2) fail("second-view-required", "Multiview generation needs a front view plus at least one side or rear view.");
+  if (Object.keys(result).length < 2) fail("second-view-required", "Multiview generation needs a front view plus at least one side or rear view.");
   return result;
 }
 
@@ -48,7 +72,7 @@ function viewMap(references) {
  * Engine orchestration facade. The returned GLB is a procedural base candidate;
  * AI candidates remain separate until a later geometry-alignment/merge worker exists.
  */
-export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
+export function createBuildingGenerationEngine({ tripoClient = null, loadAsset = null } = {}) {
   function analyze(requestValue) {
     const request = normalizeBuildingGenerationRequest(requestValue);
     return { request, plan: planBuildingGeneration(request) };
@@ -69,7 +93,7 @@ export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
     };
   }
 
-  async function submitReferenceCandidate(requestValue, { selectedVideoFrameIds = [] } = {}) {
+  async function submitReferenceCandidate(requestValue, { selectedVideoFrameIds = [], signal } = {}) {
     const { request, plan } = analyze(requestValue);
     if (!request.allowExternalProviderProcessing) {
       fail("external-processing-not-authorized", "External processing must be explicitly authorized by the Admin.", plan);
@@ -84,6 +108,8 @@ export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
       fail("provider-not-configured", "No AI generation provider client is configured on the server.", plan);
     }
 
+    const uploadTracker = createUploadTracker();
+    const uploadContext = { tripoClient, loadAsset, uploadedReferences: uploadTracker.uploadedReferences, signal };
     const videos = request.references.filter((ref) =>
       ref.kind === "video" &&
       ref.purpose === "actual-building" &&
@@ -122,9 +148,14 @@ export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
     const hasFront = labelledViews.some((ref) => ref.view === "front");
     const hasSecondView = labelledViews.some((ref) => ref.view !== "front");
     if (hasFront && hasSecondView) {
-      const views = viewMap(labelledViews);
-      const task = await tripoClient.submitMultiview({ views });
-      return { strategy: videos.length ? "video-keyframes-then-ai" : "parametric-plus-ai-multiview", ...task, plan };
+      const views = await viewMap(labelledViews, uploadContext);
+      const task = await tripoClient.submitMultiview({ views, signal });
+      return {
+        strategy: videos.length ? "video-keyframes-then-ai" : "parametric-plus-ai-multiview",
+        ...task,
+        uploadedReferences: uploadTracker.uploadedReferences,
+        plan,
+      };
     }
 
     if (videos.length > 0) {
@@ -135,9 +166,14 @@ export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
     }
 
     const image = images[0];
-    const input = requireProviderToken(image);
-    const task = await tripoClient.submitImage({ input });
-    return { strategy: "parametric-plus-ai-image", ...task, plan };
+    const input = await resolveProviderToken(image, uploadContext);
+    const task = await tripoClient.submitImage({ input, signal });
+    return {
+      strategy: "parametric-plus-ai-image",
+      ...task,
+      uploadedReferences: uploadTracker.uploadedReferences,
+      plan,
+    };
   }
 
   return Object.freeze({
