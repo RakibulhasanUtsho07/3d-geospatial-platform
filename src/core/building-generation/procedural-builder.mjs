@@ -440,25 +440,121 @@ export function generateParametricBuildingGlb(requestValue) {
     }
   }
   if (frontEdge && frontEdge.length >= 2.4 && mainHeight >= 2.3) {
-    const doorWidth = Math.min(1.15, frontEdge.length * 0.25);
+    const isDoubleDoor = entranceStyle === "double-door";
+    const isArchedEntrance = entranceStyle === "arched";
+    const doorWidth = Math.min(isDoubleDoor ? 1.75 : 1.15, frontEdge.length * (isDoubleDoor ? 0.34 : 0.25));
     const doorHeight = Math.min(2.15, floorHeight * 0.9, mainHeight * 0.75);
-    const t = 0.5;
-    const cx = frontEdge.a[0] + frontEdge.dx * t + frontEdge.nx * 0.07;
-    const cz = frontEdge.a[1] + frontEdge.dz * t + frontEdge.nz * 0.07;
+    const archHeight = isArchedEntrance ? Math.min(doorWidth * 0.42, doorHeight * 0.28) : 0;
+    const rectangularTop = doorHeight - archHeight;
+    const cx = frontEdge.a[0] + frontEdge.dx * 0.5 + frontEdge.nx * 0.07;
+    const cz = frontEdge.a[1] + frontEdge.dz * 0.5 + frontEdge.nz * 0.07;
     const half = doorWidth / 2;
-    const bl = [cx - frontEdge.tx * half, 0.04, cz - frontEdge.tz * half];
-    const br = [cx + frontEdge.tx * half, 0.04, cz + frontEdge.tz * half];
-    const tr = [br[0], doorHeight, br[2]];
-    const tl = [bl[0], doorHeight, bl[2]];
+    const point = (along, y, offset = 0) => [
+      cx + frontEdge.tx * along + frontEdge.nx * offset,
+      y,
+      cz + frontEdge.tz * along + frontEdge.nz * offset,
+    ];
+    const bl = point(-half, 0.04);
+    const br = point(half, 0.04);
+    const tl = point(-half, rectangularTop);
+    const tr = point(half, rectangularTop);
     const normal = [frontEdge.nx, 0, frontEdge.nz];
     addQuad(4, bl, br, tr, tl, normal);
     const frame = 0.08;
-    const leftInner = [bl[0] + frontEdge.tx * frame + frontEdge.nx * 0.01, 0.04, bl[2] + frontEdge.tz * frame + frontEdge.nz * 0.01];
-    const rightInner = [br[0] - frontEdge.tx * frame + frontEdge.nx * 0.01, 0.04, br[2] - frontEdge.tz * frame + frontEdge.nz * 0.01];
-    const leftTop = [leftInner[0], doorHeight, leftInner[2]];
-    const rightTop = [rightInner[0], doorHeight, rightInner[2]];
-    addQuad(1, bl, leftInner, leftTop, tl, normal);
-    addQuad(1, rightInner, br, tr, rightTop, normal);
+    const leftInnerBottom = point(-half + frame, 0.04, 0.015);
+    const rightInnerBottom = point(half - frame, 0.04, 0.015);
+    const leftInnerTop = point(-half + frame, rectangularTop, 0.015);
+    const rightInnerTop = point(half - frame, rectangularTop, 0.015);
+    addQuad(1, bl, leftInnerBottom, leftInnerTop, tl, normal);
+    addQuad(1, rightInnerBottom, br, tr, rightInnerTop, normal);
+    if (archHeight > 0) {
+      const center = point(0, rectangularTop, 0.015);
+      const segmentCount = 10;
+      let previousInner = null;
+      let previousOuter = null;
+      for (let segment = 0; segment <= segmentCount; segment += 1) {
+        const angle = Math.PI - Math.PI * segment / segmentCount;
+        const inner = point(half * Math.cos(angle), rectangularTop + archHeight * Math.sin(angle), 0.015);
+        const outer = point((half + frame) * Math.cos(angle), rectangularTop + (archHeight + frame) * Math.sin(angle), 0.015);
+        if (previousInner && previousOuter) {
+          addTriangle(4, center, previousInner, inner, normal);
+          addQuad(1, previousOuter, outer, inner, previousInner, normal);
+        }
+        previousInner = inner;
+        previousOuter = outer;
+      }
+    } else {
+      addQuad(1, tl, tr, point(half, doorHeight, 0), point(-half, doorHeight, 0), normal);
+    }
+    if (isDoubleDoor) {
+      const mullionHalf = 0.035;
+      addQuad(1, point(-mullionHalf, 0.06, 0.02), point(mullionHalf, 0.06, 0.02), point(mullionHalf, rectangularTop - 0.02, 0.02), point(-mullionHalf, rectangularTop - 0.02, 0.02), normal);
+    }
+  }
+
+  // Optional front colonnade defined by the Admin, kept independent from image-inferred detail.
+  if (frontEdge && mainHeight >= 2.3 && architecturalFeatures.columns?.frontCount > 0) {
+    const columnSpec = architecturalFeatures.columns;
+    const count = columnSpec.frontCount;
+    const columnWidth = columnSpec.widthMeters ?? 0.28;
+    const columnHeight = Math.min(columnSpec.heightMeters ?? floorHeight, mainHeight);
+    for (let index = 0; index < count; index += 1) {
+      const t = (index + 1) / (count + 1);
+      const facadeX = frontEdge.a[0] + frontEdge.dx * t;
+      const facadeZ = frontEdge.a[1] + frontEdge.dz * t;
+      addOrientedBox(
+        facadeX + frontEdge.nx * (columnWidth * 0.55),
+        facadeZ + frontEdge.nz * (columnWidth * 0.55),
+        frontEdge.tx, frontEdge.tz, frontEdge.nx, frontEdge.nz,
+        columnWidth, columnWidth, 0, columnHeight, 7,
+      );
+    }
+  }
+
+  // Optional dimensional balconies. They are explicit architecture inputs, not guessed from one photo.
+  const balconySpec = architecturalFeatures.balconies;
+  if (frontEdge && balconySpec?.enabled && floorCount >= 2 && mainHeight >= 3.5) {
+    const requestedFloors = balconySpec.floors ?? Array.from({ length: Math.max(0, floorCount - 1) }, (_, index) => index + 2);
+    const validFloors = requestedFloors.filter((storey) => storey <= floorCount);
+    if (validFloors.length !== requestedFloors.length) {
+      warnings.push("One or more requested balcony storeys exceed the generated floor count and were omitted.");
+    }
+    const count = balconySpec.count ?? 1;
+    const widthRatio = balconySpec.widthRatio ?? 0.72;
+    const depth = balconySpec.depthMeters ?? 1.2;
+    const hasRailing = balconySpec.railing ?? true;
+    for (const storey of validFloors) {
+      const slabY = (storey - 1) * floorHeight;
+      const balconyWidth = Math.min(frontEdge.length * widthRatio / count * 0.85, frontEdge.length / (count + 1) * 0.95);
+      for (let balconyIndex = 0; balconyIndex < count; balconyIndex += 1) {
+        const t = (balconyIndex + 1) / (count + 1);
+        const facadeX = frontEdge.a[0] + frontEdge.dx * t;
+        const facadeZ = frontEdge.a[1] + frontEdge.dz * t;
+        const balconyX = facadeX + frontEdge.nx * depth / 2;
+        const balconyZ = facadeZ + frontEdge.nz * depth / 2;
+        addOrientedBox(balconyX, balconyZ, frontEdge.tx, frontEdge.tz, frontEdge.nx, frontEdge.nz, balconyWidth, depth, slabY - 0.14, slabY, 5);
+        if (!hasRailing) continue;
+        const outerX = facadeX + frontEdge.nx * depth;
+        const outerZ = facadeZ + frontEdge.nz * depth;
+        const postCount = Math.max(2, Math.min(16, Math.ceil(balconyWidth / 0.75) + 1));
+        for (let postIndex = 0; postIndex < postCount; postIndex += 1) {
+          const along = -balconyWidth / 2 + balconyWidth * postIndex / (postCount - 1);
+          addOrientedBox(
+            outerX + frontEdge.tx * along, outerZ + frontEdge.tz * along,
+            frontEdge.tx, frontEdge.tz, frontEdge.nx, frontEdge.nz,
+            0.055, 0.055, slabY + 0.02, slabY + 0.92, 6,
+          );
+        }
+        addOrientedBox(outerX, outerZ, frontEdge.tx, frontEdge.tz, frontEdge.nx, frontEdge.nz, balconyWidth, 0.075, slabY + 0.84, slabY + 0.92, 6);
+        addOrientedBox(outerX, outerZ, frontEdge.tx, frontEdge.tz, frontEdge.nx, frontEdge.nz, balconyWidth, 0.05, slabY + 0.40, slabY + 0.46, 6);
+        for (const sideSign of [-1, 1]) {
+          const sideX = facadeX + frontEdge.tx * sideSign * balconyWidth / 2 + frontEdge.nx * depth / 2;
+          const sideZ = facadeZ + frontEdge.tz * sideSign * balconyWidth / 2 + frontEdge.nz * depth / 2;
+          addOrientedBox(sideX, sideZ, frontEdge.nx, frontEdge.nz, frontEdge.tx, frontEdge.tz, depth, 0.055, slabY + 0.40, slabY + 0.46, 6);
+          addOrientedBox(sideX, sideZ, frontEdge.nx, frontEdge.nz, frontEdge.tx, frontEdge.tz, depth, 0.075, slabY + 0.84, slabY + 0.92, 6);
+        }
+      }
+    }
   }
 
   // Roof geometry follows the requested type. Pitched roofs are currently limited to measured rectangles.
