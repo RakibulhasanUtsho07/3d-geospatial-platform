@@ -318,6 +318,8 @@ export function createBuildingGenerationEngine({
       provenance: "external-ai-candidate",
       ...(inputSummary ? { inputSummary } : {}),
       ...(alignment ? { alignment } : {}),
+      ...(Array.isArray(generationContext?.taskIds) ? { taskIds: generationContext.taskIds } : { taskIds: [task.taskId] }),
+      ...(Array.isArray(generationContext?.generationStages) ? { generationStages: generationContext.generationStages } : { generationStages: ["direct-3d-generation"] }),
     };
     let stored;
     try {
@@ -351,7 +353,29 @@ export function createBuildingGenerationEngine({
   } = {}) {
     const { request } = analyze(requestValue);
     const submitted = await submitReferenceCandidate(request, { selectedVideoFrameIds, signal });
-    const completed = await waitForProviderTask(submitted.taskId, { ...pollOptions, signal });
+    const taskIds = [submitted.taskId];
+    const generationStages = [submitted.stage ?? "direct-3d-generation"];
+    let finalStrategy = submitted.strategy;
+    let completed = await waitForProviderTask(submitted.taskId, { ...pollOptions, signal });
+
+    if (submitted.stage === "image-to-multiview") {
+      const allowedSourceTaskTypes = new Set(["generate_multiview_image", "edit_multiview_image"]);
+      if (completed.type && !allowedSourceTaskTypes.has(completed.type)) {
+        fail("provider-source-task-type-invalid", "The image-to-multiview task completed with an unexpected type: " + completed.type);
+      }
+      if (!completed.type) {
+        generationStages.push("multiview-source-task-type-unavailable");
+      }
+      if (typeof tripoClient.submitMultiviewFromTask !== "function") {
+        fail("provider-multiview-from-task-unavailable", "The provider cannot continue from an image-to-multiview task.");
+      }
+      const modelTask = await tripoClient.submitMultiviewFromTask({ sourceTaskId: completed.taskId, signal });
+      taskIds.push(modelTask.taskId);
+      generationStages.push(modelTask.stage ?? "multiview-to-model");
+      finalStrategy = "parametric-plus-ai-image-multiview";
+      completed = await waitForProviderTask(modelTask.taskId, { ...pollOptions, signal });
+    }
+
     const safeBuildingSummary = {
       name: request.building.name,
       buildingType: request.building.buildingType,
@@ -371,10 +395,19 @@ export function createBuildingGenerationEngine({
         quality: request.quality,
         building: safeBuildingSummary,
         referenceIds: request.references.map((reference) => reference.id),
-        strategy: submitted.strategy,
+        strategy: finalStrategy,
+        taskIds,
+        generationStages,
       },
     });
-    return { ...stored, strategy: submitted.strategy, plan: submitted.plan, uploadedReferences: submitted.uploadedReferences ?? [] };
+    return {
+      ...stored,
+      strategy: finalStrategy,
+      plan: submitted.plan,
+      uploadedReferences: submitted.uploadedReferences ?? [],
+      stageTaskIds: taskIds,
+      generationStages,
+    };
   }
 
   async function submitReferenceCandidate(requestValue, { selectedVideoFrameIds = [], signal } = {}) {
@@ -451,10 +484,21 @@ export function createBuildingGenerationEngine({
 
     const image = images[0];
     const input = await resolveProviderToken(image, uploadContext);
+    if (typeof tripoClient.submitImageToMultiview === "function" && typeof tripoClient.submitMultiviewFromTask === "function") {
+      const task = await tripoClient.submitImageToMultiview({ input, signal });
+      return {
+        strategy: "parametric-plus-ai-image-multiview",
+        ...task,
+        uploadedReferences: uploadTracker.uploadedReferences,
+        plan,
+      };
+    }
+    // Compatibility fallback for providers that do not offer image-to-multiview chaining.
     const task = await tripoClient.submitImage({ input, signal });
     return {
       strategy: "parametric-plus-ai-image",
       ...task,
+      stage: "direct-image-to-model",
       uploadedReferences: uploadTracker.uploadedReferences,
       plan,
     };
