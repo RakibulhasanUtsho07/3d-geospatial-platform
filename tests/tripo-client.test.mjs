@@ -153,3 +153,34 @@ test("preserves task type so the engine can verify image-to-multiview completion
   assert.equal(task.type, "generate_multiview_image");
   assert.equal(task.status, "success");
 });
+
+test("submits a structured architectural text prompt to the text-to-model task", async () => {
+  let request;
+  const client = createTripoGenerationClient({
+    apiKey: "test-secret",
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return fakeResponse(200, { code: 0, data: { task_id: "task_text123" } });
+    },
+  });
+  const result = await client.submitText({
+    prompt: "A five-storey apartment building, 18 metres wide and 12 metres deep, warm plaster facade, flat parapet roof, two balconies on each upper floor.",
+    negativePrompt: "text, logo, watermark, disconnected parts",
+  });
+  assert.deepEqual(result, { taskId: "task_text123", stage: "text-to-model" });
+  assert.equal(request.url, "https://openapi.tripo3d.ai/v3/generation/text-to-model");
+  assert.equal(request.init.headers.Authorization, "Bearer test-secret");
+  const body = JSON.parse(request.init.body);
+  assert.equal(body.model, "v3.1-20260211");
+  assert.match(body.prompt, /five-storey apartment/);
+  assert.equal(body.negative_prompt, "text, logo, watermark, disconnected parts");
+});
+
+test("rejects empty or oversized text-to-3D prompts before calling the provider", async () => {
+  let called = false;
+  const client = createTripoGenerationClient({ apiKey: "test-secret", fetchImpl: async () => { called = true; throw new Error("must not call"); } });
+  await assert.rejects(client.submitText({ prompt: " " }), /1 to 1024/);
+  await assert.rejects(client.submitText({ prompt: "x".repeat(1025) }), /1 to 1024/);
+  await assert.rejects(client.submitText({ prompt: "house", negativePrompt: "x".repeat(256) }), /255 characters/);
+  assert.equal(called, false);
+});
