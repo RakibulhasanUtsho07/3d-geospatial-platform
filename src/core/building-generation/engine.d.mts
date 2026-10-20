@@ -1,6 +1,7 @@
 import type { BuildingGenerationPlan, BuildingGenerationRequest } from "./types";
 import type { TripoTaskResult } from "./providers/tripo-client.mjs";
 import type { VideoFrameExtractionOptions, VideoFrameExtractionResult } from "./video-frame-extractor.mjs";
+import type { GlbValidationResult } from "./glb-validation.mjs";
 
 export type BuildingGenerationAnalysis = {
   request: BuildingGenerationRequest;
@@ -33,6 +34,17 @@ export type PreparedVideoFrames = {
   reviewRequired: true;
   nextStep: string;
 };
+export type StoredGeneratedCandidate = {
+  status: "needs-admin-review";
+  taskId: string;
+  assetId: string;
+  validation: GlbValidationResult;
+  warnings: string[];
+  strategy?: string;
+  plan?: BuildingGenerationPlan;
+  uploadedReferences?: Array<{ referenceId: string; providerFileToken: string }>;
+};
+
 export declare function createBuildingGenerationEngine(options?: {
   tripoClient?: {
     uploadImage(options: { bytes: Uint8Array; filename?: string; contentType?: "image/jpeg" | "image/png"; signal?: AbortSignal }): Promise<{ fileToken: string }>;
@@ -43,12 +55,34 @@ export declare function createBuildingGenerationEngine(options?: {
   loadAsset?: (assetId: string) => Promise<{ bytes: Uint8Array; filename?: string; contentType: "image/jpeg" | "image/png" }>;
   resolveVideoAssetPath?: (assetId: string) => Promise<string>;
   storeFrameAsset?: (input: { path: string; filename: string; contentType: "image/jpeg"; sourceVideoAssetId: string; sourceVideoReferenceId: string; timestampSeconds: number }) => Promise<{ assetId: string }>;
+  storeGeneratedCandidate?: (input: {
+    taskId: string;
+    bytes: Buffer;
+    contentType: "model/gltf-binary";
+    metadata: {
+      taskId: string;
+      provider: "tripo";
+      outputValidation: GlbValidationResult;
+      provenance: "external-ai-candidate";
+    };
+  }) => Promise<{ assetId: string }>;
+  fetchImpl?: typeof fetch;
+  allowedModelHosts?: readonly string[];
   extractVideo?: (options: { inputPath: string; outputDirectory: string; signal?: AbortSignal } & VideoFrameExtractionOptions) => Promise<VideoFrameExtractionResult>;
   createVideoWorkDirectory?: () => Promise<string>;
   removeVideoWorkDirectory?: (directory: string) => Promise<void>;
+  sleepImpl?: (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 }): {
   analyze(request: unknown): BuildingGenerationAnalysis;
   generateProceduralCandidate(request: unknown): ProceduralBuildingCandidate;
   prepareVideoFrames(request: unknown, options: { videoReferenceId: string; signal?: AbortSignal; extractionOptions?: VideoFrameExtractionOptions }): Promise<PreparedVideoFrames>;
   submitReferenceCandidate(request: unknown, options?: { selectedVideoFrameIds?: string[]; signal?: AbortSignal }): Promise<{ strategy: string; taskId: string; plan: BuildingGenerationPlan; uploadedReferences?: Array<{ referenceId: string; providerFileToken: string }> }>;
+  waitForProviderTask(taskId: string, options?: { signal?: AbortSignal; timeoutMs?: number; pollIntervalMs?: number; maxAttempts?: number; sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void> }): Promise<TripoTaskResult>;
+  validateAndStoreProviderOutput(task: TripoTaskResult, options?: { signal?: AbortSignal; maxBytes?: number; downloadTimeoutMs?: number }): Promise<StoredGeneratedCandidate>;
+  generateAndStoreReferenceCandidate(request: unknown, options?: {
+    selectedVideoFrameIds?: string[];
+    signal?: AbortSignal;
+    pollOptions?: { timeoutMs?: number; pollIntervalMs?: number; maxAttempts?: number; sleep?: (milliseconds: number, signal?: AbortSignal) => Promise<void> };
+    downloadOptions?: { maxBytes?: number; downloadTimeoutMs?: number };
+  }): Promise<StoredGeneratedCandidate>;
 };
