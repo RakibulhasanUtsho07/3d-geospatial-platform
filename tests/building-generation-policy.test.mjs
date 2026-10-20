@@ -48,8 +48,10 @@ test("single-view AI plan labels hidden sides as inferred", () => {
     ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
     references: [image("front", "front")],
   });
-  assert.equal(plan.strategy, "parametric-plus-ai-image");
-  assert.ok(plan.qualityNotes.some((note) => note.toLowerCase().includes("hidden/back-side")));
+  assert.equal(plan.strategy, "parametric-plus-ai-image-multiview");
+  assert.ok(plan.stages.includes("submit-image-to-multiview"));
+  assert.ok(plan.stages.includes("submit-multiview-to-model"));
+  assert.ok(plan.qualityNotes.some((note) => note.toLowerCase().includes("hidden surfaces")));
 });
 
 test("video inputs must pass through keyframe selection before AI generation", () => {
@@ -117,4 +119,14 @@ test("requires an explicit external processing decision", () => {
   assert.throws(() => normalizeBuildingGenerationRequest({
     ...base, allowExternalProviderProcessing: undefined,
   }), TypeError);
+});
+
+test("asks for view labels when several source photos are not labelled", () => {
+  const plan = planBuildingGeneration({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
+    references: [image("photo-a", "unknown"), image("photo-b", "unknown")],
+  });
+  assert.equal(plan.strategy, "needs-more-inputs");
+  assert.equal(plan.blocked, true);
+  assert.ok(plan.missingInputs.some((item) => item.toLowerCase().includes("labelled as at least two distinct views")));
 });
