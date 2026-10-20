@@ -216,3 +216,89 @@ test("does not extract a video reference without explicit processing authorizati
   }, { videoReferenceId: "video1" }), (error) => error.code === "video-processing-not-authorized");
   assert.equal(resolverCalled, false);
 });
+
+test("polls a successful AI task, validates its GLB, and stores an Admin-review candidate", async () => {
+  const { generateParametricBuildingGlb } = await import("../src/core/building-generation/procedural-builder.mjs");
+  const glb = generateParametricBuildingGlb(base).glb;
+  let polls = 0;
+  let saved = null;
+  let downloads = 0;
+  const engine = createBuildingGenerationEngine({
+    tripoClient: {
+      async submitImage({ input }) { assert.equal(input, "file_front1234"); return { taskId: "task_engine123" }; },
+      async getTask(taskId) {
+        polls += 1;
+        assert.equal(taskId, "task_engine123");
+        if (polls === 1) return { taskId, status: "running", progress: 42 };
+        return { taskId, status: "success", progress: 100, modelUrl: "https://cdn.tripo3d.ai/output/building.glb" };
+      },
+    },
+    fetchImpl: async (url, options) => {
+      downloads += 1;
+      assert.equal(url, "https://cdn.tripo3d.ai/output/building.glb");
+      assert.equal(options.redirect, "manual");
+      return new Response(glb, { status: 200 });
+    },
+    storeGeneratedCandidate: async (input) => { saved = input; return { assetId: "draft-building-v1" }; },
+    sleepImpl: async () => {},
+  });
+  const result = await engine.generateAndStoreReferenceCandidate({
+    ...base,
+    quality: "reference-assisted",
+    allowExternalProviderProcessing: true,
+    references: [image("front", "front")],
+  }, { pollOptions: { pollIntervalMs: 100, maxAttempts: 4 } });
+  assert.equal(polls, 2);
+  assert.equal(downloads, 1);
+  assert.equal(result.status, "needs-admin-review");
+  assert.equal(result.assetId, "draft-building-v1");
+  assert.equal(result.taskId, "task_engine123");
+  assert.equal(result.strategy, "parametric-plus-ai-image");
+  assert.equal(result.validation.valid, true);
+  assert.equal(result.validation.contentType, "model/gltf-binary");
+  assert.ok(result.warnings.some((warning) => warning.toLowerCase().includes("review")));
+  assert.equal(saved.taskId, "task_engine123");
+  assert.equal(saved.contentType, "model/gltf-binary");
+  assert.equal(saved.metadata.provenance, "external-ai-candidate");
+  assert.equal(saved.bytes.toString("ascii", 0, 4), "glTF");
+});
+
+test("failed provider tasks never download or store a model", async () => {
+  let downloads = 0;
+  let stores = 0;
+  const engine = createBuildingGenerationEngine({
+    tripoClient: {
+      async submitImage() { return { taskId: "task_failed123" }; },
+      async getTask(taskId) { return { taskId, status: "failed", message: "model generation failed" }; },
+    },
+    fetchImpl: async () => { downloads += 1; return new Response("bad"); },
+    storeGeneratedCandidate: async () => { stores += 1; return { assetId: "should-not-exist" }; },
+    sleepImpl: async () => {},
+  });
+  await assert.rejects(engine.generateAndStoreReferenceCandidate({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
+    references: [image("front", "front")],
+  }), (error) => error.code === "provider-task-failed");
+  assert.equal(downloads, 0);
+  assert.equal(stores, 0);
+});
+
+test("provider output outside the trusted CDN is rejected before download", async () => {
+  let downloads = 0;
+  let stores = 0;
+  const engine = createBuildingGenerationEngine({
+    tripoClient: {
+      async submitImage() { return { taskId: "task_badurl123" }; },
+      async getTask(taskId) { return { taskId, status: "success", modelUrl: "https://cdn.tripo3d.ai.evil.example/model.glb" }; },
+    },
+    fetchImpl: async () => { downloads += 1; return new Response("bad"); },
+    storeGeneratedCandidate: async () => { stores += 1; return { assetId: "should-not-exist" }; },
+    sleepImpl: async () => {},
+  });
+  await assert.rejects(engine.generateAndStoreReferenceCandidate({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
+    references: [image("front", "front")],
+  }), (error) => error.code === "provider-output-validation-failed");
+  assert.equal(downloads, 0);
+  assert.equal(stores, 0);
+});
