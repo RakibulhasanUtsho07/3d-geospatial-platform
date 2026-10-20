@@ -22,6 +22,7 @@ export type VideoFrameExtractionResult = {
   outputDirectory: string;
   durationSeconds: number;
   samplingFps: number;
+  requestedSamplingFps: number;
   frames: ExtractedVideoFrame[];
   notes: string[];
 };
