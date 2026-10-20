@@ -74,14 +74,14 @@ export function createBuildingGenerationEngine({ tripoClient = null } = {}) {
     if (!request.allowExternalProviderProcessing) {
       fail("external-processing-not-authorized", "External processing must be explicitly authorized by the Admin.", plan);
     }
-    if (!tripoClient) {
-      fail("provider-not-configured", "No AI generation provider client is configured on the server.", plan);
+    if (plan.blocked) {
+      fail("generation-inputs-blocked", [...plan.missingInputs, ...plan.warnings].join(" "), plan);
     }
     if (plan.strategy === "photogrammetry-candidate") {
       fail("photogrammetry-worker-required", "This evidence is routed to the photogrammetry worker, not the image-to-3D API.", plan);
     }
-    if (plan.blocked && !plan.canGenerateParametricBase) {
-      fail("generation-inputs-blocked", [...plan.missingInputs, ...plan.warnings].join(" "), plan);
+    if (!tripoClient) {
+      fail("provider-not-configured", "No AI generation provider client is configured on the server.", plan);
     }
 
     const videos = request.references.filter((ref) =>
