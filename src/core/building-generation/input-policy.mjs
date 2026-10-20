@@ -68,6 +68,13 @@ function normalizeReference(value, index) {
   if (value.providerFileToken !== undefined && (typeof value.providerFileToken !== "string" || !PROVIDER_FILE_TOKEN_PATTERN.test(value.providerFileToken))) {
     throw new TypeError("reference " + index + " has an invalid provider file token.");
   }
+  if (value.derivedFromReferenceId !== undefined && (typeof value.derivedFromReferenceId !== "string" || !ID_PATTERN.test(value.derivedFromReferenceId))) {
+    throw new TypeError("reference " + index + " has an invalid source-video reference ID.");
+  }
+  if (value.timestampSeconds !== undefined) finite(value.timestampSeconds, "reference timestampSeconds", 0, 86400);
+  if (value.derivedFromReferenceId !== undefined && value.kind !== "image") {
+    throw new TypeError("Only image references can be extracted from a source video.");
+  }
   const result = {
     id: value.id,
     kind: value.kind,
@@ -77,6 +84,8 @@ function normalizeReference(value, index) {
   };
   if (value.view !== undefined) result.view = value.view;
   if (value.providerFileToken !== undefined) result.providerFileToken = value.providerFileToken;
+  if (value.derivedFromReferenceId !== undefined) result.derivedFromReferenceId = value.derivedFromReferenceId;
+  if (value.timestampSeconds !== undefined) result.timestampSeconds = value.timestampSeconds;
   if (value.sourceLabel !== undefined) result.sourceLabel = optionalText(value.sourceLabel, "sourceLabel", 240);
   if (value.licence !== undefined) result.licence = optionalText(value.licence, "licence", 240);
   return result;
@@ -109,6 +118,7 @@ export function normalizeBuildingGenerationRequest(value) {
 
   const footprint = normalizeFootprint(value.building.footprint);
   const buildingType = optionalText(value.building.buildingType, "buildingType", 100);
+  if (!buildingType) throw new TypeError("buildingType is required.");
   const building = { buildingType, dimensions };
   for (const key of ["name", "architecturalStyle", "designBrief", "roofType"]) {
     const text = optionalText(value.building[key], key, key === "designBrief" ? 2000 : 240);
@@ -127,6 +137,16 @@ export function normalizeBuildingGenerationRequest(value) {
   for (const ref of references) {
     if (ids.has(ref.id)) throw new TypeError("reference IDs must be unique.");
     ids.add(ref.id);
+  }
+  const byId = new Map(references.map((ref) => [ref.id, ref]));
+  for (const ref of references) {
+    if (ref.derivedFromReferenceId !== undefined) {
+      const source = byId.get(ref.derivedFromReferenceId);
+      if (!source || source.kind !== "video") throw new TypeError("An extracted image must reference an existing video asset.");
+      if (source.permission !== "authorized" || ref.permission !== "authorized") {
+        throw new TypeError("Video and extracted frames must both be authorized before provider processing.");
+      }
+    }
   }
   if (!building.designBrief && !building.architecturalStyle && references.length === 0) {
     throw new TypeError("Provide a designBrief/style or at least one image, video, drawing or blueprint reference.");
@@ -148,8 +168,9 @@ export function planBuildingGeneration(requestValue) {
   const request = normalizeBuildingGenerationRequest(requestValue);
   const refs = request.references;
   const actualImages = refs.filter((ref) => ref.kind === "image" && ref.purpose === "actual-building");
-  const actualVideos = refs.filter((ref) => ref.kind === "video" && ref.purpose === "actual-building");
+  const actualVideos = refs.filter((ref) => ref.kind === "video" && ref.purpose === "actual-building" && ref.permission === "authorized");
   const authorized = refs.filter((ref) => ref.permission === "authorized");
+  const authorizedImages = refs.filter((ref) => ref.kind === "image" && ref.permission === "authorized");
   const authorizedActualImages = actualImages.filter((ref) => ref.permission === "authorized");
   const planImages = refs.filter((ref) => ["floor-plan", "elevation", "blueprint"].includes(ref.kind));
   const hasRectangle = Boolean(request.building.footprint?.widthMeters && request.building.footprint?.depthMeters);
@@ -170,7 +191,7 @@ export function planBuildingGeneration(requestValue) {
       request.building.dimensions.floorToFloorHeightMeters !== undefined) {
     qualityNotes.push("Total height is derived from floor count and floor-to-floor height; roof/parapet can change the final height.");
   }
-  if (!actualImages.length && !actualVideos.length) qualityNotes.push("No actual-building photo/video is supplied; appearance will be based on parameters and optional style references.");
+  if (!authorizedActualImages.length && !actualVideos.length) qualityNotes.push("No authorized actual-building photo/video is supplied; model appearance must not be claimed as a verified reconstruction.");
   if (refs.some((ref) => ref.permission !== "authorized") && request.allowExternalProviderProcessing) {
     warnings.push("Some references are not marked authorized. Only explicitly authorized assets may be sent to an external generation provider.");
   }
@@ -236,7 +257,7 @@ export function planBuildingGeneration(requestValue) {
     };
   }
 
-  if (authorizedActualImages.length === 0 && authorized.length === 0) {
+  if (authorizedImages.length === 0 && actualVideos.length === 0) {
     warnings.push("No reference is explicitly authorized for external generation.");
     if (canGenerateParametricBase) {
       stages.push("generate-parametric-base", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
@@ -258,7 +279,7 @@ export function planBuildingGeneration(requestValue) {
     return { strategy: "parametric-plus-ai-multiview", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
   }
 
-  if (authorizedActualImages.length > 0 || authorized.length > 0) {
+  if (authorizedImages.length > 0) {
     stages.push(...(canGenerateParametricBase ? ["generate-parametric-base"] : []), "submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
     qualityNotes.push("Single-view generation is an appearance candidate. Hidden/back-side geometry is inferred and must not be labelled verified.");
     return { strategy: "parametric-plus-ai-image", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
