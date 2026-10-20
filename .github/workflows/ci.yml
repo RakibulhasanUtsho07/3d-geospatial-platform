@@ -57,6 +57,9 @@ jobs:
       - name: Test video keyframe extraction
         run: npm run test:video-frame-extractor
 
+      - name: Test generated GLB validation and download
+        run: npm run test:glb-validation
+
       - name: Test Tripo image and multiview provider adapter
         run: npm run test:tripo-client
 
