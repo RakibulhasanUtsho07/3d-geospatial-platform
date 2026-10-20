@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { generateParametricBuildingGlb } from "../src/core/building-generation/procedural-builder.mjs";
+import { inspectGeneratedGlb } from "../src/core/building-generation/glb-validation.mjs";
 
 function request(overrides = {}) {
   return {
@@ -74,4 +75,48 @@ test("rejects self-intersecting, degenerate or missing dimensions", () => {
   assert.throws(() => generateParametricBuildingGlb(request({
     footprint: undefined,
   })), /footprint/i);
+});
+
+test("generates gable and hip roof geometry with the requested overall height", () => {
+  const gable = generateParametricBuildingGlb(request({ roofType: "gable" }));
+  const hip = generateParametricBuildingGlb(request({ roofType: "hip" }));
+  const gableJson = readGlbJson(gable.glb);
+  const hipJson = readGlbJson(hip.glb);
+  assert.equal(gable.metadata.roofType, "gable");
+  assert.equal(hip.metadata.roofType, "hip");
+  assert.equal(gableJson.extras.roofType, "gable");
+  assert.equal(hipJson.extras.roofType, "hip");
+  assert.ok(Math.abs(inspectGeneratedGlb(gable.glb).bounds.max[1] - 15) < 1e-4);
+  assert.ok(Math.abs(inspectGeneratedGlb(hip.glb).bounds.max[1] - 15) < 1e-4);
+  assert.ok(gable.metadata.primitiveCount > 3);
+  assert.ok(hip.metadata.primitiveCount > 3);
+});
+
+test("adds explicit balconies, railings, columns and arched facade details", () => {
+  const output = generateParametricBuildingGlb(request({
+    roofType: "flat",
+    architecturalFeatures: {
+      windowStyle: "arched",
+      entranceStyle: "arched",
+      balconies: { enabled: true, floors: [2, 3, 4], count: 2, widthRatio: 0.7, depthMeters: 1.25, railing: true },
+      columns: { frontCount: 2, widthMeters: 0.3, heightMeters: 3.1 },
+    },
+  }));
+  const gltf = readGlbJson(output.glb);
+  const materialNames = gltf.materials.map((material) => material.name);
+  assert.ok(materialNames.includes("Balcony concrete"));
+  assert.ok(materialNames.includes("Balcony railing metal"));
+  assert.ok(materialNames.includes("Facade columns"));
+  assert.ok(output.metadata.primitiveCount > 5);
+  assert.equal(output.metadata.architecturalFeatures.windowStyle, "arched");
+  assert.equal(inspectGeneratedGlb(output.glb).valid, true);
+});
+
+test("falls back explicitly when a pitched roof is requested for a polygon footprint", () => {
+  const output = generateParametricBuildingGlb(request({
+    roofType: "gable",
+    footprint: { polygonXYMeters: [[0, 0], [12, 0], [12, 4], [5, 4], [5, 10], [0, 10]] },
+  }));
+  assert.equal(output.metadata.roofType, "flat");
+  assert.ok(output.metadata.warnings.some((warning) => warning.includes("require a measured rectangular")));
 });
