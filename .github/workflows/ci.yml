@@ -9,6 +9,7 @@ on:
       - feat/generated-building-model-layer
       - feat/building-generation-core
       - feat/building-media-intake
+      - feat/colmap-reconstruction-worker
   pull_request:
     branches:
       - main
@@ -52,6 +53,9 @@ jobs:
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
+
+      - name: Test textured PLY conversion and COLMAP reconstruction worker contract
+        run: npm run test:colmap-worker
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget

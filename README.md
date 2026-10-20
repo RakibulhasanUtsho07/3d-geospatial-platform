@@ -53,22 +53,25 @@ If the app reports that the Overture pilot dataset is missing, ensure the source
 
 ## Building Generation Engine (first slice)
 
-The current engine validates a versioned, source-aware BuildingSpec and generates a parametric GLB plus a JSON provenance/QA report. The initial mesh supports footprint-based walls, windows/frames, a door, repeated front balconies, flat/terrace roof cap and parapet. The schema is documented in [building-generation-spec.schema.json](building-generation-spec.schema.json).
+The current engine validates a versioned, source-aware BuildingSpec and generates a deterministic parametric GLB with a JSON provenance/QA report. It includes local image/video intake, content-addressed assets, bounded FFmpeg video-frame extraction, and an opt-in COLMAP multi-view reconstruction adapter with textured PLY-to-GLB conversion.
 
-```powershell
+~~~powershell
 npm run test:building-generation
 npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifacts/dhaka-demo-01.glb
-```
-
-Media intake and video-frame extraction commands:
-
-```powershell
 npm run test:building-media
 npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
-```
+npm run test:colmap-worker
+~~~
 
-Create `E:\Building-Engine-Workspace\uploads` and put the local file there first. FFmpeg must be installed and available on `PATH` for video input. Intake stores a private copy below `.building-engine/media/` inside that workspace and writes JSON provenance records. Licences default to `unknown` and usage to `unreviewed` until explicitly confirmed. Images/videos are not yet interpreted into facade geometry; sampled frames are inputs for a future photogrammetry/reconstruction worker. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md).
+For media intake, create E:\Building-Engine-Workspace\uploads and put a local input file there first. FFmpeg must be installed and available on PATH for video input. Media is copied beneath .building-engine/media/ in that workspace, with SHA-256 provenance metadata. By default, licences are unknown and use is unreviewed; record and confirm real rights before publishing or reconstruction.
 
+For a reviewed multi-view photogrammetry candidate, prepare a BuildingSpec whose sources match the ingested file IDs, licence values, asset IDs and usageStatus: approved. Then run from PowerShell:
+
+~~~powershell
+npm run reconstruct:building-media -- E:\Building-Engine-Workspace .\building-spec.json recon-job-01 front-photo,side-photo,back-photo Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed --model-distance 10 --real-distance-m 25 --quality MEDIUM
+~~~
+
+The scale arguments say a known 10-model-unit baseline corresponds to 25 metres. Omit both only for a provisional-scale preview. COLMAP must be installed separately. The generated GLB is intentionally marked completed-requires-review, mapReady: false and publicationEligible: false: GPS metadata alone does not register a local mesh precisely to WGS84, and this worker does not publish anything to /map. See the Building Generation Engine guide for the remaining review gates.
 ## Geospatial data pipeline
 
 Generate the coarse spatial tiles and manifest from the pilot dataset:
