@@ -174,6 +174,12 @@ function align4(buffer) {
   return Buffer.concat([buffer, Buffer.alloc(padding)]);
 }
 
+function alignJson4(buffer) {
+  const padding = (4 - (buffer.length % 4)) % 4;
+  if (!padding) return buffer;
+  return Buffer.concat([buffer, Buffer.alloc(padding, 0x20)]);
+}
+
 /**
  * Generate a deterministic LOD/prototype building shell. This is deliberately
  * a dimension-controlled fallback, not a photo reconstruction or a structural BIM.
@@ -479,7 +485,7 @@ export function generateParametricBuildingGlb(requestValue) {
     },
   };
 
-  const jsonChunk = align4(Buffer.from(JSON.stringify(gltf), "utf8"));
+  const jsonChunk = alignJson4(Buffer.from(JSON.stringify(gltf), "utf8"));
   const binChunk = align4(binary);
   const totalLength = 12 + 8 + jsonChunk.length + 8 + binChunk.length;
   const glb = Buffer.alloc(totalLength);
