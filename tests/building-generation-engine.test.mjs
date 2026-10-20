@@ -129,3 +129,90 @@ test("does not route research-only video frames to the provider", async () => {
     references: [video, ...frames],
   }), TypeError);
 });
+
+test("uploads protected image assets to the provider without exposing internal asset IDs", async () => {
+  let uploadedBytes;
+  let submittedInput;
+  const engine = createBuildingGenerationEngine({
+    loadAsset: async (assetId) => {
+      assert.equal(assetId, "asset-front");
+      return { bytes: new Uint8Array([255, 216, 255, 217]), filename: "front.jpg", contentType: "image/jpeg" };
+    },
+    tripoClient: {
+      async uploadImage(options) { uploadedBytes = options.bytes; return { fileToken: "file_uploaded123" }; },
+      async submitImage(options) { submittedInput = options.input; return { taskId: "task_uploaded1" }; },
+    },
+  });
+  const result = await engine.submitReferenceCandidate({
+    ...base, quality: "reference-assisted", allowExternalProviderProcessing: true,
+    references: [{ ...image("front", "front"), providerFileToken: undefined }],
+  });
+  assert.deepEqual([...uploadedBytes], [255, 216, 255, 217]);
+  assert.equal(submittedInput, "file_uploaded123");
+  assert.deepEqual(result.uploadedReferences, [{ referenceId: "front", providerFileToken: "file_uploaded123" }]);
+});
+
+test("extracts video frames into provenance-linked, Admin-reviewable image references", async () => {
+  const { mkdtemp, mkdir, rm, stat } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const root = await mkdtemp(join(tmpdir(), "building-engine-test-"));
+  const workDirectory = join(root, "work");
+  await mkdir(workDirectory);
+  let removed = false;
+  let extractedOptions;
+  let stored = 0;
+  const video = { id: "walkthrough", assetId: "video-asset", kind: "video", purpose: "actual-building", permission: "authorized", licence: "admin-upload" };
+  const engine = createBuildingGenerationEngine({
+    resolveVideoAssetPath: async (assetId) => { assert.equal(assetId, "video-asset"); return join(root, "private-source.mp4"); },
+    createVideoWorkDirectory: async () => workDirectory,
+    removeVideoWorkDirectory: async (directory) => { removed = true; assert.equal(directory, workDirectory); await rm(directory, { recursive: true, force: true }); },
+    extractVideo: async (options) => {
+      extractedOptions = options;
+      return {
+        inputPath: options.inputPath, outputDirectory: options.outputDirectory, durationSeconds: 8, samplingFps: 0.5,
+        frames: [
+          { index: 0, filename: "frame_0000.jpg", path: join(options.outputDirectory, "frame_0000.jpg"), timestampSeconds: 1.25, timestampConfidence: "ffmpeg-presentation-timestamp", sourceVideoPath: options.inputPath },
+          { index: 1, filename: "frame_0001.jpg", path: join(options.outputDirectory, "frame_0001.jpg"), timestampSeconds: 3.5, timestampConfidence: "ffmpeg-presentation-timestamp", sourceVideoPath: options.inputPath },
+        ],
+        notes: ["Admin must inspect the frames."],
+      };
+    },
+    storeFrameAsset: async ({ path: framePath, sourceVideoAssetId, timestampSeconds }) => {
+      assert.ok(framePath.endsWith(".jpg"));
+      assert.equal(sourceVideoAssetId, "video-asset");
+      stored += 1;
+      return { assetId: "saved-frame-" + Math.round(timestampSeconds * 100) };
+    },
+  });
+  const prepared = await engine.prepareVideoFrames({
+    ...base, references: [video],
+  }, { videoReferenceId: "walkthrough", extractionOptions: { fps: 0.25, maxFrames: 8 } });
+  assert.equal(extractedOptions.inputPath, join(root, "private-source.mp4"));
+  assert.ok(extractedOptions.outputDirectory.startsWith(workDirectory));
+  assert.equal(extractedOptions.fps, 0.25);
+  assert.equal(stored, 2);
+  assert.equal(prepared.reviewRequired, true);
+  assert.equal(prepared.frameReferences[0].kind, "image");
+  assert.equal(prepared.frameReferences[0].view, "unknown");
+  assert.equal(prepared.frameReferences[0].derivedFromReferenceId, "walkthrough");
+  assert.equal(prepared.frameReferences[1].timestampSeconds, 3.5);
+  assert.equal(prepared.request.references.length, 3);
+  assert.equal(removed, true);
+  await assert.rejects(stat(workDirectory), { code: "ENOENT" });
+  await rm(root, { recursive: true, force: true });
+});
+
+test("does not extract a video reference without explicit processing authorization", async () => {
+  let resolverCalled = false;
+  const engine = createBuildingGenerationEngine({
+    resolveVideoAssetPath: async () => { resolverCalled = true; return "/private/video.mp4"; },
+    storeFrameAsset: async () => ({ assetId: "frame-1" }),
+    extractVideo: async () => { throw new Error("should not start extraction"); },
+  });
+  await assert.rejects(engine.prepareVideoFrames({
+    ...base,
+    references: [{ id: "video1", assetId: "video1-asset", kind: "video", purpose: "actual-building", permission: "research-only" }],
+  }, { videoReferenceId: "video1" }), (error) => error.code === "video-processing-not-authorized");
+  assert.equal(resolverCalled, false);
+});
