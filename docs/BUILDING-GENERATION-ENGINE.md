@@ -1,6 +1,6 @@
 # Building Generation Engine
 
-Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, and a TripoSR single-image preview adapter are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
+Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, image-quality preflight, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, and a TripoSR single-image preview adapter are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
 
 ## 1. Baseline input → 3D model
 
@@ -48,6 +48,12 @@ npm run test:colmap-worker
 npm run reconstruct:building-media -- <workspaceRoot> <buildingSpec.json> <jobId> <sourceId1,sourceId2,sourceId3> <sourceUpAxis> --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed
 ~~~
 
+### Image quality preflight
+
+Before COLMAP starts, the worker samples each staged image through FFmpeg as a 64x64 grayscale thumbnail. It records dimensions, mean luminance, contrast standard deviation, Laplacian-variance blur heuristic, and a 64-bit perceptual difference hash. Cross-view hashes flag potentially near-duplicate images and video frames. A preflight result is a warning/review signal only: it does not automatically discard images or claim to understand camera pose, identify a building, prove overlap or validate architectural accuracy.
+
+Install FFmpeg on the reconstruction worker and run `npm run test:image-quality-preflight` to test the heuristics. If FFmpeg cannot decode a selected image, the job fails with an explicit preflight diagnostic instead of silently treating the image as good input.
+
 ### Mandatory output gates
 
 - **Rights and provenance:** source file bytes must match recorded SHA-256, usage must be approved and a known licence must be recorded.
@@ -78,7 +84,7 @@ This is a single-view inference route, appropriate for visual preview/asset draf
 
 ## 6. Next milestones
 
-1. Image QA: blur/duplicate checks, frame sampling review, camera-pose quality and same-building/overlap assistance.
+1. Improved view selection: frame sampling review, camera-pose quality, field-of-view and same-building/overlap assistance (basic blur/duplicate preflight now exists).
 2. Ground control: measured baseline inputs tied to named points, heading/front direction and horizontal/vertical datum registration.
 3. Image-to-model QA: compare AI-proposed rear/roof geometry against independent multi-view evidence and never merge low-confidence surfaces silently.
 4. Mesh QA: scale/axis checks, degenerate triangles, holes/occlusion notes, texture quality and a side-by-side reference review report.
