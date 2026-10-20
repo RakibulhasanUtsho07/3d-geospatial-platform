@@ -133,7 +133,7 @@ export function createBuildingGenerationEngine({
     const workDirectory = await createVideoWorkDirectory();
     const outputDirectory = join(workDirectory, "frames");
     try {
-      const extraction = await extractVideo({ inputPath, outputDirectory, signal, ...extractionOptions });
+      const extraction = await extractVideo({ ...extractionOptions, inputPath, outputDirectory, signal });
       const frameReferences = [];
       for (const frame of extraction.frames) {
         const stored = await storeFrameAsset({
@@ -164,7 +164,7 @@ export function createBuildingGenerationEngine({
       }
       const updatedRequest = normalizeBuildingGenerationRequest({
         ...request,
-        references: [...request.references, ...frameReferences],
+        references: [...request.references.filter((reference) => reference.derivedFromReferenceId !== video.id), ...frameReferences],
       });
       return {
         request: updatedRequest,
