@@ -34,7 +34,8 @@
     "test:tripo-client": "node --test tests/tripo-client.test.mjs",
     "test:procedural-builder": "node --test tests/procedural-builder.test.mjs",
     "test:building-generation-engine": "node --test tests/building-generation-engine.test.mjs",
-    "generate:building-model": "node scripts/generate-building-model.mjs"
+    "generate:building-model": "node scripts/generate-building-model.mjs",
+    "test:video-frame-extractor": "node --test tests/video-frame-extractor.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
