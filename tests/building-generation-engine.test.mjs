@@ -256,10 +256,15 @@ test("polls a successful AI task, validates its GLB, and stores an Admin-review 
   assert.equal(result.strategy, "parametric-plus-ai-image");
   assert.equal(result.validation.valid, true);
   assert.equal(result.validation.contentType, "model/gltf-binary");
+  assert.equal(result.alignment.mode, "uniform-fit");
+  assert.ok(Math.abs(result.validation.bounds.min[1]) < 1e-5);
+  assert.ok(result.alignment.finalDimensions.height <= 6.2 + 1e-3);
   assert.ok(result.warnings.some((warning) => warning.toLowerCase().includes("review")));
   assert.equal(saved.taskId, "task_engine123");
   assert.equal(saved.contentType, "model/gltf-binary");
   assert.equal(saved.metadata.provenance, "external-ai-candidate");
+  assert.equal(saved.metadata.inputSummary.requestId, "engine-test-1");
+  assert.equal(saved.metadata.alignment.mode, "uniform-fit");
   assert.equal(saved.bytes.toString("ascii", 0, 4), "glTF");
 });
 
