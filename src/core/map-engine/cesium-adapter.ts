@@ -30,6 +30,7 @@ import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
 import { MAP_LAYER_IDS } from "./types";
+import { normalizeGeneratedModelDefinition } from "./generated-model-policy.mjs";
 import type {
   BuildingStyleAssignment,
   CameraTarget,
@@ -2873,6 +2874,10 @@ export class CesiumAdapter implements MapEngine {
     this.heritageManifestAssets = null;
     this.heritageManifestPromise = null;
 
+    // Invalidate pending generated-model loads before destroying the viewer.
+    for (const record of this.generatedModels.values()) record.revision += 1;
+    this.generatedModels.clear();
+
     // Prevent requests from surviving a retry or component unmount.
     this.viewportRequestAbortController?.abort();
     this.viewportRequestAbortController = null;
@@ -3301,6 +3306,138 @@ export class CesiumAdapter implements MapEngine {
       pitch: this.viewer.camera.pitch,
       roll: this.viewer.camera.roll,
     };
+  }
+
+  private createGeneratedModelMatrix(definition: GeneratedModelDefinition, Cesium: CesiumModule): import("cesium").Matrix4 {
+    const origin = Cesium.Cartesian3.fromDegrees(definition.position.longitude, definition.position.latitude, definition.position.height ?? 0);
+    const orientation = new Cesium.HeadingPitchRoll(
+      Cesium.Math.toRadians(definition.headingDegrees ?? 0),
+      Cesium.Math.toRadians(definition.pitchDegrees ?? 0),
+      Cesium.Math.toRadians(definition.rollDegrees ?? 0),
+    );
+    return Cesium.Transforms.headingPitchRollToFixedFrame(origin, orientation, Cesium.Ellipsoid.WGS84, Cesium.Transforms.eastNorthUpToFixedFrame);
+  }
+
+  private resolveGeneratedModelAxis(axis: "X" | "Y" | "Z", Cesium: CesiumModule) {
+    if (axis === "X") return Cesium.Axis.X;
+    if (axis === "Z") return Cesium.Axis.Z;
+    return Cesium.Axis.Y;
+  }
+
+  private async createGeneratedModelInstance(definition: GeneratedModelDefinition, viewer: CesiumViewer, Cesium: CesiumModule): Promise<import("cesium").Model> {
+    const options = {
+      url: definition.url,
+      modelMatrix: this.createGeneratedModelMatrix(definition, Cesium),
+      scale: definition.scale ?? 1,
+      minimumPixelSize: definition.minimumPixelSize ?? 0,
+      upAxis: this.resolveGeneratedModelAxis(definition.upAxis ?? "Y", Cesium),
+      forwardAxis: this.resolveGeneratedModelAxis(definition.forwardAxis ?? "Z", Cesium),
+      ...(definition.maximumScale === undefined ? {} : { maximumScale: definition.maximumScale }),
+    };
+    const model = await Cesium.Model.fromGltfAsync(options);
+    if (this.viewer !== viewer || viewer.isDestroyed()) {
+      if (!model.isDestroyed()) model.destroy();
+      throw new Error("The map was destroyed while the generated model was loading.");
+    }
+    return model;
+  }
+
+  /** Add one validated GLB model to the existing Cesium map. */
+  async addGeneratedModel(definition: GeneratedModelDefinition): Promise<void> {
+    const normalized = normalizeGeneratedModelDefinition(definition);
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) throw new Error("The map must be initialized before adding a generated model.");
+    if (this.generatedModels.has(normalized.id)) throw new Error("A generated model with ID \"" + normalized.id + "\" already exists.");
+
+    const record: GeneratedModelRecord = { definition: normalized, model: null, revision: 1 };
+    const revision = record.revision;
+    this.generatedModels.set(normalized.id, record);
+    let model: import("cesium").Model | null = null;
+    try {
+      model = await this.createGeneratedModelInstance(normalized, viewer, Cesium);
+      if (this.viewer !== viewer || viewer.isDestroyed() || this.generatedModels.get(normalized.id) !== record || record.revision !== revision) {
+        if (!model.isDestroyed()) model.destroy();
+        return;
+      }
+      model.show = record.definition.show ?? true;
+      viewer.scene.primitives.add(model);
+      record.model = model;
+      viewer.scene.requestRender();
+    } catch (error: unknown) {
+      if (model && !model.isDestroyed() && record.model !== model) model.destroy();
+      if (this.generatedModels.get(normalized.id) === record && record.model === null) this.generatedModels.delete(normalized.id);
+      throw error;
+    }
+  }
+
+  /** Update placement or stage a replacement before removing the old asset. */
+  async updateGeneratedModel(id: string, patch: GeneratedModelUpdate): Promise<void> {
+    const record = this.generatedModels.get(id);
+    if (!record) throw new Error("Generated model not found: " + id);
+    const viewer = this.viewer;
+    const Cesium = this.cesium;
+    if (!viewer || !Cesium || viewer.isDestroyed()) throw new Error("The map must be initialized before updating a generated model.");
+    const nextDefinition = normalizeGeneratedModelDefinition({ ...record.definition, ...patch, id });
+    const revision = ++record.revision;
+
+    if (record.model && nextDefinition.url === record.definition.url) {
+      record.model.modelMatrix = this.createGeneratedModelMatrix(nextDefinition, Cesium);
+      record.model.scale = nextDefinition.scale ?? 1;
+      record.model.minimumPixelSize = nextDefinition.minimumPixelSize ?? 0;
+      if (nextDefinition.maximumScale !== undefined) record.model.maximumScale = nextDefinition.maximumScale;
+      record.model.show = nextDefinition.show ?? true;
+      record.definition = nextDefinition;
+      viewer.scene.requestRender();
+      return;
+    }
+
+    let replacement: import("cesium").Model | null = null;
+    try {
+      replacement = await this.createGeneratedModelInstance(nextDefinition, viewer, Cesium);
+      if (this.viewer !== viewer || viewer.isDestroyed() || this.generatedModels.get(id) !== record || record.revision !== revision) {
+        if (!replacement.isDestroyed()) replacement.destroy();
+        return;
+      }
+      replacement.show = false;
+      viewer.scene.primitives.add(replacement);
+      const previous = record.model;
+      record.model = replacement;
+      record.definition = nextDefinition;
+      replacement.show = nextDefinition.show ?? true;
+      if (previous && !previous.isDestroyed()) viewer.scene.primitives.remove(previous, true);
+      viewer.scene.requestRender();
+    } catch (error: unknown) {
+      if (replacement && !replacement.isDestroyed() && record.model !== replacement) replacement.destroy();
+      throw error;
+    }
+  }
+
+  setGeneratedModelVisibility(id: string, visible: boolean): boolean {
+    const record = this.generatedModels.get(id);
+    if (!record) return false;
+    if (typeof visible !== "boolean") throw new TypeError("Model visibility must be a boolean.");
+    record.definition = normalizeGeneratedModelDefinition({ ...record.definition, show: visible });
+    if (record.model && !record.model.isDestroyed()) record.model.show = visible;
+    if (this.viewer && !this.viewer.isDestroyed()) this.viewer.scene.requestRender();
+    return true;
+  }
+
+  removeGeneratedModel(id: string): boolean {
+    const record = this.generatedModels.get(id);
+    if (!record) return false;
+    record.revision += 1;
+    this.generatedModels.delete(id);
+    const viewer = this.viewer;
+    if (record.model && !record.model.isDestroyed() && viewer && !viewer.isDestroyed()) {
+      viewer.scene.primitives.remove(record.model, true);
+      viewer.scene.requestRender();
+    }
+    return true;
+  }
+
+  getGeneratedModelIds(): string[] {
+    return [...this.generatedModels.keys()];
   }
 
   getCapabilities(): MapEngineCapabilities {
