@@ -15,7 +15,7 @@ function png(width=1024,height=768,tail=0){
 async function workspace(t){const root=await mkdtemp(path.join(os.tmpdir(),"media-quality-"));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 async function intake(root,sourceId,{licence="CC BY 4.0",usageStatus="approved"}={}){
  const inputDir=path.join(root,"uploads");await mkdir(inputDir,{recursive:true});
- await writeFile(path.join(inputDir,sourceId+".png"),png(1024,768,sourceId.length));
+ const tail=Array.from(sourceId).reduce((sum,char)=>sum+char.charCodeAt(0),0)%200;await writeFile(path.join(inputDir,sourceId+".png"),png(1024,768,tail));
  return await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/"+sourceId+".png",buildingId:"quality-demo",sourceId,kind:"image",licence,usageStatus,title:sourceId});
 }
 function testPixels(pattern){

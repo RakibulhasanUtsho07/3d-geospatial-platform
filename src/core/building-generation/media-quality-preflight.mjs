@@ -8,7 +8,6 @@ const MAX_SOURCE_COUNT = 120;
 const SAMPLE_SIDE = 64;
 const SAMPLE_BYTES = SAMPLE_SIDE * SAMPLE_SIDE;
 
-function inRange(value, min, max) { return Number.isFinite(value) && value >= min && value <= max; }
 function readDimensions(buffer, mimeType) {
   if (mimeType === "image/png") {
     if (buffer.length < 24 || buffer.subarray(0, 8).compare(Buffer.from([137,80,78,71,13,10,26,10])) !== 0 || buffer.toString("ascii", 12, 16) !== "IHDR") {
