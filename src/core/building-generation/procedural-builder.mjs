@@ -219,12 +219,16 @@ export function generateParametricBuildingGlb(requestValue) {
 
   const colors = Array.isArray(building.facadeColours) ? building.facadeColours : [];
   const facadeColor = readHexColour(colors.find((color) => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)), PALETTE.facade);
+  const trimColor = readHexColour(colors.find((color, index) => index > 0 && typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)), PALETTE.trim);
   const materials = [
     makeMaterial("Facade plaster", facadeColor),
-    makeMaterial("Floor bands and window frames", PALETTE.trim),
+    makeMaterial("Floor bands and window frames", trimColor),
     makeMaterial("Window glass", PALETTE.glass, 0.05, 0.3),
     makeMaterial("Roof", PALETTE.roof),
     makeMaterial("Entrance door", PALETTE.door),
+    makeMaterial("Balcony concrete", [0.72, 0.70, 0.66, 1]),
+    makeMaterial("Balcony railing metal", [0.22, 0.25, 0.27, 1], 0.45, 0.55),
+    makeMaterial("Facade columns", facadeColor),
   ];
   const meshes = materials.map(() => ({ positions: [], normals: [], indices: [] }));
 
@@ -270,12 +274,46 @@ export function generateParametricBuildingGlb(requestValue) {
     return [point[0] + offsetX, y, point[1] + offsetZ];
   }
 
+  function addOrientedBox(centerX, centerZ, tangentX, tangentZ, normalX, normalZ, width, depth, bottomY, topY, materialIndex) {
+    const halfWidth = width / 2;
+    const halfDepth = depth / 2;
+    const point = (along, outward, y) => [
+      centerX + tangentX * along + normalX * outward,
+      y,
+      centerZ + tangentZ * along + normalZ * outward,
+    ];
+    const bl = point(-halfWidth, -halfDepth, bottomY);
+    const br = point(halfWidth, -halfDepth, bottomY);
+    const fr = point(halfWidth, halfDepth, bottomY);
+    const fl = point(-halfWidth, halfDepth, bottomY);
+    const BL = point(-halfWidth, -halfDepth, topY);
+    const BR = point(halfWidth, -halfDepth, topY);
+    const FR = point(halfWidth, halfDepth, topY);
+    const FL = point(-halfWidth, halfDepth, topY);
+    addQuad(materialIndex, BL, BR, FR, FL, [0, 1, 0]);
+    addQuad(materialIndex, bl, fl, fr, br, [0, -1, 0]);
+    addQuad(materialIndex, bl, br, BR, BL, [-normalX, 0, -normalZ]);
+    addQuad(materialIndex, fr, fl, FL, FR, [normalX, 0, normalZ]);
+    addQuad(materialIndex, fl, bl, BL, FL, [-tangentX, 0, -tangentZ]);
+    addQuad(materialIndex, br, fr, FR, BR, [tangentX, 0, tangentZ]);
+  }
+
   const points = footprint.points;
-  const parapetHeight = typeof building.roofType === "string" && /parapet/i.test(building.roofType)
+  const roofDescription = typeof building.roofType === "string" ? building.roofType.toLowerCase() : "flat";
+  let roofMode = /\bhip\b/.test(roofDescription) ? "hip" : /\bgable\b|\bpitched\b/.test(roofDescription) ? "gable" : "flat";
+  if (roofMode !== "flat" && !footprint.isRectangularInput) {
+    warnings.push("Gable/hip roofs currently require a measured rectangular width/depth footprint; a flat roof was generated for this polygon footprint.");
+    roofMode = "flat";
+  }
+  const roofRise = roofMode === "flat" ? 0 : Math.min(2.5, Math.max(0.5, totalHeight * 0.15));
+  const parapetHeight = roofMode === "flat" && /parapet/i.test(roofDescription)
     ? Math.min(1.2, totalHeight * 0.08)
     : 0;
-  const mainHeight = totalHeight - parapetHeight;
+  const mainHeight = totalHeight - parapetHeight - roofRise;
   const floorHeight = mainHeight / floorCount;
+  const architecturalFeatures = building.architecturalFeatures ?? {};
+  const windowStyle = architecturalFeatures.windowStyle ?? "rectangular";
+  const entranceStyle = architecturalFeatures.entranceStyle ?? "single-door";
 
   // Outer shell walls and repeated horizontal floor bands.
   for (let edgeIndex = 0; edgeIndex < points.length; edgeIndex += 1) {
