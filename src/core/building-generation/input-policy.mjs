@@ -267,7 +267,7 @@ export function planBuildingGeneration(requestValue) {
   }
 
   if (actualVideos.some((ref) => ref.permission === "authorized")) {
-    stages.push(...(canGenerateParametricBase ? ["generate-parametric-base"] : []), "submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
+    stages.push("submit-ai-generation", "poll-ai-task", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
     qualityNotes.push("Video must be converted to reviewed keyframes first. Keyframe-based AI output is not the same as calibrated photogrammetry.");
     return { strategy: "video-keyframes-then-ai", stages, canGenerateParametricBase, externalProviderRequired: true, blocked: false, warnings, missingInputs, qualityNotes };
   }
@@ -292,7 +292,6 @@ export function planBuildingGeneration(requestValue) {
 
   if (authorizedImages.length > 0) {
     stages.push(
-      ...(canGenerateParametricBase ? ["generate-parametric-base"] : []),
       "submit-image-to-multiview",
       "poll-image-to-multiview",
       "submit-multiview-to-model",
