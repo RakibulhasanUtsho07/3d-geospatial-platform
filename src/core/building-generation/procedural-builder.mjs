@@ -62,6 +62,7 @@ function segmentsIntersect(a, b, c, d) {
 
 function normalizePolygon(footprint) {
   let points;
+  const isRectangularInput = !Array.isArray(footprint.polygonXYMeters);
   if (Array.isArray(footprint.polygonXYMeters)) {
     points = footprint.polygonXYMeters.map(([x, y]) => [x, y]);
   } else if (Number.isFinite(footprint.widthMeters) && Number.isFinite(footprint.depthMeters)) {
@@ -113,6 +114,7 @@ function normalizePolygon(footprint) {
     widthMeters: bounds.maxX - bounds.minX,
     depthMeters: bounds.maxZ - bounds.minZ,
     areaSquareMeters: Math.abs(signedArea(points)),
+    isRectangularInput,
   };
 }
 
