@@ -470,6 +470,7 @@ export function createBuildingGenerationEngine({
       return {
         strategy: videos.length ? "video-keyframes-then-ai" : "parametric-plus-ai-multiview",
         ...task,
+        stage: "multiview-to-model",
         uploadedReferences: uploadTracker.uploadedReferences,
         plan,
       };
