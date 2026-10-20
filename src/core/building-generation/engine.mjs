@@ -42,8 +42,8 @@ export function buildArchitecturalTextPrompt(requestValue) {
   }
   if (building.frontAzimuthDegrees !== undefined) parts.push("Front facade heading metadata: " + building.frontAzimuthDegrees + " degrees clockwise from north.");
   if (building.roofType) parts.push("Roof type: " + clampPromptSegment(building.roofType, 80) + ".");
-  if (building.facadeMaterials?.length) parts.push("Facade material palette: " + building.facadeMaterials.map((v) => clampPromptSegment(v, 50)).join(", ") + ".");
-  if (building.facadeColours?.length) parts.push("Facade colours: " + building.facadeColours.map((v) => clampPromptSegment(v, 30)).join(", ") + ".");
+  if (building.facadeMaterials?.length) parts.push("Facade material palette: " + clampPromptSegment(building.facadeMaterials.map((v) => clampPromptSegment(v, 50)).join(", "), 180) + ".");
+  if (building.facadeColours?.length) parts.push("Facade colours: " + clampPromptSegment(building.facadeColours.map((v) => clampPromptSegment(v, 30)).join(", "), 110) + ".");
   const features = building.architecturalFeatures;
   if (features?.windowStyle) parts.push("Window style: " + features.windowStyle + ".");
   if (features?.entranceStyle) parts.push("Entrance style: " + features.entranceStyle + ".");
