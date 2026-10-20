@@ -151,7 +151,7 @@ export function normalizeBuildingGenerationRequest(value) {
   if (!building.designBrief && !building.architecturalStyle && references.length === 0) {
     throw new TypeError("Provide a designBrief/style or at least one image, video, drawing or blueprint reference.");
   }
-  if (!Object.keys(dimensions).length && references.length === 0 && !building.designBrief) {
+  if (!Object.keys(dimensions).length && references.length === 0 && !building.designBrief && !building.architecturalStyle) {
     throw new TypeError("Provide measurable dimensions, a design brief, or reference assets.");
   }
   return {
