@@ -1,3 +1,5 @@
+import { normalizeBuildingGenerationRequest } from "./input-policy.mjs";
+
 const DEFAULT_FLOOR_TO_FLOOR_METERS = 3.2;
 
 const PALETTE = Object.freeze({
@@ -180,6 +182,7 @@ function align4(buffer) {
  * a dimension-controlled fallback, not a photo reconstruction or a structural BIM.
  */
 export function generateParametricBuildingGlb(requestValue) {
+  requestValue = normalizeBuildingGenerationRequest(requestValue);
   if (!isRecord(requestValue) || !isRecord(requestValue.building)) {
     throw new TypeError("A normalized building generation request is required.");
   }
