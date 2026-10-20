@@ -6,6 +6,7 @@ import { ingestMediaFile } from "./media-intake.mjs";
 import { extractVideoFrames } from "./video-frame-extractor.mjs";
 import { reviewBuildingSource, prepareBuildingSpecSources } from "./source-workflow.mjs";
 import { generateBuildingAsset } from "./generation-pipeline.mjs";
+import { registerModelToWgs84 } from "./ground-control-registration.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const KNOWN_LICENCE=value=>typeof value==="string"&&value.trim().length>0&&!["unknown","n/a","none"].includes(value.trim().toLowerCase());
@@ -163,9 +164,14 @@ export async function runMediaToModelWorkflow(options){
   };
   runReport.strategyPlan=result.plan;
   runReport.modelReport=result.report;
+  if(options.controlPoints!==undefined){
+   runReport.georeference=registerModelToWgs84({controlPoints:options.controlPoints,maxRmsErrorM:options.maxGcpRmsErrorM,maxResidualM:options.maxGcpResidualM});
+   runReport.warnings.push("Ground-control registration was calculated; verify that each model X/Z coordinate identifies the corresponding physical feature in this exact GLB.");
+   runReport.warnings.push("Vertical height datum remains unresolved; horizontal registration alone does not make the model publishable.");
+  }
   runReport.mapReady=false;
   runReport.publicationEligible=false;
-  runReport.warnings=[...new Set([...(result.report?.warnings??[]),...(result.warning?[result.warning]:[]),"The workflow produces a review candidate only; it does not publish assets to /map."])];
+  runReport.warnings=[...new Set([...(runReport.warnings??[]),...(result.report?.warnings??[]),...(result.warning?[result.warning]:[]),"The workflow produces a review candidate only; it does not publish assets to /map."])];
   await atomicJson(runReportPath,runReport);
   return {workflowDir:realWorkflowDir,modelPath:finalModelPath,specPath,reportPath:runReportPath,report:runReport};
  }catch(error){

@@ -15,6 +15,7 @@ on:
       - feat/multiview-image-quality-preflight
       - feat/generated-model-geometry-qa
       - feat/unified-media-to-3d-cli
+      - feat/building-ground-control-registration
   pull_request:
     branches:
       - main
@@ -64,6 +65,9 @@ jobs:
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
+
+      - name: Test ground-control WGS84 registration math
+        run: npm run test:ground-control-registration
 
       - name: Test end-to-end media-to-model orchestration
         run: npm run test:media-to-model-workflow

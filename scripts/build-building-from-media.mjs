@@ -27,10 +27,13 @@ const {values,positionals}=parseArgs({
   "reconstruction-timeout-ms":{type:"string",default:"3600000"},
   "ai-timeout-ms":{type:"string",default:"1800000"},
   "heading-degrees":{type:"string",default:"0"},
+  "control-points":{type:"string"},
+  "max-gcp-rms-m":{type:"string",default:"0.5"},
+  "max-gcp-residual-m":{type:"string",default:"1.0"},
  }
 });
 function usage(){
- console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable>\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
+ console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --control-points <gcp.json> --max-gcp-rms-m 0.5 --max-gcp-residual-m 1.0\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable>\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
 }
 function asList(value){return value===undefined?[]:Array.isArray(value)?value:[value];}
 function parsePairs(raw,label){
@@ -73,6 +76,7 @@ try{
  const realDistanceM=values["real-distance-m"]===undefined?undefined:numeric(values["real-distance-m"],"--real-distance-m");
  const workspaceRoot=path.resolve(workspaceRootArg);
  const buildingSpec=JSON.parse(await readFile(path.resolve(baseSpecArg),"utf8"));
+ const controlPoints=values["control-points"]===undefined?undefined:JSON.parse(await readFile(path.resolve(values["control-points"]),"utf8"));
  const result=await runMediaToModelWorkflow({
   workspaceRoot,buildingSpec,jobId,sources,viewSourceIds,strategy:values.strategy,
   confirmRights:values["confirm-rights"],confirmSingleViewInference:values["confirm-single-view-inference"],
@@ -87,6 +91,9 @@ try{
   reconstructionTimeoutMs:numeric(values["reconstruction-timeout-ms"],"--reconstruction-timeout-ms"),
   singleImageTimeoutMs:numeric(values["ai-timeout-ms"],"--ai-timeout-ms"),
   headingDegrees:numeric(values["heading-degrees"],"--heading-degrees"),
+  controlPoints,
+  maxGcpRmsErrorM:numeric(values["max-gcp-rms-m"],"--max-gcp-rms-m"),
+  maxGcpResidualM:numeric(values["max-gcp-residual-m"],"--max-gcp-residual-m"),
  });
  console.log(JSON.stringify({
   workflowDirectory:path.relative(workspaceRoot,result.workflowDir).split(path.sep).join("/"),
@@ -95,7 +102,11 @@ try{
   reportPath:path.relative(workspaceRoot,result.reportPath).split(path.sep).join("/"),
   mode:result.report.mode,status:result.report.status,modelBytes:result.report.output.modelBytes,
   modelSha256:result.report.output.modelSha256,mapReady:result.report.mapReady,
-  publicationEligible:result.report.publicationEligible,warnings:result.report.warnings,
+  publicationEligible:result.report.publicationEligible,
+  georeferenceStatus:result.report.georeference?.status??"not-solved",
+  georeferenceRmsErrorM:result.report.georeference?.controls?.rmsErrorM??null,
+  modelOrigin:result.report.georeference?.transform?.modelOrigin??null,
+  warnings:result.report.warnings,
  },null,2));
 }catch(error){
  console.error(JSON.stringify({error:error instanceof Error?error.message:String(error),reportPath:error?.reportPath},null,2));
