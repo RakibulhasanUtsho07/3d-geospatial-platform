@@ -5,6 +5,7 @@ import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
+import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_IMAGE_COUNT=120,MAX_TOTAL_INPUT_BYTES=500*1024*1024;
@@ -137,8 +138,8 @@ export async function runColmapReconstruction(options){
   if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
   const modelPath=path.join(outputJobDir,"model.glb"),converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
   await writeFile(modelPath,converted.glb,{flag:"wx",mode:0o600});
-  const glbSha256=createHash("sha256").update(converted.glb).digest("hex");
-  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
+  const glbSha256=createHash("sha256").update(converted.glb).digest("hex"),modelQuality=analyzeGlbQuality(converted.glb);
+  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
   report.warnings.push("Photogrammetry was run, but this worker does not compute ground-control-point registration to WGS84; the BuildingSpec location is a placement hint only.");
   report.warnings.push("Human review is required for scale, vertical axis, front-facing heading, mesh completeness, texture seams, occlusion and same-building identity.");
   if(!calibration.scaleCalibrated)report.warnings.push("No real-world scale was supplied; 1 model unit was provisionally treated as 1 metre for preview only.");

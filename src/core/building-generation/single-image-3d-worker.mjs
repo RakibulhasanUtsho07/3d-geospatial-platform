@@ -3,6 +3,7 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_MODEL_BYTES=500*1024*1024;
@@ -105,10 +106,11 @@ export async function runSingleImage3D(options){
   report.durationMs=Date.now()-begin;
   const outputPath=path.join(outputDir,"0","mesh.glb"),output=await requiredRegularFile(outputPath,"TripoSR GLB output");
   if(output.size>MAX_MODEL_BYTES)throw new RangeError("TripoSR GLB output exceeds 500 MB");
-  const bytes=await readFile(output.path),parsed=parseGlb(bytes),sha256=createHash("sha256").update(bytes).digest("hex");
+  const bytes=await readFile(output.path),parsed=parseGlb(bytes),modelQuality=analyzeGlbQuality(bytes),sha256=createHash("sha256").update(bytes).digest("hex");
   const modelPath=path.join(realJobDir,"model.glb");
   await writeFile(modelPath,bytes,{flag:"wx",mode:0o600});
   report.status="ai-proposed-requires-review";report.completedAt=new Date().toISOString();
+  report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");
   report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:bytes.length,sha256,meshCount:parsed.meshCount}};
   report.runner={executable:pythonPath,scriptPath:runner.path,stdoutTail:processResult.stdout.slice(-2000),stderrTail:processResult.stderr.slice(-4000)};
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
