@@ -56,6 +56,16 @@ If the app reports that the Overture pilot dataset is missing, ensure the source
 
 The engine supports three routes: information/measurements → deterministic procedural GLB; approved multi-view images/video frames → COLMAP textured reconstruction candidate; and one approved image → TripoSR AI-proposed preview. Each route retains source provenance, confidence labels and a QA report.
 
+A single local command now orchestrates **BuildingSpec + image/video inputs → source-rights metadata → (video frame extraction) → chosen generation route → GLB + workflow QA report**. Example with an image:
+
+~~~powershell
+npm run build:building-from-media -- E:\Building-Engine-Workspace .\building-spec-base.json dhaka-job-01 --source front-photo=uploads\front.jpg --licence "front-photo=CC BY 4.0" --author "front-photo=Photographer Name" --attribution "front-photo=Required source credit" --confirm-rights --strategy procedural
+~~~
+
+For a video input, use --source site-walk=uploads\site-walk.mp4 --licence "site-walk=CC BY 4.0" --confirm-rights; FFmpeg extracts a bounded set of child frame records. To preview one image using locally installed TripoSR, add --strategy single-image-ai --views front-photo --runner-script E:\Tools\TripoSR\run.py --confirm-single-view-inference --device cuda:0. To use COLMAP, provide 3+ selected overlapping views via --views front-photo,side-photo,site-walk-frame-000001, --strategy photogrammetry, --up-axis Z, and --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed; install COLMAP separately.
+
+The base BuildingSpec must already contain the building’s real footprint, location and whatever measured dimensions/style facts are available. Unknown facts stay unknown: an image/video is not silently treated as measured scale or as a precise WGS84 survey. The command writes the model, normalized BuildingSpec and workflow report under .building-engine/jobs/<buildingId>/<jobId>-workflow. Results remain review candidates, never auto-published to /map.
+
 ~~~powershell
 npm run test:glb-geometry-qa
 npm run test:building-generation
@@ -120,6 +130,7 @@ npm run test:building-style
 npm run test:building-generation
 npm run test:building-media
 npm run test:building-source-workflow
+npm run test:media-to-model-workflow
 npm run test:colmap-worker
 npm run test:single-image-3d
 npm run build:geospatial-tiles
