@@ -1,6 +1,6 @@
 # Engine-first plan: information, photos and video to 3D building
 
-**Status:** engine-core prototype. It now validates/normalizes requests, plans the evidence-based route, generates a parametric GLB from metric dimensions, offers a local CLI, and has a mocked Tripo image/multiview adapter. It is not yet a protected Admin product or a complete media-to-model worker pipeline.
+**Status:** engine-core prototype. It validates/normalizes requests, plans evidence-based routes, generates a parametric GLB from metric dimensions, offers a local CLI, has a mocked Tripo image/multiview adapter and has a bounded FFmpeg keyframe-extraction worker interface. Protected Admin APIs, durable jobs and real provider credentials remain unconfigured.
 
 ## Decision
 
@@ -63,9 +63,11 @@ COLMAP documents an image-reconstruction pipeline that estimates sparse scene ge
 
 - **E0 — contracts and routing (implemented):** validate requests and return a transparent evidence-based plan.
 - **E1 — provider task adapter (implemented/tested with mocks):** submit image/multiview tasks and query state through a server-side secret. No real API key is configured; live provider generation is not yet verified.
-- **E1b — first procedural GLB output (implemented/tested):** create an editable-by-recipe, dimension-controlled visual shell with floors, floor bands, facade panels/windows, door, flat roof and optional parapet; includes GLB metadata and explicit estimation warnings.
-- **E2 — upload and job persistence:** Admin authorization, private storage, provider file upload tokens, durable jobs, retries, cancellation and audit.
-- **E3 — video worker:** keyframe extraction, deduplication/blur scoring and view-selection workflow.
+- **E1b — first procedural GLB output (implemented/tested):** create a dimension-controlled visual shell with floors, floor bands, facade panels/windows, door, flat roof and optional parapet; includes GLB metadata and explicit assumption warnings.
+- **E2a — video keyframe extractor (implemented/tested with fake processes):** probe video duration, apply file-size/duration/frame/timeout limits, use FFmpeg without a shell, retain presentation timestamps where available and clean temp output on failure.
+- **E2b — video-to-reference orchestration (implemented/tested with adapters):** resolve a private source-video asset, extract frames, write them through a private asset callback, preserve parent video ID/timestamp/licence and return new frames with unknown view labels for Admin review.
+- **E2 — persistent job productionization:** Admin authorization, durable jobs, retries/idempotency, cancellation, audit, upload quotas and immutable model artifacts. Provider image upload to Tripo is implemented as an adapter, but the application-level private asset upload service is still an injected dependency.
+- **E3 — video quality selection:** add blur/duplicate scoring and Admin frame-selection/label UI; the current extractor samples frames and preserves time metadata but does not score visual quality or infer view direction automatically.
 - **E4 — procedural geometry worker (prototype exists; still needs production worker/persistent job integration):** expand beyond the current shell with tested building families, real opening geometry, richer roof families and detailed component controls.
 - **E5 — alignment and QA:** preserve authoritative dimensions, establish origin/heading/scale, validate GLB and create preview renders.
 - **E6 — provider benchmark:** compare the same inputs against Tripo and an alternative; score visual fidelity, footprint/height error, success rate, latency, cost and data policy.
@@ -121,4 +123,4 @@ Use `--force` only when intentionally overwriting the selected output file. This
 - `src/core/building-generation/engine.mjs` — orchestration facade for route analysis, procedural candidates and eligible provider task submission.
 - `scripts/generate-building-model.mjs` — local CLI to generate a sample `.glb` from a JSON request.
 
-Still not implemented: protected Admin auth/upload, durable job/database records, actual video decoding/frames, provider file-upload handling, downloaded/immutable AI artifact storage, geometric alignment/mesh cleanup, and live browser QA. Do not treat this prototype as a finished automatic reconstruction engine.
+Still not implemented: protected Admin auth/API, durable job/database records, the application-level private asset store, frame blur/duplicate scoring and Admin selection UI, download/scan/immutable storage of provider output, dimension/footprint alignment, full mesh QA/cleanup, photogrammetry and live browser QA. The FFmpeg/video orchestration is covered by mock-process tests; real codec and actual footage testing remains required. Do not treat this prototype as a finished automatic reconstruction engine.
