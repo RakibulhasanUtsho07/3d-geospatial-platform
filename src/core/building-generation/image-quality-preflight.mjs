@@ -87,7 +87,7 @@ function runFfmpeg(executable,args,timeoutMs,spawnImpl=nodeSpawn){
  return new Promise((resolve,reject)=>{
   let child;
   try{child=spawnImpl(executable,args,{stdio:["ignore","pipe","pipe"],windowsHide:true});}
-  catch(error){reject(error);return;}
+  catch(error){reject(new Error("Could not start FFmpeg image preflight: "+error.message));return;}
   let stdout=Buffer.alloc(0),stderr="",settled=false;
   const done=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
   child.stdout?.on("data",chunk=>{
