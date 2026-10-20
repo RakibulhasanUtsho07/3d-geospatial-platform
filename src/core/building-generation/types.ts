@@ -100,6 +100,8 @@ export type GenerationStage =
   | "generate-parametric-base"
   | "submit-ai-generation"
   | "poll-ai-task"
+  | "submit-text-to-model"
+  | "poll-text-to-model"
   | "submit-image-to-multiview"
   | "poll-image-to-multiview"
   | "submit-multiview-to-model"
