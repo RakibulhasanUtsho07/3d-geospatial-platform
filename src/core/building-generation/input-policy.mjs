@@ -169,8 +169,7 @@ export function planBuildingGeneration(requestValue) {
   const refs = request.references;
   const actualImages = refs.filter((ref) => ref.kind === "image" && ref.purpose === "actual-building");
   const actualVideos = refs.filter((ref) => ref.kind === "video" && ref.purpose === "actual-building" && ref.permission === "authorized");
-  const authorized = refs.filter((ref) => ref.permission === "authorized");
-  const authorizedImages = refs.filter((ref) => ref.kind === "image" && ref.permission === "authorized");
+  const authorizedImages = refs.filter((ref) => ref.kind === "image" && ref.purpose === "actual-building" && ref.permission === "authorized");
   const authorizedActualImages = actualImages.filter((ref) => ref.permission === "authorized");
   const planImages = refs.filter((ref) => ["floor-plan", "elevation", "blueprint"].includes(ref.kind));
   const hasRectangle = Boolean(request.building.footprint?.widthMeters && request.building.footprint?.depthMeters);
@@ -228,7 +227,7 @@ export function planBuildingGeneration(requestValue) {
         warnings, missingInputs, qualityNotes,
       };
     }
-    if (!hasFootprint && !hasHeight) missingInputs.push("A measured size or reference scale is needed before metric alignment.");
+    if (!hasFootprint || !hasHeight) missingInputs.push("A measured footprint and height strategy (or external scale control) are needed before metric alignment.");
     stages.push("reconstruct-photogrammetry", "align-to-authoritative-dimensions", "mesh-cleanup-and-optimize", "validate-glb", "admin-review");
     qualityNotes.push("Photogrammetry is a candidate reconstruction, not guaranteed to recover occluded facades; Admin review remains mandatory.");
     return {
