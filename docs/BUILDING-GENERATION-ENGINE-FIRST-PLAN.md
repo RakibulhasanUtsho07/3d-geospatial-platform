@@ -6,7 +6,7 @@
 
 Build the generation engine before building the map editor. The engine accepts normalized building information and references, selects a route based on evidence quality, tracks asynchronous provider tasks, and produces a candidate that must be validated and reviewed. Connect it to the existing `/map` only after this core is stable.
 
-Use a hybrid pipeline, not one magic AI model:
+Use a staged, hybrid engine, not one magic AI model. The procedural GLB route and the AI reconstruction route currently create separate candidates; the engine does not falsely merge the parametric shell into an AI mesh.
 
 1. **Measurements + procedural base** own known footprint, floor counts and height.
 2. **Image/multiview AI** proposes appearance where reference-processing permission is explicit.
