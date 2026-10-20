@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { extractVideoKeyframes } from "./video-frame-extractor.mjs";
 import {
   normalizeBuildingGenerationRequest,
   planBuildingGeneration,
@@ -72,7 +77,15 @@ async function viewMap(references, uploadContext) {
  * Engine orchestration facade. The returned GLB is a procedural base candidate;
  * AI candidates remain separate until a later geometry-alignment/merge worker exists.
  */
-export function createBuildingGenerationEngine({ tripoClient = null, loadAsset = null } = {}) {
+export function createBuildingGenerationEngine({
+  tripoClient = null,
+  loadAsset = null,
+  resolveVideoAssetPath = null,
+  storeFrameAsset = null,
+  extractVideo = extractVideoKeyframes,
+  createVideoWorkDirectory = () => mkdtemp(join(tmpdir(), "building-video-engine-")),
+  removeVideoWorkDirectory = (directory) => rm(directory, { recursive: true, force: true }),
+} = {}) {
   function analyze(requestValue) {
     const request = normalizeBuildingGenerationRequest(requestValue);
     return { request, plan: planBuildingGeneration(request) };
@@ -91,6 +104,83 @@ export function createBuildingGenerationEngine({ tripoClient = null, loadAsset =
       ...artifact,
       plan,
     };
+  }
+
+  async function prepareVideoFrames(requestValue, { videoReferenceId, signal, extractionOptions = {} } = {}) {
+    const { request, plan } = analyze(requestValue);
+    const video = request.references.find((reference) => reference.id === videoReferenceId);
+    if (!video || video.kind !== "video" || video.purpose !== "actual-building") {
+      fail("video-reference-not-found", "Choose an existing actual-building video reference.");
+    }
+    if (video.permission !== "authorized") {
+      fail("video-processing-not-authorized", "The source video must be marked authorized before frame extraction.");
+    }
+    if (typeof resolveVideoAssetPath !== "function" || typeof storeFrameAsset !== "function") {
+      fail("video-storage-adapter-required", "Configure a private server-side video path resolver and frame asset writer before extracting frames.", plan);
+    }
+    if (typeof extractVideo !== "function") {
+      fail("video-extractor-not-configured", "No video keyframe extractor is configured.", plan);
+    }
+
+    let inputPath;
+    try { inputPath = await resolveVideoAssetPath(video.assetId); } catch {
+      fail("source-video-load-failed", "The protected source video could not be resolved from private storage.");
+    }
+    if (typeof inputPath !== "string" || !inputPath.trim()) {
+      fail("source-video-path-invalid", "Private video storage did not return a valid internal file path.");
+    }
+
+    const workDirectory = await createVideoWorkDirectory();
+    const outputDirectory = join(workDirectory, "frames");
+    try {
+      const extraction = await extractVideo({ inputPath, outputDirectory, signal, ...extractionOptions });
+      const frameReferences = [];
+      for (const frame of extraction.frames) {
+        const stored = await storeFrameAsset({
+          path: frame.path,
+          filename: frame.filename,
+          contentType: "image/jpeg",
+          sourceVideoAssetId: video.assetId,
+          sourceVideoReferenceId: video.id,
+          timestampSeconds: frame.timestampSeconds,
+        });
+        if (!stored || typeof stored.assetId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(stored.assetId)) {
+          fail("frame-asset-store-failed", "The private asset writer did not return a valid frame asset ID.");
+        }
+        const sourceKey = createHash("sha256").update(video.id).digest("hex").slice(0, 12);
+        const reference = {
+          id: "frame-" + sourceKey + "-" + String(frame.index + 1).padStart(3, "0"),
+          assetId: stored.assetId,
+          kind: "image",
+          purpose: "actual-building",
+          permission: video.permission,
+          view: "unknown",
+          derivedFromReferenceId: video.id,
+          timestampSeconds: frame.timestampSeconds,
+          sourceLabel: "Video frame " + (frame.index + 1) + " at " + frame.timestampSeconds.toFixed(2) + "s",
+          ...(video.licence ? { licence: video.licence } : {}),
+        };
+        frameReferences.push(reference);
+      }
+      const updatedRequest = normalizeBuildingGenerationRequest({
+        ...request,
+        references: [...request.references, ...frameReferences],
+      });
+      return {
+        request: updatedRequest,
+        videoReferenceId: video.id,
+        frameReferences,
+        extraction: {
+          durationSeconds: extraction.durationSeconds,
+          samplingFps: extraction.samplingFps,
+          notes: extraction.notes,
+        },
+        reviewRequired: true,
+        nextStep: "Admin must label selected frames as front/left/back/right before multiview generation.",
+      };
+    } finally {
+      await removeVideoWorkDirectory(workDirectory).catch(() => {});
+    }
   }
 
   async function submitReferenceCandidate(requestValue, { selectedVideoFrameIds = [], signal } = {}) {
@@ -178,6 +268,7 @@ export function createBuildingGenerationEngine({ tripoClient = null, loadAsset =
 
   return Object.freeze({
     analyze,
+    prepareVideoFrames,
     generateProceduralCandidate,
     submitReferenceCandidate,
   });
