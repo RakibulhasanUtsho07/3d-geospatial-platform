@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
-import { basename, extname, resolve, sep } from "node:path";
+import { extname, resolve, sep } from "node:path";
 
 const SUPPORTED_EXTENSIONS = new Set([".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"]);
 const MAX_STDOUT_BYTES = 64 * 1024;
@@ -134,6 +134,7 @@ function runProcess(executable, args, { spawnImpl = spawn, timeoutMs, signal } =
       try { child.kill("SIGKILL"); } catch {}
     }, timeoutMs);
     signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
   });
 }
 
