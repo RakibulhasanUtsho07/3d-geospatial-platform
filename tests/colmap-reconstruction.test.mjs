@@ -96,11 +96,15 @@ test("fails closed when COLMAP cannot start and preserves failure diagnostics",a
  const report=JSON.parse(await readFile(path.join(root,".building-engine","jobs",buildingSpec.id,"missing-colmap","report.json"),"utf8"));
  assert.equal(report.status,"failed");assert.match(report.failureMessage,/Could not start/);
 });
-test("strategy router stays procedural by default, with an explicit photogrammetry gate",async t=>{
+test("strategy router defaults to procedural and gates the explicit photogrammetry route",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  const route=await generateBuildingAsset(buildingSpec);
  assert.equal(route.mode,"procedural");assert.equal(route.report.photogrammetryCandidateNotRun,true);
- await assert.rejects(generateBuildingAsset(buildingSpec,{strategy:"photogrammetry",reconstruction:{
-  workspaceRoot:root,jobId:"unused",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn
+ await assert.rejects(generateBuildingAsset({...buildingSpec,sources:buildingSpec.sources.slice(0,1)},{strategy:"photogrammetry",reconstruction:{
+  workspaceRoot:root,jobId:"not-eligible",sourceIds:["view-1"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn
  }}),/photogrammetry strategy/);
+ const result=await generateBuildingAsset(buildingSpec,{strategy:"photogrammetry",reconstruction:{
+  workspaceRoot:root,jobId:"routed-job",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn
+ }});
+ assert.equal(result.mode,"photogrammetry");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
 });
