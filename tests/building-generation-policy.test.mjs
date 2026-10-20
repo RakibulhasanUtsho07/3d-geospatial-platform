@@ -131,3 +131,38 @@ test("asks for view labels when several source photos are not labelled", () => {
   assert.equal(plan.blocked, true);
   assert.ok(plan.missingInputs.some((item) => item.toLowerCase().includes("labelled as at least two distinct views")));
 });
+
+test("normalizes explicit balconies, columns and window styles", () => {
+  const request = normalizeBuildingGenerationRequest({
+    ...base,
+    building: {
+      ...base.building,
+      architecturalFeatures: {
+        windowStyle: "arched",
+        entranceStyle: "double-door",
+        balconies: { enabled: true, floors: [2, 4, 5], count: 2, widthRatio: 0.7, depthMeters: 1.4, railing: true },
+        columns: { frontCount: 4, widthMeters: 0.3, heightMeters: 3.2 },
+      },
+    },
+  });
+  assert.equal(request.building.architecturalFeatures.windowStyle, "arched");
+  assert.equal(request.building.architecturalFeatures.entranceStyle, "double-door");
+  assert.deepEqual(request.building.architecturalFeatures.balconies.floors, [2, 4, 5]);
+  assert.equal(request.building.architecturalFeatures.balconies.depthMeters, 1.4);
+  assert.equal(request.building.architecturalFeatures.columns.frontCount, 4);
+});
+
+test("rejects ambiguous or out-of-range architectural feature parameters", () => {
+  assert.throws(() => normalizeBuildingGenerationRequest({
+    ...base, building: { ...base.building, architecturalFeatures: { windowStyle: "circular" } },
+  }), TypeError);
+  assert.throws(() => normalizeBuildingGenerationRequest({
+    ...base, building: { ...base.building, architecturalFeatures: { balconies: { count: 1.5 } } },
+  }), TypeError);
+  assert.throws(() => normalizeBuildingGenerationRequest({
+    ...base, building: { ...base.building, architecturalFeatures: { balconies: { floors: [2, 2] } } },
+  }), TypeError);
+  assert.throws(() => normalizeBuildingGenerationRequest({
+    ...base, building: { ...base.building, architecturalFeatures: { balconies: { floors: [6] } } },
+  }), RangeError);
+});
