@@ -135,8 +135,7 @@ function validateAccessors(gltf, binaryBuffer, bufferViews, positionIds, { maxVe
   if (!binaryBuffer) throw new TypeError("GLB mesh accessors require an embedded BIN chunk.");
 
   let positionCount = 0;
-  const boundsMin = [Infinity, Infinity, Infinity];
-  const boundsMax = [-Infinity, -Infinity, -Infinity];
+  const positionBoundsByAccessor = new Map();
 
   for (let index = 0; index < accessors.length; index += 1) {
     const accessor = accessors[index];
@@ -169,23 +168,185 @@ function validateAccessors(gltf, binaryBuffer, bufferViews, positionIds, { maxVe
       }
       positionCount += accessor.count;
       if (positionCount > maxVertices) throw new RangeError("GLB exceeds the configured total vertex limit.");
+      const minimum = [Infinity, Infinity, Infinity];
+      const maximum = [-Infinity, -Infinity, -Infinity];
       const start = (view.byteOffset ?? 0) + byteOffset;
       for (let item = 0; item < accessor.count; item += 1) {
         for (let axis = 0; axis < 3; axis += 1) {
           const value = binaryBuffer.readFloatLE(start + item * stride + axis * 4);
           if (!Number.isFinite(value)) throw new TypeError("GLB POSITION accessor contains non-finite coordinates.");
-          if (value < boundsMin[axis]) boundsMin[axis] = value;
-          if (value > boundsMax[axis]) boundsMax[axis] = value;
+          if (value < minimum[axis]) minimum[axis] = value;
+          if (value > maximum[axis]) maximum[axis] = value;
         }
+      }
+      positionBoundsByAccessor.set(index, { min: minimum, max: maximum });
+    }
+  }
+
+  return { accessors, positionCount, positionBoundsByAccessor };
+}
+
+const IDENTITY_MATRIX = Object.freeze([
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, 1, 0,
+  0, 0, 0, 1,
+]);
+
+function multiplyMatrices(a, b) {
+  const out = new Array(16).fill(0);
+  for (let column = 0; column < 4; column += 1) {
+    for (let row = 0; row < 4; row += 1) {
+      out[column * 4 + row] =
+        a[row] * b[column * 4] +
+        a[4 + row] * b[column * 4 + 1] +
+        a[8 + row] * b[column * 4 + 2] +
+        a[12 + row] * b[column * 4 + 3];
+    }
+  }
+  return out;
+}
+
+function nodeLocalMatrix(node) {
+  const hasMatrix = node.matrix !== undefined;
+  const hasTrs = node.translation !== undefined || node.rotation !== undefined || node.scale !== undefined;
+  if (hasMatrix && hasTrs) throw new TypeError("GLB nodes must not define matrix and TRS transforms together.");
+  if (hasMatrix) {
+    if (!Array.isArray(node.matrix) || node.matrix.length !== 16 || !node.matrix.every(Number.isFinite)) {
+      throw new TypeError("GLB node matrix must contain 16 finite values.");
+    }
+    return [...node.matrix];
+  }
+
+  const translation = node.translation ?? [0, 0, 0];
+  const scale = node.scale ?? [1, 1, 1];
+  const rotation = node.rotation ?? [0, 0, 0, 1];
+  if (!Array.isArray(translation) || translation.length !== 3 || !translation.every(Number.isFinite)) {
+    throw new TypeError("GLB node translation must contain 3 finite values.");
+  }
+  if (!Array.isArray(scale) || scale.length !== 3 || !scale.every(Number.isFinite)) {
+    throw new TypeError("GLB node scale must contain 3 finite values.");
+  }
+  if (!Array.isArray(rotation) || rotation.length !== 4 || !rotation.every(Number.isFinite)) {
+    throw new TypeError("GLB node rotation must contain 4 finite quaternion values.");
+  }
+
+  let [x, y, z, w] = rotation;
+  const quaternionLength = Math.hypot(x, y, z, w);
+  if (quaternionLength < 1e-12) throw new TypeError("GLB node rotation quaternion is degenerate.");
+  x /= quaternionLength;
+  y /= quaternionLength;
+  z /= quaternionLength;
+  w /= quaternionLength;
+
+  const x2 = x + x;
+  const y2 = y + y;
+  const z2 = z + z;
+  const xx = x * x2;
+  const xy = x * y2;
+  const xz = x * z2;
+  const yy = y * y2;
+  const yz = y * z2;
+  const zz = z * z2;
+  const wx = w * x2;
+  const wy = w * y2;
+  const wz = w * z2;
+  const sx = scale[0];
+  const sy = scale[1];
+  const sz = scale[2];
+
+  return [
+    (1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0,
+    (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0,
+    (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0,
+    translation[0], translation[1], translation[2], 1,
+  ];
+}
+
+function transformPoint(matrix, point) {
+  const x = point[0];
+  const y = point[1];
+  const z = point[2];
+  const w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15];
+  const output = [
+    matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+    matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+    matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
+  ];
+  if (Math.abs(w) > 1e-12 && Math.abs(w - 1) > 1e-12) {
+    return output.map((value) => value / w);
+  }
+  return output;
+}
+
+function inferRootNodes(nodes) {
+  const childIds = new Set();
+  for (const node of nodes) {
+    for (const child of node.children ?? []) childIds.add(child);
+  }
+  const roots = nodes.map((_, index) => index).filter((index) => !childIds.has(index));
+  if (nodes.length > 0 && roots.length === 0) throw new TypeError("GLB node graph has no root node or contains a cycle.");
+  return roots;
+}
+
+function computeSceneBounds(gltf, positionBoundsByAccessor) {
+  const nodes = Array.isArray(gltf.nodes) ? gltf.nodes : [];
+  const meshes = Array.isArray(gltf.meshes) ? gltf.meshes : [];
+  if (nodes.length === 0) throw new TypeError("GLB must contain at least one node.");
+
+  let scenes = Array.isArray(gltf.scenes) ? gltf.scenes : [];
+  if (scenes.length === 0) scenes = [{ nodes: inferRootNodes(nodes) }];
+  const sceneIndex = gltf.scene ?? 0;
+  safeInteger(sceneIndex, "default scene", 0, scenes.length - 1);
+  const activeScene = scenes[sceneIndex];
+  if (!isRecord(activeScene) || !Array.isArray(activeScene.nodes)) throw new TypeError("GLB default scene is invalid.");
+
+  const boundsMin = [Infinity, Infinity, Infinity];
+  const boundsMax = [-Infinity, -Infinity, -Infinity];
+  const onPath = new Set();
+  let visitedMeshPrimitives = 0;
+
+  function addTransformedBounds(localBounds, worldMatrix) {
+    for (let mask = 0; mask < 8; mask += 1) {
+      const corner = [0, 1, 2].map((axis) =>
+        (mask & (1 << axis)) ? localBounds.max[axis] : localBounds.min[axis]
+      );
+      const point = transformPoint(worldMatrix, corner);
+      if (!point.every(Number.isFinite)) throw new TypeError("GLB node transforms produce non-finite coordinates.");
+      for (let axis = 0; axis < 3; axis += 1) {
+        boundsMin[axis] = Math.min(boundsMin[axis], point[axis]);
+        boundsMax[axis] = Math.max(boundsMax[axis], point[axis]);
       }
     }
   }
 
-  return {
-    accessors,
-    positionCount,
-    bounds: positionCount > 0 ? { min: boundsMin, max: boundsMax } : null,
-  };
+  function visit(nodeIndex, parentMatrix, depth) {
+    if (depth > 256) throw new RangeError("GLB node hierarchy is too deep.");
+    safeInteger(nodeIndex, "scene node", 0, nodes.length - 1);
+    if (onPath.has(nodeIndex)) throw new TypeError("GLB node hierarchy contains a cycle.");
+    const node = nodes[nodeIndex];
+    if (!isRecord(node)) throw new TypeError("GLB node definition is invalid.");
+    onPath.add(nodeIndex);
+    const worldMatrix = multiplyMatrices(parentMatrix, nodeLocalMatrix(node));
+
+    if (node.mesh !== undefined) {
+      const mesh = meshes[node.mesh];
+      if (!mesh) throw new TypeError("GLB node references a missing mesh.");
+      for (const primitive of mesh.primitives) {
+        const positionAccessorIndex = primitive.attributes.POSITION;
+        const positionBounds = positionBoundsByAccessor.get(positionAccessorIndex);
+        if (!positionBounds) throw new TypeError("GLB scene references a POSITION accessor without validated bounds.");
+        addTransformedBounds(positionBounds, worldMatrix);
+        visitedMeshPrimitives += 1;
+      }
+    }
+    for (const childIndex of node.children ?? []) visit(childIndex, worldMatrix, depth + 1);
+    onPath.delete(nodeIndex);
+  }
+
+  for (const rootIndex of activeScene.nodes) visit(rootIndex, IDENTITY_MATRIX, 0);
+  if (visitedMeshPrimitives === 0) throw new TypeError("GLB active scene contains no renderable mesh geometry.");
+  return { min: boundsMin, max: boundsMax };
 }
 
 function validateMeshes(gltf, accessors, binaryBuffer, bufferViews, { maxVertices }) {
@@ -270,7 +431,7 @@ export function inspectGeneratedGlb(value, options = {}) {
   const positionIds = collectPositionAccessorIds(parsed.gltf);
   const accessorInfo = validateAccessors(parsed.gltf, parsed.binaryBuffer, storage.views, positionIds, { maxVertices });
   const meshes = validateMeshes(parsed.gltf, accessorInfo.accessors, parsed.binaryBuffer, storage.views, { maxVertices });
-  const bounds = accessorInfo.bounds;
+  const bounds = computeSceneBounds(parsed.gltf, accessorInfo.positionBoundsByAccessor);
 
   return {
     valid: true,
@@ -284,9 +445,138 @@ export function inspectGeneratedGlb(value, options = {}) {
     nodeCount: meshes.nodes.length,
     materialCount: meshes.materials.length,
     bounds,
-    warnings: bounds && Math.max(...bounds.max.map((value, axis) => value - bounds.min[axis])) > 10000
+    warnings: Math.max(...bounds.max.map((value, axis) => value - bounds.min[axis])) > 10000
       ? ["The raw mesh spans more than 10 km; confirm that model units and scale are correct before publishing."]
       : [],
+  };
+}
+
+function packGlb(gltf, binaryBuffer) {
+  const jsonRaw = Buffer.from(JSON.stringify(gltf), "utf8");
+  const jsonPadding = (4 - (jsonRaw.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([jsonRaw, Buffer.alloc(jsonPadding, 0x20)]);
+  const hasBinary = binaryBuffer !== null && binaryBuffer.length > 0;
+  const binPadding = hasBinary ? (4 - (binaryBuffer.length % 4)) % 4 : 0;
+  const binChunk = hasBinary ? Buffer.concat([binaryBuffer, Buffer.alloc(binPadding)]) : Buffer.alloc(0);
+  const totalLength = 12 + 8 + jsonChunk.length + (hasBinary ? 8 + binChunk.length : 0);
+  const output = Buffer.alloc(totalLength);
+  output.write("glTF", 0, 4, "ascii");
+  output.writeUInt32LE(2, 4);
+  output.writeUInt32LE(totalLength, 8);
+  output.writeUInt32LE(jsonChunk.length, 12);
+  output.writeUInt32LE(GLB_JSON_CHUNK, 16);
+  jsonChunk.copy(output, 20);
+  if (hasBinary) {
+    const binHeaderOffset = 20 + jsonChunk.length;
+    output.writeUInt32LE(binChunk.length, binHeaderOffset);
+    output.writeUInt32LE(GLB_BIN_CHUNK, binHeaderOffset + 4);
+    binChunk.copy(output, binHeaderOffset + 8);
+  }
+  return output;
+}
+
+/**
+ * Adds a root transform so a candidate has an explicit local-metre size and sits on y=0.
+ * uniform-fit preserves proportions and fits inside the requested envelope.
+ * fit-dimensions hits each requested dimension exactly but may distort architectural proportions.
+ */
+export function alignGeneratedGlbToDimensions(value, {
+  footprintWidthMeters,
+  footprintDepthMeters,
+  totalHeightMeters,
+  mode = "uniform-fit",
+  maxBytes = 100 * 1024 * 1024,
+} = {}) {
+  const target = [
+    footprintWidthMeters,
+    totalHeightMeters,
+    footprintDepthMeters,
+  ];
+  for (let axis = 0; axis < target.length; axis += 1) {
+    if (typeof target[axis] !== "number" || !Number.isFinite(target[axis]) || target[axis] < 0.5 || target[axis] > 1000) {
+      throw new RangeError("Alignment target dimensions must each be between 0.5 and 1000 metres.");
+    }
+  }
+  if (mode !== "uniform-fit" && mode !== "fit-dimensions") {
+    throw new TypeError("Alignment mode must be uniform-fit or fit-dimensions.");
+  }
+
+  const originalBuffer = toBuffer(value);
+  const originalValidation = inspectGeneratedGlb(originalBuffer, { maxBytes });
+  const rawSize = originalValidation.bounds.max.map((max, axis) => max - originalValidation.bounds.min[axis]);
+  if (rawSize.some((size) => !Number.isFinite(size) || size < 1e-4)) {
+    throw new RangeError("Cannot align a degenerate model whose scene bounds have zero size on an axis.");
+  }
+
+  const ratios = target.map((size, axis) => size / rawSize[axis]);
+  let scale;
+  if (mode === "uniform-fit") {
+    const uniform = Math.min(...ratios);
+    scale = [uniform, uniform, uniform];
+  } else {
+    scale = ratios;
+  }
+  const translation = [
+    -((originalValidation.bounds.min[0] + originalValidation.bounds.max[0]) / 2) * scale[0],
+    -originalValidation.bounds.min[1] * scale[1],
+    -((originalValidation.bounds.min[2] + originalValidation.bounds.max[2]) / 2) * scale[2],
+  ];
+
+  const parsed = parseGlb(originalBuffer, { maxBytes, maxJsonChunkBytes: Math.min(16 * 1024 * 1024, maxBytes) });
+  const gltf = parsed.gltf;
+  const nodes = Array.isArray(gltf.nodes) ? gltf.nodes : [];
+  let scenes = Array.isArray(gltf.scenes) ? gltf.scenes : [];
+  if (scenes.length === 0) scenes = [{ nodes: inferRootNodes(nodes) }];
+  if (!Array.isArray(gltf.scenes) || gltf.scenes.length === 0) gltf.scenes = scenes;
+  const defaultScene = gltf.scene ?? 0;
+  safeInteger(defaultScene, "default scene", 0, gltf.scenes.length - 1);
+
+  for (const scene of gltf.scenes) {
+    if (!isRecord(scene) || !Array.isArray(scene.nodes)) throw new TypeError("GLB scene definition is invalid.");
+    const originalRoots = [...scene.nodes];
+    const wrapperIndex = gltf.nodes.length;
+    gltf.nodes.push({
+      name: "Building Generation · Metric Alignment",
+      children: originalRoots,
+      translation,
+      scale,
+      extras: {
+        buildingGenerationAlignment: {
+          mode,
+          units: "metres",
+          targetDimensions: { width: target[0], height: target[1], depth: target[2] },
+          sourceBounds: originalValidation.bounds,
+          uniformScale: mode === "uniform-fit" ? scale[0] : null,
+          scale,
+          translation,
+          nonUniformDistortionPossible: mode === "fit-dimensions",
+        },
+      },
+    });
+    scene.nodes = [wrapperIndex];
+  }
+  gltf.scene = defaultScene;
+  const alignedGlb = packGlb(gltf, parsed.binaryBuffer);
+  const validation = inspectGeneratedGlb(alignedGlb, { maxBytes: Math.max(maxBytes, alignedGlb.length) });
+  const finalSize = validation.bounds.max.map((max, axis) => max - validation.bounds.min[axis]);
+  const warnings = [...validation.warnings];
+  if (mode === "fit-dimensions") {
+    warnings.push("Non-uniform scaling was applied to match dimensions; inspect facade and roof proportions before approval.");
+  } else if (finalSize.some((size, axis) => Math.abs(size - target[axis]) > Math.max(0.1, target[axis] * 0.02))) {
+    warnings.push("Uniform-fit preserves proportions, so one or more final dimensions remain below the requested envelope.");
+  }
+  return {
+    glb: alignedGlb,
+    validation,
+    alignment: {
+      mode,
+      targetDimensions: { width: target[0], height: target[1], depth: target[2] },
+      sourceDimensions: { width: rawSize[0], height: rawSize[1], depth: rawSize[2] },
+      finalDimensions: { width: finalSize[0], height: finalSize[1], depth: finalSize[2] },
+      scale,
+      translation,
+      warnings,
+    },
   };
 }
 
