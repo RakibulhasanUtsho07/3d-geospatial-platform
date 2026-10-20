@@ -1,6 +1,6 @@
 # Building Generation Engine
 
-Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, COLMAP orchestration and textured PLY-to-GLB conversion are implemented. Durable Admin workflow, AI vision, CAD/IFC/BIM import, georeferencing against control points and public publishing are not implemented yet.
+Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, and a TripoSR single-image preview adapter are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
 
 ## 1. Baseline input → 3D model
 
@@ -46,17 +46,31 @@ npm run reconstruct:building-media -- <workspaceRoot> <buildingSpec.json> <jobId
 
 A single exterior photo cannot reveal hidden elevations, measured scale, floor plans or interior spaces. Multi-view photogrammetry also fails when images lack overlap, are blurry, show different buildings or have insufficient texture. A worker success is a candidate mesh, not proof of architectural accuracy.
 
-## 4. Strategy routing
+## 4. Single-image AI preview (TripoSR)
 
-**generation-pipeline.mjs** retains deterministic procedural generation as default. Photogrammetry runs only when explicitly requested and the validated source set qualifies as a multi-view candidate. It does not silently infer missing geometry from media. BIM/IFC, CAD/floor-plan parsing and AI-based reference interpretation need separate adapters.
+The single-image-3d-worker.mjs module runs an operator-installed TripoSR run.py with a bounded timeout and fixed output format GLB. It validates the selected source's SHA-256, licence, usage approval and BuildingSpec asset ID before running. It records model parameters, input provenance, output checksum and a failure/completion report. The official TripoSR README describes single-image mesh inference, optional background removal and an MIT licence for the published project/model; verify the exact installed revision and notices: https://github.com/VAST-AI-Research/TripoSR
 
-## 5. Next milestones
+Install TripoSR/PyTorch in a separate Python environment; no ML weights are downloaded or bundled by this repository. Then run:
+
+~~~powershell
+npm run test:single-image-3d
+npm run generate:building-from-image -- <workspaceRoot> <buildingSpec.json> <jobId> <sourceId> --runner-script <TripoSR-run.py> --confirm-single-view-inference
+~~~
+
+This is a single-view inference route, appropriate for visual preview/asset drafting, not accurate architecture reconstruction. It may hallucinate the unseen side and roof, and its model-space scale/orientation is not tied to real measurements. Reports are always labelled ai-proposed-requires-review, mapReady=false and publicationEligible=false.
+
+## 5. Strategy routing
+
+**generation-pipeline.mjs** retains deterministic procedural generation as default. Photogrammetry runs only when explicitly requested and the validated source set qualifies as a multi-view candidate. Single-image AI runs only when explicitly requested and produces an ai-proposed draft. It does not silently infer missing geometry from media. BIM/IFC, CAD/floor-plan parsing and AI-based reference interpretation need separate adapters.
+
+## 6. Next milestones
 
 1. Image QA: blur/duplicate checks, frame sampling review, camera-pose quality and same-building/overlap assistance.
 2. Ground control: measured baseline inputs tied to named points, heading/front direction and horizontal/vertical datum registration.
-3. Mesh QA: scale/axis checks, degenerate triangles, holes/occlusion notes, texture quality and a side-by-side reference review report.
-4. Persistent Admin workflow: server-side authorization, database-backed versioned BuildingSpec, private object storage and durable async jobs.
-5. Publish integration: human approval, versioned GLB asset and rollback, then load only reviewed/published assets in existing /map without breaking Overture roads/buildings or Ahsan Manzil.
-6. Other source routes: CAD/DWG/vector floor-plan parser, IFC/BIM import and optionally AI-assisted visual attribute extraction with source/confidence tracking.
+3. Image-to-model QA: compare AI-proposed rear/roof geometry against independent multi-view evidence and never merge low-confidence surfaces silently.
+4. Mesh QA: scale/axis checks, degenerate triangles, holes/occlusion notes, texture quality and a side-by-side reference review report.
+5. Persistent Admin workflow: server-side authorization, database-backed versioned BuildingSpec, private object storage and durable async jobs.
+6. Publish integration: human approval, versioned GLB asset and rollback, then load only reviewed/published assets in existing /map without breaking Overture roads/buildings or Ahsan Manzil.
+7. Other source routes: CAD/DWG/vector floor-plan parser, IFC/BIM import and optionally AI-assisted visual attribute extraction with source/confidence tracking.
 
 The generated model registry already added to the map engine is in-memory only. This reconstruction worker is not an authorization layer or public upload endpoint. Do not expose unauthenticated model generation, arbitrary asset URLs or publishing controls.

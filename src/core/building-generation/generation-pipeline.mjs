@@ -1,15 +1,20 @@
 import { planGeneration, generateBuildingModel } from "./generation-engine.mjs";
 import { runColmapReconstruction } from "./colmap-worker.mjs";
+import { runSingleImage3D } from "./single-image-3d-worker.mjs";
 
 export async function generateBuildingAsset(rawSpec, options = {}) {
   const strategy = options.strategy ?? "auto";
-  if (!["auto", "procedural", "photogrammetry"].includes(strategy)) throw new TypeError("strategy must be auto, procedural or photogrammetry");
+  if (!["auto", "procedural", "photogrammetry", "single-image-ai"].includes(strategy)) throw new TypeError("strategy must be auto, procedural, photogrammetry or single-image-ai");
   const plan = planGeneration(rawSpec);
   const shouldRunPhotogrammetry = strategy === "photogrammetry" || (strategy === "auto" && options.enablePhotogrammetry === true && plan.sourceRoute === "multiview-photogrammetry-candidate");
   if (strategy === "photogrammetry" && plan.sourceRoute !== "multiview-photogrammetry-candidate") throw new TypeError("photogrammetry strategy requires at least three licence-approved, geolocated visual references; current route is " + plan.sourceRoute);
   if (shouldRunPhotogrammetry) {
     const result = await runColmapReconstruction({ ...options.reconstruction, buildingId: plan.buildingId, buildingSpec: rawSpec });
     return { mode: "photogrammetry", plan, ...result, warning: "This GLB is a reconstructed candidate, not yet registered to ground-control coordinates or approved for public map placement." };
+  }
+  if (strategy === "single-image-ai") {
+    const result = await runSingleImage3D({ ...options.singleImage, buildingId: plan.buildingId, buildingSpec: rawSpec });
+    return { mode: "single-image-ai", plan, ...result, warning: "This is an AI-proposed single-view mesh. Hidden surfaces, metric scale and WGS84 placement are unknown; it is not map-ready." };
   }
   const procedural = generateBuildingModel(rawSpec);
   return {

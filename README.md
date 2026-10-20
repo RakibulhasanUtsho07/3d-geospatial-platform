@@ -51,9 +51,9 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
 
-## Building Generation Engine (first slice)
+## Building Generation Engine
 
-The current engine validates a versioned, source-aware BuildingSpec and generates a deterministic parametric GLB with a JSON provenance/QA report. It includes local image/video intake, content-addressed assets, bounded FFmpeg video-frame extraction, and an opt-in COLMAP multi-view reconstruction adapter with textured PLY-to-GLB conversion.
+The engine now supports three distinct routes: source/measurement information → deterministic procedural GLB; approved overlapping multi-view photographs/video frames → COLMAP textured reconstruction candidate; and a single approved image → TripoSR AI-proposed mesh preview. Sources and confidence/QA reports are kept alongside each generated asset.
 
 ~~~powershell
 npm run test:building-generation
@@ -61,17 +61,17 @@ npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifa
 npm run test:building-media
 npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
 npm run test:colmap-worker
+npm run test:single-image-3d
+npm run test:single-image-3d
 ~~~
 
-For media intake, create E:\Building-Engine-Workspace\uploads and put a local input file there first. FFmpeg must be installed and available on PATH for video input. Media is copied beneath .building-engine/media/ in that workspace, with SHA-256 provenance metadata. By default, licences are unknown and use is unreviewed; record and confirm real rights before publishing or reconstruction.
-
-For a reviewed multi-view photogrammetry candidate, prepare a BuildingSpec whose sources match the ingested file IDs, licence values, asset IDs and usageStatus: approved. Then run from PowerShell:
+For multi-view reconstruction, install COLMAP and use the command documented in the engine guide. For single-photo AI preview, install TripoSR and its Python/PyTorch dependencies separately; this repository intentionally does not bundle large ML weights or GPU-specific packages.
 
 ~~~powershell
-npm run reconstruct:building-media -- E:\Building-Engine-Workspace .\building-spec.json recon-job-01 front-photo,side-photo,back-photo Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed --model-distance 10 --real-distance-m 25 --quality MEDIUM
+npm run generate:building-from-image -- E:\Building-Engine-Workspace .\building-spec.json ai-preview-01 facade-photo --runner-script E:\Tools\TripoSR\run.py --confirm-single-view-inference --device cuda:0
 ~~~
 
-The scale arguments say a known 10-model-unit baseline corresponds to 25 metres. Omit both only for a provisional-scale preview. COLMAP must be installed separately. The generated GLB is intentionally marked completed-requires-review, mapReady: false and publicationEligible: false: GPS metadata alone does not register a local mesh precisely to WGS84, and this worker does not publish anything to /map. See the Building Generation Engine guide for the remaining review gates.
+The source record in BuildingSpec must match an ingested image with a known licence and usageStatus: approved. TripoSR outputs are explicitly tagged ai-proposed, without measured scale or a solved WGS84 position. A single image cannot verify unseen sides, structural dimensions or room plans. Neither AI-preview nor photogrammetry output is automatically published to /map; both require QA and manual approval. See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md).
 ## Geospatial data pipeline
 
 Generate the coarse spatial tiles and manifest from the pilot dataset:
