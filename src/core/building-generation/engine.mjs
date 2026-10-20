@@ -8,6 +8,7 @@ import {
   planBuildingGeneration,
 } from "./input-policy.mjs";
 import { generateParametricBuildingGlb } from "./procedural-builder.mjs";
+import { downloadGeneratedGlb } from "./glb-validation.mjs";
 
 function fail(code, message, plan = null) {
   const error = new Error(message);
@@ -82,9 +83,29 @@ export function createBuildingGenerationEngine({
   loadAsset = null,
   resolveVideoAssetPath = null,
   storeFrameAsset = null,
+  storeGeneratedCandidate = null,
+  fetchImpl = fetch,
+  allowedModelHosts = undefined,
   extractVideo = extractVideoKeyframes,
   createVideoWorkDirectory = () => mkdtemp(join(tmpdir(), "building-video-engine-")),
   removeVideoWorkDirectory = (directory) => rm(directory, { recursive: true, force: true }),
+  sleepImpl = (ms, signal) => new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(Object.assign(new Error("Generation wait was aborted."), { code: "ABORT_ERR" }));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(Object.assign(new Error("Generation wait was aborted."), { code: "ABORT_ERR" }));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  }),
 } = {}) {
   function analyze(requestValue) {
     const request = normalizeBuildingGenerationRequest(requestValue);
@@ -183,6 +204,98 @@ export function createBuildingGenerationEngine({
     }
   }
 
+  async function waitForProviderTask(taskId, { signal, timeoutMs = 300_000, pollIntervalMs = 2_000, maxAttempts = 150, sleep = sleepImpl } = {}) {
+    if (!tripoClient || typeof tripoClient.getTask !== "function") fail("provider-not-configured", "No AI generation task client is configured on the server.");
+    if (typeof taskId !== "string" || !/^task_[A-Za-z0-9_-]{4,195}$/.test(taskId)) {
+      fail("provider-task-id-invalid", "The generation provider task ID is invalid.");
+    }
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 900_000) throw new RangeError("timeoutMs must be from 1000 to 900000.");
+    if (!Number.isInteger(pollIntervalMs) || pollIntervalMs < 100 || pollIntervalMs > 30_000) throw new RangeError("pollIntervalMs must be from 100 to 30000.");
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 1000) throw new RangeError("maxAttempts must be from 1 to 1000.");
+    if (typeof sleep !== "function") throw new TypeError("sleep must be a function.");
+    const deadline = Date.now() + timeoutMs;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (signal?.aborted) fail("provider-task-aborted", "Waiting for the provider task was aborted.");
+      if (Date.now() >= deadline) fail("provider-task-timeout", "Provider task did not finish before the configured timeout.");
+      let task;
+      try { task = await tripoClient.getTask(taskId, { signal }); } catch (error) {
+        if (signal?.aborted) fail("provider-task-aborted", "Waiting for the provider task was aborted.");
+        throw error;
+      }
+      if (!task || task.taskId !== taskId) fail("provider-task-response-invalid", "Provider returned a different task ID.");
+      if (task.status === "success") return task;
+      if (task.status === "failed" || task.status === "cancelled") {
+        fail("provider-task-" + task.status, task.message || ("Provider task " + task.status + "."));
+      }
+      if (task.status !== "queued" && task.status !== "running") {
+        fail("provider-task-status-invalid", "Provider returned an unsupported task status.");
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) fail("provider-task-timeout", "Provider task did not finish before the configured timeout.");
+      await sleep(Math.min(pollIntervalMs, remaining), signal);
+    }
+    fail("provider-task-attempt-limit", "Provider task exceeded the configured polling attempt limit.");
+  }
+
+  async function validateAndStoreProviderOutput(task, { signal, maxBytes = 100 * 1024 * 1024, downloadTimeoutMs = 60_000 } = {}) {
+    if (!task || task.status !== "success") fail("provider-task-not-successful", "Only successful provider tasks can produce a candidate model.");
+    if (!task.modelUrl) fail("provider-output-missing-model", "The provider task succeeded but did not return a model URL.");
+    if (typeof storeGeneratedCandidate !== "function") {
+      fail("candidate-storage-not-configured", "Configure the server-side private candidate asset writer before storing provider output.");
+    }
+    let downloaded;
+    try {
+      downloaded = await downloadGeneratedGlb(task.modelUrl, {
+        fetchImpl,
+        ...(allowedModelHosts === undefined ? {} : { allowedHosts: allowedModelHosts }),
+        maxBytes,
+        timeoutMs: downloadTimeoutMs,
+        signal,
+      });
+    } catch (error) {
+      fail("provider-output-validation-failed", "Provider output was not accepted: " + (error instanceof Error ? error.message : String(error)));
+    }
+    const generationMetadata = {
+      taskId: task.taskId,
+      provider: "tripo",
+      outputValidation: downloaded.validation,
+      provenance: "external-ai-candidate",
+    };
+    let stored;
+    try {
+      stored = await storeGeneratedCandidate({
+        taskId: task.taskId,
+        bytes: downloaded.glb,
+        contentType: "model/gltf-binary",
+        metadata: generationMetadata,
+      });
+    } catch {
+      fail("candidate-storage-failed", "Validated provider output could not be saved to private storage.");
+    }
+    if (!stored || typeof stored.assetId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(stored.assetId)) {
+      fail("candidate-storage-failed", "Private candidate storage did not return a valid internal asset ID.");
+    }
+    return {
+      status: "needs-admin-review",
+      taskId: task.taskId,
+      assetId: stored.assetId,
+      validation: downloaded.validation,
+      warnings: [...downloaded.validation.warnings, "AI-generated geometry is a candidate. Align against known footprint/height and review before map publication."],
+    };
+  }
+
+  async function generateAndStoreReferenceCandidate(requestValue, {
+    selectedVideoFrameIds = [],
+    signal,
+    pollOptions = {},
+    downloadOptions = {},
+  } = {}) {
+    const submitted = await submitReferenceCandidate(requestValue, { selectedVideoFrameIds, signal });
+    const completed = await waitForProviderTask(submitted.taskId, { ...pollOptions, signal });
+    const stored = await validateAndStoreProviderOutput(completed, { ...downloadOptions, signal });
+    return { ...stored, strategy: submitted.strategy, plan: submitted.plan, uploadedReferences: submitted.uploadedReferences ?? [] };
+  }
+
   async function submitReferenceCandidate(requestValue, { selectedVideoFrameIds = [], signal } = {}) {
     const { request, plan } = analyze(requestValue);
     if (!request.allowExternalProviderProcessing) {
@@ -271,5 +384,8 @@ export function createBuildingGenerationEngine({
     prepareVideoFrames,
     generateProceduralCandidate,
     submitReferenceCandidate,
+    waitForProviderTask,
+    validateAndStoreProviderOutput,
+    generateAndStoreReferenceCandidate,
   });
 }
