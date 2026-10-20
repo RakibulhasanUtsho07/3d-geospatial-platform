@@ -166,3 +166,28 @@ test("rejects ambiguous or out-of-range architectural feature parameters", () =>
     ...base, building: { ...base.building, architecturalFeatures: { balconies: { floors: [6] } } },
   }), RangeError);
 });
+
+test("routes an approved written architectural brief to text-to-3D when no photo or video is supplied", () => {
+  const plan = planBuildingGeneration({
+    ...base,
+    quality: "reference-assisted",
+    allowExternalProviderProcessing: true,
+    references: [],
+  });
+  assert.equal(plan.strategy, "parametric-plus-ai-text");
+  assert.equal(plan.externalProviderRequired, true);
+  assert.equal(plan.blocked, false);
+  assert.ok(plan.stages.includes("submit-ai-generation"));
+  assert.ok(plan.stages.includes("align-to-authoritative-dimensions"));
+});
+
+test("does not send a written brief to an external provider without explicit permission", () => {
+  const plan = planBuildingGeneration({
+    ...base,
+    quality: "reference-assisted",
+    allowExternalProviderProcessing: false,
+    references: [],
+  });
+  assert.equal(plan.blocked, true);
+  assert.notEqual(plan.strategy, "parametric-plus-ai-text");
+});
