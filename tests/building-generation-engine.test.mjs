@@ -400,7 +400,12 @@ test("generates, validates, aligns and stores a text-to-3D candidate from the wr
   });
   const result = await engine.generateAndStoreReferenceCandidate({
     ...base, quality: "reference-assisted", allowExternalProviderProcessing: true, references: [],
-    building: { ...base.building, designBrief: "A compact two-storey house with warm plaster and a flat roof." },
+    building: {
+      ...base.building,
+      designBrief: "A compact two-storey house with warm plaster and a flat roof.",
+      roofType: "flat parapet",
+      architecturalFeatures: { windowStyle: "arched", entranceStyle: "double-door", balconies: { enabled: true, floors: [2], count: 1, depthMeters: 1.1, railing: true } },
+    },
   });
   assert.ok(submittedPrompt.includes("compact two-storey house"));
   assert.equal(downloadCount, 1);
@@ -410,5 +415,6 @@ test("generates, validates, aligns and stores a text-to-3D candidate from the wr
   assert.deepEqual(result.generationStages, ["text-to-model"]);
   assert.deepEqual(result.stageTaskIds, ["task_text123"]);
   assert.equal(saved.metadata.prompt, submittedPrompt);
-  assert.equal(saved.metadata.inputSummary.building.architecturalFeatures, undefined);
+  assert.equal(saved.metadata.inputSummary.building.architecturalFeatures.windowStyle, "arched");
+  assert.equal(saved.metadata.inputSummary.building.roofType, "flat parapet");
 });
