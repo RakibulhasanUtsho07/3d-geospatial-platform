@@ -449,6 +449,7 @@ export function createBuildingGenerationEngine({
         building: safeBuildingSummary,
         referenceIds: request.references.map((reference) => reference.id),
         strategy: finalStrategy,
+        ...(submitted.prompt ? { prompt: submitted.prompt } : {}),
         taskIds,
         generationStages,
       },
