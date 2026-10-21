@@ -9,7 +9,7 @@ function positiveInteger(value,label){
 function axisStarts(length,tileSize,overlap){
  if(length<=tileSize)return [0];
  const stride=tileSize-overlap,starts=[];
- for(let start=0;start+tileSize<length;start+=stride)starts.push(start);
+ for(let start=0;start<length-tileSize;start+=stride)starts.push(start);
  const last=length-tileSize;
  if(starts.at(-1)!==last)starts.push(last);
  return [...new Set(starts)];
