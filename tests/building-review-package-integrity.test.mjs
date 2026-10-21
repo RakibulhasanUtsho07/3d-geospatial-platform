@@ -14,6 +14,48 @@ import { verifyBuildingReviewPackage } from "../src/core/building-generation/bui
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const semanticDigest = (value) => hash(Buffer.from(JSON.stringify(value)));
 const JSON_BYTES = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
+const EARTH_RADIUS_M = 6378137;
+
+function makeAccuracyEvidence(candidateHash, geometryQa) {
+  const dimensions = geometryQa.bounds.dimensions;
+  const latitudeOrigin = 23.7;
+  const longitudeOrigin = 90.4;
+  const latitudeOriginRadians = latitudeOrigin * Math.PI / 180;
+  const lonLatFromLocal = (east, north) => ({
+    longitude: (longitudeOrigin + east / (EARTH_RADIUS_M * Math.cos(latitudeOriginRadians)) * 180 / Math.PI + 540) % 360 - 180,
+    latitude: latitudeOrigin + north / EARTH_RADIUS_M * 180 / Math.PI,
+  });
+  const controlPoints = [
+    [0, 0], [dimensions[0], 0], [0, dimensions[2]], [dimensions[0], dimensions[2]],
+  ].map(([modelX, modelZ], index) => ({
+    id: "package-gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    ...lonLatFromLocal(modelX * 2.5 + 100, modelZ * 2.5 + 200),
+    evidenceSourceId: "survey-record-package-test",
+  }));
+  return {
+    generatedAt: "2026-10-21T12:00:00Z",
+    dimensionReference: {
+      referenceDimensionsM: { x: dimensions[0], y: dimensions[1], z: dimensions[2] },
+      metresPerModelUnit: 1,
+      tolerancePercent: 1,
+      evidence: {
+        basis: "surveyed",
+        referenceId: "package-survey-fixture",
+        sourceDescription: "Independent dimensions in package integrity fixture.",
+      },
+    },
+    groundControl: {
+      modelCoordinatesGlbSha256: candidateHash,
+      coordinateEvidenceBasis: "surveyed",
+      sourceDescription: "Horizontal survey control fixture bound to this exact GLB.",
+      controlPoints,
+      maxRmsErrorM: 0.5,
+      maxResidualM: 1,
+    },
+  };
+}
 
 async function createFixture() {
   const spec = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
@@ -21,6 +63,7 @@ async function createFixture() {
   const candidateHash = hash(glb);
   const geometryQa = analyzeGlbQuality(glb);
   const textureQa = reviewGlbTextureBindings(glb);
+  const accuracyEvidence = makeAccuracyEvidence(candidateHash, geometryQa);
   const referenceBuffers = new Map();
   const renderBuffers = new Map();
   const views = REQUIRED_REVIEW_VIEWS.map((id) => {
@@ -123,6 +166,7 @@ async function createFixture() {
     renderReferenceReview: review,
     correctionTaskBacklog: backlog,
     correctionVerification: verification,
+    accuracyEvidence,
   });
 
   const artifactInputs = [];
@@ -144,6 +188,7 @@ async function createFixture() {
   add("render-reference-review", "reports/render-reference-review.json", JSON_BYTES(review), {}, review, true);
   add("correction-task-backlog", "reports/correction-tasks.json", JSON_BYTES(backlog), {}, backlog, true);
   add("correction-verification", "reports/correction-verification.json", JSON_BYTES(verification), {}, verification, true);
+  add("accuracy-evidence", "reports/accuracy-evidence.json", JSON_BYTES(accuracyEvidence), {}, accuracyEvidence, true);
   add("release-readiness-report", "reports/release-readiness.json", JSON_BYTES(readiness), {}, readiness, true);
   for (const view of views) {
     const actual = renderBuffers.get(view.id);
