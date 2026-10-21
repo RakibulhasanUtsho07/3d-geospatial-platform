@@ -73,7 +73,9 @@
     "test:glb-texture-binding-qa": "node --test tests/glb-texture-binding-qa.test.mjs",
     "review:glb-texture-bindings": "node scripts/review-glb-texture-bindings.mjs",
     "test:uv-seam-review": "node --test tests/uv-seam-review.test.mjs",
-    "test:texture-image-content-review": "node --test tests/texture-image-content-review.test.mjs"
+    "test:texture-image-content-review": "node --test tests/texture-image-content-review.test.mjs",
+    "test:render-review-manifest": "node --test tests/render-review-manifest.test.mjs",
+    "render:building-review": "node scripts/render-building-review-views.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
