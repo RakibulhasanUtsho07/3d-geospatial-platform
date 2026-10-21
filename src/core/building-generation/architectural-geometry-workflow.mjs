@@ -7,7 +7,6 @@ import {
   realpath,
   rename,
   rm,
-  stat,
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
@@ -73,14 +72,6 @@ async function hashFile(filePath) {
   const digest = createHash("sha256");
   for await (const chunk of createReadStream(filePath)) digest.update(chunk);
   return digest.digest("hex");
-}
-
-function canonicalJson(value) {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
-  return "{" + Object.keys(value).sort().map((key) =>
-    JSON.stringify(key) + ":" + canonicalJson(value[key])
-  ).join(",") + "}";
 }
 
 async function readRegularFile(root, relativePath, label, maxBytes) {
@@ -291,12 +282,6 @@ export async function runArchitecturalGeometryWorkflow(options) {
     stageIds: ARCHITECTURAL_GEOMETRY_STAGE_IDS,
   });
   const stateArgs = { workspaceRoot: root, buildingId, jobId };
-  const stateArtifactSha = (stageId) => {
-    const stage = state.job.stages.find((candidate) => candidate.id === stageId);
-    const active = stage?.artifacts.find((record) => record.artifactId === stage.activeArtifactId);
-    return active?.contentSha256 ?? null;
-  };
-
   const registration = await runStage({
     ...stateArgs,
     stageId: "view-registration",
