@@ -71,7 +71,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       !finite(stats.transparentRatio) || !Number.isSafeInteger(stats.sampledPixels) || stats.sampledPixels < 1) {
       errors.push("render-pixel-statistics-invalid:" + id);
     } else {
-      if (stats.luminanceStandardDeviation < 1) warnings.push("low-contrast-render-review:" + id);
+      if (stats.luminanceStandardDeviation < 0.002) warnings.push("low-contrast-render-review:" + id);
       if (stats.transparentRatio > 0.95) warnings.push("mostly-transparent-render-review:" + id);
     }
     views.push({
