@@ -21,6 +21,7 @@ A `model-correction-review` task becomes `verified` only when all of these are t
 - The report includes the exact same `viewId` and `referenceImageId` pair.
 - The new source-model SHA-256 differs from the task's original model hash.
 - The new render-manifest SHA-256 differs from the task's original manifest hash.
+- The reference image SHA-256 is unchanged from the original task, so the comparison is against the same reference file content.
 - A human reviewer recorded `match` for that pair.
 
 If the new outcome is `partial` or `mismatch`, the result is `needs-more-work`; `pending` waits for review; `not-comparable` is blocked. A match against unchanged model or manifest evidence is `stale-evidence`, not verification. Missing evidence never closes a task.
