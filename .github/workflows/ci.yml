@@ -19,6 +19,7 @@ on:
       - feat/per-view-architectural-sketches
       - feat/mask-guided-building-sketches
       - feat/multi-view-wireframe-registration
+      - feat/wireframe-qa-repair-passes
   pull_request:
     branches:
       - main
@@ -85,6 +86,9 @@ jobs:
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
         run: npm run test:mask-guided-building-sketches
+
+      - name: Test bounded wireframe QA and safe repair passes
+        run: npm run test:wireframe-qa-repair-passes
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
