@@ -32,12 +32,26 @@ on:
       - feat/building-release-readiness-gate
       - feat/building-review-package
       - feat/building-review-package-integrity-v2
+      - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
+      - feat/render-image-similarity-diagnostics
+      - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
+      - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
       - feat/texture-projection-validation
   pull_request:
     branches:
       - main
       - dev
       - rakibul-hasan
+      - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
+      - feat/render-image-similarity-diagnostics
+      - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
+      - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
 
 permissions:
   contents: read
@@ -133,13 +147,18 @@ jobs:
       - name: Test evidence-linked render reference review
         run: npm run test:render-reference-review
 
+      - name: Test render/reference image similarity diagnostics
+        run: npm run test:render-image-similarity-diagnostics
+
+      - name: Test evidence-linked similarity diagnostics in the reference-review workflow
+        run: npm run test:render-reference-diagnostics-attachment
       - name: Test evidence-linked render correction task backlog
         run: npm run test:render-correction-tasks
 
       - name: Test evidence-gated correction verification cycle
         run: npm run test:render-correction-verification
 
-      - name: Test building release readiness evidence gate
+      - name: Test building release readiness with dimension and WGS84 ground-control evidence
         run: npm run test:building-release-readiness
 
       - name: Test immutable building review package
@@ -147,6 +166,12 @@ jobs:
 
       - name: Test offline review package integrity verifier
         run: npm run test:building-review-package-integrity
+
+      - name: Test Ed25519 review package manifest signatures
+        run: npm run test:building-review-package-signature
+
+      - name: Test evidence-based building accuracy benchmark
+        run: npm run test:building-accuracy-benchmark
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
