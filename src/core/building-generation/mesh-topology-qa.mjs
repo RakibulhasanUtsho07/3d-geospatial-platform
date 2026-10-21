@@ -2,6 +2,7 @@ const DEFAULTS = Object.freeze({
   maxTopologyVertices: 250_000,
   weldToleranceRelative: 1e-6,
   maxLongEdgeRatio: 0.15,
+  maxLongEdgeTriangleRatio: 0.01,
   maxSmallComponentTriangles: 10,
 });
 
@@ -19,6 +20,9 @@ function validateOptions(options) {
   }
   if (!validNumber(settings.maxLongEdgeRatio) || settings.maxLongEdgeRatio <= 0 || settings.maxLongEdgeRatio > 1) {
     throw new RangeError("maxLongEdgeRatio must be greater than 0 and at most 1");
+  }
+  if (!validNumber(settings.maxLongEdgeTriangleRatio) || settings.maxLongEdgeTriangleRatio < 0 || settings.maxLongEdgeTriangleRatio > 1) {
+    throw new RangeError("maxLongEdgeTriangleRatio must be between 0 and 1");
   }
   if (!Number.isSafeInteger(settings.maxSmallComponentTriangles) || settings.maxSmallComponentTriangles < 0 || settings.maxSmallComponentTriangles > 1_000_000) {
     throw new RangeError("maxSmallComponentTriangles must be between 0 and 1000000");
@@ -197,12 +201,9 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
 
   if (connectedComponentCount > 1) common.warnings.push("disconnected-mesh-components-present");
   if (smallDetachedComponentCount > 0) common.warnings.push("small-detached-components-present");
-  if (longEdgeTriangleRatioExceeded(common)) common.warnings.push("long-triangle-edges-present");
+  if (common.longEdgeTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
   if (boundaryEdgeCount > 0) common.warnings.push("open-boundary-edges-present");
   if (nonManifoldEdgeCount > 0) common.warnings.push("non-manifold-edges-present");
   return common;
 }
 
-function longEdgeTriangleRatioExceeded(metrics) {
-  return metrics.longEdgeTriangleRatio > 0.01;
-}
