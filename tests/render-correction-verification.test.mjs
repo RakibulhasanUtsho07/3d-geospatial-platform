@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { verifyRenderCorrectionTasks } from "../src/core/building-generation/render-correction-verification.mjs";
 
 const modelSha = "a".repeat(64);
@@ -205,11 +206,7 @@ test("rejects same report reuse, wrong building, invalid hashes and duplicate co
     ...reviewReport(),
     provenance: { sourceModelSha256: modelSha, renderManifestSha256: manifestSha },
   };
-  const sameHashBacklog = backlog({
-    createdFromReviewReportSha256: "0".repeat(64),
-  });
   // Explicitly reuse the exact source report digest to ensure it is not accepted as a fresh cycle.
-  const { createHash } = await import("node:crypto");
   const exactDigest = createHash("sha256").update(JSON.stringify(sameReport)).digest("hex");
   assert.throws(() => verifyRenderCorrectionTasks(backlog({
     createdFromReviewReportSha256: exactDigest,
