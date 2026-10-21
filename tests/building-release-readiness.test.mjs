@@ -161,6 +161,20 @@ test("changed render image bytes or dimensions block readiness even when the man
   assert.ok(alteredDimensions.blockers.some((item) => item.id === "render-image-dimensions:front"));
 });
 
+test("duplicate render filenames cannot stand in for separate review views", () => {
+  const { input } = fixture();
+  const manifest = {
+    ...input.renderManifest,
+    views: input.renderManifest.views.map((view) =>
+      view.id === "back" ? { ...view, filename: "front.png" } : view
+    ),
+  };
+  const result = buildBuildingReleaseReadiness({ ...input, renderManifest: manifest });
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.id === "render-view-filename:back"));
+  assert.ok(result.blockers.some((item) => item.id === "render-image-content-hash:back"));
+});
+
 test("partial/mismatch comparison blocks release readiness", () => {
   const { input } = fixture({ mismatchView: "front" });
   const result = buildBuildingReleaseReadiness(input);
