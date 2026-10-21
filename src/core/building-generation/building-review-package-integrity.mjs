@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
+import { buildBuildingAccuracyBenchmark } from "./building-accuracy-benchmark.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -12,6 +13,7 @@ const requiredArtifactTypes = [
   "render-reference-review",
   "correction-task-backlog",
   "correction-verification",
+  "accuracy-evidence",
   "release-readiness-report",
   "review-instructions",
 ];
@@ -172,6 +174,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
   const review = content("render-reference-review");
   const backlog = content("correction-task-backlog");
   const verification = content("correction-verification");
+  const accuracyEvidence = content("accuracy-evidence");
   const readiness = content("release-readiness-report");
 
   check("candidate-model-hash", Boolean(candidate && packageManifest.readiness.sourceCandidateGlbSha256?.toLowerCase?.() === candidate.sha256.toLowerCase()),
@@ -193,6 +196,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     ["render-reference-review", provenance.renderReferenceReviewSha256, "content-digest"],
     ["correction-task-backlog", provenance.correctionTaskBacklogSha256, "content-digest"],
     ["correction-verification", provenance.correctionVerificationReportSha256, "content-digest"],
+    ["accuracy-evidence", provenance.accuracyEvidenceSha256, "content-digest"],
     ["geometry-qa", provenance.geometryQaReportSha256, "content-digest"],
     ["texture-qa", provenance.textureQaReportSha256, "content-digest"],
   ];
@@ -202,6 +206,47 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     check("readiness-provenance:" + type, isHash(expected) &&
       actualValue?.toLowerCase?.() === expected.toLowerCase(),
     "Release readiness provenance does not match packaged evidence: " + type + ".");
+  }
+
+  if (candidateBytes && isObject(accuracyEvidence) && isObject(review) && isObject(readiness)) {
+    try {
+      const rebuiltGeometry = analyzeGlbQuality(candidateBytes);
+      const benchmark = buildBuildingAccuracyBenchmark({
+        buildingId: packageManifest.buildingId,
+        candidateGlbSha256: digest(candidateBytes),
+        geometryQa: rebuiltGeometry,
+        dimensionReference: accuracyEvidence.dimensionReference,
+        groundControl: accuracyEvidence.groundControl,
+        renderReferenceReview: review,
+        generatedAt: accuracyEvidence.generatedAt,
+      });
+      const expectedSummary = {
+        engine: benchmark.engine,
+        status: benchmark.status,
+        generatedAt: benchmark.generatedAt,
+        candidateGlbSha256: benchmark.candidateGlbSha256,
+        counts: benchmark.counts,
+        metrics: benchmark.metrics,
+        evidence: benchmark.evidence,
+        policy: benchmark.policy,
+        checks: benchmark.checks,
+        warnings: benchmark.warnings,
+        failures: benchmark.failures,
+        limitations: benchmark.limitations,
+      };
+      check("accuracy-benchmark-recomputed",
+        readiness.provenance?.accuracyBenchmarkReportSha256 === semanticDigest(benchmark) &&
+          isObject(readiness.qaSummary?.accuracyBenchmark) &&
+          semanticDigest(readiness.qaSummary.accuracyBenchmark) === semanticDigest(expectedSummary),
+        "The accuracy benchmark must reproduce from the packaged exact candidate GLB, dimension evidence, ground controls and review report.");
+    } catch (error) {
+      check("accuracy-benchmark-recomputed", false,
+        "The packaged dimension/georeferencing benchmark could not be recomputed: " +
+          (error instanceof Error ? error.message : String(error)));
+    }
+  } else {
+    check("accuracy-benchmark-recomputed", false,
+      "The package must include candidate bytes, accuracy evidence, current reference review and release-readiness report.");
   }
 
   check("geometry-qa-report", Boolean(geometry && geometry.engine === "glb-geometry-qa-v2" &&
