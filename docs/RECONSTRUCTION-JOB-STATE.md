@@ -2,11 +2,11 @@
 
 ## Scope
 
-This is the first implementation step of the staged architectural reconstruction specification. It supplies a versioned, resumable state contract and immutable per-stage JSON artifacts. It does not claim that the computer-vision stages are automatically orchestrated or that architectural reconstruction is accurate. The existing media-to-model CLI is not yet wired to this state machine.
+The state machine supplies versioned, resumable state and immutable per-stage JSON artifacts. It supports two explicit execution profiles: the complete architectural-reconstruction plan and the implemented media-to-model CLI stages. A profile only marks work completed when that work actually ran. This does not claim that architectural reconstruction is accurate.
 
-## Stage order
+## Architectural reconstruction stage order
 
-The state machine uses this strict sequence:
+The reconstruction profile uses this strict sequence:
 
 1. ingest
 2. image-analysis
@@ -21,6 +21,18 @@ The state machine uses this strict sequence:
 11. final-acceptance
 
 A stage cannot start until all earlier stages have a completed state and a validated active artifact.
+
+## Media-to-model CLI execution profile
+
+The current local CLI uses a separate, truthful four-stage plan:
+1. media-ingestion — local file validation/copy, source rights attestation, and bounded video-frame extraction;
+2. building-spec-sync — verified source records are synchronized into a normalized BuildingSpec, and selected views are validated;
+3. model-generation — the configured procedural, COLMAP, or single-image AI worker runs and the resulting GLB is checksum-verified;
+4. report-finalization — the workflow review report is written with map/publication gates remaining false.
+
+On resume, the CLI reuses completed stage artifacts only when the source manifest, configuration, stage inputs and content hashes still match. A failed or interrupted stage can be retried; an upstream rerun invalidates downstream artifact pointers while preserving their historical files. Intake and video frame extraction are idempotent for matching, verified source content. Changing the source bytes or job configuration requires a new job ID rather than silently mixing outputs.
+
+The four-stage profile does not claim that per-view sketches, wireframe repair, architecture geometry construction or texture repair ran. Those belong to the longer architectural-reconstruction profile and remain separate until connected to actual workers.
 
 ## Storage layout
 
