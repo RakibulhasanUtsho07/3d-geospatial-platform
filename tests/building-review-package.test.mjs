@@ -36,7 +36,7 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
     { artifactType: "candidate-glb", relativePath: "model/candidate.glb", sha256: hash("candidate-glb"), bytes: 1000 },
     { artifactType: "geometry-qa", relativePath: "reports/geometry-qa.json", sha256: hash("geometry-file"), contentDigest: geometryDigest, bytes: 200 },
     { artifactType: "texture-qa", relativePath: "reports/texture-qa.json", sha256: hash("texture-file"), contentDigest: textureDigest, bytes: 200 },
-    { artifactType: "render-manifest", relativePath: "renders/render-review-manifest.json", sha256: hash("manifest-file"), contentDigest: manifestDigest, bytes: 300 },
+    { artifactType: "render-manifest", relativePath: "renders/render-review-manifest.json", sha256: manifestDigest, contentDigest: hash("render-manifest-semantic"), bytes: 300 },
     { artifactType: "render-reference-review", relativePath: "reports/render-reference-review.json", sha256: hash("review-file"), contentDigest: reviewDigest, bytes: 300 },
     { artifactType: "correction-task-backlog", relativePath: "reports/correction-tasks.json", sha256: hash("backlog-file"), contentDigest: backlogDigest, bytes: 300 },
     { artifactType: "correction-verification", relativePath: "reports/correction-verification.json", sha256: hash("verification-file"), contentDigest: verificationDigest, bytes: 300 },
