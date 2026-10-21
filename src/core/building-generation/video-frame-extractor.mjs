@@ -1,8 +1,10 @@
 import { spawn as nodeSpawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readdir, mkdir, realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { ingestMediaFile } from "./media-intake.mjs";
+import { loadVerifiedSource } from "./source-workflow.mjs";
+import { readFile } from "node:fs/promises";
 
 function validateOptions(options) {
   if (!options || typeof options !== "object") throw new TypeError("options are required");
@@ -50,7 +52,19 @@ export async function extractVideoFrames(options) {
     for(const name of names){
       const index=Number(name.match(/-(\d+)\.jpg$/)[1]),frameSourceId=(sourceId+"-frame-"+String(index).padStart(6,"0")).slice(0,80);
       const relative=path.relative(root,path.join(workDir,name)).split(path.sep).join("/");
-      const ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:relative,buildingId,sourceId:frameSourceId,kind:"video-frame",title:(videoRecord?.title||sourceId)+" frame "+index,licence:videoRecord?.licence||"unknown",author:videoRecord?.author,attribution:videoRecord?.attribution,usageStatus:videoRecord?.usageStatus||"unreviewed",parentSourceId:sourceId,description:"FFmpeg sample: frame "+index+"; nominal sample time "+((index-1)/options.fps)+" seconds at "+options.fps+" fps. This timestamp is approximate and is not camera calibration."});
+      const imageBytes=await readFile(path.join(workDir,name));
+      const imageSha256=createHash("sha256").update(imageBytes).digest("hex");
+      let ingested;
+      try{
+        const existing=await loadVerifiedSource(root,buildingId,frameSourceId);
+        if(existing.sha256!==imageSha256||existing.record.parentSourceId!==sourceId||existing.record.kind!=="video-frame"){
+          throw new TypeError("existing video-frame ID '"+frameSourceId+"' does not match the sampled source frame");
+        }
+        ingested={record:existing.record};
+      }catch(error){
+        if(error?.code!=="ENOENT")throw error;
+        ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:relative,buildingId,sourceId:frameSourceId,kind:"video-frame",title:(videoRecord?.title||sourceId)+" frame "+index,licence:videoRecord?.licence||"unknown",author:videoRecord?.author,attribution:videoRecord?.attribution,usageStatus:videoRecord?.usageStatus||"unreviewed",parentSourceId:sourceId,description:"FFmpeg sample: frame "+index+"; nominal sample time "+((index-1)/options.fps)+" seconds at "+options.fps+" fps. This timestamp is approximate and is not camera calibration."});
+      }
       frames.push({...ingested.record,frameNumber:index,nominalTimeSeconds:Number(((index-1)/options.fps).toFixed(3))});
     }
     return {buildingId,sourceId,fps:options.fps,requestedMaxFrames:options.maxFrames,extractedFrames:frames.length,frames,warning:"Sampled frames are references only; sampling does not identify the building, calibrate a camera, prove overlapping views or reconstruct 3D geometry."};
