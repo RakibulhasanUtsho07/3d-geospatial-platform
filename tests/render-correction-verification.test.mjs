@@ -44,7 +44,6 @@ function task(overrides = {}) {
     kind: "model-correction-review",
     priority: "high",
     status: "open",
-    title: "Resolve render/reference mismatch: front",
     evidence: {
       reviewReportSha256: "9".repeat(64),
       sourceModelSha256: modelSha,
