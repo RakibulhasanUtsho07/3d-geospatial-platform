@@ -16,6 +16,71 @@ function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function normalizeSimilarityDiagnostics(value, comparison) {
+  if (value === undefined || value === null) return null;
+  const label = comparison?.viewId + ":" + comparison?.referenceImageId;
+  if (!comparison || !value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("review-report-similarity-diagnostics-invalid:" + label);
+  }
+
+  const metrics = value.metrics;
+  const comparability = value.comparability;
+  const validMetricNumber = (number, min, max) =>
+    typeof number === "number" && Number.isFinite(number) && number >= min && number <= max;
+  const validPsnr = metrics?.psnrDb === null ||
+    typeof metrics?.psnrDb === "number" && Number.isFinite(metrics.psnrDb) && metrics.psnrDb >= 0;
+  const valid =
+    value.engine === "render-image-similarity-diagnostics-v1" &&
+    value.status === "diagnostics-computed" &&
+    value.automaticMatch === false &&
+    sha256Pattern.test(value.reportSha256 ?? "") &&
+    sha256Pattern.test(value.renderSha256 ?? "") &&
+    sha256Pattern.test(value.referenceSha256 ?? "") &&
+    value.renderSha256.toLowerCase() === comparison.renderSha256.toLowerCase() &&
+    value.referenceSha256.toLowerCase() === comparison.referenceSha256.toLowerCase() &&
+    nonEmptyString(value.interpretation) &&
+    validMetricNumber(metrics?.meanAbsoluteError, 0, 255) &&
+    validMetricNumber(metrics?.rootMeanSquaredError, 0, 255) &&
+    validPsnr &&
+    validMetricNumber(metrics?.localSsim8x8, -1, 1) &&
+    Number.isSafeInteger(metrics?.differenceHashHammingDistance) &&
+    metrics.differenceHashHammingDistance >= 0 &&
+    metrics.differenceHashHammingDistance <= 64 &&
+    validMetricNumber(comparability?.aspectRatioDifferencePercent, 0, Number.MAX_SAFE_INTEGER) &&
+    typeof comparability?.aspectRatioWithinScreeningThreshold === "boolean" &&
+    comparability.sameFacadeConfirmedByTool === false &&
+    comparability.cameraPoseAlignmentVerifiedByTool === false &&
+    Array.isArray(value.warnings) &&
+    value.warnings.every((warning) => typeof warning === "string");
+  if (!valid) {
+    throw new Error("review-report-similarity-diagnostics-invalid:" + label);
+  }
+
+  return {
+    reportSha256: value.reportSha256.toLowerCase(),
+    engine: value.engine,
+    status: value.status,
+    interpretation: value.interpretation,
+    renderSha256: value.renderSha256.toLowerCase(),
+    referenceSha256: value.referenceSha256.toLowerCase(),
+    metrics: {
+      meanAbsoluteError: metrics.meanAbsoluteError,
+      rootMeanSquaredError: metrics.rootMeanSquaredError,
+      psnrDb: metrics.psnrDb,
+      localSsim8x8: metrics.localSsim8x8,
+      differenceHashHammingDistance: metrics.differenceHashHammingDistance,
+    },
+    comparability: {
+      aspectRatioDifferencePercent: comparability.aspectRatioDifferencePercent,
+      aspectRatioWithinScreeningThreshold: comparability.aspectRatioWithinScreeningThreshold,
+      sameFacadeConfirmedByTool: false,
+      cameraPoseAlignmentVerifiedByTool: false,
+    },
+    warnings: [...value.warnings],
+    automaticMatch: false,
+  };
+}
+
 /**
  * Turn a valid, human-authored render/reference review report into a deterministic
  * task backlog. This function never edits geometry, textures, UVs or source files.
@@ -69,6 +134,7 @@ export function createRenderCorrectionTasks(reviewReport) {
         reviewer: comparison?.reviewer ?? null,
         reviewedAt: comparison?.reviewedAt ?? null,
         notes: comparison?.notes ?? null,
+        similarityDiagnostics: normalizeSimilarityDiagnostics(comparison?.similarityDiagnostics, comparison),
       },
       nextChecks: [
         "Open the exact render and reference identified by the recorded hashes; confirm the comparison basis.",
@@ -166,6 +232,11 @@ export function createRenderCorrectionTasks(reviewReport) {
       highPriority: tasks.filter((task) => task.priority === "high").length,
       mediumPriority: tasks.filter((task) => task.priority === "medium").length,
       byKind: kindCounts,
+    },
+    similarityDiagnosticsSummary: {
+      attachedToTasks: tasks.filter((task) => task.evidence.similarityDiagnostics !== null).length,
+      withWarnings: tasks.filter((task) => (task.evidence.similarityDiagnostics?.warnings.length ?? 0) > 0).length,
+      automaticPriorityChanges: false,
     },
     tasks,
     automationPolicy: {
