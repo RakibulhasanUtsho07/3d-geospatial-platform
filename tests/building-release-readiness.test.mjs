@@ -9,6 +9,45 @@ const hash = (value) => createHash("sha256").update(value).digest("hex");
 const modelSha = "a".repeat(64);
 const oldModelSha = "b".repeat(64);
 const oldManifestSha = "c".repeat(64);
+const EARTH_RADIUS_M = 6378137;
+
+function makeAccuracyEvidence() {
+  const latitudeOrigin = 23.7;
+  const longitudeOrigin = 90.4;
+  const latitudeOriginRadians = latitudeOrigin * Math.PI / 180;
+  const lonLatFromLocal = (east, north) => ({
+    longitude: (longitudeOrigin + east / (EARTH_RADIUS_M * Math.cos(latitudeOriginRadians)) * 180 / Math.PI + 540) % 360 - 180,
+    latitude: latitudeOrigin + north / EARTH_RADIUS_M * 180 / Math.PI,
+  });
+  const controlPoints = [[0, 0], [10, 0], [0, 10], [10, 10]].map(([modelX, modelZ], index) => ({
+    id: "release-gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    ...lonLatFromLocal(modelX * 2.5 + 100, modelZ * 2.5 + 200),
+    evidenceSourceId: "survey-set-2026-01",
+  }));
+  return {
+    generatedAt: "2026-10-21T12:00:00Z",
+    dimensionReference: {
+      referenceDimensionsM: { x: 10, y: 20, z: 30 },
+      metresPerModelUnit: 1,
+      tolerancePercent: 1,
+      evidence: {
+        basis: "surveyed",
+        referenceId: "release-survey-2026-01",
+        sourceDescription: "Independent test survey dimensions.",
+      },
+    },
+    groundControl: {
+      modelCoordinatesGlbSha256: modelSha,
+      coordinateEvidenceBasis: "surveyed",
+      sourceDescription: "Independent horizontal survey controls in the exact candidate GLB frame.",
+      controlPoints,
+      maxRmsErrorM: 0.5,
+      maxResidualM: 1,
+    },
+  };
+}
 
 function fixture({ mismatchView = null, missingView = null, unverifiedRights = null, geometryWarnings = [], textureWarnings = [], unverifiedTask = false } = {}) {
   const renderViews = REQUIRED_REVIEW_VIEWS
@@ -104,6 +143,7 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
       geometryQa: {
         schemaVersion: "1.0.0", engine: "glb-geometry-qa-v2",
         status: "basic-geometry-check-passed", valid: true, warnings: geometryWarnings,
+        bounds: { dimensions: [10, 20, 30] }, counts: { vertexCount: 100, triangleCount: 50 },
       },
       textureQa: {
         schemaVersion: "1.0.0", engine: "glb-texture-binding-qa-v1",
@@ -113,6 +153,7 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
       renderReferenceReview: review,
       correctionTaskBacklog: backlog,
       correctionVerification: verification,
+      accuracyEvidence: makeAccuracyEvidence(),
     },
     review,
     backlog,
@@ -130,6 +171,47 @@ test("clean evidence is ready for final human review but never publication-eligi
   assert.equal(result.publicationEligible, false);
   assert.equal(result.finalHumanReviewRequired, true);
   assert.equal(result.automationPolicy.assetPublished, false);
+  assert.equal(result.qaSummary.accuracyBenchmark.status, "benchmark-passed-review-required");
+  assert.equal(result.qaSummary.accuracyBenchmark.metrics.georeference.thresholdPass, true);
+  assert.equal(result.qaSummary.accuracyBenchmark.metrics.dimensions.maxRelativeErrorPercent, 0);
+  assert.ok(result.provenance.accuracyBenchmarkReportSha256);
+});
+
+test("dimension mismatch blocks release readiness and retains the benchmark failure", () => {
+  const { input } = fixture();
+  input.accuracyEvidence.dimensionReference.referenceDimensionsM.x = 13;
+  const result = buildBuildingReleaseReadiness(input);
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.id === "accuracy-dimensions-within-tolerance"));
+  assert.equal(result.qaSummary.accuracyBenchmark.status, "benchmark-failed");
+  assert.equal(result.publicationEligible, false);
+});
+
+test("ground-control coordinates must bind to this exact candidate GLB", () => {
+  const { input } = fixture();
+  input.accuracyEvidence.groundControl.modelCoordinatesGlbSha256 = "f".repeat(64);
+  const result = buildBuildingReleaseReadiness(input);
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.id === "accuracy-ground-control-model-binding"));
+  assert.ok(result.blockers.some((item) => item.id === "accuracy-benchmark-status"));
+});
+
+test("missing ground-control evidence blocks geospatial release readiness", () => {
+  const { input } = fixture();
+  input.accuracyEvidence.groundControl = null;
+  const result = buildBuildingReleaseReadiness(input);
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.id === "accuracy-ground-control-model-binding"));
+  assert.equal(result.qaSummary.accuracyBenchmark.status, "benchmark-incomplete");
+});
+
+test("missing dimension evidence is a blocker instead of silently assuming a model scale", () => {
+  const { input } = fixture();
+  input.accuracyEvidence = null;
+  const result = buildBuildingReleaseReadiness(input);
+  assert.equal(result.status, "blocked");
+  assert.ok(result.blockers.some((item) => item.id === "accuracy-evidence-input"));
+  assert.equal(result.qaSummary.accuracyBenchmark, null);
 });
 
 test("changed candidate GLB cannot reuse render evidence from another model", () => {
