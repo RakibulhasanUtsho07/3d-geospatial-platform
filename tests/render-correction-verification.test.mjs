@@ -108,6 +108,19 @@ test("does not verify a match when the render manifest has not changed", () => {
   assert.equal(result.tasks[0].status, "stale-evidence");
 });
 
+test("does not verify a match when the reference image hash changed", () => {
+  const changedReference = "7".repeat(64);
+  const report = reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      referenceSha256: changedReference,
+    }],
+  });
+  const result = verifyRenderCorrectionTasks(backlog(), report);
+  assert.equal(result.tasks[0].status, "stale-evidence");
+  assert.equal(result.tasks[0].gates.referenceImageHashUnchanged, false);
+});
+
 test("keeps a task active when the latest comparison is partial or mismatch", () => {
   const partial = reviewReport({
     comparisons: [reviewReport().comparisons[0] && {
