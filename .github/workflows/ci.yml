@@ -113,6 +113,9 @@ jobs:
       - name: Test overlapping image tile planning and coordinate merging
         run: npm run test:image-tile-analysis
 
+      - name: Test resumable reconstruction job state and immutable stage artifacts
+        run: npm run test:reconstruction-job-state
+
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
