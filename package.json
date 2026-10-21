@@ -90,7 +90,9 @@
     "verify:building-review-package": "node scripts/verify-building-review-package.mjs",
     "test:building-review-package-signature": "node --test tests/building-review-package-signature.test.mjs",
     "sign:building-review-package": "node scripts/sign-building-review-package.mjs",
-    "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs"
+    "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs",
+    "test:building-accuracy-benchmark": "node --test tests/building-accuracy-benchmark.test.mjs",
+    "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
