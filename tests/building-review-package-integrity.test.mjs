@@ -237,9 +237,11 @@ test("detects JSON content-digest changes and refuses unsafe manifest entries", 
 
   const unsafe = await createFixture();
   unsafe.packageManifest.artifacts[0].relativePath = "../outside.glb";
-  assert.throws(() => verifyBuildingReviewPackage({
+  const unsafeReport = verifyBuildingReviewPackage({
     packageManifest: unsafe.packageManifest,
     actualFiles: unsafe.actualFiles,
     packageManifestSha256: hash(JSON_BYTES(unsafe.packageManifest)),
-  }), /artifact-invalid/);
+  });
+  assert.equal(unsafeReport.valid, false);
+  assert.ok(unsafeReport.errors.some((item) => item.id === "manifest-artifact:0"));
 });
