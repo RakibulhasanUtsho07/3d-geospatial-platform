@@ -29,6 +29,7 @@ on:
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
       - feat/render-correction-verification
+      - feat/building-release-readiness-gate
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -135,6 +136,9 @@ jobs:
 
       - name: Test evidence-gated correction verification cycle
         run: npm run test:render-correction-verification
+
+      - name: Test building release readiness evidence gate
+        run: npm run test:building-release-readiness
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
