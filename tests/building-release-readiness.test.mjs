@@ -94,6 +94,13 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
       candidateGlbSha256: modelSha,
       renderManifest: manifest,
       renderManifestSha256: manifestSha,
+      actualRenderFiles: renderViews.map((view) => ({
+        filename: view.filename,
+        sha256: view.sha256,
+        width: view.width,
+        height: view.height,
+        bytes: view.bytes,
+      })),
       geometryQa: {
         schemaVersion: "1.0.0", engine: "glb-geometry-qa-v2",
         status: "basic-geometry-check-passed", valid: true, warnings: geometryWarnings,
@@ -131,6 +138,27 @@ test("changed candidate GLB cannot reuse render evidence from another model", ()
   assert.equal(result.status, "blocked");
   assert.ok(result.blockers.some((item) => item.id === "rendered-candidate-hash"));
   assert.ok(result.blockers.some((item) => item.id === "reference-review-candidate-hash"));
+});
+
+test("changed render image bytes or dimensions block readiness even when the manifest is unchanged", () => {
+  const { input } = fixture();
+  const alteredHash = buildBuildingReleaseReadiness({
+    ...input,
+    actualRenderFiles: input.actualRenderFiles.map((file) =>
+      file.filename === "front.png" ? { ...file, sha256: "f".repeat(64) } : file
+    ),
+  });
+  assert.equal(alteredHash.status, "blocked");
+  assert.ok(alteredHash.blockers.some((item) => item.id === "render-image-content-hash:front"));
+
+  const alteredDimensions = buildBuildingReleaseReadiness({
+    ...input,
+    actualRenderFiles: input.actualRenderFiles.map((file) =>
+      file.filename === "front.png" ? { ...file, width: file.width + 1 } : file
+    ),
+  });
+  assert.equal(alteredDimensions.status, "blocked");
+  assert.ok(alteredDimensions.blockers.some((item) => item.id === "render-image-dimensions:front"));
 });
 
 test("partial/mismatch comparison blocks release readiness", () => {
