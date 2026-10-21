@@ -30,7 +30,7 @@ async function sha256File(filePath) {
   for await (const chunk of createReadStream(filePath)) hash.update(chunk);
   return hash.digest("hex");
 }
-async function loadVerifiedSource(workspaceRoot, buildingId, sourceId) {
+export async function loadVerifiedSource(workspaceRoot, buildingId, sourceId) {
   const root = await realpath(path.resolve(workspaceRoot));
   const bid = safeId(buildingId, "buildingId");
   const sid = safeId(sourceId, "sourceId");
