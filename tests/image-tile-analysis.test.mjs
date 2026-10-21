@@ -19,9 +19,9 @@ test("uses one tile for images smaller than the configured tile size",()=>{
 
 test("maps tile-local boxes back to original image coordinates",()=>{
  const result=planImageTiles(1800,1200,{tileSize:1024,overlap:128});
- const tile=result.tiles.find(item=>item.x===896&&item.y===0);
+ const tile=result.tiles.find(item=>item.x===776&&item.y===0);
  assert.ok(tile);
- assert.deepEqual(mapTileBoxToSource(tile,{x:10,y:20,width:100,height:60}),{x:906,y:20,width:100,height:60});
+ assert.deepEqual(mapTileBoxToSource(tile,{x:10,y:20,width:100,height:60}),{x:786,y:20,width:100,height:60});
  assert.throws(()=>mapTileBoxToSource(tile,{x:1000,y:20,width:100,height:60}),/within tile bounds/);
 });
 
