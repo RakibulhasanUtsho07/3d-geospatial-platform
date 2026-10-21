@@ -75,7 +75,9 @@
     "test:uv-seam-review": "node --test tests/uv-seam-review.test.mjs",
     "test:texture-image-content-review": "node --test tests/texture-image-content-review.test.mjs",
     "test:render-review-manifest": "node --test tests/render-review-manifest.test.mjs",
-    "render:building-review": "node scripts/render-building-review-views.mjs"
+    "render:building-review": "node scripts/render-building-review-views.mjs",
+    "test:render-reference-review": "node --test tests/render-reference-review.test.mjs",
+    "review:render-references": "node scripts/review-render-references.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
