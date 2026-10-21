@@ -127,6 +127,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
   // Optional pixel diagnostics are attached only when they identify the exact
   // render/reference bytes already verified by this review package.
   const diagnosticsByPair = new Map();
+  const seenDiagnosticPairs = new Set();
   for (let index = 0; index < similarityDiagnostics.length; index++) {
     const entry = similarityDiagnostics[index];
     if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
@@ -138,10 +139,11 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
     const viewId = entry.viewId;
     const referenceImageId = entry.referenceImageId;
     const pairKey = viewId + "\u0000" + referenceImageId;
-    if (diagnosticsByPair.has(pairKey)) {
+    if (seenDiagnosticPairs.has(pairKey)) {
       errors.push("duplicate-similarity-diagnostic:" + viewId + ":" + referenceImageId);
       continue;
     }
+    seenDiagnosticPairs.add(pairKey);
     if (!knownViews.has(viewId)) {
       errors.push("similarity-diagnostic-unknown-render-view:" + viewId);
       continue;
