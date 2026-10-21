@@ -11,7 +11,8 @@ function validNumber(value) {
 }
 
 function validateOptions(options) {
-  const settings = { ...DEFAULTS, ...options };
+  const settings = { ...DEFAULTS };
+  for (const [key, value] of Object.entries(options)) if (value !== undefined) settings[key] = value;
   if (!Number.isSafeInteger(settings.maxTopologyVertices) || settings.maxTopologyVertices < 3 || settings.maxTopologyVertices > 1_000_000) {
     throw new RangeError("maxTopologyVertices must be between 3 and 1000000");
   }
