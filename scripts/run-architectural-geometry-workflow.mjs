@@ -3,7 +3,7 @@ import { runArchitecturalGeometryWorkflow } from "../src/core/building-generatio
 
 function parseArgs(argv) {
   if (argv.includes("--help")) {
-    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2] [--texture-atlas-width=2048] [--texture-atlas-height=2048] [--texture-atlas-padding=4] [--render-review] [--render-resolution=1024] [--blender=<path>]");
+    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2] [--texture-atlas-width=2048] [--texture-atlas-height=2048] [--texture-atlas-padding=4] [--render-review] [--render-resolution=1024] [--blender=<path>] [--texture-atlas-width=2048] [--texture-atlas-height=2048] [--texture-atlas-padding=4] [--render-review] [--render-resolution=1024] [--blender=<path>]");
     console.log("Input JSON requires cameras, manually verified multi-view features, edges, explicit triangular faces and textureCandidate evidence. Input/reference image paths must be relative to workspace-root. Outputs are review candidates, never map-ready.");
     process.exit(0);
   }
@@ -44,7 +44,7 @@ function parseArgs(argv) {
     }
   }
   if (positional.length !== 4 || argv.includes("--help")) {
-    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2]");
+    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2] [--texture-atlas-width=2048] [--texture-atlas-height=2048] [--texture-atlas-padding=4] [--render-review] [--render-resolution=1024] [--blender=<path>]");
     console.log("Input JSON requires cameras, manually verified multi-view features, edges, explicit triangular faces and textureCandidate evidence. Input/reference image paths must be relative to workspace-root. Outputs are review candidates, never map-ready.");
     process.exit(argv.includes("--help") ? 0 : 2);
   }

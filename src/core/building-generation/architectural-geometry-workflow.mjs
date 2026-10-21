@@ -197,7 +197,7 @@ function canonicalFaceKey(vertices) {
   if (!Array.isArray(vertices) || vertices.length !== 3 ||
       vertices.some((id) => typeof id !== "string" || !id) ||
       new Set(vertices).size !== 3) return null;
-  return [...vertices].sort().join("\\u0000");
+  return [...vertices].sort().join("\u0000");
 }
 
 function attemptLabel(started, stageId) {
@@ -746,7 +746,7 @@ export async function runArchitecturalGeometryWorkflow(options) {
       const modelSha256 = await hashFile(modelPath);
       return {
         payload: {
-          status: built.report.status,
+          status: built.report.untexturedTriangleCount > 0 ? "partial-textured-mesh" : "exported",
           modelPath: relativeModelPath,
           modelSha256,
           report: built.report,

@@ -152,8 +152,14 @@ export function buildTexturedGlb({ mesh, faces, atlasBytes, atlasWidth, atlasHei
   const indexView = appendView(encodedIndices, 34963);
   const imageView = appendView(atlasBytes);
 
-  const minPosition = [0, 1, 2].map((axis) => Math.min(...positions.filter((_, index) => index % 3 === axis)));
-  const maxPosition = [0, 1, 2].map((axis) => Math.max(...positions.filter((_, index) => index % 3 === axis)));
+  const minPosition = [Infinity, Infinity, Infinity];
+  const maxPosition = [-Infinity, -Infinity, -Infinity];
+  for (let offset = 0; offset < positions.length; offset += 3) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      minPosition[axis] = Math.min(minPosition[axis], positions[offset + axis]);
+      maxPosition[axis] = Math.max(maxPosition[axis], positions[offset + axis]);
+    }
+  }
   const gltf = {
     asset: { version: "2.0", generator: "3d-geospatial-platform-textured-glb-export-v1" },
     scene: 0,
