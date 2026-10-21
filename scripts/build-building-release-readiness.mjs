@@ -8,9 +8,6 @@ import { buildBuildingReleaseReadiness } from "../src/core/building-generation/b
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-function canonicalDigest(value) {
-  return sha256(Buffer.from(JSON.stringify(value)));
-}
 
 async function main() {
   const [glbArg, renderDirArg, reviewArg, backlogArg, verificationArg, outputArg] = process.argv.slice(2);
