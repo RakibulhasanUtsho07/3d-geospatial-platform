@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { verifyRenderCorrectionTasks } from "./render-correction-verification.mjs";
+import { buildBuildingAccuracyBenchmark } from "./building-accuracy-benchmark.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const directlyComparableBases = new Set(["same-facade-known", "pose-estimated"]);
@@ -46,6 +47,7 @@ export function buildBuildingReleaseReadiness(input) {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    accuracyEvidence,
   } = input;
 
   if (!nonEmptyString(buildingId)) throw new TypeError("buildingId is required");
@@ -171,6 +173,85 @@ export function buildBuildingReleaseReadiness(input) {
   "The reference-review report must refer to the exact render manifest file hash.");
   check("reference-review-publication-flag", review?.publicationEligible === false,
     "The review report must not claim publication eligibility.");
+
+  // Recompute dimension and WGS84 ground-control evidence from this exact candidate,
+  // the fresh geometry QA and the current human-authored reference review.
+  let accuracyBenchmark = null;
+  if (!isObject(accuracyEvidence)) {
+    check("accuracy-evidence-input", false,
+      "A dimension reference and WGS84 ground-control evidence input are required for geospatial release review.");
+  } else if (!isObject(accuracyEvidence.dimensionReference)) {
+    check("accuracy-dimension-reference", false,
+      "Independent dimension-reference evidence is required; guessed dimensions cannot establish ground truth.");
+  } else {
+    try {
+      accuracyBenchmark = buildBuildingAccuracyBenchmark({
+        buildingId,
+        candidateGlbSha256,
+        geometryQa,
+        dimensionReference: accuracyEvidence.dimensionReference,
+        groundControl: accuracyEvidence.groundControl,
+        renderReferenceReview: review,
+        generatedAt: accuracyEvidence.generatedAt,
+      });
+      const benchmarkChecks = new Map((accuracyBenchmark.checks ?? []).map((item) => [item.id, item]));
+      const dimensionMetrics = accuracyBenchmark.metrics?.dimensions;
+      const georeference = accuracyBenchmark.metrics?.georeference;
+      const failures = Array.isArray(accuracyBenchmark.failures) ? accuracyBenchmark.failures : [];
+      const benchmarkWarnings = Array.isArray(accuracyBenchmark.warnings) ? accuracyBenchmark.warnings : [];
+      const geometryWarningsOnly = accuracyBenchmark.status === "benchmark-incomplete" &&
+        failures.length === 0 && benchmarkWarnings.length > 0 &&
+        benchmarkWarnings.every((item) => item.id === "glb-geometry-warnings");
+
+      check("accuracy-benchmark-engine",
+        accuracyBenchmark.schemaVersion === "1.0.0" &&
+          accuracyBenchmark.engine === "building-accuracy-benchmark-v1",
+        "A supported building-accuracy-benchmark-v1 report must be computed from the current inputs.");
+      check("accuracy-benchmark-candidate-binding",
+        accuracyBenchmark.buildingId === buildingId &&
+          isHash(accuracyBenchmark.candidateGlbSha256) &&
+          accuracyBenchmark.candidateGlbSha256.toLowerCase() === candidateGlbSha256?.toLowerCase?.(),
+        "The dimension/georeferencing benchmark must bind to this building and exact candidate GLB.");
+      check("accuracy-dimension-reference-provenance",
+        benchmarkChecks.get("dimension-reference-provenance")?.status === "passed",
+        "Dimension references must declare surveyed or published-measurement provenance; estimates are not ground truth.");
+      check("accuracy-dimensions-within-tolerance",
+        dimensionMetrics?.status === "dimension-check-passed-review-required" &&
+          Number.isFinite(dimensionMetrics?.maxRelativeErrorPercent) &&
+          Number.isFinite(dimensionMetrics?.tolerancePercent),
+        "The candidate's axis-aligned dimensions must fall within the configured independently sourced tolerance.");
+      check("accuracy-ground-control-model-binding",
+        benchmarkChecks.get("ground-control-model-binding")?.status === "passed" &&
+          georeference?.modelCoordinatesGlbSha256?.toLowerCase?.() === candidateGlbSha256?.toLowerCase?.(),
+        "WGS84 ground-control coordinates must be linked to the exact candidate GLB.");
+      check("accuracy-ground-control-provenance",
+        benchmarkChecks.get("ground-control-provenance")?.status === "passed",
+        "Ground-control points must declare surveyed or official-control provenance.");
+      check("accuracy-ground-control-residuals",
+        georeference?.supplied === true &&
+          georeference?.status === "calibrated-needs-human-review" &&
+          georeference?.thresholdPass === true &&
+          Number.isFinite(georeference?.rmsErrorM) &&
+          Number.isFinite(georeference?.maxResidualM) &&
+          Number.isSafeInteger(georeference?.controlPointCount) &&
+          georeference.controlPointCount >= 3,
+        "Horizontal WGS84 ground-control residuals must pass configured thresholds with at least three control points; vertical datum still needs review.");
+      check("accuracy-benchmark-policy",
+        accuracyBenchmark.policy?.mapReady === false &&
+          accuracyBenchmark.policy?.publicationEligible === false &&
+          accuracyBenchmark.policy?.automaticApproval === false,
+        "The accuracy benchmark must not imply map readiness, automatic approval or publication eligibility.");
+      check("accuracy-benchmark-status",
+        accuracyBenchmark.status === "benchmark-passed-review-required" || geometryWarningsOnly,
+        "The benchmark must pass dimension, georeferencing and human visual-evidence checks. Status: " +
+          String(accuracyBenchmark.status) + (failures.length ? "; failures: " + failures.map((item) => item.id).join(", ") : "") +
+          (benchmarkWarnings.length ? "; warnings: " + benchmarkWarnings.map((item) => item.id).join(", ") : ""));
+    } catch (error) {
+      check("accuracy-benchmark-computation", false,
+        "Dimension/georeferencing benchmark could not be calculated: " +
+          (error instanceof Error ? error.message : String(error)));
+    }
+  }
 
   const references = new Map();
   if (Array.isArray(review?.referenceImages)) {
@@ -340,6 +421,7 @@ export function buildBuildingReleaseReadiness(input) {
       correctionVerificationSourceReviewSha256: verification?.verificationReviewReportSha256 ?? null,
       geometryQaReportSha256: isObject(geometryQa) ? digest(JSON.stringify(geometryQa)) : null,
       textureQaReportSha256: isObject(textureQa) ? digest(JSON.stringify(textureQa)) : null,
+      accuracyBenchmarkReportSha256: accuracyBenchmark ? digest(JSON.stringify(accuracyBenchmark)) : null,
     },
     qaSummary: {
       geometry: {
@@ -357,6 +439,20 @@ export function buildBuildingReleaseReadiness(input) {
         errors: Array.isArray(textureQa?.errors) ? textureQa.errors : [],
         warnings: Array.isArray(textureQa?.warnings) ? textureQa.warnings : [],
       },
+      accuracyBenchmark: accuracyBenchmark ? {
+        engine: accuracyBenchmark.engine,
+        status: accuracyBenchmark.status,
+        generatedAt: accuracyBenchmark.generatedAt,
+        candidateGlbSha256: accuracyBenchmark.candidateGlbSha256,
+        counts: accuracyBenchmark.counts,
+        metrics: accuracyBenchmark.metrics,
+        evidence: accuracyBenchmark.evidence,
+        policy: accuracyBenchmark.policy,
+        checks: accuracyBenchmark.checks,
+        warnings: accuracyBenchmark.warnings,
+        failures: accuracyBenchmark.failures,
+        limitations: accuracyBenchmark.limitations,
+      } : null,
     },
     counts: {
       requiredRenderViews: REQUIRED_REVIEW_VIEWS.length,
@@ -364,6 +460,8 @@ export function buildBuildingReleaseReadiness(input) {
       actualRenderFilesRead: actualFilesByName.size,
       correctionTasks: backlogTasks.length,
       verifiedCorrectionTasks: verificationTasks.filter((item) => item.status === "verified").length,
+      accuracyBenchmarkChecks: accuracyBenchmark?.counts?.passed ?? 0,
+      groundControlPoints: accuracyBenchmark?.metrics?.georeference?.controlPointCount ?? 0,
       blockers: uniqueBlockers.length,
       warnings: uniqueWarnings.length,
       checks: checks.length,
