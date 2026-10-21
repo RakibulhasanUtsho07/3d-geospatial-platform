@@ -53,7 +53,9 @@
     "test:image-tile-analysis": "node --test tests/image-tile-analysis.test.mjs",
     "tile:building-images": "node scripts/tile-building-images.mjs",
     "test:architectural-sketch-preparation": "node --test tests/architectural-sketch-preparation.test.mjs",
-    "prepare:architectural-sketches": "node scripts/prepare-architectural-sketches.mjs"
+    "prepare:architectural-sketches": "node scripts/prepare-architectural-sketches.mjs",
+    "test:mask-guided-building-sketches": "node --test tests/mask-guided-building-sketches.test.mjs",
+    "build:mask-guided-sketches": "node scripts/build-mask-guided-sketches.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
