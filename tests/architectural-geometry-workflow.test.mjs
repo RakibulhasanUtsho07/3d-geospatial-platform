@@ -222,7 +222,7 @@ test("requires explicit calibration, correspondence, face and texture-evidence r
 
 test("rejects modified local texture source bytes even when the declared digest is unchanged", async (t) => {
   const f = await fixture(t);
-  await writeFile(path.join(f.root, "uploads", "front.png"), pngHeader(640, 480).fill(0));
+  await writeFile(path.join(f.root, "uploads", "front.png"), pngRgba(640, 480).fill(0));
   await assert.rejects(
     runArchitecturalGeometryWorkflow(workflowOptions(f)),
     /SHA-256 mismatch/,
