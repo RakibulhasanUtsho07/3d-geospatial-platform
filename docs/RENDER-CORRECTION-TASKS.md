@@ -26,6 +26,10 @@ The output file must not already exist. This is intentional so an earlier task s
 
 Each task preserves source-model and render-manifest hashes; comparison tasks also preserve render/reference hashes, reference/view IDs, basis, reviewer, timestamp and notes. If a mismatch has no structured `correctionRequest`, the task explicitly asks a human to inspect the pair and write a correction proposal. The tool does not guess the defect from free text.
 
+When a reference-review report includes validated image-similarity diagnostics for the exact render/reference hashes, the task carries a compact `evidence.similarityDiagnostics` record: the diagnostic report hash, pair hashes, MAE/RMSE/PSNR/SSIM/hash-distance metrics, aspect-ratio screening context and warning strings. Malformed diagnostics or diagnostics bound to different image hashes are rejected. When no diagnostics are supplied, this field is `null`. The backlog summary reports how many tasks carry diagnostics and how many carry screening warnings.
+
+These metrics are triage context only. They do **not** change the human-authored outcome, task priority, task type, verification status, or publication eligibility. In particular, low pixel similarity does not prove a geometry defect, and a clean diagnostic does not prove a correct building model.
+
 ## Safe correction loop
 
 1. Open the exact render and reference files, and check that the view/facade comparison basis is appropriate.
