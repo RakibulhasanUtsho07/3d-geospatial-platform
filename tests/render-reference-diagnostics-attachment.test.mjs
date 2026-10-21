@@ -168,7 +168,7 @@ test("rejects malformed metrics, invalid report hashes, duplicates and unknown p
       { viewId: "front", referenceImageId: "reference-front-01", report: badMetric, reportSha256: "f".repeat(64) },
       { viewId: "front", referenceImageId: "reference-front-01", report: diagnostic(), reportSha256: "f".repeat(64) },
       { viewId: "back", referenceImageId: "unknown-reference", report: diagnostic(), reportSha256: "f".repeat(64) },
-      { viewId: "front", referenceImageId: "reference-front-01", report: diagnostic(), reportSha256: "bad" },
+      { viewId: "back", referenceImageId: "reference-front-01", report: diagnostic({ renderSha256: backRenderHash }), reportSha256: "bad" },
     ],
   });
   assert.equal(report.valid, false);
