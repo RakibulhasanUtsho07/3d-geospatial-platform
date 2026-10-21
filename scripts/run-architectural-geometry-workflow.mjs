@@ -3,7 +3,7 @@ import { runArchitecturalGeometryWorkflow } from "../src/core/building-generatio
 
 function parseArgs(argv) {
   if (argv.includes("--help")) {
-    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2]");
+    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2] [--texture-atlas-width=2048] [--texture-atlas-height=2048] [--texture-atlas-padding=4] [--render-review] [--render-resolution=1024] [--blender=<path>]");
     console.log("Input JSON requires cameras, manually verified multi-view features, edges, explicit triangular faces and textureCandidate evidence. Input/reference image paths must be relative to workspace-root. Outputs are review candidates, never map-ready.");
     process.exit(0);
   }
@@ -14,6 +14,7 @@ function parseArgs(argv) {
     ["--confirm-correspondences-reviewed", "confirmCorrespondencesReviewed"],
     ["--confirm-face-definitions-reviewed", "confirmFaceDefinitionsReviewed"],
     ["--confirm-texture-evidence-reviewed", "confirmTextureEvidenceReviewed"],
+    ["--render-review", "renderReview"],
   ]);
   const numeric = new Map([
     ["--max-rms-reprojection-error", "maxRmsReprojectionError"],
@@ -21,10 +22,18 @@ function parseArgs(argv) {
     ["--max-boundary-edges", "maxBoundaryEdges"],
     ["--min-triangle-area", "minTriangleArea"],
     ["--max-texture-reprojection-error-px", "maxTextureReprojectionErrorPx"],
+    ["--texture-atlas-width", "textureAtlasWidth"],
+    ["--texture-atlas-height", "textureAtlasHeight"],
+    ["--texture-atlas-padding", "textureAtlasPadding"],
+    ["--render-resolution", "renderResolution"],
   ]);
   for (const arg of argv) {
     if (flags.has(arg)) options[flags.get(arg)] = true;
-    else {
+    else if (arg.startsWith("--blender=")) {
+      const executable = arg.slice("--blender=".length);
+      if (!executable.trim()) throw new TypeError("--blender needs a non-empty executable path");
+      options.blenderExecutable = executable;
+    } else {
       const match = arg.match(/^([^=]+)=(.+)$/);
       if (match && numeric.has(match[1])) {
         const value = Number(match[2]);

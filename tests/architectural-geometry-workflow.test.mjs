@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { deflateSync } from "node:zlib";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -20,12 +21,48 @@ function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function pngHeader(width, height) {
-  const image = Buffer.alloc(40, 37);
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(image, 0);
-  image.writeUInt32BE(width, 16);
-  image.writeUInt32BE(height, 20);
-  return image;
+function pngCrc32(bytes) {
+  let value = 0xffffffff;
+  for (const byte of bytes) {
+    value ^= byte;
+    for (let bit = 0; bit < 8; bit++) value = (value & 1) ? (value >>> 1) ^ 0xedb88320 : (value >>> 1);
+  }
+  return (value ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const name = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(pngCrc32(Buffer.concat([name, data])));
+  return Buffer.concat([length, name, data, checksum]);
+}
+
+function pngRgba(width, height) {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const rows = Buffer.alloc(height * (width * 4 + 1));
+  for (let y = 0; y < height; y++) {
+    const row = y * (width * 4 + 1);
+    rows[row] = 0;
+    for (let x = 0; x < width; x++) {
+      const at = row + 1 + x * 4;
+      rows[at] = 80 + ((x * 7 + y) % 150);
+      rows[at + 1] = 65 + ((y * 9 + x) % 160);
+      rows[at + 2] = 50 + ((x + y * 3) % 180);
+      rows[at + 3] = 255;
+    }
+  }
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(rows)),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
 }
 
 const cameras = [
@@ -51,7 +88,7 @@ async function fixture(t, { textureStatus = "verified" } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "architectural-geometry-workflow-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await import("node:fs/promises").then(({ mkdir }) => mkdir(path.join(root, "uploads"), { recursive: true }));
-  const imageBytes = pngHeader(640, 480);
+  const imageBytes = pngRgba(640, 480);
   await writeFile(path.join(root, "uploads", "front.png"), imageBytes);
   const textureCandidate = {
     images: [{
@@ -69,12 +106,12 @@ async function fixture(t, { textureStatus = "verified" } = {}) {
       status: textureStatus,
       reprojectionErrorPx: 0.2,
     }],
-    faces: [{
-      vertices: ["a","b","c"],
+    faces: faces.map((vertices) => ({
+      vertices,
       uv: [[0,0],[1,0],[0.5,1]],
       sourceImageId: "front",
       cameraCalibrationId: "left",
-    }],
+    })),
   };
   const inputPath = path.join(root, "geometry-input.json");
   const input = {
@@ -115,8 +152,16 @@ test("runs registration, wireframe QA, explicit-face meshing, surface review and
   assert.equal(result.report.checks.boundaryEdgeCount, 0);
   assert.equal(result.report.checks.nonManifoldEdgeCount, 0);
   assert.equal(result.report.checks.textureProjectionEvidenceStatus, "evidence-validation-passed");
-  assert.equal(result.report.checks.texturePixelProjectionPerformed, false);
-  assert.equal(result.report.checks.textureAtlasBakingPerformed, false);
+  assert.equal(result.report.checks.textureAtlasBakingPerformed, true);
+  assert.equal(result.report.checks.glbTextureBindingQaValid, true);
+  assert.equal(result.report.checks.texturedTriangleCount, 4);
+  assert.equal(result.report.checks.untexturedTriangleCount, 0);
+  assert.equal(result.report.checks.renderImagesGenerated, false);
+  assert.ok(result.report.output.textureAtlas.sha256);
+  assert.ok(result.report.output.texturedModel.sha256);
+  const modelBytes = await readFile(path.join(f.root, ...result.report.output.texturedModel.path.split("/")));
+  assert.equal(modelBytes.readUInt32LE(0), 0x46546c67);
+  assert.equal(modelBytes.readUInt32LE(4), 2);
   assert.equal(result.report.mapReady, false);
   assert.equal(result.report.publicationEligible, false);
 

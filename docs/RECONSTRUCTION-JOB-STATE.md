@@ -34,7 +34,7 @@ The command below wires existing reconstruction workers into a checksummed resum
 
 Every referenced texture image is hashed and its dimensions checked against the input. The operator must explicitly attest that camera calibration, cross-view correspondences, face definitions, and texture source/evidence were reviewed. These attestations are recorded; they are not independent proof that the evidence is correct.
 
-The seven persisted stages are view-registration, wireframe, iterative-sketch-repair, volume-and-facade-model, geometry-repair, texture, and final-acceptance. They call the repository's real triangulation, bounded wireframe-QA, explicit-face mesh-building, mesh-surface-review and texture-projection-evidence-review workers. A stage is marked complete when its worker ran and the result was durably saved; quality blockers remain in the artifact/report and are not confused with worker completion.
+The eleven persisted stages are view-registration, wireframe, iterative-sketch-repair, volume-and-facade-model, geometry-repair, texture, texture-atlas-bake, glb-export, glb-validation, render-review, and final-acceptance. They call the repository's real triangulation, bounded wireframe-QA, explicit-face mesh-building, mesh-surface-review, texture-evidence review, deterministic atlas packer/FFmpeg raster baker, textured GLB exporter, and embedded-texture binding QA workers. A stage is marked complete when its worker ran and a truthful result was durably saved; blocked stages can complete with an explicit blocked status so a final acceptance report is still produced. Quality blockers remain in the report and are not confused with worker completion.
 
 Example:
 
@@ -43,7 +43,7 @@ npm run test:architectural-geometry-workflow
 node scripts/run-architectural-geometry-workflow.mjs . building-001 geometry-job-001 .\geometry-input.json --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed
 ~~~
 
-This slice does not infer faces, fill boundaries, move vertices, bake texture pixels, or generate an atlas. mapReady and publicationEligible remain false even when technical checks pass. Human review, measured dimensions, ground-control evidence and a defensible vertical datum remain separate release requirements.
+The texture-atlas-bake stage composites the verified source-image files into an actual PNG atlas using FFmpeg, preserves their aspect ratios, extends configured gutter pixels and saves UV-remapped face mappings. It does not compute UVs or project pixels from camera calibration; supplied per-face UVs and camera-evidence review are required. The glb-export stage writes geometry, normals, TEXCOORD_0, material bindings and the PNG bytes into a self-contained GLB 2.0 file. The glb-validation stage checks embedded image dimensions/hash, material/texture references, UV layout and seam/content diagnostics. The render-review stage can optionally invoke the existing Blender renderer using renderReview: true; otherwise it records a render plan and correctly says no images were generated. A partial GLB may be retained as a review candidate, but untextured triangles are reported as blockers. mapReady and publicationEligible remain false even when technical checks pass. Human review, measured dimensions, ground-control evidence and a defensible vertical datum remain separate release requirements.
 
 ## Media-to-model CLI execution profile
 
@@ -134,6 +134,7 @@ Both job state and every stage artifact explicitly keep mapReady: false and publ
 
 ~~~powershell
 npm run test:reconstruction-job-state
+npm run test:textured-glb-export
 ~~~
 
 The Node.js tests cover stage ordering, immutable/versioned artifacts, checksums, input matching, failure/retry, crash recovery, downstream invalidation, and fail-closed publication gates.

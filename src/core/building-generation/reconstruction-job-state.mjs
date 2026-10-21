@@ -35,8 +35,8 @@ export const MEDIA_TO_MODEL_STAGE_IDS = Object.freeze([
   "report-finalization",
 ]);
 
-// Evidence-driven geometry stages backed by the existing triangulation, wireframe QA,
-// explicit-face mesh builder, surface-review, and texture-projection review workers.
+// Evidence-driven geometry and textured-GLB release-candidate stages. Atlas baking,
+// GLB export and binding QA run only from verified files and explicit reviewed UV evidence.
 export const ARCHITECTURAL_GEOMETRY_STAGE_IDS = Object.freeze([
   "view-registration",
   "wireframe",
@@ -44,6 +44,10 @@ export const ARCHITECTURAL_GEOMETRY_STAGE_IDS = Object.freeze([
   "volume-and-facade-model",
   "geometry-repair",
   "texture",
+  "texture-atlas-bake",
+  "glb-export",
+  "glb-validation",
+  "render-review",
   "final-acceptance",
 ]);
 
@@ -128,7 +132,7 @@ function nowIso(value) {
 }
 
 function assertStageId(stageId) {
-  const known = [...RECONSTRUCTION_STAGE_IDS, ...MEDIA_TO_MODEL_STAGE_IDS];
+  const known = [...RECONSTRUCTION_STAGE_IDS, ...MEDIA_TO_MODEL_STAGE_IDS, ...ARCHITECTURAL_GEOMETRY_STAGE_IDS];
   if (!known.includes(stageId)) {
     throw new TypeError("unknown reconstruction stage: " + String(stageId));
   }
