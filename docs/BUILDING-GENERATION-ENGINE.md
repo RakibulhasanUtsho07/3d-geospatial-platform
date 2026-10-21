@@ -45,6 +45,30 @@ The control-points JSON must be a JSON array whose rows have id, modelX, modelZ,
 
 This fit is horizontal only. Vertical height datum, roof/ground elevation, camera reconstruction quality, control-point identity and architectural fidelity need independent review. Even a successful fit stays mapReady=false and publicationEligible=false; a person must review the placement before any publishing feature is allowed.
 
+## 4. Reference-dimension validation
+
+`reference-dimension-validation.mjs` compares the exact GLB's axis-aligned bounds against independently measured reference dimensions. It reports absolute and percentage error per axis, RMS percentage error and the largest relative error. The operator must supply the model-to-metre scale and an explicit axis mapping when the model orientation differs from the reference. The check never guesses scale or silently swaps axes.
+
+Create a reference JSON file from verified measurements (not estimates), for example:
+
+~~~json
+{
+  "referenceDimensionsM": { "x": 20.0, "y": 12.0, "z": 30.0 },
+  "metresPerModelUnit": 1.0,
+  "tolerancePercent": 5,
+  "axisMapping": { "x": "x", "y": "y", "z": "z" }
+}
+~~~
+
+Run the comparison on the exact GLB:
+
+~~~powershell
+npm run test:reference-dimension-validation
+npm run validate:model-dimensions -- artifacts\\building.glb artifacts\\reference-dimensions.json artifacts\\dimension-report.json
+~~~
+
+The example numbers above are placeholders, not measurements for any real building. Replace them with trustworthy independent measurements and verify the axis mapping. The script exits non-zero when any axis exceeds tolerance. A pass only means that the bounding-box dimensions agree within the configured tolerance; it does not validate detailed shape, facade geometry, texture, height datum or geospatial placement.
+
 ## 4. GLB structure and geometry QA
 
 The shared `glb-geometry-qa.mjs` analyser validates GLB 2.0 chunks/accessors, finite positions, index bounds, triangle counts, degenerate triangles, materials and texture references. It also calls `mesh-topology-qa.mjs` for bounded, review-only topology hints: scale-relative long triangle edges, disconnected components, small detached triangle islands, boundary edges and non-manifold edges. Duplicate positions across UV seams are welded using a relative tolerance before edge/component checks. Topology maps are skipped above the configurable per-primitive vertex limit (default 250,000) to cap memory use; basic long-edge metrics remain available.
