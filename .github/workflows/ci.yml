@@ -28,6 +28,7 @@ on:
       - feat/blender-render-review-views
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
+      - feat/render-correction-verification
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -131,6 +132,9 @@ jobs:
 
       - name: Test evidence-linked render correction task backlog
         run: npm run test:render-correction-tasks
+
+      - name: Test evidence-gated correction verification cycle
+        run: npm run test:render-correction-verification
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
