@@ -23,6 +23,7 @@ on:
       - feat/texture-projection-validation
       - feat/texture-bake-readiness-qa
       - feat/texture-atlas-baking
+      - feat/glb-texture-binding-qa
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -108,6 +109,9 @@ jobs:
 
       - name: Test texture atlas packing and UV remapping
         run: npm run test:texture-atlas
+
+      - name: Test GLB texture binding and atlas verification
+        run: npm run test:glb-texture-binding-qa
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
