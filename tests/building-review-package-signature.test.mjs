@@ -10,7 +10,7 @@ function keys() {
   const pair = generateKeyPairSync("ed25519");
   return {
     privateKeyPem: pair.privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
-    publicKeyPem: pair.publicKey.export({ type: "spki", format: "pem" }).toString(),
+    trustedPublicKeyPem: pair.publicKey.export({ type: "spki", format: "pem" }).toString(),
   };
 }
 
@@ -47,7 +47,7 @@ test("rejects the wrong trusted public key", () => {
   const fixture = signFixture();
   const result = verifyBuildingReviewPackageSignature({
     ...fixture,
-    trustedPublicKeyPem: keys().publicKeyPem,
+    trustedPublicKeyPem: keys().trustedPublicKeyPem,
   });
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((item) => item.id === "trusted-public-key-fingerprint"));
