@@ -40,6 +40,7 @@ export function buildBuildingReleaseReadiness(input) {
     candidateGlbSha256,
     renderManifest,
     renderManifestSha256,
+    actualRenderFiles,
     geometryQa,
     textureQa,
     renderReferenceReview,
@@ -101,6 +102,18 @@ export function buildBuildingReleaseReadiness(input) {
   "The Blender render manifest must reference the exact candidate GLB hash.");
 
   const manifestViews = new Map();
+  const actualFilesByName = new Map();
+  if (Array.isArray(actualRenderFiles)) {
+    for (const file of actualRenderFiles) {
+      if (!isObject(file) || !nonEmptyString(file.filename) || actualFilesByName.has(file.filename)) {
+        blockers.push({ id: "actual-render-file-metadata", message: "Actual render files must have unique filenames." });
+        continue;
+      }
+      actualFilesByName.set(file.filename, file);
+    }
+  } else {
+    check("actual-render-files-supplied", false, "Actual render files must be read from disk and hashed during this release check.");
+  }
   if (Array.isArray(renderManifest?.views)) {
     for (const view of renderManifest.views) {
       if (!isObject(view) || !nonEmptyString(view.id) || manifestViews.has(view.id)) {
@@ -110,6 +123,19 @@ export function buildBuildingReleaseReadiness(input) {
       manifestViews.set(view.id, view);
       check("render-view-hash:" + view.id, isHash(view.sha256),
         "Render view " + view.id + " must have a valid image SHA-256 hash.");
+      const actualFile = actualFilesByName.get(view.filename);
+      check("render-image-present:" + view.id, Boolean(actualFile),
+        "The actual render image must exist on disk: " + String(view.filename) + ".");
+      check("render-image-content-hash:" + view.id, Boolean(actualFile && isHash(actualFile.sha256) &&
+        isHash(view.sha256) && actualFile.sha256.toLowerCase() === view.sha256.toLowerCase()),
+      "The actual render image bytes must match the manifest hash for view " + view.id + ".");
+      check("render-image-dimensions:" + view.id, Boolean(actualFile &&
+        actualFile.width === view.width && actualFile.height === view.height &&
+        Number.isSafeInteger(actualFile.width) && actualFile.width > 0 &&
+        Number.isSafeInteger(actualFile.height) && actualFile.height > 0),
+      "The actual render image dimensions must match the manifest for view " + view.id + ".");
+      check("render-image-size:" + view.id, Boolean(actualFile && Number.isSafeInteger(actualFile.bytes) && actualFile.bytes > 0),
+        "The actual render image must be non-empty: " + String(view.filename) + ".");
     }
   }
   for (const requiredView of REQUIRED_REVIEW_VIEWS) {
@@ -301,6 +327,9 @@ export function buildBuildingReleaseReadiness(input) {
     provenance: {
       renderManifestSha256: isHash(renderManifestSha256) ? renderManifestSha256.toLowerCase() : null,
       renderReferenceReviewSha256: reviewDigest,
+      renderImageEvidenceSha256: Array.isArray(actualRenderFiles)
+        ? digest(JSON.stringify([...actualRenderFiles].sort((a, b) => String(a.filename).localeCompare(String(b.filename)))))
+        : null,
       correctionTaskBacklogSha256: backlogDigest,
       correctionVerificationReportSha256: verification ? digest(JSON.stringify(verification)) : null,
       correctionVerificationSourceReviewSha256: verification?.verificationReviewReportSha256 ?? null,
@@ -327,6 +356,7 @@ export function buildBuildingReleaseReadiness(input) {
     counts: {
       requiredRenderViews: REQUIRED_REVIEW_VIEWS.length,
       qualifyingReviewedViews: reviewedViews.size,
+      actualRenderFilesRead: actualFilesByName.size,
       correctionTasks: backlogTasks.length,
       verifiedCorrectionTasks: verificationTasks.filter((item) => item.status === "verified").length,
       blockers: uniqueBlockers.length,
