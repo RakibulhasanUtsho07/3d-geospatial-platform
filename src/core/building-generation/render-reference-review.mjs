@@ -200,6 +200,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       report.comparability.aspectRatioDifferencePercent >= 0 &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
+    if (!candidateMatches || !referenceMatches || !metricsValid) continue;
     const normalized = {
       reportSha256: entry.reportSha256.toLowerCase(),
       engine: report.engine,
