@@ -128,3 +128,77 @@ test("task ids and report hashes are deterministic for identical input", () => {
   assert.equal(one.createdFromReviewReportSha256, two.createdFromReviewReportSha256);
   assert.match(one.tasks[0].id, /^rrt-[a-f0-9]{20}$/);
 });
+
+function similarityDiagnostics(overrides = {}) {
+  return {
+    reportSha256: "1".repeat(64),
+    engine: "render-image-similarity-diagnostics-v1",
+    status: "diagnostics-computed",
+    interpretation: "review-recommended",
+    renderSha256,
+    referenceSha256,
+    metrics: {
+      meanAbsoluteError: 41.25,
+      rootMeanSquaredError: 52.1,
+      psnrDb: 13.8,
+      localSsim8x8: 0.21,
+      differenceHashHammingDistance: 48,
+    },
+    comparability: {
+      aspectRatioDifferencePercent: 0.5,
+      aspectRatioWithinScreeningThreshold: true,
+      sameFacadeConfirmedByTool: false,
+      cameraPoseAlignmentVerifiedByTool: false,
+    },
+    warnings: ["low-grayscale-ssim-screening-hint"],
+    automaticMatch: false,
+    ...overrides,
+  };
+}
+
+test("preserves valid similarity evidence on the exact correction task without changing human priority", () => {
+  const baseline = createRenderCorrectionTasks(report());
+  const withDiagnostics = createRenderCorrectionTasks(report({
+    comparisons: [comparison({ similarityDiagnostics: similarityDiagnostics() })],
+  }));
+  const baselineMismatch = baseline.tasks.find((task) => task.kind === "model-correction-review");
+  const diagnosedMismatch = withDiagnostics.tasks.find((task) => task.kind === "model-correction-review");
+
+  assert.equal(diagnosedMismatch.priority, baselineMismatch.priority);
+  assert.equal(diagnosedMismatch.kind, baselineMismatch.kind);
+  assert.equal(diagnosedMismatch.evidence.outcome, baselineMismatch.evidence.outcome);
+  assert.equal(diagnosedMismatch.evidence.similarityDiagnostics.reportSha256, "1".repeat(64));
+  assert.equal(diagnosedMismatch.evidence.similarityDiagnostics.renderSha256, renderSha256);
+  assert.equal(diagnosedMismatch.evidence.similarityDiagnostics.referenceSha256, referenceSha256);
+  assert.equal(diagnosedMismatch.evidence.similarityDiagnostics.metrics.localSsim8x8, 0.21);
+  assert.deepEqual(diagnosedMismatch.evidence.similarityDiagnostics.warnings, ["low-grayscale-ssim-screening-hint"]);
+  assert.equal(diagnosedMismatch.evidence.similarityDiagnostics.automaticMatch, false);
+  assert.equal(withDiagnostics.similarityDiagnosticsSummary.attachedToTasks, 1);
+  assert.equal(withDiagnostics.similarityDiagnosticsSummary.withWarnings, 1);
+  assert.equal(withDiagnostics.similarityDiagnosticsSummary.automaticPriorityChanges, false);
+  assert.equal(diagnosedMismatch.autoApplied, false);
+  assert.equal(diagnosedMismatch.publicationEligible, false);
+});
+
+test("rejects diagnostics bound to a different render/reference or malformed metric values", () => {
+  assert.throws(() => createRenderCorrectionTasks(report({
+    comparisons: [comparison({
+      similarityDiagnostics: similarityDiagnostics({ renderSha256: "0".repeat(64) }),
+    })],
+  })), /similarity-diagnostics-invalid/);
+
+  const invalidMetrics = similarityDiagnostics();
+  invalidMetrics.metrics.localSsim8x8 = 9;
+  assert.throws(() => createRenderCorrectionTasks(report({
+    comparisons: [comparison({ similarityDiagnostics: invalidMetrics })],
+  })), /similarity-diagnostics-invalid/);
+});
+
+test("tasks without image diagnostics keep a null evidence field", () => {
+  const result = createRenderCorrectionTasks(report());
+  const mismatch = result.tasks.find((task) => task.kind === "model-correction-review");
+  assert.equal(mismatch.evidence.similarityDiagnostics, null);
+  assert.equal(result.similarityDiagnosticsSummary.attachedToTasks, 0);
+  assert.equal(result.similarityDiagnosticsSummary.withWarnings, 0);
+});
+
