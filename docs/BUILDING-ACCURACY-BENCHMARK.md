@@ -66,3 +66,19 @@ Attach or preserve these files for an actual numerical audit:
 - surveyed control points if map placement accuracy is required.
 
 Once this bundle is available, report separate results for **view coverage, mesh integrity, dimensions, georeferencing, texture and human visual fidelity**. Do not publish a single accuracy percentage unless a defined, repeatable reference metric actually supports it.
+
+
+## Implemented CLI: repeatable accuracy benchmark
+
+The repository now exposes a combined runner:
+
+```powershell
+Get-FileHash .\\artifacts\\building.glb -Algorithm SHA256
+npm run benchmark:building-accuracy -- ".\\artifacts\\building.glb" ".\\benchmarks\\building.json" ".\\benchmarks\\accuracy-report.json"
+```
+
+The JSON config uses `schemaVersion: "1.0.0"`, `buildingId`, and `dimensionReference` with `referenceDimensionsM`, `metresPerModelUnit`, and `evidence` (`basis`, `referenceId`, `sourceDescription`). Add `groundControl` with at least three non-collinear control points, the exact candidate SHA-256 in `modelCoordinatesGlbSha256`, surveyed-coordinate provenance and residual thresholds. Add `renderReferenceReviewReportPath` to include the report produced by the existing human review workflow; that review must reference the same GLB hash.
+
+For dimensions, the accepted provenance labels are `surveyed` and `published-measurement`; a guess cannot pass as ground truth. Survey provenance and reviewer outcomes remain operator-attested. If control evidence or render/reference review is missing or pending, the status is `benchmark-incomplete`; mismatched measurements/references or stale hashes produce `benchmark-failed`; complete evidence can produce `benchmark-passed-review-required`. Geometry QA warnings remain visible and can also keep the result incomplete.
+
+The report contains no combined accuracy percentage. It always keeps `mapReady: false`, `publicationEligible: false`, and `automaticApproval: false`.
