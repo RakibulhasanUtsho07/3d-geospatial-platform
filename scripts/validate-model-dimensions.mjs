@@ -1,6 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 import { validateReferenceDimensions } from "../src/core/building-generation/reference-dimension-validation.mjs";
 
