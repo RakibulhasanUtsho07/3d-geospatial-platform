@@ -29,3 +29,28 @@ Only compare the same facade from a closely matched camera pose and crop. The to
 A low pixel error is not proof that the 3D geometry is correct: a wrong mesh can have a similar facade texture, while a good mesh rendered under different lighting may have high pixel error. Do not combine these metrics into a single accuracy percentage. Keep dimension checks, survey-based georeferencing and human architectural review as separate evidence.
 
 The tool accepts regular JPEG/PNG files, rejects symlinks, limits FFmpeg output to a 64×64 grayscale preview, and invokes FFmpeg using argument arrays rather than a shell. Its reports set `mapReady: false` and `publicationEligible: false`.
+
+
+## Attach diagnostics to the full reference-review report
+
+The reference-review CLI can optionally attach the diagnostics report for each manually selected render/reference pair. Add `similarityDiagnosticsPath` to the comparison object in your review-input JSON. The path is relative to the review-input file's directory, must stay inside that directory, and must point to a regular JSON file (symlinks and absolute paths are rejected).
+
+```json
+{
+  "viewId": "front",
+  "referenceImageId": "front-reference",
+  "comparisonBasis": "same-facade-known",
+  "outcome": "pending",
+  "similarityDiagnosticsPath": "diagnostics/front.json"
+}
+```
+
+Generate `diagnostics/front.json` with the single-pair command above, then run the existing review workflow:
+
+```powershell
+npm run review:render-references -- ".\\renders\\front-set" ".\\review\\review-input.json" ".\\review\\render-reference-report.json"
+```
+
+The review report preserves the human-authored outcome and adds the diagnostic metrics, warning list, exact render/reference SHA-256 hashes, and SHA-256 of the diagnostics report itself. Before attachment, the workflow requires the diagnostic report's file hashes, dimensions and byte counts to match the render manifest and verified image files. Stale/mismatched reports make the review package invalid.
+
+Diagnostics are optional. If no `similarityDiagnosticsPath` is supplied, the existing review workflow behaves as before. Screening warnings are exposed in the report but **never change** `outcome`, `reviewStatus`, correction priority or publication policy. The metrics remain evidence hints only; a person still decides whether a view matches.
