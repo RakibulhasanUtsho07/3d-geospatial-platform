@@ -102,6 +102,7 @@ export function buildBuildingReleaseReadiness(input) {
   "The Blender render manifest must reference the exact candidate GLB hash.");
 
   const manifestViews = new Map();
+  const manifestFilenames = new Set();
   const actualFilesByName = new Map();
   if (Array.isArray(actualRenderFiles)) {
     for (const file of actualRenderFiles) {
@@ -121,6 +122,10 @@ export function buildBuildingReleaseReadiness(input) {
         continue;
       }
       manifestViews.set(view.id, view);
+      check("render-view-filename:" + view.id, nonEmptyString(view.filename) &&
+        !manifestFilenames.has(view.filename),
+      "Render image filenames must be present and unique; duplicate or missing name for view " + view.id + ".");
+      if (nonEmptyString(view.filename)) manifestFilenames.add(view.filename);
       check("render-view-hash:" + view.id, isHash(view.sha256),
         "Render view " + view.id + " must have a valid image SHA-256 hash.");
       const actualFile = actualFilesByName.get(view.filename);
