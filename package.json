@@ -67,7 +67,9 @@
     "test:texture-projection-review": "node --test tests/texture-projection-review.test.mjs",
     "review:texture-projection": "node scripts/review-texture-projection.mjs",
     "test:texture-bake-readiness": "node --test tests/texture-bake-readiness.test.mjs",
-    "assess:texture-bake-readiness": "node scripts/assess-texture-bake-readiness.mjs"
+    "assess:texture-bake-readiness": "node scripts/assess-texture-bake-readiness.mjs",
+    "test:texture-atlas": "node --test tests/texture-atlas.test.mjs",
+    "build:texture-atlas": "node scripts/build-texture-atlas.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
