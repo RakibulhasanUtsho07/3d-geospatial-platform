@@ -291,7 +291,8 @@ export function reviewGlbTextureBindings(input, options = {}) {
       }
       const material = Number.isSafeInteger(materialIndex) ? materials[materialIndex] : null;
       const refs = material ? materialTextureRefs(material) : [];
-      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[], uvSeamReviews:[] };\n      const seamReviewByTexCoord = new Map();
+      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[], uvSeamReviews:[] };
+      const seamReviewByTexCoord = new Map();
       if (refs.length === 0) {
         untexturedPrimitiveCount++;
         warnings.push(`${key}-no-supported-material-textures`);
@@ -393,7 +394,9 @@ export function reviewGlbTextureBindings(input, options = {}) {
     valid:errors.length === 0,
     publicationEligible:false,
     counts:{ meshCount:gltf.meshes?.length ?? 0, materialCount:materials.length, textureCount:textures.length, imageCount:images.length,
-      texturedPrimitiveCount, untexturedPrimitiveCount, uvAccessorCount:uvAttributeCount, uvVertexCount,\n      uvSeamCandidateCount:primitiveReports.reduce((sum, item) => sum + item.uvSeamReviews.reduce((part, review) => part + review.seamCandidateCount, 0), 0),\n      textureContentRiskCount:images.reduce((sum, image) => sum + (image.contentReview?.risks?.length ?? 0), 0) },
+      texturedPrimitiveCount, untexturedPrimitiveCount, uvAccessorCount:uvAttributeCount, uvVertexCount,
+      uvSeamCandidateCount:primitiveReports.reduce((sum, item) => sum + item.uvSeamReviews.reduce((part, review) => part + review.seamCandidateCount, 0), 0),
+      textureContentRiskCount:images.reduce((sum, image) => sum + (image.contentReview?.risks?.length ?? 0), 0) },
     images, primitiveReports, errors:[...new Set(errors)], warnings:[...new Set(warnings)],
     limitations:[
       "This audit validates glTF resource references and UV numeric ranges; it does not render the model or determine whether the photo belongs to the corresponding facade.",
