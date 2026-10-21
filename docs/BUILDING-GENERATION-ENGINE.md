@@ -47,13 +47,13 @@ This fit is horizontal only. Vertical height datum, roof/ground elevation, camer
 
 ## 4. GLB structure and geometry QA
 
-The shared glb-geometry-qa.mjs analyser reads the GLB 2.0 header/chunks and validates its embedded buffer structure. For supported triangle primitives it checks that vertex positions are finite, byte ranges/strides are valid, index values stay inside the POSITION accessor, and triangle counts are well formed. It reports mesh/primitive/vertex/triangle counts, zero-area/degenerate triangles, material/texture/image counts, external URIs, and model-space bounds. The procedural, COLMAP and single-image AI routes attach this report to their generation report.
+The shared `glb-geometry-qa.mjs` analyser validates GLB 2.0 chunks/accessors, finite positions, index bounds, triangle counts, degenerate triangles, materials and texture references. It also calls `mesh-topology-qa.mjs` for bounded, review-only topology hints: scale-relative long triangle edges, disconnected components, small detached triangle islands, boundary edges and non-manifold edges. Duplicate positions across UV seams are welded using a relative tolerance before edge/component checks. Topology maps are skipped above the configurable per-primitive vertex limit (default 250,000) to cap memory use; basic long-edge metrics remain available.
+
+These metrics are not automatic mesh repair. Open boundary edges can be legitimate on partial scans or deliberately open surfaces; separate components may also be intentional. Long edges are scale-relative heuristics, not a universal definition of a bad triangle. Always review flagged geometry visually before cleanup. The QA report does not prove watertightness, architectural accuracy, camera calibration, true metric scale, or WGS84 registration.
 
 ~~~powershell
 npm run test:glb-geometry-qa
 ~~~
-
-A report with warnings is a manual-review signal, not an automatic rejection or a proof that the mesh matches the real building. Current QA does not calculate watertightness, connected-component quality, facade accuracy, camera calibration, true metric scale, or WGS84 registration. GLB bounds are model-space values unless independent scale calibration is available.
 
 ## 5. Local image, video and floor-plan intake
 
