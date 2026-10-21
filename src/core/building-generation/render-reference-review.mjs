@@ -1,0 +1,231 @@
+const sha256Pattern = /^[a-f0-9]{64}$/i;
+const finite = (value) => typeof value === "number" && Number.isFinite(value);
+const validOutcomes = new Set(["pending", "match", "partial", "mismatch", "not-comparable"]);
+const validBases = new Set(["same-facade-known", "pose-estimated", "context-only", "not-comparable"]);
+const validRightsStatuses = new Set(["verified", "pending", "unknown"]);
+
+function validIsoDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) &&
+    Number.isFinite(Date.parse(value));
+}
+
+/**
+ * Assemble a traceable, reviewer-authored comparison between fixed renders and
+ * independently supplied reference images. It deliberately creates no similarity
+ * score and never promotes this evidence to publication eligibility.
+ */
+export function buildRenderReferenceReview({ renderManifest, renderManifestSha256, reviewInput, renderFiles, referenceFiles }) {
+  const errors = [], warnings = [];
+  if (!renderManifest || renderManifest.schemaVersion !== "1.0.0" ||
+    renderManifest.engine !== "building-render-review-manifest-v1" || !Array.isArray(renderManifest.views)) {
+    throw new TypeError("renderManifest must be a version 1.0.0 building render review manifest");
+  }
+  if (!sha256Pattern.test(renderManifestSha256 ?? "")) throw new TypeError("renderManifestSha256 must be a 64-character SHA-256 hash");
+  if (!sha256Pattern.test(renderManifest.modelSha256 ?? "")) throw new TypeError("render manifest has no valid source model SHA-256");
+  if (!reviewInput || reviewInput.schemaVersion !== "1.0.0" ||
+    typeof reviewInput.buildingId !== "string" || !reviewInput.buildingId.trim() ||
+    !Array.isArray(reviewInput.referenceImages) || !Array.isArray(reviewInput.comparisons)) {
+    throw new TypeError("reviewInput must be schemaVersion 1.0.0 with buildingId, referenceImages and comparisons");
+  }
+  if (!Array.isArray(renderFiles) || !Array.isArray(referenceFiles)) {
+    throw new TypeError("renderFiles and referenceFiles must be arrays of disk-verified image metadata");
+  }
+
+  const actualRenderFiles = new Map(renderFiles.map((file) => [file.filename, file]));
+  const actualReferences = new Map(referenceFiles.map((file) => [file.id, file]));
+  const knownViews = new Map();
+  for (const view of renderManifest.views) {
+    if (!view || typeof view.id !== "string" || !view.id || knownViews.has(view.id)) {
+      errors.push("render-manifest-view-ids-invalid-or-duplicated");
+      continue;
+    }
+    knownViews.set(view.id, view);
+    const actual = actualRenderFiles.get(view.filename);
+    if (!actual) {
+      errors.push("render-image-missing:" + view.id);
+      continue;
+    }
+    if (actual.sha256 !== view.sha256) errors.push("render-image-sha256-mismatch:" + view.id);
+    if (actual.width !== view.width || actual.height !== view.height) errors.push("render-image-dimensions-mismatch:" + view.id);
+  }
+
+  if (renderManifest.status === "failed" || renderManifest.valid !== true) {
+    warnings.push("render-manifest-not-clean");
+  }
+  if (renderManifest.publicationEligible !== false) warnings.push("render-manifest-eligibility-flag-unexpected");
+  const seenReferenceIds = new Set();
+  const references = [];
+  const referenceById = new Map();
+  for (const reference of reviewInput.referenceImages) {
+    if (!reference || typeof reference.id !== "string" || !reference.id) {
+      errors.push("reference-image-id-invalid");
+      continue;
+    }
+    if (seenReferenceIds.has(reference.id)) {
+      errors.push("duplicate-reference-image-id:" + reference.id);
+      continue;
+    }
+    seenReferenceIds.add(reference.id);
+    referenceById.set(reference.id, reference);
+    if (typeof reference.path !== "string" || !reference.path.trim()) errors.push("reference-path-missing:" + reference.id);
+    if (!sha256Pattern.test(reference.sha256 ?? "")) errors.push("reference-sha256-invalid:" + reference.id);
+    if (!Number.isSafeInteger(reference.width) || reference.width < 1 ||
+      !Number.isSafeInteger(reference.height) || reference.height < 1) {
+      errors.push("reference-dimensions-invalid:" + reference.id);
+    }
+    if (typeof reference.sourceDescription !== "string" || !reference.sourceDescription.trim()) {
+      warnings.push("reference-source-description-missing:" + reference.id);
+    }
+    if (!validRightsStatuses.has(reference.rightsStatus)) {
+      errors.push("reference-rights-status-invalid:" + reference.id);
+    } else if (reference.rightsStatus !== "verified") {
+      warnings.push("reference-rights-review-pending:" + reference.id);
+    }
+    if (reference.captureHeadingDegrees !== undefined && reference.captureHeadingDegrees !== null &&
+      (!finite(reference.captureHeadingDegrees) || reference.captureHeadingDegrees < 0 || reference.captureHeadingDegrees >= 360)) {
+      errors.push("reference-heading-invalid:" + reference.id);
+    }
+    const actual = actualReferences.get(reference.id);
+    if (!actual) {
+      errors.push("reference-file-not-found:" + reference.id);
+      continue;
+    }
+    if (!sha256Pattern.test(actual.sha256 ?? "") || actual.sha256 !== reference.sha256?.toLowerCase()) {
+      errors.push("reference-file-sha256-mismatch:" + reference.id);
+    }
+    if (actual.width !== reference.width || actual.height !== reference.height) {
+      errors.push("reference-file-dimensions-mismatch:" + reference.id);
+    }
+    if (!Number.isSafeInteger(actual.bytes) || actual.bytes < 1) errors.push("reference-file-size-invalid:" + reference.id);
+    references.push({
+      id: reference.id,
+      filename: typeof actual.filename === "string" ? actual.filename : null,
+      sha256: actual.sha256 ?? null,
+      width: actual.width ?? null,
+      height: actual.height ?? null,
+      bytes: actual.bytes ?? null,
+      sourceDescription: reference.sourceDescription?.trim() ?? "",
+      sourceUrl: typeof reference.sourceUrl === "string" && reference.sourceUrl.trim() ? reference.sourceUrl.trim() : null,
+      attribution: typeof reference.attribution === "string" && reference.attribution.trim() ? reference.attribution.trim() : null,
+      rightsStatus: validRightsStatuses.has(reference.rightsStatus) ? reference.rightsStatus : "unknown",
+      facadeLabel: typeof reference.facadeLabel === "string" && reference.facadeLabel.trim() ? reference.facadeLabel.trim() : "unknown",
+      captureHeadingDegrees: reference.captureHeadingDegrees ?? null,
+      captureHeadingBasis: reference.captureHeadingBasis ?? "unknown",
+    });
+    if (!reference.facadeLabel || reference.facadeLabel === "unknown") warnings.push("reference-facade-not-identified:" + reference.id);
+    if (reference.captureHeadingDegrees === undefined || reference.captureHeadingDegrees === null ||
+      reference.captureHeadingBasis !== "measured" && reference.captureHeadingBasis !== "estimated") {
+      warnings.push("reference-camera-heading-unverified:" + reference.id);
+    }
+    if (reference.sourceUrl && !/^https?:\/\//i.test(reference.sourceUrl)) errors.push("reference-source-url-invalid:" + reference.id);
+  }
+  if (reviewInput.referenceImages.length === 0) warnings.push("no-reference-images-supplied");
+
+  const seenPairs = new Set();
+  const comparisons = [];
+  for (let index = 0; index < reviewInput.comparisons.length; index++) {
+    const comparison = reviewInput.comparisons[index];
+    if (!comparison || typeof comparison.viewId !== "string" || !comparison.viewId) {
+      errors.push("comparison-view-id-invalid:" + index);
+      continue;
+    }
+    if (!knownViews.has(comparison.viewId)) {
+      errors.push("comparison-unknown-render-view:" + comparison.viewId);
+      continue;
+    }
+    if (typeof comparison.referenceImageId !== "string" || !referenceById.has(comparison.referenceImageId)) {
+      errors.push("comparison-unknown-reference-image:" + index);
+      continue;
+    }
+    const pairKey = comparison.viewId + "\u0000" + comparison.referenceImageId;
+    if (seenPairs.has(pairKey)) {
+      errors.push("duplicate-view-reference-comparison:" + comparison.viewId + ":" + comparison.referenceImageId);
+      continue;
+    }
+    seenPairs.add(pairKey);
+    if (!validBases.has(comparison.comparisonBasis)) errors.push("comparison-basis-invalid:" + comparison.viewId);
+    if (!validOutcomes.has(comparison.outcome)) errors.push("comparison-outcome-invalid:" + comparison.viewId);
+    const basis = validBases.has(comparison.comparisonBasis) ? comparison.comparisonBasis : "not-comparable";
+    const outcome = validOutcomes.has(comparison.outcome) ? comparison.outcome : "pending";
+    if (outcome === "match" && basis !== "same-facade-known" && basis !== "pose-estimated") {
+      errors.push("comparison-match-needs-facade-or-pose-basis:" + comparison.viewId);
+    }
+    if (outcome === "not-comparable" && basis !== "not-comparable" && basis !== "context-only") {
+      errors.push("comparison-not-comparable-basis-mismatch:" + comparison.viewId);
+    }
+    if (outcome !== "pending") {
+      if (typeof comparison.reviewer !== "string" || !comparison.reviewer.trim()) errors.push("comparison-reviewer-missing:" + comparison.viewId);
+      if (!validIsoDate(comparison.reviewedAt)) errors.push("comparison-reviewedAt-invalid:" + comparison.viewId);
+      if (typeof comparison.notes !== "string" || !comparison.notes.trim()) errors.push("comparison-notes-required:" + comparison.viewId);
+    }
+    if (outcome === "pending") warnings.push("comparison-pending:" + comparison.viewId + ":" + comparison.referenceImageId);
+    if (outcome === "partial") warnings.push("partial-match-needs-revision:" + comparison.viewId);
+    if (outcome === "mismatch") warnings.push("reference-mismatch-needs-correction:" + comparison.viewId);
+    if (basis === "context-only" || basis === "not-comparable") warnings.push("comparison-is-not-direct-facade-validation:" + comparison.viewId);
+    comparisons.push({
+      viewId: comparison.viewId,
+      renderFilename: knownViews.get(comparison.viewId).filename,
+      renderSha256: knownViews.get(comparison.viewId).sha256,
+      referenceImageId: comparison.referenceImageId,
+      referenceSha256: referenceById.get(comparison.referenceImageId).sha256.toLowerCase(),
+      comparisonBasis: basis,
+      outcome,
+      reviewer: typeof comparison.reviewer === "string" ? comparison.reviewer.trim() : "",
+      reviewedAt: validIsoDate(comparison.reviewedAt) ? comparison.reviewedAt : null,
+      notes: typeof comparison.notes === "string" ? comparison.notes.trim() : "",
+      correctionRequest: typeof comparison.correctionRequest === "string" && comparison.correctionRequest.trim()
+        ? comparison.correctionRequest.trim() : null,
+    });
+  }
+  if (reviewInput.comparisons.length === 0) warnings.push("no-render-reference-comparisons-supplied");
+
+  const outcomeCounts = { match:0, partial:0, mismatch:0, notComparable:0, pending:0 };
+  for (const comparison of comparisons) {
+    if (comparison.outcome === "not-comparable") outcomeCounts.notComparable++;
+    else outcomeCounts[comparison.outcome]++;
+  }
+  const coveredViews = new Set(comparisons.map((comparison) => comparison.viewId));
+  const missingViewComparisons = [...knownViews.keys()].filter((viewId) => !coveredViews.has(viewId));
+  for (const viewId of missingViewComparisons) warnings.push("no-reference-comparison-for-view:" + viewId);
+  const reviewStatus = errors.length ? "invalid-review-package" :
+    outcomeCounts.pending || missingViewComparisons.length || comparisons.length === 0 ? "pending-human-review" :
+    outcomeCounts.mismatch || outcomeCounts.partial ? "needs-model-or-reference-correction" :
+    outcomeCounts.notComparable ? "review-complete-with-unresolved-comparisons" :
+    "reviewer-reported-matches";
+
+  return {
+    schemaVersion: "1.0.0",
+    engine: "render-reference-review-v1",
+    buildingId: reviewInput.buildingId.trim(),
+    reviewStatus,
+    valid: errors.length === 0,
+    publicationEligible: false,
+    provenance: {
+      renderManifestSha256: renderManifestSha256.toLowerCase(),
+      sourceModelSha256: renderManifest.modelSha256.toLowerCase(),
+      renderManifestStatus: renderManifest.status ?? "unknown",
+      referenceImageCount: references.length,
+    },
+    counts: {
+      renderViewCount: knownViews.size,
+      referenceImageCount: references.length,
+      comparisonCount: comparisons.length,
+      ...outcomeCounts,
+      viewsWithoutComparisons: missingViewComparisons.length,
+      errors: errors.length,
+      warnings: warnings.length,
+    },
+    referenceImages: references,
+    comparisons,
+    viewsWithoutComparisons: missingViewComparisons,
+    errors: [...new Set(errors)],
+    warnings: [...new Set(warnings)],
+    limitations: [
+      "Outcomes are manually entered reviewer judgements; this workflow does not compute image similarity or autonomously determine facade correctness.",
+      "A 'match' records a human report for a named comparison basis. It does not independently verify camera pose or model accuracy.",
+      "Only JPEG/PNG image headers are supported for dimension verification. Inspect the images visually and confirm their metadata separately.",
+      "Rights status and attribution are user-supplied declarations, not legal verification.",
+      "Publication eligibility remains false until independent geometry, scale, georeference, rights, and visual checks pass.",
+    ],
+  };
+}
