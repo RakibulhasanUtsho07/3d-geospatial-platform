@@ -19,7 +19,7 @@ The output is created exclusively; if the path already exists, the CLI refuses t
 - `ready-for-final-human-review-with-warnings`: hard gates passed, but geometry, texture or render QA reported warnings that need human review.
 - `ready-for-final-human-review`: automated evidence gates passed with no recorded warnings. This still requires a release reviewer.
 
-The CLI computes geometry and texture/UV QA from the candidate GLB bytes itself. It checks the candidate SHA-256 against the render manifest and reference review; binds render and reference comparisons to their recorded image hashes; requires all predefined render views to have a human-reported direct-basis `match`; checks reference rights status; and verifies that correction-review tasks have reached their required terminal states using the exact backlog and review report digests.
+The CLI computes geometry and texture/UV QA from the candidate GLB bytes itself. It recomputes the correction-verification report from the exact supplied backlog and current review, then rejects the supplied verification JSON if it differs. It checks the candidate SHA-256 against the render manifest and reference review; binds render and reference comparisons to their recorded image hashes; requires all predefined render views to have a human-reported direct-basis `match`; checks reference rights status; and verifies that correction-review tasks have reached their required terminal states using exact backlog and review report digests.
 
 ## Non-negotiable limitations
 
