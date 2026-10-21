@@ -20,6 +20,7 @@ on:
       - feat/mask-guided-building-sketches
       - feat/multi-view-wireframe-registration
       - feat/wireframe-qa-repair-passes
+      - feat/texture-projection-validation
   pull_request:
     branches:
       - main
