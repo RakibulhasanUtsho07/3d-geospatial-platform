@@ -76,6 +76,7 @@ npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifa
 npm run test:building-media
 npm run ingest:building-media -- E:\Building-Engine-Workspace dhaka-demo walkthrough-01 uploads\walkthrough.mp4 auto 0.5 60
 npm run test:building-source-workflow
+npm run test:media-quality-preflight
 npm run test:image-quality-preflight
 npm run test:colmap-worker
 npm run test:single-image-3d
@@ -92,6 +93,14 @@ Once source records have been ingested (and the relevant rights reviewed), join 
 ~~~powershell
 npm run prepare:building-spec -- E:\Building-Engine-Workspace .\building-spec-base.json front-photo,walkthrough-01-frame-000001,walkthrough-01-frame-000002 .\building-spec-ready.json
 ~~~
+
+Before launching COLMAP, optionally create a persistent source-media quality/rights report:
+
+~~~powershell
+npm run assess:building-media -- <workspaceRoot> <buildingId> <sourceId1,sourceId2,...>
+~~~
+
+The assessment re-verifies ingested source hashes, checks JPEG/PNG dimensions and a small FFmpeg grayscale sample, reports heuristic sharpness/luminance/contrast and perceptual near-duplicates, and writes a timestamped JSON report beside the source metadata. It never proves camera overlap or same-building identity, and it does not replace the worker's required operator confirmations.
 
 For multi-view reconstruction, install COLMAP separately. If the selected views overlap and depict the same building, use the command documented in the engine guide. A minimum of three approved images can be reconstructed as a local mesh even when the images have no GPS tags; precise map placement still needs ground-control registration.
 
@@ -133,6 +142,7 @@ npm run test:building-style
 npm run test:building-generation
 npm run test:building-media
 npm run test:building-source-workflow
+npm run test:media-quality-preflight
 npm run test:media-to-model-workflow
 npm run test:ground-control-registration
 npm run test:colmap-worker
