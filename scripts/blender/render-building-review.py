@@ -112,7 +112,10 @@ def main():
     camera_distance = max_dimension * 3.0
     ortho_scale = max_dimension * 1.45
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    try:
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
+    except TypeError:
+        scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = resolution
     scene.render.resolution_y = resolution
     scene.render.resolution_percentage = 100
