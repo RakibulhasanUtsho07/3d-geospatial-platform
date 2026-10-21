@@ -78,6 +78,9 @@ jobs:
       - name: Test overlapping image tile planning and coordinate merging
         run: npm run test:image-tile-analysis
 
+      - name: Test per-view architectural sketch preparation
+        run: npm run test:architectural-sketch-preparation
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
