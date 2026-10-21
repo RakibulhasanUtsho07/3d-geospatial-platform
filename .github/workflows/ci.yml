@@ -16,11 +16,42 @@ on:
       - feat/generated-model-geometry-qa
       - feat/unified-media-to-3d-cli
       - feat/building-ground-control-registration
+      - feat/per-view-architectural-sketches
+      - feat/mask-guided-building-sketches
+      - feat/multi-view-wireframe-registration
+      - feat/wireframe-qa-repair-passes
+      - feat/texture-projection-validation
+      - feat/texture-bake-readiness-qa
+      - feat/texture-atlas-baking
+      - feat/glb-texture-binding-qa
+      - feat/glb-uv-seam-review
+      - feat/blender-render-review-views
+      - feat/render-reference-comparison-review
+      - feat/render-review-correction-tasks
+      - feat/render-correction-verification
+      - feat/building-release-readiness-gate
+      - feat/building-review-package
+      - feat/building-review-package-integrity-v2
+      - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
+      - feat/render-image-similarity-diagnostics
+      - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
+      - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
+      - feat/texture-projection-validation
   pull_request:
     branches:
       - main
       - dev
       - rakibul-hasan
+      - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
+      - feat/render-image-similarity-diagnostics
+      - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
+      - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
 
 permissions:
   contents: read
@@ -74,6 +105,76 @@ jobs:
 
       - name: Test image quality preflight and near-duplicate view detection
         run: npm run test:image-quality-preflight
+
+      - name: Test overlapping image tile planning and coordinate merging
+        run: npm run test:image-tile-analysis
+
+      - name: Test per-view architectural sketch preparation
+        run: npm run test:architectural-sketch-preparation
+      - name: Test mask-guided building sketch preparation
+        run: npm run test:mask-guided-building-sketches
+
+      - name: Test bounded wireframe QA and safe repair passes
+        run: npm run test:wireframe-qa-repair-passes
+
+      - name: Test reviewed wireframe to mesh candidate
+        run: npm run test:wireframe-to-mesh
+
+      - name: Test evidence-gated mesh surface review
+        run: npm run test:mesh-surface-review
+
+      - name: Test texture projection evidence review
+        run: npm run test:texture-projection-review
+
+      - name: Test texture bake readiness preflight
+        run: npm run test:texture-bake-readiness
+
+      - name: Test texture atlas packing and UV remapping
+        run: npm run test:texture-atlas
+
+      - name: Test GLB texture binding and atlas verification
+        run: npm run test:glb-texture-binding-qa
+
+      - name: Test mesh UV seam candidates
+        run: npm run test:uv-seam-review
+
+      - name: Test texture pixel content and resolution risk hints
+        run: npm run test:texture-image-content-review
+
+      - name: Test multi-view render review manifest validation
+        run: npm run test:render-review-manifest
+
+      - name: Test evidence-linked render reference review
+        run: npm run test:render-reference-review
+
+      - name: Test render/reference image similarity diagnostics
+        run: npm run test:render-image-similarity-diagnostics
+
+      - name: Test evidence-linked similarity diagnostics in the reference-review workflow
+        run: npm run test:render-reference-diagnostics-attachment
+      - name: Test evidence-linked render correction task backlog
+        run: npm run test:render-correction-tasks
+
+      - name: Test evidence-gated correction verification cycle
+        run: npm run test:render-correction-verification
+
+      - name: Test building release readiness with dimension and WGS84 ground-control evidence
+        run: npm run test:building-release-readiness
+
+      - name: Test immutable building review package
+        run: npm run test:building-review-package
+
+      - name: Test offline review package integrity verifier
+        run: npm run test:building-review-package-integrity
+
+      - name: Test Ed25519 review package manifest signatures
+        run: npm run test:building-review-package-signature
+
+      - name: Test evidence-based building accuracy benchmark
+        run: npm run test:building-accuracy-benchmark
+
+      - name: Validate Blender render automation Python syntax
+        run: python3 -m py_compile scripts/blender/render-building-review.py
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker

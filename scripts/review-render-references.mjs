@@ -1,0 +1,149 @@
+#!/usr/bin/env node
+import { createHash } from "node:crypto";
+import { lstat, readFile, realpath, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
+import { buildRenderReferenceReview } from "../src/core/building-generation/render-reference-review.mjs";
+
+const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const safeFileName = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]*\.(?:png|jpe?g)$/i.test(value) && !value.includes("..");
+
+async function readVerifiedImage(filePath, label) {
+  const info = await readFile(filePath);
+  if (!info.length || info.length > 250 * 1024 * 1024) throw new RangeError(label + " must be a non-empty image under 250 MB");
+  const dimensions = readImageDimensions(info);
+  if (!dimensions) throw new TypeError(label + " must be a readable JPEG/PNG image");
+  return { sha256:sha256(info), width:dimensions.width, height:dimensions.height, bytes:info.length };
+}
+
+async function readSimilarityDiagnostic(diagnosticPath, reviewRoot, label) {
+  if (typeof diagnosticPath !== "string" || !diagnosticPath.trim() ||
+    path.isAbsolute(diagnosticPath) || path.win32.isAbsolute(diagnosticPath)) {
+    throw new TypeError(label + " similarityDiagnosticsPath must be a non-empty relative path");
+  }
+  const rootPath = await realpath(reviewRoot);
+  const candidatePath = path.resolve(rootPath, diagnosticPath);
+  const relativePath = path.relative(rootPath, candidatePath);
+  if (relativePath === ".." || relativePath.startsWith(".." + path.sep) || path.isAbsolute(relativePath)) {
+    throw new TypeError(label + " similarity diagnostics path escapes the review-input directory");
+  }
+  const entry = await lstat(candidatePath);
+  if (entry.isSymbolicLink() || !entry.isFile()) {
+    throw new TypeError(label + " similarity diagnostics must be a regular file and not a symlink");
+  }
+  const resolvedPath = await realpath(candidatePath);
+  const resolvedRelative = path.relative(rootPath, resolvedPath);
+  if (resolvedRelative === ".." || resolvedRelative.startsWith(".." + path.sep) || path.isAbsolute(resolvedRelative)) {
+    throw new TypeError(label + " similarity diagnostics path resolves outside the review-input directory");
+  }
+  const bytes = await readFile(resolvedPath);
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) {
+    throw new RangeError(label + " similarity diagnostics report must be a non-empty JSON file under 10 MB");
+  }
+  return { path: resolvedPath, bytes, report: JSON.parse(bytes.toString("utf8")) };
+}
+
+async function main() {
+  const [renderDirArg, reviewInputArg, reportArg, ...extra] = process.argv.slice(2);
+  if (!renderDirArg || !reviewInputArg || !reportArg || extra.length) {
+    throw new Error("Usage: node scripts/review-render-references.mjs <render-directory> <review-input.json> <report.json>");
+  }
+  const renderDir = path.resolve(renderDirArg);
+  const reviewInputPath = path.resolve(reviewInputArg);
+  const reportPath = path.resolve(reportArg);
+  const manifestPath = path.join(renderDir, "render-review-manifest.json");
+  const [manifestBytes, inputBytes] = await Promise.all([readFile(manifestPath), readFile(reviewInputPath)]);
+  const renderManifest = JSON.parse(manifestBytes.toString("utf8"));
+  const reviewInput = JSON.parse(inputBytes.toString("utf8"));
+  const renderFiles = [];
+  const inputPaths = [manifestPath, reviewInputPath];
+  for (const view of renderManifest.views ?? []) {
+    if (!safeFileName(view?.filename) || !view.filename.toLowerCase().endsWith(".png")) {
+      throw new TypeError("render manifest contains an unsafe or non-PNG render filename");
+    }
+    const filePath = path.join(renderDir, view.filename);
+    inputPaths.push(filePath);
+    try {
+      const actual = await readVerifiedImage(filePath, "render " + view.id);
+      renderFiles.push({ filename:view.filename, ...actual });
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+  }
+
+  const referenceFiles = [];
+  const referenceRoot = path.dirname(reviewInputPath);
+  for (const reference of reviewInput.referenceImages ?? []) {
+    if (typeof reference?.id !== "string" || typeof reference.path !== "string" || !reference.path.trim()) continue;
+    const filePath = path.resolve(referenceRoot, reference.path);
+    inputPaths.push(filePath);
+    const actual = await readVerifiedImage(filePath, "reference " + reference.id);
+    referenceFiles.push({
+      id:reference.id,
+      filename:path.basename(filePath),
+      ...actual,
+    });
+  }
+  const similarityDiagnostics = [];
+  const comparisonInputs = Array.isArray(reviewInput.comparisons) ? reviewInput.comparisons : [];
+  for (let index = 0; index < comparisonInputs.length; index++) {
+    const comparison = comparisonInputs[index];
+    if (!comparison || comparison.similarityDiagnosticsPath === undefined) continue;
+    const label = "comparison " + (comparison.viewId ?? index);
+    const diagnostic = await readSimilarityDiagnostic(
+      comparison.similarityDiagnosticsPath,
+      path.dirname(reviewInputPath),
+      label,
+    );
+    inputPaths.push(diagnostic.path);
+    similarityDiagnostics.push({
+      viewId: comparison.viewId,
+      referenceImageId: comparison.referenceImageId,
+      report: diagnostic.report,
+      reportSha256: sha256(diagnostic.bytes),
+    });
+  }
+
+  if (inputPaths.some((filePath) => path.resolve(filePath) === path.resolve(reportPath))) {
+    throw new Error("report output must not overwrite any input file");
+  }
+  try {
+    await readFile(reportPath);
+    throw new Error("Report already exists; choose a new path rather than overwrite review history: " + reportPath);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  const report = buildRenderReferenceReview({
+    renderManifest,
+    renderManifestSha256:sha256(manifestBytes),
+    reviewInput,
+    renderFiles,
+    referenceFiles,
+    similarityDiagnostics,
+  });
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag:"wx", mode:0o600 });
+  console.log(JSON.stringify({
+    report:reportPath,
+    reviewStatus:report.reviewStatus,
+    valid:report.valid,
+    renderViews:report.counts.renderViewCount,
+    references:report.counts.referenceImageCount,
+    comparisons:report.counts.comparisonCount,
+    similarityDiagnostics:report.similarityDiagnosticsSummary.count,
+    similarityDiagnosticsWithWarnings:report.similarityDiagnosticsSummary.withWarnings,
+    pending:report.counts.pending,
+    partial:report.counts.partial,
+    mismatch:report.counts.mismatch,
+    errors:report.counts.errors,
+    warnings:report.counts.warnings,
+    publicationEligible:false,
+  }, null, 2));
+  if (!report.valid) process.exitCode = 2;
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exitCode = 1;
+});
