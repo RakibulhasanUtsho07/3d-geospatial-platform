@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "dhaka-demo-01",
+  "name": "Dhaka Procedural Test Building",
+  "location": {
+    "longitude": 90.406,
+    "latitude": 23.709,
+    "heightM": 3.5
+  },
+  "footprint": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          90.40594,
+          23.70896
+        ],
+        [
+          90.40606,
+          23.70896
+        ],
+        [
+          90.40606,
+          23.70904
+        ],
+        [
+          90.40594,
+          23.70904
+        ],
+        [
+          90.40594,
+          23.70896
+        ]
+      ]
+    ]
+  },
+  "dimensions": {
+    "floorCount": 5,
+    "floorHeightM": 3.05,
+    "parapetHeightM": 0.8,
+    "wallThicknessM": 0.22
+  },
+  "architecture": {
+    "style": "dhaka-residential-modern",
+    "roofType": "terrace",
+    "wallColor": "#D7D1C6",
+    "roofColor": "#B9BDC4",
+    "glassColor": "#536D86",
+    "frameColor": "#F4F1E8",
+    "concreteColor": "#B6B5AE",
+    "doorColor": "#76533A",
+    "balcony": {
+      "enabled": true,
+      "everyFloors": 2,
+      "widthM": 1.6,
+      "depthM": 0.85
+    },
+    "windows": {
+      "enabled": true,
+      "widthM": 1.15,
+      "heightM": 1.25
+    },
+    "includeDoor": true
+  },
+  "sources": [
+    {
+      "id": "survey-notes",
+      "kind": "text",
+      "title": "Manually entered test dimensions",
+      "usageStatus": "approved",
+      "description": "Synthetic test fixture; not a real building survey."
+    }
+  ],
+  "evidence": [
+    {
+      "field": "floorCount",
+      "value": 5,
+      "confidence": "estimated",
+      "sourceIds": [
+        "survey-notes"
+      ],
+      "notes": "Synthetic fixture used to test the generator."
+    },
+    {
+      "field": "footprint",
+      "value": "manually drawn rectangle",
+      "confidence": "derived",
+      "sourceIds": [
+        "survey-notes"
+      ]
+    }
+  ],
+  "tags": [
+    "test",
+    "procedural"
+  ]
+}

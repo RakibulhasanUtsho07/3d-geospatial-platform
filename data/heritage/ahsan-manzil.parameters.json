@@ -1,0 +1,732 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ahsan-manzil-kumartuli-dhaka",
+  "name": "Ahsan Manzil (Pink Palace)",
+  "status": "provisional-parametric-exterior-model",
+  "units": "meters",
+  "confidenceLegend": {
+    "[V]": "Verified in published heritage/tourism sources listed below.",
+    "[C]": "Conflicting sources; resolve with footprint trace or imagery.",
+    "[E]": "Estimate/placeholder; retain as an editable parameter.",
+    "[?]": "Unknown; default exists only to keep the model buildable."
+  },
+  "sources": [
+    {
+      "id": "tourism-board",
+      "title": "Ahsan Manzil — Bangladesh Tourism Board",
+      "url": "https://beautifulbangladesh.gov.bd/cat/heritage/3"
+    },
+    {
+      "id": "tourism-dome",
+      "title": "Ahsan Manzil: an aristocracy of the ancient era — Bangladesh Tourism Board",
+      "url": "https://beautifulbangladesh.gov.bd/newsletter/single/479"
+    },
+    {
+      "id": "parjatan",
+      "title": "Ahsan Manzil — Bangladesh Parjatan Corporation",
+      "url": "https://parjatan.portal.gov.bd/pages/static-pages/6922ddbe933eb65569e16134"
+    },
+    {
+      "id": "unesco",
+      "title": "Historic Mosque City of Bagerhat — UNESCO World Heritage Centre",
+      "url": "https://whc.unesco.org/en/list/321/"
+    },
+    {
+      "id": "unesco-coordinates",
+      "title": "Historic Mosque City of Bagerhat — UNESCO geographic information",
+      "url": "https://whc.unesco.org/document/216536"
+    },
+    {
+      "id": "wikipedia-ahsan-manzil",
+      "title": "Ahsan Manzil — Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Ahsan_Manzil",
+      "supports": [
+        "approximate site coordinate",
+        "east Rangmahal / west Andarmahal orientation",
+        "architectural form"
+      ],
+      "note": "Coordinates near 23.7085972 N, 90.4060583 E agree closely with supplied anchor. Anchor still remains [C] until footprint polygon centroid is traced."
+    },
+    {
+      "id": "daily-star-adnan-zillur-morshed",
+      "title": "A Palace on the River: Ahsan Manzil — The Daily Star, Adnan Zillur Morshed",
+      "url": "https://www.thedailystar.net/slow-reads/focus/news/palace-the-river-ahsan-manzil-1598293",
+      "supports": [
+        "architectural description",
+        "riverfront/site context",
+        "historic building form"
+      ]
+    }
+  ],
+  "georeference": {
+    "latitude": {
+      "value": 23.7086,
+      "unit": "degrees_north",
+      "confidence": "[C]",
+      "source": "User-supplied anchor; Wikipedia coordinates (23.7085972 N, 90.4060583 E) agree closely; alternate listings reported in the brief conflict",
+      "note": "Retain [C] until the outline is traced and the origin is moved to the actual footprint centroid."
+    },
+    "longitude": {
+      "value": 90.40606,
+      "unit": "degrees_east",
+      "confidence": "[C]",
+      "source": "User-supplied anchor; Wikipedia coordinates (23.7085972 N, 90.4060583 E) agree closely; alternate listings reported in the brief conflict",
+      "note": "Retain [C] until the outline is traced and the origin is moved to the actual footprint centroid."
+    },
+    "longAxisAzimuthDegrees": {
+      "value": 90,
+      "unit": "degrees",
+      "confidence": "[E]",
+      "source": "Approximate east-west direction in supplied brief",
+      "note": "Measure from satellite/OSM imagery."
+    },
+    "axes": {
+      "value": "X east-west; Y up; +Z south / river-front",
+      "confidence": "[E]",
+      "source": "Local model coordinate convention"
+    },
+    "riverFacade": {
+      "value": "south",
+      "confidence": "[V]",
+      "source": "Bangladesh Tourism Board and supplied brief"
+    },
+    "rearFacade": {
+      "value": "north",
+      "confidence": "[V]",
+      "source": "Supplied brief"
+    },
+    "units": {
+      "value": "meters",
+      "confidence": "[V]",
+      "source": "User request"
+    }
+  },
+  "parameters": {
+    "footprint": {
+      "overallLength": {
+        "value": 125.4,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Bangladesh Tourism Board / Parjatan",
+        "note": "Working dimension pending footprint trace."
+      },
+      "overallDepth": {
+        "value": 28.75,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Bangladesh Tourism Board",
+        "note": "Working dimension; resolve against satellite/plan."
+      },
+      "rangmahalBlockLength": {
+        "value": 55.8,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "183 ft (55.8 m) whole front facade width reported in the architectural article by Adnan Zillur Morshed / The Daily Star",
+        "note": "Use as the provisional river-facing Rangmahal length; resolve conflict with the 125.4 m overall length by tracing the footprint and don't treat this as surveyed."
+      },
+      "andarmahalBlockLength": {
+        "value": 69.6,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "125.4 m overall extent minus the 55.8 m Rangmahal frontage working hypothesis",
+        "note": "Derived west/rear Andarmahal length for the provisional stepped plan. The actual historic footprint needs north-up trace/plan confirmation."
+      },
+      "interiorGridEW": {
+        "value": 4,
+        "unit": "bays",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Recorded separately; not treated as exterior opening count."
+      },
+      "interiorGridNS": {
+        "value": 5,
+        "unit": "bays",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Recorded separately; not treated as exterior opening count."
+      },
+      "exteriorBayCount": {
+        "value": 15,
+        "unit": "bays per long facade",
+        "confidence": "[E]",
+        "source": "One south-elevation reference photo; provisional symmetric composition 2 + 4 + 3 + 4 + 2",
+        "note": "This replaces the earlier uniform 24-bay assumption. Verify each bay from a straight-on elevation before treating the count as fixed."
+      },
+      "averageBayPitch": {
+        "value": 3.72,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "55.8 m Rangmahal river-front width / 15 estimated bays",
+        "note": "Derived pitch for the provisional 2 + 4 + 3 + 4 + 2 facade rhythm; reconcile with the initial generic 4.5-5.5 m estimate using a straight-on elevation."
+      },
+      "andarmahalDepth": {
+        "value": 14.375,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Half of the 28.75 m overall depth, using the single-photo hypothesis that Andarmahal is set back to the north of the river-facing Rangmahal block",
+        "note": "This stepped/L-shaped plan is a provisional interpretation intended to reconcile the 56–62 m river-front Rangmahal width with the reported 125.4 m total extent. Verify from a north-up satellite trace or measured plan before survey-grade use."
+      },
+      "andarmahalNorthOffset": {
+        "value": -7.1875,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Derived from the provisional 14.375 m Andarmahal depth and the 28.75 m overall depth",
+        "note": "Centers the Andarmahal on the rear/north half of the total footprint so the public south-facing Rangmahal facade remains near 62.7 m wide. This is a modeling hypothesis, not a verified site measurement."
+      },
+      "andarmahalBayCount": {
+        "value": 8,
+        "unit": "bays",
+        "confidence": "[E]",
+        "source": "Procedural approximation for the older adjoining Andarmahal block",
+        "note": "Keep separate from the 15-bay Rangmahal south-elevation composition; replace from a straight-on photo."
+      }
+    },
+    "vertical": {
+      "naturalGround": {
+        "value": 0,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Supplied coordinate convention"
+      },
+      "plinthHeight": {
+        "value": 1,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "alternatePlinth": {
+        "value": 1.2,
+        "unit": "m",
+        "confidence": "[C]",
+        "source": "Alternative value in supplied brief",
+        "note": "Not used in current model."
+      },
+      "groundFloorClearHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "firstFloorClearHeight": {
+        "value": 5.8,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board / Parjatan"
+      },
+      "slabThickness": {
+        "value": 0.4,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "wallThickness": {
+        "value": 0.78,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board",
+        "note": "Used as facade reveal-depth proxy."
+      },
+      "parapetHeight": {
+        "value": 1,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "rooflineHeight": {
+        "value": 13.6,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Calculated vertical stack including slabs and parapet",
+        "note": "Derived, not surveyed."
+      },
+      "porticoHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board"
+      }
+    },
+    "facade": {
+      "openingsHead": {
+        "value": "semicircular arches",
+        "confidence": "[V]",
+        "source": "Supplied brief"
+      },
+      "gfOpeningWidth": {
+        "value": 1.2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "gfOpeningCrownHeight": {
+        "value": 3.2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "ffOpeningWidth": {
+        "value": 1.3,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "ffOpeningCrownHeight": {
+        "value": 3.8,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied brief"
+      },
+      "verandaArchSpan": {
+        "value": 3.3,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Midpoint of supplied 3.0–3.5 m range"
+      },
+      "pilasterOrder": {
+        "value": "simplified Corinthian-type",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Fine capital and fluting geometry simplified."
+      },
+      "capitalFluting": {
+        "value": "smooth simplified capital",
+        "confidence": "[?]",
+        "source": "Placeholder; needs close-up"
+      },
+      "coloredGlazing": {
+        "value": "dark rose/amber panels with simple mullions",
+        "confidence": "[?]",
+        "source": "Placeholder; exact pattern unknown"
+      },
+      "porticoWidth": {
+        "value": 16.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Single south-elevation reference image, ±20% estimate",
+        "note": "Working projection width for the central three-arch pavilion; recalibrate by counting its three arches from a straight-on photo."
+      },
+      "porticoDepth": {
+        "value": 4,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder until footprint/photo calibration",
+        "note": "Projection depth of the central portico."
+      },
+      "pedimentPeakHeightAboveGround": {
+        "value": 15.2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Approximate reference-photo proportion for the central pediment above the upper triple-arched loggia",
+        "note": "Maintain the apex below the 27.13 m [V] dome peak; calibrate against a rectified front elevation."
+      },
+      "doorBayInterval": {
+        "value": 4,
+        "unit": "bays",
+        "confidence": "[E]",
+        "source": "Procedural modeling default until a rectified facade image is counted",
+        "note": "Every fourth exterior bay is treated as a glazed door in LOD2/LOD3; actual count and placement require photo calibration."
+      },
+      "stoneInlayBandWidth": {
+        "value": 0.08,
+        "unit": "m",
+        "confidence": "[?]",
+        "source": "Procedural placeholder for the stone inlay described in the heritage brief",
+        "note": "Band width and exact stone pattern are unknown; replace after close-up door photographs."
+      },
+      "doorGlazingPattern": {
+        "value": "simple multi-panel colored glazing with vertical center stile",
+        "confidence": "[?]",
+        "source": "Placeholder derived from documented colored-glass doors",
+        "note": "Do not treat panel count/color pattern as verified."
+      },
+      "balustradeHeight": {
+        "value": 0.9,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visible upper-veranda guardrail proportion in exterior photographs",
+        "note": "Approximate top rail height above the veranda floor; not measured from a survey."
+      },
+      "balusterSpacing": {
+        "value": 0.85,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural rendering parameter chosen to keep an even, readable upper-veranda balustrade",
+        "note": "Approximate post interval; replace after elevation/photo calibration."
+      },
+      "rooflinePinnacleHeight": {
+        "value": 1.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visible small roofline finials/pinnacles in exterior photographs",
+        "note": "Stylized height above the parapet; ornamental profile is illustrative and not a measured moulding."
+      }
+    },
+    "stair": {
+      "riserHeight": {
+        "value": 0.23,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Single reference photo, ±20% estimate",
+        "note": "28 risers at 0.23 m give approximately 6.44 m rise to the upper portal."
+      },
+      "treadDepth": {
+        "value": 0.34,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "16 m total stair run / 28 steps",
+        "note": "Matched to the reference HTML stair geometry (0.34 m per tread); visual estimate pending survey."
+      },
+      "stepCount": {
+        "value": 28,
+        "unit": "steps",
+        "confidence": "[E]",
+        "source": "Single front reference photo estimate (25–30 steps)",
+        "note": "28 steps; calibrate by counting steps in a straight-on image."
+      },
+      "width": {
+        "value": 16.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Single front reference photo estimate",
+        "note": "Approximate clear width at the garden-facing base of the stair."
+      },
+      "sideRail": {
+        "value": "simple low side rails",
+        "confidence": "[?]",
+        "source": "Stylized placeholder"
+      },
+      "runLength": {
+        "value": 9.52,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Procedural placeholder",
+        "note": "Matched to the reference HTML: 28 steps × 0.34 m tread depth = 9.52 m horizontal run. Visual estimate; verify against measured site drawings."
+      },
+      "topWidth": {
+        "value": 13.5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Single front reference photo estimate",
+        "note": "Approximate clear width at the upper portal; the stair tapers from 16.5 m at the base."
+      }
+    },
+    "dome": {
+      "peakHeight": {
+        "value": 27.13,
+        "unit": "m above ground",
+        "confidence": "[V]",
+        "source": "Bangladesh Tourism Board heritage newsletter"
+      },
+      "drumHeight": {
+        "value": 5,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied placeholder"
+      },
+      "bodyHeight": {
+        "value": 6.53,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Derived to meet 27.13 m peak with 13.6 m roofline and 2 m finial"
+      },
+      "finialHeight": {
+        "value": 2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Supplied placeholder"
+      },
+      "drumWidth": {
+        "value": 14,
+        "unit": "m",
+        "confidence": "[?]",
+        "source": "Placeholder; calibrate from elevation photo"
+      },
+      "profile": {
+        "value": "square base room → octagonal drum → lotus-bud dome → finial",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Curvature and ribs remain stylized."
+      },
+      "drumOpeningCount": {
+        "value": 8,
+        "unit": "open bays around octagonal drum",
+        "confidence": "[E]",
+        "source": "Reference-image interpretation of an open/fenestrated octagonal drum",
+        "note": "The procedural LOD2/LOD3 currently creates one open arched bay on each of the eight drum faces; verify from oblique and elevation photographs."
+      },
+      "drumOpeningWidth": {
+        "value": 2.7,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Reference-photo estimate for an open eight-sided colonnaded drum",
+        "note": "Widened from narrow window slits to represent open arched colonnade bays; calibrate against an elevation photo."
+      },
+      "drumOpeningCrownHeight": {
+        "value": 2.8,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Reference-photo estimate for open arched drum bays",
+        "note": "Approximate crown height within the 5 m drum; final dimensions require rectified imagery."
+      },
+      "profileRings": {
+        "value": [
+          [
+            4,
+            0
+          ],
+          [
+            3.9922,
+            0.4131
+          ],
+          [
+            3.9686,
+            0.8263
+          ],
+          [
+            3.9291,
+            1.2394
+          ],
+          [
+            3.873,
+            1.6525
+          ],
+          [
+            3.7997,
+            2.0656
+          ],
+          [
+            3.7081,
+            2.4788
+          ],
+          [
+            3.5969,
+            2.8919
+          ],
+          [
+            3.4641,
+            3.305
+          ],
+          [
+            3.3072,
+            3.7181
+          ],
+          [
+            3.1225,
+            4.1313
+          ],
+          [
+            2.9047,
+            4.5444
+          ],
+          [
+            2.6458,
+            4.9575
+          ],
+          [
+            2.3319,
+            5.3706
+          ],
+          [
+            1.9364,
+            5.7838
+          ],
+          [
+            1.3919,
+            6.1969
+          ],
+          [
+            0,
+            6.61
+          ]
+        ],
+        "unit": "[radius_m, height_above_dome_base_m] pairs",
+        "confidence": "[E]",
+        "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
+        "note": "Profile samples approximate the stretched hemispherical SphereGeometry in the reference Three.js HTML scene (4.0 m base radius, 6.61 m rise). These are visual estimates, not survey-measured heritage dimensions."
+      }
+    },
+    "materials": {
+      "facadePink": {
+        "value": "#E1917D",
+        "confidence": "[E]",
+        "source": "User-supplied daylight photo estimate",
+        "note": "Warm salmon pink. Sample a colour-managed daylight photo for final calibrated RGB."
+      },
+      "trimOffWhite": {
+        "value": "#ECAE9B",
+        "confidence": "[E]",
+        "source": "User-supplied daylight photo estimate",
+        "note": "Matched to the warm peach trim in the reference Three.js HTML scene; visual estimate, not a colour-calibrated heritage survey."
+      },
+      "glass": {
+        "value": "#392B27",
+        "confidence": "[E]",
+        "source": "Dark recessed opening colour sampled from the reference HTML scene palette",
+        "note": "Use a near-charcoal brown for recessed arched openings beneath the green shutters."
+      },
+      "roof": {
+        "value": "#CC8274",
+        "confidence": "[E]",
+        "source": "User-supplied daylight photo estimate",
+        "note": "Muted rose roof/parapet proxy; calibrate from reference imagery."
+      },
+      "verandaFloor": {
+        "value": "#EFE6D5",
+        "confidence": "[V]",
+        "source": "Supplied brief; light marble proxy"
+      },
+      "stairStone": {
+        "value": "#6E625A",
+        "confidence": "[E]",
+        "source": "User-supplied reference photo estimate",
+        "note": "Dark grey-brown stone for the ceremonial exterior stair treads."
+      },
+      "doorWood": {
+        "value": "#6B4A32",
+        "confidence": "[E]",
+        "source": "User-supplied reference photo estimate",
+        "note": "Brown wood for the central glazed doors and timber shutter details."
+      }
+    },
+    "roof": {
+      "covering": {
+        "value": "flat roof behind parapet; covering material unknown",
+        "confidence": "[?]",
+        "source": "Supplied brief"
+      },
+      "structure": {
+        "value": "timber/iron beams, interior only",
+        "confidence": "[V]",
+        "source": "Supplied brief",
+        "note": "Not included in exterior mesh."
+      }
+    },
+    "runtimeLod": {
+      "lod1MaxDistance": {
+        "value": 18000,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show only when the view centre is within 18 km and camera height is at most 20 km."
+      },
+      "lod1MaxCameraHeight": {
+        "value": 20000,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      },
+      "lod2MaxDistance": {
+        "value": 6500,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show when closer than this and camera height is at most 8 km unless LOD3 threshold is met."
+      },
+      "lod2MaxCameraHeight": {
+        "value": 8000,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      },
+      "lod3MaxDistance": {
+        "value": 2000,
+        "unit": "m from view centre to provisional anchor",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Show detail mesh when closer than this and camera height is at most 2.5 km."
+      },
+      "lod3MaxCameraHeight": {
+        "value": 2500,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Rendering heuristic in heritage-landmarks.mjs",
+        "note": "Rendering threshold, not a building measurement."
+      }
+    },
+    "runtimeCamera": {
+      "frontFocusOffsetEastMeters": {
+        "value": 34.8,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Centre of the provisional 55.8 m Rangmahal frontage when the 125.4 m overall footprint extents are centred at the georeference origin: (125.4 - 55.8)/2 + 55.8/2 = 34.8 m",
+        "note": "Offsets the perspective camera target to the dome/main-entrance axis for frontal and orbit views; it does not move the model anchor."
+      },
+      "frontCameraRangeMeters": {
+        "value": 112,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera-framing estimate for the 55.8 m river-facing facade and 27.13 m dome peak",
+        "note": "Focused river-front view for the 55.8 m Rangmahal, central portico, dome and stair; use the separate Full model / Top view presets for the complete stepped footprint."
+      },
+      "footprintCameraRangeMeters": {
+        "value": 205,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera-framing estimate for the provisional 125.4 m overall footprint",
+        "note": "Used for the whole-model oblique view, all manual orbit steps, guided 360-degree tour, and north-up Top view so the 125.4 m stepped footprint stays inside frame."
+      },
+      "orbitPitchDegrees": {
+        "value": -14,
+        "unit": "degrees",
+        "confidence": "[E]",
+        "source": "Visual camera framing estimate",
+        "note": "Matches the low oblique hero angle in the reference Three.js HTML scene; camera framing preference, not a measured heritage parameter."
+      },
+      "orbitDegreesPerSecond": {
+        "value": 8,
+        "unit": "degrees_per_second",
+        "confidence": "[E]",
+        "source": "Usability choice for the guided 360-degree inspection camera",
+        "note": "One guided revolution takes about 45 seconds, allowing time to inspect facade and side details."
+      },
+      "frontBoundingSphereRadiusMeters": {
+        "value": 50,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Camera composition estimate for the offset front target and rear-set Andarmahal",
+        "note": "Focused frontal composition around the Rangmahal, projecting portico, dome and central stair. The whole rear-set Andarmahal is framed by the separate 72 m overall-footprint sphere."
+      },
+      "footprintBoundingSphereRadiusMeters": {
+        "value": 72,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Bounding-sphere estimate for the 125.4 m overall footprint",
+        "note": "Encloses the whole 125.4 m stepped plan, including the west/rear Andarmahal offset and the river-facing front stair, for full-model and top-down views."
+      }
+    }
+  },
+  "modelAssets": {
+    "lod1": "/models/ahsan-manzil-lod1.glb",
+    "lod2": "/models/ahsan-manzil-lod2.glb",
+    "lod3": "/models/ahsan-manzil-lod3.glb",
+    "defaultRuntimeAsset": "/models/ahsan-manzil-lod3.glb",
+    "units": "meters",
+    "note": "Provisional procedural geometry, not photogrammetry/survey."
+  },
+  "requiredNodeNames": [
+    "Plinth",
+    "Rangmahal_GF",
+    "Rangmahal_FF",
+    "Portico_S",
+    "Portico_N",
+    "Stair_S",
+    "Veranda_S",
+    "Veranda_N",
+    "Parapet",
+    "Dome_Drum",
+    "Dome",
+    "Finial",
+    "Andarmahal"
+  ],
+  "calibrationBacklog": [
+    "Trace OSM/satellite footprint and shift origin to footprint centre.",
+    "Measure the exact long-axis azimuth.",
+    "Rectify south elevation using 5.0 m / 5.8 m floor heights and 27.13 m dome peak.",
+    "Recount facade openings; revise estimated bay count/pitch and opening dimensions.",
+    "Calibrate drum width, dome profile, portico width and staircase.",
+    "Sample pink and trim colors from daylight photos.",
+    "Replace generic east/west elevations, glazing and capital details from photos."
+  ]
+}

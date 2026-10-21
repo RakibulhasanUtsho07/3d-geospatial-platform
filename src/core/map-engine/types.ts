@@ -1,0 +1,166 @@
+
+export type GeoCoordinate = {
+  longitude: number;
+  latitude: number;
+  height?: number;
+};
+
+export type GeneratedModelAxis = "X" | "Y" | "Z";
+
+/** Declarative placement for one GLB-backed building/model in the current Cesium map. */
+export type GeneratedModelDefinition = {
+  /** Stable application ID, not a source URL or arbitrary external identifier. */
+  id: string;
+  name?: string;
+  /** Same-origin absolute asset path or HTTPS asset URL. */
+  url: string;
+  /** WGS84 position; height is metres above the configured ellipsoid/reference. */
+  position: GeoCoordinate;
+  headingDegrees?: number;
+  pitchDegrees?: number;
+  rollDegrees?: number;
+  scale?: number;
+  minimumPixelSize?: number;
+  maximumScale?: number;
+  show?: boolean;
+  upAxis?: GeneratedModelAxis;
+  forwardAxis?: GeneratedModelAxis;
+};
+
+export type GeneratedModelUpdate = Partial<Omit<GeneratedModelDefinition, "id">>;
+
+export type CameraTarget = {
+  destination: GeoCoordinate;
+  heading?: number;
+  pitch?: number;
+  roll?: number;
+  durationMs?: number;
+};
+
+import type { BuildingVisualStyle } from "../buildings/building-style";
+import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
+import type { PropertyListing } from "../geospatial/property-listings.mjs";
+import type { RoadFeature } from "../geospatial/road-network.mjs";
+
+export interface BuildingStyleAssignment {
+  featureId: string;
+  referenceId: string;
+  referenceTitle: string;
+  sourceUrl: string;
+  license?: string | null;
+  usageStatus: string;
+  assignedAt: string;
+  reportedBuildingMetadata?: Record<string, unknown>;
+  style: BuildingVisualStyle;
+}
+
+export interface MapFeatureSelection {
+  source:
+    | "cesium-ion-osm-buildings"
+    | "overture-local-buildings";
+
+  properties: Record<string, unknown>;
+
+  coordinates: {
+    longitude: number;
+    latitude: number;
+    height: number;
+  } | null;
+
+  /** Building-center coordinates for camera focus, when geometry permits. */
+  focusCoordinates?: GeoCoordinate | null;
+
+  /** Approximate horizontal footprint area derived from polygon geometry. */
+  footprintAreaM2?: number | null;
+}
+
+export type MapEngineCapabilities = {
+  globe: boolean;
+  terrain: boolean;
+  imagery: boolean;
+  threeDTiles: boolean;
+  vectorLayers: boolean;
+  modelLayers: boolean;
+  featurePicking: boolean;
+};
+
+export const MAP_LAYER_IDS = {
+  baseImagery: "base-imagery",
+  roads: "roads",
+  overtureBuildings: "overture-buildings",
+  nearbyPlaces: "nearby-places",
+  propertyListings: "property-listings",
+} as const;
+
+export type MapLayerId =
+  (typeof MAP_LAYER_IDS)[keyof typeof MAP_LAYER_IDS];
+
+export type MapLayer = {
+  id: MapLayerId;
+  name: string;
+  visible: boolean;
+};
+
+export type MapEngineState = {
+  center: GeoCoordinate;
+  heading: number;
+  pitch: number;
+  roll: number;
+};
+
+export interface MapEngine {
+  initialize(container: HTMLElement): Promise<void> | void;
+
+  onFeatureSelected(
+    listener: (
+      feature: MapFeatureSelection | null,
+    ) => void,
+  ): () => void;
+
+  clearFeatureSelection(): void;
+  /** Add one validated GLB model to the existing map; duplicate IDs are rejected. */
+  addGeneratedModel(definition: GeneratedModelDefinition): Promise<void>;
+  /** Update an existing model. Asset replacement is staged before the old asset is removed. */
+  updateGeneratedModel(id: string, patch: GeneratedModelUpdate): Promise<void>;
+  setGeneratedModelVisibility(id: string, visible: boolean): boolean;
+  removeGeneratedModel(id: string): boolean;
+  getGeneratedModelIds(): string[];
+  setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void;
+  previewSelectedBuildingStyle(style: BuildingVisualStyle | null): boolean;
+  onRoadSelected(listener: (road: RoadFeature | null) => void): () => void;
+  destroy(): void;
+  resize(): void;
+
+  flyTo(target: CameraTarget): Promise<void> | void;
+  getState(): MapEngineState;
+
+  zoomIn(): void;
+  zoomOut(): void;
+
+  rotateLeft(stepDegrees?: number): void;
+  rotateRight(stepDegrees?: number): void;
+
+  tiltUp(stepDegrees?: number): void;
+  tiltDown(stepDegrees?: number): void;
+
+  resetOrientation(): void;
+
+  getCapabilities(): MapEngineCapabilities;
+
+  getLayers(): MapLayer[];
+
+  setLayerVisibility(layerId: MapLayerId, visible: boolean): void;
+
+  getGroundCenter(): GeoCoordinate | null;
+  setNearbyPlaces(places: NearbyPlace[]): Promise<void>;
+  onPlaceSelected(listener: (place: NearbyPlace | null) => void): () => void;
+
+  setPropertyListings(properties: PropertyListing[]): Promise<void>;
+  onPropertySelected(listener: (property: PropertyListing | null) => void): () => void;
+  setNavigationPath(origin: GeoCoordinate | null, destination: GeoCoordinate | null): void;
+
+  pickFeature(
+    screenX: number,
+    screenY: number,
+  ): unknown | null;
+}

@@ -1,0 +1,133 @@
+{
+  "manifestVersion": "1.0.0",
+  "schema": "3d-geospatial-platform/heritage-building-model",
+  "coordinateReferenceSystem": "EPSG:4326",
+  "entries": [
+    {
+      "id": "ahsan-manzil-kumartuli-dhaka",
+      "featureType": "heritage-building",
+      "displayName": "Ahsan Manzil (Pink Palace)",
+      "displayNameBn": "আহসান মঞ্জিল",
+      "location": {
+        "longitude": 90.40606,
+        "latitude": 23.7086,
+        "confidence": "[C]",
+        "note": "Supplied anchor agrees closely with Wikipedia's published coordinates but is not a traced footprint centroid; final placement remains [C]."
+      },
+      "orientation": {
+        "longAxisAzimuthDegrees": 90,
+        "confidence": "[E]",
+        "note": "Approximate east-west orientation; confirm against imagery."
+      },
+      "units": "meters",
+      "localCoordinateFrame": {
+        "xAxis": "east",
+        "yAxis": "up",
+        "zAxis": "south / river-front",
+        "verticalDatum": "natural ground at 0 m"
+      },
+      "assets": {
+        "lod1": {
+          "uri": "/models/ahsan-manzil-lod1.glb",
+          "lod": 1,
+          "purpose": "massing"
+        },
+        "lod2": {
+          "uri": "/models/ahsan-manzil-lod2.glb",
+          "lod": 2,
+          "purpose": "roofline, parapet, dome and simplified facade detail"
+        },
+        "lod3": {
+          "uri": "/models/ahsan-manzil-lod3.glb",
+          "lod": 3,
+          "purpose": "detailed exterior facade"
+        },
+        "default": {
+          "uri": "/models/ahsan-manzil-lod3.glb",
+          "lod": 3
+        }
+      },
+      "nodes": [
+        "Plinth",
+        "Rangmahal_GF",
+        "Rangmahal_FF",
+        "Portico_S",
+        "Portico_N",
+        "Stair_S",
+        "Veranda_S",
+        "Veranda_N",
+        "Parapet",
+        "Dome_Drum",
+        "Dome",
+        "Finial",
+        "Andarmahal"
+      ],
+      "parameterConfig": "/data/heritage/ahsan-manzil.parameters.json",
+      "deviationReport": "/docs/heritage/ahsan-manzil-deviation-report.md",
+      "status": "provisional-not-survey-verified",
+      "rendering": {
+        "strategy": "camera-distance-and-height thresholds; out-of-range models are unloaded",
+        "thresholds": {
+          "lod1": {
+            "maxDistanceMeters": 18000,
+            "maxCameraHeightMeters": 20000,
+            "confidence": "[E]"
+          },
+          "lod2": {
+            "maxDistanceMeters": 6500,
+            "maxCameraHeightMeters": 8000,
+            "confidence": "[E]"
+          },
+          "lod3": {
+            "maxDistanceMeters": 2000,
+            "maxCameraHeightMeters": 2500,
+            "confidence": "[E]"
+          }
+        },
+        "modelGenerator": {
+          "script": "scripts/build-ahsan-manzil-model.mjs",
+          "command": "npm run build:heritage-model",
+          "status": "procedural source-controlled generator; photogrammetry/survey not claimed"
+        }
+      },
+      "modelAxes": {
+        "value": "GLB Y-up; +X east-west long axis; +Z south / river-front face",
+        "confidence": "[E]",
+        "source": "Procedural model coordinate convention",
+        "note": "Cesium Model loader uses upAxis=Y and forwardAxis=Z. Exact azimuth remains to be measured from footprint imagery."
+      },
+      "facadeTreatment": {
+        "glazedDoorBayInterval": 4,
+        "confidence": "[E]",
+        "stoneInlayBandWidthMeters": 0.08,
+        "stoneInlayConfidence": "[?]",
+        "note": "Door bay placements and inlay width remain provisional."
+      },
+      "contextNodes": [
+        "Site_Ground",
+        "Site_River",
+        "Site_Approach",
+        "Site_Pond",
+        "Site_Family_Mosque",
+        "Site_Stable",
+        "Site_Trees",
+        "Site_Context_Blocks"
+      ],
+      "siteContext": {
+        "source": "Ahsan Manzil reference Three.js HTML scene",
+        "includes": [
+          "ground plane",
+          "Buriganga river plane",
+          "approach path",
+          "pond",
+          "illustrative family mosque",
+          "stable/service building",
+          "70 deterministic tree placements",
+          "contextual Old Dhaka building blocks"
+        ],
+        "confidence": "[E]",
+        "note": "Illustrative surrounding geometry copied from the reference scene; the water, tree, mosque and neighbourhood placements are visual context rather than surveyed site assets."
+      }
+    }
+  ]
+}

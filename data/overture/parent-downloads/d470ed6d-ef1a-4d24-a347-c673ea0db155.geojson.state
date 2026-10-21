@@ -1,0 +1,14 @@
+{
+  "last_release": "2026-09-23.1",
+  "last_run": "2026-10-10T03:39:47.878192+00:00",
+  "theme": "buildings",
+  "type": "building",
+  "bbox": {
+    "xmin": 90.390141,
+    "ymin": 23.756785,
+    "xmax": 90.394447,
+    "ymax": 23.761072
+  },
+  "backend": "geojson",
+  "output": "E:\\My-Projects\\3D-Map\\3d-geospatial-platform\\data\\overture\\parent-downloads\\d470ed6d-ef1a-4d24-a347-c673ea0db155.geojson"
+}
