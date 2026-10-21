@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
+import { verifyRenderCorrectionTasks } from "./render-correction-verification.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const directlyComparableBases = new Set(["same-facade-known", "pose-estimated"]);
@@ -213,11 +214,27 @@ export function buildBuildingReleaseReadiness(input) {
 
   const reviewDigest = isObject(review) ? digest(JSON.stringify(review)) : null;
   const backlogDigest = isObject(backlog) ? digest(JSON.stringify(backlog)) : null;
-  const verification = correctionVerification;
+  let recomputedVerification = null;
+  let recomputeError = null;
+  if (backlogValid && reviewValid) {
+    try {
+      recomputedVerification = verifyRenderCorrectionTasks(backlog, review);
+    } catch (error) {
+      recomputeError = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const verification = recomputedVerification;
+  const suppliedVerificationMatches = Boolean(
+    isObject(correctionVerification) && verification &&
+    digest(JSON.stringify(correctionVerification)) === digest(JSON.stringify(verification))
+  );
+  check("verification-report-recomputed", suppliedVerificationMatches,
+    "The saved correction verification report must exactly match a fresh recomputation from the supplied backlog and current review." +
+      (recomputeError ? " Recompute failed: " + recomputeError : ""));
   check("verification-engine", verification?.schemaVersion === "1.0.0" &&
     verification?.engine === "render-correction-verification-v1" &&
     verification?.buildingId === buildingId && Array.isArray(verification?.tasks),
-  "A valid correction verification report for this building is required.");
+  "A valid correction verification report for this building must be reproducible from the current inputs.");
   check("verification-current-model", isHash(candidateGlbSha256) &&
     verification?.provenance?.verificationSourceModelSha256?.toLowerCase?.() === candidateGlbSha256.toLowerCase(),
   "Correction verification must refer to the exact candidate GLB hash.");
@@ -285,7 +302,27 @@ export function buildBuildingReleaseReadiness(input) {
       renderManifestSha256: isHash(renderManifestSha256) ? renderManifestSha256.toLowerCase() : null,
       renderReferenceReviewSha256: reviewDigest,
       correctionTaskBacklogSha256: backlogDigest,
-      correctionVerificationReviewSha256: verification?.verificationReviewReportSha256 ?? null,
+      correctionVerificationReportSha256: verification ? digest(JSON.stringify(verification)) : null,
+      correctionVerificationSourceReviewSha256: verification?.verificationReviewReportSha256 ?? null,
+      geometryQaReportSha256: isObject(geometryQa) ? digest(JSON.stringify(geometryQa)) : null,
+      textureQaReportSha256: isObject(textureQa) ? digest(JSON.stringify(textureQa)) : null,
+    },
+    qaSummary: {
+      geometry: {
+        engine: geometryQa?.engine ?? null,
+        status: geometryQa?.status ?? null,
+        valid: geometryQa?.valid === true,
+        counts: geometryQa?.counts ?? null,
+        warnings: Array.isArray(geometryQa?.warnings) ? geometryQa.warnings : [],
+      },
+      texture: {
+        engine: textureQa?.engine ?? null,
+        status: textureQa?.status ?? null,
+        valid: textureQa?.valid === true,
+        counts: textureQa?.counts ?? null,
+        errors: Array.isArray(textureQa?.errors) ? textureQa.errors : [],
+        warnings: Array.isArray(textureQa?.warnings) ? textureQa.warnings : [],
+      },
     },
     counts: {
       requiredRenderViews: REQUIRED_REVIEW_VIEWS.length,
