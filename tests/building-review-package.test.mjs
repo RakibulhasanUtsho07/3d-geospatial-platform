@@ -31,7 +31,6 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
       geometryQaReportSha256: geometryDigest,
       textureQaReportSha256: badDigest ? "0".repeat(64) : textureDigest,
     },
-    _renderManifestViews: [],
   };
   const artifacts = [
     { artifactType: "candidate-glb", relativePath: "model/candidate.glb", sha256: hash("candidate-glb"), bytes: 1000 },
@@ -47,7 +46,6 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
     if (viewId === missingView) continue;
     const data = { artifactType: "render-image", relativePath: "renders/" + viewId + ".png", sha256: hash("render:" + viewId), viewId, width: 512, height: 512, bytes: 5120 };
     artifacts.push(data);
-    readiness._renderManifestViews.push({ id: viewId, sha256: data.sha256, width: data.width, height: data.height });
   }
   artifacts.push({
     artifactType: "reference-image",
@@ -59,12 +57,12 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
     height: 512,
     bytes: 4096,
   });
-  return { readiness, artifacts };
+  return { readiness, artifacts, renderManifestViews: artifacts.filter((item) => item.artifactType === "render-image").map((item) => ({ id: item.viewId, sha256: item.sha256, width: item.width, height: item.height })) };
 }
 
 test("creates a review-only package manifest when all required evidence types exist", () => {
-  const { readiness, artifacts } = fixture();
-  const result = buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, generatedAt: "2026-10-21T12:00:00Z" });
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const result = buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews, generatedAt: "2026-10-21T12:00:00Z" });
   assert.equal(result.engine, "building-review-package-v1");
   assert.equal(result.packagePurpose, "final-human-release-review");
   assert.equal(result.readiness.status, "ready-for-final-human-review");
@@ -76,7 +74,7 @@ test("creates a review-only package manifest when all required evidence types ex
 
 test("refuses to package a blocked release candidate", () => {
   const { readiness, artifacts } = fixture({ blocked: true });
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts }), /blocked-release-candidate/);
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews: fixture().renderManifestViews }), /blocked-release-candidate/);
 });
 
 test("refuses reference images with unverified rights", () => {
