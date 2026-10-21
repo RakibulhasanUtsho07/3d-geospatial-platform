@@ -47,6 +47,7 @@ on:
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
       - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
 
 permissions:
   contents: read
