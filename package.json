@@ -92,7 +92,9 @@
     "sign:building-review-package": "node scripts/sign-building-review-package.mjs",
     "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs",
     "test:building-accuracy-benchmark": "node --test tests/building-accuracy-benchmark.test.mjs",
-    "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs"
+    "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs",
+    "test:render-image-similarity-diagnostics": "node --test tests/render-image-similarity-diagnostics.test.mjs",
+    "compare:render-reference-images": "node scripts/compare-render-reference-images.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
