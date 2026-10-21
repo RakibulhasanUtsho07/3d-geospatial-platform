@@ -17,6 +17,7 @@ on:
       - feat/unified-media-to-3d-cli
       - feat/building-ground-control-registration
       - feat/per-view-architectural-sketches
+      - feat/mask-guided-building-sketches
   pull_request:
     branches:
       - main
