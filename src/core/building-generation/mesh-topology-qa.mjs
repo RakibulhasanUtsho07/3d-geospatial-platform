@@ -135,7 +135,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   if (vertexCount > settings.maxTopologyVertices) {
     common.topologySkipReason = "vertex-limit";
     common.warnings.push("topology-analysis-skipped-vertex-limit");
-    if (longEdgeTriangleCount > 0) common.warnings.push("long-triangle-edges-present");
+    if (common.longEdgeTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
     return common;
   }
 
