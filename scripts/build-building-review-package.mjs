@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { copyFile, lstat, mkdir, readFile, readlink, rm, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
@@ -151,19 +151,19 @@ async function main() {
   const reportItems = [
     ["geometry-qa", "reports/geometry-qa.json", geometryBytes, geometryQa],
     ["texture-qa", "reports/texture-qa.json", textureBytes, textureQa],
-    ["render-manifest", "renders/render-review-manifest.json", manifestBytes, renderManifest],
+    ["render-manifest", "renders/render-review-manifest.json", manifestBytes, renderManifest, sha256(manifestBytes)],
     ["render-reference-review", "reports/render-reference-review.json", reviewBytes, renderReferenceReview],
     ["correction-task-backlog", "reports/correction-tasks.json", backlogBytes, correctionTaskBacklog],
     ["correction-verification", "reports/correction-verification.json", verificationDiskBytes, correctionVerification],
     ["release-readiness-report", "reports/release-readiness.json", readinessBytes, readinessReport],
   ];
-  for (const [artifactType, relativePath, bytes, object] of reportItems) {
+  for (const [artifactType, relativePath, bytes, object, digestOverride] of reportItems) {
     addArtifact(artifacts, copyOperations, {
       artifactType,
       sourcePath: null,
       relativePath,
       bytes,
-      objectDigest: semanticDigest(object),
+      objectDigest: digestOverride ?? semanticDigest(object),
     });
   }
 
@@ -185,7 +185,7 @@ async function main() {
     addArtifact(artifacts, copyOperations, {
       artifactType: "reference-image",
       sourcePath: actual.sourcePath,
-      relativePath: "references/" + actual.filename,
+      relativePath: "references/" + sha256(Buffer.from(reference.id)).slice(0, 12) + "-" + actual.filename,
       bytes: actual.bytes,
       metadata: {
         referenceImageId: reference.id,
@@ -198,15 +198,6 @@ async function main() {
 
   const readinessDigestArtifact = artifacts.find((artifact) => artifact.artifactType === "release-readiness-report");
   readinessDigestArtifact.contentDigest = semanticDigest(readinessReport);
-  const packageManifest = buildBuildingReviewPackageManifest({
-    buildingId: renderReferenceReview.buildingId,
-    readinessReport: {
-      ...recomputedReadiness,
-      _renderManifestViews: renderManifest.views,
-    },
-    artifacts,
-  });
-  const packageManifestBytes = Buffer.from(JSON.stringify(packageManifest, null, 2) + "\n");
   const readmeBytes = Buffer.from([
     "# Building Review Package",
     "",
@@ -225,8 +216,20 @@ async function main() {
     "See \`package-manifest.json\` for SHA-256 hashes, sizes, view/reference identifiers and the exact evidence files included.",
     "",
   ].join("\n"));
+  addArtifact(artifacts, copyOperations, {
+    artifactType: "review-instructions",
+    sourcePath: null,
+    relativePath: "README.md",
+    bytes: readmeBytes,
+  });
+  const packageManifest = buildBuildingReviewPackageManifest({
+    buildingId: renderReferenceReview.buildingId,
+    readinessReport: recomputedReadiness,
+    renderManifestViews: renderManifest.views,
+    artifacts,
+  });
+  const packageManifestBytes = Buffer.from(JSON.stringify(packageManifest, null, 2) + "\n");
   copyOperations.push({ sourcePath: null, relativePath: "package-manifest.json", bytes: packageManifestBytes });
-  copyOperations.push({ sourcePath: null, relativePath: "README.md", bytes: readmeBytes });
 
   const outputParent = path.dirname(outputDir);
   const outputName = path.basename(outputDir);
