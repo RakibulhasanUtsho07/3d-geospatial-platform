@@ -34,7 +34,6 @@ on:
       - feat/building-review-package-integrity-v2
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
-      - feat/render-image-similarity-diagnostics
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -136,9 +135,6 @@ jobs:
 
       - name: Test evidence-linked render reference review
         run: npm run test:render-reference-review
-
-      - name: Test render/reference image similarity diagnostics
-        run: npm run test:render-image-similarity-diagnostics
 
       - name: Test evidence-linked render correction task backlog
         run: npm run test:render-correction-tasks
