@@ -33,6 +33,7 @@ on:
       - feat/building-review-package
       - feat/building-review-package-integrity-v2
       - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -151,6 +152,9 @@ jobs:
 
       - name: Test Ed25519 review package manifest signatures
         run: npm run test:building-review-package-signature
+
+      - name: Test evidence-based building accuracy benchmark
+        run: npm run test:building-accuracy-benchmark
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
