@@ -27,12 +27,9 @@ export function planImageTiles(width,height,options={}){
  const xs=axisStarts(width,tileSize,overlap),ys=axisStarts(height,tileSize,overlap),tiles=[];
  for(let row=0;row<ys.length;row++)for(let column=0;column<xs.length;column++){
   const x=xs[column],y=ys[row],w=Math.min(tileSize,width-x),h=Math.min(tileSize,height-y);
-  if(w<minTileSize||h<minTileSize){
-   // Keep small edge regions by expanding the preceding tile when possible; never drop source pixels.
-   const previous=tiles.find(tile=>tile.row===row&&tile.column===column-1);
-   if(previous&&w<minTileSize){previous.width=Math.min(width-previous.x,Math.max(previous.width,width-previous.x));continue;}
-   if(w<minTileSize||h<minTileSize)throw new RangeError("planned edge tile is smaller than minTileSize; reduce tileSize or minTileSize");
-  }
+  // A small source image is valid as a single tile; minTileSize only constrains
+  // edge tiles when that source axis is larger than tileSize.
+  if((width>tileSize&&w<minTileSize)||(height>tileSize&&h<minTileSize))throw new RangeError("planned edge tile is smaller than minTileSize; reduce tileSize or minTileSize");
   tiles.push({id:"r"+String(row+1).padStart(3,"0")+"-c"+String(column+1).padStart(3,"0"),row,column,x,y,width:w,height:h,sourceWidth:width,sourceHeight:height});
  }
  return {schemaVersion:"1.0.0",strategy:"overlapping-grid-v1",source:{width,height},config:{tileSize,overlap,minTileSize},tileCount:tiles.length,tiles};
