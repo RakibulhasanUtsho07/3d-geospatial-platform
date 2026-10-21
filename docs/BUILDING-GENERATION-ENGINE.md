@@ -104,6 +104,17 @@ Before COLMAP starts, the worker samples each staged image through FFmpeg as a 6
 
 Install FFmpeg on the reconstruction worker and run `npm run test:image-quality-preflight` to test the heuristics. If FFmpeg cannot decode a selected image, the job fails with an explicit preflight diagnostic instead of silently treating the image as good input.
 
+### Consolidated model review triage
+
+After conversion to GLB, `model-review-summary.mjs` combines image preflight, COLMAP sparse-model diagnostics, mesh topology/texture warnings, scale calibration, up-axis confirmation and georeference status into `report.json` under `modelReview`. The report orders findings by review priority, shows primitive-level topology metrics, and lists concrete next actions. It is a summary of existing signals, not a mesh repairer or architectural-understanding model.
+
+A `no-automated-findings` status means only that these automated checks did not emit a finding. Human review is still required in every case; `humanReviewRequired` remains true, and `mapReady` / `publicationEligible` remain false. Boundary edges may be intentional, and high/medium/low are triage priorities rather than architectural-certainty scores.
+
+~~~powershell
+npm run test:model-review-summary
+npm run test:colmap-worker
+~~~
+
 ### Mandatory output gates
 
 - **Rights and provenance:** source file bytes must match recorded SHA-256, usage must be approved and a known licence must be recorded.

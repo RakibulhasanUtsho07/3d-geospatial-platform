@@ -7,6 +7,7 @@ import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
+import { buildModelReviewSummary } from "./model-review-summary.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_IMAGE_COUNT=120,MAX_TOTAL_INPUT_BYTES=500*1024*1024;
@@ -197,6 +198,15 @@ export async function runColmapReconstruction(options){
   if(!calibration.scaleCalibrated)report.warnings.push("No real-world scale was supplied; 1 model unit was provisionally treated as 1 metre for preview only.");
   if(!options.upAxisReviewed)report.warnings.push("Source up axis has not been reviewed; verify model orientation before map placement.");
   report.mapReady=false;report.publicationEligible=false;
+  report.modelReview=buildModelReviewSummary({
+   imageQualityPreflight:report.imageQualityPreflight,
+   reconstructionDiagnostics:report.reconstructionDiagnostics,
+   modelQuality,
+   scaleCalibration:report.scaleCalibration,
+   upAxisReviewed:report.confirmations.upAxisReviewed,
+   georeference:report.georeference
+  });
+  report.warnings.push("Model review triage: "+report.modelReview.priority+" priority; "+report.modelReview.findingCount+" finding(s); human review remains required.");
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   return {jobDir:outputJobDir,modelPath,reportPath,report};
  }catch(error){report.status="failed";report.failedAt=new Date().toISOString();report.failureMessage=error instanceof Error?error.message:String(error);report.mapReady=false;await writeFile(reportPath,JSON.stringify(report,null,2)+"\n").catch(()=>{});error.reportPath=reportPath;throw error;}
