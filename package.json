@@ -55,7 +55,9 @@
     "test:architectural-sketch-preparation": "node --test tests/architectural-sketch-preparation.test.mjs",
     "prepare:architectural-sketches": "node scripts/prepare-architectural-sketches.mjs",
     "test:mask-guided-building-sketches": "node --test tests/mask-guided-building-sketches.test.mjs",
-    "build:mask-guided-sketches": "node scripts/build-mask-guided-sketches.mjs"
+    "build:mask-guided-sketches": "node scripts/build-mask-guided-sketches.mjs",
+    "test:multi-view-wireframe-registration": "node --test tests/multi-view-wireframe-registration.test.mjs",
+    "build:multi-view-wireframe": "node scripts/build-multi-view-wireframe.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
