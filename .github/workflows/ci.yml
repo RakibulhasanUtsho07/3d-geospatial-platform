@@ -36,6 +36,7 @@ on:
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
       - feat/evidence-linked-image-diagnostics
+      - feat/similarity-evidence-correction-tasks
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -45,6 +46,7 @@ on:
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
+      - feat/evidence-linked-image-diagnostics
 
 permissions:
   contents: read
