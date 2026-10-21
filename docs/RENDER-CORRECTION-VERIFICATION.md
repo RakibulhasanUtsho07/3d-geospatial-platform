@@ -26,6 +26,12 @@ A `model-correction-review` task becomes `verified` only when all of these are t
 
 If the new outcome is `partial` or `mismatch`, the result is `needs-more-work`; `pending` waits for review; `not-comparable` is blocked. A match against unchanged model or manifest evidence is `stale-evidence`, not verification. Missing evidence never closes a task.
 
+## Similarity diagnostics in verification snapshots
+
+If the fresh review report contains image-similarity diagnostics, the verification snapshot carries the compact diagnostic record under `tasks[].matchedEvidence.similarityDiagnostics`. The snapshot summary counts comparisons with diagnostics and screening warnings. It validates the diagnostic schema, metric ranges, and render/reference hashes against the exact comparison before preserving the data. Reports without diagnostics remain supported.
+
+Diagnostics are advisory audit evidence only. A low SSIM/high pixel-error warning does not override a human `match`, and clean metrics do not create one. The verification gates and status mapping stay unchanged; `similarityDiagnosticsSummary.affectVerificationStatus` and the automation policy both explicitly remain false.
+
 ## Other task outcomes
 
 | Task kind | Completion rule |
