@@ -20,6 +20,15 @@ const cleanReconstruction = {
   warnings: [],
 };
 
+const cleanCameraCoverage = {
+  status: "diagnostics-passed",
+  registeredCameraPoseCount: 3,
+  sparsePointCount: 900,
+  cameraPositionSpreadRatio: 0.4,
+  maximumViewingDirectionAngleDegrees: 90,
+  warnings: [],
+};
+
 const cleanMesh = {
   valid: true,
   warnings: [],
@@ -71,6 +80,14 @@ test("synthesizes actionable findings across photos, COLMAP, mesh, scale and pla
       metrics: { registeredImages: 1, sparsePointCount: 12 },
       warnings: ["Only 1 of 4 selected images registered.", "Sparse reconstruction has too few points."],
     },
+    cameraCoverage: {
+      status: "review-recommended",
+      registeredCameraPoseCount: 2,
+      sparsePointCount: 12,
+      cameraPositionSpreadRatio: 0.01,
+      maximumViewingDirectionAngleDegrees: 4,
+      warnings: ["fewer-than-three-registered-camera-poses", "camera-positions-have-low-spread-relative-to-scene", "camera-viewing-directions-are-nearly-identical"],
+    },
     modelQuality: {
       ...cleanMesh,
       counts: { ...cleanMesh.counts, triangleCount: 100, degenerateTriangleCount: 3, degenerateTriangleRatio: 0.03 },
@@ -89,6 +106,7 @@ test("synthesizes actionable findings across photos, COLMAP, mesh, scale and pla
   assert.equal(report.publicationEligible, false);
   assert.ok(report.findings.some((item) => item.code === "input-views-need-inspection"));
   assert.ok(report.findings.some((item) => item.code === "sparse-reconstruction-needs-review" && item.severity === "high"));
+  assert.ok(report.findings.some((item) => item.code === "camera-coverage-needs-review" && item.severity === "medium"));
   assert.ok(report.findings.some((item) => item.code === "mesh-topology-needs-visual-review" && item.severity === "high"));
   assert.ok(report.findings.some((item) => item.code === "metric-scale-unverified"));
   assert.ok(report.findings.some((item) => item.code === "up-axis-not-reviewed"));
@@ -101,6 +119,7 @@ test("does not remove the human approval gate when no automated signals are foun
   const report = buildModelReviewSummary({
     imageQualityPreflight: cleanImages,
     reconstructionDiagnostics: cleanReconstruction,
+    cameraCoverage: cleanCameraCoverage,
     modelQuality: cleanMesh,
     ...cleanPlacement,
   });
@@ -117,6 +136,7 @@ test("reports missing diagnostics rather than treating them as a pass", () => {
   const report = buildModelReviewSummary({
     imageQualityPreflight: cleanImages,
     reconstructionDiagnostics: { status: "unavailable", warnings: ["model_analyzer unavailable"] },
+    cameraCoverage: { status: "unavailable", warnings: ["model_converter unavailable"] },
     modelQuality: null,
     scaleCalibration: { scaleCalibrated: true },
     upAxisReviewed: true,
@@ -124,6 +144,7 @@ test("reports missing diagnostics rather than treating them as a pass", () => {
   });
 
   assert.ok(report.findings.some((item) => item.code === "reconstruction-diagnostics-unavailable"));
+  assert.ok(report.findings.some((item) => item.code === "camera-coverage-diagnostics-unavailable"));
   assert.ok(report.findings.some((item) => item.code === "mesh-geometry-qa-unavailable"));
   assert.ok(report.findings.some((item) => item.code === "wgs84-placement-not-registered"));
   assert.notEqual(report.status, "no-automated-findings");
