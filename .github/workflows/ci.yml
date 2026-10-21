@@ -26,6 +26,7 @@ on:
       - feat/glb-texture-binding-qa
       - feat/glb-uv-seam-review
       - feat/blender-render-review-views
+      - feat/render-reference-comparison-review
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -123,6 +124,9 @@ jobs:
 
       - name: Test multi-view render review manifest validation
         run: npm run test:render-review-manifest
+
+      - name: Test evidence-linked render reference review
+        run: npm run test:render-reference-review
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
