@@ -81,6 +81,8 @@ jobs:
 
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
+      - name: Test mask-guided building sketch preparation
+        run: npm run test:mask-guided-building-sketches
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
