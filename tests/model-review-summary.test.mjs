@@ -155,6 +155,7 @@ test("validates the summary input and emits a safe default action for a clean pa
   const report = buildModelReviewSummary({
     imageQualityPreflight: cleanImages,
     reconstructionDiagnostics: cleanReconstruction,
+    cameraCoverage: cleanCameraCoverage,
     modelQuality: cleanMesh,
     ...cleanPlacement,
   });
