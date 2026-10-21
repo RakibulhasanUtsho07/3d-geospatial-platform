@@ -57,7 +57,9 @@
     "test:mask-guided-building-sketches": "node --test tests/mask-guided-building-sketches.test.mjs",
     "build:mask-guided-sketches": "node scripts/build-mask-guided-sketches.mjs",
     "test:multi-view-wireframe-registration": "node --test tests/multi-view-wireframe-registration.test.mjs",
-    "build:multi-view-wireframe": "node scripts/build-multi-view-wireframe.mjs"
+    "build:multi-view-wireframe": "node scripts/build-multi-view-wireframe.mjs",
+    "test:wireframe-qa-repair-passes": "node --test tests/wireframe-qa-repair-passes.test.mjs",
+    "qa:wireframe-repair-passes": "node scripts/run-wireframe-qa-repair-passes.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
