@@ -267,7 +267,8 @@ export function reviewGlbTextureBindings(input, options = {}) {
 
   const primitiveReports = [];
   let texturedPrimitiveCount = 0, untexturedPrimitiveCount = 0, uvAttributeCount = 0, uvVertexCount = 0;
-  const reportedUvAccessors = new Map();\n  const reportedPositionAccessors = new Map();
+  const reportedUvAccessors = new Map();
+  const reportedPositionAccessors = new Map();
   (gltf.meshes ?? []).forEach((mesh,meshIndex) => {
     if (!Array.isArray(mesh.primitives) || mesh.primitives.length === 0) {
       errors.push(`mesh-${meshIndex}-has-no-primitives`);
