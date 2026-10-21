@@ -85,7 +85,9 @@
     "test:building-release-readiness": "node --test tests/building-release-readiness.test.mjs",
     "assess:building-release-readiness": "node scripts/build-building-release-readiness.mjs",
     "test:building-review-package": "node --test tests/building-review-package.test.mjs",
-    "package:building-review": "node scripts/build-building-review-package.mjs"
+    "package:building-review": "node scripts/build-building-review-package.mjs",
+    "test:building-review-package-integrity": "node --test tests/building-review-package-integrity.test.mjs",
+    "verify:building-review-package": "node scripts/verify-building-review-package.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
