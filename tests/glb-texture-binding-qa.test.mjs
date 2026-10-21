@@ -6,19 +6,23 @@ import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-te
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lYsAAAAASUVORK5CYII=", "base64");
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-function makeGlb({ uvs = [[0,0],[1,0],[0,1]], omitUv = false, textureIndex = 0, imageUri = null } = {}) {
-  const positions = Buffer.alloc(36);
-  [[0,0,0],[1,0,0],[0,1,0]].flat().forEach((n,i)=>positions.writeFloatLE(n,i*4));
+function makeGlb({ uvs = [[0,0],[1,0],[0,1]], positionsList = [[0,0,0],[1,0,0],[0,1,0]],
+  indicesList = [0,1,2], omitUv = false, textureIndex = 0, imageUri = null } = {}) {
+  const positions = Buffer.alloc(positionsList.length * 12);
+  positionsList.flat().forEach((n,i)=>positions.writeFloatLE(n,i*4));
   const uvBytes = Buffer.alloc(uvs.length * 8);
   uvs.flat().forEach((n,i)=>uvBytes.writeFloatLE(n,i*4));
-  const indices = Buffer.alloc(6);
-  [0,1,2].forEach((n,i)=>indices.writeUInt16LE(n,i*2));
-  const imageOffset = 68;
-  const binary = Buffer.concat([positions,uvBytes,indices,Buffer.alloc(2),imageUri ? Buffer.alloc(0) : png]);
+  const indexBytes = Buffer.alloc(indicesList.length * 2);
+  indicesList.forEach((n,i)=>indexBytes.writeUInt16LE(n,i*2));
+  const indexOffset = positions.length + uvBytes.length;
+  const imageOffset = Math.ceil((indexOffset + indexBytes.length) / 4) * 4;
+  const padding = Buffer.alloc(imageOffset - (indexOffset + indexBytes.length));
+  const imageBytes = imageUri ? Buffer.alloc(0) : png;
+  const binary = Buffer.concat([positions,uvBytes,indexBytes,padding,imageBytes]);
   const bufferViews = [
     { buffer:0, byteOffset:0, byteLength:positions.length, target:34962 },
-    { buffer:0, byteOffset:36, byteLength:uvBytes.length, target:34962 },
-    { buffer:0, byteOffset:60, byteLength:indices.length, target:34963 },
+    { buffer:0, byteOffset:positions.length, byteLength:uvBytes.length, target:34962 },
+    { buffer:0, byteOffset:indexOffset, byteLength:indexBytes.length, target:34963 },
   ];
   const images = imageUri ? [{ uri:imageUri, mimeType:"image/png" }] : [{ bufferView:3, mimeType:"image/png", name:"atlas" }];
   if (!imageUri) bufferViews.push({ buffer:0, byteOffset:imageOffset, byteLength:png.length });
@@ -29,9 +33,9 @@ function makeGlb({ uvs = [[0,0],[1,0],[0,1]], omitUv = false, textureIndex = 0, 
     scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],
     meshes:[{primitives:[{attributes,indices:2,material:0,mode:4}]}],
     accessors:[
-      {bufferView:0,componentType:5126,count:3,type:"VEC3",min:[0,0,0],max:[1,1,0]},
+      {bufferView:0,componentType:5126,count:positionsList.length,type:"VEC3"},
       {bufferView:1,componentType:5126,count:uvs.length,type:"VEC2"},
-      {bufferView:2,componentType:5123,count:3,type:"SCALAR",min:[0],max:[2]},
+      {bufferView:2,componentType:5123,count:indicesList.length,type:"SCALAR",min:[0],max:[Math.max(...indicesList)]},
     ],
     bufferViews,buffers:[{byteLength:binary.length}],
     materials:[{name:"facade",pbrMetallicRoughness:{baseColorTexture:{index:textureIndex}}}],
@@ -51,11 +55,11 @@ function makeGlb({ uvs = [[0,0],[1,0],[0,1]], omitUv = false, textureIndex = 0, 
 test("accepts embedded PNG with material texture and normalized TEXCOORD_0", () => {
   const report = reviewGlbTextureBindings(makeGlb());
   assert.equal(report.valid,true);
-  assert.equal(report.status,"texture-bindings-structurally-valid");
+  assert.equal(report.status,"review-recommended");
   assert.equal(report.counts.texturedPrimitiveCount,1);
   assert.equal(report.images[0].width,1);
   assert.equal(report.images[0].height,1);
-  assert.equal(report.images[0].embedded,true);
+  assert.equal(report.images[0].embedded,true);\n  assert.ok(report.warnings.includes("image-0-low-resolution-texture-review"));
 });
 
 test("verifies atlas byte hash and manifest dimensions", () => {
@@ -93,4 +97,16 @@ test("reports external image resources without pretending they are embedded", ()
 
 test("rejects malformed GLB inputs", () => {
   assert.throws(() => reviewGlbTextureBindings(Buffer.from("not a glb")), /GLB 2.0 Buffer/);
+});
+
+test("includes UV seam review candidates for adjacent faces mapped differently", () => {
+  const report = reviewGlbTextureBindings(makeGlb({
+    positionsList:[[0,0,0],[1,0,0],[1,1,0],[1,0,0],[1,1,0],[0,1,0]],
+    uvs:[[0,0],[1,0],[1,1],[0,0],[0,1],[1,1]],
+    indicesList:[0,1,2,3,4,5],
+  }));
+  assert.equal(report.valid,true);
+  assert.equal(report.counts.uvSeamCandidateCount,1);
+  assert.equal(report.primitiveReports[0].uvSeamReviews[0].seamCandidateCount,1);
+  assert.ok(report.warnings.includes("mesh-0-primitive-0-uv-seam-review-candidates-present"));
 });
