@@ -183,6 +183,9 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     readiness.candidateGlbSha256?.toLowerCase?.() === candidate?.sha256.toLowerCase() &&
     readiness.publicationEligible === false && readiness.finalHumanReviewRequired === true),
   "Release readiness report does not match package metadata or release policy.");
+  check("release-readiness-no-blockers", Boolean(readiness && readiness.counts?.blockers === 0 &&
+    Array.isArray(readiness.checks) && readiness.checks.every((item) => item.status !== "blocked")),
+  "The packaged release-readiness report must contain zero blockers and no blocked checks.");
 
   const provenance = readiness?.provenance ?? {};
   const digestBindings = [
@@ -234,7 +237,12 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     manifest.engine === "building-render-review-manifest-v1" && manifest.valid === true &&
     manifest.modelSha256?.toLowerCase?.() === candidate?.sha256.toLowerCase()),
   "Render manifest is invalid or refers to a different candidate GLB.");
-  const manifestViews = new Map((Array.isArray(manifest?.views) ? manifest.views : []).map((view) => [view.id, view]));
+  const manifestViewList = Array.isArray(manifest?.views) ? manifest.views : [];
+  const manifestViewIds = manifestViewList.map((view) => view?.id);
+  const manifestViews = new Map(manifestViewList.map((view) => [view.id, view]));
+  check("render-manifest-view-identities", manifestViewIds.length === manifestViews.size &&
+    REQUIRED_REVIEW_VIEWS.every((viewId) => manifestViews.has(viewId)),
+  "Render manifest must contain unique IDs for all required render views.");
   for (const viewId of REQUIRED_REVIEW_VIEWS) {
     const view = manifestViews.get(viewId);
     const packaged = artifactByViewId.get(viewId);
@@ -252,6 +260,12 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     review.buildingId === packageManifest.buildingId &&
     review.provenance?.sourceModelSha256?.toLowerCase?.() === candidate?.sha256.toLowerCase()),
   "Render/reference review report is invalid or belongs to a different candidate/building.");
+  check("reference-review-status", review?.reviewStatus === "reviewer-reported-matches",
+    "Review report must record reviewer-reported matches, without unresolved outcomes.");
+  if (Array.isArray(review?.warnings) && review.warnings.length > 0) {
+    check("reference-review-warnings", false,
+      "Reference review retains " + review.warnings.length + " warning(s) for the final reviewer.", "warning");
+  }
 
   const references = new Map((Array.isArray(review?.referenceImages) ? review.referenceImages : []).map((item) => [item.id, item]));
   check("reference-count", references.size === artifactByReferenceId.size,
