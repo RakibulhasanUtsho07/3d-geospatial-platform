@@ -40,6 +40,7 @@ on:
       - dev
       - rakibul-hasan
       - feat/building-review-package-signatures
+      - feat/building-accuracy-benchmark
 
 permissions:
   contents: read
