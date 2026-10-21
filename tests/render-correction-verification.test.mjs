@@ -5,8 +5,8 @@ import { verifyRenderCorrectionTasks } from "../src/core/building-generation/ren
 
 const modelSha = "a".repeat(64);
 const manifestSha = "b".repeat(64);
-const renderSha = "c".repeat(64);
-const referenceSha = "d".repeat(64);
+const renderSha256 = "c".repeat(64);
+const referenceSha256 = "d".repeat(64);
 const changedModelSha = "e".repeat(64);
 const changedManifestSha = "f".repeat(64);
 
