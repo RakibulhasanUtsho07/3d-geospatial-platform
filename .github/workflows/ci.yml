@@ -18,6 +18,7 @@ on:
       - feat/building-ground-control-registration
       - feat/per-view-architectural-sketches
       - feat/mask-guided-building-sketches
+      - feat/multi-view-wireframe-registration
   pull_request:
     branches:
       - main
