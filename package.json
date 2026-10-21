@@ -49,7 +49,9 @@
     "build:building-from-media": "node scripts/build-building-from-media.mjs",
     "test:ground-control-registration": "node --test tests/ground-control-registration.test.mjs",
     "test:reference-dimension-validation": "node --test tests/reference-dimension-validation.test.mjs",
-    "validate:model-dimensions": "node scripts/validate-model-dimensions.mjs"
+    "validate:model-dimensions": "node scripts/validate-model-dimensions.mjs",
+    "test:image-tile-analysis": "node --test tests/image-tile-analysis.test.mjs",
+    "tile:building-images": "node scripts/tile-building-images.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
