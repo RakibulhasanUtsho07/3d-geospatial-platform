@@ -60,7 +60,7 @@ function completeInput(overrides = {}) {
   return {
     buildingId: fixture.id,
     candidateGlbSha256: candidateHash,
-    geometryQa,
+    geometryQa: { ...geometryQa, warnings: [] },
     dimensionReference: {
       referenceDimensionsM: { x: dimensions[0], y: dimensions[1], z: dimensions[2] },
       metresPerModelUnit: 1,
