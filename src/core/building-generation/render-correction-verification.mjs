@@ -26,6 +26,68 @@ function validHash(value) {
   return typeof value === "string" && sha256Pattern.test(value);
 }
 
+function normalizeSimilarityDiagnostics(value, comparison) {
+  if (value === undefined || value === null) return null;
+  const label = comparison.viewId + ":" + comparison.referenceImageId;
+  const metrics = value.metrics;
+  const comparability = value.comparability;
+  const inRange = (number, min, max) =>
+    typeof number === "number" && Number.isFinite(number) && number >= min && number <= max;
+  const psnrValid = metrics?.psnrDb === null ||
+    typeof metrics?.psnrDb === "number" && Number.isFinite(metrics.psnrDb) && metrics.psnrDb >= 0;
+  const valid =
+    isObject(value) &&
+    value.engine === "render-image-similarity-diagnostics-v1" &&
+    value.status === "diagnostics-computed" &&
+    value.automaticMatch === false &&
+    validHash(value.reportSha256) &&
+    validHash(value.renderSha256) &&
+    validHash(value.referenceSha256) &&
+    value.renderSha256.toLowerCase() === comparison.renderSha256.toLowerCase() &&
+    value.referenceSha256.toLowerCase() === comparison.referenceSha256.toLowerCase() &&
+    nonEmptyString(value.interpretation) &&
+    inRange(metrics?.meanAbsoluteError, 0, 255) &&
+    inRange(metrics?.rootMeanSquaredError, 0, 255) &&
+    psnrValid &&
+    inRange(metrics?.localSsim8x8, -1, 1) &&
+    Number.isSafeInteger(metrics?.differenceHashHammingDistance) &&
+    metrics.differenceHashHammingDistance >= 0 &&
+    metrics.differenceHashHammingDistance <= 64 &&
+    inRange(comparability?.aspectRatioDifferencePercent, 0, Number.MAX_SAFE_INTEGER) &&
+    typeof comparability?.aspectRatioWithinScreeningThreshold === "boolean" &&
+    comparability.sameFacadeConfirmedByTool === false &&
+    comparability.cameraPoseAlignmentVerifiedByTool === false &&
+    Array.isArray(value.warnings) &&
+    value.warnings.every((warning) => typeof warning === "string");
+  if (!valid) {
+    throw new Error("verification-review-similarity-diagnostics-invalid:" + label);
+  }
+
+  return {
+    reportSha256: value.reportSha256.toLowerCase(),
+    engine: value.engine,
+    status: value.status,
+    interpretation: value.interpretation,
+    renderSha256: value.renderSha256.toLowerCase(),
+    referenceSha256: value.referenceSha256.toLowerCase(),
+    metrics: {
+      meanAbsoluteError: metrics.meanAbsoluteError,
+      rootMeanSquaredError: metrics.rootMeanSquaredError,
+      psnrDb: metrics.psnrDb,
+      localSsim8x8: metrics.localSsim8x8,
+      differenceHashHammingDistance: metrics.differenceHashHammingDistance,
+    },
+    comparability: {
+      aspectRatioDifferencePercent: comparability.aspectRatioDifferencePercent,
+      aspectRatioWithinScreeningThreshold: comparability.aspectRatioWithinScreeningThreshold,
+      sameFacadeConfirmedByTool: false,
+      cameraPoseAlignmentVerifiedByTool: false,
+    },
+    warnings: [...value.warnings],
+    automaticMatch: false,
+  };
+}
+
 function validateReviewReport(report) {
   if (!isObject(report) || report.engine !== "render-reference-review-v1" || report.schemaVersion !== "1.0.0") {
     throw new Error("unsupported-render-reference-review-report");
@@ -48,6 +110,7 @@ function validateReviewReport(report) {
     if (!validHash(comparison.renderSha256) || !validHash(comparison.referenceSha256)) {
       throw new Error("verification-review-comparison-hash-invalid:" + comparison.viewId);
     }
+    normalizeSimilarityDiagnostics(comparison.similarityDiagnostics, comparison);
     const pairKey = comparison.viewId + "\u0000" + comparison.referenceImageId;
     if (pairKeys.has(pairKey)) throw new Error("duplicate-verification-comparison:" + comparison.viewId + ":" + comparison.referenceImageId);
     pairKeys.add(pairKey);
@@ -112,6 +175,9 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
   const sourceModelChanged = sourceModelSha256 !== backlog.provenance.sourceModelSha256.toLowerCase();
   const renderManifestChanged = renderManifestSha256 !== backlog.provenance.renderManifestSha256.toLowerCase();
   const backlogSha256 = digest(JSON.stringify(backlog));
+  const diagnostics = verificationReviewReport.comparisons
+    .map((comparison) => normalizeSimilarityDiagnostics(comparison.similarityDiagnostics, comparison))
+    .filter(Boolean);
 
   const taskResults = backlog.tasks.map((task) => {
     const exactComparison = task.evidence.referenceImageId
@@ -136,6 +202,7 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       reviewer: comparison.reviewer ?? null,
       reviewedAt: comparison.reviewedAt ?? null,
       notes: comparison.notes ?? null,
+      similarityDiagnostics: normalizeSimilarityDiagnostics(comparison.similarityDiagnostics, comparison),
     } : null;
 
     let status;
@@ -232,6 +299,13 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       sourceModelChanged,
       renderManifestChanged,
     },
+    similarityDiagnosticsSummary: {
+      comparisonsWithDiagnostics: diagnostics.length,
+      comparisonsWithWarnings: diagnostics.filter((item) => item.warnings.length > 0).length,
+      screeningWarnings: [...new Set(diagnostics.flatMap((item) => item.warnings))],
+      affectVerificationStatus: false,
+      automaticMatch: false,
+    },
     counts: {
       total: taskResults.length,
       verified: taskResults.filter((item) => item.status === "verified").length,
@@ -248,8 +322,9 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
     automationPolicy: {
       backlogMutated: false,
       geometryOrTextureEditsApplied: false,
+      similarityDiagnosticsAffectVerificationStatus: false,
       publicationEligible: false,
-      note: "Verification is an evidence-gated snapshot. Only exact-pair reviewer-reported matches on a changed model and changed render manifest can verify a model-correction task; it is not an automated assessment of visual or heritage accuracy.",
+      note: "Verification is an evidence-gated snapshot. Only exact-pair reviewer-reported matches on a changed model and changed render manifest can verify a model-correction task; similarity metrics are carried for audit and never determine verification status. It is not an automated assessment of visual or heritage accuracy.",
     },
   };
 }
