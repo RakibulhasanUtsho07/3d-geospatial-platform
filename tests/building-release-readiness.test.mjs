@@ -56,8 +56,6 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
     warnings: [],
     errors: [],
   };
-  const reviewSha = hash(JSON.stringify(review));
-
   const backlogTask = {
     id: "rrt-example-task",
     buildingId: "test-building",
