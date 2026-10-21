@@ -2,7 +2,6 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
 import { buildRenderReferenceReview } from "../src/core/building-generation/render-reference-review.mjs";
 
