@@ -10,6 +10,7 @@ const requiredArtifactTypes = [
   "render-reference-review",
   "correction-task-backlog",
   "correction-verification",
+  "accuracy-evidence",
   "release-readiness-report",
 ];
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -122,6 +123,7 @@ export function buildBuildingReviewPackageManifest({
     ["render-reference-review", { expected: readyProvenance.renderReferenceReviewSha256, field: "contentDigest" }],
     ["correction-task-backlog", { expected: readyProvenance.correctionTaskBacklogSha256, field: "contentDigest" }],
     ["correction-verification", { expected: readyProvenance.correctionVerificationReportSha256, field: "contentDigest" }],
+    ["accuracy-evidence", { expected: readyProvenance.accuracyEvidenceSha256, field: "contentDigest" }],
     ["geometry-qa", { expected: readyProvenance.geometryQaReportSha256, field: "contentDigest" }],
     ["texture-qa", { expected: readyProvenance.textureQaReportSha256, field: "contentDigest" }],
   ]);
