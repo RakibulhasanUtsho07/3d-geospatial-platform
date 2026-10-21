@@ -2,6 +2,11 @@
 import { runArchitecturalGeometryWorkflow } from "../src/core/building-generation/architectural-geometry-workflow.mjs";
 
 function parseArgs(argv) {
+  if (argv.includes("--help")) {
+    console.log("Usage: node scripts/run-architectural-geometry-workflow.mjs <workspace-root> <building-id> <job-id> <input.json> --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed [--max-rms-reprojection-error=3] [--max-repair-passes=3] [--max-boundary-edges=0] [--min-triangle-area=0.00000001] [--max-texture-reprojection-error-px=2]");
+    console.log("Input JSON requires cameras, manually verified multi-view features, edges, explicit triangular faces and textureCandidate evidence. Input/reference image paths must be relative to workspace-root. Outputs are review candidates, never map-ready.");
+    process.exit(0);
+  }
   const positional = [];
   const options = {};
   const flags = new Map([
