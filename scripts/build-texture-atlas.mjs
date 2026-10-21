@@ -58,15 +58,48 @@ async function main() {
   candidate.images.forEach((image, index) => {
     const p = placementById.get(image.id);
     const pad = p.padding;
-    const label = `tex${index}`;
-    const overlay = `atlas${index}`;
-    const paddedWidth = p.width + pad * 2;
-    const paddedHeight = p.height + pad * 2;
-    filterParts.push(`[${index + 1}:v]scale=${p.width}:${p.height}:flags=lanczos,pad=${paddedWidth}:${paddedHeight}:${pad}:${pad}:color=black@0,fillborders=left=${pad}:right=${pad}:top=${pad}:bottom=${pad}:mode=smear,format=rgba[${label}]`);
-    filterParts.push(`[${previous}][${label}]overlay=${p.outerX}:${p.outerY}:format=auto:shortest=1[${overlay}]`);
+    const scaled = `scaled${index}`;
+    const tile = `tile${index}`;
+    filterParts.push(`[${index + 1}:v]scale=${p.width}:${p.height}:flags=lanczos,setsar=1,format=rgba[${scaled}]`);
+    if (pad === 0) {
+      // No gutter requested: the scaled image itself is the atlas tile.
+      filterParts.push(`[${scaled}]null[${tile}]`);
+    } else {
+      // Extend all four edges and corners into the gutter to reduce sampling bleed.
+      const labels = ["main","leftsrc","rightsrc","topsrc","bottomsrc","tlsrc","trsrc","blsrc","brsrc"]
+        .map((name) => `${name}${index}`);
+      filterParts.push(`[${scaled}]split=9[${labels.join("][")}]`);
+      const [main,leftsrc,rightsrc,topsrc,bottomsrc,tlsrc,trsrc,blsrc,brsrc] = labels;
+      const padded = `padded${index}`;
+      filterParts.push(`[${main}]pad=${p.outerWidth}:${p.outerHeight}:${pad}:${pad}:color=black@0[${padded}]`);
+      const strips = [
+        [leftsrc, `left${index}`, `crop=1:${p.height}:0:0,scale=${pad}:${p.height}:flags=neighbor`],
+        [rightsrc, `right${index}`, `crop=1:${p.height}:${p.width - 1}:0,scale=${pad}:${p.height}:flags=neighbor`],
+        [topsrc, `top${index}`, `crop=${p.width}:1:0:0,scale=${p.width}:${pad}:flags=neighbor`],
+        [bottomsrc, `bottom${index}`, `crop=${p.width}:1:0:${p.height - 1},scale=${p.width}:${pad}:flags=neighbor`],
+        [tlsrc, `tl${index}`, `crop=1:1:0:0,scale=${pad}:${pad}:flags=neighbor`],
+        [trsrc, `tr${index}`, `crop=1:1:${p.width - 1}:0,scale=${pad}:${pad}:flags=neighbor`],
+        [blsrc, `bl${index}`, `crop=1:1:0:${p.height - 1},scale=${pad}:${pad}:flags=neighbor`],
+        [brsrc, `br${index}`, `crop=1:1:${p.width - 1}:${p.height - 1},scale=${pad}:${pad}:flags=neighbor`],
+      ];
+      for (const [source,label,filters] of strips) filterParts.push(`[${source}]${filters},format=rgba[${label}]`);
+      let local = padded;
+      const overlays = [
+        [`left${index}`, 0, pad], [`right${index}`, pad + p.width, pad],
+        [`top${index}`, pad, 0], [`bottom${index}`, pad, pad + p.height],
+        [`tl${index}`, 0, 0], [`tr${index}`, pad + p.width, 0],
+        [`bl${index}`, 0, pad + p.height], [`br${index}`, pad + p.width, pad + p.height],
+      ];
+      overlays.forEach(([source,x,y], overlayIndex) => {
+        const target = overlayIndex === overlays.length - 1 ? tile : `gutter${index}_${overlayIndex}`;
+        filterParts.push(`[${local}][${source}]overlay=${x}:${y}:format=auto:shortest=1[${target}]`);
+        local = target;
+      });
+    }
+    const overlay = index === candidate.images.length - 1 ? "outv" : `atlas${index}`;
+    filterParts.push(`[${previous}][${tile}]overlay=${p.outerX}:${p.outerY}:format=auto:shortest=1[${overlay}]`);
     previous = overlay;
   });
-  filterParts[filterParts.length - 1] = filterParts[filterParts.length - 1].replace(/\[atlas\d+\]$/, "[outv]");
   const tempAtlas = `${atlasPath}.tmp-${process.pid}.png`;
   const tempManifest = `${manifestPath}.tmp-${process.pid}`;
   try {
