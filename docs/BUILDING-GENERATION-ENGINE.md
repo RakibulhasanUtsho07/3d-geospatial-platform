@@ -139,6 +139,17 @@ Before COLMAP starts, the worker samples each staged image through FFmpeg as a 6
 
 Install FFmpeg on the reconstruction worker and run `npm run test:image-quality-preflight` to test the heuristics. If FFmpeg cannot decode a selected image, the job fails with an explicit preflight diagnostic instead of silently treating the image as good input.
 
+### Persistent source-media assessment report
+
+For an additional source-level report before creating a reconstruction job, run:
+
+~~~powershell
+npm run test:media-quality-preflight
+npm run assess:building-media -- <workspaceRoot> <buildingId> <sourceId1,sourceId2,...>
+~~~
+
+This separate tool re-verifies each ingested source and SHA-256, checks JPEG/PNG dimensions before decoding, samples a bounded 64×64 grayscale image through FFmpeg, and reports heuristic sharpness, luminance, contrast and average-hash near-duplicate candidates. Its timestamped JSON report is created beside the source metadata without replacing earlier reports. A source set is not declared safe when decoding fails, fewer than three distinct content hashes remain, or any source lacks approved usage status and a known licence. These heuristics do not prove overlap, camera pose, building identity or architectural accuracy. The reconstruction worker retains its existing image-quality, diagnostic and human-review gates.
+
 ### Consolidated model review triage
 
 After conversion to GLB, `model-review-summary.mjs` combines image preflight, COLMAP sparse-model diagnostics, mesh topology/texture warnings, scale calibration, up-axis confirmation and georeference status into `report.json` under `modelReview`. The report orders findings by review priority, shows primitive-level topology metrics, and lists concrete next actions. It is a summary of existing signals, not a mesh repairer or architectural-understanding model.

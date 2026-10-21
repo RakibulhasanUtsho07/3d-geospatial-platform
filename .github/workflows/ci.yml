@@ -39,6 +39,7 @@ on:
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
+      - feat/final-merge-cleanup
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -96,6 +97,9 @@ jobs:
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
+
+      - name: Test standalone source-media quality assessment
+        run: npm run test:media-quality-preflight
 
       - name: Test ground-control WGS84 registration math
         run: npm run test:ground-control-registration
