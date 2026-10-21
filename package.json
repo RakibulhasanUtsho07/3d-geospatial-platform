@@ -81,7 +81,9 @@
     "test:render-correction-tasks": "node --test tests/render-correction-tasks.test.mjs",
     "create:render-correction-tasks": "node scripts/create-render-correction-tasks.mjs",
     "test:render-correction-verification": "node --test tests/render-correction-verification.test.mjs",
-    "verify:render-correction-tasks": "node scripts/verify-render-correction-tasks.mjs"
+    "verify:render-correction-tasks": "node scripts/verify-render-correction-tasks.mjs",
+    "test:building-release-readiness": "node --test tests/building-release-readiness.test.mjs",
+    "assess:building-release-readiness": "node scripts/build-building-release-readiness.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
