@@ -91,7 +91,7 @@ test("validates thresholds and streams a text model from files", async (t) => {
     imageRow(3, [0.7071068, 0, 0.7071068, 0], [0, 5, 0], "rear.jpg"),
   ].join("\n"));
   await writeFile(pointsPath, scenePoints);
-  const report = await analyzeColmapTextModelFiles({ imagesPath, points3DPath });
+  const report = await analyzeColmapTextModelFiles({ imagesPath, points3DPath: pointsPath });
   assert.equal(report.registeredCameraPoseCount, 3);
   assert.equal(report.sparsePointCount, 4);
   assert.equal(report.engine, "colmap-view-coverage-v1");
