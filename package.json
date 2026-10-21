@@ -98,7 +98,9 @@
     "test:render-image-similarity-diagnostics": "node --test tests/render-image-similarity-diagnostics.test.mjs",
     "compare:render-reference-images": "node scripts/compare-render-reference-images.mjs",
     "test:render-reference-diagnostics-attachment": "node --test tests/render-reference-diagnostics-attachment.test.mjs tests/review-render-references-cli-diagnostics.test.mjs",
-    "test:reconstruction-job-state": "node --test tests/reconstruction-job-state.test.mjs"
+    "test:reconstruction-job-state": "node --test tests/reconstruction-job-state.test.mjs",
+    "test:architectural-geometry-workflow": "node --test tests/architectural-geometry-workflow.test.mjs",
+    "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
