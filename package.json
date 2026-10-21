@@ -59,7 +59,9 @@
     "test:multi-view-wireframe-registration": "node --test tests/multi-view-wireframe-registration.test.mjs",
     "build:multi-view-wireframe": "node scripts/build-multi-view-wireframe.mjs",
     "test:wireframe-qa-repair-passes": "node --test tests/wireframe-qa-repair-passes.test.mjs",
-    "qa:wireframe-repair-passes": "node scripts/run-wireframe-qa-repair-passes.mjs"
+    "qa:wireframe-repair-passes": "node scripts/run-wireframe-qa-repair-passes.mjs",
+    "test:wireframe-to-mesh": "node --test tests/wireframe-to-mesh.test.mjs",
+    "build:reviewed-wireframe-mesh": "node scripts/build-reviewed-wireframe-mesh.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
