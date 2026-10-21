@@ -13,6 +13,7 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
   const verificationDigest = hash("correction-verification");
   const geometryDigest = hash("geometry-qa");
   const textureDigest = hash("texture-qa");
+  const accuracyDigest = hash("accuracy-evidence");
   const readiness = {
     schemaVersion: "1.0.0",
     engine: "building-release-readiness-gate-v1",
@@ -30,6 +31,7 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
       correctionVerificationReportSha256: verificationDigest,
       geometryQaReportSha256: geometryDigest,
       textureQaReportSha256: badDigest ? "0".repeat(64) : textureDigest,
+      accuracyEvidenceSha256: accuracyDigest,
     },
   };
   const artifacts = [
@@ -40,6 +42,7 @@ function fixture({ blocked = false, invalidRights = null, missingView = null, ba
     { artifactType: "render-reference-review", relativePath: "reports/render-reference-review.json", sha256: hash("review-file"), contentDigest: reviewDigest, bytes: 300 },
     { artifactType: "correction-task-backlog", relativePath: "reports/correction-tasks.json", sha256: hash("backlog-file"), contentDigest: backlogDigest, bytes: 300 },
     { artifactType: "correction-verification", relativePath: "reports/correction-verification.json", sha256: hash("verification-file"), contentDigest: verificationDigest, bytes: 300 },
+    { artifactType: "accuracy-evidence", relativePath: "reports/accuracy-evidence.json", sha256: hash("accuracy-file"), contentDigest: accuracyDigest, bytes: 300 },
     { artifactType: "release-readiness-report", relativePath: "reports/release-readiness.json", sha256: hash("readiness-file"), contentDigest: hash(JSON.stringify(readiness)), bytes: 300 },
   ];
   for (const viewId of REQUIRED_REVIEW_VIEWS) {
