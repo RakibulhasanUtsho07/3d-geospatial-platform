@@ -81,6 +81,11 @@ function validateBacklog(backlog) {
       !nonEmptyString(task.evidence.referenceImageId)) {
       throw new Error("correction-task-reference-id-invalid:" + task.id);
     }
+    if (task.kind === "model-correction-review" &&
+      (!nonEmptyString(task.evidence.referenceImageId) ||
+        !validHash(task.evidence.referenceSha256) || !validHash(task.evidence.renderSha256))) {
+      throw new Error("model-correction-task-image-evidence-invalid:" + task.id);
+    }
   }
 }
 
@@ -117,6 +122,10 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
     const comparison = exactComparison ?? (task.kind === "add-reference-comparison"
       ? viewComparisons.find((item) => item.outcome !== "pending") ?? viewComparisons[0]
       : undefined);
+    const referenceImageHashUnchanged = Boolean(
+      comparison && validHash(task.evidence.referenceSha256) &&
+      comparison.referenceSha256.toLowerCase() === task.evidence.referenceSha256.toLowerCase()
+    );
     const matchedEvidence = comparison ? {
       viewId: comparison.viewId,
       referenceImageId: comparison.referenceImageId,
@@ -143,12 +152,12 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
         status = "blocked";
         reason = "The current render/reference pair is not comparable; geometry correctness remains unverified.";
       } else if (comparison.outcome === "match") {
-        if (sourceModelChanged && renderManifestChanged) {
+        if (sourceModelChanged && renderManifestChanged && referenceImageHashUnchanged) {
           status = "verified";
-          reason = "A human reported a match for the exact view/reference pair in a new model and render-manifest revision.";
+          reason = "A human reported a match for the exact view/reference pair on a changed model and render manifest, using the unchanged reference image hash.";
         } else {
           status = "stale-evidence";
-          reason = "A match was recorded, but both the source model and render manifest must differ from the correction task's original evidence.";
+          reason = "A match was recorded, but verification requires changed model and render-manifest hashes plus the same reference image SHA-256 as the original task.";
         }
       } else {
         status = "needs-more-work";
@@ -193,6 +202,7 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       gates: {
         freshReviewReport: true,
         exactViewReferencePairMatched: Boolean(comparison),
+        referenceImageHashUnchanged,
         sourceModelChanged,
         renderManifestChanged,
         modelCorrectionRequiresNewModelAndManifest: task.kind === "model-correction-review",
