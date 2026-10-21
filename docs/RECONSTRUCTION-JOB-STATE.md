@@ -22,6 +22,29 @@ The reconstruction profile uses this strict sequence:
 
 A stage cannot start until all earlier stages have a completed state and a validated active artifact.
 
+## Architectural geometry evidence execution profile
+
+The command below wires existing reconstruction workers into a checksummed resumable job. It expects one workspace-relative JSON file with:
+
+- cameras: calibrated 3×4 projection matrices in one common frame;
+- features: manually verified cross-view observations for the same physical feature IDs;
+- edges: explicit feature-ID pairs;
+- faces: explicit, reviewed triangular face ID triples;
+- textureCandidate: source-image metadata/paths, verified camera calibration records and explicit per-face UV/source-camera evidence.
+
+Every referenced texture image is hashed and its dimensions checked against the input. The operator must explicitly attest that camera calibration, cross-view correspondences, face definitions, and texture source/evidence were reviewed. These attestations are recorded; they are not independent proof that the evidence is correct.
+
+The seven persisted stages are view-registration, wireframe, iterative-sketch-repair, volume-and-facade-model, geometry-repair, texture, and final-acceptance. They call the repository's real triangulation, bounded wireframe-QA, explicit-face mesh-building, mesh-surface-review and texture-projection-evidence-review workers. A stage is marked complete when its worker ran and the result was durably saved; quality blockers remain in the artifact/report and are not confused with worker completion.
+
+Example:
+
+~~~powershell
+npm run test:architectural-geometry-workflow
+node scripts/run-architectural-geometry-workflow.mjs . building-001 geometry-job-001 .\geometry-input.json --confirm-camera-calibration-reviewed --confirm-correspondences-reviewed --confirm-face-definitions-reviewed --confirm-texture-evidence-reviewed
+~~~
+
+This slice does not infer faces, fill boundaries, move vertices, bake texture pixels, or generate an atlas. mapReady and publicationEligible remain false even when technical checks pass. Human review, measured dimensions, ground-control evidence and a defensible vertical datum remain separate release requirements.
+
 ## Media-to-model CLI execution profile
 
 The current local CLI uses a separate, truthful four-stage plan:

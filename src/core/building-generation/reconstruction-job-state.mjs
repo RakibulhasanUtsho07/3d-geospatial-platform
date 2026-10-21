@@ -35,6 +35,18 @@ export const MEDIA_TO_MODEL_STAGE_IDS = Object.freeze([
   "report-finalization",
 ]);
 
+// Evidence-driven geometry stages backed by the existing triangulation, wireframe QA,
+// explicit-face mesh builder, surface-review, and texture-projection review workers.
+export const ARCHITECTURAL_GEOMETRY_STAGE_IDS = Object.freeze([
+  "view-registration",
+  "wireframe",
+  "iterative-sketch-repair",
+  "volume-and-facade-model",
+  "geometry-repair",
+  "texture",
+  "final-acceptance",
+]);
+
 const JOB_STATE_FILE = "job-state.json";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -124,7 +136,11 @@ function assertStageId(stageId) {
 
 function stageIdsForJob(job, requestedStageIds) {
   const candidate = requestedStageIds ?? job?.stageIds ?? RECONSTRUCTION_STAGE_IDS;
-  const plans = [RECONSTRUCTION_STAGE_IDS, MEDIA_TO_MODEL_STAGE_IDS];
+  const plans = [
+    RECONSTRUCTION_STAGE_IDS,
+    MEDIA_TO_MODEL_STAGE_IDS,
+    ARCHITECTURAL_GEOMETRY_STAGE_IDS,
+  ];
   if (!Array.isArray(candidate) || !plans.some((plan) =>
     plan.length === candidate.length && plan.every((id, index) => id === candidate[index])
   )) {
