@@ -181,3 +181,7 @@ For more detail on tile generation, endpoint validation, diagnostics, and manual
 ### Building Accuracy Benchmark
 
 Use `npm run benchmark:building-accuracy -- <candidate.glb> <benchmark.json> [report.json]` to compare a candidate model against independent reference dimensions, optional surveyed ground control, and an exact-GLB-bound render/reference review. See [the benchmark guide](docs/BUILDING-ACCURACY-BENCHMARK.md) for evidence requirements and interpretation. A passing result still requires human release review and never enables map publishing.
+
+### Render/reference image similarity diagnostics
+
+Use `npm run compare:render-reference-images -- <reference.jpg|png> <candidate-render.jpg|png> [report.json]` to calculate bounded grayscale MAE/RMSE, PSNR, local SSIM and difference-hash diagnostics for one manually paired view. These are diagnostic hints only: same-facade/camera alignment remains a human responsibility, and the metrics never certify architectural accuracy or approve publication. See [the diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
