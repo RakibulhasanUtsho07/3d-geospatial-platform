@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
 
@@ -52,6 +53,7 @@ async function main() {
     throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender]");
   }
   const { resolution, blender } = parseOptions(flags);
+  const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
   const outputDir = path.resolve(outputArg);
   const modelStat = await stat(modelPath);
@@ -75,7 +77,7 @@ async function main() {
   }
 
   const pythonScript = path.join(os.tmpdir(), "building-review-render-" + process.pid + "-" + Date.now() + ".py");
-  const pythonPath = path.resolve("scripts/blender/render-building-review.py");
+  const pythonPath = path.resolve(scriptDirectory, "blender", "render-building-review.py");
   try {
     const python = await readFile(pythonPath, "utf8");
     await writeFile(pythonScript, python, { flag: "wx", mode: 0o600 });
