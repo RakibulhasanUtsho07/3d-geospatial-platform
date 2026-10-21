@@ -238,8 +238,8 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
     metrics: {
       geometry: {
         valid: geometryValid,
-        vertices: geometryQa.counts?.vertices ?? null,
-        triangles: geometryQa.counts?.triangles ?? null,
+        vertices: geometryQa.counts?.vertexCount ?? null,
+        triangles: geometryQa.counts?.triangleCount ?? null,
         dimensionsModelUnits: measuredModelDimensions,
         warningCount: Array.isArray(geometryQa.warnings) ? geometryQa.warnings.length : null,
       },
