@@ -71,7 +71,9 @@
     "test:texture-atlas": "node --test tests/texture-atlas.test.mjs",
     "build:texture-atlas": "node scripts/build-texture-atlas.mjs",
     "test:glb-texture-binding-qa": "node --test tests/glb-texture-binding-qa.test.mjs",
-    "review:glb-texture-bindings": "node scripts/review-glb-texture-bindings.mjs"
+    "review:glb-texture-bindings": "node scripts/review-glb-texture-bindings.mjs",
+    "test:uv-seam-review": "node --test tests/uv-seam-review.test.mjs",
+    "test:texture-image-content-review": "node --test tests/texture-image-content-review.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
