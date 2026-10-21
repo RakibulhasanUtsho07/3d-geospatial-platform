@@ -175,7 +175,7 @@ test("rejects malformed metrics, invalid report hashes, duplicates and unknown p
   assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
   assert.ok(report.errors.includes("duplicate-similarity-diagnostic:front:reference-front-01"));
   assert.ok(report.errors.includes("similarity-diagnostic-unknown-reference-image:unknown-reference"));
-  assert.ok(report.errors.includes("similarity-diagnostic-report-sha256-invalid:front:reference-front-01"));
+  assert.ok(report.errors.includes("similarity-diagnostic-report-sha256-invalid:back:reference-front-01"));
 });
 
 test("existing reviews remain valid and report no diagnostic when none is supplied", () => {
