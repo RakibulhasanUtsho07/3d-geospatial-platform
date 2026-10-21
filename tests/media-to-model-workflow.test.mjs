@@ -133,6 +133,18 @@ test("resumes media-to-model artifacts without re-ingesting sources or rebuildin
  assert.equal(secondState.mapReady,false);
  assert.equal(secondState.publicationEligible,false);
 
+ await rm(second.modelPath,{force:true});
+ const repaired=await runMediaToModelWorkflow(options);
+ const repairedState=JSON.parse(await readFile(statePath,"utf8"));
+ assert.equal(repaired.report.output.modelSha256,first.report.output.modelSha256);
+ assert.equal(repairedState.stages[0].artifacts.length,1);
+ assert.equal(repairedState.stages[1].artifacts.length,1);
+ assert.equal(repairedState.stages[2].attempts,2);
+ assert.equal(repairedState.stages[2].artifacts.length,2);
+ assert.equal(repairedState.stages[3].attempts,2);
+ assert.equal(repairedState.stages[3].artifacts.length,2);
+ assert.ok((await stat(repaired.modelPath)).size>100);
+
  await writeFile(sourcePath,Buffer.concat([png,Buffer.from("changed-source-content")]));
  await assert.rejects(runMediaToModelWorkflow(options),/different source\/config inputs/);
 });
