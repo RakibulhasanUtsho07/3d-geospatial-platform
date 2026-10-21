@@ -234,6 +234,8 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
     candidateGlbSha256: candidateGlbSha256.toLowerCase(),
     status,
     checks,
+    warnings,
+    failures,
     counts: { passed: checks.filter((item) => item.status === "passed").length, warnings: warnings.length, failures: failures.length },
     metrics: {
       geometry: {
