@@ -13,6 +13,9 @@ The render directory must contain the exact \`render-review-manifest.json\` and 
 
 The output directory must not exist beforehand. If packaging fails mid-copy, the newly created output directory is removed. The resulting directory contains the candidate, exact render/reference images, QA reports, task history, release-readiness report, a SHA-256 package manifest and a reviewer README.
 
+
+Before packaging, recompute release readiness with the required `accuracy-evidence.json` input. The package builder now also accepts that input, recomputes the dimension/georeferencing benchmark, and preserves the source evidence at `reports/accuracy-evidence.json` so its digest can be verified offline.
+
 ## Limits
 
 Reference images are included only when their recorded rights status is \`verified\` and their bytes still match the source report. This metadata gate is not legal advice. The package is for final human inspection only; \`publicationEligible\` remains \`false\`.
