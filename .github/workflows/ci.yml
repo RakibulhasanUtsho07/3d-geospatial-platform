@@ -25,6 +25,7 @@ on:
       - feat/texture-atlas-baking
       - feat/glb-texture-binding-qa
       - feat/glb-uv-seam-review
+      - feat/blender-render-review-views
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -119,6 +120,9 @@ jobs:
 
       - name: Test texture pixel content and resolution risk hints
         run: npm run test:texture-image-content-review
+
+      - name: Test multi-view render review manifest validation
+        run: npm run test:render-review-manifest
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
