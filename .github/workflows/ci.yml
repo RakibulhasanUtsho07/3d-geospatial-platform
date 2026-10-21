@@ -93,6 +93,9 @@ jobs:
       - name: Test reviewed wireframe to mesh candidate
         run: npm run test:wireframe-to-mesh
 
+      - name: Test evidence-gated mesh surface review
+        run: npm run test:mesh-surface-review
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
