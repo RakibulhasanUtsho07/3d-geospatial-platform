@@ -92,6 +92,86 @@ test("verifies a correction only with a fresh match for the exact pair and chang
   assert.equal(result.automationPolicy.publicationEligible, false);
 });
 
+
+function similarityDiagnostics(overrides = {}) {
+  return {
+    reportSha256: "0".repeat(64),
+    engine: "render-image-similarity-diagnostics-v1",
+    status: "diagnostics-computed",
+    interpretation: "review-recommended",
+    renderSha256: "1".repeat(64),
+    referenceSha256,
+    metrics: {
+      meanAbsoluteError: 55.5,
+      rootMeanSquaredError: 72.25,
+      psnrDb: 10.96,
+      localSsim8x8: 0.12,
+      differenceHashHammingDistance: 51,
+    },
+    comparability: {
+      aspectRatioDifferencePercent: 0.5,
+      aspectRatioWithinScreeningThreshold: true,
+      sameFacadeConfirmedByTool: false,
+      cameraPoseAlignmentVerifiedByTool: false,
+    },
+    warnings: ["low-grayscale-ssim-screening-hint", "high-grayscale-pixel-error-screening-hint"],
+    automaticMatch: false,
+    ...overrides,
+  };
+}
+
+test("carries fresh similarity diagnostics into verification evidence without changing status", () => {
+  const review = reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      similarityDiagnostics: similarityDiagnostics(),
+    }],
+  });
+  const result = verifyRenderCorrectionTasks(backlog(), review);
+  assert.equal(result.tasks[0].status, "verified");
+  assert.equal(result.tasks[0].verified, true);
+  assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics.metrics.localSsim8x8, 0.12);
+  assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics.renderSha256, "1".repeat(64));
+  assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics.referenceSha256, referenceSha256);
+  assert.deepEqual(result.tasks[0].matchedEvidence.similarityDiagnostics.warnings, [
+    "low-grayscale-ssim-screening-hint",
+    "high-grayscale-pixel-error-screening-hint",
+  ]);
+  assert.equal(result.similarityDiagnosticsSummary.comparisonsWithDiagnostics, 1);
+  assert.equal(result.similarityDiagnosticsSummary.comparisonsWithWarnings, 1);
+  assert.equal(result.similarityDiagnosticsSummary.affectVerificationStatus, false);
+  assert.equal(result.automationPolicy.similarityDiagnosticsAffectVerificationStatus, false);
+  assert.equal(result.automationPolicy.publicationEligible, false);
+});
+
+test("rejects diagnostics that do not match the reviewed render/reference hashes", () => {
+  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      similarityDiagnostics: similarityDiagnostics({ referenceSha256: "8".repeat(64) }),
+    }],
+  })), /similarity-diagnostics-invalid/);
+});
+
+test("rejects malformed diagnostic metric ranges instead of silently trusting them", () => {
+  const invalid = similarityDiagnostics();
+  invalid.metrics.localSsim8x8 = 2;
+  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      similarityDiagnostics: invalid,
+    }],
+  })), /similarity-diagnostics-invalid/);
+});
+
+test("legacy verification reports without diagnostic metrics remain supported", () => {
+  const result = verifyRenderCorrectionTasks(backlog(), reviewReport());
+  assert.equal(result.tasks[0].status, "verified");
+  assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics, null);
+  assert.equal(result.similarityDiagnosticsSummary.comparisonsWithDiagnostics, 0);
+  assert.equal(result.similarityDiagnosticsSummary.comparisonsWithWarnings, 0);
+});
+
 test("does not verify a match when the source model has not changed", () => {
   const result = verifyRenderCorrectionTasks(backlog(), reviewReport({
     provenance: { sourceModelSha256: modelSha, renderManifestSha256: changedManifestSha },
