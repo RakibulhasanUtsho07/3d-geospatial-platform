@@ -10,12 +10,17 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { readImageDimensions } from "./image-quality-preflight.mjs";
 import { buildMultiViewWireframe } from "./multi-view-wireframe-registration.mjs";
 import { runWireframeQaRepairPasses } from "./wireframe-qa-repair-passes.mjs";
 import { buildMeshFromReviewedWireframe } from "./wireframe-to-mesh.mjs";
 import { reviewMeshSurfaces } from "./mesh-surface-review.mjs";
 import { reviewTextureProjection } from "./texture-projection-review.mjs";
+import { buildTexturedGlb } from "./textured-glb-export.mjs";
+import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
+import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import {
   ARCHITECTURAL_GEOMETRY_STAGE_IDS,
   createOrResumeReconstructionJob,
@@ -25,7 +30,9 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-evidence-v1";
+const WORKFLOW_VERSION = "architectural-geometry-textured-glb-v2";
+const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
+const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
 const MAX_REFERENCE_IMAGE_BYTES = 20 * 1024 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/i;
@@ -123,6 +130,88 @@ async function atomicWriteJson(filePath, value) {
       throw replaceError;
     }
   }
+}
+
+async function atomicWriteBytes(filePath, bytes) {
+  const parent = path.dirname(filePath);
+  const tempPath = path.join(parent, "." + path.basename(filePath) + "." + randomUUID() + ".tmp");
+  await writeFile(tempPath, bytes, { flag: "wx", mode: 0o600 });
+  try {
+    await rename(tempPath, filePath);
+  } catch (error) {
+    if (!["EEXIST", "EPERM", "ENOTEMPTY"].includes(error?.code)) {
+      await rm(tempPath, { force: true }).catch(() => {});
+      throw error;
+    }
+    try {
+      const current = await lstat(filePath);
+      if (current.isSymbolicLink() || !current.isFile()) {
+        throw new TypeError("refusing to replace a non-regular binary output");
+      }
+      await rm(filePath);
+      await rename(tempPath, filePath);
+    } catch (replaceError) {
+      await rm(tempPath, { force: true }).catch(() => {});
+      throw replaceError;
+    }
+  }
+}
+
+async function ensureWorkflowDirectory(root, segments) {
+  let current = root;
+  for (const segment of segments) {
+    if (!segment || segment === "." || segment === ".." || segment.includes(path.sep)) {
+      throw new TypeError("unsafe workflow output directory segment");
+    }
+    const next = path.join(current, segment);
+    try {
+      const entry = await lstat(next);
+      if (entry.isSymbolicLink() || !entry.isDirectory()) {
+        throw new TypeError("workflow output path must not contain symlinks or non-directories: " + next);
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      try {
+        await mkdir(next, { mode: 0o700 });
+      } catch (createError) {
+        if (createError?.code !== "EEXIST") throw createError;
+      }
+      const entry = await lstat(next);
+      if (entry.isSymbolicLink() || !entry.isDirectory()) {
+        throw new TypeError("unsafe workflow output directory: " + next);
+      }
+    }
+    current = await realpath(next);
+    if (!inside(root, current)) throw new TypeError("workflow output directory resolves outside workspaceRoot");
+  }
+  return current;
+}
+
+async function readVerifiedOutput(root, relativePath, label, maxBytes = 512 * 1024 * 1024) {
+  const file = await readRegularFile(root, relativePath, label, maxBytes);
+  const bytes = await readFile(file.path);
+  return { ...file, bytes, sha256: sha256(bytes) };
+}
+
+function canonicalFaceKey(vertices) {
+  if (!Array.isArray(vertices) || vertices.length !== 3 ||
+      vertices.some((id) => typeof id !== "string" || !id) ||
+      new Set(vertices).size !== 3) return null;
+  return [...vertices].sort().join("\u0000");
+}
+
+function attemptLabel(started, stageId) {
+  const stage = started.job.stages.find((item) => item.id === stageId);
+  if (!stage) throw new TypeError("stage attempt is missing from the active job state");
+  return "attempt-" + String(stage.attempts).padStart(4, "0");
+}
+
+async function verifySha256File(root, relativePath, expectedSha256, label, maxBytes) {
+  const file = await readVerifiedOutput(root, relativePath, label, maxBytes);
+  if (file.sha256 !== String(expectedSha256 ?? "").toLowerCase()) {
+    throw new TypeError(label + " SHA-256 mismatch");
+  }
+  return file;
 }
 
 function requireAttestations(options) {
@@ -231,12 +320,19 @@ async function loadAndVerifyInput(root, relativePath) {
   };
 }
 
-async function runStage({ workspaceRoot, buildingId, jobId, stageId, inputFingerprint, execute }) {
+async function runStage({ workspaceRoot, buildingId, jobId, stageId, inputFingerprint, execute, validateReused }) {
   const args = { workspaceRoot, buildingId, jobId, stageId, inputFingerprint };
-  const started = await startReconstructionStage(args);
+  let started = await startReconstructionStage(args);
+  if (started.reused && validateReused) {
+    try {
+      await validateReused(started.artifact);
+    } catch {
+      started = await startReconstructionStage({ ...args, force: true });
+    }
+  }
   if (started.reused) return { artifact: started.artifact, reused: true };
   try {
-    const result = await execute();
+    const result = await execute(started);
     const completed = await completeReconstructionStage({
       workspaceRoot,
       buildingId,
@@ -282,7 +378,26 @@ export async function runArchitecturalGeometryWorkflow(options) {
     maxBoundaryEdges: options.maxBoundaryEdges ?? input.options?.maxBoundaryEdges ?? 0,
     minTriangleArea: options.minTriangleArea ?? input.options?.minTriangleArea ?? 1e-8,
     maxTextureReprojectionErrorPx: options.maxTextureReprojectionErrorPx ?? input.options?.maxTextureReprojectionErrorPx ?? 2,
+    textureAtlasWidth: options.textureAtlasWidth ?? 2048,
+    textureAtlasHeight: options.textureAtlasHeight ?? 2048,
+    textureAtlasPadding: options.textureAtlasPadding ?? 4,
+    renderReviewRequested: options.renderReview === true,
+    renderResolution: options.renderResolution ?? 1024,
+    blenderExecutable: options.blenderExecutable ?? null,
   };
+  if (![config.textureAtlasWidth, config.textureAtlasHeight].every((value) =>
+    Number.isInteger(value) && value >= 256 && value <= 4096)) {
+    throw new RangeError("texture atlas dimensions must be integers between 256 and 4096");
+  }
+  if (!Number.isInteger(config.textureAtlasPadding) || config.textureAtlasPadding < 0 ||
+      config.textureAtlasPadding > 64) {
+    throw new RangeError("texture atlas padding must be an integer between 0 and 64");
+  }
+  if (config.renderReviewRequested && (!Number.isInteger(config.renderResolution) ||
+      config.renderResolution < 256 || config.renderResolution > 2048 ||
+      (config.renderResolution & (config.renderResolution - 1)) !== 0)) {
+    throw new RangeError("renderResolution must be a power of two between 256 and 2048");
+  }
   const state = await createOrResumeReconstructionJob({
     workspaceRoot: root,
     buildingId,
@@ -476,6 +591,339 @@ export async function runArchitecturalGeometryWorkflow(options) {
   });
 
   const texturePayload = textureStage.artifact.payload;
+  const atlasStage = await runStage({
+    ...stateArgs,
+    stageId: "texture-atlas-bake",
+    inputFingerprint: stageFingerprint(
+      "texture-atlas-bake",
+      inputSha256,
+      [geometryReview.artifact.contentSha256, textureStage.artifact.contentSha256],
+      {
+        width: config.textureAtlasWidth,
+        height: config.textureAtlasHeight,
+        padding: config.textureAtlasPadding,
+        baker: "ffmpeg-edge-gutter-v1",
+      },
+    ),
+    validateReused: async (artifact) => {
+      if (artifact.payload.status !== "baked") return;
+      const atlasFile = await verifySha256File(root, artifact.outputs.atlasPath, artifact.outputs.atlasSha256, "cached texture atlas", 512 * 1024 * 1024);
+      const manifestFile = await verifySha256File(root, artifact.outputs.manifestPath, artifact.outputs.manifestSha256, "cached texture atlas manifest", 64 * 1024 * 1024);
+      const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
+      const dimensions = readImageDimensions(await readHeader(atlasFile.path));
+      if (!dimensions || dimensions.width !== artifact.outputs.width || dimensions.height !== artifact.outputs.height ||
+          manifest.atlas?.width !== dimensions.width || manifest.atlas?.height !== dimensions.height) {
+        throw new TypeError("cached texture atlas dimensions do not match its manifest");
+      }
+    },
+    execute: async (started) => {
+      const reviewedFaceIndices = new Set(texturePayload.report?.evidenceEligibleFaceIndices ?? []);
+      const mesh = geometryPayload.mesh;
+      const meshKeys = new Set(mesh.triangles.map((triangle) => canonicalFaceKey(triangle.vertices)).filter(Boolean));
+      const candidateFaces = input.textureCandidate.faces.filter((face, index) =>
+        reviewedFaceIndices.has(index) && meshKeys.has(canonicalFaceKey(face?.vertices)));
+      const usedImageIds = new Set(candidateFaces.map((face) => face.sourceImageId));
+      const images = input.textureCandidate.images.filter((image) => usedImageIds.has(image.id));
+      if (!candidateFaces.length || !images.length) {
+        return {
+          payload: {
+            status: "blocked",
+            reason: "no-mesh-triangles-have-verified-texture-and-UV-evidence",
+            atlasBakingPerformed: false,
+          },
+          outputs: {
+            status: "blocked",
+            candidateFaceCount: candidateFaces.length,
+            sourceImageCount: images.length,
+            atlasBakingPerformed: false,
+          },
+        };
+      }
+      const outputDir = await ensureWorkflowDirectory(root, [
+        ".building-engine", "reconstruction-jobs", buildingId, jobId, "outputs",
+        "texture-atlas-bake", attemptLabel(started, "texture-atlas-bake"),
+      ]);
+      const candidatePath = path.join(outputDir, "verified-texture-candidate.json");
+      const manifestPath = path.join(outputDir, "texture-atlas-manifest.json");
+      const atlasPath = path.join(outputDir, "texture-atlas.png");
+      const candidate = {
+        images: images.map((image) => ({ ...image, path: path.resolve(root, image.path) })),
+        faces: candidateFaces,
+      };
+      await writeFile(candidatePath, JSON.stringify(candidate, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+      const result = spawnSync(process.execPath, [
+        ATLAS_SCRIPT,
+        candidatePath,
+        manifestPath,
+        atlasPath,
+        "--width=" + config.textureAtlasWidth,
+        "--height=" + config.textureAtlasHeight,
+        "--padding=" + config.textureAtlasPadding,
+      ], { cwd: root, encoding: "utf8", windowsHide: true, maxBuffer: 16 * 1024 * 1024 });
+      if (result.error) throw new Error("Unable to start texture atlas builder: " + result.error.message);
+      if (result.status !== 0) {
+        throw new Error("Texture atlas builder failed: " + ((result.stderr || result.stdout || "unknown error").trim()).slice(-5000));
+      }
+      const relativeAtlasPath = path.relative(root, atlasPath).split(path.sep).join("/");
+      const relativeManifestPath = path.relative(root, manifestPath).split(path.sep).join("/");
+      const atlasFile = await readVerifiedOutput(root, relativeAtlasPath, "generated texture atlas", 512 * 1024 * 1024);
+      const manifestFile = await readVerifiedOutput(root, relativeManifestPath, "generated texture atlas manifest", 64 * 1024 * 1024);
+      const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
+      const dimensions = readImageDimensions(await readHeader(atlasFile.path));
+      if (!dimensions || dimensions.width !== config.textureAtlasWidth || dimensions.height !== config.textureAtlasHeight ||
+          manifest.atlas?.width !== dimensions.width || manifest.atlas?.height !== dimensions.height ||
+          !Array.isArray(manifest.faces) || manifest.faces.length !== candidateFaces.length) {
+        throw new TypeError("texture atlas output or remapped-face manifest failed validation");
+      }
+      return {
+        payload: {
+          status: "baked",
+          atlasBakingPerformed: true,
+          selectedFaceCount: candidateFaces.length,
+          sourceImageCount: images.length,
+          atlasSha256: atlasFile.sha256,
+          manifestSha256: manifestFile.sha256,
+        },
+        outputs: {
+          status: "baked",
+          atlasPath: relativeAtlasPath,
+          atlasSha256: atlasFile.sha256,
+          manifestPath: relativeManifestPath,
+          manifestSha256: manifestFile.sha256,
+          width: dimensions.width,
+          height: dimensions.height,
+          sourceImageCount: images.length,
+          texturedFaceCount: manifest.faces.length,
+          uniformScale: manifest.packing.uniformScale,
+          publicationEligible: false,
+        },
+      };
+    },
+  });
+
+  const atlasPayload = atlasStage.artifact.payload;
+  const glbExport = await runStage({
+    ...stateArgs,
+    stageId: "glb-export",
+    inputFingerprint: stageFingerprint(
+      "glb-export",
+      inputSha256,
+      [geometryReview.artifact.contentSha256, atlasStage.artifact.contentSha256],
+      { exporter: "textured-glb-export-v1" },
+    ),
+    validateReused: async (artifact) => {
+      if (artifact.payload.status !== "exported" && artifact.payload.status !== "partial-textured-mesh") return;
+      const modelFile = await verifySha256File(root, artifact.outputs.modelPath, artifact.outputs.modelSha256, "cached textured GLB", 512 * 1024 * 1024);
+      if (modelFile.bytes.readUInt32LE(0) !== 0x46546c67 || modelFile.bytes.readUInt32LE(4) !== 2) {
+        throw new TypeError("cached textured GLB does not have a valid GLB 2.0 header");
+      }
+    },
+    execute: async (started) => {
+      if (atlasPayload.status !== "baked") {
+        return {
+          payload: { status: "blocked", reason: "texture-atlas-stage-did-not-produce-an-atlas" },
+          outputs: { status: "blocked", texturedTriangleCount: 0, untexturedTriangleCount: meshPayload.mesh.triangles.length },
+        };
+      }
+      const atlasFile = await verifySha256File(root, atlasStage.artifact.outputs.atlasPath, atlasStage.artifact.outputs.atlasSha256, "texture atlas for GLB export", 512 * 1024 * 1024);
+      const manifestFile = await verifySha256File(root, atlasStage.artifact.outputs.manifestPath, atlasStage.artifact.outputs.manifestSha256, "texture atlas manifest for GLB export", 64 * 1024 * 1024);
+      const manifest = JSON.parse(manifestFile.bytes.toString("utf8"));
+      const built = buildTexturedGlb({
+        mesh: geometryPayload.mesh,
+        faces: manifest.faces,
+        atlasBytes: atlasFile.bytes,
+        atlasWidth: manifest.atlas.width,
+        atlasHeight: manifest.atlas.height,
+        atlasSha256: atlasFile.sha256,
+      });
+      const outputDir = await ensureWorkflowDirectory(root, [
+        ".building-engine", "reconstruction-jobs", buildingId, jobId, "outputs",
+        "glb-export", attemptLabel(started, "glb-export"),
+      ]);
+      const modelPath = path.join(outputDir, "textured-building-candidate.glb");
+      await atomicWriteBytes(modelPath, built.buffer);
+      const relativeModelPath = path.relative(root, modelPath).split(path.sep).join("/");
+      const modelSha256 = await hashFile(modelPath);
+      return {
+        payload: {
+          status: built.report.untexturedTriangleCount > 0 ? "partial-textured-mesh" : "exported",
+          modelPath: relativeModelPath,
+          modelSha256,
+          report: built.report,
+        },
+        outputs: {
+          status: "exported",
+          modelPath: relativeModelPath,
+          modelSha256,
+          texturedTriangleCount: built.report.texturedTriangleCount,
+          untexturedTriangleCount: built.report.untexturedTriangleCount,
+          meshTriangleCount: built.report.meshTriangleCount,
+          atlasSha256: built.report.atlasSha256,
+          publicationEligible: false,
+        },
+      };
+    },
+  });
+
+  const glbPayload = glbExport.artifact.payload;
+  const glbValidation = await runStage({
+    ...stateArgs,
+    stageId: "glb-validation",
+    inputFingerprint: stageFingerprint(
+      "glb-validation",
+      inputSha256,
+      [atlasStage.artifact.contentSha256, glbExport.artifact.contentSha256],
+      { validator: "glb-texture-binding-qa-v1", expectedAtlasSha256: atlasStage.artifact.outputs.atlasSha256 ?? null },
+    ),
+    validateReused: async (artifact) => {
+      if (artifact.payload.status === "blocked") return;
+      const modelFile = await verifySha256File(root, artifact.outputs.modelPath, artifact.outputs.modelSha256, "cached GLB for texture QA", 512 * 1024 * 1024);
+      const qaFile = await verifySha256File(root, artifact.outputs.qaPath, artifact.outputs.qaSha256, "cached GLB texture QA report", 64 * 1024 * 1024);
+      if (modelFile.bytes.readUInt32LE(0) !== 0x46546c67) throw new TypeError("cached GLB is corrupt");
+      JSON.parse(qaFile.bytes.toString("utf8"));
+    },
+    execute: async (started) => {
+      if (atlasPayload.status !== "baked" ||
+          !["exported", "partial-textured-mesh"].includes(glbPayload.status)) {
+        return {
+          payload: { status: "blocked", report: null, reason: "textured-GLB-export-not-available" },
+          outputs: { status: "blocked", qaValid: false, errorCount: 0 },
+        };
+      }
+      const modelFile = await verifySha256File(root, glbExport.artifact.outputs.modelPath, glbExport.artifact.outputs.modelSha256, "GLB for texture QA", 512 * 1024 * 1024);
+      let qaReport;
+      try {
+        qaReport = reviewGlbTextureBindings(modelFile.bytes, {
+          expectedAtlas: {
+            sha256: atlasStage.artifact.outputs.atlasSha256,
+            width: atlasStage.artifact.outputs.width,
+            height: atlasStage.artifact.outputs.height,
+          },
+        });
+      } catch (error) {
+        qaReport = {
+          schemaVersion: "1.0.0",
+          engine: "glb-texture-binding-qa-v1",
+          status: "failed",
+          valid: false,
+          publicationEligible: false,
+          errors: [error instanceof Error ? error.message : String(error)],
+          warnings: [],
+          counts: { meshCount: 0, materialCount: 0, textureCount: 0, imageCount: 0, texturedPrimitiveCount: 0 },
+        };
+      }
+      const outputDir = await ensureWorkflowDirectory(root, [
+        ".building-engine", "reconstruction-jobs", buildingId, jobId, "outputs",
+        "glb-validation", attemptLabel(started, "glb-validation"),
+      ]);
+      const qaPath = path.join(outputDir, "glb-texture-qa.json");
+      await atomicWriteJson(qaPath, qaReport);
+      const relativeQaPath = path.relative(root, qaPath).split(path.sep).join("/");
+      const qaSha256 = await hashFile(qaPath);
+      return {
+        payload: { status: qaReport.valid ? "valid" : "failed", report: qaReport, modelSha256: modelFile.sha256 },
+        outputs: {
+          status: qaReport.status,
+          qaValid: qaReport.valid,
+          qaPath: relativeQaPath,
+          qaSha256,
+          modelPath: glbExport.artifact.outputs.modelPath,
+          modelSha256: modelFile.sha256,
+          errorCount: qaReport.errors?.length ?? 0,
+          warningCount: qaReport.warnings?.length ?? 0,
+          embeddedImageCount: qaReport.counts?.imageCount ?? 0,
+          publicationEligible: false,
+        },
+      };
+    },
+  });
+
+  const glbValidationPayload = glbValidation.artifact.payload;
+  const renderReview = await runStage({
+    ...stateArgs,
+    stageId: "render-review",
+    inputFingerprint: stageFingerprint(
+      "render-review",
+      inputSha256,
+      [glbExport.artifact.contentSha256, glbValidation.artifact.contentSha256],
+      {
+        requested: config.renderReviewRequested,
+        resolution: config.renderResolution,
+        blenderExecutable: config.blenderExecutable,
+      },
+    ),
+    validateReused: async (artifact) => {
+      await verifySha256File(root, artifact.outputs.reviewManifestPath, artifact.outputs.reviewManifestSha256, "cached render-review manifest", 64 * 1024 * 1024);
+      if (artifact.outputs.rendererReportPath) {
+        await verifySha256File(root, artifact.outputs.rendererReportPath, artifact.outputs.rendererReportSha256, "cached Blender render report", 64 * 1024 * 1024);
+      }
+    },
+    execute: async (started) => {
+      const outputDir = await ensureWorkflowDirectory(root, [
+        ".building-engine", "reconstruction-jobs", buildingId, jobId, "outputs",
+        "render-review", attemptLabel(started, "render-review"),
+      ]);
+      const manifestPath = path.join(outputDir, "render-review-plan.json");
+      const canRender = config.renderReviewRequested && atlasPayload.status === "baked" &&
+        ["exported", "partial-textured-mesh"].includes(glbPayload.status);
+      let renderStatus = canRender ? "renderer-not-run" : "render-plan-only";
+      let rendererError = null;
+      let rendererReportPath = null;
+      let rendererReportSha256 = null;
+      let renderedViewCount = 0;
+      if (canRender) {
+        const modelPath = path.resolve(root, glbExport.artifact.outputs.modelPath);
+        const renderOutputDir = path.join(outputDir, "blender-renders");
+        const args = [RENDER_SCRIPT, modelPath, renderOutputDir, "--resolution=" + config.renderResolution];
+        if (config.blenderExecutable) args.push("--blender=" + config.blenderExecutable);
+        const result = spawnSync(process.execPath, args, { cwd: root, encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+        if (result.status === 0) {
+          const reportPath = path.join(renderOutputDir, "render-review-manifest.json");
+          const reportBytes = await readFile(reportPath);
+          const report = JSON.parse(reportBytes.toString("utf8"));
+          rendererReportPath = path.relative(root, reportPath).split(path.sep).join("/");
+          rendererReportSha256 = sha256(reportBytes);
+          renderedViewCount = report.counts?.generatedViews ?? 0;
+          renderStatus = report.valid ? report.status : "render-review-invalid";
+        } else {
+          rendererError = (result.error?.message || result.stderr || result.stdout || "renderer failed").trim().slice(-5000);
+          renderStatus = "renderer-failed";
+        }
+      }
+      const envelope = {
+        schemaVersion: "1.0.0",
+        status: renderStatus,
+        requested: config.renderReviewRequested,
+        rendersGenerated: renderedViewCount > 0,
+        renderedViewCount,
+        requiredViewIds: [...REQUIRED_REVIEW_VIEWS],
+        rendererReportPath,
+        rendererReportSha256,
+        error: rendererError,
+        humanReviewStatus: "pending",
+        publicationEligible: false,
+      };
+      await atomicWriteJson(manifestPath, envelope);
+      const relativeManifestPath = path.relative(root, manifestPath).split(path.sep).join("/");
+      const manifestSha256 = await hashFile(manifestPath);
+      return {
+        payload: envelope,
+        outputs: {
+          status: renderStatus,
+          requested: config.renderReviewRequested,
+          rendersGenerated: renderedViewCount > 0,
+          renderedViewCount,
+          reviewManifestPath: relativeManifestPath,
+          reviewManifestSha256: manifestSha256,
+          rendererReportPath,
+          rendererReportSha256,
+          publicationEligible: false,
+        },
+      };
+    },
+  });
+
+  const renderPayload = renderReview.artifact.payload;
   const finalFingerprint = stageFingerprint(
     "final-acceptance",
     inputSha256,
@@ -486,6 +934,10 @@ export async function runArchitecturalGeometryWorkflow(options) {
       meshStage.artifact.contentSha256,
       geometryReview.artifact.contentSha256,
       textureStage.artifact.contentSha256,
+      atlasStage.artifact.contentSha256,
+      glbExport.artifact.contentSha256,
+      glbValidation.artifact.contentSha256,
+      renderReview.artifact.contentSha256,
     ],
     { workflowVersion: WORKFLOW_VERSION },
   );
@@ -499,6 +951,9 @@ export async function runArchitecturalGeometryWorkflow(options) {
       const mesh = meshPayload.mesh;
       const surfaceReport = geometryPayload.report;
       const textureReport = texturePayload.report;
+      const atlasResult = atlasStage.artifact.payload;
+      const glbResult = glbExport.artifact.payload;
+      const glbQa = glbValidationPayload.report;
       const blockers = [];
       if (wireframe.status !== "candidate-wireframe" || wireframe.issues.length) blockers.push("multi-view-registration-needs-review");
       if (!wireframe.vertices.length) blockers.push("no-triangulated-vertices");
@@ -511,6 +966,12 @@ export async function runArchitecturalGeometryWorkflow(options) {
       if (surfaceReport.blockers.length) blockers.push("mesh-surface-review-needs-review");
       if (textureReport.status !== "evidence-validation-passed" || textureReport.blockers.length) blockers.push("texture-projection-evidence-needs-review");
       if (!textureReport.faceCount) blockers.push("no-texture-projection-faces-reviewed");
+      if (atlasResult.status !== "baked") blockers.push("texture-atlas-bake-blocked");
+      if (!["exported", "partial-textured-mesh"].includes(glbResult.status)) blockers.push("textured-glb-export-blocked");
+      if (glbQa && glbQa.valid !== true) blockers.push("glb-texture-binding-qa-failed");
+      if ((glbResult.report?.untexturedTriangleCount ?? glbResult.untexturedTriangleCount ?? 0) > 0) blockers.push("mesh-triangles-missing-texture-evidence");
+      if (config.renderReviewRequested && renderPayload.status === "renderer-failed") blockers.push("render-review-rendering-failed");
+      if (config.renderReviewRequested && renderPayload.status === "render-review-invalid") blockers.push("render-review-manifest-invalid");
 
       const stages = [
         { id: "view-registration", status: wireframe.status, artifactSha256: registration.artifact.contentSha256, reused: registration.reused },
@@ -519,6 +980,10 @@ export async function runArchitecturalGeometryWorkflow(options) {
         { id: "volume-and-facade-model", status: mesh.qa.closedManifoldCandidate ? "closed-manifold-candidate" : "mesh-review-required", artifactSha256: meshStage.artifact.contentSha256, reused: meshStage.reused },
         { id: "geometry-repair", status: surfaceReport.status, artifactSha256: geometryReview.artifact.contentSha256, reused: geometryReview.reused },
         { id: "texture", status: textureReport.status, artifactSha256: textureStage.artifact.contentSha256, reused: textureStage.reused },
+        { id: "texture-atlas-bake", status: atlasResult.status, artifactSha256: atlasStage.artifact.contentSha256, reused: atlasStage.reused },
+        { id: "glb-export", status: glbResult.status, artifactSha256: glbExport.artifact.contentSha256, reused: glbExport.reused },
+        { id: "glb-validation", status: glbValidationPayload.status, artifactSha256: glbValidation.artifact.contentSha256, reused: glbValidation.reused },
+        { id: "render-review", status: renderPayload.status, artifactSha256: renderReview.artifact.contentSha256, reused: renderReview.reused },
         { id: "final-acceptance", status: blockers.length ? "review-required" : "technical-checks-passed-requires-human-review" },
       ];
       const report = {
@@ -559,20 +1024,31 @@ export async function runArchitecturalGeometryWorkflow(options) {
           textureProjectionEvidenceStatus: textureReport.status,
           textureProjectionFaceCount: textureReport.faceCount,
           textureEvidenceEligibleFaceCount: textureReport.evidenceEligibleFaceIndices.length,
-          texturePixelProjectionPerformed: false,
-          textureAtlasBakingPerformed: false,
+          textureAtlasBakingPerformed: atlasResult.status === "baked",
+          textureAtlasSha256: atlasStage.artifact.outputs.atlasSha256 ?? null,
+          glbExportStatus: glbResult.status,
+          texturedTriangleCount: glbExport.artifact.outputs.texturedTriangleCount ?? 0,
+          untexturedTriangleCount: glbExport.artifact.outputs.untexturedTriangleCount ?? mesh.triangles.length,
+          glbTextureBindingQaStatus: glbQa?.status ?? "not-run",
+          glbTextureBindingQaValid: glbQa?.valid === true,
+          embeddedTextureCount: glbQa?.counts?.imageCount ?? 0,
+          renderReviewRequested: config.renderReviewRequested,
+          renderReviewStatus: renderPayload.status,
+          renderImagesGenerated: renderPayload.rendersGenerated === true,
           automaticSurfaceFillingPerformed: false,
           automaticCoordinateCorrectionPerformed: false,
         },
         stages,
         blockers: [...new Set(blockers)],
         limitations: [
-          "Calibration, cross-view feature matching, explicit faces and texture evidence are supplied by the operator and are not independently surveyed by this workflow.",
+          "Calibration, cross-view feature matching, explicit faces, per-face UVs and texture evidence are supplied by the operator and are not independently surveyed by this workflow.",
           "The wireframe repair worker only removes malformed/duplicate edges; it never moves coordinates or invents architecture.",
           "Mesh generation uses explicit triangular faces only. Missing surfaces are not guessed or auto-filled.",
-          "Texture stage validates existing image/UV/calibration evidence. It does not project texture pixels or bake a texture atlas.",
+          "The atlas baker composites verified source images and remaps supplied UVs; it does not solve camera poses, project pixels from photographs, or infer missing facade texture.",
+          "The exporter writes only triangles with matching texture evidence. Any uncovered mesh triangles remain a blocker and are listed in the GLB export artifact.",
+          "Render images are generated only when renderReview is true and Blender is configured. A render manifest or clean texture QA does not establish architectural fidelity.",
           "A clean topology or low reprojection error does not establish real-world dimensions, building identity or geographic accuracy.",
-          "Human review, independent dimensional evidence, horizontal control and a defensible vertical datum remain required for map placement and publication.",
+          "Human review, independent dimensional evidence, surveyed horizontal control and a defensible vertical datum remain required for map placement and publication.",
         ],
         output: {
           meshVertexCount: mesh.vertices.length,
@@ -580,6 +1056,22 @@ export async function runArchitecturalGeometryWorkflow(options) {
           meshCandidate: geometryPayload.mesh,
           meshSurfaceReview: surfaceReport,
           textureProjectionReview: textureReport,
+          textureAtlas: atlasResult.status === "baked" ? {
+            path: atlasStage.artifact.outputs.atlasPath,
+            manifestPath: atlasStage.artifact.outputs.manifestPath,
+            sha256: atlasStage.artifact.outputs.atlasSha256,
+            manifestSha256: atlasStage.artifact.outputs.manifestSha256,
+            width: atlasStage.artifact.outputs.width,
+            height: atlasStage.artifact.outputs.height,
+          } : null,
+          texturedModel: ["exported", "partial-textured-mesh"].includes(glbResult.status) ? {
+            path: glbExport.artifact.outputs.modelPath,
+            sha256: glbExport.artifact.outputs.modelSha256,
+            texturedTriangleCount: glbExport.artifact.outputs.texturedTriangleCount,
+            untexturedTriangleCount: glbExport.artifact.outputs.untexturedTriangleCount,
+          } : null,
+          glbTextureQa: glbQa,
+          renderReview: renderPayload,
         },
         mapReady: false,
         publicationEligible: false,
@@ -590,6 +1082,7 @@ export async function runArchitecturalGeometryWorkflow(options) {
           status: report.status,
           blockerCount: report.blockers.length,
           meshTriangleCount: report.output.meshTriangleCount,
+          glbTextureBindingQaValid: report.checks.glbTextureBindingQaValid,
           mapReady: false,
           publicationEligible: false,
         },

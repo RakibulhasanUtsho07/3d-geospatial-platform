@@ -116,7 +116,15 @@ jobs:
       - name: Test resumable reconstruction job state and immutable stage artifacts
         run: npm run test:reconstruction-job-state
 
-      - name: Test calibrated geometry, wireframe QA, explicit mesh and texture evidence workflow
+      - name: Install FFmpeg for deterministic texture atlas baking
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+
+      - name: Test textured GLB exporter and embedded texture contract
+        run: npm run test:textured-glb-export
+
+      - name: Test calibrated geometry, wireframe QA, explicit mesh, baked atlas and textured GLB workflow
         run: npm run test:architectural-geometry-workflow
 
       - name: Test per-view architectural sketch preparation
