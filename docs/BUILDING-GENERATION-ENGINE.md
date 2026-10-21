@@ -98,6 +98,17 @@ After `automatic_reconstructor` succeeds, the worker looks for the generated spa
 
 The default review heuristics warn when fewer than 75% of selected input images register, sparse points fall below 50 per registered image, mean track length is below 2.0, or mean reprojection error exceeds 2 pixels. Thresholds can be supplied through `reconstructionDiagnosticsThresholds`. These are review hints, not universal photogrammetry quality standards: the worker continues to create a review-only preview, but the warnings are copied into the job report. A passing diagnostic does not prove image overlap, architecture, metric scale, or map readiness.
 
+### Registered camera coverage review
+
+After COLMAP writes its sparse reconstruction, the worker converts that sparse model to a temporary TXT export and streams `images.txt` and `points3D.txt` to calculate camera-center spread relative to the sparse-scene bounds, median pairwise camera baseline, and pairwise viewing-direction angle spread. The temporary export is removed afterwards; the computed `cameraCoverage` metrics and warnings are stored in `report.json` and summarized as model-review findings.
+
+The heuristics can flag fewer than three registered camera poses, tightly clustered camera positions, or near-identical viewing directions. Thresholds can be adjusted through `cameraCoverageThresholds`. A missing converter or incomplete sparse model is recorded as unavailable and does not stop the preview. Camera poses in COLMAP are in its local arbitrary coordinate frame: these metrics do not determine north, metric scale, facade visibility, same-building identity or whether hidden sides were reconstructed. Camera spread is only a coverage clue, not proof of parallax or architectural completeness.
+
+~~~powershell
+npm run test:colmap-view-coverage
+npm run test:colmap-worker
+~~~
+
 ### Image quality preflight
 
 Before COLMAP starts, the worker samples each staged image through FFmpeg as a 64x64 grayscale thumbnail. It records dimensions, mean luminance, contrast standard deviation, Laplacian-variance blur heuristic, and a 64-bit perceptual difference hash. Cross-view hashes flag potentially near-duplicate images and video frames. A preflight result is a warning/review signal only: it does not automatically discard images or claim to understand camera pose, identify a building, prove overlap or validate architectural accuracy.

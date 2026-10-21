@@ -48,6 +48,22 @@ function mockedColmapSpawn(_executable,args){
      "I20261021 10:53:42.369588 model.cc:462] Mean track length: 2.895833",
      "I20261021 10:53:42.369621 model.cc:467] Mean reprojection error: 0.570908px"
     ].join("\n"));
+   }else if(args[0]==="model_converter"){
+    const outputPath=args[args.indexOf("--output_path")+1];await mkdir(outputPath,{recursive:true});
+    await writeFile(path.join(outputPath,"images.txt"),[
+     "# Image list with two lines of data per image:",
+     "1 1 0 0 0 0 0 0 1 view-0001.png",
+     "0 0 -1",
+     "2 0.9238795 0 0.3826834 0 -5 0 0 1 view-0002.png",
+     "0 0 -1"
+    ].join("\n"));
+    await writeFile(path.join(outputPath,"points3D.txt"),[
+     "# 3D point list",
+     "1 0 0 0 255 255 255 0",
+     "2 10 0 0 255 255 255 0",
+     "3 0 10 0 255 255 255 0",
+     "4 0 0 10 255 255 255 0"
+    ].join("\n"));
    }else if(args[0]==="mesh_texturer"){
     const outputPath=args[args.indexOf("--output_path")+1];await mkdir(outputPath,{recursive:true});
     await writeFile(path.join(outputPath,"mesh.ply"),asciiPly(true));await writeFile(path.join(outputPath,"texture.png"),png);
@@ -101,6 +117,10 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
  assert.equal(result.report.reconstructionDiagnostics.status,"review-recommended");
  assert.equal(result.report.reconstructionDiagnostics.metrics.registeredImages,2);
  assert.equal(result.report.reconstructionDiagnostics.metrics.sparsePointCount,96);
+ assert.equal(result.report.cameraCoverage.registeredCameraPoseCount,2);
+ assert.equal(result.report.cameraCoverage.status,"review-recommended");
+ assert.ok(result.report.cameraCoverage.warnings.includes("fewer-than-three-registered-camera-poses"));
+ assert.ok(result.report.modelReview.findings.some(item=>item.code==="camera-coverage-needs-review"));
  assert.ok(result.report.reconstructionDiagnostics.warnings.some(warning=>warning.includes("Only 2 of 3 selected images registered")));
  assert.ok(result.report.warnings.some(warning=>warning.startsWith("Reconstruction diagnostics:")));
  assert.equal(result.report.scaleCalibration.metresPerModelUnit,4);assert.ok(result.report.outputs.glb.bytes>100);

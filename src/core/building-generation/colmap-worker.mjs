@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
-import { copyFile, lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
@@ -8,6 +8,7 @@ import { analyzeImageQuality, compareImageQuality } from "./image-quality-prefli
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
 import { buildModelReviewSummary } from "./model-review-summary.mjs";
+import { analyzeColmapTextModelFiles } from "./colmap-view-coverage.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_IMAGE_COUNT=120,MAX_TOTAL_INPUT_BYTES=500*1024*1024;
@@ -183,7 +184,45 @@ export async function runColmapReconstruction(options){
    }
   }
   report.timingsMs.reconstructionDiagnostics=Date.now()-diagnosticsStart;
+  const coverageStart=Date.now();
+  if(!sparseModelDir){
+   report.cameraCoverage={
+    schemaVersion:"1.0.0",
+    engine:"colmap-view-coverage-v1",
+    status:"unavailable",
+    registeredCameraPoseCount:0,
+    sparsePointCount:0,
+    warnings:["COLMAP sparse model is unavailable; camera-position and viewing-direction coverage could not be assessed."],
+    caveat:"Camera coverage metrics are heuristic and cannot prove facade completeness or architectural accuracy."
+   };
+  }else{
+   let coverageWorkspace=null;
+   try{
+    coverageWorkspace=await mkdtemp(path.join(outputJobDir,"colmap-view-coverage-"));
+    await runProcess(colmapPath,["model_converter","--input_path",sparseModelDir,"--output_path",coverageWorkspace,"--output_type","TXT"],Math.min(timeoutMs,120000),spawnImpl);
+    const imagesPath=path.join(coverageWorkspace,"images.txt"),points3DPath=path.join(coverageWorkspace,"points3D.txt");
+    if(!(await fileExists(imagesPath))||!(await fileExists(points3DPath)))throw new Error("COLMAP model_converter did not write images.txt and points3D.txt");
+    report.cameraCoverage={
+     ...await analyzeColmapTextModelFiles({imagesPath,points3DPath,thresholds:options.cameraCoverageThresholds}),
+     sparseModelPath:path.relative(outputJobDir,sparseModelDir).split(path.sep).join("/")
+    };
+   }catch(coverageError){
+    report.cameraCoverage={
+     schemaVersion:"1.0.0",
+     engine:"colmap-view-coverage-v1",
+     status:"unavailable",
+     registeredCameraPoseCount:0,
+     sparsePointCount:0,
+     warnings:["COLMAP camera coverage analysis was unavailable; reconstruction was kept for review. "+(coverageError instanceof Error?coverageError.message:String(coverageError))],
+     caveat:"Camera coverage metrics are heuristic and cannot prove facade completeness or architectural accuracy."
+    };
+   }finally{
+    if(coverageWorkspace)await rm(coverageWorkspace,{recursive:true,force:true}).catch(()=>{});
+   }
+  }
+  report.timingsMs.cameraCoverage=Date.now()-coverageStart;
   for(const warning of report.reconstructionDiagnostics.warnings||[])report.warnings.push("Reconstruction diagnostics: "+warning);
+  for(const warning of report.cameraCoverage.warnings||[])report.warnings.push("Camera coverage: "+warning);
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const inputMesh=await locateMesh(outputJobDir),denseWorkspace=path.dirname(inputMesh),texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
   const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
@@ -201,6 +240,7 @@ export async function runColmapReconstruction(options){
   report.modelReview=buildModelReviewSummary({
    imageQualityPreflight:report.imageQualityPreflight,
    reconstructionDiagnostics:report.reconstructionDiagnostics,
+   cameraCoverage:report.cameraCoverage,
    modelQuality,
    scaleCalibration:report.scaleCalibration,
    upAxisReviewed:report.confirmations.upAxisReviewed,
