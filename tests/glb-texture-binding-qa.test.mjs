@@ -59,7 +59,8 @@ test("accepts embedded PNG with material texture and normalized TEXCOORD_0", () 
   assert.equal(report.counts.texturedPrimitiveCount,1);
   assert.equal(report.images[0].width,1);
   assert.equal(report.images[0].height,1);
-  assert.equal(report.images[0].embedded,true);\n  assert.ok(report.warnings.includes("image-0-low-resolution-texture-review"));
+  assert.equal(report.images[0].embedded,true);
+  assert.ok(report.warnings.includes("image-0-low-resolution-texture-review"));
 });
 
 test("verifies atlas byte hash and manifest dimensions", () => {
