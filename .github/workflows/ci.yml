@@ -38,6 +38,7 @@ on:
       - feat/evidence-linked-image-diagnostics
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -50,6 +51,7 @@ on:
       - feat/evidence-linked-image-diagnostics
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
+      - feat/release-readiness-accuracy-evidence
 
 permissions:
   contents: read
@@ -156,7 +158,7 @@ jobs:
       - name: Test evidence-gated correction verification cycle
         run: npm run test:render-correction-verification
 
-      - name: Test building release readiness evidence gate
+      - name: Test building release readiness with dimension and WGS84 ground-control evidence
         run: npm run test:building-release-readiness
 
       - name: Test immutable building review package
