@@ -22,6 +22,7 @@ on:
       - feat/wireframe-qa-repair-passes
       - feat/texture-projection-validation
       - feat/texture-bake-readiness-qa
+      - feat/texture-atlas-baking
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -98,6 +99,15 @@ jobs:
 
       - name: Test evidence-gated mesh surface review
         run: npm run test:mesh-surface-review
+
+      - name: Test texture projection evidence review
+        run: npm run test:texture-projection-review
+
+      - name: Test texture bake readiness preflight
+        run: npm run test:texture-bake-readiness
+
+      - name: Test texture atlas packing and UV remapping
+        run: npm run test:texture-atlas
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
