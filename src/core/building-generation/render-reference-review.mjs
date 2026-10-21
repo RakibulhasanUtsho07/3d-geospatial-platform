@@ -167,7 +167,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       renderFilename: knownViews.get(comparison.viewId).filename,
       renderSha256: knownViews.get(comparison.viewId).sha256,
       referenceImageId: comparison.referenceImageId,
-      referenceSha256: referenceById.get(comparison.referenceImageId).sha256.toLowerCase(),
+      referenceSha256: typeof referenceById.get(comparison.referenceImageId).sha256 === "string" ? referenceById.get(comparison.referenceImageId).sha256.toLowerCase() : null,
       comparisonBasis: basis,
       outcome,
       reviewer: typeof comparison.reviewer === "string" ? comparison.reviewer.trim() : "",
@@ -188,8 +188,8 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
   const missingViewComparisons = [...knownViews.keys()].filter((viewId) => !coveredViews.has(viewId));
   for (const viewId of missingViewComparisons) warnings.push("no-reference-comparison-for-view:" + viewId);
   const reviewStatus = errors.length ? "invalid-review-package" :
-    outcomeCounts.pending || missingViewComparisons.length || comparisons.length === 0 ? "pending-human-review" :
     outcomeCounts.mismatch || outcomeCounts.partial ? "needs-model-or-reference-correction" :
+    outcomeCounts.pending || missingViewComparisons.length || comparisons.length === 0 ? "pending-human-review" :
     outcomeCounts.notComparable ? "review-complete-with-unresolved-comparisons" :
     "reviewer-reported-matches";
 
