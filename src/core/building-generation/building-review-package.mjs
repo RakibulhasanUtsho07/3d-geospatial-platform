@@ -36,6 +36,7 @@ export function buildBuildingReviewPackageManifest({
   readinessReport,
   artifacts,
   requiredRenderViews = REQUIRED_REVIEW_VIEWS,
+  renderManifestViews = [],
   generatedAt = new Date().toISOString(),
 }) {
   if (!nonEmptyString(buildingId)) throw new TypeError("buildingId is required");
@@ -51,6 +52,7 @@ export function buildBuildingReviewPackageManifest({
     throw new Error("review-package-release-policy-invalid");
   }
   if (!Array.isArray(artifacts)) throw new TypeError("artifacts must be an array");
+  if (!Array.isArray(renderManifestViews)) throw new TypeError("renderManifestViews must be an array");
   if (!Array.isArray(requiredRenderViews) || !requiredRenderViews.length) {
     throw new TypeError("requiredRenderViews must be a non-empty array");
   }
@@ -142,7 +144,7 @@ export function buildBuildingReviewPackageManifest({
 
   for (const artifact of cleanArtifacts) {
     if (artifact.artifactType === "render-image") {
-      const manifestView = readinessReport._renderManifestViews?.find((view) => view.id === artifact.viewId);
+      const manifestView = renderManifestViews.find((view) => view.id === artifact.viewId);
       if (manifestView && (manifestView.sha256.toLowerCase() !== artifact.sha256 ||
         manifestView.width !== artifact.width || manifestView.height !== artifact.height)) {
         throw new Error("review-package-render-image-evidence-mismatch:" + artifact.viewId);
