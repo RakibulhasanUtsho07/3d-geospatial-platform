@@ -24,6 +24,7 @@ on:
       - feat/texture-bake-readiness-qa
       - feat/texture-atlas-baking
       - feat/glb-texture-binding-qa
+      - feat/glb-uv-seam-review
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -112,6 +113,12 @@ jobs:
 
       - name: Test GLB texture binding and atlas verification
         run: npm run test:glb-texture-binding-qa
+
+      - name: Test mesh UV seam candidates
+        run: npm run test:uv-seam-review
+
+      - name: Test texture pixel content and resolution risk hints
+        run: npm run test:texture-image-content-review
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
