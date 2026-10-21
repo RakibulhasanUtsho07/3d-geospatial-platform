@@ -13,10 +13,10 @@ const safePngName = (value) => typeof value === "string" &&
   !value.includes("..") && !value.includes("/") && !value.includes("\\");
 
 async function main() {
-  const [glbArg, renderDirArg, reviewArg, backlogArg, verificationArg, outputArg] = process.argv.slice(2);
-  if (!glbArg || !renderDirArg || !reviewArg || !backlogArg || !verificationArg || !outputArg ||
-    process.argv.length !== 8) {
-    throw new Error("Usage: node scripts/build-building-release-readiness.mjs <candidate.glb> <render-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <release-readiness-report.json>");
+  const [glbArg, renderDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, outputArg] = process.argv.slice(2);
+  if (!glbArg || !renderDirArg || !reviewArg || !backlogArg || !verificationArg || !accuracyEvidenceArg || !outputArg ||
+    process.argv.length !== 9) {
+    throw new Error("Usage: node scripts/build-building-release-readiness.mjs <candidate.glb> <render-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json>");
   }
 
   const glbPath = path.resolve(glbArg);
@@ -25,21 +25,24 @@ async function main() {
   const reviewPath = path.resolve(reviewArg);
   const backlogPath = path.resolve(backlogArg);
   const verificationPath = path.resolve(verificationArg);
+  const accuracyEvidencePath = path.resolve(accuracyEvidenceArg);
   const outputPath = path.resolve(outputArg);
 
-  const [glbBytes, manifestBytes, reviewBytes, backlogBytes, verificationBytes] = await Promise.all([
+  const [glbBytes, manifestBytes, reviewBytes, backlogBytes, verificationBytes, accuracyEvidenceBytes] = await Promise.all([
     readFile(glbPath),
     readFile(manifestPath),
     readFile(reviewPath),
     readFile(backlogPath),
     readFile(verificationPath),
+    readFile(accuracyEvidencePath),
   ]);
   const renderManifest = JSON.parse(manifestBytes.toString("utf8"));
   const renderReferenceReview = JSON.parse(reviewBytes.toString("utf8"));
   const correctionTaskBacklog = JSON.parse(backlogBytes.toString("utf8"));
   const correctionVerification = JSON.parse(verificationBytes.toString("utf8"));
+  const accuracyEvidence = JSON.parse(accuracyEvidenceBytes.toString("utf8"));
 
-  const baseInputPaths = [glbPath, manifestPath, reviewPath, backlogPath, verificationPath];
+  const baseInputPaths = [glbPath, manifestPath, reviewPath, backlogPath, verificationPath, accuracyEvidencePath];
   const actualRenderFiles = [];
   const renderFilePaths = [];
   for (const view of Array.isArray(renderManifest?.views) ? renderManifest.views : []) {
@@ -84,6 +87,7 @@ async function main() {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    accuracyEvidence,
   });
 
   await writeFile(outputPath, JSON.stringify(readiness, null, 2) + "\n", {
@@ -101,6 +105,8 @@ async function main() {
     requiredRenderViews: readiness.counts.requiredRenderViews,
     qualifyingReviewedViews: readiness.counts.qualifyingReviewedViews,
     actualRenderFilesRead: readiness.counts.actualRenderFilesRead,
+    accuracyBenchmarkChecks: readiness.counts.accuracyBenchmarkChecks,
+    groundControlPoints: readiness.counts.groundControlPoints,
     publicationEligible: readiness.publicationEligible,
   }, null, 2));
   if (readiness.status === "blocked") process.exitCode = 2;
