@@ -9,5 +9,5 @@ export function buildMaskedBuildingSketchFilter(options={}){
  const normalized=normalizeSketchOptions(options);
  const edge=buildArchitecturalSketchFilter(normalized).replace(/,negate$/,"");
  const scale="scale=w='min(iw,"+normalized.maxEdge+")':h='min(ih,"+normalized.maxEdge+")':force_original_aspect_ratio=decrease:flags=lanczos";
- return "[0:v]"+edge+"[edges];[1:v]"+scale+",format=gray,threshold=0.5[mask];[edges][mask]blend=all_mode=multiply,format=gray";
+ return "[0:v]"+edge+"[edges];[1:v]"+scale+",format=gray,lut=y='if(gte(val,128),255,0)'[mask];[edges][mask]blend=all_mode=multiply,format=gray";
 }
