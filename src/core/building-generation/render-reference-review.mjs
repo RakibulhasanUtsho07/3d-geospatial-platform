@@ -14,7 +14,7 @@ function validIsoDate(value) {
  * independently supplied reference images. It deliberately creates no similarity
  * score and never promotes this evidence to publication eligibility.
  */
-export function buildRenderReferenceReview({ renderManifest, renderManifestSha256, reviewInput, renderFiles, referenceFiles }) {
+export function buildRenderReferenceReview({ renderManifest, renderManifestSha256, reviewInput, renderFiles, referenceFiles, similarityDiagnostics = [] }) {
   const errors = [], warnings = [];
   if (!renderManifest || renderManifest.schemaVersion !== "1.0.0" ||
     renderManifest.engine !== "building-render-review-manifest-v1" || !Array.isArray(renderManifest.views)) {
@@ -29,6 +29,9 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
   }
   if (!Array.isArray(renderFiles) || !Array.isArray(referenceFiles)) {
     throw new TypeError("renderFiles and referenceFiles must be arrays of disk-verified image metadata");
+  }
+  if (!Array.isArray(similarityDiagnostics)) {
+    throw new TypeError("similarityDiagnostics must be an array of diagnostic reports");
   }
 
   const actualRenderFiles = new Map(renderFiles.map((file) => [file.filename, file]));
@@ -121,6 +124,109 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
   }
   if (reviewInput.referenceImages.length === 0) warnings.push("no-reference-images-supplied");
 
+  // Optional pixel diagnostics are attached only when they identify the exact
+  // render/reference bytes already verified by this review package.
+  const diagnosticsByPair = new Map();
+  for (let index = 0; index < similarityDiagnostics.length; index++) {
+    const entry = similarityDiagnostics[index];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+      typeof entry.viewId !== "string" || !entry.viewId ||
+      typeof entry.referenceImageId !== "string" || !entry.referenceImageId) {
+      errors.push("similarity-diagnostic-entry-invalid:" + index);
+      continue;
+    }
+    const viewId = entry.viewId;
+    const referenceImageId = entry.referenceImageId;
+    const pairKey = viewId + "\u0000" + referenceImageId;
+    if (diagnosticsByPair.has(pairKey)) {
+      errors.push("duplicate-similarity-diagnostic:" + viewId + ":" + referenceImageId);
+      continue;
+    }
+    if (!knownViews.has(viewId)) {
+      errors.push("similarity-diagnostic-unknown-render-view:" + viewId);
+      continue;
+    }
+    if (!referenceById.has(referenceImageId)) {
+      errors.push("similarity-diagnostic-unknown-reference-image:" + referenceImageId);
+      continue;
+    }
+    const report = entry.report;
+    if (!report || report.schemaVersion !== "1.0.0" ||
+      report.engine !== "render-image-similarity-diagnostics-v1" ||
+      report.status !== "diagnostics-computed" ||
+      !report.pair || !report.pair.reference || !report.pair.candidateRender ||
+      !report.metrics || !Array.isArray(report.warnings)) {
+      errors.push("similarity-diagnostic-report-invalid:" + viewId + ":" + referenceImageId);
+      continue;
+    }
+    if (!sha256Pattern.test(entry.reportSha256 ?? "")) {
+      errors.push("similarity-diagnostic-report-sha256-invalid:" + viewId + ":" + referenceImageId);
+      continue;
+    }
+    const view = knownViews.get(viewId);
+    const reference = referenceById.get(referenceImageId);
+    const actualRender = actualRenderFiles.get(view.filename);
+    const actualReference = actualReferences.get(referenceImageId);
+    const pair = report.pair;
+    const candidate = pair.candidateRender;
+    const referencePair = pair.reference;
+    const metrics = report.metrics;
+    const candidateMatches =
+      actualRender &&
+      sha256Pattern.test(candidate.sha256 ?? "") &&
+      candidate.sha256.toLowerCase() === view.sha256?.toLowerCase() &&
+      candidate.sha256.toLowerCase() === actualRender.sha256?.toLowerCase() &&
+      candidate.width === view.width && candidate.height === view.height &&
+      candidate.width === actualRender.width && candidate.height === actualRender.height &&
+      candidate.bytes === actualRender.bytes;
+    const referenceMatches =
+      actualReference &&
+      sha256Pattern.test(referencePair.sha256 ?? "") &&
+      referencePair.sha256.toLowerCase() === reference.sha256?.toLowerCase() &&
+      referencePair.sha256.toLowerCase() === actualReference.sha256?.toLowerCase() &&
+      referencePair.width === reference.width && referencePair.height === reference.height &&
+      referencePair.width === actualReference.width && referencePair.height === actualReference.height &&
+      referencePair.bytes === actualReference.bytes;
+    if (!candidateMatches) errors.push("similarity-diagnostic-render-bytes-mismatch:" + viewId);
+    if (!referenceMatches) errors.push("similarity-diagnostic-reference-bytes-mismatch:" + referenceImageId);
+    const metricsValid =
+      finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
+      finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
+      (metrics.psnrDb === null || finite(metrics.psnrDb) && metrics.psnrDb >= 0) &&
+      finite(metrics.localSsim8x8) && metrics.localSsim8x8 >= -1 && metrics.localSsim8x8 <= 1 &&
+      Number.isSafeInteger(metrics.differenceHashHammingDistance) &&
+      metrics.differenceHashHammingDistance >= 0 && metrics.differenceHashHammingDistance <= 64 &&
+      finite(report.comparability?.aspectRatioDifferencePercent) &&
+      report.comparability.aspectRatioDifferencePercent >= 0 &&
+      report.warnings.every((warning) => typeof warning === "string");
+    if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
+    const normalized = {
+      reportSha256: entry.reportSha256.toLowerCase(),
+      engine: report.engine,
+      status: report.status,
+      interpretation: typeof report.interpretation === "string" ? report.interpretation : "review-recommended",
+      renderSha256: candidate.sha256.toLowerCase(),
+      referenceSha256: referencePair.sha256.toLowerCase(),
+      metrics: {
+        meanAbsoluteError: metrics.meanAbsoluteError,
+        rootMeanSquaredError: metrics.rootMeanSquaredError,
+        psnrDb: metrics.psnrDb,
+        localSsim8x8: metrics.localSsim8x8,
+        differenceHashHammingDistance: metrics.differenceHashHammingDistance,
+      },
+      comparability: {
+        aspectRatioDifferencePercent: report.comparability.aspectRatioDifferencePercent,
+        aspectRatioWithinScreeningThreshold: report.comparability.aspectRatioWithinScreeningThreshold === true,
+        sameFacadeConfirmedByTool: false,
+        cameraPoseAlignmentVerifiedByTool: false,
+      },
+      warnings: [...report.warnings],
+      automaticMatch: false,
+    };
+    diagnosticsByPair.set(pairKey, normalized);
+    if (report.warnings.length) warnings.push("image-similarity-screening-warnings:" + viewId + ":" + referenceImageId);
+  }
+
   const seenPairs = new Set();
   const comparisons = [];
   for (let index = 0; index < reviewInput.comparisons.length; index++) {
@@ -175,6 +281,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       notes: typeof comparison.notes === "string" ? comparison.notes.trim() : "",
       correctionRequest: typeof comparison.correctionRequest === "string" && comparison.correctionRequest.trim()
         ? comparison.correctionRequest.trim() : null,
+      similarityDiagnostics: diagnosticsByPair.get(pairKey) ?? null,
     });
   }
   if (reviewInput.comparisons.length === 0) warnings.push("no-render-reference-comparisons-supplied");
@@ -217,6 +324,12 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
     },
     referenceImages: references,
     comparisons,
+    similarityDiagnosticsSummary: {
+      supplied: similarityDiagnostics.length > 0,
+      count: diagnosticsByPair.size,
+      withWarnings: [...diagnosticsByPair.values()].filter((item) => item.warnings.length > 0).length,
+      automaticMatch: false,
+    },
     viewsWithoutComparisons: missingViewComparisons,
     errors: [...new Set(errors)],
     warnings: [...new Set(warnings)],
