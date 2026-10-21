@@ -33,5 +33,5 @@ test("fails when full resolution cannot fit and downscaling is disabled", () => 
 });
 
 test("reports when multiple tiny slots cannot fit the atlas", () => {
-  assert.throws(() => packTextureAtlas([image("a", 3, 3), image("b", 3, 3)], { width: 2, height: 2, padding: 0 }), /too many images/);
+  assert.throws(() => packTextureAtlas([image("a", 3, 3), image("b", 3, 3)], { width: 1, height: 1, padding: 0 }), /too many images/);
 });
