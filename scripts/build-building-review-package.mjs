@@ -47,11 +47,11 @@ function addArtifact(artifacts, copyOperations, { artifactType, sourcePath, rela
 }
 
 async function main() {
-  const [glbArg, renderDirArg, referenceDirArg, reviewArg, backlogArg, verificationArg, readinessArg, outputArg] =
+  const [glbArg, renderDirArg, referenceDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, readinessArg, outputArg] =
     process.argv.slice(2);
   if (!glbArg || !renderDirArg || !referenceDirArg || !reviewArg || !backlogArg ||
-    !verificationArg || !readinessArg || !outputArg || process.argv.length !== 10) {
-    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <release-readiness-report.json> <new-output-directory>");
+    !verificationArg || !accuracyEvidenceArg || !readinessArg || !outputArg || process.argv.length !== 11) {
+    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json> <new-output-directory>");
   }
 
   const glbPath = path.resolve(glbArg);
@@ -60,22 +60,25 @@ async function main() {
   const reviewPath = path.resolve(reviewArg);
   const backlogPath = path.resolve(backlogArg);
   const verificationPath = path.resolve(verificationArg);
+  const accuracyEvidencePath = path.resolve(accuracyEvidenceArg);
   const readinessPath = path.resolve(readinessArg);
   const outputDir = path.resolve(outputArg);
   const manifestPath = path.join(renderDir, "render-review-manifest.json");
-  const inputPaths = [glbPath, manifestPath, reviewPath, backlogPath, verificationPath, readinessPath];
+  const inputPaths = [glbPath, manifestPath, reviewPath, backlogPath, verificationPath, accuracyEvidencePath, readinessPath];
 
-  const [glbBytes, manifestBytes, reviewBytes, backlogBytes, readinessBytes] = await Promise.all([
+  const [glbBytes, manifestBytes, reviewBytes, backlogBytes, readinessBytes, accuracyEvidenceBytes] = await Promise.all([
     readRegularFile(glbPath, "candidate GLB"),
     readRegularFile(manifestPath, "render review manifest"),
     readRegularFile(reviewPath, "render/reference review report"),
     readRegularFile(backlogPath, "correction task backlog"),
     readRegularFile(readinessPath, "release readiness report"),
+    readRegularFile(accuracyEvidencePath, "dimension/georeferencing accuracy evidence"),
   ]);
   const renderManifest = JSON.parse(manifestBytes.toString("utf8"));
   const renderReferenceReview = JSON.parse(reviewBytes.toString("utf8"));
   const correctionTaskBacklog = JSON.parse(backlogBytes.toString("utf8"));
   const readinessReport = JSON.parse(readinessBytes.toString("utf8"));
+  const accuracyEvidence = JSON.parse(accuracyEvidenceBytes.toString("utf8"));
   const correctionVerification = verifyRenderCorrectionTasks(correctionTaskBacklog, renderReferenceReview);
   const verificationBytes = Buffer.from(JSON.stringify(correctionVerification, null, 2) + "\n");
   const verificationDiskBytes = await readRegularFile(path.resolve(verificationArg), "correction verification report");
@@ -113,6 +116,7 @@ async function main() {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    accuracyEvidence,
   });
   if (semanticDigest(readinessReport) !== semanticDigest(recomputedReadiness)) {
     throw new Error("Release readiness report does not match a fresh recomputation from the supplied candidate and evidence.");
@@ -155,6 +159,7 @@ async function main() {
     ["render-reference-review", "reports/render-reference-review.json", reviewBytes, renderReferenceReview],
     ["correction-task-backlog", "reports/correction-tasks.json", backlogBytes, correctionTaskBacklog],
     ["correction-verification", "reports/correction-verification.json", verificationDiskBytes, correctionVerification],
+    ["accuracy-evidence", "reports/accuracy-evidence.json", accuracyEvidenceBytes, accuracyEvidence],
     ["release-readiness-report", "reports/release-readiness.json", readinessBytes, readinessReport],
   ];
   for (const [artifactType, relativePath, bytes, object, digestOverride] of reportItems) {
