@@ -75,6 +75,9 @@ jobs:
       - name: Test image quality preflight and near-duplicate view detection
         run: npm run test:image-quality-preflight
 
+      - name: Test overlapping image tile planning and coordinate merging
+        run: npm run test:image-tile-analysis
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
