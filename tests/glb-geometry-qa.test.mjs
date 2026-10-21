@@ -44,6 +44,20 @@ test("reports a small valid triangle as a review recommendation instead of claim
  assert.equal(report.counts.degenerateTriangleCount,0);assert.ok(report.warnings.includes("very-small-triangle-count"));
  assert.ok(report.bounds.dimensions[0]===1&&report.bounds.dimensions[1]===1);
 });
+test("includes topology review hints in the final GLB quality report",()=>{
+ const glb=makeGlb([
+  0,0,0,1,0,0,0,1,0,
+  20,0,0,21,0,0,20,1,0
+ ],[0,1,2,3,4,5]);
+ const report=analyzeGlbQuality(glb);
+ const topology=report.meshDetails[0].topology;
+ assert.equal(topology.connectedComponentCount,2);
+ assert.equal(topology.smallDetachedComponentCount,1);
+ assert.ok(report.warnings.includes("disconnected-mesh-components-present"));
+ assert.ok(report.warnings.includes("small-detached-components-present"));
+ assert.ok(report.warnings.includes("open-boundary-edges-present"));
+});
+
 test("detects degenerate triangles for operator review",()=>{
  const glb=makeGlb([0,0,0,1,0,0,2,0,0],[0,1,2]),report=analyzeGlbQuality(glb);
  assert.equal(report.counts.degenerateTriangleCount,1);assert.ok(report.warnings.includes("degenerate-triangles-present"));
