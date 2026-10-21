@@ -78,26 +78,26 @@ test("refuses to package a blocked release candidate", () => {
 });
 
 test("refuses reference images with unverified rights", () => {
-  const { readiness, artifacts } = fixture({ invalidRights: "front" });
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts }), /reference-image-invalid-or-rights-unverified/);
+  const { readiness, artifacts, renderManifestViews } = fixture({ invalidRights: "front" });
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews }), /reference-image-invalid-or-rights-unverified/);
 });
 
 test("requires all predefined render views", () => {
-  const { readiness, artifacts } = fixture({ missingView: "back" });
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts }), /required-render-view-missing:back/);
+  const { readiness, artifacts, renderManifestViews } = fixture({ missingView: "back" });
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews }), /required-render-view-missing:back/);
 });
 
 test("rejects unsafe relative paths and duplicate artifact paths", () => {
   const first = fixture();
   first.artifacts[0].relativePath = "../outside.glb";
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: first.readiness, artifacts: first.artifacts }), /artifact-invalid/);
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: first.readiness, artifacts: first.artifacts, renderManifestViews: first.renderManifestViews }), /artifact-invalid/);
 
   const second = fixture();
   second.artifacts.push({ ...second.artifacts[0], artifactType: "extra", relativePath: second.artifacts[0].relativePath });
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: second.readiness, artifacts: second.artifacts }), /duplicate-path/);
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: second.readiness, artifacts: second.artifacts, renderManifestViews: second.renderManifestViews }), /duplicate-path/);
 });
 
 test("rejects evidence digest mismatch instead of creating a misleading package index", () => {
-  const { readiness, artifacts } = fixture({ badDigest: true });
-  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts }), /evidence-digest-mismatch:texture-qa/);
+  const { readiness, artifacts, renderManifestViews } = fixture({ badDigest: true });
+  assert.throws(() => buildBuildingReviewPackageManifest({ buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews }), /evidence-digest-mismatch:texture-qa/);
 });
