@@ -124,6 +124,9 @@ jobs:
       - name: Test multi-view render review manifest validation
         run: npm run test:render-review-manifest
 
+      - name: Validate Blender render automation Python syntax
+        run: python3 -m py_compile scripts/blender/render-building-review.py
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
