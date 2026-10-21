@@ -87,7 +87,10 @@
     "test:building-review-package": "node --test tests/building-review-package.test.mjs",
     "package:building-review": "node scripts/build-building-review-package.mjs",
     "test:building-review-package-integrity": "node --test tests/building-review-package-integrity.test.mjs",
-    "verify:building-review-package": "node scripts/verify-building-review-package.mjs"
+    "verify:building-review-package": "node scripts/verify-building-review-package.mjs",
+    "test:building-review-package-signature": "node --test tests/building-review-package-signature.test.mjs",
+    "sign:building-review-package": "node scripts/sign-building-review-package.mjs",
+    "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
