@@ -188,7 +188,7 @@ test("rerunning an upstream stage preserves history and invalidates descendants"
       stageId: "image-analysis",
       inputFingerprint: fingerprint("image-analysis"),
     }),
-    /cannot start before ingest is completed/,
+    /another reconstruction stage is already running/,
   );
 });
 
