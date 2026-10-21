@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-review-manifest.mjs";
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
+import { verifyRenderCorrectionTasks } from "../src/core/building-generation/render-correction-verification.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const modelSha = "a".repeat(64);
@@ -61,7 +62,24 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
     id: "rrt-example-task",
     buildingId: "test-building",
     kind: "model-correction-review",
+    priority: "high",
     status: "open",
+    title: "Review front facade correction",
+    evidence: {
+      reviewReportSha256: "d".repeat(64),
+      sourceModelSha256: oldModelSha,
+      renderManifestSha256: oldManifestSha,
+      viewId: unverifiedTask ? "no-such-view" : "front",
+      renderFilename: "front.png",
+      renderSha256: hash("old-render:front"),
+      referenceImageId: "ref-front",
+      referenceSha256: hash("reference:front"),
+      comparisonBasis: "same-facade-known",
+      outcome: "mismatch",
+      reviewer: "reviewer-01",
+      reviewedAt: "2026-10-21T10:00:00Z",
+      notes: "Opening rhythm differs from the reference.",
+    },
   };
   const backlog = {
     schemaVersion: "1.0.0",
@@ -71,24 +89,7 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
     provenance: { sourceModelSha256: oldModelSha, renderManifestSha256: oldManifestSha },
     tasks: [backlogTask],
   };
-  const backlogSha = hash(JSON.stringify(backlog));
-  const verification = {
-    schemaVersion: "1.0.0",
-    engine: "render-correction-verification-v1",
-    buildingId: "test-building",
-    sourceBacklogSha256: backlogSha,
-    sourceBacklogReviewReportSha256: backlog.createdFromReviewReportSha256,
-    verificationReviewReportSha256: reviewSha,
-    provenance: {
-      verificationSourceModelSha256: modelSha,
-      verificationRenderManifestSha256: manifestSha,
-    },
-    tasks: [{
-      taskId: backlogTask.id,
-      status: unverifiedTask ? "needs-more-work" : "verified",
-      verified: !unverifiedTask,
-    }],
-  };
+  const verification = verifyRenderCorrectionTasks(backlog, review);
   return {
     input: {
       buildingId: "test-building",
@@ -197,7 +198,7 @@ test("stale manifest and review/backlog evidence digests are rejected", () => {
     },
   });
   assert.equal(badReview.status, "blocked");
-  assert.ok(badReview.blockers.some((item) => item.id === "verification-review-digest"));
+  assert.ok(badReview.blockers.some((item) => item.id === "verification-report-recomputed"));
 
   const badBacklog = buildBuildingReleaseReadiness({
     ...input,
@@ -207,10 +208,10 @@ test("stale manifest and review/backlog evidence digests are rejected", () => {
     },
   });
   assert.equal(badBacklog.status, "blocked");
-  assert.ok(badBacklog.blockers.some((item) => item.id === "verification-backlog-digest"));
+  assert.ok(badBacklog.blockers.some((item) => item.id === "verification-report-recomputed"));
 });
 
-test("unresolved or unrelated verification tasks cannot be silently ignored", () => {
+test("externally altered verification JSON is rejected instead of trusted", () => {
   const { input } = fixture();
   const extra = {
     ...input.correctionVerification,
@@ -218,6 +219,5 @@ test("unresolved or unrelated verification tasks cannot be silently ignored", ()
   };
   const result = buildBuildingReleaseReadiness({ ...input, correctionVerification: extra });
   assert.equal(result.status, "blocked");
-  assert.ok(result.blockers.some((item) => item.id === "verification-task-count"));
-  assert.ok(result.blockers.some((item) => item.id === "verification-no-orphan-task:orphan"));
+  assert.ok(result.blockers.some((item) => item.id === "verification-report-recomputed"));
 });
