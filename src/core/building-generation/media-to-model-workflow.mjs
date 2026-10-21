@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { copyFile, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { ingestMediaFile } from "./media-intake.mjs";
@@ -252,12 +252,10 @@ export async function runMediaToModelWorkflow(options){
      let existing=null;
      try{existing=await loadVerifiedSource(root,buildingId,input.sourceId);}
      catch(error){if(error?.code!=="ENOENT")throw error;}
-     let ingested;
      if(existing){
       if(existing.sha256!==manifestInput.sha256)throw new TypeError("source ID '"+input.sourceId+"' already exists with different content; use a new source ID");
-      ingested={record:existing.record,absoluteAssetPath:existing.assetPath,recordPath:existing.recordPath};
      }else{
-      ingested=await ingestMediaFile({
+      await ingestMediaFile({
        workspaceRoot:root,sourcePath:relative,buildingId,sourceId:input.sourceId,kind:input.kind,
        title:path.basename(relative),licence:"unknown",usageStatus:"unreviewed",author:input.author,
        attribution:input.attribution,sourceUrl:input.sourceUrl,capturedAt:input.capturedAt,
