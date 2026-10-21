@@ -104,7 +104,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       width: actual.width ?? null,
       height: actual.height ?? null,
       bytes: actual.bytes ?? null,
-      sourceDescription: reference.sourceDescription?.trim() ?? "",
+      sourceDescription: typeof reference.sourceDescription === "string" ? reference.sourceDescription.trim() : "",
       sourceUrl: typeof reference.sourceUrl === "string" && reference.sourceUrl.trim() ? reference.sourceUrl.trim() : null,
       attribution: typeof reference.attribution === "string" && reference.attribution.trim() ? reference.attribution.trim() : null,
       rightsStatus: validRightsStatuses.has(reference.rightsStatus) ? reference.rightsStatus : "unknown",
