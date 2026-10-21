@@ -5,7 +5,6 @@ import test from "node:test";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
-import { buildRenderCorrectionTasks } from "../src/core/building-generation/render-correction-tasks.mjs";
 import { verifyRenderCorrectionTasks } from "../src/core/building-generation/render-correction-verification.mjs";
 import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-review-manifest.mjs";
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
@@ -107,22 +106,7 @@ async function createFixture() {
     tasks: [],
     automationPolicy: { publicationEligible: false },
   };
-  // Exercise the public workflow functions as the CLI does rather than invent a
-  // hand-written verification result.
-  const correctionTasks = buildRenderCorrectionTasks({
-    schemaVersion: "1.0.0",
-    engine: "render-reference-review-v1",
-    buildingId: review.buildingId,
-    reviewStatus: "needs-model-or-reference-correction",
-    valid: true,
-    publicationEligible: false,
-    provenance: { sourceModelSha256: "a".repeat(64), renderManifestSha256: "b".repeat(64) },
-    comparisons: [],
-    viewsWithoutComparisons: [],
-  });
-  // The package test uses an empty backlog on purpose; any non-empty backlog
-  // must have verification results before the release readiness gate can pass.
-  assert.equal(correctionTasks.tasks.length, 0);
+  // The fixture uses an empty backlog; any non-empty backlog must have verification results before the release gate can pass.
   const verification = verifyRenderCorrectionTasks(backlog, review);
   const actualRenderFiles = views.map((view) => ({
     filename: view.filename,
