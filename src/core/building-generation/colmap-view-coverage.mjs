@@ -25,7 +25,7 @@ export function parseColmapImagePoseLine(line) {
   if (!trimmed || trimmed.startsWith("#")) return null;
   const fields = trimmed.split(/\s+/);
   if (fields.length < 10 || !/^\d+$/.test(fields[0]) || !/^\d+$/.test(fields[8])) return null;
-  const name = fields.slice(9).join(" ");
+  const name = fields[9];
   // A pose row ends in an image filename/name; the adjacent 2D-observation row is numeric.
   if (!name || Number.isFinite(Number(name))) return null;
 
