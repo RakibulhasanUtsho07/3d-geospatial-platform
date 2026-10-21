@@ -421,6 +421,7 @@ export function buildBuildingReleaseReadiness(input) {
       correctionVerificationSourceReviewSha256: verification?.verificationReviewReportSha256 ?? null,
       geometryQaReportSha256: isObject(geometryQa) ? digest(JSON.stringify(geometryQa)) : null,
       textureQaReportSha256: isObject(textureQa) ? digest(JSON.stringify(textureQa)) : null,
+      accuracyEvidenceSha256: isObject(accuracyEvidence) ? digest(JSON.stringify(accuracyEvidence)) : null,
       accuracyBenchmarkReportSha256: accuracyBenchmark ? digest(JSON.stringify(accuracyBenchmark)) : null,
     },
     qaSummary: {
