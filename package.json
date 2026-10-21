@@ -95,7 +95,7 @@
     "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs",
     "test:render-image-similarity-diagnostics": "node --test tests/render-image-similarity-diagnostics.test.mjs",
     "compare:render-reference-images": "node scripts/compare-render-reference-images.mjs",
-    "test:render-reference-diagnostics-attachment": "node --test tests/render-reference-diagnostics-attachment.test.mjs"
+    "test:render-reference-diagnostics-attachment": "node --test tests/render-reference-diagnostics-attachment.test.mjs tests/review-render-references-cli-diagnostics.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
