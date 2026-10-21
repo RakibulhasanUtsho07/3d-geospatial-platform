@@ -27,6 +27,7 @@ on:
       - feat/glb-uv-seam-review
       - feat/blender-render-review-views
       - feat/render-reference-comparison-review
+      - feat/render-review-correction-tasks
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -127,6 +128,9 @@ jobs:
 
       - name: Test evidence-linked render reference review
         run: npm run test:render-reference-review
+
+      - name: Test evidence-linked render correction task backlog
+        run: npm run test:render-correction-tasks
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
