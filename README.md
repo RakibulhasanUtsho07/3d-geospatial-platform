@@ -185,3 +185,5 @@ Use `npm run benchmark:building-accuracy -- <candidate.glb> <benchmark.json> [re
 ### Render/reference image similarity diagnostics
 
 Use `npm run compare:render-reference-images -- <reference.jpg|png> <candidate-render.jpg|png> [report.json]` to calculate bounded grayscale MAE/RMSE, PSNR, local SSIM and difference-hash diagnostics for one manually paired view. These are diagnostic hints only: same-facade/camera alignment remains a human responsibility, and the metrics never certify architectural accuracy or approve publication. See [the diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
+
+Optional per-view similarity diagnostics can be attached to the existing reference-review report using `similarityDiagnosticsPath` in each comparison. The workflow validates that report metrics identify the exact render/reference bytes and leaves all human review outcomes unchanged. See the [image diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
