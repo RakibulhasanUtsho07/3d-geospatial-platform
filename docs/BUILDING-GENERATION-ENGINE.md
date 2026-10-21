@@ -92,6 +92,12 @@ npm run test:colmap-worker
 npm run reconstruct:building-media -- <workspaceRoot> <buildingSpec.json> <jobId> <sourceId1,sourceId2,sourceId3> <sourceUpAxis> --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed
 ~~~
 
+### Post-reconstruction COLMAP diagnostics
+
+After `automatic_reconstructor` succeeds, the worker looks for the generated sparse model and runs `colmap model_analyzer`. The workflow report records total and registered images, sparse 3D point count, observations, mean track length and mean reprojection error when COLMAP exposes them. Missing diagnostics are recorded as unavailable rather than silently treated as a pass.
+
+The default review heuristics warn when fewer than 75% of selected input images register, sparse points fall below 50 per registered image, mean track length is below 2.0, or mean reprojection error exceeds 2 pixels. Thresholds can be supplied through `reconstructionDiagnosticsThresholds`. These are review hints, not universal photogrammetry quality standards: the worker continues to create a review-only preview, but the warnings are copied into the job report. A passing diagnostic does not prove image overlap, architecture, metric scale, or map readiness.
+
 ### Image quality preflight
 
 Before COLMAP starts, the worker samples each staged image through FFmpeg as a 64x64 grayscale thumbnail. It records dimensions, mean luminance, contrast standard deviation, Laplacian-variance blur heuristic, and a 64-bit perceptual difference hash. Cross-view hashes flag potentially near-duplicate images and video frames. A preflight result is a warning/review signal only: it does not automatically discard images or claim to understand camera pose, identify a building, prove overlap or validate architectural accuracy.

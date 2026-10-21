@@ -36,8 +36,18 @@ function mockedColmapSpawn(_executable,args){
  queueMicrotask(async()=>{
   try{
    if(args[0]==="automatic_reconstructor"){
-    const workspacePath=args[args.indexOf("--workspace_path")+1],out=path.join(workspacePath,"dense","0");
-    await mkdir(out,{recursive:true});await writeFile(path.join(out,"meshed-poisson.ply"),asciiPly(false));
+    const workspacePath=args[args.indexOf("--workspace_path")+1],out=path.join(workspacePath,"dense","0"),sparse=path.join(workspacePath,"sparse","0");
+    await mkdir(out,{recursive:true});await mkdir(sparse,{recursive:true});await writeFile(path.join(out,"meshed-poisson.ply"),asciiPly(false));
+    for(const name of ["cameras.bin","images.bin","points3D.bin"])await writeFile(path.join(sparse,name),Buffer.from([1]));
+   }else if(args[0]==="model_analyzer"){
+    child.stderr.write([
+     "I20261021 10:53:42.368326 model.cc:456] Images: 3",
+     "I20261021 10:53:42.369568 model.cc:457] Registered images: 2",
+     "I20261021 10:53:42.369576 model.cc:459] Points: 96",
+     "I20261021 10:53:42.369581 model.cc:460] Observations: 278",
+     "I20261021 10:53:42.369588 model.cc:462] Mean track length: 2.895833",
+     "I20261021 10:53:42.369621 model.cc:467] Mean reprojection error: 0.570908px"
+    ].join("\n"));
    }else if(args[0]==="mesh_texturer"){
     const outputPath=args[args.indexOf("--output_path")+1];await mkdir(outputPath,{recursive:true});
     await writeFile(path.join(outputPath,"mesh.ply"),asciiPly(true));await writeFile(path.join(outputPath,"texture.png"),png);
@@ -88,6 +98,11 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
  });
  assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
+ assert.equal(result.report.reconstructionDiagnostics.status,"review-recommended");
+ assert.equal(result.report.reconstructionDiagnostics.metrics.registeredImages,2);
+ assert.equal(result.report.reconstructionDiagnostics.metrics.sparsePointCount,96);
+ assert.ok(result.report.reconstructionDiagnostics.warnings.some(warning=>warning.includes("Only 2 of 3 selected images registered")));
+ assert.ok(result.report.warnings.some(warning=>warning.startsWith("Reconstruction diagnostics:")));
  assert.equal(result.report.scaleCalibration.metresPerModelUnit,4);assert.ok(result.report.outputs.glb.bytes>100);
  assert.equal(glbJson(await readFile(result.modelPath)).asset.version,"2.0");
  assert.equal(JSON.parse(await readFile(result.reportPath,"utf8")).status,"completed-requires-review");

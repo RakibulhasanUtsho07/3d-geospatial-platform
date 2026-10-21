@@ -6,6 +6,7 @@ import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_IMAGE_COUNT=120,MAX_TOTAL_INPUT_BYTES=500*1024*1024;
@@ -55,6 +56,20 @@ async function locateMesh(workspace){
  const directories=[path.join(workspace,"dense","0"),path.join(workspace,"dense")];
  for(const dir of directories)for(const name of ["meshed-poisson.ply","meshed-delaunay.ply","meshed-advancing-front.ply"]){const candidate=path.join(dir,name);if(await fileExists(candidate))return candidate;}
  throw new Error("COLMAP finished but no meshed-*.ply was found under dense/0 or dense; check COLMAP output and logs");
+}
+async function locateSparseModel(workspace){
+ const candidates=[
+  path.join(workspace,"sparse","0"),
+  path.join(workspace,"sparse"),
+  path.join(workspace,"dense","sparse"),
+  path.join(workspace,"dense","0","sparse")
+ ];
+ const required=["cameras.bin","images.bin","points3D.bin"];
+ for(const directory of candidates){
+  const found=await Promise.all(required.map(name=>fileExists(path.join(directory,name))));
+  if(found.every(Boolean))return directory;
+ }
+ return null;
 }
 async function readApprovedSources(root,buildingId,sourceIds,spec){
  if(!Array.isArray(sourceIds)||sourceIds.length<3||sourceIds.length>MAX_IMAGE_COUNT)throw new RangeError("sourceIds must contain between 3 and "+MAX_IMAGE_COUNT+" candidate views");
@@ -132,6 +147,43 @@ export async function runColmapReconstruction(options){
   const colmapPath=options.colmapPath||process.env.COLMAP_BIN||"colmap",spawnImpl=options.spawnImpl;
   const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
   const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
+  // A zero exit code only means COLMAP completed; it does not mean enough input views
+  // registered or that the sparse reconstruction is strong enough for stable geometry.
+  report.progress="reconstruction-quality-diagnostics";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+  const diagnosticsStart=Date.now(),sparseModelDir=await locateSparseModel(outputJobDir);
+  if(!sparseModelDir){
+   report.reconstructionDiagnostics={
+    schemaVersion:"1.0.0",
+    status:"unavailable",
+    sourceImageCount:sources.length,
+    warnings:["COLMAP sparse model files (cameras.bin, images.bin, points3D.bin) were not found; registration and sparse-point diagnostics are unavailable."],
+    caveat:"Diagnostics are heuristic review hints, not proof of overlap, scale, completeness, or architectural accuracy."
+   };
+  }else{
+   try{
+    const modelAnalysis=await runProcess(colmapPath,["model_analyzer","--path",sparseModelDir],Math.min(timeoutMs,60000),spawnImpl);
+    report.reconstructionDiagnostics={
+     ...assessColmapReconstruction({
+      analysisText:modelAnalysis.stdout+"\n"+modelAnalysis.stderr,
+      sourceCount:sources.length,
+      thresholds:options.reconstructionDiagnosticsThresholds
+     }),
+     sparseModelPath:path.relative(outputJobDir,sparseModelDir).split(path.sep).join("/")
+    };
+   }catch(diagnosticError){
+    report.reconstructionDiagnostics={
+     schemaVersion:"1.0.0",
+     status:"unavailable",
+     sourceImageCount:sources.length,
+     sparseModelPath:path.relative(outputJobDir,sparseModelDir).split(path.sep).join("/"),
+     warnings:["COLMAP model_analyzer could not run; reconstruction was kept for review. "+(diagnosticError instanceof Error?diagnosticError.message:String(diagnosticError))],
+     caveat:"Diagnostics are heuristic review hints, not proof of overlap, scale, completeness, or architectural accuracy."
+    };
+   }
+  }
+  report.timingsMs.reconstructionDiagnostics=Date.now()-diagnosticsStart;
+  for(const warning of report.reconstructionDiagnostics.warnings||[])report.warnings.push("Reconstruction diagnostics: "+warning);
+  await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const inputMesh=await locateMesh(outputJobDir),denseWorkspace=path.dirname(inputMesh),texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
   const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
   const texturedMesh=path.join(texturedDir,"mesh.ply"),texturePath=path.join(texturedDir,"texture.png");
