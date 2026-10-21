@@ -61,7 +61,9 @@
     "test:wireframe-qa-repair-passes": "node --test tests/wireframe-qa-repair-passes.test.mjs",
     "qa:wireframe-repair-passes": "node scripts/run-wireframe-qa-repair-passes.mjs",
     "test:wireframe-to-mesh": "node --test tests/wireframe-to-mesh.test.mjs",
-    "build:reviewed-wireframe-mesh": "node scripts/build-reviewed-wireframe-mesh.mjs"
+    "build:reviewed-wireframe-mesh": "node scripts/build-reviewed-wireframe-mesh.mjs",
+    "test:mesh-surface-review": "node --test tests/mesh-surface-review.test.mjs",
+    "review:mesh-surfaces": "node scripts/review-mesh-surfaces.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
