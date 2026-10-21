@@ -56,14 +56,14 @@ function mockedColmapSpawn(_executable,args){
      "0 0 -1",
      "2 0.9238795 0 0.3826834 0 -5 0 0 1 view-0002.png",
      "0 0 -1"
-    ].join("\\n"));
+    ].join("\n"));
     await writeFile(path.join(outputPath,"points3D.txt"),[
      "# 3D point list",
      "1 0 0 0 255 255 255 0",
      "2 10 0 0 255 255 255 0",
      "3 0 10 0 255 255 255 0",
      "4 0 0 10 255 255 255 0"
-    ].join("\\n"));
+    ].join("\n"));
    }else if(args[0]==="mesh_texturer"){
     const outputPath=args[args.indexOf("--output_path")+1];await mkdir(outputPath,{recursive:true});
     await writeFile(path.join(outputPath,"mesh.ply"),asciiPly(true));await writeFile(path.join(outputPath,"texture.png"),png);
