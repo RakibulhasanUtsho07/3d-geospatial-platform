@@ -151,7 +151,7 @@ async function main() {
   const reportItems = [
     ["geometry-qa", "reports/geometry-qa.json", geometryBytes, geometryQa],
     ["texture-qa", "reports/texture-qa.json", textureBytes, textureQa],
-    ["render-manifest", "renders/render-review-manifest.json", manifestBytes, renderManifest, sha256(manifestBytes)],
+    ["render-manifest", "renders/render-review-manifest.json", manifestBytes, renderManifest],
     ["render-reference-review", "reports/render-reference-review.json", reviewBytes, renderReferenceReview],
     ["correction-task-backlog", "reports/correction-tasks.json", backlogBytes, correctionTaskBacklog],
     ["correction-verification", "reports/correction-verification.json", verificationDiskBytes, correctionVerification],
