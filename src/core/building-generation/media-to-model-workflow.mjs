@@ -244,6 +244,20 @@ export async function runMediaToModelWorkflow(options){
   });
   const ingestion=await runStateStage({
    root,buildingId,jobId,stageId:"media-ingestion",inputFingerprint:ingestionFingerprint,
+   validateReused:async artifact=>{
+    if(!Array.isArray(artifact.payload?.mediaRecords)||!Array.isArray(artifact.payload?.visualIds)){
+     throw new TypeError("cached media-ingestion artifact is incomplete");
+    }
+    for(const saved of artifact.payload.mediaRecords){
+     const loaded=await loadVerifiedSource(root,buildingId,saved.id);
+     if(loaded.sha256!==saved.sha256||loaded.record.kind!==saved.kind||
+        loaded.record.mimeType!==saved.mimeType||loaded.record.licence!==saved.licence||
+        loaded.record.usageStatus!==saved.usageStatus||loaded.record.relativePath!==saved.relativePath||
+        (saved.parentSourceId!==undefined&&loaded.record.parentSourceId!==saved.parentSourceId)){
+      throw new TypeError("cached media source no longer matches its ingestion artifact: "+saved.id);
+     }
+    }
+   },
    execute:async()=>{
     const mediaRecords=[],visualIds=[];
     for(const manifestInput of sourceFileManifest){
