@@ -121,7 +121,9 @@ test("resumes media-to-model artifacts without re-ingesting sources or rebuildin
  assert.deepEqual(firstState.stageIds,["media-ingestion","building-spec-sync","model-generation","report-finalization"]);
  assert.equal(firstState.status,"completed");
  assert.ok(firstState.stages.every(stage=>stage.status==="completed"&&stage.artifacts.length===1));
- assert.equal(first.report.output.modelSha256,firstState.stages[2].artifacts[0].contentSha256===undefined?first.report.output.modelSha256:first.report.output.modelSha256);
+ const modelArtifactPath=path.join(path.dirname(statePath),...firstState.stages[2].artifacts[0].path.split("/"));
+ const modelArtifact=JSON.parse(await readFile(modelArtifactPath,"utf8"));
+ assert.equal(first.report.output.modelSha256,modelArtifact.payload.modelSha256);
 
  const second=await runMediaToModelWorkflow(options);
  const secondState=JSON.parse(await readFile(statePath,"utf8"));
