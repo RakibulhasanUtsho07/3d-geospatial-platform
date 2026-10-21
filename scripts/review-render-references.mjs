@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { lstat, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
 import { buildRenderReferenceReview } from "../src/core/building-generation/render-reference-review.mjs";
@@ -14,6 +14,33 @@ async function readVerifiedImage(filePath, label) {
   const dimensions = readImageDimensions(info);
   if (!dimensions) throw new TypeError(label + " must be a readable JPEG/PNG image");
   return { sha256:sha256(info), width:dimensions.width, height:dimensions.height, bytes:info.length };
+}
+
+async function readSimilarityDiagnostic(diagnosticPath, reviewRoot, label) {
+  if (typeof diagnosticPath !== "string" || !diagnosticPath.trim() ||
+    path.isAbsolute(diagnosticPath) || path.win32.isAbsolute(diagnosticPath)) {
+    throw new TypeError(label + " similarityDiagnosticsPath must be a non-empty relative path");
+  }
+  const rootPath = await realpath(reviewRoot);
+  const candidatePath = path.resolve(rootPath, diagnosticPath);
+  const relativePath = path.relative(rootPath, candidatePath);
+  if (relativePath === ".." || relativePath.startsWith(".." + path.sep) || path.isAbsolute(relativePath)) {
+    throw new TypeError(label + " similarity diagnostics path escapes the review-input directory");
+  }
+  const entry = await lstat(candidatePath);
+  if (entry.isSymbolicLink() || !entry.isFile()) {
+    throw new TypeError(label + " similarity diagnostics must be a regular file and not a symlink");
+  }
+  const resolvedPath = await realpath(candidatePath);
+  const resolvedRelative = path.relative(rootPath, resolvedPath);
+  if (resolvedRelative === ".." || resolvedRelative.startsWith(".." + path.sep) || path.isAbsolute(resolvedRelative)) {
+    throw new TypeError(label + " similarity diagnostics path resolves outside the review-input directory");
+  }
+  const bytes = await readFile(resolvedPath);
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) {
+    throw new RangeError(label + " similarity diagnostics report must be a non-empty JSON file under 10 MB");
+  }
+  return { path: resolvedPath, bytes, report: JSON.parse(bytes.toString("utf8")) };
 }
 
 async function main() {
@@ -58,7 +85,29 @@ async function main() {
       ...actual,
     });
   }
-  if (inputPaths.some((filePath) => filePath === reportPath)) throw new Error("report output must not overwrite any input file");
+  const similarityDiagnostics = [];
+  const comparisonInputs = Array.isArray(reviewInput.comparisons) ? reviewInput.comparisons : [];
+  for (let index = 0; index < comparisonInputs.length; index++) {
+    const comparison = comparisonInputs[index];
+    if (!comparison || comparison.similarityDiagnosticsPath === undefined) continue;
+    const label = "comparison " + (comparison.viewId ?? index);
+    const diagnostic = await readSimilarityDiagnostic(
+      comparison.similarityDiagnosticsPath,
+      path.dirname(reviewInputPath),
+      label,
+    );
+    inputPaths.push(diagnostic.path);
+    similarityDiagnostics.push({
+      viewId: comparison.viewId,
+      referenceImageId: comparison.referenceImageId,
+      report: diagnostic.report,
+      reportSha256: sha256(diagnostic.bytes),
+    });
+  }
+
+  if (inputPaths.some((filePath) => path.resolve(filePath) === path.resolve(reportPath))) {
+    throw new Error("report output must not overwrite any input file");
+  }
   try {
     await readFile(reportPath);
     throw new Error("Report already exists; choose a new path rather than overwrite review history: " + reportPath);
@@ -72,6 +121,7 @@ async function main() {
     reviewInput,
     renderFiles,
     referenceFiles,
+    similarityDiagnostics,
   });
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag:"wx", mode:0o600 });
   console.log(JSON.stringify({
@@ -81,6 +131,8 @@ async function main() {
     renderViews:report.counts.renderViewCount,
     references:report.counts.referenceImageCount,
     comparisons:report.counts.comparisonCount,
+    similarityDiagnostics:report.similarityDiagnosticsSummary.count,
+    similarityDiagnosticsWithWarnings:report.similarityDiagnosticsSummary.withWarnings,
     pending:report.counts.pending,
     partial:report.counts.partial,
     mismatch:report.counts.mismatch,
