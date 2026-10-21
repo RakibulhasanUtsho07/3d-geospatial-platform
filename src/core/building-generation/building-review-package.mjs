@@ -118,16 +118,17 @@ export function buildBuildingReviewPackageManifest({
 
   const readyProvenance = readinessReport.provenance ?? {};
   const expectedDigests = new Map([
-    ["render-manifest", readyProvenance.renderManifestSha256],
-    ["render-reference-review", readyProvenance.renderReferenceReviewSha256],
-    ["correction-task-backlog", readyProvenance.correctionTaskBacklogSha256],
-    ["correction-verification", readyProvenance.correctionVerificationReportSha256],
-    ["geometry-qa", readyProvenance.geometryQaReportSha256],
-    ["texture-qa", readyProvenance.textureQaReportSha256],
+    ["render-manifest", { expected: readyProvenance.renderManifestSha256, field: "sha256" }],
+    ["render-reference-review", { expected: readyProvenance.renderReferenceReviewSha256, field: "contentDigest" }],
+    ["correction-task-backlog", { expected: readyProvenance.correctionTaskBacklogSha256, field: "contentDigest" }],
+    ["correction-verification", { expected: readyProvenance.correctionVerificationReportSha256, field: "contentDigest" }],
+    ["geometry-qa", { expected: readyProvenance.geometryQaReportSha256, field: "contentDigest" }],
+    ["texture-qa", { expected: readyProvenance.textureQaReportSha256, field: "contentDigest" }],
   ]);
-  for (const [artifactType, expectedDigest] of expectedDigests) {
-    const artifact = artifacts.find((item) => item.artifactType === artifactType);
-    if (!isHash(expectedDigest) || artifact?.contentDigest?.toLowerCase() !== expectedDigest.toLowerCase()) {
+  for (const [artifactType, binding] of expectedDigests) {
+    const item = artifacts.find((entry) => entry.artifactType === artifactType);
+    const actualDigest = item?.[binding.field];
+    if (!isHash(binding.expected) || actualDigest?.toLowerCase() !== binding.expected.toLowerCase()) {
       throw new Error("review-package-evidence-digest-mismatch:" + artifactType);
     }
   }
