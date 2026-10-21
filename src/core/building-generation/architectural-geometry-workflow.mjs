@@ -74,6 +74,16 @@ async function hashFile(filePath) {
   return digest.digest("hex");
 }
 
+async function readHeader(filePath, maxBytes = 1024 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of createReadStream(filePath, { start: 0, end: maxBytes - 1 })) {
+    chunks.push(chunk);
+    total += chunk.length;
+  }
+  return Buffer.concat(chunks, total);
+}
+
 async function readRegularFile(root, relativePath, label, maxBytes) {
   const safePath = safeRelativePath(relativePath, label);
   const candidate = path.resolve(root, ...safePath.split("/"));
@@ -173,7 +183,7 @@ async function loadAndVerifyInput(root, relativePath) {
     if (actualHash.toLowerCase() !== image.sha256.toLowerCase()) {
       throw new TypeError("texture image SHA-256 mismatch for " + image.id);
     }
-    const header = (await readFile(source.path)).subarray(0, 1024 * 1024);
+    const header = await readHeader(source.path);
     const dimensions = readImageDimensions(header);
     if (!dimensions || dimensions.width !== image.width || dimensions.height !== image.height) {
       throw new TypeError("texture image dimensions do not match the verified file for " + image.id);
