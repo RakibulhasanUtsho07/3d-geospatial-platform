@@ -71,6 +71,7 @@ export function buildModelReviewSummary(input = {}) {
   const {
     imageQualityPreflight,
     reconstructionDiagnostics,
+    cameraCoverage,
     modelQuality,
     scaleCalibration,
     upAxisReviewed,
@@ -135,6 +136,34 @@ export function buildModelReviewSummary(input = {}) {
         registeredImages: reconstructionDiagnostics.metrics?.registeredImages ?? null,
         sourceImageCount: reconstructionDiagnostics.sourceImageCount ?? null,
         sparsePointCount: reconstructionDiagnostics.metrics?.sparsePointCount ?? null,
+        warnings: messages.slice(0, 6),
+      },
+    ));
+  }
+
+  if (!isObject(cameraCoverage) || cameraCoverage.status === "unavailable") {
+    const messages = Array.isArray(cameraCoverage?.warnings) ? cameraCoverage.warnings : [];
+    findings.push(finding(
+      "camera-coverage-diagnostics-unavailable", "camera-coverage", "medium",
+      "Camera coverage could not be assessed",
+      messages[0] || "COLMAP camera poses or sparse scene bounds were not available for coverage analysis.",
+      "Inspect the exported COLMAP sparse model and verify that camera positions, image orientations and sparse point bounds are present before accepting the mesh.",
+      { warnings: messages.slice(0, 4) },
+    ));
+  } else if (cameraCoverage.status === "review-recommended") {
+    const messages = Array.isArray(cameraCoverage.warnings) ? cameraCoverage.warnings : [];
+    const lowSpread = messages.includes("camera-positions-have-low-spread-relative-to-scene");
+    const sameDirection = messages.includes("camera-viewing-directions-are-nearly-identical");
+    findings.push(finding(
+      "camera-coverage-needs-review", "camera-coverage", lowSpread || sameDirection ? "medium" : "low",
+      "Registered viewpoints may not cover enough of the building",
+      messages.length ? messages.slice(0, 3).join(", ") + "." : "COLMAP camera coverage heuristics recommended review.",
+      "Inspect registered camera positions and viewing directions. Capture more overlapping oblique views around the building corners, roofline and opposite facades where access permits; do not assume unobserved geometry is correct.",
+      {
+        registeredCameraPoseCount: cameraCoverage.registeredCameraPoseCount ?? null,
+        sparsePointCount: cameraCoverage.sparsePointCount ?? null,
+        cameraPositionSpreadRatio: cameraCoverage.cameraPositionSpreadRatio ?? null,
+        maximumViewingDirectionAngleDegrees: cameraCoverage.maximumViewingDirectionAngleDegrees ?? null,
         warnings: messages.slice(0, 6),
       },
     ));
