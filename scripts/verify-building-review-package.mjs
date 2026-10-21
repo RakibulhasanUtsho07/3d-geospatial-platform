@@ -20,7 +20,7 @@ async function listFiles(root, current = root, files = []) {
     }
     if (!details.isFile()) throw new Error("Unsupported filesystem entry inside review package: " + fullPath);
     const relativePath = path.relative(root, fullPath).split(path.sep).join("/");
-    if (relativePath === "package-manifest.json") continue;
+    if (relativePath === "package-manifest.json" || relativePath === "package-manifest.sig.json") continue;
     const content = await readFile(fullPath);
     const image = /\.(?:png|jpe?g)$/i.test(entry.name) ? readImageDimensions(content) : null;
     files.push({
