@@ -31,6 +31,7 @@ on:
       - feat/render-correction-verification
       - feat/building-release-readiness-gate
       - feat/building-review-package
+      - feat/building-review-package-integrity-v2
       - feat/texture-projection-validation
   pull_request:
     branches:
@@ -143,6 +144,9 @@ jobs:
 
       - name: Test immutable building review package
         run: npm run test:building-review-package
+
+      - name: Test offline review package integrity verifier
+        run: npm run test:building-review-package-integrity
 
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
