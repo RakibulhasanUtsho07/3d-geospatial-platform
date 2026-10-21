@@ -51,7 +51,9 @@
     "test:reference-dimension-validation": "node --test tests/reference-dimension-validation.test.mjs",
     "validate:model-dimensions": "node scripts/validate-model-dimensions.mjs",
     "test:image-tile-analysis": "node --test tests/image-tile-analysis.test.mjs",
-    "tile:building-images": "node scripts/tile-building-images.mjs"
+    "tile:building-images": "node scripts/tile-building-images.mjs",
+    "test:architectural-sketch-preparation": "node --test tests/architectural-sketch-preparation.test.mjs",
+    "prepare:architectural-sketches": "node scripts/prepare-architectural-sketches.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
