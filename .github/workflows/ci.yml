@@ -90,6 +90,9 @@ jobs:
       - name: Test bounded wireframe QA and safe repair passes
         run: npm run test:wireframe-qa-repair-passes
 
+      - name: Test reviewed wireframe to mesh candidate
+        run: npm run test:wireframe-to-mesh
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
