@@ -69,7 +69,9 @@
     "test:texture-bake-readiness": "node --test tests/texture-bake-readiness.test.mjs",
     "assess:texture-bake-readiness": "node scripts/assess-texture-bake-readiness.mjs",
     "test:texture-atlas": "node --test tests/texture-atlas.test.mjs",
-    "build:texture-atlas": "node scripts/build-texture-atlas.mjs"
+    "build:texture-atlas": "node scripts/build-texture-atlas.mjs",
+    "test:glb-texture-binding-qa": "node --test tests/glb-texture-binding-qa.test.mjs",
+    "review:glb-texture-bindings": "node scripts/review-glb-texture-bindings.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
