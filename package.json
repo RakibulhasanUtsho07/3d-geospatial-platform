@@ -63,7 +63,9 @@
     "test:wireframe-to-mesh": "node --test tests/wireframe-to-mesh.test.mjs",
     "build:reviewed-wireframe-mesh": "node scripts/build-reviewed-wireframe-mesh.mjs",
     "test:mesh-surface-review": "node --test tests/mesh-surface-review.test.mjs",
-    "review:mesh-surfaces": "node scripts/review-mesh-surfaces.mjs"
+    "review:mesh-surfaces": "node scripts/review-mesh-surfaces.mjs",
+    "test:texture-projection-review": "node --test tests/texture-projection-review.test.mjs",
+    "review:texture-projection": "node scripts/review-texture-projection.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
