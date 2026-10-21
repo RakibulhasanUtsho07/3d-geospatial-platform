@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { reviewUvSeams } from "./uv-seam-review.mjs";
+import { reviewTextureImageContent } from "./texture-image-content-review.mjs";
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -148,6 +150,37 @@ function readUvAccessor(accessor, views, binary, bufferLength, label, errors) {
   return { count, bounds: nonFiniteCount ? null : { minU,minV,maxU,maxV }, nonFiniteCount, outOfRangeCount, values: uvs };
 }
 
+function readPositionAccessor(accessor, views, binary, bufferLength, label, errors) {
+  if (!accessor || accessor.type !== "VEC3" || accessor.componentType !== 5126 || accessor.sparse) {
+    errors.push(`${label}-invalid-position-accessor`);
+    return null;
+  }
+  const view = views[accessor.bufferView];
+  if (!view || view.buffer !== 0) { errors.push(`${label}-position-not-in-embedded-buffer`); return null; }
+  const count = accessor.count;
+  const viewOffset = view.byteOffset ?? 0, accessorOffset = accessor.byteOffset ?? 0, stride = view.byteStride ?? 12;
+  const viewLength = view.byteLength;
+  if (!Number.isSafeInteger(count) || count < 1 || !Number.isSafeInteger(viewOffset) || viewOffset < 0 ||
+    !Number.isSafeInteger(accessorOffset) || accessorOffset < 0 || !Number.isSafeInteger(viewLength) ||
+    viewLength < 1 || !Number.isSafeInteger(stride) || stride < 12 || stride > 252 || stride % 4 !== 0) {
+    errors.push(`${label}-invalid-position-layout`);
+    return null;
+  }
+  const first = viewOffset + accessorOffset, end = first + (count - 1) * stride + 12;
+  if (!binary || end > viewOffset + viewLength || end > bufferLength || end > binary.length) {
+    errors.push(`${label}-position-accessor-out-of-bounds`);
+    return null;
+  }
+  const positions = [];
+  for (let i = 0; i < count; i++) {
+    const at = first + i * stride;
+    const point = [binary.readFloatLE(at), binary.readFloatLE(at + 4), binary.readFloatLE(at + 8)];
+    if (point.some((value) => !finite(value))) errors.push(`${label}-contains-non-finite-position`);
+    positions.push(point);
+  }
+  return { count, values: positions };
+}
+
 function readIndexAccessor(accessor, views, binary, bufferLength, vertexCount, label, errors) {
   if (!accessor) return Array.from({length:vertexCount},(_,index)=>index);
   const bytes = COMPONENT_BYTES[accessor.componentType];
@@ -203,11 +236,20 @@ export function reviewGlbTextureBindings(input, options = {}) {
     sourceBytes.push(bytes);
     const mimeType = image?.mimeType ?? (typeof image?.uri === "string" ? image.uri.match(/^data:([^;,]+)/)?.[1] : null);
     const dimensions = bytes ? imageDimensions(bytes,mimeType) : null;
+    const contentReview = bytes ? reviewTextureImageContent(bytes,mimeType, {
+      minRecommendedDimension: options.minRecommendedTextureDimension ?? 512,
+      maxPixels: options.maxTextureAnalysisPixels ?? 16_777_216,
+    }) : null;
+    if (contentReview) {
+      for (const risk of contentReview.risks) {
+        if (risk !== "pixel-content-not-analysed-for-this-image-format") warnings.push(`image-${index}-${risk}`);
+      }
+    }
     if (bytes && ["image/png","image/jpeg","image/jpg"].includes(mimeType) && !dimensions) errors.push(`image-${index}-content-does-not-match-mimeType-or-is-truncated`);
     if (dimensions && (dimensions.width < 1 || dimensions.height < 1)) errors.push(`image-${index}-invalid-dimensions`);
     images.push({ index, name:image?.name ?? null, mimeType:mimeType ?? null, embedded:Boolean(bytes), byteLength:bytes?.length ?? null,
       sha256:bytes ? sha256(bytes) : null, width:dimensions?.width ?? null, height:dimensions?.height ?? null,
-      format:dimensions?.format ?? null });
+      format:dimensions?.format ?? null, contentReview });
   });
 
   const validTextureImage = new Map();
@@ -225,7 +267,7 @@ export function reviewGlbTextureBindings(input, options = {}) {
 
   const primitiveReports = [];
   let texturedPrimitiveCount = 0, untexturedPrimitiveCount = 0, uvAttributeCount = 0, uvVertexCount = 0;
-  const reportedUvAccessors = new Map();
+  const reportedUvAccessors = new Map();\n  const reportedPositionAccessors = new Map();
   (gltf.meshes ?? []).forEach((mesh,meshIndex) => {
     if (!Array.isArray(mesh.primitives) || mesh.primitives.length === 0) {
       errors.push(`mesh-${meshIndex}-has-no-primitives`);
@@ -248,7 +290,7 @@ export function reviewGlbTextureBindings(input, options = {}) {
       }
       const material = Number.isSafeInteger(materialIndex) ? materials[materialIndex] : null;
       const refs = material ? materialTextureRefs(material) : [];
-      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[] };
+      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[], uvSeamReviews:[] };\n      const seamReviewByTexCoord = new Map();
       if (refs.length === 0) {
         untexturedPrimitiveCount++;
         warnings.push(`${key}-no-supported-material-textures`);
@@ -287,7 +329,8 @@ export function reviewGlbTextureBindings(input, options = {}) {
           const indices = !indexAccessor ? Array.from({length:position?.count ?? 0},(_,i)=>i) :
             readIndexAccessor(indexAccessor,views,binary,bufferLength,position?.count ?? 0,key,errors);
           let degenerateUvTriangles = 0;
-          if (uv && indices) {
+          let uvSeamReview = null;
+          if (uv && indices && !uv.nonFiniteCount && position?.count === uv.count) {
             for (let i=0;i+2<indices.length;i+=3) {
               const a=uv.values[indices[i]], b=uv.values[indices[i+1]], c=uv.values[indices[i+2]];
               if (!a||!b||!c || [ ...a,...b,...c ].some(n=>!finite(n))) continue;
@@ -295,8 +338,26 @@ export function reviewGlbTextureBindings(input, options = {}) {
               if (area <= 1e-12) degenerateUvTriangles++;
             }
             if (degenerateUvTriangles) warnings.push(`${key}-degenerate-uv-triangles`);
+            if (!seamReviewByTexCoord.has(texCoord)) {
+              let positionData = reportedPositionAccessors.get(positionIndex);
+              if (!positionData) {
+                positionData = readPositionAccessor(position,views,binary,bufferLength,`${key}-POSITION`,errors);
+                reportedPositionAccessors.set(positionIndex,positionData);
+              }
+              if (positionData && positionData.count === uv.count) {
+                try {
+                  const review = reviewUvSeams({ positions:positionData.values, uvs:uv.values, indices }, options.uvSeamReview ?? {});
+                  seamReviewByTexCoord.set(texCoord,review);
+                  report.uvSeamReviews.push({ texCoord, ...review });
+                  if (review.seamCandidateCount > 0) warnings.push(`${key}-uv-seam-review-candidates-present`);
+                } catch (error) {
+                  errors.push(`${key}-uv-seam-review-failed`);
+                }
+              }
+            }
+            uvSeamReview = seamReviewByTexCoord.get(texCoord) ?? null;
           }
-          report.textureBindings.push({ property:ref.property, textureIndex, sourceImageIndex:sourceIndex ?? null, texCoord, valid:Boolean(uv && sourceIndex !== undefined), uvBounds:uv?.bounds ?? null, degenerateUvTriangles });
+          report.textureBindings.push({ property:ref.property, textureIndex, sourceImageIndex:sourceIndex ?? null, texCoord, valid:Boolean(uv && sourceIndex !== undefined), uvBounds:uv?.bounds ?? null, degenerateUvTriangles, uvSeamCandidateCount:uvSeamReview?.seamCandidateCount ?? null });
         });
       }
       report.uvAttributes = Object.keys(primitive.attributes ?? {}).filter(name=>/^TEXCOORD_\d+$/.test(name));
@@ -331,7 +392,7 @@ export function reviewGlbTextureBindings(input, options = {}) {
     valid:errors.length === 0,
     publicationEligible:false,
     counts:{ meshCount:gltf.meshes?.length ?? 0, materialCount:materials.length, textureCount:textures.length, imageCount:images.length,
-      texturedPrimitiveCount, untexturedPrimitiveCount, uvAccessorCount:uvAttributeCount, uvVertexCount },
+      texturedPrimitiveCount, untexturedPrimitiveCount, uvAccessorCount:uvAttributeCount, uvVertexCount,\n      uvSeamCandidateCount:primitiveReports.reduce((sum, item) => sum + item.uvSeamReviews.reduce((part, review) => part + review.seamCandidateCount, 0), 0),\n      textureContentRiskCount:images.reduce((sum, image) => sum + (image.contentReview?.risks?.length ?? 0), 0) },
     images, primitiveReports, errors:[...new Set(errors)], warnings:[...new Set(warnings)],
     limitations:[
       "This audit validates glTF resource references and UV numeric ranges; it does not render the model or determine whether the photo belongs to the corresponding facade.",
