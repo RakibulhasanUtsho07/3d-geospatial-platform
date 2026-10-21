@@ -43,6 +43,7 @@ on:
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
+      - feat/render-image-similarity-diagnostics
 
 permissions:
   contents: read
