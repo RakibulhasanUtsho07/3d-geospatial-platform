@@ -27,6 +27,14 @@ export const RECONSTRUCTION_STAGE_IDS = Object.freeze([
   "final-acceptance",
 ]);
 
+// A truthful execution profile for the current media-to-model CLI.
+export const MEDIA_TO_MODEL_STAGE_IDS = Object.freeze([
+  "media-ingestion",
+  "building-spec-sync",
+  "model-generation",
+  "report-finalization",
+]);
+
 const JOB_STATE_FILE = "job-state.json";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -108,9 +116,21 @@ function nowIso(value) {
 }
 
 function assertStageId(stageId) {
-  if (!RECONSTRUCTION_STAGE_IDS.includes(stageId)) {
+  const known = [...RECONSTRUCTION_STAGE_IDS, ...MEDIA_TO_MODEL_STAGE_IDS];
+  if (!known.includes(stageId)) {
     throw new TypeError("unknown reconstruction stage: " + String(stageId));
   }
+}
+
+function stageIdsForJob(job, requestedStageIds) {
+  const candidate = requestedStageIds ?? job?.stageIds ?? RECONSTRUCTION_STAGE_IDS;
+  const plans = [RECONSTRUCTION_STAGE_IDS, MEDIA_TO_MODEL_STAGE_IDS];
+  if (!Array.isArray(candidate) || !plans.some((plan) =>
+    plan.length === candidate.length && plan.every((id, index) => id === candidate[index])
+  )) {
+    throw new TypeError("stageIds must match a supported, ordered execution profile");
+  }
+  return [...candidate];
 }
 
 function inside(root, candidate) {
@@ -234,8 +254,9 @@ function validateJobState(job) {
   safeId(job.buildingId, "buildingId");
   safeId(job.jobId, "jobId");
   if (!JOB_STATUSES.has(job.status)) throw new TypeError("invalid reconstruction job status");
-  if (!Array.isArray(job.stages) || job.stages.length !== RECONSTRUCTION_STAGE_IDS.length) {
-    throw new TypeError("job state must contain every reconstruction stage in order");
+  const stageIds = stageIdsForJob(job);
+  if (!Array.isArray(job.stages) || job.stages.length !== stageIds.length) {
+    throw new TypeError("job state must contain every stage in its execution profile and in order");
   }
   if (!isRecord(job.sourceManifest) && !Array.isArray(job.sourceManifest)) {
     throw new TypeError("job sourceManifest must be an object or array");
@@ -249,9 +270,9 @@ function validateJobState(job) {
     throw new TypeError("reconstruction jobs must remain fail-closed until separately approved");
   }
 
-  for (let index = 0; index < RECONSTRUCTION_STAGE_IDS.length; index += 1) {
+  for (let index = 0; index < stageIds.length; index += 1) {
     const stage = job.stages[index];
-    if (!isRecord(stage) || stage.id !== RECONSTRUCTION_STAGE_IDS[index] ||
+    if (!isRecord(stage) || stage.id !== stageIds[index] ||
         stage.order !== index || !STAGE_STATUSES.has(stage.status)) {
       throw new TypeError("job stages are invalid or out of order");
     }
@@ -409,12 +430,14 @@ export async function createOrResumeReconstructionJob({
   sourceManifest = [],
   config = {},
   recoverInterrupted = true,
+  stageIds: requestedStageIds = RECONSTRUCTION_STAGE_IDS,
   now,
 }) {
   safeId(buildingId, "buildingId");
   safeId(jobId, "jobId");
   const normalizedManifest = cloneJson(sourceManifest, "sourceManifest");
   const normalizedConfig = cloneJson(config, "config");
+  const normalizedStageIds = stageIdsForJob(null, requestedStageIds);
   if (!Array.isArray(normalizedManifest) && !isRecord(normalizedManifest)) {
     throw new TypeError("sourceManifest must be an object or array");
   }
@@ -426,7 +449,8 @@ export async function createOrResumeReconstructionJob({
 
   if (exists) {
     const job = await loadJob(jobDirectory);
-    if (job.sourceManifestSha256 !== hashJson(normalizedManifest) ||
+    if (JSON.stringify(stageIdsForJob(job)) !== JSON.stringify(normalizedStageIds) ||
+        job.sourceManifestSha256 !== hashJson(normalizedManifest) ||
         job.configSha256 !== hashJson(normalizedConfig)) {
       throw new TypeError("jobId already belongs to different source/config inputs; use a new jobId");
     }
@@ -448,7 +472,8 @@ export async function createOrResumeReconstructionJob({
     sourceManifestSha256: hashJson(normalizedManifest),
     config: normalizedConfig,
     configSha256: hashJson(normalizedConfig),
-    stages: RECONSTRUCTION_STAGE_IDS.map(createStageState),
+    stageIds: normalizedStageIds,
+    stages: normalizedStageIds.map(createStageState),
     mapReady: false,
     publicationEligible: false,
   };
@@ -486,7 +511,8 @@ export async function startReconstructionStage({
   }
   const jobDirectory = await resolveJobDirectory({ workspaceRoot, buildingId, jobId, create: false });
   const job = await loadJob(jobDirectory);
-  const index = RECONSTRUCTION_STAGE_IDS.indexOf(stageId);
+  const index = stageIdsForJob(job).indexOf(stageId);
+  if (index < 0) throw new TypeError("stage " + stageId + " is not part of this job's execution profile");
   const stage = job.stages[index];
   if (job.stages.some((item) => item.status === "running")) {
     throw new Error("another reconstruction stage is already running");
@@ -548,7 +574,9 @@ export async function completeReconstructionStage({
   if (!isRecord(normalizedOutputs)) throw new TypeError("stage outputs must be an object");
   const jobDirectory = await resolveJobDirectory({ workspaceRoot, buildingId, jobId, create: false });
   const job = await loadJob(jobDirectory);
-  const stage = job.stages[RECONSTRUCTION_STAGE_IDS.indexOf(stageId)];
+  const stageIndex = stageIdsForJob(job).indexOf(stageId);
+  if (stageIndex < 0) throw new TypeError("stage " + stageId + " is not part of this job's execution profile");
+  const stage = job.stages[stageIndex];
   if (stage.status !== "running") throw new Error("stage " + stageId + " is not running");
 
   const revision = stage.artifacts.reduce((maximum, record) => Math.max(maximum, record.revision), 0) + 1;
@@ -621,7 +649,9 @@ export async function failReconstructionStage({
   assertStageId(stageId);
   const jobDirectory = await resolveJobDirectory({ workspaceRoot, buildingId, jobId, create: false });
   const job = await loadJob(jobDirectory);
-  const stage = job.stages[RECONSTRUCTION_STAGE_IDS.indexOf(stageId)];
+  const stageIndex = stageIdsForJob(job).indexOf(stageId);
+  if (stageIndex < 0) throw new TypeError("stage " + stageId + " is not part of this job's execution profile");
+  const stage = job.stages[stageIndex];
   if (stage.status !== "running") throw new Error("stage " + stageId + " is not running");
   const timestamp = nowIso(now);
   const normalizedError = error instanceof Error
