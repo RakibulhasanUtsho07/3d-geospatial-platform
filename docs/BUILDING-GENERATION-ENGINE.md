@@ -1,6 +1,6 @@
 # Building Generation Engine
 
-Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake, FFmpeg frame extraction, image-quality preflight, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, TripoSR single-image preview, and shared GLB integrity/geometry QA are implemented. Learned architectural understanding, CAD/IFC/BIM import, durable Admin workflow, ground-control georeferencing and public publishing are not implemented yet.
+Status: deterministic procedural generation, source-aware BuildingSpec validation, local media intake with rights review, resumable media-to-model stage orchestration, FFmpeg frame extraction, image-quality preflight, COLMAP multi-view reconstruction, textured PLY-to-GLB conversion, TripoSR single-image preview, and shared GLB integrity/geometry QA are implemented. The current local stage runner persists source ingestion, BuildingSpec sync, model generation, and report finalization. Learned architectural understanding, automatic integration of the full sketch-to-texture reconstruction plan, CAD/IFC/BIM import, durable Admin workflow, surveyed vertical-datum handling and public publishing are not implemented yet.
 
 ## 1. Baseline input → 3D model
 
@@ -13,7 +13,7 @@ npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifa
 
 ## 2. Unified media-to-model workflow
 
-The runMediaToModelWorkflow function and scripts/build-building-from-media.mjs orchestrate local files into one reviewed output package. A run can ingest source media, compute SHA-256 content IDs, record an explicit licence/permission attestation, extract bounded video frames, sync the current source records into BuildingSpec, choose a generation strategy, and write a GLB with workflow/report metadata.
+The runMediaToModelWorkflow function and scripts/build-building-from-media.mjs orchestrate local files into one reviewed output package with four versioned/resumable stages: media ingestion, BuildingSpec sync, model generation, and report finalization. Stage artifacts are SHA-256 checked; source/config changes require a new job ID; retries preserve prior artifacts and invalidate dependent outputs. A run can ingest source media, record an explicit licence/permission attestation, extract bounded video frames, sync verified source records into BuildingSpec, choose a generation strategy, and write a GLB with workflow/report metadata. This profile does not pretend that the full per-view-sketch, wireframe-repair, geometry-repair and texture pipeline has run.
 
 ~~~powershell
 npm run test:media-to-model-workflow

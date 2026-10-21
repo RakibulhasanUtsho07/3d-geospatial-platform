@@ -104,3 +104,47 @@ test("rejects absolute media paths, path traversal, and incomplete reconstructio
   workspaceRoot:root,buildingSpec:fixture,jobId:"missing-overlap",strategy:"photogrammetry",sources:[],viewSourceIds:["one","two","three"],upAxis:"Z",confirmSameBuilding:true,confirmOverlapReviewed:false,confirmUpAxisReviewed:true,
  }),/photogrammetry requires/);
 });
+
+
+test("resumes media-to-model artifacts without re-ingesting sources or rebuilding a verified model",async t=>{
+ const root=await workspace(t);
+ await mkdir(path.join(root,"uploads"));
+ const sourcePath=path.join(root,"uploads","resume-front.png");
+ await writeFile(sourcePath,Buffer.concat([png,Buffer.from("resumable-source")]));
+ const options={
+  workspaceRoot:root,buildingSpec:fixture,jobId:"resumable-flow",strategy:"procedural",confirmRights:true,
+  sources:[{sourceId:"resume-front",relativePath:"uploads/resume-front.png",licence:"CC BY 4.0",author:"Test photographer",attribution:"Test source credit"}],
+ };
+ const first=await runMediaToModelWorkflow(options);
+ const statePath=path.join(root,".building-engine","reconstruction-jobs",fixture.id,"resumable-flow","job-state.json");
+ const firstState=JSON.parse(await readFile(statePath,"utf8"));
+ assert.deepEqual(firstState.stageIds,["media-ingestion","building-spec-sync","model-generation","report-finalization"]);
+ assert.equal(firstState.status,"completed");
+ assert.ok(firstState.stages.every(stage=>stage.status==="completed"&&stage.artifacts.length===1));
+ const modelArtifactPath=path.join(path.dirname(statePath),...firstState.stages[2].artifacts[0].path.split("/"));
+ const modelArtifact=JSON.parse(await readFile(modelArtifactPath,"utf8"));
+ assert.equal(first.report.output.modelSha256,modelArtifact.payload.modelSha256);
+
+ const second=await runMediaToModelWorkflow(options);
+ const secondState=JSON.parse(await readFile(statePath,"utf8"));
+ assert.equal(second.report.status,"completed-requires-review");
+ assert.equal(second.report.output.modelSha256,first.report.output.modelSha256);
+ assert.ok(secondState.stages.every(stage=>stage.status==="completed"&&stage.artifacts.length===1&&stage.attempts===1));
+ assert.equal(secondState.mapReady,false);
+ assert.equal(secondState.publicationEligible,false);
+
+ await rm(second.modelPath,{force:true});
+ const repaired=await runMediaToModelWorkflow(options);
+ const repairedState=JSON.parse(await readFile(statePath,"utf8"));
+ assert.equal(repaired.report.output.modelSha256,first.report.output.modelSha256);
+ assert.equal(repairedState.stages[0].artifacts.length,1);
+ assert.equal(repairedState.stages[1].artifacts.length,1);
+ assert.equal(repairedState.stages[2].attempts,2);
+ assert.equal(repairedState.stages[2].artifacts.length,2);
+ assert.equal(repairedState.stages[3].attempts,2);
+ assert.equal(repairedState.stages[3].artifacts.length,2);
+ assert.ok((await stat(repaired.modelPath)).size>100);
+
+ await writeFile(sourcePath,Buffer.concat([png,Buffer.from("changed-source-content")]));
+ await assert.rejects(runMediaToModelWorkflow(options),/different source\/config inputs/);
+});

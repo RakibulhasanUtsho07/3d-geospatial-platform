@@ -49,6 +49,9 @@ test("extracts bounded frames as distinct source records and avoids reconstructi
  const result=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:video.record,spawnImpl:fakeSpawn});
  assert.equal(result.extractedFrames,2);assert.equal(result.frames[0].kind,"video-frame");assert.equal(result.frames[0].parentSourceId,"site-video");
  assert.equal(result.frames[1].nominalTimeSeconds,2);assert.match(result.warning,/does not identify the building/);
+ const resumed=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:video.record,spawnImpl:fakeSpawn});
+ assert.equal(resumed.extractedFrames,2);
+ assert.deepEqual(resumed.frames.map(frame=>frame.sha256),result.frames.map(frame=>frame.sha256));
 });
 test("reports missing FFmpeg clearly",async t=>{
  const root=await workspace(t);await writeFile(path.join(root,"video.mp4"),mp4);
