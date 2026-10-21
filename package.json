@@ -77,7 +77,9 @@
     "test:render-review-manifest": "node --test tests/render-review-manifest.test.mjs",
     "render:building-review": "node scripts/render-building-review-views.mjs",
     "test:render-reference-review": "node --test tests/render-reference-review.test.mjs",
-    "review:render-references": "node scripts/review-render-references.mjs"
+    "review:render-references": "node scripts/review-render-references.mjs",
+    "test:render-correction-tasks": "node --test tests/render-correction-tasks.test.mjs",
+    "create:render-correction-tasks": "node scripts/create-render-correction-tasks.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
