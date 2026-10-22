@@ -36,3 +36,21 @@ export function shouldContinueViewportLoad(
 ) {
   return requestRevision === currentRevision && buildingsLayerVisible === true;
 }
+
+
+/**
+ * A viewport batch/stage may continue only while its camera intent, layer
+ * visibility, and viewer instance all remain current.
+ */
+export function shouldContinueViewportStage(
+  requestRevision,
+  currentRevision,
+  buildingsLayerVisible,
+  viewerIsCurrent,
+) {
+  return shouldContinueViewportLoad(
+    requestRevision,
+    currentRevision,
+    buildingsLayerVisible,
+  ) && viewerIsCurrent === true;
+}
