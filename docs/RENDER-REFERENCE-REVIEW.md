@@ -87,3 +87,12 @@ Similarity reports also divide the normalized 64×64 grayscale preview into a fi
 - `spatial-edge-coverage-difference-screening-hint`: the grid cells containing edge structure overlap too little.
 
 This is a reproducible coarse framing/crop **screen**, not a crop estimator or image-registration algorithm. It does not align images, remove background, or prove that images depict the same facade. A plain wall, foliage, shadows, different viewpoints, or a different render crop may trigger or hide these signals. Use the report to prioritize a manual visual check; the review outcome stays human-authored and `publicationEligible` stays false.
+
+
+## Localized difference diagnostics
+
+The similarity report now includes sixteen row-major cell summaries for a 4×4 split of its 64×64 grayscale preview. Each cell reports mean absolute pixel error, signed candidate-minus-reference luminance offset, and a local SSIM-style statistic over its 16×16 pixels. The report also gives the median and maximum cell error, their gap, and the four cell coordinates with the largest mean absolute error.
+
+A `localized-image-difference-screening-hint` is emitted when the highest-error cell is substantially worse than the median cell by the configured threshold. In JSON, `cellX` and `cellY` range from 0 through 3 starting at the top-left. These summaries help a reviewer prioritize a region for inspection, but do not generate a graphical heatmap or mask.
+
+A high-error cell may be caused by lighting, shadows, textures, windows, vegetation, crop, or background—not necessarily geometry. The metrics remain heuristic, do not alter the reviewer-entered comparison outcome, and do not change `publicationEligible: false`.
