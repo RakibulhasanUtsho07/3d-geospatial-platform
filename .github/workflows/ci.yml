@@ -188,6 +188,9 @@ jobs:
       - name: Test evidence-gated correction verification cycle
         run: npm run test:render-correction-verification
 
+      - name: Test file-backed correction artifact integrity
+        run: npm run test:render-correction-artifact-evidence
+
       - name: Test building release readiness with dimension and WGS84 ground-control evidence
         run: npm run test:building-release-readiness
 
