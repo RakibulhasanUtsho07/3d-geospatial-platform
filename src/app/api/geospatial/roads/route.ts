@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   buildOverpassRoadQuery,
+  buildRoadNetworkCacheKey,
   normalizeOverpassRoadElements,
   parseRoadNetworkParams,
 } from "@/core/geospatial/road-network.mjs";
@@ -34,16 +35,6 @@ function getOverpassUrl(): string {
     throw new Error("OVERPASS_API_URL must be an HTTPS URL without embedded credentials.");
   }
   return parsed.toString();
-}
-
-function cacheKey(request: RoadNetworkRequest): string {
-  return [
-    request.west.toFixed(3),
-    request.south.toFixed(3),
-    request.east.toFixed(3),
-    request.north.toFixed(3),
-    request.limit,
-  ].join("|");
 }
 
 function remember(key: string, roads: RoadFeature[]): void {
@@ -135,7 +126,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   const bounds = parsed.value;
-  const key = cacheKey(bounds);
+  const key = buildRoadNetworkCacheKey(bounds);
   const cached = responseCache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
     responseCache.delete(key);
