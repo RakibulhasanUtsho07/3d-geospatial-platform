@@ -159,6 +159,16 @@ test("records an immutable approved review and publishes only through the explic
   assert.equal(published.mapReady, false);
   assert.equal(published.publicationEligible, false);
 
+  const repeatedPublish = await publishReviewedFloorPlanModelCandidate({
+    workspaceRoot: setup.root,
+    buildingId: setup.candidate.buildingId,
+    candidateId: setup.candidate.candidateId,
+    publishedAt: "2026-10-22T14:06:00.000Z",
+  });
+  assert.equal(repeatedPublish.alreadyPublished, true);
+  assert.equal(repeatedPublish.versionId, published.versionId);
+  assert.equal(repeatedPublish.assetUrl, published.assetUrl);
+
   const manifestPath = path.join(setup.root, "public", "models", "generated", "manifest.json");
   const catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
   assert.equal(catalog.models.length, 1);
