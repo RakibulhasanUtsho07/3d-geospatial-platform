@@ -1,10 +1,9 @@
 /**
- * Resolve a building's rendered height while retaining a label that distinguishes
- * source-provided measurements from explicit estimates.
+ * Resolve a building's rendered height while retaining source/estimate provenance.
  *
- * The floor-height conversion and 9m fallback are rendering estimates, not
- * survey measurements. Dimensions are capped to keep invalid source values
- * from producing extreme geometry.
+ * Floor-height conversion and the 9m fallback are rendering estimates, not
+ * survey measurements. Safety caps are surfaced to the caller rather than
+ * being silently represented as the original requested value.
  */
 function getPositiveNumber(properties, keys) {
   for (const key of keys) {
@@ -38,15 +37,20 @@ export function resolveBuildingHeight(properties) {
     "height_m",
     "heightMeters",
   ]);
-
   const minHeight =
     getPositiveNumber(properties, ["min_height", "minHeight"]) ?? 0;
+  const baseHeight = Math.min(minHeight, 100);
+  const baseHeightWasClamped = minHeight > 100;
 
   if (height !== null) {
     return {
       meters: Math.min(Math.max(height, 3), 300),
-      baseHeight: Math.min(minHeight, 100),
+      baseHeight,
       source: "overture-height",
+      unclampedMeters: height,
+      heightWasClamped: height < 3 || height > 300,
+      unclampedBaseHeight: minHeight,
+      baseHeightWasClamped,
     };
   }
 
@@ -58,16 +62,25 @@ export function resolveBuildingHeight(properties) {
   ]);
 
   if (floors !== null) {
+    const unclampedMeters = floors * 3;
     return {
-      meters: Math.min(Math.max(floors * 3, 3), 300),
-      baseHeight: Math.min(minHeight, 100),
+      meters: Math.min(Math.max(unclampedMeters, 3), 300),
+      baseHeight,
       source: "floor-estimate",
+      unclampedMeters,
+      heightWasClamped: unclampedMeters < 3 || unclampedMeters > 300,
+      unclampedBaseHeight: minHeight,
+      baseHeightWasClamped,
     };
   }
 
   return {
     meters: 9,
-    baseHeight: Math.min(minHeight, 100),
+    baseHeight,
     source: "fallback-estimate",
+    unclampedMeters: 9,
+    heightWasClamped: false,
+    unclampedBaseHeight: minHeight,
+    baseHeightWasClamped,
   };
 }
