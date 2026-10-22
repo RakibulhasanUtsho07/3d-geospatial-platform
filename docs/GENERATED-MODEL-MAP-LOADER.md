@@ -79,6 +79,11 @@ npm run activate:building-model-version -- $workspace $modelId $previousVersionI
 
 The command verifies the selected static GLB still matches its recorded SHA-256 before changing the catalog's \`activeVersion\`. Commit/deploy the changed manifest for a hosted deployment.
 
+
+### Publish only after queue review
+
+For the integrated path from a generated job to the catalog, read [the published-model workflow](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md). The approved-job publisher checks the immutable review record, GLB and QA-report hashes, then requires explicit longitude, latitude, height and placement orientation parameters. It still does not claim to independently prove real-world accuracy or legal rights.
+
 ## Manual / development preview
 
 Use this for initial visual checks before publication. Place the review candidate under \`public/models/generated/\` only in a local development checkout, start the app, and in **Manual / development preview** enter the static path and explicit placement:
@@ -96,7 +101,7 @@ This path bypasses the published catalog and its publication attestation. Do not
 - The publish command records an operator's review attestation. It checks file hashes and required fields, but it cannot independently prove copyright permission, correct building identity, historical/architectural accuracy, real-world dimensions, survey precision or vertical-datum correctness.
 - Any GLB under \`public/\` is publicly served when the site is deployed. Do not put private evidence or restricted material there; the evidence file itself is not copied into the public catalog.
 - The published catalog stores public metadata and an evidence identifier/checksum, not private review files.
-- Current publishing is a local CLI plus a static JSON manifest, not an authenticated Admin UI, role-based approval workflow, private object store, background job system or database-backed asset service.
+- Catalog publishing is a local operator CLI plus a static JSON manifest, not a full Admin UI, private object store or database-backed asset service. The repository also has a separate authenticated generation queue/review API and a local persistent worker; see the generation-jobs guide. The file-backed queue requires a persistent filesystem shared by the API and worker.
 - The loader does not solve placement automatically. The operator must supply valid coordinates, axes, heading, scale and height.
 - External HTTPS assets in manual preview must be trusted and reachable by the browser; network or CORS restrictions can block them.
 - A successful Cesium load means only that the model loaded. It is not evidence of survey quality or architectural correctness.
