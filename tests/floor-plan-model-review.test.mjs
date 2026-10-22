@@ -129,8 +129,9 @@ test("records an immutable approved review and publishes only through the explic
   const auditRecord = JSON.parse(await readFile(path.join(candidateDir, "review.json"), "utf8"));
   const attestation = JSON.parse(await readFile(path.join(candidateDir, "attestation.json"), "utf8"));
   assert.equal(auditRecord.candidate.modelSha256, setup.candidate.modelSha256);
-  assert.equal(auditRecord.candidate.reportSha256, setup.candidate.report.output.sha256 === setup.candidate.modelSha256
-    ? auditRecord.candidate.reportSha256 : auditRecord.candidate.reportSha256);
+  const reportBytes = await readFile(path.join(candidateDir, "report.json"));
+  assert.equal(auditRecord.candidate.reportSha256, hash(reportBytes));
+  assert.equal(auditRecord.candidate.geometrySha256, setup.candidate.geometrySha256);
   assert.equal(attestation.candidateSha256, setup.candidate.modelSha256);
   assert.equal(attestation.model.id, publication.modelId);
   assert.equal(attestation.review.evidenceSha256, setup.evidenceSha256);
