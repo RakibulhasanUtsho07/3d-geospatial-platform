@@ -117,6 +117,31 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
       reviewedAt: "2026-10-21T10:00:00Z",
       notes: "Opening rhythm differs from the reference.",
     },
+    reviewChecklist: {
+      schemaVersion: "1.0.0",
+      correctionProposal: {
+        status: "approved",
+        proposalText: "Adjust the facade opening rhythm to match the reviewed source images.",
+        proposedBy: "modeler-01",
+        proposedAt: "2026-10-21T10:15:00Z",
+        approval: {
+          status: "approved",
+          approvedBy: "reviewer-02",
+          approvedAt: "2026-10-21T10:30:00Z",
+          rationale: "Test fixture records explicit human approval before implementation.",
+        },
+      },
+      implementationEvidence: {
+        status: "qa-complete",
+        changeSummary: "Updated facade opening rhythm.",
+        implementedAt: "2026-10-21T11:00:00Z",
+        outputModelSha256: modelSha,
+        geometryQaReportSha256: hash("geometry-qa:release-fixture"),
+        textureChangeApplicable: false,
+        textureQaReportSha256: null,
+        generatedRenderManifestSha256: manifestSha,
+      },
+    },
   };
   const backlog = {
     schemaVersion: "1.0.0",
