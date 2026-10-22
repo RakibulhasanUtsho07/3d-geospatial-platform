@@ -76,3 +76,14 @@ The image-similarity report also measures bounded grayscale-preview edge density
 - `candidate-lower-sharpness-screening-hint` when a sufficiently structured reference has much higher Laplacian variance than the candidate render.
 
 These metrics operate on a 64×64 grayscale preview. They are sensitive to crop, image texture, anti-aliasing, lighting, compression, shadows and unrelated scene content. Edge orientation means pixel-gradient direction only; it is **not** a compass bearing or a verified facade orientation. Laplacian variance is a screening proxy, not a calibrated blur score. Do not use these metrics to automatically label a model as correct/incorrect or to change the human review outcome. `publicationEligible` remains false.
+
+
+## Spatial edge-coverage screening
+
+Similarity reports also divide the normalized 64×64 grayscale preview into a fixed 4×4 grid and compare where strong edge pixels appear. The report records each image's normalized spatial edge distribution, the number and proportion of grid cells with repeated edge activity, a distribution distance, and an active-cell overlap distance. The following warnings may be added:
+
+- `low-edge-content-comparability-screening-hint`: one or both previews contain too little edge evidence for a useful structural comparison.
+- `spatial-edge-layout-difference-screening-hint`: the distribution of edge structure across the 4×4 preview differs past the configured threshold.
+- `spatial-edge-coverage-difference-screening-hint`: the grid cells containing edge structure overlap too little.
+
+This is a reproducible coarse framing/crop **screen**, not a crop estimator or image-registration algorithm. It does not align images, remove background, or prove that images depict the same facade. A plain wall, foliage, shadows, different viewpoints, or a different render crop may trigger or hide these signals. Use the report to prioritize a manual visual check; the review outcome stays human-authored and `publicationEligible` stays false.
