@@ -43,9 +43,9 @@ async function readJsonBody(request: Request): Promise<unknown> {
   }
 }
 
-function errorResponse(error: unknown) {
+function errorResponse(error: unknown, generationFailure = false) {
   if (error instanceof RangeError) {
-    return NextResponse.json({ error: error.message }, { status: 413 });
+    return NextResponse.json({ error: error.message }, { status: generationFailure ? 422 : 413 });
   }
   if (error instanceof TypeError) {
     return NextResponse.json({ error: error.message }, { status: 400 });
@@ -105,6 +105,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, true);
   }
 }
