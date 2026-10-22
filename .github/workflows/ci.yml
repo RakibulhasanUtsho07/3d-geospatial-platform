@@ -144,6 +144,9 @@ jobs:
       - name: Test texture projection evidence review
         run: npm run test:texture-projection-review
 
+      - name: Test calibrated camera-to-UV projection and visibility gates
+        run: npm run test:calibrated-texture-uv-projection
+
       - name: Test texture bake readiness preflight
         run: npm run test:texture-bake-readiness
 
