@@ -469,7 +469,7 @@ function validateBacklog(backlog) {
 
 function validIsoTimestamp(value) {
   return nonEmptyString(value) &&
-    /^\\d{4}-\\d{2}-\\d{2}T/.test(value) &&
+    /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(value) &&
     Number.isFinite(Date.parse(value));
 }
 
