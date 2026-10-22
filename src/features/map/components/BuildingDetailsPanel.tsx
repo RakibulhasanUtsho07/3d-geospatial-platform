@@ -172,9 +172,6 @@ export default function BuildingDetailsPanel({
       "buildingname",
     ]) ?? "Selected 3D Building";
 
-  const referenceReportedHeight = findNumericProperty(feature.properties, [
-    "architecture_profile_reported_height_m",
-  ]);
   const referenceReportedFloors = findNumericProperty(feature.properties, [
     "architecture_profile_reported_floor_count",
   ]);
