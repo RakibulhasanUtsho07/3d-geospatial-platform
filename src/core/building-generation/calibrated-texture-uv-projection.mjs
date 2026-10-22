@@ -106,9 +106,13 @@ export function projectTextureFaces({ cameras, vertices, candidate, options = {}
       else if (calibration.reprojectionErrorPx > maxReprojectionErrorPx) reasons.push("calibration-reprojection-error-exceeds-threshold");
     }
 
-    // Face/view association is operator-reviewed because this worker has no z-buffer,
-    // semantic facade classifier, or cross-view occlusion solver.
-    if (face?.visibilityReviewed !== true) reasons.push("source-view-visibility-review-required");
+    const computedVisibility = options.allowComputedVisibilityEvidence === true &&
+      face?.visibilityEvidence?.status === "visible-by-mesh-ray-test";
+    // A geometry visibility result is accepted only when the caller explicitly uses
+    // the calibrated view-selection worker. Otherwise a manual attestation is required.
+    if (face?.visibilityReviewed !== true && !computedVisibility) {
+      reasons.push("source-view-visibility-review-required");
+    }
 
     const cameraId = calibration?.cameraId ?? calibration?.id ?? image?.cameraId;
     if (image?.cameraId && cameraId && image.cameraId !== cameraId) {
@@ -167,13 +171,14 @@ export function projectTextureFaces({ cameras, vertices, candidate, options = {}
       ...original,
       uv,
       projectionEvidence: {
-        status: "projected-with-reviewed-view-assignment",
+        status: computedVisibility ? "projected-with-geometry-visibility-evidence" : "projected-with-reviewed-view-assignment",
         cameraId,
         sourceImageId: image.id,
         sourceImageSha256: image.sha256.toLowerCase(),
         projectedPixels: pixels,
         projectedAreaPx,
-        visibilityReviewed: true,
+        visibilityReviewed: face?.visibilityReviewed === true,
+        visibilityEvidence: computedVisibility ? face.visibilityEvidence : null,
         uvOrigin: "bottom-left",
       },
     };
