@@ -13,6 +13,7 @@ import {
   validateGenerationJobRequest,
 } from "../src/core/building-generation/generation-job-queue.mjs";
 import { runMediaToModelWorkflow } from "../src/core/building-generation/media-to-model-workflow.mjs";
+import { writeGenerationWorkerStatus } from "../src/core/building-generation/generation-worker-status.mjs";
 
 function asError(error) {
   return error instanceof Error ? error : new Error(String(error));
@@ -31,7 +32,7 @@ function delay(ms, signal) {
   });
 }
 
-async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIntervalMs }) {
+async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIntervalMs, workerStartedAt }) {
   const request = validateGenerationJobRequest(claimed.request);
   const jobId = claimed.job.jobId;
   let stoppingHeartbeats = false;
@@ -43,6 +44,14 @@ async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIn
     heartbeatChain = heartbeatChain.then(async () => {
       if (stoppingHeartbeats) return;
       await heartbeatGenerationJob({ workspaceRoot, jobId, phase: "media-to-model-workflow" });
+      await writeGenerationWorkerStatus({
+        workspaceRoot,
+        workerId,
+        status: "running",
+        phase: "processing",
+        currentJobId: jobId,
+        startedAt: workerStartedAt,
+      });
     }).catch((error) => {
       heartbeatFailure = asError(error);
     });
@@ -121,23 +130,55 @@ export async function runGenerationWorker({
   }
 
   const lock = await acquireGenerationWorkerLock({ workspaceRoot });
+  const workerStartedAt = new Date().toISOString();
+  let lastWorkerStatusWriteAt = 0;
+  let lastError = null;
   const summary = { workerId: lock.workerId, recoveredJobIds: [], processed: [] };
+
+  async function publishWorkerStatus({ phase, currentJobId = null, status = "running" }) {
+    try {
+      await writeGenerationWorkerStatus({
+        workspaceRoot,
+        workerId: lock.workerId,
+        status,
+        phase,
+        currentJobId,
+        startedAt: workerStartedAt,
+        lastError,
+      });
+      lastWorkerStatusWriteAt = Date.now();
+    } catch (error) {
+      // Status is operational telemetry; a heartbeat write must not fail an otherwise valid model job.
+      console.error("Generation worker status update failed: " + (error instanceof Error ? error.message : String(error)));
+    }
+  }
+
   try {
+    await publishWorkerStatus({ phase: "starting" });
     summary.recoveredJobIds = await recoverInterruptedGenerationJobs({ workspaceRoot });
+    await publishWorkerStatus({ phase: "idle" });
     while (!signal?.aborted) {
       const claimed = await claimNextGenerationJob({ workspaceRoot, workerId: lock.workerId });
       if (!claimed) {
         if (once) break;
+        if (Date.now() - lastWorkerStatusWriteAt >= heartbeatIntervalMs) {
+          await publishWorkerStatus({ phase: "idle" });
+        }
         await delay(pollIntervalMs, signal);
         continue;
       }
+
+      await publishWorkerStatus({ phase: "processing", currentJobId: claimed.job.jobId });
       const outcome = await executeClaimedJob({
         workspaceRoot,
         claimed,
         workerId: lock.workerId,
         heartbeatIntervalMs,
+        workerStartedAt,
       });
+      lastError = outcome.error ?? null;
       summary.processed.push(outcome);
+      await publishWorkerStatus({ phase: "idle" });
       console.log(JSON.stringify({
         workerId: lock.workerId,
         jobId: outcome.job.jobId,
@@ -148,7 +189,11 @@ export async function runGenerationWorker({
     }
     return summary;
   } finally {
-    await lock.release();
+    try {
+      await publishWorkerStatus({ phase: "stopped", currentJobId: null, status: "stopped" });
+    } finally {
+      await lock.release();
+    }
   }
 }
 
