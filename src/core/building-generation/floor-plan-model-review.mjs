@@ -197,6 +197,22 @@ async function candidateDirectory(root, buildingId, candidateId) {
   return current;
 }
 
+async function readCandidateArtifact(directory, name, maximumBytes) {
+  const filePath = path.join(directory, name);
+  const entry = await lstat(filePath);
+  if (entry.isSymbolicLink() || !entry.isFile()) {
+    throw new TypeError("Candidate artifact '" + name + "' must be a regular, non-symlink file.");
+  }
+  if (entry.size <= 0 || entry.size > maximumBytes) {
+    throw new RangeError("Candidate artifact '" + name + "' is empty or too large.");
+  }
+  const actual = await realpath(filePath);
+  if (!inside(directory, actual)) {
+    throw new TypeError("Candidate artifact '" + name + "' resolves outside its candidate directory.");
+  }
+  return readFile(actual);
+}
+
 async function writeExclusiveAtomically(directory, name, bytes) {
   const target = path.join(directory, name);
   const temporary = target + "." + randomUUID() + ".tmp";
@@ -387,7 +403,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
   const root = await realpath(path.resolve(workspaceRoot));
   const candidate = await loadFloorPlanModelCandidate({ workspaceRoot: root, buildingId: bid, candidateId: cid });
   const directory = await candidateDirectory(root, bid, cid);
-  const reviewBytes = await readFile(path.join(directory, "review.json"));
+  const reviewBytes = await readCandidateArtifact(directory, "review.json", 2 * 1024 * 1024);
   const review = JSON.parse(reviewBytes.toString("utf8"));
   const actualReviewHash = sha256(reviewBytes);
   if (!isRecord(review) || review.schemaVersion !== "1.0.0" ||
@@ -420,7 +436,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     }
   }
 
-  const attestationBytes = await readFile(path.join(directory, "attestation.json"));
+  const attestationBytes = await readCandidateArtifact(directory, "attestation.json", 2 * 1024 * 1024);
   const attestation = JSON.parse(attestationBytes.toString("utf8"));
   if (!isRecord(attestation) || attestation.schemaVersion !== "1.0.0" ||
       attestation.candidateSha256 !== candidate.modelSha256 ||
