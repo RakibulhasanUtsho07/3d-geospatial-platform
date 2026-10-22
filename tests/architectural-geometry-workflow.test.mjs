@@ -93,6 +93,7 @@ async function fixture(t, { textureStatus = "verified" } = {}) {
   const textureCandidate = {
     images: [{
       id: "front",
+      cameraId: "left",
       path: "uploads/front.png",
       sha256: digest(imageBytes),
       width: 640,
@@ -172,6 +173,23 @@ test("runs registration, wireframe QA, explicit-face meshing, surface review and
   const savedState = JSON.parse(await readFile(result.statePath, "utf8"));
   assert.equal(savedState.mapReady, false);
   assert.equal(savedState.publicationEligible, false);
+});
+
+test("automatic texture-view selection is wired into the resumable workflow and keeps publication gated", async (t) => {
+  const f = await fixture(t);
+  f.input.options.autoSelectTextureViews = true;
+  f.input.textureCandidate.faces = faces.map((vertices) => ({ vertices }));
+  await writeFile(path.join(f.root, f.inputPath), JSON.stringify(f.input, null, 2));
+
+  const result = await runArchitecturalGeometryWorkflow(workflowOptions(f));
+  const textureReport = result.report.output.textureProjectionReview;
+  const selection = textureReport.calibratedUvProjection.viewSelection;
+  assert.ok(selection.autoSelectedFaceCount > 0);
+  assert.ok(selection.visibilityCheckedFaceCount > 0);
+  assert.equal(textureReport.policy.automaticallyChoosesSourceView, true);
+  assert.equal(textureReport.policy.automaticOcclusionDetection, true);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
 });
 
 test("reuses every checksummed stage on a repeated run with unchanged evidence", async (t) => {

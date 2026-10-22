@@ -19,6 +19,7 @@ import { buildMeshFromReviewedWireframe } from "./wireframe-to-mesh.mjs";
 import { reviewMeshSurfaces } from "./mesh-surface-review.mjs";
 import { reviewTextureProjection } from "./texture-projection-review.mjs";
 import { projectTextureFaces } from "./calibrated-texture-uv-projection.mjs";
+import { selectCalibratedTextureViews } from "./calibrated-texture-view-selection.mjs";
 import { buildTexturedGlb } from "./textured-glb-export.mjs";
 import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
@@ -31,7 +32,7 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-calibrated-textured-glb-v3";
+const WORKFLOW_VERSION = "architectural-geometry-auto-texture-view-visibility-v4";
 const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
 const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
@@ -573,20 +574,38 @@ export async function runArchitecturalGeometryWorkflow(options) {
       { maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx },
     ),
     execute: async () => {
+      const viewSelection = selectCalibratedTextureViews({
+        cameras: input.cameras,
+        vertices: geometryPayload.mesh.vertices,
+        triangles: geometryPayload.mesh.triangles,
+        candidate: input.textureCandidate,
+        options: {
+          autoSelectSourceView: input.options?.autoSelectTextureViews === true,
+          maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
+          minProjectedTriangleAreaPx: input.options?.minProjectedTriangleAreaPx ?? 0.5,
+          minFacingCosine: input.options?.minTextureFacingCosine ?? 0.02,
+        },
+      });
+      const selectedCandidate = { ...input.textureCandidate, faces: viewSelection.faces };
       const projection = projectTextureFaces({
         cameras: input.cameras,
         vertices: geometryPayload.mesh.vertices,
-        candidate: input.textureCandidate,
+        candidate: selectedCandidate,
         options: {
           maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
           minProjectedTriangleAreaPx: input.options?.minProjectedTriangleAreaPx ?? 0.5,
+          allowComputedVisibilityEvidence: true,
         },
       });
-      const projectedCandidate = { ...input.textureCandidate, faces: projection.faces };
+      const projectedCandidate = { ...selectedCandidate, faces: projection.faces };
       const evidenceReport = reviewTextureProjection(projectedCandidate, {
         maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
       });
-      const blockers = [...new Set([...projection.blockers, ...evidenceReport.blockers])];
+      const blockers = [...new Set([
+        ...viewSelection.blockers,
+        ...projection.blockers,
+        ...evidenceReport.blockers,
+      ])];
       const report = {
         ...evidenceReport,
         status: blockers.length ? "review-required" : "uv-projection-complete-requires-human-review",
@@ -595,16 +614,26 @@ export async function runArchitecturalGeometryWorkflow(options) {
           status: projection.status,
           projectedFaceCount: projection.projectedFaceCount,
           rejectedFaces: projection.rejectedFaces,
+          viewSelection: {
+            status: viewSelection.status,
+            autoSelectedFaceCount: viewSelection.autoSelectedFaceCount,
+            visibilityCheckedFaceCount: viewSelection.visibilityCheckedFaceCount,
+            rejectedFaces: viewSelection.rejectedFaces,
+            blockers: viewSelection.blockers,
+            policy: viewSelection.policy,
+          },
           policy: projection.policy,
-          limitations: projection.limitations,
+          limitations: [...viewSelection.limitations, ...projection.limitations],
         },
         policy: {
           ...evidenceReport.policy,
           generatesUvs: true,
           usesSuppliedUvs: false,
-          automaticOcclusionDetection: false,
+          automaticallyChoosesSourceView: viewSelection.autoSelectedFaceCount > 0,
+          automaticOcclusionDetection: viewSelection.visibilityCheckedFaceCount > 0,
+          requiresPerFaceVisibilityAttestation: viewSelection.policy.requiresExplicitViewVisibilityAttestation,
         },
-        limitations: [...projection.limitations, ...evidenceReport.limitations],
+        limitations: [...viewSelection.limitations, ...projection.limitations, ...evidenceReport.limitations],
       };
       return {
         payload: {
@@ -615,6 +644,9 @@ export async function runArchitecturalGeometryWorkflow(options) {
         outputs: {
           status: report.status,
           inputFaceCount: report.faceCount,
+          autoSelectedFaceCount: viewSelection.autoSelectedFaceCount,
+          visibilityCheckedFaceCount: viewSelection.visibilityCheckedFaceCount,
+          rejectedViewFaceCount: viewSelection.rejectedFaces.length,
           projectedFaceCount: projection.projectedFaceCount,
           evidenceEligibleFaceCount: evidenceReport.evidenceEligibleFaceIndices.length,
           rejectedFaceCount: blockers.length ? report.rejectedFaces.length + projection.rejectedFaces.length : 0,

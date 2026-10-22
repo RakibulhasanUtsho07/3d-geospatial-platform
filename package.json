@@ -68,6 +68,7 @@
     "review:mesh-surfaces": "node scripts/review-mesh-surfaces.mjs",
     "test:texture-projection-review": "node --test tests/texture-projection-review.test.mjs",
     "test:calibrated-texture-uv-projection": "node --test tests/calibrated-texture-uv-projection.test.mjs",
+    "test:calibrated-texture-view-selection": "node --test tests/calibrated-texture-view-selection.test.mjs",
     "review:texture-projection": "node scripts/review-texture-projection.mjs",
     "test:texture-bake-readiness": "node --test tests/texture-bake-readiness.test.mjs",
     "assess:texture-bake-readiness": "node scripts/assess-texture-bake-readiness.mjs",
