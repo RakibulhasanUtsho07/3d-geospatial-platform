@@ -29,6 +29,11 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       rootMeanSquaredError: 22.25,
       psnrDb: 21.184,
       localSsim8x8: 0.83,
+      medianCandidateMinusReferenceLuminanceOffset: -4,
+      luminanceOffsetNormalizedMeanAbsoluteError: 5.25,
+      luminanceOffsetNormalizedRootMeanSquaredError: 12.5,
+      luminanceOffsetNormalizedSsim8x8: 0.91,
+      luminanceOffsetNormalizedMaeReductionPercent: 50,
       differenceHashHammingDistance: 12,
       referenceEdgePixelCount: 512,
       candidateEdgePixelCount: 450,
@@ -173,6 +178,10 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.reviewStatus, "reviewer-reported-matches");
   assert.equal(report.comparisons[0].outcome, "match");
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.localSsim8x8, 0.83);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.medianCandidateMinusReferenceLuminanceOffset, -4);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.luminanceOffsetNormalizedMeanAbsoluteError, 5.25);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.luminanceOffsetNormalizedSsim8x8, 0.91);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.luminanceOffsetNormalizedMaeReductionPercent, 50);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.edgeOrientationHistogramDistance, 0.05);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.candidateToReferenceSharpnessRatio, 0.84);
   assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.referenceEdgeOrientationHistogram,
@@ -292,6 +301,24 @@ test("rejects localized difference cells with inconsistent summaries or ordering
   const input = fixture();
   const badMetric = diagnostic();
   badMetric.metrics.spatialCellDiagnostics[6].meanAbsoluteError = 190;
+  const report = buildRenderReferenceReview({
+    ...input,
+    similarityDiagnostics: [{
+      viewId: "front",
+      referenceImageId: "reference-front-01",
+      report: badMetric,
+      reportSha256: "f".repeat(64),
+    }],
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
+  assert.equal(report.comparisons[0].similarityDiagnostics, null);
+});
+
+test("rejects inconsistent luminance-normalized error reduction evidence", () => {
+  const input = fixture();
+  const badMetric = diagnostic();
+  badMetric.metrics.luminanceOffsetNormalizedMaeReductionPercent = 90;
   const report = buildRenderReferenceReview({
     ...input,
     similarityDiagnostics: [{
