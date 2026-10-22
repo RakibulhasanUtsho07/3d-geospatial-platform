@@ -104,7 +104,7 @@ async function writeAtomically(filePath, bytes) {
  * source was already ingested through the protected media-intake pipeline.
  * This does not publish the result or assert that its geometry is accurate.
  */
-export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }) {
+export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, traceEvidence }) {
   if (!floorPlan || typeof floorPlan !== "object" || Array.isArray(floorPlan)) {
     throw new TypeError("floorPlan must be a JSON object.");
   }
@@ -154,6 +154,42 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     );
   }
 
+  let traceReviewBytes;
+  let traceReviewSha256;
+  if (traceEvidence !== undefined) {
+    if (!traceEvidence || typeof traceEvidence !== "object" || Array.isArray(traceEvidence) ||
+        typeof traceEvidence.traceId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(traceEvidence.traceId) ||
+        typeof traceEvidence.traceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(traceEvidence.traceSha256) ||
+        !traceEvidence.transformation || typeof traceEvidence.transformation !== "object" ||
+        Array.isArray(traceEvidence.transformation)) {
+      throw new TypeError("traceEvidence must contain a trace ID, trace SHA-256 and reviewed transformation record.");
+    }
+    const transformation = traceEvidence.transformation;
+    if (transformation.traceId !== traceEvidence.traceId ||
+        transformation.traceSha256 !== traceEvidence.traceSha256.toLowerCase() ||
+        transformation.sourceSha256 !== loadedSource.sha256 ||
+        transformation.status !== "measured-draft-needs-independent-QA" ||
+        !Array.isArray(transformation.confirmedLineIds) ||
+        !Array.isArray(transformation.confirmedRoomIds)) {
+      throw new TypeError("traceEvidence does not match this source and measured transformation.");
+    }
+    traceReviewBytes = Buffer.from(JSON.stringify(transformation, null, 2) + "\n", "utf8");
+    traceReviewSha256 = sha256(traceReviewBytes);
+    generated.report.input.rasterTrace = {
+      traceId: traceEvidence.traceId,
+      traceSha256: traceEvidence.traceSha256.toLowerCase(),
+      transformationSha256: traceReviewSha256,
+      method: transformation.method,
+      confirmedLineCount: transformation.confirmedLineIds.length,
+      confirmedRoomCount: transformation.confirmedRoomIds.length,
+      metresPerSourcePixel: transformation.calibration?.metresPerSourcePixel,
+      reviewStatus: transformation.status,
+    };
+    generated.report.warnings.push(
+      "The raster trace and selected pixel-space candidates were operator-confirmed and calibrated; independent architectural, metric-scale and geospatial QA is still required before approval.",
+    );
+  }
+
   const candidateId = "floorplan-" + randomUUID();
   const buildingDirectory = await ensurePrivateDirectory(
     root,
@@ -175,6 +211,9 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     await writeAtomically(path.join(realCandidateDirectory, "floor-plan.json"), normalizedPlanBytes);
     await writeAtomically(path.join(realCandidateDirectory, "model.glb"), generated.glb);
     await writeAtomically(path.join(realCandidateDirectory, "report.json"), reportBytes);
+    if (traceReviewBytes) {
+      await writeAtomically(path.join(realCandidateDirectory, "trace-review.json"), traceReviewBytes);
+    }
   } catch (error) {
     await rm(realCandidateDirectory, { recursive: true, force: true }).catch(() => {});
     throw error;
@@ -191,6 +230,7 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     geometrySha256,
     sourceSha256: loadedSource.sha256,
     sourceUsageStatus: generated.report.input.sourceUsageStatus,
+    traceReviewSha256: traceReviewSha256 ?? null,
     candidateUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId,
     modelUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId + "/model",
     mapReady: false,
@@ -257,6 +297,29 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
       sha256(planBytes) !== report.input.normalizedGeometrySha256) {
     throw new TypeError("Floor-plan candidate geometry checksum or identity does not match its report.");
   }
+  let traceReview = null;
+  if (report.input.rasterTrace !== undefined) {
+    const evidence = report.input.rasterTrace;
+    if (!evidence || typeof evidence !== "object" ||
+        typeof evidence.traceId !== "string" ||
+        typeof evidence.traceSha256 !== "string" || !/^[a-f0-9]{64}$/.test(evidence.traceSha256) ||
+        typeof evidence.transformationSha256 !== "string" || !/^[a-f0-9]{64}$/.test(evidence.transformationSha256)) {
+      throw new TypeError("Floor-plan raster trace metadata in candidate report is invalid.");
+    }
+    const evidenceBytes = await readCandidateFile(directory, "trace-review.json", 2 * 1024 * 1024);
+    if (sha256(evidenceBytes) !== evidence.transformationSha256) {
+      const error = new Error("Stored raster trace transformation checksum does not match its report.");
+      error.code = "TRACE_CHECKSUM_MISMATCH";
+      throw error;
+    }
+    traceReview = JSON.parse(evidenceBytes.toString("utf8"));
+    if (!traceReview || traceReview.traceId !== evidence.traceId ||
+        traceReview.traceSha256 !== evidence.traceSha256 ||
+        traceReview.sourceSha256 !== report.input.verifiedSourceSha256 ||
+        traceReview.status !== "measured-draft-needs-independent-QA") {
+      throw new TypeError("Stored raster trace transformation identity does not match its report.");
+    }
+  }
   const modelBytes = await readCandidateFile(directory, "model.glb", 200 * 1024 * 1024);
   const actualSha256 = sha256(modelBytes);
   if (actualSha256 !== report.output.sha256) {
@@ -269,6 +332,7 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
     buildingId: bid,
     plan,
     report,
+    traceReview,
     reportSha256: sha256(reportBytes),
     geometrySha256: report.input.normalizedGeometrySha256,
     modelBytes,

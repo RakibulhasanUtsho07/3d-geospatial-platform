@@ -334,3 +334,75 @@ npm run publish:floor-plan-candidate -- E:\\Building-Engine-Workspace dhaka-demo
 The command calls the existing versioned generated-model catalog publisher, which rechecks candidate and evidence hashes and placement. Rejected or changes-requested reviews do not create a publication attestation. Reviews are immutable; create a new candidate for a replacement trace. Published versions are written to `public/models/generated/` and can be rolled back with the existing catalog activation command. The private candidate's `mapReady` and `publicationEligible` flags remain false so the candidate itself is never silently treated as map-ready.
 
 This workflow does not automatically trace walls and room polygons from a raster/PDF, independently verify permissions or survey measurements, or sign the reviewer identity. Those remain separate responsibilities.
+
+
+## 15. Raster floor-plan trace candidates
+
+The backend can now inspect an already-ingested JPEG, PNG or WebP floor-plan image through `POST /api/building-generation/floor-plan-traces`, authenticated with `GENERATION_API_TOKEN`. It verifies the source against the private intake metadata, decodes and downsizes the raster with bounded image dimensions, finds long dark horizontal/vertical strokes, and proposes closed rectangular grid cells as possible rooms. Trace JSON is stored privately below `.building-engine/floor-plan-traces/<buildingId>/<traceId>/` and retrieval rechecks the trace artifact SHA-256 plus the current source hash.
+
+Example request after ingesting a floor-plan raster:
+
+~~~json
+{
+  "buildingId": "dhaka-demo",
+  "sourceId": "floor-plan-raster-01",
+  "options": {
+    "maxEdge": 2048,
+    "threshold": 180,
+    "maxGapPx": 2,
+    "lineMergeTolerancePx": 4,
+    "minLineLengthPx": 60,
+    "minRoomSidePx": 32,
+    "maxLinesPerOrientation": 1200,
+    "maxRoomCandidates": 2500
+  }
+}
+~~~
+
+The response returns `traceId`, candidate counts and an authenticated trace URL at `GET /api/building-generation/floor-plan-traces/<buildingId>/<traceId>`. Available options are bounded: the analysis image's longest edge is 256–4096 pixels; source media is limited to 50 MiB; the decoder is limited to 40 million source pixels; the persisted trace JSON is limited to 8 MiB. The detector currently targets orthogonal plans with long dark linework. It is not an OCR or architectural-vision model and may miss angled/curved walls, symbols, gaps, dimensions, or confuse furniture and text with walls.
+
+**A trace is a hypothesis document, not a 3D model.** Coordinates remain pixels with `metresPerPixel: null`; room cells and wall segments are marked `unreviewed`. No scale, room semantics, north/heading, WGS84 origin, level elevation, copyright status or construction detail is inferred. The current endpoint accepts raster image sources only; rasterize a PDF page to a reviewed image first. Once the line/room candidates have been corrected against the original drawing and a measured scale plus surveyed map origin have been established, use the calibrated trace-to-candidate endpoint in section 16 (or manually supply the [measured vector schema in section 12](#12-measured-floor-plan-vectors-to-interior-glb)), then continue through the explicit review/publish gate in section 14. Nothing is automatically approved or published.
+
+
+## 16. Calibrated raster trace → measured vector plan → private GLB
+
+After retrieving a trace and reviewing its candidate IDs, the new authenticated endpoint can create a private interior GLB candidate in one operation:
+
+`POST /api/building-generation/floor-plan-traces/<buildingId>/<traceId>/generate`
+
+Use `Authorization: Bearer <GENERATION_API_TOKEN>`. The JSON body is capped at 128 KiB. Example shape (line and room IDs must come from the selected trace response):
+
+~~~json
+{
+  "confirmTraceReview": true,
+  "planId": "ground-floor",
+  "name": "Dhaka Demo Ground Floor",
+  "reviewNotes": "Checked each selected wall line and room outline against the original drawing.",
+  "origin": {
+    "longitude": 90.406,
+    "latitude": 23.709,
+    "heightM": 3.5,
+    "headingDegrees": 0
+  },
+  "originPixel": [30, 30],
+  "calibration": {
+    "startPx": [30, 30],
+    "endPx": [290, 30],
+    "distanceM": 26
+  },
+  "level": {
+    "elevationM": 0,
+    "wallHeightM": 3,
+    "wallThicknessM": 0.15,
+    "floorThicknessM": 0.12
+  },
+  "confirmedLineIds": ["h-001", "h-002", "v-001", "v-002"],
+  "confirmedRoomIds": ["room-001"]
+}
+~~~
+
+This body is an example only. Replace `confirmedLineIds` and `confirmedRoomIds` with IDs actually returned by the trace, and choose only candidates you have checked. The example calibration uses a measured 26-metre segment between two points in the original oriented source image; that measured distance must be supported by the actual drawing/survey. `originPixel`, `startPx` and `endPx` are coordinates in the original oriented image, not the downsampled trace raster. `origin` must be a separately surveyed WGS84 map origin, height and heading. Do not use guessed numbers just to make the endpoint accept a request.
+
+The service derives metres-per-original-source-pixel from the known distance, maps analysis pixels back into original source pixels, converts selected wall center-lines and rectangular rooms into the vector schema, and invokes the existing source-hash-checked GLB candidate builder. Every selected room must have all four boundary lines selected. The service stores `trace-review.json` with the private candidate and includes its SHA-256, the trace artifact hash, selected line/room counts and calibration method in the candidate report. Retrieval verifies the transformation-audit hash along with the geometry, source and GLB hashes.
+
+The generated model is still **a draft requiring independent architectural QA**. This bridge does not determine source scale itself, read dimensions with OCR, infer openings, furniture, stairs, ceiling or angled/curved walls, verify surveying, or confirm that the reviewer is qualified. The model candidate stays private and `mapReady=false`, `publicationEligible=false`; use section 14 to record human review and an explicit publish command only after QA and rights review.
