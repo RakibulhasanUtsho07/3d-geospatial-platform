@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   shouldAbortViewportRequest,
+  shouldContinueViewportLoad,
   shouldLoadFullDatasetForWideViewport,
 } from "../src/core/map-engine/viewport-load-policy.mjs";
 
@@ -50,4 +51,21 @@ test("a wide view upgrades a previously loaded bounded viewport to the full data
 
 test("a wide view reuses the full dataset when it is already loaded", () => {
   assert.equal(shouldLoadFullDatasetForWideViewport(true, null), false);
+});
+
+
+test("a current viewport intent may continue while buildings are visible", () => {
+  assert.equal(shouldContinueViewportLoad(4, 4, true), true);
+});
+
+test("a superseded viewport intent is discarded after fetch completion", () => {
+  assert.equal(shouldContinueViewportLoad(4, 5, true), false);
+});
+
+test("a hidden building layer discards a pending viewport stage", () => {
+  assert.equal(shouldContinueViewportLoad(4, 4, false), false);
+});
+
+test("a restored layer does not revive an older intent revision", () => {
+  assert.equal(shouldContinueViewportLoad(4, 5, true), false);
 });
