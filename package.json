@@ -123,7 +123,7 @@
     "test:floor-plan-model-api": "node --test tests/floor-plan-model-job.test.mjs",
     "test:floor-plan-review": "node --test tests/floor-plan-model-review.test.mjs",
     "publish:floor-plan-candidate": "node scripts/publish-floor-plan-candidate.mjs",
-    "test:floor-plan-raster-trace": "node --test tests/floor-plan-raster-trace.test.mjs tests/floor-plan-raster-trace-job.test.mjs"
+    "test:floor-plan-raster-trace": "node --test tests/floor-plan-raster-trace.test.mjs tests/floor-plan-raster-trace-job.test.mjs tests/floor-plan-trace-to-vector.test.mjs tests/floor-plan-raster-generation.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
