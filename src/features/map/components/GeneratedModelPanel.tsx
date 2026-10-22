@@ -63,9 +63,6 @@ export default function GeneratedModelPanel({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setCatalogLoading(true);
-    setCatalogError(null);
-
     fetch("/models/generated/manifest.json", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Published model catalog could not be loaded (HTTP " + response.status + ").");
@@ -202,7 +199,11 @@ export default function GeneratedModelPanel({
         aria-controls="generated-model-loader"
         disabled={disabled}
         onClick={() => {
-          setOpen((current) => !current);
+          if (!open) {
+            setCatalogLoading(true);
+            setCatalogError(null);
+          }
+          setOpen(!open);
           setError(null);
           setMessage(null);
         }}
@@ -262,6 +263,7 @@ export default function GeneratedModelPanel({
                   disabled={catalogLoading || busy}
                   onClick={() => {
                     setCatalogModels([]);
+                    setCatalogLoading(true);
                     setCatalogError(null);
                     setCatalogRefreshKey((current) => current + 1);
                   }}
