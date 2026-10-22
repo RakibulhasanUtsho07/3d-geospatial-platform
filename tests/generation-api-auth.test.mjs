@@ -40,3 +40,26 @@ test("workspace configuration is explicit and can be read from an injected envir
   assert.throws(() => getGenerationWorkspaceRoot({}), /BUILDING_ENGINE_WORKSPACE/);
   assert.equal(getGenerationWorkspaceRoot({ BUILDING_ENGINE_WORKSPACE: "  /srv/building-engine  " }), "/srv/building-engine");
 });
+
+
+test("generation review API requires its own token and cannot reuse the generation token", () => {
+  const reviewToken = "review-only-test-token-at-least-thirty-two-characters";
+  const env = {
+    GENERATION_API_TOKEN: TOKEN,
+    GENERATION_REVIEW_API_TOKEN: reviewToken,
+  };
+  assert.equal(authorizeGenerationApiRequest(request("Bearer " + TOKEN), env, {
+    tokenEnvName: "GENERATION_REVIEW_API_TOKEN",
+    serviceName: "Generation review API",
+  }).status, 401);
+  assert.deepEqual(authorizeGenerationApiRequest(request("Bearer " + reviewToken), env, {
+    tokenEnvName: "GENERATION_REVIEW_API_TOKEN",
+    serviceName: "Generation review API",
+  }), { allowed: true, status: 200 });
+  assert.equal(authorizeGenerationApiRequest(request("Bearer " + reviewToken), {
+    GENERATION_API_TOKEN: TOKEN,
+  }, {
+    tokenEnvName: "GENERATION_REVIEW_API_TOKEN",
+    serviceName: "Generation review API",
+  }).status, 503);
+});
