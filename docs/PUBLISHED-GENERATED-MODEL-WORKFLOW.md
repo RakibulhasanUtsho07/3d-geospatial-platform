@@ -20,6 +20,25 @@ npm run activate:building-model-version -- <workspaceRoot> <model-id> <version-i
 
 Activation verifies that the versioned GLB still matches the stored SHA-256 before changing \`activeVersion\`. Commit/deploy the updated manifest for a remote deployment to use the rollback.
 
+
+## Recommended: publish directly from an approved generation job
+
+The connected generation queue has a separate review API. Submit the explicit review after inspecting the exact GLB and QA report, using `GENERATION_REVIEW_API_TOKEN` (not `GENERATION_API_TOKEN`). The approved review record is persisted under the private job workspace and its hash is attached to the job status.
+
+After the job is approved, publish the same reviewed bytes with explicit map placement:
+
+```powershell
+$workspace = "E:\\building-engine-workspace"
+$jobId = "gen-<job-uuid>"
+npm run publish:approved-generation-job -- $workspace $jobId --longitude 90.40606 --latitude 23.7086 --height 0 --heading 0 --scale 1 --up-axis Y --forward-axis Z
+```
+
+Replace the sample coordinates with the surveyed position for this exact model. The longitude, latitude and height flags are required; orientation defaults are shown explicitly above. The command verifies the queue request checksum, approved review-audit checksum, candidate GLB checksum and QA-report checksum before invoking the versioned catalog publisher. It refuses unapproved jobs, missing review checks, tampered records, a changed model/report, or missing placement.
+
+Successful publication writes the content-addressed GLB and updates `public/models/generated/manifest.json`. The review audit remains private. The publication action is explicit and does not mutate the completed queue job into a different status: `mapReady=false` and `publicationEligible=false` remain fail-closed in that job record. This means “approved review” and “published catalog version” are deliberately separate states.
+
+`npm run publish:approved-generation-job` is an operator CLI, not a public endpoint. Do not expose it to untrusted requests or deploy the workspace as static content.
+
 ## Review attestation format
 
 Save an attestation JSON file inside the workspace, for example \`review/dhaka-building-001.attestation.json\`. Replace every example with verified information; do not mark a check true merely to make the command pass.
