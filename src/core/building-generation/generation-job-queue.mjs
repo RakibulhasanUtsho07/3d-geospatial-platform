@@ -304,9 +304,70 @@ export function getGenerationJobView(state) {
   };
 }
 
+const MAX_SOURCE_BYTES_BY_KIND = Object.freeze({
+  image: 20 * 1024 * 1024,
+  video: 500 * 1024 * 1024,
+  "floor-plan": 50 * 1024 * 1024,
+  auto: 500 * 1024 * 1024,
+});
+
+async function preflightGenerationSources(root, sources) {
+  for (const source of sources) {
+    const candidate = path.resolve(root, ...source.relativePath.split("/"));
+    if (!inside(root, candidate)) {
+      throw new TypeError("Source '" + source.sourceId + "' escapes workspaceRoot.");
+    }
+
+    let current = root;
+    const segments = source.relativePath.split("/");
+    let sourceStat;
+    for (let index = 0; index < segments.length; index += 1) {
+      current = path.join(current, segments[index]);
+      let entry;
+      try {
+        entry = await lstat(current);
+      } catch (error) {
+        if (error?.code === "ENOENT") {
+          throw new TypeError(
+            "Source '" + source.sourceId + "' does not exist in workspaceRoot; upload or copy it before queueing.",
+          );
+        }
+        throw error;
+      }
+      if (entry.isSymbolicLink()) {
+        throw new TypeError("Source '" + source.sourceId + "' must not contain symbolic links.");
+      }
+      const isLast = index === segments.length - 1;
+      if (!isLast && !entry.isDirectory()) {
+        throw new TypeError("Source '" + source.sourceId + "' has a non-directory path segment.");
+      }
+      if (isLast && !entry.isFile()) {
+        throw new TypeError("Source '" + source.sourceId + "' must resolve to a regular file.");
+      }
+      const actual = await realpath(current);
+      if (!inside(root, actual)) {
+        throw new TypeError("Source '" + source.sourceId + "' resolves outside workspaceRoot.");
+      }
+      if (isLast) sourceStat = entry;
+    }
+
+    if (!sourceStat || sourceStat.size <= 0) {
+      throw new RangeError("Source '" + source.sourceId + "' is empty.");
+    }
+    const kind = source.kind ?? "auto";
+    const maximum = MAX_SOURCE_BYTES_BY_KIND[kind];
+    if (sourceStat.size > maximum) {
+      throw new RangeError(
+        "Source '" + source.sourceId + "' exceeds the " + maximum + "-byte " + kind + " intake limit.",
+      );
+    }
+  }
+}
+
 export async function enqueueGenerationJob({ workspaceRoot, input, now = new Date() }) {
   const root = await workspaceRootPath(workspaceRoot);
   const normalized = normalizeRequest(input);
+  await preflightGenerationSources(root, normalized.sources);
   const timestamp = new Date(now).toISOString();
   if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("now must be a valid timestamp.");
   const jobId = "gen-" + randomUUID();
