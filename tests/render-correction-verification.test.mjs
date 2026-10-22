@@ -59,6 +59,31 @@ function task(overrides = {}) {
       reviewedAt: "2026-10-21T10:00:00Z",
       notes: "Facade openings differ.",
     },
+    reviewChecklist: {
+      schemaVersion: "1.0.0",
+      correctionProposal: {
+        status: "proposed",
+        proposalText: "Adjust front facade opening proportions to match the approved reference.",
+        proposedBy: "modeler-01",
+        proposedAt: "2026-10-21T12:15:00Z",
+        approval: {
+          status: "approved",
+          approvedBy: "reviewer-02",
+          approvedAt: "2026-10-21T12:30:00Z",
+          rationale: "Proposal reviewed against the exact source and reference images.",
+        },
+      },
+      implementationEvidence: {
+        status: "qa-complete",
+        changeSummary: "Adjusted opening proportions using the approved proposal.",
+        implementedAt: "2026-10-21T12:45:00Z",
+        outputModelSha256: changedModelSha,
+        geometryQaReportSha256: "7".repeat(64),
+        textureChangeApplicable: false,
+        textureQaReportSha256: null,
+        generatedRenderManifestSha256: changedManifestSha,
+      },
+    },
     title: "Review front facade correction",
     ...overrides,
   };
@@ -119,6 +144,136 @@ function similarityDiagnostics(overrides = {}) {
     ...overrides,
   };
 }
+
+test("a changed model and fresh match still wait for an explicit approved proposal", () => {
+  const sourceTask = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      correctionProposal: {
+        ...task().reviewChecklist.correctionProposal,
+        proposalText: null,
+        proposedBy: null,
+        proposedAt: null,
+        approval: {
+          status: "not-approved",
+          approvedBy: null,
+          approvedAt: null,
+          rationale: null,
+        },
+      },
+    },
+  });
+  const result = verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport());
+  assert.equal(result.tasks[0].status, "awaiting-approved-proposal");
+  assert.equal(result.tasks[0].verified, false);
+  assert.equal(result.tasks[0].gates.proposalWritten, false);
+  assert.equal(result.tasks[0].gates.proposalApproved, false);
+  assert.equal(result.counts.awaitingApprovedProposal, 1);
+});
+
+test("rejects an approval timestamp that follows implementation", () => {
+  const sourceTask = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      correctionProposal: {
+        ...task().reviewChecklist.correctionProposal,
+        approval: {
+          ...task().reviewChecklist.correctionProposal.approval,
+          approvedAt: "2026-10-21T13:30:00Z",
+        },
+      },
+    },
+  });
+  const result = verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport());
+  assert.equal(result.tasks[0].status, "approval-order-violation");
+  assert.equal(result.tasks[0].verified, false);
+  assert.equal(result.tasks[0].gates.approvalOrderViolation, true);
+  assert.equal(result.counts.approvalOrderViolation, 1);
+});
+
+test("requires geometry QA and fresh report hashes to match implementation evidence", () => {
+  const noGeometryQa = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        geometryQaReportSha256: null,
+      },
+    },
+  });
+  const noGeometryResult = verifyRenderCorrectionTasks(backlog({ tasks: [noGeometryQa] }), reviewReport());
+  assert.equal(noGeometryResult.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(noGeometryResult.tasks[0].gates.geometryQaEvidencePresent, false);
+
+  const staleOutputHash = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        outputModelSha256: modelSha,
+      },
+    },
+  });
+  const staleOutputResult = verifyRenderCorrectionTasks(backlog({ tasks: [staleOutputHash] }), reviewReport());
+  assert.equal(staleOutputResult.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(staleOutputResult.tasks[0].gates.outputModelMatchesVerificationReport, false);
+
+  const staleManifestHash = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        generatedRenderManifestSha256: manifestSha,
+      },
+    },
+  });
+  const staleManifestResult = verifyRenderCorrectionTasks(backlog({ tasks: [staleManifestHash] }), reviewReport());
+  assert.equal(staleManifestResult.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(staleManifestResult.tasks[0].gates.renderManifestMatchesVerificationReport, false);
+  assert.equal(staleManifestResult.counts.incompleteImplementationEvidence, 1);
+});
+
+test("requires an explicit texture-change decision and texture QA when textures changed", () => {
+  const missingApplicability = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        textureChangeApplicable: null,
+      },
+    },
+  });
+  const missingApplicabilityResult = verifyRenderCorrectionTasks(
+    backlog({ tasks: [missingApplicability] }), reviewReport());
+  assert.equal(missingApplicabilityResult.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(missingApplicabilityResult.tasks[0].gates.textureChangeApplicabilityRecorded, false);
+
+  const textureChangedWithoutQa = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        textureChangeApplicable: true,
+        textureQaReportSha256: null,
+      },
+    },
+  });
+  const textureQaResult = verifyRenderCorrectionTasks(backlog({ tasks: [textureChangedWithoutQa] }), reviewReport());
+  assert.equal(textureQaResult.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(textureQaResult.tasks[0].gates.textureQaEvidencePresent, false);
+
+  const withTextureQa = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        textureChangeApplicable: true,
+        textureQaReportSha256: "8".repeat(64),
+      },
+    },
+  });
+  assert.equal(verifyRenderCorrectionTasks(backlog({ tasks: [withTextureQa] }), reviewReport()).tasks[0].status, "verified");
+});
 
 test("carries fresh similarity diagnostics into verification evidence without changing status", () => {
   const review = reviewReport({
