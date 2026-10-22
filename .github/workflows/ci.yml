@@ -257,6 +257,12 @@ jobs:
       - name: Test dynamic map performance telemetry and baseline aggregation
         run: npm run test:map-performance
 
+      - name: Test dynamic map optimization parity and visual style policies
+        run: npm run test:map-optimization
+
+      - name: Benchmark map optimizations against reference implementations
+        run: npm run benchmark:map-optimization
+
       - name: Test map initialization cancellation policy
         run: npm run test:map-initialization-policy
 

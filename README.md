@@ -238,3 +238,9 @@ Candidates created from measured floor-plan vectors can be reviewed through a se
 ### Raster floor-plan line proposals
 
 A new authenticated endpoint analyzes an already-ingested JPEG/PNG/WebP floor-plan raster and returns a hash-verified private report of long horizontal/vertical line candidates. It deliberately does not claim to infer rooms, wall semantics, metric scale or geospatial placement. PDF pages must first be rasterized separately. Review the [engine guide, section 15](docs/BUILDING-GENERATION-ENGINE.md) before using proposals; they remain unpublished and `mapReady=false`.
+
+
+## Dynamic map performance and release validation
+
+- [Dynamic Map Performance Baseline](docs/MAP-PERFORMANCE-BASELINE.md) — inspect local viewport/building/road timings and run reference-vs-optimized CPU microbenchmarks.
+- [Dynamic Map Release Checklist](docs/DYNAMIC-MAP-RELEASE-CHECKLIST.md) — pre-release browser, real-data visual QA, attribution, resilience checks, rollback guidance and known limitations.
