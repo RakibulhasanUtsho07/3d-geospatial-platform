@@ -321,7 +321,7 @@ jobs:
         run: npm run build
 
       - name: Install Chromium for map browser integration tests
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Verify viewport API against the production server
         env:
