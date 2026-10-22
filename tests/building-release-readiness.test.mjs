@@ -95,6 +95,19 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
     warnings: [],
     errors: [],
   };
+  const geometryQa = {
+    schemaVersion: "1.0.0", engine: "glb-geometry-qa-v2",
+    status: "basic-geometry-check-passed", valid: true, warnings: geometryWarnings,
+    bounds: { dimensions: [10, 20, 30] }, counts: { vertexCount: 100, triangleCount: 50 },
+  };
+  const textureQa = {
+    schemaVersion: "1.0.0", engine: "glb-texture-binding-qa-v1",
+    status: "texture-bindings-structurally-valid", valid: true, errors: [],
+    warnings: textureWarnings, counts: { textureContentRiskCount: 0, uvSeamCandidateCount: 0 },
+  };
+  const geometryQaReportSha256 = hash(Buffer.from(JSON.stringify(geometryQa, null, 2) + "\n"));
+  const textureQaReportSha256 = hash(Buffer.from(JSON.stringify(textureQa, null, 2) + "\n"));
+
   const backlogTask = {
     id: "rrt-example-task",
     buildingId: "test-building",
@@ -136,7 +149,7 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
         changeSummary: "Updated facade opening rhythm.",
         implementedAt: "2026-10-21T11:00:00Z",
         outputModelSha256: modelSha,
-        geometryQaReportSha256: hash("geometry-qa:release-fixture"),
+        geometryQaReportSha256,
         textureChangeApplicable: false,
         textureQaReportSha256: null,
         generatedRenderManifestSha256: manifestSha,
@@ -151,7 +164,15 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
     provenance: { sourceModelSha256: oldModelSha, renderManifestSha256: oldManifestSha },
     tasks: [backlogTask],
   };
-  const verification = verifyRenderCorrectionTasks(backlog, review);
+  const correctionArtifactEvidence = {
+    validated: true,
+    candidateGlbSha256: modelSha,
+    renderManifestSha256: manifestSha,
+    geometryQaReportSha256,
+    textureQaReportSha256,
+    qaReportsRecomputedFromCandidateModel: true,
+  };
+  const verification = verifyRenderCorrectionTasks(backlog, review, correctionArtifactEvidence);
   return {
     input: {
       buildingId: "test-building",
@@ -165,19 +186,12 @@ function fixture({ mismatchView = null, missingView = null, unverifiedRights = n
         height: view.height,
         bytes: view.bytes,
       })),
-      geometryQa: {
-        schemaVersion: "1.0.0", engine: "glb-geometry-qa-v2",
-        status: "basic-geometry-check-passed", valid: true, warnings: geometryWarnings,
-        bounds: { dimensions: [10, 20, 30] }, counts: { vertexCount: 100, triangleCount: 50 },
-      },
-      textureQa: {
-        schemaVersion: "1.0.0", engine: "glb-texture-binding-qa-v1",
-        status: "texture-bindings-structurally-valid", valid: true, errors: [],
-        warnings: textureWarnings, counts: { textureContentRiskCount: 0, uvSeamCandidateCount: 0 },
-      },
+      geometryQa,
+      textureQa,
       renderReferenceReview: review,
       correctionTaskBacklog: backlog,
       correctionVerification: verification,
+      correctionArtifactEvidence,
       accuracyEvidence: makeAccuracyEvidence(),
     },
     review,
