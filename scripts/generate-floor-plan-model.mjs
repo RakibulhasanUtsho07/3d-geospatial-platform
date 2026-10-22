@@ -29,23 +29,24 @@ async function main() {
   const inputBytes = await readFile(inputPath);
   if (inputBytes.length > 2 * 1024 * 1024) throw new RangeError("Floor-plan geometry JSON must be at most 2 MiB.");
   const floorPlan = JSON.parse(inputBytes.toString("utf8"));
+  let verifiedSourceSha256 = null;
   if (sourcePath) {
     const sourceBytes = await readFile(sourcePath);
     if (sourceBytes.length > 100 * 1024 * 1024) {
       throw new RangeError("Original source file must be at most 100 MiB for CLI hash verification.");
     }
-    const actual = sha256(sourceBytes);
-    if (!floorPlan.source?.sha256 || floorPlan.source.sha256.toLowerCase() !== actual) {
+    verifiedSourceSha256 = sha256(sourceBytes);
+    if (!floorPlan.source?.sha256 || floorPlan.source.sha256.toLowerCase() !== verifiedSourceSha256) {
       throw new Error("Original source SHA-256 does not match floorPlan.source.sha256; refusing to generate.");
     }
   }
 
   const result = generateFloorPlanGlb(floorPlan);
-  if (sourcePath) {
+  if (verifiedSourceSha256) {
     result.report.input.sourceEvidenceVerified = true;
-    result.report.input.verifiedSourceSha256 = sha256(await readFile(sourcePath));
+    result.report.input.verifiedSourceSha256 = verifiedSourceSha256;
     result.report.warnings = result.report.warnings.filter(
-      (warning) => !warning.startsWith("An optional source SHA-256 field is metadata"),
+      (warning) => !warning.startsWith("A source SHA-256 is metadata"),
     );
   }
   const reportPath = outputPath + ".report.json";
