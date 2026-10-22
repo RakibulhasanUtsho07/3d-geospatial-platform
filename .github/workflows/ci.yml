@@ -7,6 +7,7 @@ on:
       - dev
       - rakibul-hasan
       - feat/generated-building-model-layer
+      - feat/generated-model-map-loader
       - feat/building-generation-core
       - feat/building-media-intake
       - feat/colmap-reconstruction-worker
@@ -86,6 +87,9 @@ jobs:
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
 
+
+      - name: Test reviewed generated-model catalog, publication checksums and version rollback
+        run: npm run test:published-model-catalog
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
