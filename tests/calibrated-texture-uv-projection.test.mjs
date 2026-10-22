@@ -95,6 +95,22 @@ test("rejects unverified calibration, excessive reprojection error and source ca
     cameras, vertices, candidate: candidate({}, {}, { cameraId: "other-camera" }),
   });
   assert.ok(mismatch.rejectedFaces[0].reasons.includes("source-image-camera-does-not-match-calibration"));
+
+  const implicitCalibrationMismatch = projectTextureFaces({
+    cameras,
+    vertices,
+    candidate: {
+      images: [{ ...image, cameraId: "other-camera" }],
+      cameraCalibrations: [{ id: "front", status: "verified", reprojectionErrorPx: 0.25 }],
+      faces: [{
+        vertices: ["a", "b", "c"],
+        sourceImageId: "front-image",
+        cameraCalibrationId: "front",
+        visibilityReviewed: true,
+      }],
+    },
+  });
+  assert.ok(implicitCalibrationMismatch.rejectedFaces[0].reasons.includes("source-image-camera-does-not-match-calibration"));
 });
 
 test("rejects vertices behind the camera and validates all required inputs", () => {

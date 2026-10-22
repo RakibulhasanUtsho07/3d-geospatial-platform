@@ -110,7 +110,7 @@ export function projectTextureFaces({ cameras, vertices, candidate, options = {}
     // semantic facade classifier, or cross-view occlusion solver.
     if (face?.visibilityReviewed !== true) reasons.push("source-view-visibility-review-required");
 
-    const cameraId = calibration?.cameraId ?? image?.cameraId ?? calibration?.id;
+    const cameraId = calibration?.cameraId ?? calibration?.id ?? image?.cameraId;
     if (image?.cameraId && cameraId && image.cameraId !== cameraId) {
       reasons.push("source-image-camera-does-not-match-calibration");
     }
