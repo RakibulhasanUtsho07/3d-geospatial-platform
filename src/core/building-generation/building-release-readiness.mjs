@@ -47,6 +47,7 @@ export function buildBuildingReleaseReadiness(input) {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    correctionArtifactEvidence,
     accuracyEvidence,
   } = input;
 
@@ -323,6 +324,12 @@ export function buildBuildingReleaseReadiness(input) {
     isHash(backlog.createdFromReviewReportSha256);
   check("correction-backlog-valid", backlogValid,
     "A valid correction task backlog for the same building is required.");
+  const hasModelCorrectionTasks = Array.isArray(backlog?.tasks) &&
+    backlog.tasks.some((task) => task?.kind === "model-correction-review");
+  check("correction-artifact-files-validated", !hasModelCorrectionTasks ||
+    correctionArtifactEvidence?.validated === true &&
+      correctionArtifactEvidence?.qaReportsRecomputedFromCandidateModel === true,
+  "Model-correction verification requires real candidate/manifest files and QA reports checked against a fresh recomputation from the candidate GLB.");
 
   const reviewDigest = isObject(review) ? digest(JSON.stringify(review)) : null;
   const backlogDigest = isObject(backlog) ? digest(JSON.stringify(backlog)) : null;
@@ -330,7 +337,7 @@ export function buildBuildingReleaseReadiness(input) {
   let recomputeError = null;
   if (backlogValid && reviewValid) {
     try {
-      recomputedVerification = verifyRenderCorrectionTasks(backlog, review);
+      recomputedVerification = verifyRenderCorrectionTasks(backlog, review, correctionArtifactEvidence);
     } catch (error) {
       recomputeError = error instanceof Error ? error.message : String(error);
     }
@@ -419,6 +426,8 @@ export function buildBuildingReleaseReadiness(input) {
       correctionTaskBacklogSha256: backlogDigest,
       correctionVerificationReportSha256: verification ? digest(JSON.stringify(verification)) : null,
       correctionVerificationSourceReviewSha256: verification?.verificationReviewReportSha256 ?? null,
+      correctionArtifactEvidenceSha256: isObject(correctionArtifactEvidence)
+        ? digest(JSON.stringify(correctionArtifactEvidence)) : null,
       geometryQaReportSha256: isObject(geometryQa) ? digest(JSON.stringify(geometryQa)) : null,
       textureQaReportSha256: isObject(textureQa) ? digest(JSON.stringify(textureQa)) : null,
       accuracyEvidenceSha256: isObject(accuracyEvidence) ? digest(JSON.stringify(accuracyEvidence)) : null,
