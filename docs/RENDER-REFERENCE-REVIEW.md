@@ -65,3 +65,14 @@ The render directory must contain the `render-review-manifest.json` and generate
 The final status only summarizes the entered assessment. It does not prove accuracy independently. Reports include model/render/reference hashes so reviewers can identify exactly which versions were compared. A reference whose rights are pending/unknown, facade is unknown, or camera heading is unverified creates warnings. Rights and camera metadata are user-declared and are not independently certified.
 
 `publicationEligible` remains false for every status. Do not convert a manual report into a geometric accuracy score; corrections still require editing the mesh/UV/model using reviewed evidence and rerunning QA and render checks.
+
+
+## Edge-structure and sharpness screening
+
+The image-similarity report also measures bounded grayscale-preview edge density, gradient magnitude, an 8-bin edge-orientation histogram, and Laplacian variance as a coarse sharpness proxy. When screening thresholds are exceeded, the report can add:
+
+- `edge-density-difference-screening-hint` when the amount of visible edge structure differs substantially.
+- `edge-orientation-structure-difference-screening-hint` when both previews contain enough edges but their gradient-orientation distributions differ.
+- `candidate-lower-sharpness-screening-hint` when a sufficiently structured reference has much higher Laplacian variance than the candidate render.
+
+These metrics operate on a 64×64 grayscale preview. They are sensitive to crop, image texture, anti-aliasing, lighting, compression, shadows and unrelated scene content. Edge orientation means pixel-gradient direction only; it is **not** a compass bearing or a verified facade orientation. Laplacian variance is a screening proxy, not a calibrated blur score. Do not use these metrics to automatically label a model as correct/incorrect or to change the human review outcome. `publicationEligible` remains false.
