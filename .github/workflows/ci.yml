@@ -100,6 +100,9 @@ jobs:
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
+      - name: Test measured floor-plan vector to GLB generation
+        run: npm run test:floor-plan-model
+
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
       - name: Test authenticated generation media upload storage
