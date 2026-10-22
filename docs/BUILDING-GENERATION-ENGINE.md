@@ -206,3 +206,23 @@ This is a single-view inference route, appropriate for visual preview/asset draf
 7. Other source routes: CAD/DWG/vector floor-plan parser, IFC/BIM import and optionally AI-assisted visual attribute extraction with source/confidence tracking.
 
 The generated model registry already added to the map engine is in-memory only. This reconstruction worker is not an authorization layer or public upload endpoint. Do not expose unauthenticated model generation, arbitrary asset URLs or publishing controls.
+
+## 8. Authenticated media upload API
+
+The Node.js route `POST /api/building-generation/uploads` accepts multipart form data using the existing `GENERATION_API_TOKEN`. Required fields are `buildingId`, `sourceId`, and `file`; optional fields include `kind` (`auto`, `image`, `video`, or `floor-plan`), `licence`, `author`, `attribution`, `sourceUrl`, `capturedAt`, and `description`.
+
+API uploads have a **50 MiB request-file ceiling** (image intake also enforces its stricter 20 MiB image limit). The endpoint reads the incoming request with a hard multipart-body cap before parsing it, validates the uploaded bytes using the same file-signature checks as local intake, stores content-addressed bytes in the private workspace, and removes the temporary upload file. A successful response contains a source record including its workspace-relative `relativePath`, detected MIME type, SHA-256 and `usageStatus: "unreviewed"`.
+
+PowerShell example:
+
+~~~powershell
+$env:GENERATION_API_TOKEN = "<server-configured-token>"
+curl.exe -X POST "http://localhost:3000/api/building-generation/uploads" `
+  -H "Authorization: Bearer $env:GENERATION_API_TOKEN" `
+  -F "buildingId=dhaka-demo" `
+  -F "sourceId=front-photo" `
+  -F "licence=CC BY 4.0" `
+  -F "file=@E:\Building-Engine-Workspace\uploads\front.jpg"
+~~~
+
+Use the returned `source.relativePath` in a later `POST /api/building-generation/jobs` request. The source ID must match the upload response. Supply a real permission/licence basis and `confirmRights: true` only after you have checked reuse rights for each source. Uploading alone never approves rights or starts generation. The same API token must remain server-side; do not place it in browser code. The HTTP upload endpoint caps video uploads at 50 MiB even though the local CLI intake supports larger files.
