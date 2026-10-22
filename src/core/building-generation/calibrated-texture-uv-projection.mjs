@@ -133,7 +133,11 @@ export function projectTextureFaces({ cameras, vertices, candidate, options = {}
         }
         if (!reasons.length) {
           // glTF normalized UVs use a bottom-left origin; projected image pixels use top-left.
-          uv = pixels.map((point) => [point.x / image.width, 1 - point.y / image.height]);
+          const normalized = (value) => Math.round(value * 1e12) / 1e12;
+          uv = pixels.map((point) => [
+            normalized(point.x / image.width),
+            normalized(1 - point.y / image.height),
+          ]);
         }
       } catch (error) {
         reasons.push(error instanceof Error && /behind the camera|projection horizon/.test(error.message)
