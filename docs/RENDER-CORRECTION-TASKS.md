@@ -77,7 +77,7 @@ The checklist does not change task priority, decide a correction category from m
 
 The separate verification command now requires every one of these gates in addition to a fresh exact-pair `match`, changed source-model and render-manifest hashes, and an unchanged reference-image hash. It reports `awaiting-approved-proposal`, `approval-order-violation`, or `incomplete-implementation-evidence` rather than `verified` when the corresponding gate fails. The recorded output-model and render-manifest hashes must equal the fresh review report provenance. Existing model-correction tasks without a completed checklist remain readable, but they will not pass verification until a human records the required proposal, approval and implementation evidence.
 
-**Evidence boundary:** this command validates the recorded SHA-256 values and their linkage to the fresh review report; it does not open the geometry/texture QA files or independently attest their contents, and it does not cryptographically authenticate the human identities or approval record. Keep the QA reports and signed/controlled human review records alongside the task JSON for audit. Publication eligibility remains false.
+**Evidence boundary:** the CLI reads the actual candidate, manifest and QA report files, hashes their raw bytes, and recomputes geometry/texture QA from the candidate GLB before accepting the reports. This does not cryptographically authenticate the human identities or approval record; keep signed/controlled human review records alongside the task JSON for audit. Publication eligibility remains false.
 
 
 ## File-backed implementation evidence
