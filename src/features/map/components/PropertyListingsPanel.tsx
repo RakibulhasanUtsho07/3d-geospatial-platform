@@ -58,6 +58,7 @@ export default function PropertyListingsPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
+  const activeServiceRequestRef = useRef<symbol | null>(null);
 
   useEffect(() => {
     try {
@@ -83,7 +84,11 @@ export default function PropertyListingsPanel({
     }
   }, [savedIds, savedLoaded]);
 
-  useEffect(() => () => activeRequestRef.current?.abort(), []);
+  useEffect(() => () => {
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    activeServiceRequestRef.current = null;
+  }, []);
   function toggleSaved(id: string) {
     setSavedIds((previous) => previous.includes(id)
       ? previous.filter((value) => value !== id)
@@ -162,14 +167,20 @@ export default function PropertyListingsPanel({
   }
 
   async function handleCheckServices(property: PropertyResult) {
+    const requestToken = Symbol("property-service-search");
+    activeServiceRequestRef.current = requestToken;
     setServiceLoading(true);
     setServiceError(null);
     try {
       await onCheckNearbyServices(property);
     } catch (error: unknown) {
+      if (activeServiceRequestRef.current !== requestToken) return;
       setServiceError(error instanceof Error ? error.message : "Nearby service matching failed.");
     } finally {
-      setServiceLoading(false);
+      if (activeServiceRequestRef.current === requestToken) {
+        activeServiceRequestRef.current = null;
+        setServiceLoading(false);
+      }
     }
   }
 
