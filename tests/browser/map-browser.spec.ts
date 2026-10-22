@@ -5,10 +5,60 @@ type ObservedRequests = {
   roads: URL[];
 };
 
-const EMPTY_FEATURE_COLLECTION = {
+const SAMPLE_BUILDING_FEATURE_COLLECTION = {
   type: "FeatureCollection",
-  features: [],
+  features: [
+    {
+      type: "Feature",
+      id: "qa-building-01",
+      properties: {
+        id: "qa-building-01",
+        height: 16,
+        building: "residential",
+        subtype: "residential",
+        _renderRole: "building",
+        _renderPartCount: 0,
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [90.40598, 23.70854],
+          [90.40612, 23.70854],
+          [90.40612, 23.70867],
+          [90.40598, 23.70867],
+          [90.40598, 23.70854],
+        ]],
+      },
+    },
+  ],
 };
+
+const SAMPLE_ROADS = [
+  {
+    id: "qa-arterial-road",
+    name: "QA Main Road",
+    highway: "primary",
+    roadClass: "arterial",
+    widthMeters: 8,
+    surface: "asphalt",
+    layer: 0,
+    bridge: false,
+    tunnel: false,
+    coordinates: [[90.4057, 23.70845], [90.4060, 23.70860], [90.4063, 23.70874]],
+  },
+  {
+    id: "qa-local-road",
+    name: "QA Local Street",
+    highway: "residential",
+    roadClass: "local",
+    widthMeters: 3.2,
+    surface: "concrete",
+    layer: 0,
+    bridge: false,
+    tunnel: false,
+    coordinates: [[90.4060, 23.70840], [90.4061, 23.70857], [90.4062, 23.70878]],
+  },
+];
 
 const TRANSPARENT_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGBgAAAABQABpfZFQAAAAABJRU5ErkJggg==",
@@ -43,7 +93,7 @@ async function stubMapNetwork(page: Page): Promise<ObservedRequests> {
     await route.fulfill({
       status: 200,
       contentType: "application/geo+json",
-      body: JSON.stringify(EMPTY_FEATURE_COLLECTION),
+      body: JSON.stringify(SAMPLE_BUILDING_FEATURE_COLLECTION),
     });
   });
 
@@ -52,7 +102,7 @@ async function stubMapNetwork(page: Page): Promise<ObservedRequests> {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ results: [] }),
+      body: JSON.stringify({ results: SAMPLE_ROADS }),
     });
   });
 
@@ -162,6 +212,46 @@ test("canvas drag stays interactive and zooming requests fresh road viewport bou
   await expect.poll(
     () => observed.roads.slice(beforeZoomCount).some(
       (url) => roadBoundsKey(url) !== boundsBeforeZoom,
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+});
+
+test("fixture building and roads pass through Cesium geometry staging with expected visual counts", async ({ page }) => {
+  const summaries: {
+    buildings: Array<{ returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number }>;
+    roads: Array<{ returnedWays?: number; renderedWays?: number; labelledRoads?: number }>;
+  } = { buildings: [], roads: [] };
+
+  page.on("console", (message) => {
+    const args = message.args();
+    void Promise.all(args.map((arg) => arg.jsonValue().catch(() => null))).then((values) => {
+      if (values[0] === "[Overture] Building viewport rendered." && values[1] && typeof values[1] === "object") {
+        summaries.buildings.push(values[1] as { returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number });
+      }
+      if (values[0] === "[Roads] Vector road viewport rendered." && values[1] && typeof values[1] === "object") {
+        summaries.roads.push(values[1] as { returnedWays?: number; renderedWays?: number; labelledRoads?: number });
+      }
+    });
+  });
+
+  await stubMapNetwork(page);
+  await openReadyMap(page);
+
+  await expect.poll(
+    () => summaries.buildings.some((summary) =>
+      summary.returnedFeatures === 1 &&
+      summary.renderedBuildings === 1 &&
+      summary.renderedExtrusions === 1
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  await expect.poll(
+    () => summaries.roads.some((summary) =>
+      summary.returnedWays === 2 &&
+      summary.renderedWays === 2 &&
+      (summary.labelledRoads ?? 0) >= 1
     ),
     { timeout: 20_000 },
   ).toBe(true);
