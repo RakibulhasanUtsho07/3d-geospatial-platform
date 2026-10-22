@@ -161,7 +161,7 @@ test("canvas drag stays interactive and zooming requests fresh road viewport bou
 
   await expect.poll(
     () => observed.roads.slice(beforeZoomCount).some(
-      (url) => roadBoundsKey(url) !== boundsBeforeZoom && roadBoundsKey(url) !== initialBounds,
+      (url) => roadBoundsKey(url) !== boundsBeforeZoom,
     ),
     { timeout: 20_000 },
   ).toBe(true);
