@@ -347,3 +347,63 @@ test("tasks without image diagnostics keep a null evidence field", () => {
   assert.equal(result.similarityDiagnosticsSummary.withWarnings, 0);
   assert.equal(result.similarityDiagnosticsSummary.withSpatialHotspots, 0);
 });
+
+
+test("creates an actionable reviewer checklist without inventing a proposal or approval", () => {
+  const result = createRenderCorrectionTasks(report({ viewsWithoutComparisons: [] }));
+  const task = result.tasks[0];
+  const checklist = task.reviewChecklist;
+
+  assert.ok(checklist);
+  assert.equal(checklist.schemaVersion, "1.0.0");
+  assert.equal(checklist.status, "awaiting-human-completion");
+  assert.equal(checklist.issueAssessment.status, "reviewer-recorded");
+  assert.equal(checklist.issueAssessment.statement, "Main facade opening rhythm differs from the reference.");
+  assert.equal(checklist.issueAssessment.source, "review-report.comparison.notes");
+  assert.equal(checklist.issueAssessment.needsSemanticConfirmation, true);
+  assert.equal(checklist.sourceEvidence.status, "recorded");
+  assert.equal(checklist.sourceEvidence.viewId, "front");
+  assert.equal(checklist.sourceEvidence.renderSha256, renderSha256);
+  assert.equal(checklist.sourceEvidence.referenceSha256, referenceSha256);
+  assert.equal(checklist.correctionProposal.requestedScope, "Review window spacing and facade proportions.");
+  assert.equal(checklist.correctionProposal.requestedScopeSource, "review-report.comparison.correctionRequest");
+  assert.equal(checklist.correctionProposal.status, "awaiting-human-proposal");
+  assert.equal(checklist.correctionProposal.proposalText, null);
+  assert.equal(checklist.correctionProposal.proposedBy, null);
+  assert.equal(checklist.correctionProposal.approval.status, "not-approved");
+  assert.equal(checklist.correctionProposal.approval.approvedBy, null);
+  assert.equal(checklist.implementationEvidence.status, "not-started");
+  assert.equal(checklist.implementationEvidence.outputModelSha256, null);
+  assert.equal(checklist.implementationEvidence.geometryQaReportSha256, null);
+  assert.equal(checklist.freshVerification.status, "not-started");
+  assert.equal(checklist.freshVerification.gates.sourceModelHashChanged, "pending");
+  assert.ok(checklist.freshVerification.requirements.some((item) => /same reference image content and SHA-256/.test(item)));
+  assert.equal(checklist.policy.proposalApprovalRequiredBeforeEditing, true);
+  assert.equal(checklist.policy.diagnosticsCanApproveChange, false);
+  assert.equal(checklist.policy.autoApplied, false);
+  assert.equal(checklist.policy.verified, false);
+  assert.equal(checklist.policy.publicationEligible, false);
+});
+
+test("leaves the proposed change empty when the reviewer did not provide a structured request", () => {
+  const result = createRenderCorrectionTasks(report({
+    comparisons: [comparison({ correctionRequest: null })],
+    viewsWithoutComparisons: [],
+  }));
+  const checklist = result.tasks[0].reviewChecklist;
+  assert.equal(checklist.correctionProposal.requestedScope, null);
+  assert.equal(checklist.correctionProposal.requestedScopeSource, null);
+  assert.equal(checklist.correctionProposal.proposalText, null);
+  assert.equal(checklist.correctionProposal.approval.status, "not-approved");
+  assert.match(result.tasks[0].correctionRequest, /No structured correction request/);
+});
+
+test("non-correction follow-up tasks do not receive an inapplicable correction checklist", () => {
+  const result = createRenderCorrectionTasks(report({
+    reviewStatus: "pending-human-review",
+    comparisons: [comparison({ outcome: "pending", reviewer: "", reviewedAt: null, notes: "", correctionRequest: null })],
+    viewsWithoutComparisons: [],
+  }));
+  assert.equal(result.tasks[0].kind, "complete-reference-review");
+  assert.equal(result.tasks[0].reviewChecklist, null);
+});

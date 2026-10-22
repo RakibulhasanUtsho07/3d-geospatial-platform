@@ -291,6 +291,94 @@ function hasHumanConfirmedOutcome(comparison) {
     Number.isFinite(Date.parse(comparison.reviewedAt));
 }
 
+
+function validTaskEvidencePair(comparison) {
+  return nonEmptyString(comparison?.viewId) &&
+    nonEmptyString(comparison?.referenceImageId) &&
+    sha256Pattern.test(comparison?.renderSha256 ?? "") &&
+    sha256Pattern.test(comparison?.referenceSha256 ?? "");
+}
+
+function buildCorrectionReviewChecklist({ comparison, humanReviewConfirmed }) {
+  const requestedScope = nonEmptyString(comparison?.correctionRequest)
+    ? comparison.correctionRequest.trim()
+    : null;
+  return {
+    schemaVersion: "1.0.0",
+    status: "awaiting-human-completion",
+    note: "Checklist template only. Nothing is proposed, approved, applied, or verified by generating this task.",
+    issueAssessment: {
+      status: humanReviewConfirmed ? "reviewer-recorded" : "needs-human-review",
+      statement: nonEmptyString(comparison?.notes) ? comparison.notes.trim() : null,
+      source: nonEmptyString(comparison?.notes) ? "review-report.comparison.notes" : null,
+      outcome: comparison?.outcome ?? null,
+      reviewer: comparison?.reviewer ?? null,
+      reviewedAt: comparison?.reviewedAt ?? null,
+      needsSemanticConfirmation: true,
+    },
+    sourceEvidence: {
+      status: comparison && validTaskEvidencePair(comparison) ? "recorded" : "incomplete",
+      viewId: comparison?.viewId ?? null,
+      renderFilename: comparison?.renderFilename ?? null,
+      renderSha256: comparison?.renderSha256 ?? null,
+      referenceImageId: comparison?.referenceImageId ?? null,
+      referenceSha256: comparison?.referenceSha256 ?? null,
+      comparisonBasis: comparison?.comparisonBasis ?? null,
+      imageSpaceHotspotsOnly: comparison?.similarityDiagnostics?.spatialHotspots !== null &&
+        comparison?.similarityDiagnostics?.spatialHotspots !== undefined,
+      confirmationStep: "Open both source images and confirm camera/facade comparability before interpreting visual differences.",
+    },
+    correctionProposal: {
+      status: "awaiting-human-proposal",
+      requestedScope,
+      requestedScopeSource: requestedScope ? "review-report.comparison.correctionRequest" : null,
+      proposalText: null,
+      proposedBy: null,
+      proposedAt: null,
+      approval: {
+        status: "not-approved",
+        approvedBy: null,
+        approvedAt: null,
+        rationale: null,
+      },
+    },
+    implementationEvidence: {
+      status: "not-started",
+      changeSummary: null,
+      outputModelSha256: null,
+      geometryQaReportSha256: null,
+      textureQaReportSha256: null,
+      generatedRenderManifestSha256: null,
+    },
+    freshVerification: {
+      status: "not-started",
+      verificationReviewReportSha256: null,
+      requirements: [
+        "Record geometry/texture QA report hashes for the changed model, as applicable.",
+        "Generate a new render set and record its render-manifest SHA-256.",
+        "Use the same reference image content and SHA-256 for this exact view/reference pair.",
+        "Record a fresh human outcome for the same viewId and referenceImageId.",
+        "Verify using the separate correction-verification command; do not infer success from hotspot overlap.",
+      ],
+      gates: {
+        sourceModelHashChanged: "pending",
+        renderManifestHashChanged: "pending",
+        referenceImageHashUnchanged: "pending",
+        exactViewReferencePairReviewed: "pending",
+        humanReportedMatch: "pending",
+      },
+    },
+    policy: {
+      proposalApprovalRequiredBeforeEditing: true,
+      checklistAffectsTaskPriority: false,
+      diagnosticsCanApproveChange: false,
+      autoApplied: false,
+      verified: false,
+      publicationEligible: false,
+    },
+  };
+}
+
 /**
  * Turn a valid, human-authored render/reference review report into a deterministic
  * task backlog. This function never edits geometry, textures, UVs or source files.
@@ -333,6 +421,9 @@ export function createRenderCorrectionTasks(reviewReport) {
       action,
       correctionRequest,
       humanReviewConfirmed,
+      reviewChecklist: kind === "model-correction-review"
+        ? buildCorrectionReviewChecklist({ comparison, humanReviewConfirmed })
+        : null,
       evidence: {
         reviewReportSha256,
         sourceModelSha256,
