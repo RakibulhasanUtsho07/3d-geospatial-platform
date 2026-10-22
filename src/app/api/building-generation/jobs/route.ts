@@ -9,7 +9,6 @@ import {
   getGenerationWorkspaceRoot,
 } from "@/core/building-generation/generation-api-auth.mjs";
 
-export const runtime = "nodejs";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
