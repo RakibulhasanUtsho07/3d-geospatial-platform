@@ -6,7 +6,6 @@ import {
   getGenerationWorkspaceRoot,
 } from "@/core/building-generation/generation-api-auth.mjs";
 
-export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ jobId: string }> };
 
