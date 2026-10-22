@@ -69,18 +69,7 @@ export async function inspectRenderCorrectionArtifactEvidence({
   }
 
   const textureQa = reviewGlbTextureBindings(candidateModelBytes);
-  // Only the standalone texture-review CLI's non-semantic input label is allowed
-  // as an additional field. All actual QA fields must match recomputed results.
-  const textureQaPayload = { ...suppliedTextureQa };
-  if (Object.hasOwn(textureQaPayload, "input")) {
-    const input = textureQaPayload.input;
-    if (!input || typeof input !== "object" ||
-      typeof input.glb !== "string" || typeof input.expectedAtlasChecked !== "boolean") {
-      throw new Error("artifact-texture-qa-input-metadata-invalid");
-    }
-    delete textureQaPayload.input;
-  }
-  if (!isDeepStrictEqual(textureQaPayload, textureQa)) {
+  if (!isDeepStrictEqual(suppliedTextureQa, textureQa)) {
     throw new Error("artifact-texture-qa-does-not-match-recomputed-candidate-report");
   }
 
