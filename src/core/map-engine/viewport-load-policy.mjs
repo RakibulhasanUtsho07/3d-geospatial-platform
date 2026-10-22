@@ -10,3 +10,15 @@ export function shouldAbortViewportRequest(activeEndpoint, nextEndpoint) {
   return activeEndpoint !== null &&
     activeEndpoint !== nextEndpoint;
 }
+
+
+/**
+ * A wide camera view needs the full pilot dataset unless it is already active.
+ * A bounded viewport cannot guarantee coverage for a world-scale view.
+ */
+export function shouldLoadFullDatasetForWideViewport(
+  hasLoadedBuildings,
+  loadedViewportBounds,
+) {
+  return !hasLoadedBuildings || loadedViewportBounds !== null;
+}
