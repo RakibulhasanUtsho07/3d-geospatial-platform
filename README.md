@@ -228,3 +228,8 @@ A deterministic shell builder now extrudes **explicit measured/vector floor-plan
 ### Authenticated floor-plan candidate API
 
 The backend can create a private interior GLB candidate from a complete measured/vector floor-plan JSON tied to an uploaded source classified as floor-plan. It verifies the source checksum against the protected intake store, saves a report/model privately, and offers bearer-token-protected report and GLB retrieval endpoints. This does not extract vector geometry from a raster/PDF automatically or publish models to the map. See the engine guide section 13, Authenticated floor-plan candidate API.
+
+
+### Floor-plan review and publication
+
+Candidates created from measured floor-plan vectors can be reviewed through a separate authenticated review API, then published only via an explicit hash-verified catalog command after approval. Source rights must be reviewed before candidate generation; rejected or changes-requested reviews do not create a publishing attestation. Run `npm run publish:floor-plan-candidate -- <workspaceRoot> <buildingId> <candidateId>` only after an approved review. Automatic PDF/image-to-vector tracing remains unimplemented. See section 14 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
