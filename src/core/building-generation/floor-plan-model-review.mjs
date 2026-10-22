@@ -602,7 +602,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
       error.code = "PUBLICATION_RECEIPT_MISMATCH";
       throw error;
     }
-    if (!/^\\/models\\/generated\\/[A-Za-z0-9._-]+-[a-f0-9]{12}\\.glb$/.test(version.url)) {
+    if (!/^\/models\/generated\/[A-Za-z0-9._-]+-[a-f0-9]{12}\.glb$/.test(version.url)) {
       throw new TypeError("Published candidate asset URL is invalid.");
     }
     const assetPath = path.join(root, "public", "models", "generated", path.basename(version.url));
@@ -660,7 +660,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     mapReady: false,
     publicationEligible: false,
   };
-  await writeExclusiveAtomically(directory, "publication.json", Buffer.from(JSON.stringify(receipt, null, 2) + "\\n", "utf8"));
+  await writeExclusiveAtomically(directory, "publication.json", Buffer.from(JSON.stringify(receipt, null, 2) + "\n", "utf8"));
   return {
     ...result,
     candidateId: cid,
