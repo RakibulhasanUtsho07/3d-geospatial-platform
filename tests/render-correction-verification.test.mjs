@@ -315,3 +315,183 @@ test("rejects same report reuse, wrong building, invalid hashes and duplicate co
     ],
   })), /duplicate-verification-comparison/);
 });
+
+
+function spatialDiagnosticMetrics() {
+  const cells = Array.from({ length: 16 }, (_, index) => {
+    const cellX = index % 4;
+    const cellY = Math.floor(index / 4);
+    const edgeSampleCount = (cellX === 0 || cellX === 3 ? 15 : 16) *
+      (cellY === 0 || cellY === 3 ? 15 : 16);
+    const referenceEdgePixelCount = index + 1;
+    const candidateEdgePixelCount = (index * 3) % 17;
+    return {
+      cellX,
+      cellY,
+      meanAbsoluteError: index + 1,
+      meanSignedLuminanceOffset: index - 8,
+      localSsim16x16: Number((0.5 + index / 100).toFixed(4)),
+      edgeSampleCount,
+      referenceEdgePixelCount,
+      candidateEdgePixelCount,
+      referenceEdgeDensity: Number((referenceEdgePixelCount / edgeSampleCount).toFixed(4)),
+      candidateEdgeDensity: Number((candidateEdgePixelCount / edgeSampleCount).toFixed(4)),
+      edgeDensityAbsoluteDifference: Number((
+        Math.abs(referenceEdgePixelCount - candidateEdgePixelCount) / edgeSampleCount
+      ).toFixed(4)),
+    };
+  });
+  const medianOf = (values) => {
+    const ordered = [...values].sort((left, right) => left - right);
+    return (ordered[7] + ordered[8]) / 2;
+  };
+  const pixelRanked = [...cells].sort((left, right) =>
+    right.meanAbsoluteError - left.meanAbsoluteError || left.cellY - right.cellY || left.cellX - right.cellX);
+  const edgeRanked = [...cells].sort((left, right) =>
+    right.edgeDensityAbsoluteDifference - left.edgeDensityAbsoluteDifference ||
+    left.cellY - right.cellY || left.cellX - right.cellX);
+  const errors = cells.map((cell) => cell.meanAbsoluteError);
+  const edgeDifferences = cells.map((cell) => cell.edgeDensityAbsoluteDifference);
+  return {
+    spatialCellDiagnostics: cells,
+    spatialCellMaeMedian: medianOf(errors),
+    spatialCellMaeMaximum: Math.max(...errors),
+    spatialCellMaeMedianGap: Math.max(...errors) - medianOf(errors),
+    highestDifferenceCells: pixelRanked.slice(0, 4).map(({ cellX, cellY }) => ({ cellX, cellY })),
+    localEdgeDensityDifferenceMedian: medianOf(edgeDifferences),
+    localEdgeDensityDifferenceMaximum: Math.max(...edgeDifferences),
+    highestEdgeDifferenceCells: edgeRanked.slice(0, 4).map(({ cellX, cellY }) => ({ cellX, cellY })),
+    luminanceOffsetNormalizedMeanAbsoluteError: 18.5,
+    luminanceOffsetNormalizedRootMeanSquaredError: 27.25,
+    luminanceOffsetNormalizedSsim8x8: 0.61,
+    luminanceOffsetNormalizedMaeReductionPercent: 66.6667,
+  };
+}
+
+function storedSpatialHotspots() {
+  return {
+    coordinateSpace: "normalized-64x64-grayscale-preview-4x4-grid",
+    gridSize: 4,
+    note: "Descriptive image-space context only. Not facade coordinates.",
+    pixelDifference: {
+      medianMeanAbsoluteError: 22,
+      maximumMeanAbsoluteError: 44,
+      maximumAboveMedian: 22,
+      highestDifferenceCells: [
+        { cellX: 0, cellY: 0, meanAbsoluteError: 44, meanSignedLuminanceOffset: -5, localSsim16x16: 0.6 },
+        { cellX: 1, cellY: 0, meanAbsoluteError: 38, meanSignedLuminanceOffset: -4, localSsim16x16: 0.7 },
+        { cellX: 2, cellY: 0, meanAbsoluteError: 30, meanSignedLuminanceOffset: 2, localSsim16x16: 0.8 },
+        { cellX: 3, cellY: 0, meanAbsoluteError: 28, meanSignedLuminanceOffset: 1, localSsim16x16: 0.8 },
+      ],
+    },
+    edgeStructure: {
+      medianAbsoluteEdgeDensityDifference: 0.04,
+      maximumAbsoluteEdgeDensityDifference: 0.2,
+      highestEdgeDifferenceCells: [
+        { cellX: 0, cellY: 0, edgeDensityAbsoluteDifference: 0.2, referenceEdgeDensity: 0.3, candidateEdgeDensity: 0.1, referenceEdgePixelCount: 45, candidateEdgePixelCount: 15 },
+        { cellX: 1, cellY: 0, edgeDensityAbsoluteDifference: 0.15, referenceEdgeDensity: 0.25, candidateEdgeDensity: 0.1, referenceEdgePixelCount: 60, candidateEdgePixelCount: 24 },
+        { cellX: 2, cellY: 0, edgeDensityAbsoluteDifference: 0.12, referenceEdgeDensity: 0.2, candidateEdgeDensity: 0.08, referenceEdgePixelCount: 48, candidateEdgePixelCount: 19 },
+        { cellX: 3, cellY: 0, edgeDensityAbsoluteDifference: 0.1, referenceEdgeDensity: 0.2, candidateEdgeDensity: 0.1, referenceEdgePixelCount: 45, candidateEdgePixelCount: 22 },
+      ],
+    },
+  };
+}
+
+test("reports before/after hotspot overlap as image-space context without affecting verification status", () => {
+  const originalTask = task({
+    evidence: {
+      ...task().evidence,
+      similarityDiagnostics: {
+        reportSha256: "2".repeat(64),
+        renderSha256,
+        referenceSha256,
+        warnings: ["localized-image-difference-screening-hint"],
+        automaticMatch: false,
+        spatialHotspots: storedSpatialHotspots(),
+      },
+    },
+  });
+  const sourceBacklog = backlog({ tasks: [originalTask] });
+  const nextReport = reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      similarityDiagnostics: similarityDiagnostics({
+        metrics: {
+          meanAbsoluteError: 55.5,
+          rootMeanSquaredError: 72.25,
+          psnrDb: 10.96,
+          localSsim8x8: 0.12,
+          differenceHashHammingDistance: 51,
+          ...spatialDiagnosticMetrics(),
+        },
+      }),
+    }],
+  });
+
+  const result = verifyRenderCorrectionTasks(sourceBacklog, nextReport);
+  const taskResult = result.tasks[0];
+  assert.equal(taskResult.status, "verified");
+  assert.equal(taskResult.verified, true);
+  assert.equal(taskResult.matchedEvidence.similarityDiagnostics.spatialHotspots.gridSize, 4);
+  assert.equal(taskResult.matchedEvidence.similarityDiagnostics.metrics.luminanceOffsetNormalizedSsim8x8, 0.61);
+  assert.equal(taskResult.diagnosticHotspotComparison.coordinateSpace,
+    "normalized-64x64-grayscale-preview-4x4-grid");
+  assert.equal(taskResult.diagnosticHotspotComparison.affectsVerificationStatus, false);
+  assert.equal(taskResult.diagnosticHotspotComparison.pixelDifference.sharedCellCount, 0);
+  assert.deepEqual(taskResult.diagnosticHotspotComparison.pixelDifference.baselineOnlyCells,
+    [{ cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 }, { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 }]);
+  assert.equal(taskResult.diagnosticHotspotComparison.edgeStructure.baselineAvailable, true);
+  assert.equal(taskResult.diagnosticHotspotComparison.edgeStructure.verificationAvailable, true);
+  assert.equal(result.similarityDiagnosticsSummary.comparisonsWithSpatialHotspots, 1);
+  assert.equal(result.similarityDiagnosticsSummary.tasksWithHotspotComparison, 1);
+  assert.equal(result.automationPolicy.hotspotOverlapAffectsVerificationStatus, false);
+  assert.equal(result.automationPolicy.publicationEligible, false);
+});
+
+test("rejects malformed before/after hotspot evidence rather than comparing untrusted coordinates", () => {
+  const invalidStored = storedSpatialHotspots();
+  invalidStored.pixelDifference.highestDifferenceCells[1].cellX = 0;
+  const sourceTask = task({
+    evidence: {
+      ...task().evidence,
+      similarityDiagnostics: {
+        reportSha256: "2".repeat(64),
+        renderSha256,
+        referenceSha256,
+        warnings: [],
+        automaticMatch: false,
+        spatialHotspots: invalidStored,
+      },
+    },
+  });
+  assert.throws(() => verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport()),
+    /backlog-spatial-hotspots-invalid/);
+
+  const invalidFreshMetrics = spatialDiagnosticMetrics();
+  invalidFreshMetrics.highestDifferenceCells = [
+    { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
+    { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
+  ];
+  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+    comparisons: [{
+      ...reviewReport().comparisons[0],
+      similarityDiagnostics: similarityDiagnostics({
+        metrics: {
+          meanAbsoluteError: 55.5,
+          rootMeanSquaredError: 72.25,
+          psnrDb: 10.96,
+          localSsim8x8: 0.12,
+          differenceHashHammingDistance: 51,
+          ...invalidFreshMetrics,
+        },
+      }),
+    }],
+  })), /spatial-hotspots-invalid/);
+});
+
+test("legacy correction tasks without baseline hotspots remain verifiable and report no hotspot delta", () => {
+  const result = verifyRenderCorrectionTasks(backlog(), reviewReport());
+  assert.equal(result.tasks[0].status, "verified");
+  assert.equal(result.tasks[0].diagnosticHotspotComparison, null);
+  assert.equal(result.similarityDiagnosticsSummary.tasksWithHotspotComparison, 0);
+});
