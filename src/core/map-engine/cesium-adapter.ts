@@ -15,6 +15,7 @@ import {
   shouldContinueViewportLoad,
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
+import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
@@ -1165,6 +1166,17 @@ export class CesiumAdapter implements MapEngine {
       this.loadedRoadBounds &&
       this.roadBoundsContain(this.loadedRoadBounds, bounds)
     ) {
+      // Reusing rendered geometry is also a new camera intent. Cancel a
+      // different viewport request so its late response cannot replace these
+      // roads after the camera has returned to the already-covered area.
+      const hasActiveRoadRequest =
+        this.roadRequestAbortController !== null ||
+        this.activeRoadRequestKey !== null;
+      if (shouldCancelRoadRequestForCachedViewport(true, hasActiveRoadRequest)) {
+        this.roadRequestAbortController?.abort();
+        this.roadRequestAbortController = null;
+        this.activeRoadRequestKey = null;
+      }
       return;
     }
 
