@@ -92,9 +92,12 @@ export async function POST(request: Request) {
   headers.delete("content-length");
   headers.delete("transfer-encoding");
 
+  const bodyArrayBuffer = new ArrayBuffer(body.byteLength);
+  new Uint8Array(bodyArrayBuffer).set(body);
+
   let form: FormData;
   try {
-    form = await new Response(body, { headers }).formData();
+    form = await new Response(bodyArrayBuffer, { headers }).formData();
   } catch {
     return NextResponse.json({ error: "Upload body must be valid multipart form data." }, { status: 400 });
   }
