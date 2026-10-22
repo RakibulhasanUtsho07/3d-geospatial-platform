@@ -95,7 +95,8 @@ test("detects trace artifact tampering and source tampering on retrieval", async
     options: { maxEdge: 512, threshold: 180, minLineLengthPx: 50, minRoomSidePx: 40 },
   });
   const artifactPath = path.join(root, ...result.artifact.relativePath.split("/"));
-  const trace = JSON.parse(await readFile(artifactPath, "utf8"));
+  const originalTraceBytes = await readFile(artifactPath);
+  const trace = JSON.parse(originalTraceBytes.toString("utf8"));
   trace.candidates.rooms = [];
   await writeFile(artifactPath, JSON.stringify(trace));
   await assert.rejects(
@@ -103,13 +104,13 @@ test("detects trace artifact tampering and source tampering on retrieval", async
     (error) => error.code === "TRACE_CHECKSUM_MISMATCH",
   );
 
-  // Restore the integrity-protected trace, then alter the content-addressed source bytes.
-  await writeFile(artifactPath, JSON.stringify(JSON.parse(await readFile(artifactPath, "utf8"))));
-  const integrityPath = path.join(path.dirname(artifactPath), "trace.integrity.json");
-  const integrity = JSON.parse(await readFile(integrityPath, "utf8"));
-  // The stored hash still represents the original file, so the tampered trace must continue to fail.
-  assert.ok(integrity.traceSha256 !== (await import("node:crypto")).createHash("sha256").update(await readFile(artifactPath)).digest("hex"));
-  await assert.rejects(readFile(path.join(root, ".building-engine", "media", "dhaka-demo", "assets", source.record.assetId + ".png")), { code: "ENOENT" });
+  await writeFile(artifactPath, originalTraceBytes);
+  const originalSourcePath = path.join(root, ...source.record.relativePath.split("/"));
+  await writeFile(originalSourcePath, Buffer.concat([pngBytes, Buffer.from("tampered")]));
+  await assert.rejects(
+    loadFloorPlanRasterTrace({ workspaceRoot: root, buildingId: "dhaka-demo", traceId: result.traceId }),
+    /source asset SHA-256 does not match its ingestion record/,
+  );
 });
 
 test("rejects an oversized resize option before decoding a source", async (t) => {
