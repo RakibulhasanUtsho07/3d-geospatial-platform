@@ -206,3 +206,160 @@ This is a single-view inference route, appropriate for visual preview/asset draf
 7. Other source routes: CAD/DWG/vector floor-plan parser, IFC/BIM import and optionally AI-assisted visual attribute extraction with source/confidence tracking.
 
 The generated model registry already added to the map engine is in-memory only. This reconstruction worker is not an authorization layer or public upload endpoint. Do not expose unauthenticated model generation, arbitrary asset URLs or publishing controls.
+
+## 10. Authenticated media upload API
+
+The Node.js route `POST /api/building-generation/uploads` accepts multipart form data using the existing `GENERATION_API_TOKEN`. Required fields are `buildingId`, `sourceId`, and `file`; optional fields include `kind` (`auto`, `image`, `video`, or `floor-plan`), `licence`, `author`, `attribution`, `sourceUrl`, `capturedAt`, and `description`.
+
+API uploads have a **50 MiB request-file ceiling** (image intake also enforces its stricter 20 MiB image limit). The endpoint reads the incoming request with a hard multipart-body cap before parsing it, validates the uploaded bytes using the same file-signature checks as local intake, stores content-addressed bytes in the private workspace, and removes the temporary upload file. A successful response contains a source record including its workspace-relative `relativePath`, detected MIME type, SHA-256 and `usageStatus: "unreviewed"`.
+
+PowerShell example:
+
+~~~powershell
+$env:GENERATION_API_TOKEN = "<server-configured-token>"
+curl.exe -X POST "http://localhost:3000/api/building-generation/uploads" `
+  -H "Authorization: Bearer $env:GENERATION_API_TOKEN" `
+  -F "buildingId=dhaka-demo" `
+  -F "sourceId=front-photo" `
+  -F "licence=CC BY 4.0" `
+  -F "file=@E:\Building-Engine-Workspace\uploads\front.jpg"
+~~~
+
+Use the returned `source.relativePath` in a later `POST /api/building-generation/jobs` request. The source ID must match the upload response. Supply a real permission/licence basis and `confirmRights: true` only after you have checked reuse rights for each source. Uploading alone never approves rights or starts generation. The same API token must remain server-side; do not place it in browser code. The HTTP upload endpoint caps video uploads at 50 MiB even though the local CLI intake supports larger files.
+
+
+## 11. Queue source preflight
+
+Before a generation job is persisted, the queue validates every supplied source path against the configured workspace. It rejects missing files, empty files, directories, symbolic links in any path segment, paths resolving outside the workspace, and files that exceed the per-kind intake limit (image 20 MiB, video 500 MiB, floor-plan 50 MiB; `auto` uses the 500 MiB cap). This prevents broken requests from consuming a worker retry.
+
+Preflight is a file/path/size check, not a file-content or rights decision. The worker still runs media signature detection, hashes the bytes, checks the media kind, and syncs the source through the existing provenance workflow. A caller's licence string and `confirmRights` flag remain an operator attestation, not independent legal verification.
+
+
+## 12. Measured floor-plan vectors to interior GLB
+
+The floor-plan shell builder is a deterministic geometry adapter for a **measured/vector trace**, not an automatic PDF/image parser. It extrudes explicit room polygons into floor slabs and explicit wall centre-lines into walls, leaving openings for doors and windows and adding simple door/window geometry. This provides a reviewable interior shell where the room outlines, wall paths, openings and dimensions are already traced or supplied by a CAD/vector conversion step.
+
+Required geometry fields include:
+
+- `units: "m"`; coordinates are local `[x, z]` points in metres.
+- An explicit `origin` with WGS84 longitude/latitude, elevation and heading.
+- `level` values for elevation, wall height, wall thickness and floor thickness.
+- Room polygons and wall centre-lines; doors/windows use measured wall offsets, width, height and sill height.
+
+Generate the GLB and its JSON QA/provenance report:
+
+~~~powershell
+npm run test:floor-plan-model
+npm run generate:floor-plan-model -- .\floor-plan-geometry.json .\output\ground-floor.glb
+~~~
+
+The report is written beside the GLB as `ground-floor.glb.report.json`. To independently check the source PDF or source image checksum, provide the original source file as the third CLI argument; the input JSON must contain `source.sourceId` and the expected `source.sha256`:
+
+~~~powershell
+npm run generate:floor-plan-model -- .\floor-plan-geometry.json .\output\ground-floor.glb .\original-floor-plan.pdf
+~~~
+
+A source checksum in JSON is treated as metadata unless this optional original-file check succeeds. The generated GLB is always a candidate with `mapReady=false` and `publicationEligible=false`; it is not automatically published or georeferenced by itself. Verify the trace, metres, heading, origin, dimensions, doors/windows and source rights before review. Furniture, stairs, ceilings, electrical/plumbing systems and automatic PDF/image wall extraction are not included in this worker.
+
+
+## 13. Authenticated floor-plan candidate API
+
+After uploading the source file with kind=floor-plan, the authenticated backend can build a private candidate from an explicit traced geometry JSON. The original uploaded file is checked through the protected media-intake record; the JSON floorPlan.source.sha256 must match the actual stored source bytes.
+
+Endpoints use Authorization: Bearer GENERATION_API_TOKEN:
+
+- POST /api/building-generation/floor-plan-models — submit a { "floorPlan": { ... } } JSON body; returns a private candidate ID, report and model URL.
+- GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId> — return the saved report after verifying the saved GLB hash.
+- GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/model — download the private GLB after checking its SHA-256 against the report.
+
+Example source upload (use the SHA-256 returned in the JSON response):
+
+~~~powershell
+$env:GENERATION_API_TOKEN = "<server-configured-token>"
+curl.exe -X POST "http://localhost:3000/api/building-generation/uploads" `
+  -H "Authorization: Bearer $env:GENERATION_API_TOKEN" `
+  -F "buildingId=dhaka-demo" `
+  -F "sourceId=measured-plan-pdf" `
+  -F "kind=floor-plan" `
+  -F "licence=CC BY 4.0" `
+  -F "file=@E:\\Building-Engine-Workspace\\uploads\\floor-plan.pdf"
+~~~
+
+Then send the measured geometry to the candidate endpoint. Reuse the actual source.sha256 from the upload response; the placeholder below is not a real hash:
+
+~~~json
+{
+  "floorPlan": {
+    "schemaVersion": "1.0.0",
+    "id": "ground-floor",
+    "buildingId": "dhaka-demo",
+    "name": "Ground Floor",
+    "units": "m",
+    "origin": { "longitude": 90.406, "latitude": 23.709, "heightM": 3.5, "headingDegrees": 0 },
+    "level": { "elevationM": 0, "wallHeightM": 3, "wallThicknessM": 0.15, "floorThicknessM": 0.12 },
+    "source": { "sourceId": "measured-plan-pdf", "sha256": "<exact-upload-source-sha256>" },
+    "rooms": [{ "id": "living", "name": "Living", "polygon": [[0,0],[5,0],[5,4],[0,4]] }],
+    "walls": [
+      { "id": "north", "start": [0,0], "end": [5,0], "openings": [] },
+      { "id": "east", "start": [5,0], "end": [5,4], "openings": [] },
+      { "id": "south", "start": [5,4], "end": [0,4], "openings": [] },
+      { "id": "west", "start": [0,4], "end": [0,0], "openings": [] }
+    ]
+  }
+}
+~~~
+
+Submit the complete geometry in floorPlan; the short JSON above shows the fields and must be adjusted to the measured plan. API resource limits are 2 MiB JSON, 100 rooms, 500 walls, 4,000 room vertices total (at most 64 per room) and 1,000 openings. Candidate artifacts are stored privately under .building-engine/floor-plan-candidates/<buildingId>/<candidateId>/; they are not copied into public/. Report and GLB download endpoints use the bearer token and verify the saved model checksum.
+
+This API does not trace room or wall geometry out of a PDF/image, approve rights, survey the origin/heading, or publish the GLB. Source-use status is included in the report, and an unreviewed source adds a warning. Candidate status remains mapReady=false and publicationEligible=false.
+
+
+## 14. Floor-plan candidate review and explicit publishing
+
+A generated floor-plan candidate stays private and unpublished until a separate operator review is recorded. Review uses the separate `GENERATION_REVIEW_API_TOKEN` (not `GENERATION_API_TOKEN`) at:
+
+- `POST /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/review` — write one immutable review record.
+- `GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/review` — retrieve sanitized review status.
+
+The POST body is capped at 32 KiB and must include `decision` (`approved`, `rejected`, or `changes_requested`), `reviewer`, `notes`, an `evidencePath` and its exact SHA-256, explicit boolean values for all seven checks, and (for approval only) an explicit `publication` object with model ID/name, surveyed position, heading/pitch/roll, scale and axes.
+
+Approval requires that the source has already been through the existing source-rights review (`usageStatus=approved` with a known licence) *before the candidate is generated*. If the candidate report predates rights review, rebuild the candidate after source review. The application checks the original source, normalized geometry, report, generated GLB and review-evidence hashes. Reviewer names are operator-supplied labels; they are not verified by an identity provider, and review checklist values remain attestations that the operator must substantiate.
+
+After an approved review creates a private `attestation.json`, publication stays a separate explicit operation:
+
+~~~powershell
+npm run publish:floor-plan-candidate -- E:\\Building-Engine-Workspace dhaka-demo <candidateId>
+~~~
+
+The command calls the existing versioned generated-model catalog publisher, which rechecks candidate and evidence hashes and placement. Rejected or changes-requested reviews do not create a publication attestation. Reviews are immutable; create a new candidate for a replacement trace. Published versions are written to `public/models/generated/` and can be rolled back with the existing catalog activation command. The private candidate's `mapReady` and `publicationEligible` flags remain false so the candidate itself is never silently treated as map-ready.
+
+This workflow does not automatically trace walls and room polygons from a raster/PDF, independently verify permissions or survey measurements, or sign the reviewer identity. Those remain separate responsibilities.
+
+
+## 15. Raster floor-plan line proposals (review aid only)
+
+The backend can now analyze a privately ingested **JPEG, PNG or WebP** floor-plan raster and suggest long horizontal/vertical line segments. It uses bounded image normalization, a global Otsu threshold and run-length scans, then stores the result as a hash-verified private report. This is a review aid for tracing, not a room/wall semantic model.
+
+After uploading a raster file through `/api/building-generation/uploads`, call the authenticated endpoint with `Authorization: Bearer <GENERATION_API_TOKEN>`:
+
+~~~json
+{
+  "buildingId": "dhaka-demo",
+  "sourceId": "measured-plan-image",
+  "options": {
+    "maxDimension": 2048,
+    "minLineLengthPx": 48,
+    "mergeGapPx": 2,
+    "maxCandidates": 300
+  }
+}
+~~~
+
+- `POST /api/building-generation/floor-plan-line-proposals` — analyzes an already-ingested source and returns the proposal report and `proposalId`.
+- `GET /api/building-generation/floor-plan-line-proposals/<buildingId>/<proposalId>` — retrieves the saved report after verifying its manifest hash and confirming the source bytes still match intake.
+
+The proposal report uses pixels in the normalized raster's coordinate frame. `raster.width`/`height` describe the resized image used for detection; `originalWidth`/`originalHeight` preserve the source dimensions. Line coordinates must be mapped/reviewed manually if the raster was resized. The `confidenceScore` is a heuristic ranking, not a probability that a line is a wall. Results may include dimension lines, text strokes, furniture, hatching or page borders.
+
+This stage does **not** create room polygons, identify doors/windows, infer wall thickness in metres, calibrate scale, infer north/elevation, or assign WGS84 placement. It does not feed the generated-model catalog automatically. The report is always `review-required-not-scaled`, `mapReady=false`, and `publicationEligible=false`.
+
+PDF is not decoded by this stage. Rasterize the specific PDF page using a trusted local PDF renderer, record the rendering/page choice and upload the resulting PNG/JPEG/WebP as a separate source before analysis. The original PDF should remain attached as provenance. Unknown or unreviewed source-use status remains explicit; do not publish/share imagery without resolving reuse rights. A human must trace and verify candidate lines, supply measured metre geometry, and use the measured-vector engine and review/publish gate described in sections 12–14.

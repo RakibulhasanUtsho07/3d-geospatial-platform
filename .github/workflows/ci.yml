@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - feat/reviewed-model-map-publish
+      - feat/generation-queue-worker
       - dev
       - rakibul-hasan
       - feat/generated-building-model-layer
@@ -86,14 +88,33 @@ jobs:
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
 
+      - name: Test reviewed generated-model catalog publishing and rollback
+        run: npm run test:published-model-catalog
+
+      - name: Test approved generation review to explicit map publication
+        run: npm run test:publish-approved-generation-job
+
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
+      - name: Test measured floor-plan vector to GLB generation
+        run: npm run test:floor-plan-model
+      - name: Test uploaded-source verification and private floor-plan candidate API service
+        run: npm run test:floor-plan-model-api
+      - name: Test immutable floor-plan review and gated publication lifecycle
+        run: npm run test:floor-plan-review
+      - name: Test raster floor-plan line proposal extraction
+        run: npm run test:floor-plan-raster-line-proposals
+      - name: Test private raster proposal persistence and integrity
+        run: npm run test:floor-plan-raster-line-job
+
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
+      - name: Test authenticated generation media upload storage
+        run: npm run test:generation-media-upload
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
@@ -107,6 +128,12 @@ jobs:
       - name: Test end-to-end media-to-model orchestration
         run: npm run test:media-to-model-workflow
 
+      - name: Test durable generation queue, authenticated API gate and end-to-end worker
+        run: npm run test:generation-queue
+
+      - name: Test review decisions, candidate integrity and publication gate
+        run: npm run test:generation-review
+
       - name: Test image quality preflight and near-duplicate view detection
         run: npm run test:image-quality-preflight
 
@@ -117,9 +144,9 @@ jobs:
         run: npm run test:reconstruction-job-state
 
       - name: Install FFmpeg for deterministic texture atlas baking
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes ffmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: release
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -227,14 +254,32 @@ jobs:
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
+      - name: Test dynamic map performance telemetry and baseline aggregation
+        run: npm run test:map-performance
+
+      - name: Test dynamic map optimization parity and visual style policies
+        run: npm run test:map-optimization
+
+      - name: Benchmark map optimizations against reference implementations
+        run: npm run benchmark:map-optimization
+
+      - name: Test map initialization cancellation policy
+        run: npm run test:map-initialization-policy
+
       - name: Test building search index
         run: npm run test:building-search
 
       - name: Test building footprint area calculations
         run: npm run test:footprint-area
 
+      - name: Test building height provenance and fallbacks
+        run: npm run test:building-height
+
       - name: Test nearby-place query and normalization
         run: npm run test:nearby-places
+
+      - name: Test async search request freshness and cancellation
+        run: npm run test:async-request-policy
 
       - name: Test property listing filters and nearby-service matching
         run: npm run test:property-listings
@@ -244,6 +289,12 @@ jobs:
 
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
+
+      - name: Test shared request cancellation lifecycle
+        run: npm run test:shared-request-lifecycle
+
+      - name: Test stale road viewport request cancellation
+        run: npm run test:road-request-policy
 
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
@@ -277,6 +328,9 @@ jobs:
 
       - name: Build production app
         run: npm run build
+
+      - name: Install Chromium for map browser integration tests
+        run: npx playwright install chromium
 
       - name: Verify viewport API against the production server
         env:
@@ -423,3 +477,4 @@ jobs:
           NODE
 
           npm run test:geospatial-api
+          npm run test:map-browser

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { shouldAbortViewportRequest } from "../src/core/map-engine/viewport-load-policy.mjs";
+import {
+  shouldAbortViewportRequest,
+  shouldContinueViewportLoad,
+  shouldContinueViewportStage,
+  shouldLoadFullDatasetForWideViewport,
+} from "../src/core/map-engine/viewport-load-policy.mjs";
 
 test("no active request means there is nothing to abort", () => {
   assert.equal(shouldAbortViewportRequest(null, "/viewport?a=1"), false);
@@ -26,4 +31,50 @@ test("request policy rejects an empty next endpoint", () => {
     () => shouldAbortViewportRequest("/viewport?a=1", ""),
     /non-empty string/,
   );
+});
+
+
+test("a wide view requests the full dataset before any buildings are loaded", () => {
+  assert.equal(shouldLoadFullDatasetForWideViewport(false, null), true);
+});
+
+test("a wide view upgrades a previously loaded bounded viewport to the full dataset", () => {
+  assert.equal(
+    shouldLoadFullDatasetForWideViewport(true, {
+      west: 90.4,
+      south: 23.7,
+      east: 90.5,
+      north: 23.8,
+    }),
+    true,
+  );
+});
+
+test("a wide view reuses the full dataset when it is already loaded", () => {
+  assert.equal(shouldLoadFullDatasetForWideViewport(true, null), false);
+});
+
+
+test("a current viewport intent may continue while buildings are visible", () => {
+  assert.equal(shouldContinueViewportLoad(4, 4, true), true);
+});
+
+test("a superseded viewport intent is discarded after fetch completion", () => {
+  assert.equal(shouldContinueViewportLoad(4, 5, true), false);
+});
+
+test("a hidden building layer discards a pending viewport stage", () => {
+  assert.equal(shouldContinueViewportLoad(4, 4, false), false);
+});
+
+test("a restored layer does not revive an older intent revision", () => {
+  assert.equal(shouldContinueViewportLoad(4, 5, true), false);
+});
+
+
+test("a viewport stage continues only for the current visible viewer", () => {
+  assert.equal(shouldContinueViewportStage(7, 7, true, true), true);
+  assert.equal(shouldContinueViewportStage(7, 8, true, true), false);
+  assert.equal(shouldContinueViewportStage(7, 7, false, true), false);
+  assert.equal(shouldContinueViewportStage(7, 7, true, false), false);
 });

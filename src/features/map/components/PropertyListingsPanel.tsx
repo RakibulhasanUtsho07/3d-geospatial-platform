@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { matchNearbyServices, PROPERTY_TYPES } from "@/core/geospatial/property-listings.mjs";
+import { isCurrentAsyncRequest } from "@/core/geospatial/async-request-policy.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 
@@ -57,6 +58,7 @@ export default function PropertyListingsPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
+  const activeServiceRequestRef = useRef<symbol | null>(null);
 
   useEffect(() => {
     try {
@@ -82,7 +84,11 @@ export default function PropertyListingsPanel({
     }
   }, [savedIds, savedLoaded]);
 
-  useEffect(() => () => activeRequestRef.current?.abort(), []);
+  useEffect(() => () => {
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    activeServiceRequestRef.current = null;
+  }, []);
   function toggleSaved(id: string) {
     setSavedIds((previous) => previous.includes(id)
       ? previous.filter((value) => value !== id)
@@ -101,6 +107,9 @@ export default function PropertyListingsPanel({
       return;
     }
     if (savedOnly && savedIds.length === 0) {
+      activeRequestRef.current?.abort();
+      activeRequestRef.current = null;
+      setIsLoading(false);
       setResults([]);
       setTotalMatches(0);
       setHasSearched(true);
@@ -130,6 +139,9 @@ export default function PropertyListingsPanel({
         signal: controller.signal,
       });
       const payload = (await response.json()) as PropertiesResponse;
+      // Abort may happen while response.json() is still being read; only the
+      // latest request may publish results or replace the markers on the map.
+      if (!isCurrentAsyncRequest(controller, activeRequestRef.current, controller.signal.aborted)) return;
       if (!response.ok) throw new Error(payload.error || "Property search failed.");
       if (!Array.isArray(payload.results)) throw new Error("The property service returned an invalid response.");
 
@@ -137,7 +149,7 @@ export default function PropertyListingsPanel({
       setTotalMatches(typeof payload.totalMatches === "number" ? payload.totalMatches : payload.results.length);
       await onPropertiesLoaded(payload.results);
     } catch (error: unknown) {
-      if (controller.signal.aborted) return;
+      if (!isCurrentAsyncRequest(controller, activeRequestRef.current, controller.signal.aborted)) return;
       setResults([]);
       setTotalMatches(0);
       try {
@@ -155,14 +167,20 @@ export default function PropertyListingsPanel({
   }
 
   async function handleCheckServices(property: PropertyResult) {
+    const requestToken = Symbol("property-service-search");
+    activeServiceRequestRef.current = requestToken;
     setServiceLoading(true);
     setServiceError(null);
     try {
       await onCheckNearbyServices(property);
     } catch (error: unknown) {
+      if (activeServiceRequestRef.current !== requestToken) return;
       setServiceError(error instanceof Error ? error.message : "Nearby service matching failed.");
     } finally {
-      setServiceLoading(false);
+      if (activeServiceRequestRef.current === requestToken) {
+        activeServiceRequestRef.current = null;
+        setServiceLoading(false);
+      }
     }
   }
 

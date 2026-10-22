@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { CameraController } from "@/core/camera";
+import { isCurrentAsyncRequest } from "@/core/geospatial/async-request-policy.mjs";
 import { CesiumAdapter } from "@/core/map-engine";
 import type { BuildingVisualStyle } from "@/core/buildings/building-style";
 import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs";
@@ -12,6 +13,7 @@ import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type { RoadFeature } from "@/core/geospatial/road-network.mjs";
 import type {
   BuildingStyleAssignment,
+  GeneratedModelDefinition,
   MapFeatureSelection,
   MapLayer,
 } from "@/core/map-engine/types";
@@ -22,6 +24,7 @@ import PropertyListingsPanel from "./PropertyListingsPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
+import GeneratedModelPanel from "./GeneratedModelPanel";
 import RoadDetailsPanel from "./RoadDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
@@ -52,6 +55,8 @@ export default function MapCanvas({
   const onStylePreviewResultRef = useRef(onStylePreviewResult);
   const cameraRef = useRef<CameraController | null>(null);
   const engineRef = useRef<CesiumAdapter | null>(null);
+  const nearbyServiceRequestRef = useRef<AbortController | null>(null);
+  const nearbyPlacesLoadRevisionRef = useRef(0);
 
   const [status, setStatus] = useState<MapStatus>("loading");
   const [errorMessage, setErrorMessage] =
@@ -133,9 +138,13 @@ export default function MapCanvas({
       }
     });
     const unsubscribePropertySelection = engine.onPropertySelected((property) => {
-      if (!cancelled && property) {
-        setSelectedRoad(null);
-        focusProperty(property);
+      if (!cancelled) {
+        cancelNearbyServiceRequest();
+        setSelectedProperty(property);
+        if (property) {
+          setSelectedRoad(null);
+          focusProperty(property);
+        }
       }
     });
 
@@ -202,6 +211,8 @@ export default function MapCanvas({
         engineRef.current = null;
       }
 
+      // Stop outstanding service lookups before destroying the viewer.
+      cancelNearbyServiceRequest();
       // Stop any frame-driven camera tour before destroying the viewer.
       engine.stopAhsanManzilOrbitTour();
       // Destroy the viewer before retry or component unmount.
@@ -492,6 +503,11 @@ export default function MapCanvas({
     setLayers(engine.getLayers());
   }
 
+  function cancelNearbyServiceRequest() {
+    nearbyServiceRequestRef.current?.abort();
+    nearbyServiceRequestRef.current = null;
+  }
+
   function getNearbyPlacesCenter() {
     return engineRef.current?.getGroundCenter() ?? null;
   }
@@ -499,7 +515,14 @@ export default function MapCanvas({
   async function handleNearbyPlacesLoaded(places: NearbyPlace[]) {
     const engine = engineRef.current;
     if (!engine) return;
+    const revision = ++nearbyPlacesLoadRevisionRef.current;
     await engine.setNearbyPlaces(places);
+    if (
+      nearbyPlacesLoadRevisionRef.current !== revision ||
+      engineRef.current !== engine
+    ) {
+      return;
+    }
     setNearbyPlaces(places);
     setLayers(engine.getLayers());
   }
@@ -515,6 +538,7 @@ export default function MapCanvas({
     const engine = engineRef.current;
     if (!engine) return;
 
+    cancelNearbyServiceRequest();
     const origin = engine.getGroundCenter();
     const destination = { longitude: property.longitude, latitude: property.latitude, height: 0 };
     engine.clearFeatureSelection();
@@ -533,6 +557,13 @@ export default function MapCanvas({
 
   async function checkNearbyServicesForProperty(property: PropertyListing) {
     focusProperty(property);
+    const controller = new AbortController();
+    nearbyServiceRequestRef.current = controller;
+    const isCurrentRequest = () => isCurrentAsyncRequest(
+      controller,
+      nearbyServiceRequestRef.current,
+      controller.signal.aborted,
+    );
     const params = new URLSearchParams({
       lat: String(property.latitude),
       lon: String(property.longitude),
@@ -540,16 +571,30 @@ export default function MapCanvas({
       categories: "pharmacy,hospital,medical_center,supermarket,market",
       limit: "100",
     });
-    const response = await fetch("/api/geospatial/nearby-places?" + params.toString(), {
-      signal: AbortSignal.timeout(30_000),
-    });
-    const payload = (await response.json()) as { error?: string; results?: NearbyPlace[] };
-    if (!response.ok) throw new Error(payload.error ?? "Could not load services around this property.");
-    if (!Array.isArray(payload.results)) throw new Error("The nearby service API returned an invalid response.");
-    await handleNearbyPlacesLoaded(payload.results);
+    try {
+      const response = await fetch("/api/geospatial/nearby-places?" + params.toString(), {
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(30_000),
+        ]),
+      });
+      const payload = (await response.json()) as { error?: string; results?: NearbyPlace[] };
+      if (!isCurrentRequest()) return;
+      if (!response.ok) throw new Error(payload.error ?? "Could not load services around this property.");
+      if (!Array.isArray(payload.results)) throw new Error("The nearby service API returned an invalid response.");
+      await handleNearbyPlacesLoaded(payload.results);
+    } catch (error: unknown) {
+      if (!isCurrentRequest()) return;
+      throw error;
+    } finally {
+      if (nearbyServiceRequestRef.current === controller) {
+        nearbyServiceRequestRef.current = null;
+      }
+    }
   }
 
   function clearSelectedProperty() {
+    cancelNearbyServiceRequest();
     engineRef.current?.setNavigationPath(null, null);
     setSelectedProperty(null);
   }
@@ -558,6 +603,7 @@ export default function MapCanvas({
     const engine = engineRef.current;
     if (!engine) return;
 
+    cancelNearbyServiceRequest();
     engine.clearFeatureSelection();
     engine.setNavigationPath(null, null);
     setSelectedProperty(null);
@@ -582,6 +628,7 @@ export default function MapCanvas({
       return;
     }
 
+    cancelNearbyServiceRequest();
     engine.clearFeatureSelection();
     engine.setNavigationPath(null, null);
     setSelectedProperty(null);
@@ -605,11 +652,42 @@ export default function MapCanvas({
     });
   }
 
+  async function handleAddGeneratedModel(definition: GeneratedModelDefinition): Promise<void> {
+    const engine = engineRef.current;
+    if (!engine) throw new Error("The 3D map is not ready yet.");
+    await engine.addGeneratedModel(definition);
+  }
+
+  function handleGeneratedModelVisibility(id: string, visible: boolean): boolean {
+    return engineRef.current?.setGeneratedModelVisibility(id, visible) ?? false;
+  }
+
+  function handleRemoveGeneratedModel(id: string): boolean {
+    return engineRef.current?.removeGeneratedModel(id) ?? false;
+  }
+
+  function focusGeneratedModel(definition: GeneratedModelDefinition) {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.flyTo({
+      destination: {
+        longitude: definition.position.longitude,
+        latitude: definition.position.latitude,
+        height: Math.max(100, (definition.position.height ?? 0) + 100),
+      },
+      heading: definition.headingDegrees ?? 0,
+      pitch: -38,
+      roll: 0,
+      durationMs: 1000,
+    });
+  }
+
   return (
     <div className="relative h-full min-h-[600px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       {/* This ref belongs to the same component as the initialization effect. */}
       <div
         ref={containerRef}
+        data-testid="cesium-map-container"
         className="absolute inset-0"
       />
 
@@ -637,6 +715,15 @@ export default function MapCanvas({
         onSelectProperty={focusProperty}
         onCheckNearbyServices={checkNearbyServicesForProperty}
         onClearSelectedProperty={clearSelectedProperty}
+      />
+
+      <GeneratedModelPanel
+        key={retryKey}
+        disabled={status !== "ready"}
+        onAdd={handleAddGeneratedModel}
+        onSetVisibility={handleGeneratedModelVisibility}
+        onRemove={handleRemoveGeneratedModel}
+        onFocus={focusGeneratedModel}
       />
 
       {layers.length > 0 && (

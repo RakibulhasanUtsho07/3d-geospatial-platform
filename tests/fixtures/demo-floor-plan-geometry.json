@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ground-floor",
+  "buildingId": "dhaka-demo",
+  "name": "Dhaka Demo Ground Floor",
+  "units": "m",
+  "origin": {
+    "longitude": 90.406,
+    "latitude": 23.709,
+    "heightM": 3.5,
+    "headingDegrees": 0
+  },
+  "level": {
+    "elevationM": 0,
+    "wallHeightM": 3,
+    "wallThicknessM": 0.15,
+    "floorThicknessM": 0.12
+  },
+  "source": {
+    "sourceId": "measured-plan-pdf",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "rooms": [
+    {
+      "id": "living-room",
+      "name": "Living Room",
+      "polygon": [[0, 0], [5, 0], [5, 4], [0, 4], [0, 0]]
+    }
+  ],
+  "walls": [
+    {
+      "id": "north-wall",
+      "start": [0, 0],
+      "end": [5, 0],
+      "openings": [
+        { "id": "main-door", "type": "door", "offsetM": 1, "widthM": 1, "heightM": 2.1, "sillHeightM": 0 }
+      ]
+    },
+    {
+      "id": "east-wall",
+      "start": [5, 0],
+      "end": [5, 4],
+      "openings": [
+        { "id": "living-window", "type": "window", "offsetM": 1.2, "widthM": 1.2, "heightM": 1.2, "sillHeightM": 0.9 }
+      ]
+    },
+    { "id": "south-wall", "start": [5, 4], "end": [0, 4], "openings": [] },
+    { "id": "west-wall", "start": [0, 4], "end": [0, 0], "openings": [] }
+  ]
+}

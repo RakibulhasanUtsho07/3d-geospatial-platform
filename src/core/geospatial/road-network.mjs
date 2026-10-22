@@ -89,6 +89,33 @@ export function parseRoadNetworkParams(params) {
   };
 }
 
+/**
+ * Build a stable cache key using the same 4-decimal viewport precision as the
+ * map engine's in-flight request key. Finer keys could bypass useful coalescing;
+ * coarser keys could reuse roads normalized for a neighbouring viewport.
+ */
+export function buildRoadNetworkCacheKey(request) {
+  if (
+    !request ||
+    ![request.west, request.south, request.east, request.north].every(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    ) ||
+    !Number.isInteger(request.limit) ||
+    request.limit < 1
+  ) {
+    throw new TypeError("Road cache key requires finite bounds and a positive integer limit.");
+  }
+
+  return [
+    request.west.toFixed(4),
+    request.south.toFixed(4),
+    request.east.toFixed(4),
+    request.north.toFixed(4),
+    request.limit,
+  ].join("|");
+}
+
+
 export function buildOverpassRoadQuery(request) {
   const highwayPattern = INCLUDED_HIGHWAYS.join("|");
   return [

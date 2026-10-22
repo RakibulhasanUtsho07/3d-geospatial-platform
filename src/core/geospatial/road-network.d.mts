@@ -38,3 +38,5 @@ export const ROAD_NETWORK_LIMITS: Readonly<{
   defaultLimit: number;
   maxLimit: number;
 }>;
+
+export function buildRoadNetworkCacheKey(request: RoadNetworkRequest): string;
