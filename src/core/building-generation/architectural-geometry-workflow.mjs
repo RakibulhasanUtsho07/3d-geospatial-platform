@@ -31,7 +31,7 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-textured-glb-v2";
+const WORKFLOW_VERSION = "architectural-geometry-calibrated-textured-glb-v3";
 const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
 const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
