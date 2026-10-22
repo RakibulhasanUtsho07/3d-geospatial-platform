@@ -16,6 +16,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 - A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output, and source/confidence + geometry-integrity QA reports.
+- A map-side **Generated models** loader for placing already-reviewed GLB assets at explicit WGS84 coordinates, with focus, visibility and removal controls; loading is session-only and does not publish candidate files.
+- A checksum-verified, versioned **published model catalog** with explicit human-review attestations and rollback; see [Published Generated Model Workflow](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md).
 - Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
 - Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion, an FFmpeg-based image-quality preflight, and a shared GLB integrity/geometry QA report for procedural, photogrammetry, and single-image AI outputs.
 - Evidence-based Building Accuracy Benchmark that reports dimension errors, horizontal ground-control residuals, and human visual-review outcomes separately; it never calculates an unsupported single accuracy percentage.
@@ -52,6 +54,12 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
+
+## Loading a reviewed generated model in the map
+
+The `/map` view includes a **Generated models** panel that loads an existing GLB static asset and lets you set its WGS84 origin, height, heading and scale. For safety, it does not upload files or automatically expose output from the local generation workspace.
+
+Only after appropriate review, place the approved GLB under `public/models/generated/`, open `/map`, and enter its same-origin URL (for example `/models/generated/my-building.glb`). Model placements exist only in the current map session. See [Generated Model Map Loader](docs/GENERATED-MODEL-MAP-LOADER.md) for the full workflow and limits.
 
 ## Building Generation Engine
 
@@ -197,3 +205,8 @@ Use `npm run benchmark:building-accuracy -- <candidate.glb> <benchmark.json> [re
 Use `npm run compare:render-reference-images -- <reference.jpg|png> <candidate-render.jpg|png> [report.json]` to calculate bounded grayscale MAE/RMSE, PSNR, local SSIM and difference-hash diagnostics for one manually paired view. These are diagnostic hints only: same-facade/camera alignment remains a human responsibility, and the metrics never certify architectural accuracy or approve publication. See [the diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
 
 Optional per-view similarity diagnostics can be attached to the existing reference-review report using `similarityDiagnosticsPath` in each comparison. The workflow validates that report metrics identify the exact render/reference bytes and leaves all human review outcomes unchanged. See the [image diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
+
+
+### Durable building generation, review and map publishing
+
+Generation requests are persisted in a local file-backed queue and run by `scripts/run-generation-worker.mjs`. The separate review API verifies the completed GLB and QA report hashes before recording an explicit decision. To publish a reviewed job to the map's versioned GLB catalog, use `npm run publish:approved-generation-job` with the job ID and explicit surveyed placement. Read the [generation queue/worker guide](docs/GENERATION-JOBS-API-AND-WORKER.md), [reviewed model catalog guide](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md), and [map loader guide](docs/GENERATED-MODEL-MAP-LOADER.md). The job itself remains fail-closed after publication; catalog publication does not bypass the review evidence gate.

@@ -111,7 +111,12 @@
     "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
     "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs",
     "test:generation-review": "node --test tests/generation-job-review.test.mjs tests/generation-api-auth.test.mjs",
-    "run:generation-worker": "node scripts/run-generation-worker.mjs"
+    "run:generation-worker": "node scripts/run-generation-worker.mjs",
+    "test:published-model-catalog": "node --test tests/published-model-catalog.test.mjs",
+    "publish:building-model": "node scripts/publish-reviewed-building-model.mjs",
+    "activate:building-model-version": "node scripts/activate-published-model-version.mjs",
+    "test:publish-approved-generation-job": "node --test tests/publish-approved-generation-job.test.mjs",
+    "publish:approved-generation-job": "node scripts/publish-approved-generation-job.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
