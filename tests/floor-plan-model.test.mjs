@@ -48,6 +48,7 @@ test("extrudes explicit room polygons, walls, doors and windows into a metric GL
   assert.equal(result.report.publicationEligible, false);
   assert.equal(result.report.output.sha256, createHash("sha256").update(result.glb).digest("hex"));
   assert.ok(result.report.warnings.some((warning) => warning.includes("does not extract walls")));
+  assert.ok(result.report.warnings.some((warning) => warning.startsWith("A source SHA-256 is metadata")));
 });
 
 test("output is deterministic for the same explicit trace", () => {
