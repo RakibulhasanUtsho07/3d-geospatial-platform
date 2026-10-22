@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
+import { resolveRenderedHeightForDisplay } from "../src/core/buildings/rendered-height-display.mjs";
 
 test("prefers explicit source height and preserves its provenance", () => {
   assert.deepEqual(
@@ -106,4 +107,54 @@ test("ignores non-positive heights and floors instead of treating them as measur
 test("rejects malformed property containers", () => {
   assert.throws(() => resolveBuildingHeight(null), TypeError);
   assert.throws(() => resolveBuildingHeight([]), TypeError);
+});
+
+
+test("rendered height wins over source and reported attributes regardless of object key order", () => {
+  assert.equal(
+    resolveRenderedHeightForDisplay({
+      height: 450,
+      architecture_profile_reported_height_m: 480,
+      rendered_height_m: 300,
+    }),
+    300,
+  );
+});
+
+test("fallback source heights use the renderer's safety limits", () => {
+  assert.equal(resolveRenderedHeightForDisplay({ height: 450 }), 300);
+  assert.equal(resolveRenderedHeightForDisplay({ height: 1.5 }), 3);
+});
+
+test("unsafe reference reports do not masquerade as rendered heights", () => {
+  assert.equal(
+    resolveRenderedHeightForDisplay({
+      architecture_profile_reported_height_m: 450,
+      height: 42,
+    }),
+    42,
+  );
+  assert.equal(
+    resolveRenderedHeightForDisplay({
+      architecture_profile_reported_floor_count: 101,
+      levels: 4,
+    }),
+    12,
+  );
+});
+
+test("valid reference reports are usable only when no actual rendered height is supplied", () => {
+  assert.equal(
+    resolveRenderedHeightForDisplay({
+      architecture_profile_reported_height_m: 27.5,
+    }),
+    27.5,
+  );
+  assert.equal(
+    resolveRenderedHeightForDisplay({
+      architecture_profile_reported_floor_count: 8,
+    }),
+    24,
+  );
+  assert.equal(resolveRenderedHeightForDisplay({}), null);
 });
