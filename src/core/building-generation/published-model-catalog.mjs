@@ -285,7 +285,7 @@ export async function activatePublishedModelVersion({ workspaceRoot, modelId, ve
   if (!model) throw new Error("Published model was not found: " + modelId);
   const version = model.versions.find((item) => item.versionId === versionId);
   if (!version) throw new Error("Published model version was not found: " + versionId);
-  const assetRelative = version.url.slice(1);
+  const assetRelative = path.join("public", version.url.slice(1));
   const asset = await resolveWorkspaceFile(root, assetRelative, "published GLB");
   const actualHash = sha256(await readFile(asset.real));
   if (actualHash !== version.sha256) throw new Error("Published GLB checksum mismatch; refusing to activate this version.");
