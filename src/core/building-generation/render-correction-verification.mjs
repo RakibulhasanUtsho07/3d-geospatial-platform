@@ -291,6 +291,38 @@ function summarizeHotspotComparison(baseline, verification) {
   };
 }
 
+function normalizeOptionalDiagnosticMetrics(metrics, label) {
+  const ranges = {
+    medianCandidateMinusReferenceLuminanceOffset: [-255, 255],
+    luminanceOffsetNormalizedMeanAbsoluteError: [0, 255],
+    luminanceOffsetNormalizedRootMeanSquaredError: [0, 255],
+    luminanceOffsetNormalizedSsim8x8: [-1, 1],
+    luminanceOffsetNormalizedMaeReductionPercent: [-0.1, 100.1],
+    edgeDensityAbsoluteDifference: [0, 1],
+    edgeOrientationHistogramDistance: [0, 1],
+    spatialEdgeDistributionDistance: [0, 1],
+    activeEdgeCellJaccardDistance: [0, 1],
+    referenceSpatialEdgeCoverage: [0, 1],
+    candidateSpatialEdgeCoverage: [0, 1],
+  };
+  const normalized = {};
+  for (const [key, [min, max]] of Object.entries(ranges)) {
+    if (metrics?.[key] === undefined) continue;
+    if (!finiteInRange(metrics[key], min, max)) {
+      throw new Error("verification-review-similarity-diagnostics-invalid:" + label);
+    }
+    normalized[key] = metrics[key];
+  }
+  if (metrics?.candidateToReferenceSharpnessRatio !== undefined) {
+    const ratio = metrics.candidateToReferenceSharpnessRatio;
+    if (ratio !== null && !finiteInRange(ratio, 0, 1e15)) {
+      throw new Error("verification-review-similarity-diagnostics-invalid:" + label);
+    }
+    normalized.candidateToReferenceSharpnessRatio = ratio;
+  }
+  return normalized;
+}
+
 function normalizeSimilarityDiagnostics(value, comparison) {
   if (value === undefined || value === null) return null;
   const label = comparison.viewId + ":" + comparison.referenceImageId;
@@ -341,6 +373,7 @@ function normalizeSimilarityDiagnostics(value, comparison) {
       psnrDb: metrics.psnrDb,
       localSsim8x8: metrics.localSsim8x8,
       differenceHashHammingDistance: metrics.differenceHashHammingDistance,
+      ...normalizeOptionalDiagnosticMetrics(metrics, label),
     },
     comparability: {
       aspectRatioDifferencePercent: comparability.aspectRatioDifferencePercent,
