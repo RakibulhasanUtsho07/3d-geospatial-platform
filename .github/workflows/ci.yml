@@ -271,6 +271,9 @@ jobs:
       - name: Test nearby-place query and normalization
         run: npm run test:nearby-places
 
+      - name: Test async search request freshness and cancellation
+        run: npm run test:async-request-policy
+
       - name: Test property listing filters and nearby-service matching
         run: npm run test:property-listings
 
