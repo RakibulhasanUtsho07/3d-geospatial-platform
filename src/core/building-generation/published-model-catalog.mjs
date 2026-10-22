@@ -55,13 +55,17 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function validateReview(review, label) {
+function validateReview(review, label, options = {}) {
   if (!isRecord(review)) throw new TypeError(label + ".review must be an object.");
   if (!nonEmptyString(review.reviewer) || review.reviewer.length > 200) {
     throw new TypeError(label + ".review.reviewer is required (max 200 characters).");
   }
   if (!isIsoDate(review.reviewedAt)) throw new TypeError(label + ".review.reviewedAt must be an ISO-compatible timestamp.");
-  assertSafeRelativePath(review.evidencePath, label + ".review.evidencePath");
+  if (options.requireEvidencePath === true) {
+    assertSafeRelativePath(review.evidencePath, label + ".review.evidencePath");
+  } else if (typeof review.evidenceId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(review.evidenceId)) {
+    throw new TypeError(label + ".review.evidenceId must be a safe public evidence identifier.");
+  }
   if (!isHash(review.evidenceSha256)) throw new TypeError(label + ".review.evidenceSha256 must be a SHA-256 hash.");
   if (!isRecord(review.checks)) throw new TypeError(label + ".review.checks must be an object.");
   for (const check of REQUIRED_REVIEW_CHECKS) {
@@ -249,7 +253,7 @@ export async function publishReviewedBuildingModel({
     throw new TypeError("Attestation model.id and model.name are required.");
   }
   if (!isRecord(attestation.review)) throw new TypeError("Attestation review is required.");
-  validateReview(attestation.review, "attestation");
+  validateReview(attestation.review, "attestation", { requireEvidencePath: true });
   const evidence = await resolveWorkspaceFile(root, attestation.review.evidencePath, "review evidence");
   const evidenceHash = sha256(await readFile(evidence.real));
   if (evidenceHash !== attestation.review.evidenceSha256.toLowerCase()) {
@@ -323,7 +327,9 @@ export async function publishReviewedBuildingModel({
     review: {
       reviewer: attestation.review.reviewer.trim(),
       reviewedAt: attestation.review.reviewedAt,
-      evidencePath: attestation.review.evidencePath,
+      evidenceId: (attestation.review.evidenceId && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(attestation.review.evidenceId))
+        ? attestation.review.evidenceId
+        : "sha256-" + evidenceHash.slice(0, 24),
       evidenceSha256: evidenceHash,
       checks: Object.fromEntries(REQUIRED_REVIEW_CHECKS.map((key) => [key, true])),
       notes: attestation.review.notes.trim(),
