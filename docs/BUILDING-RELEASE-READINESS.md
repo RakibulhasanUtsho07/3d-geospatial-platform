@@ -8,7 +8,8 @@ Use the exact GLB revision from which the latest Blender render set was generate
 
 ```powershell
 npm run test:building-release-readiness
-npm run assess:building-release-readiness -- ".\\candidate.glb" ".\\building-review" ".\\render-reference-review-report.json" ".\\render-correction-tasks.json" ".\\render-correction-verification.json" ".\\accuracy-evidence.json" ".\\building-release-readiness.json"
+npm run create:render-correction-qa-evidence -- ".\\candidate.glb" ".\\geometry-qa.json" ".\\texture-qa.json"
+npm run assess:building-release-readiness -- ".\\candidate.glb" ".\\building-review" ".\\render-reference-review-report.json" ".\\render-correction-tasks.json" ".\\render-correction-verification.json" ".\\accuracy-evidence.json" ".\\geometry-qa.json" ".\\texture-qa.json" ".\\building-release-readiness.json"
 ```
 
 The output is created exclusively; if the path already exists, the CLI refuses to overwrite the earlier report. Choose a new output path for every candidate revision.
@@ -79,7 +80,7 @@ The benchmark reports axis-aligned dimension errors and horizontal WGS84 residua
 - `ready-for-final-human-review-with-warnings`: hard gates passed, but geometry, texture or render QA reported warnings that need human review.
 - `ready-for-final-human-review`: automated evidence gates passed with no recorded warnings. This still requires a release reviewer.
 
-The CLI computes geometry and texture/UV QA from the candidate GLB bytes itself and reopens every safe-named render PNG to verify its current SHA-256 and dimensions against the manifest. It recomputes the correction-verification report from the exact supplied backlog and current review, then rejects the supplied verification JSON if it differs. It checks the candidate SHA-256 against the render manifest and reference review; requires a newly computed dimension/georeferencing benchmark to pass independently sourced dimension tolerances and exact-GLB-bound horizontal WGS84 ground-control residuals; binds render and reference comparisons to the exact recorded image hashes; requires all predefined render views to have a human-reported direct-basis `match`; checks reference rights status; and verifies that correction-review tasks have reached their required terminal states using exact backlog and review report digests.
+The CLI reads the geometry and texture QA report files as regular files, hashes their actual bytes, and recomputes both reports from the exact candidate GLB; stale or edited QA JSON is a blocker. The reports can be created with `create:render-correction-qa-evidence`, which refuses to overwrite prior files. The CLI also reopens every safe-named render PNG to verify its current SHA-256 and dimensions against the manifest. It recomputes the correction-verification report from the exact supplied backlog and current review, then rejects the supplied verification JSON if it differs. It checks the candidate SHA-256 against the render manifest and reference review; requires a newly computed dimension/georeferencing benchmark to pass independently sourced dimension tolerances and exact-GLB-bound horizontal WGS84 ground-control residuals; binds render and reference comparisons to the exact recorded image hashes; requires all predefined render views to have a human-reported direct-basis `match`; checks reference rights status; and verifies that correction-review tasks have reached their required terminal states using exact backlog and review report digests.
 
 ## Non-negotiable limitations
 
