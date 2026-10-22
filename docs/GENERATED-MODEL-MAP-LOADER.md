@@ -48,6 +48,9 @@ Run from the project root:
 
 \`\`\`powershell
 $workspace = (Get-Location).Path
+$buildingId = "your-building-id"
+$jobId = "your-job-id"
+$attestationFile = "your-attestation.json"
 $candidate = ".building-engine/jobs/$buildingId/$jobId-workflow/model.glb"
 $attestation = "review/$attestationFile"
 npm run publish:building-model -- $workspace $candidate $attestation
