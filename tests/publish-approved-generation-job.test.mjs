@@ -108,7 +108,7 @@ test("refuses publication without placement or without an approved review", asyn
 
 test("refuses publication when the approved model or review evidence changes", async (t) => {
   const setup = await makeApprovedJob(t);
-  const recordPath = path.join(setup.workspaceRoot, setup.review.job.review.recordPath);
+  const recordPath = path.join(setup.workspaceRoot, setup.reviewed.job.review.recordPath);
   await writeFile(recordPath, JSON.stringify({ tampered: true }));
   await assert.rejects(publishApprovedGenerationJob({ ...setup, placement }), /review record checksum mismatch/);
 });
