@@ -485,7 +485,8 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
   const proposalWritten = nonEmptyString(proposal?.proposalText) &&
     nonEmptyString(proposal?.proposedBy) &&
     validIsoTimestamp(proposal?.proposedAt);
-  const proposalApproved = approval?.status === "approved" &&
+  const proposalApproved = proposal?.status === "approved" &&
+    approval?.status === "approved" &&
     nonEmptyString(approval?.approvedBy) &&
     validIsoTimestamp(approval?.approvedAt) &&
     nonEmptyString(approval?.rationale);
@@ -500,6 +501,7 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
   const approvalOrderViolation = proposalWritten && proposalApproved &&
     ((Number.isFinite(proposalTime) && Number.isFinite(approvalTime) && approvalTime < proposalTime) ||
       (Number.isFinite(approvalTime) && Number.isFinite(implementationTime) && approvalTime > implementationTime));
+  const implementationQaMarkedComplete = implementation?.status === "qa-complete";
   const geometryQaEvidencePresent = validHash(implementation?.geometryQaReportSha256);
   const textureChangeApplicabilityRecorded =
     implementation?.textureChangeApplicable === true || implementation?.textureChangeApplicable === false;
@@ -512,8 +514,8 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
     validHash(implementation?.generatedRenderManifestSha256) &&
     implementation.generatedRenderManifestSha256.toLowerCase() === renderManifestSha256;
   const approvedProposalAndQaEvidenceComplete = proposalWritten && proposalApproved &&
-    approvalBeforeImplementation && geometryQaEvidencePresent &&
-    textureChangeApplicabilityRecorded && textureQaEvidencePresent &&
+    approvalBeforeImplementation && implementationQaMarkedComplete &&
+    geometryQaEvidencePresent && textureChangeApplicabilityRecorded && textureQaEvidencePresent &&
     outputModelMatchesVerificationReport && renderManifestMatchesVerificationReport &&
     implementationTimestampRecorded;
   return {
@@ -522,6 +524,7 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
     approvalBeforeImplementation,
     approvalOrderViolation,
     implementationTimestampRecorded,
+    implementationQaMarkedComplete,
     geometryQaEvidencePresent,
     textureChangeApplicabilityRecorded,
     textureQaEvidencePresent,
