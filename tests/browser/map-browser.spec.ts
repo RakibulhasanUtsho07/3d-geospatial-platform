@@ -163,7 +163,7 @@ test("zooming and dragging the map request fresh road viewport bounds", async ({
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 160, startY + 40);
+  await page.mouse.move(startX + 420, startY + 80);
   await page.mouse.up();
 
   await expect.poll(
