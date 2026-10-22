@@ -2467,6 +2467,7 @@ export class CesiumAdapter implements MapEngine {
     this.emitFeatureSelection(null);
     this.emitPlaceSelection(null);
     this.emitRoadSelection(null);
+    this.emitPropertySelection(null);
 
     if (
       hadSelection &&
@@ -2673,6 +2674,7 @@ export class CesiumAdapter implements MapEngine {
         const picked = viewer.scene.pick(movement.position);
         if (!picked) {
           this.clearFeatureSelection();
+          this.setNavigationPath(null, null);
           return;
         }
 
@@ -2683,7 +2685,6 @@ export class CesiumAdapter implements MapEngine {
 
         if (nearbyEntity?.point) {
           this.clearFeatureSelection();
-          this.emitPropertySelection(null);
           this.emitPlaceSelection(
             this.nearbyPlaceByEntityId.get(nearbyEntity.id) ?? null,
           );
@@ -2696,7 +2697,6 @@ export class CesiumAdapter implements MapEngine {
           : null;
         if (propertyEntity?.point) {
           this.clearFeatureSelection();
-          this.emitPlaceSelection(null);
           this.emitPropertySelection(this.propertyByEntityId.get(propertyEntity.id) ?? null);
           return;
         }
@@ -2708,8 +2708,6 @@ export class CesiumAdapter implements MapEngine {
         const road = roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
         if (road) {
           this.clearFeatureSelection();
-          this.emitPlaceSelection(null);
-          this.emitPropertySelection(null);
           this.emitRoadSelection(road);
           return;
         }

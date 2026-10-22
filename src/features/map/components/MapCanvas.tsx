@@ -135,9 +135,12 @@ export default function MapCanvas({
       }
     });
     const unsubscribePropertySelection = engine.onPropertySelected((property) => {
-      if (!cancelled && property) {
-        setSelectedRoad(null);
-        focusProperty(property);
+      if (!cancelled) {
+        setSelectedProperty(property);
+        if (property) {
+          setSelectedRoad(null);
+          focusProperty(property);
+        }
       }
     });
 
