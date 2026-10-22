@@ -334,3 +334,31 @@ npm run publish:floor-plan-candidate -- E:\\Building-Engine-Workspace dhaka-demo
 The command calls the existing versioned generated-model catalog publisher, which rechecks candidate and evidence hashes and placement. Rejected or changes-requested reviews do not create a publication attestation. Reviews are immutable; create a new candidate for a replacement trace. Published versions are written to `public/models/generated/` and can be rolled back with the existing catalog activation command. The private candidate's `mapReady` and `publicationEligible` flags remain false so the candidate itself is never silently treated as map-ready.
 
 This workflow does not automatically trace walls and room polygons from a raster/PDF, independently verify permissions or survey measurements, or sign the reviewer identity. Those remain separate responsibilities.
+
+
+## 15. Raster floor-plan trace candidates
+
+The backend can now inspect an already-ingested JPEG, PNG or WebP floor-plan image through `POST /api/building-generation/floor-plan-traces`, authenticated with `GENERATION_API_TOKEN`. It verifies the source against the private intake metadata, decodes and downsizes the raster with bounded image dimensions, finds long dark horizontal/vertical strokes, and proposes closed rectangular grid cells as possible rooms. Trace JSON is stored privately below `.building-engine/floor-plan-traces/<buildingId>/<traceId>/` and retrieval rechecks the trace artifact SHA-256 plus the current source hash.
+
+Example request after ingesting a floor-plan raster:
+
+~~~json
+{
+  "buildingId": "dhaka-demo",
+  "sourceId": "floor-plan-raster-01",
+  "options": {
+    "maxEdge": 2048,
+    "threshold": 180,
+    "maxGapPx": 2,
+    "lineMergeTolerancePx": 4,
+    "minLineLengthPx": 60,
+    "minRoomSidePx": 32,
+    "maxLinesPerOrientation": 1200,
+    "maxRoomCandidates": 2500
+  }
+}
+~~~
+
+The response returns `traceId`, candidate counts and an authenticated trace URL at `GET /api/building-generation/floor-plan-traces/<buildingId>/<traceId>`. Available options are bounded: the analysis image's longest edge is 256–4096 pixels; source media is limited to 50 MiB; the decoder is limited to 40 million source pixels; the persisted trace JSON is limited to 8 MiB. The detector currently targets orthogonal plans with long dark linework. It is not an OCR or architectural-vision model and may miss angled/curved walls, symbols, gaps, dimensions, or confuse furniture and text with walls.
+
+**A trace is a hypothesis document, not a 3D model.** Coordinates remain pixels with `metresPerPixel: null`; room cells and wall segments are marked `unreviewed`. No scale, room semantics, north/heading, WGS84 origin, level elevation, copyright status or construction detail is inferred. The current endpoint accepts raster image sources only; rasterize a PDF page to a reviewed image first. Once the line/room candidates have been corrected against the original drawing and a measured scale plus surveyed map origin have been established, convert the accepted geometry into the [measured vector schema in section 12](#12-measured-floor-plan-vectors-to-interior-glb), generate a private candidate via section 13, and continue through the explicit review/publish gate in section 14. Nothing is automatically approved or published.
