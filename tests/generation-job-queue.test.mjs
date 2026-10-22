@@ -56,7 +56,7 @@ test("rejects source path traversal, unknown licence, and missing rights attesta
   }), /confirmRights/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0" }], confirmRights: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z" }),
+    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0" }], confirmRights: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
   }), /at least three selected/);
 });
 
