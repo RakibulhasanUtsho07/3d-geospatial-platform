@@ -210,3 +210,8 @@ Optional per-view similarity diagnostics can be attached to the existing referen
 ### Durable building generation, review and map publishing
 
 Generation requests are persisted in a local file-backed queue and run by `scripts/run-generation-worker.mjs`. The separate review API verifies the completed GLB and QA report hashes before recording an explicit decision. To publish a reviewed job to the map's versioned GLB catalog, use `npm run publish:approved-generation-job` with the job ID and explicit surveyed placement. Read the [generation queue/worker guide](docs/GENERATION-JOBS-API-AND-WORKER.md), [reviewed model catalog guide](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md), and [map loader guide](docs/GENERATED-MODEL-MAP-LOADER.md). The job itself remains fail-closed after publication; catalog publication does not bypass the review evidence gate.
+
+
+### Authenticated generation media upload
+
+The backend also provides `POST /api/building-generation/uploads` for authenticated multipart uploads of building photos, videos and floor-plan PDFs. It enforces a bounded request body, validates file signatures, writes a private content-addressed source record, and leaves its rights status `unreviewed`. Set `GENERATION_API_TOKEN` and keep it on the server; never embed it in browser JavaScript. The API upload limit is 50 MiB per file (images retain the intake module's 20 MiB limit). See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md#8-authenticated-media-upload-api) for usage.
