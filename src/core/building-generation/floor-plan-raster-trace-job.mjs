@@ -57,18 +57,27 @@ async function ensurePrivateDirectory(root, segments) {
 }
 
 async function persistTrace(root, buildingId, traceId, trace) {
-  const directory = await ensurePrivateDirectory(root, [
-    ".building-engine", "floor-plan-traces", buildingId, traceId,
-  ]);
   const bytes = Buffer.from(JSON.stringify(trace, null, 2) + "\n", "utf8");
   if (bytes.byteLength > MAX_TRACE_JSON_BYTES) {
     const error = new RangeError("Trace output exceeds the 8 MiB artifact limit; simplify the source or detection options.");
     error.code = "TRACE_OUTPUT_TOO_LARGE";
     throw error;
   }
+  const directory = await ensurePrivateDirectory(root, [
+    ".building-engine", "floor-plan-traces", buildingId, traceId,
+  ]);
   const filePath = path.join(directory, "trace.json");
+  const integrityPath = path.join(directory, "trace.integrity.json");
+  const integrityBytes = Buffer.from(JSON.stringify({
+    schemaVersion: "1.0.0",
+    traceId,
+    buildingId,
+    traceSha256: sha256(bytes),
+    sourceSha256: trace.source?.sha256,
+  }, null, 2) + "\n", "utf8");
   try {
     await writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });
+    await writeFile(integrityPath, integrityBytes, { flag: "wx", mode: 0o600 });
   } catch (error) {
     await rm(directory, { recursive: true, force: true }).catch(() => {});
     throw error;
@@ -197,11 +206,26 @@ export async function loadFloorPlanRasterTrace({ workspaceRoot, buildingId, trac
   const entry = await lstat(filePath);
   if (entry.isSymbolicLink() || !entry.isFile()) throw new TypeError("Trace artifact must be a regular, non-symlink file.");
   if (entry.size <= 0 || entry.size > MAX_TRACE_JSON_BYTES) throw new RangeError("Trace artifact size is invalid.");
+  const integrityPath = path.join(current, "trace.integrity.json");
+  const integrityEntry = await lstat(integrityPath);
+  if (integrityEntry.isSymbolicLink() || !integrityEntry.isFile() ||
+      integrityEntry.size <= 0 || integrityEntry.size > 16 * 1024) {
+    throw new TypeError("Trace integrity record must be a small regular, non-symlink file.");
+  }
   const bytes = await readFile(await realpath(filePath));
+  const integrity = JSON.parse((await readFile(await realpath(integrityPath))).toString("utf8"));
+  if (!integrity || integrity.schemaVersion !== "1.0.0" ||
+      integrity.traceId !== tid || integrity.buildingId !== bid ||
+      integrity.traceSha256 !== sha256(bytes)) {
+    const error = new Error("Stored floor-plan trace failed its SHA-256 integrity check.");
+    error.code = "TRACE_CHECKSUM_MISMATCH";
+    throw error;
+  }
   const trace = JSON.parse(bytes.toString("utf8"));
   if (!trace || trace.traceId !== tid || trace.buildingId !== bid ||
       trace.status !== "needs-human-trace-review" ||
       trace.source?.sha256 !== trace.sourceEvidence?.sha256 ||
+      integrity.sourceSha256 !== trace.sourceEvidence?.sha256 ||
       trace.mapReady !== false || trace.publicationEligible !== false) {
     throw new TypeError("Stored floor-plan trace identity or review status is invalid.");
   }
