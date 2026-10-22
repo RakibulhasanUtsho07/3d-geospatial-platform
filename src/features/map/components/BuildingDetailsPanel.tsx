@@ -1,6 +1,7 @@
 "use client";
 
 import { SQUARE_METERS_TO_SQUARE_FEET } from "@/core/geospatial/footprint-area.mjs";
+import { resolveRenderedHeightForDisplay } from "@/core/buildings/rendered-height-display.mjs";
 import type { MapFeatureSelection } from "@/core/map-engine/types";
 import StreetImageryPanel from "./StreetImageryPanel";
 
@@ -177,16 +178,7 @@ export default function BuildingDetailsPanel({
   const referenceReportedFloors = findNumericProperty(feature.properties, [
     "architecture_profile_reported_floor_count",
   ]);
-  const sourceRenderedHeight = findNumericProperty(feature.properties, [
-    "rendered_height_m",
-    "height_m",
-    "height",
-  ]);
-  const height = referenceReportedHeight ?? (
-    referenceReportedFloors !== null
-      ? referenceReportedFloors * 3
-      : sourceRenderedHeight
-  );
+  const height = resolveRenderedHeightForDisplay(feature.properties);
   const floorCount = referenceReportedFloors ?? findNumericProperty(feature.properties, [
     "num_floors",
     "numfloors",
