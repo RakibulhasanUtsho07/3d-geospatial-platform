@@ -265,6 +265,9 @@ jobs:
       - name: Test building footprint area calculations
         run: npm run test:footprint-area
 
+      - name: Test building height provenance and fallbacks
+        run: npm run test:building-height
+
       - name: Test nearby-place query and normalization
         run: npm run test:nearby-places
 
