@@ -55,6 +55,20 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       candidateSpatialActiveCells: [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false],
       spatialEdgeDistributionDistance: 0,
       activeEdgeCellJaccardDistance: 0,
+      spatialCellDiagnostics: Array.from({ length: 16 }, (_, index) => ({
+        cellX: index % 4,
+        cellY: Math.floor(index / 4),
+        meanAbsoluteError: 10,
+        meanSignedLuminanceOffset: 0,
+        localSsim16x16: 0.83,
+      })),
+      spatialCellMaeMedian: 10,
+      spatialCellMaeMaximum: 10,
+      spatialCellMaeMedianGap: 0,
+      highestDifferenceCells: [
+        { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
+        { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
+      ],
     },
     warnings,
     policy: {
@@ -149,6 +163,10 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.activeEdgeCellJaccardDistance, 0);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.referenceSpatialEdgeCoverage, 0.25);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.referenceSpatialEdgeDistribution.length, 16);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellDiagnostics.length, 16);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellMaeMedianGap, 0);
+  assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.highestDifferenceCells,
+    [{ cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 }, { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 }]);
   assert.equal(report.comparisons[0].similarityDiagnostics.renderSha256, frontRenderHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.referenceSha256, referenceHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.automaticMatch, false);
@@ -233,6 +251,24 @@ test("rejects malformed spatial edge-layout evidence and inconsistent derived di
   const input = fixture();
   const badMetric = diagnostic();
   badMetric.metrics.referenceSpatialEdgeDistribution = [1.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  const report = buildRenderReferenceReview({
+    ...input,
+    similarityDiagnostics: [{
+      viewId: "front",
+      referenceImageId: "reference-front-01",
+      report: badMetric,
+      reportSha256: "f".repeat(64),
+    }],
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
+  assert.equal(report.comparisons[0].similarityDiagnostics, null);
+});
+
+test("rejects localized difference cells with inconsistent summaries or ordering", () => {
+  const input = fixture();
+  const badMetric = diagnostic();
+  badMetric.metrics.spatialCellDiagnostics[6].meanAbsoluteError = 190;
   const report = buildRenderReferenceReview({
     ...input,
     similarityDiagnostics: [{
