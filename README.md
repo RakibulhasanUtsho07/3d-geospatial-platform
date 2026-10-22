@@ -16,6 +16,7 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 - A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output, and source/confidence + geometry-integrity QA reports.
+- A map-side **Generated models** loader for placing already-reviewed GLB assets at explicit WGS84 coordinates, with focus, visibility and removal controls; loading is session-only and does not publish candidate files.
 - Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
 - Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion, an FFmpeg-based image-quality preflight, and a shared GLB integrity/geometry QA report for procedural, photogrammetry, and single-image AI outputs.
 - Evidence-based Building Accuracy Benchmark that reports dimension errors, horizontal ground-control residuals, and human visual-review outcomes separately; it never calculates an unsupported single accuracy percentage.
@@ -52,6 +53,12 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
+
+## Loading a reviewed generated model in the map
+
+The `/map` view includes a **Generated models** panel that loads an existing GLB static asset and lets you set its WGS84 origin, height, heading and scale. For safety, it does not upload files or automatically expose output from the local generation workspace.
+
+Only after appropriate review, place the approved GLB under `public/models/generated/`, open `/map`, and enter its same-origin URL (for example `/models/generated/my-building.glb`). Model placements exist only in the current map session. See [Generated Model Map Loader](docs/GENERATED-MODEL-MAP-LOADER.md) for the full workflow and limits.
 
 ## Building Generation Engine
 
