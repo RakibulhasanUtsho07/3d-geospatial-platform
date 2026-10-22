@@ -302,6 +302,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const maximumActiveEdgeCellJaccardDistance = options.maximumActiveEdgeCellJaccardDistance ?? 0.5;
   const maximumSpatialCellMaeMedianGap = options.maximumSpatialCellMaeMedianGap ?? 16;
   const maximumLocalEdgeDensityDifference = options.maximumLocalEdgeDensityDifference ?? 0.2;
+  const minimumLuminanceNormalizationMaeReduction = options.minimumLuminanceNormalizationMaeReduction ?? 5;
   if (!Number.isFinite(maxAspectRatioDifferencePercent) || maxAspectRatioDifferencePercent < 0 || maxAspectRatioDifferencePercent > 100) {
     throw new RangeError("maxAspectRatioDifferencePercent must be between 0 and 100");
   }
@@ -341,6 +342,10 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     maximumLocalEdgeDensityDifference < 0 || maximumLocalEdgeDensityDifference > 1) {
     throw new RangeError("maximumLocalEdgeDensityDifference must be between 0 and 1");
   }
+  if (!Number.isFinite(minimumLuminanceNormalizationMaeReduction) ||
+    minimumLuminanceNormalizationMaeReduction < 0 || minimumLuminanceNormalizationMaeReduction > 255) {
+    throw new RangeError("minimumLuminanceNormalizationMaeReduction must be between 0 and 255");
+  }
 
   const referenceStructure = edgeStructure(referencePixels);
   const candidateStructure = edgeStructure(candidatePixels);
@@ -375,8 +380,24 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       left.cellY - right.cellY || left.cellX - right.cellX)
     .slice(0, 4)
     .map(({ cellX, cellY }) => ({ cellX, cellY }));
+  const candidateMinusReferenceOffsets = Array.from(
+    { length: SAMPLE_BYTES }, (_, index) => candidatePixels[index] - referencePixels[index],
+  );
+  const medianCandidateMinusReferenceLuminanceOffset = median(candidateMinusReferenceOffsets);
+  const luminanceOffsetNormalizedCandidate = new Float64Array(SAMPLE_BYTES);
+  for (let index = 0; index < SAMPLE_BYTES; index++) {
+    luminanceOffsetNormalizedCandidate[index] = Math.max(
+      0, Math.min(255, candidatePixels[index] - medianCandidateMinusReferenceLuminanceOffset),
+    );
+  }
+  const luminanceOffsetNormalizedMae = meanAbsoluteError(referencePixels, luminanceOffsetNormalizedCandidate);
+  const normalizedMse = meanSquaredError(referencePixels, luminanceOffsetNormalizedCandidate);
+  const luminanceOffsetNormalizedSsim = localSsim(referencePixels, luminanceOffsetNormalizedCandidate);
   const mse = meanSquaredError(referencePixels, candidatePixels);
   const mae = meanAbsoluteError(referencePixels, candidatePixels);
+  const luminanceOffsetNormalizedMaeReductionPercent = mae > 0
+    ? (mae - luminanceOffsetNormalizedMae) / mae * 100
+    : 0;
   const ssim = localSsim(referencePixels, candidatePixels);
   const referenceHash = differenceHash(referencePixels);
   const candidateHash = differenceHash(candidatePixels);
