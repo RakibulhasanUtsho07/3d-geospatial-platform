@@ -112,6 +112,9 @@ test("localizes a concentrated pixel mismatch to its 4x4 cell", () => {
   assert.equal(result.metrics.spatialCellDiagnostics.length, 16);
   assert.deepEqual(result.metrics.highestDifferenceCells[0], { cellX: 2, cellY: 1 });
   assert.equal(result.metrics.spatialCellDiagnostics[6].meanAbsoluteError, 190);
+  assert.equal(result.metrics.medianCandidateMinusReferenceLuminanceOffset, 0);
+  assert.equal(result.metrics.luminanceOffsetNormalizedMeanAbsoluteError, result.metrics.meanAbsoluteError);
+  assert.equal(result.metrics.luminanceOffsetNormalizedMaeReductionPercent, 0);
   assert.equal(result.metrics.spatialCellMaeMedian, 0);
   assert.equal(result.metrics.spatialCellMaeMedianGap, 190);
   assert.ok(result.warnings.includes("localized-image-difference-screening-hint"));
@@ -147,15 +150,21 @@ test("low-edge previews are flagged as weak comparison evidence", () => {
 });
 
 test("brightness-only shifts do not become local edge-structure warnings", () => {
-  const reference = pattern((x, y) => (Math.floor(x / 2) % 2 ? 180 : 40) + y);
-  const candidate = pattern((x, y) => (Math.floor(x / 2) % 2 ? 200 : 60) + y);
+  const reference = pattern((x, y) => (Math.floor(x / 2) % 2 ? 160 : 40) + y);
+  const candidate = pattern((x, y) => (Math.floor(x / 2) % 2 ? 180 : 60) + y);
   const result = compareGrayscaleImageSamples(reference, candidate, {
     reference: { width: 1600, height: 1200 },
     candidate: { width: 800, height: 600 },
   });
-  assert.ok(result.metrics.meanAbsoluteError > 0);
+  assert.equal(result.metrics.meanAbsoluteError, 20);
+  assert.equal(result.metrics.medianCandidateMinusReferenceLuminanceOffset, 20);
+  assert.equal(result.metrics.luminanceOffsetNormalizedMeanAbsoluteError, 0);
+  assert.equal(result.metrics.luminanceOffsetNormalizedRootMeanSquaredError, 0);
+  assert.equal(result.metrics.luminanceOffsetNormalizedSsim8x8, 1);
+  assert.equal(result.metrics.luminanceOffsetNormalizedMaeReductionPercent, 100);
   assert.equal(result.metrics.localEdgeDensityDifferenceMaximum, 0);
   assert.equal(result.metrics.spatialCellDiagnostics.length, 16);
+  assert.ok(result.warnings.includes("global-luminance-offset-reduces-pixel-error-screening-hint"));
   assert.ok(!result.warnings.includes("localized-edge-structure-difference-screening-hint"));
 });
 
@@ -227,6 +236,7 @@ test("rejects invalid preview buffers, dimensions and thresholds", () => {
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumActiveEdgeCellJaccardDistance: -1 }), /between 0 and 1/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumSpatialCellMaeMedianGap: 256 }), /between 0 and 255/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumLocalEdgeDensityDifference: 2 }), /between 0 and 1/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { minimumLuminanceNormalizationMaeReduction: 256 }), /between 0 and 255/);
 });
 
 test("decodes bounded grayscale previews, hashes both files and records safe FFmpeg args", async (t) => {

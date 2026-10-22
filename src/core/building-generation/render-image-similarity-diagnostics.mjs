@@ -302,6 +302,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const maximumActiveEdgeCellJaccardDistance = options.maximumActiveEdgeCellJaccardDistance ?? 0.5;
   const maximumSpatialCellMaeMedianGap = options.maximumSpatialCellMaeMedianGap ?? 16;
   const maximumLocalEdgeDensityDifference = options.maximumLocalEdgeDensityDifference ?? 0.2;
+  const minimumLuminanceNormalizationMaeReduction = options.minimumLuminanceNormalizationMaeReduction ?? 5;
   if (!Number.isFinite(maxAspectRatioDifferencePercent) || maxAspectRatioDifferencePercent < 0 || maxAspectRatioDifferencePercent > 100) {
     throw new RangeError("maxAspectRatioDifferencePercent must be between 0 and 100");
   }
@@ -341,6 +342,10 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     maximumLocalEdgeDensityDifference < 0 || maximumLocalEdgeDensityDifference > 1) {
     throw new RangeError("maximumLocalEdgeDensityDifference must be between 0 and 1");
   }
+  if (!Number.isFinite(minimumLuminanceNormalizationMaeReduction) ||
+    minimumLuminanceNormalizationMaeReduction < 0 || minimumLuminanceNormalizationMaeReduction > 255) {
+    throw new RangeError("minimumLuminanceNormalizationMaeReduction must be between 0 and 255");
+  }
 
   const referenceStructure = edgeStructure(referencePixels);
   const candidateStructure = edgeStructure(candidatePixels);
@@ -375,8 +380,24 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       left.cellY - right.cellY || left.cellX - right.cellX)
     .slice(0, 4)
     .map(({ cellX, cellY }) => ({ cellX, cellY }));
+  const candidateMinusReferenceOffsets = Array.from(
+    { length: SAMPLE_BYTES }, (_, index) => candidatePixels[index] - referencePixels[index],
+  );
+  const medianCandidateMinusReferenceLuminanceOffset = median(candidateMinusReferenceOffsets);
+  const luminanceOffsetNormalizedCandidate = new Float64Array(SAMPLE_BYTES);
+  for (let index = 0; index < SAMPLE_BYTES; index++) {
+    luminanceOffsetNormalizedCandidate[index] = Math.max(
+      0, Math.min(255, candidatePixels[index] - medianCandidateMinusReferenceLuminanceOffset),
+    );
+  }
+  const luminanceOffsetNormalizedMae = meanAbsoluteError(referencePixels, luminanceOffsetNormalizedCandidate);
+  const normalizedMse = meanSquaredError(referencePixels, luminanceOffsetNormalizedCandidate);
+  const luminanceOffsetNormalizedSsim = localSsim(referencePixels, luminanceOffsetNormalizedCandidate);
   const mse = meanSquaredError(referencePixels, candidatePixels);
   const mae = meanAbsoluteError(referencePixels, candidatePixels);
+  const luminanceOffsetNormalizedMaeReductionPercent = mae > 0
+    ? (mae - luminanceOffsetNormalizedMae) / mae * 100
+    : 0;
   const ssim = localSsim(referencePixels, candidatePixels);
   const referenceHash = differenceHash(referencePixels);
   const candidateHash = differenceHash(candidatePixels);
@@ -415,6 +436,10 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   if (localEdgeDensityDifferenceMaximum > maximumLocalEdgeDensityDifference) {
     warnings.push("localized-edge-structure-difference-screening-hint");
   }
+  if (mae - luminanceOffsetNormalizedMae >= minimumLuminanceNormalizationMaeReduction &&
+    luminanceOffsetNormalizedMaeReductionPercent >= 25) {
+    warnings.push("global-luminance-offset-reduces-pixel-error-screening-hint");
+  }
 
   return {
     schemaVersion: "1.0.0",
@@ -435,6 +460,11 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       rootMeanSquaredError: Number(Math.sqrt(mse).toFixed(3)),
       psnrDb: mse === 0 ? null : Number((10 * Math.log10((255 ** 2) / mse)).toFixed(3)),
       localSsim8x8: Number(ssim.toFixed(6)),
+      medianCandidateMinusReferenceLuminanceOffset: Number(medianCandidateMinusReferenceLuminanceOffset.toFixed(3)),
+      luminanceOffsetNormalizedMeanAbsoluteError: Number(luminanceOffsetNormalizedMae.toFixed(3)),
+      luminanceOffsetNormalizedRootMeanSquaredError: Number(Math.sqrt(normalizedMse).toFixed(3)),
+      luminanceOffsetNormalizedSsim8x8: Number(luminanceOffsetNormalizedSsim.toFixed(6)),
+      luminanceOffsetNormalizedMaeReductionPercent: Number(luminanceOffsetNormalizedMaeReductionPercent.toFixed(3)),
       referenceDifferenceHash: referenceHash,
       candidateDifferenceHash: candidateHash,
       differenceHashHammingDistance: hammingDistanceHex(referenceHash, candidateHash),
@@ -485,6 +515,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       maximumActiveEdgeCellJaccardDistance,
       maximumSpatialCellMaeMedianGap,
       maximumLocalEdgeDensityDifference,
+      minimumLuminanceNormalizationMaeReduction,
     },
     warnings,
     interpretation: warnings.length ? "review-recommended" : "no-screening-warning",
@@ -505,6 +536,8 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       "The tool does not estimate or repair an image crop. Matching aspect ratios and spatial edge layouts still do not prove that the same facade or camera view is being compared.",
       "Use only reference/render pairs showing the same facade from a closely matched pose, with similar crop and exposure.",
       "Different illumination, shadows, weather, lens distortion, perspective, vegetation and occlusion can dominate the metrics even when geometry is sound.",
+      "Global luminance normalization subtracts the median candidate-minus-reference brightness offset for a supplementary error comparison; it is a diagnostic calculation only and does not edit either image.",
+      "A lower luminance-normalized error suggests a global brightness offset explains some pixel difference, but does not establish a match; local shadows, contrast changes, clipping and different materials can remain.",
       "Similar pixel values can be caused by texture or background and do not establish correct 3D geometry, dimensions, building identity or heritage fidelity.",
       "This diagnostic never changes a human comparison outcome or release-readiness decision.",
     ],

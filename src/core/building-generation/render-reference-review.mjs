@@ -222,6 +222,14 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
         cell && ["edgeSampleCount", "referenceEdgePixelCount", "candidateEdgePixelCount",
           "referenceEdgeDensity", "candidateEdgeDensity", "edgeDensityAbsoluteDifference"]
           .some((key) => Object.hasOwn(cell, key))));
+    const luminanceNormalizationKeys = [
+      "medianCandidateMinusReferenceLuminanceOffset",
+      "luminanceOffsetNormalizedMeanAbsoluteError",
+      "luminanceOffsetNormalizedRootMeanSquaredError",
+      "luminanceOffsetNormalizedSsim8x8",
+      "luminanceOffsetNormalizedMaeReductionPercent",
+    ];
+    const luminanceNormalizationPresent = luminanceNormalizationKeys.some((key) => Object.hasOwn(metrics, key));
     const validHistogram = (histogram) => {
       if (!Array.isArray(histogram) || histogram.length !== 8 ||
         !histogram.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
@@ -389,6 +397,28 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       return metrics.highestEdgeDifferenceCells.every((cell, index) =>
         cell && cell.cellX === expected[index].cellX && cell.cellY === expected[index].cellY);
     })();
+    const luminanceNormalizationValid = !luminanceNormalizationPresent || (() => {
+      if (!finite(metrics.medianCandidateMinusReferenceLuminanceOffset) ||
+        metrics.medianCandidateMinusReferenceLuminanceOffset < -255 ||
+        metrics.medianCandidateMinusReferenceLuminanceOffset > 255 ||
+        !finite(metrics.luminanceOffsetNormalizedMeanAbsoluteError) ||
+        metrics.luminanceOffsetNormalizedMeanAbsoluteError < 0 ||
+        metrics.luminanceOffsetNormalizedMeanAbsoluteError > 255 ||
+        !finite(metrics.luminanceOffsetNormalizedRootMeanSquaredError) ||
+        metrics.luminanceOffsetNormalizedRootMeanSquaredError < 0 ||
+        metrics.luminanceOffsetNormalizedRootMeanSquaredError > 255 ||
+        !finite(metrics.luminanceOffsetNormalizedSsim8x8) ||
+        metrics.luminanceOffsetNormalizedSsim8x8 < -1 ||
+        metrics.luminanceOffsetNormalizedSsim8x8 > 1 ||
+        !finite(metrics.luminanceOffsetNormalizedMaeReductionPercent) ||
+        metrics.luminanceOffsetNormalizedMaeReductionPercent < -0.1 ||
+        metrics.luminanceOffsetNormalizedMaeReductionPercent > 100.1) return false;
+      const expectedReduction = metrics.meanAbsoluteError > 0
+        ? (metrics.meanAbsoluteError - metrics.luminanceOffsetNormalizedMeanAbsoluteError) /
+          metrics.meanAbsoluteError * 100
+        : 0;
+      return Math.abs(expectedReduction - metrics.luminanceOffsetNormalizedMaeReductionPercent) <= 0.2;
+    })();
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
       finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
@@ -402,6 +432,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       spatialMetricsValid &&
       localDifferenceMetricsValid &&
       localEdgeMetricsValid &&
+      luminanceNormalizationValid &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
     if (!candidateMatches || !referenceMatches || !metricsValid) continue;
@@ -462,6 +493,13 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
             cellX: cell.cellX,
             cellY: cell.cellY,
           })),
+        } : {}),
+        ...(luminanceNormalizationPresent ? {
+          medianCandidateMinusReferenceLuminanceOffset: metrics.medianCandidateMinusReferenceLuminanceOffset,
+          luminanceOffsetNormalizedMeanAbsoluteError: metrics.luminanceOffsetNormalizedMeanAbsoluteError,
+          luminanceOffsetNormalizedRootMeanSquaredError: metrics.luminanceOffsetNormalizedRootMeanSquaredError,
+          luminanceOffsetNormalizedSsim8x8: metrics.luminanceOffsetNormalizedSsim8x8,
+          luminanceOffsetNormalizedMaeReductionPercent: metrics.luminanceOffsetNormalizedMaeReductionPercent,
         } : {}),
         ...(localEdgeMetricsPresent ? {
           localEdgeDensityDifferenceMedian: metrics.localEdgeDensityDifferenceMedian,
