@@ -147,7 +147,7 @@ jobs:
       - name: Test calibrated camera-to-UV projection and visibility gates
         run: npm run test:calibrated-texture-uv-projection
 
-      - name: Test calibrated texture view selection and mesh-ray occlusion
+      - name: Test calibrated texture view selection and rasterized depth-buffer occlusion
         run: npm run test:calibrated-texture-view-selection
 
       - name: Test texture bake readiness preflight

@@ -32,7 +32,7 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-auto-texture-view-visibility-v4";
+const WORKFLOW_VERSION = "architectural-geometry-rasterized-texture-visibility-v5";
 const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
 const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
@@ -584,6 +584,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
           maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
           minProjectedTriangleAreaPx: input.options?.minProjectedTriangleAreaPx ?? 0.5,
           minFacingCosine: input.options?.minTextureFacingCosine ?? 0.02,
+          maxRasterResolution: input.options?.textureVisibilityRasterResolution ?? 512,
+          depthToleranceRatio: input.options?.textureVisibilityDepthToleranceRatio ?? 1e-4,
         },
       });
       const selectedCandidate = { ...input.textureCandidate, faces: viewSelection.faces };

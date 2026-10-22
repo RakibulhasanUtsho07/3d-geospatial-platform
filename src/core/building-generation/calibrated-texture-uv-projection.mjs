@@ -107,7 +107,7 @@ export function projectTextureFaces({ cameras, vertices, candidate, options = {}
     }
 
     const computedVisibility = options.allowComputedVisibilityEvidence === true &&
-      face?.visibilityEvidence?.status === "visible-by-mesh-ray-test";
+      face?.visibilityEvidence?.status === "visible-by-rasterized-depth-buffer";
     // A geometry visibility result is accepted only when the caller explicitly uses
     // the calibrated view-selection worker. Otherwise a manual attestation is required.
     if (face?.visibilityReviewed !== true && !computedVisibility) {

@@ -37,9 +37,12 @@ test("automatically chooses the calibrated visible view with the strongest proje
   assert.equal(result.visibilityCheckedFaceCount, 1);
   assert.equal(result.faces[0].sourceImageId, "zoom-photo");
   assert.equal(result.faces[0].cameraCalibrationId, "zoom");
-  assert.equal(result.faces[0].visibilityEvidence.status, "visible-by-mesh-ray-test");
+  assert.equal(result.faces[0].visibilityEvidence.status, "visible-by-rasterized-depth-buffer");
   assert.equal(result.faces[0].visibilityEvidence.sampleCount, 4);
+  assert.equal(result.faces[0].visibilityEvidence.visibilityMethod, "software-rasterized-inverse-depth-buffer");
+  assert.ok(result.faces[0].visibilityEvidence.rasterWidth <= 512);
   assert.equal(result.faces[0].visibilityEvidence.visibleSampleCount, 4);
+  assert.ok(result.faces[0].visibilityEvidence.rasterizedTriangleCount >= 1);
   assert.equal(result.faces[0].selectionEvidence.eligibleCandidateCount, 2);
   assert.equal(result.publicationEligible, false);
 });
@@ -67,6 +70,53 @@ test("rejects a source view where another mesh triangle occludes the target face
   assert.equal(result.autoSelectedFaceCount, 0);
   assert.ok(result.rejectedFaces[0].reasons.includes("source-view-occludes-or-partially-occludes-face"));
   assert.equal(result.faces[0].sourceImageId, undefined);
+});
+
+test("does not treat a triangle behind the target as an occluder", () => {
+  const behind = [
+    { id: "b1", position: [0, 0, 8] },
+    { id: "b2", position: [1.6, 0, 8] },
+    { id: "b3", position: [0, 1.6, 8] },
+  ];
+  const result = selectCalibratedTextureViews({
+    cameras: [cameras[0]],
+    vertices: [...targetVertices, ...behind],
+    triangles: [
+      { vertices: ["a", "b", "c"] },
+      { vertices: ["b1", "b2", "b3"] },
+    ],
+    candidate: {
+      images: [images[0]],
+      cameraCalibrations: [cameraCalibrations[0]],
+      faces: [{ vertices: ["a", "b", "c"] }],
+    },
+  });
+  assert.equal(result.status, "texture-views-selected-requires-human-review");
+  assert.equal(result.faces[0].visibilityEvidence.status, "visible-by-rasterized-depth-buffer");
+});
+
+test("fails closed when a mesh triangle crosses the camera near plane", () => {
+  const crossing = [
+    { id: "n1", position: [-1, -1, 2] },
+    { id: "n2", position: [0, 0, -2] },
+    { id: "n3", position: [2, -1, 2] },
+  ];
+  const result = selectCalibratedTextureViews({
+    cameras: [cameras[0]],
+    vertices: [...targetVertices, ...crossing],
+    triangles: [
+      { vertices: ["a", "b", "c"] },
+      { vertices: ["n1", "n2", "n3"] },
+    ],
+    candidate: {
+      images: [images[0]],
+      cameraCalibrations: [cameraCalibrations[0]],
+      faces: [{ vertices: ["a", "b", "c"] }],
+    },
+  });
+  assert.equal(result.status, "review-required");
+  assert.ok(result.rejectedFaces[0].reasons.includes("rasterized-visibility-check-indeterminate"));
+  assert.ok(result.rejectedFaces[0].candidateFailures[0].reasons.includes("rasterized-visibility-check-indeterminate"));
 });
 
 test("keeps explicit human-reviewed assignments and records their provenance", () => {
@@ -112,4 +162,8 @@ test("validates camera, mesh and quality thresholds", () => {
     cameras, vertices: targetVertices, triangles: [{ vertices: ["a", "b", "c"] }], candidate: makeCandidate(),
     options: { minFacingCosine: 2 },
   }), /between zero and one/);
+  assert.throws(() => selectCalibratedTextureViews({
+    cameras, vertices: targetVertices, triangles: [{ vertices: ["a", "b", "c"] }], candidate: makeCandidate(),
+    options: { maxRasterResolution: 32 },
+  }), /between 64 and 1024/);
 });
