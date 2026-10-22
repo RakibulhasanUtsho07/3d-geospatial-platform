@@ -233,3 +233,8 @@ The backend can create a private interior GLB candidate from a complete measured
 ### Floor-plan review and publication
 
 Candidates created from measured floor-plan vectors can be reviewed through a separate authenticated review API, then published only via an explicit hash-verified catalog command after approval. Source rights must be reviewed before candidate generation; rejected or changes-requested reviews do not create a publishing attestation. Run `npm run publish:floor-plan-candidate -- <workspaceRoot> <buildingId> <candidateId>` only after an approved review. Automatic PDF/image-to-vector tracing remains unimplemented. See section 14 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
+
+
+### Raster floor-plan trace candidates
+
+The engine can analyze an uploaded floor-plan raster (JPEG/PNG/WebP) to propose horizontal/vertical wall lines and closed rectangular room candidates. Traces remain private, hash-checked, pixel-based and unreviewed until a human corrects them and supplies measured scale/georeferencing. The detector is a limited orthogonal-line heuristic; it does not read dimensions or infer angled walls, and it does not auto-publish. See section 15 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
