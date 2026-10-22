@@ -74,9 +74,17 @@ export default function GeneratedModelPanel({
         { definition, visible: true },
       ]);
       setMessage("Model loaded into the current map session.");
-      setId((current) => current === "generated-building-01"
-        ? "generated-building-02"
-        : current);
+      const usedIds = new Set([
+        ...models.map((item) => item.definition.id),
+        definition.id,
+      ]);
+      let nextSequence = 1;
+      let nextId = "generated-building-" + String(nextSequence).padStart(2, "0");
+      while (usedIds.has(nextId)) {
+        nextSequence += 1;
+        nextId = "generated-building-" + String(nextSequence).padStart(2, "0");
+      }
+      setId(nextId);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Could not load this GLB model.");
     } finally {
