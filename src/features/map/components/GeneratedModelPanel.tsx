@@ -161,7 +161,7 @@ export default function GeneratedModelPanel({
             </header>
 
             <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/5 px-3 py-2.5 text-xs leading-5 text-amber-100">
-              The generator's output in <code>.building-engine/jobs/</code> is a review candidate, not a public asset. After review, place the approved GLB under the app's <code>public/</code> directory and enter its URL below. This panel does not publish, copy, or approve model files.
+              The generator output in <code>.building-engine/jobs/</code> is a review candidate, not a public asset. After review, place the approved GLB under <code>public/</code> and enter its URL below. This panel does not publish, copy, or approve model files.
             </div>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
@@ -215,7 +215,7 @@ export default function GeneratedModelPanel({
               </div>
 
               <p className="text-xs leading-5 text-zinc-400">
-                Placement is horizontal WGS84 longitude/latitude plus height above the map's ellipsoid reference. The default axes are Y-up and Z-forward. This loader does not infer building dimensions, orientation, or surveyed elevation from a GLB.
+                Placement is horizontal WGS84 longitude/latitude plus height above the configured ellipsoid reference. The default axes are Y-up and Z-forward. This loader does not infer building dimensions, orientation, or surveyed elevation from a GLB.
               </p>
 
               {error && <p role="alert" className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">{error}</p>}
