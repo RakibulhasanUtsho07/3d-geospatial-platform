@@ -1101,6 +1101,16 @@ export class CesiumAdapter implements MapEngine {
       );
       stageTelemetryRecorded = true;
 
+      const facadeColors = [...new Set(lodRecords.map((record) => record.visualStyle.facadeColor.toLowerCase()))].sort();
+      const roofColors = [...new Set(lodRecords.map((record) => record.visualStyle.roofColor.toLowerCase()))].sort();
+      const visualStyleSummary = {
+        facadePatterns: [...new Set(lodRecords.map((record) => record.visualStyle.pattern))].sort(),
+        facadeColors: facadeColors.slice(0, 8),
+        roofColors: roofColors.slice(0, 8),
+        uniqueFacadeColors: facadeColors.length,
+        uniqueRoofColors: roofColors.length,
+      };
+
       console.info("[Overture] Building viewport rendered.", {
         returnedFeatures: entities.length,
         viewport: requestedBounds,
@@ -1113,6 +1123,7 @@ export class CesiumAdapter implements MapEngine {
         hiddenUnderground,
         invalidPolygons,
         cameraAwareLod: true,
+        visualStyleSummary,
       });
     } catch (error: unknown) {
       if (!fetchTelemetryRecorded) {
@@ -1421,6 +1432,16 @@ export class CesiumAdapter implements MapEngine {
       // This coalesces many entity add/remove notifications into one flush.
       dataSource.entities.suspendEvents();
       let renderedRoads = 0;
+      const roadStyleSummary = {
+        byClass: { arterial: 0, collector: 0, local: 0, path: 0 },
+        centreLineRoads: 0,
+        taggedSurfaceRoads: 0,
+        elevatedRoads: 0,
+        tunnelRoads: 0,
+      };
+      const roadStyleColors = new Set<string>();
+      let minimumRoadWidthMeters = Number.POSITIVE_INFINITY;
+      let maximumRoadWidthMeters = 0;
       try {
         dataSource.entities.removeAll();
         this.roadByEntityId.clear();
@@ -1447,6 +1468,18 @@ export class CesiumAdapter implements MapEngine {
           if (positions.length < 2) continue;
 
           const visualStyle = resolveRoadVisualStyle(road);
+          if (visualStyle.roadClass === "arterial") roadStyleSummary.byClass.arterial += 1;
+          else if (visualStyle.roadClass === "collector") roadStyleSummary.byClass.collector += 1;
+          else if (visualStyle.roadClass === "local") roadStyleSummary.byClass.local += 1;
+          else roadStyleSummary.byClass.path += 1;
+          if (visualStyle.hasCentreLine) roadStyleSummary.centreLineRoads += 1;
+          if (typeof road.surface === "string" && road.surface.trim()) roadStyleSummary.taggedSurfaceRoads += 1;
+          if (visualStyle.renderHeight > 0) roadStyleSummary.elevatedRoads += 1;
+          if (visualStyle.renderHeight < 0) roadStyleSummary.tunnelRoads += 1;
+          roadStyleColors.add(visualStyle.color.toLowerCase());
+          minimumRoadWidthMeters = Math.min(minimumRoadWidthMeters, visualStyle.widthMeters);
+          maximumRoadWidthMeters = Math.max(maximumRoadWidthMeters, visualStyle.widthMeters);
+
           const centerIndex = Math.min(
             road.coordinates.length - 1,
             Math.floor(road.coordinates.length / 2),
@@ -1531,6 +1564,12 @@ export class CesiumAdapter implements MapEngine {
         labelledRoads: Math.min(40, payload.results.filter((road) =>
           road.name && (road.roadClass === "arterial" || road.roadClass === "collector")
         ).length),
+        styleSummary: {
+          ...roadStyleSummary,
+          uniqueColors: roadStyleColors.size,
+          minWidthMeters: renderedRoads > 0 ? Number(minimumRoadWidthMeters.toFixed(2)) : null,
+          maxWidthMeters: renderedRoads > 0 ? Number(maximumRoadWidthMeters.toFixed(2)) : null,
+        },
         attribution: "© OpenStreetMap contributors",
       });
     } catch (error: unknown) {
