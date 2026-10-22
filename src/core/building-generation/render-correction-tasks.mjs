@@ -345,8 +345,10 @@ function buildCorrectionReviewChecklist({ comparison, humanReviewConfirmed }) {
     implementationEvidence: {
       status: "not-started",
       changeSummary: null,
+      implementedAt: null,
       outputModelSha256: null,
       geometryQaReportSha256: null,
+      textureChangeApplicable: null,
       textureQaReportSha256: null,
       generatedRenderManifestSha256: null,
     },
