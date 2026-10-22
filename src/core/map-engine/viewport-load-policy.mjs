@@ -22,3 +22,17 @@ export function shouldLoadFullDatasetForWideViewport(
 ) {
   return !hasLoadedBuildings || loadedViewportBounds !== null;
 }
+
+
+/**
+ * Keep an in-flight viewport stage only while its intent is current and the
+ * building layer is visible. This also covers work after fetch has completed,
+ * when there is no longer an AbortController to stop GeoJSON staging.
+ */
+export function shouldContinueViewportLoad(
+  requestRevision,
+  currentRevision,
+  buildingsLayerVisible,
+) {
+  return requestRevision === currentRevision && buildingsLayerVisible === true;
+}
