@@ -55,13 +55,31 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       candidateSpatialActiveCells: [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false],
       spatialEdgeDistributionDistance: 0,
       activeEdgeCellJaccardDistance: 0,
-      spatialCellDiagnostics: Array.from({ length: 16 }, (_, index) => ({
-        cellX: index % 4,
-        cellY: Math.floor(index / 4),
-        meanAbsoluteError: 10,
-        meanSignedLuminanceOffset: 0,
-        localSsim16x16: 0.83,
-      })),
+      spatialCellDiagnostics: Array.from({ length: 16 }, (_, index) => {
+        const cellX = index % 4;
+        const cellY = Math.floor(index / 4);
+        const edgeSampleCount = (cellX === 0 || cellX === 3 ? 15 : 16) *
+          (cellY === 0 || cellY === 3 ? 15 : 16);
+        return {
+          cellX,
+          cellY,
+          meanAbsoluteError: 10,
+          meanSignedLuminanceOffset: 0,
+          localSsim16x16: 0.83,
+          edgeSampleCount,
+          referenceEdgePixelCount: 10,
+          candidateEdgePixelCount: 10,
+          referenceEdgeDensity: Number((10 / edgeSampleCount).toFixed(4)),
+          candidateEdgeDensity: Number((10 / edgeSampleCount).toFixed(4)),
+          edgeDensityAbsoluteDifference: 0,
+        };
+      }),
+      localEdgeDensityDifferenceMedian: 0,
+      localEdgeDensityDifferenceMaximum: 0,
+      highestEdgeDifferenceCells: [
+        { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
+        { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
+      ],
       spatialCellMaeMedian: 10,
       spatialCellMaeMaximum: 10,
       spatialCellMaeMedianGap: 0,
@@ -165,6 +183,11 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.referenceSpatialEdgeDistribution.length, 16);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellDiagnostics.length, 16);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellMaeMedianGap, 0);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.localEdgeDensityDifferenceMaximum, 0);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellDiagnostics[0].edgeSampleCount, 225);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialCellDiagnostics[0].meanAbsoluteError, 10);
+  assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.highestEdgeDifferenceCells,
+    [{ cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 }, { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 }]);
   assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.highestDifferenceCells,
     [{ cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 }, { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 }]);
   assert.equal(report.comparisons[0].similarityDiagnostics.renderSha256, frontRenderHash);
@@ -269,6 +292,24 @@ test("rejects localized difference cells with inconsistent summaries or ordering
   const input = fixture();
   const badMetric = diagnostic();
   badMetric.metrics.spatialCellDiagnostics[6].meanAbsoluteError = 190;
+  const report = buildRenderReferenceReview({
+    ...input,
+    similarityDiagnostics: [{
+      viewId: "front",
+      referenceImageId: "reference-front-01",
+      report: badMetric,
+      reportSha256: "f".repeat(64),
+    }],
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
+  assert.equal(report.comparisons[0].similarityDiagnostics, null);
+});
+
+test("rejects local edge densities that contradict their pixel counts", () => {
+  const input = fixture();
+  const badMetric = diagnostic();
+  badMetric.metrics.spatialCellDiagnostics[0].referenceEdgeDensity = 0.5;
   const report = buildRenderReferenceReview({
     ...input,
     similarityDiagnostics: [{
