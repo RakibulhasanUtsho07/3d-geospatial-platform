@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,7 +7,7 @@ import sharp from "sharp";
 import test from "node:test";
 
 import { ingestMediaFile } from "../src/core/building-generation/media-intake.mjs";
-import { traceFloorPlanImageSource } from "../src/core/building-generation/floor-plan-raster-trace-job.mjs";
+import { loadFloorPlanRasterTrace, traceFloorPlanImageSource } from "../src/core/building-generation/floor-plan-raster-trace-job.mjs";
 import { generateFloorPlanCandidateFromRasterTrace } from "../src/core/building-generation/floor-plan-raster-generation.mjs";
 import { loadFloorPlanModelCandidate } from "../src/core/building-generation/floor-plan-model-job.mjs";
 
@@ -68,17 +69,17 @@ function conversion(trace) {
 
 test("turns a reviewed/calibrated private raster trace into a GLB candidate bound to trace evidence", async (t) => {
   const state = await setup(t);
+  const trace = await loadFloorPlanRasterTrace({
+    workspaceRoot: state.root,
+    buildingId: "dhaka-demo",
+    traceId: state.trace.traceId,
+  });
+  const selected = conversion(trace);
   const result = await generateFloorPlanCandidateFromRasterTrace({
     workspaceRoot: state.root,
     buildingId: "dhaka-demo",
     traceId: state.trace.traceId,
-    conversion: conversion(await import("../src/core/building-generation/floor-plan-raster-trace-job.mjs").then(
-      ({ loadFloorPlanRasterTrace }) => loadFloorPlanRasterTrace({
-        workspaceRoot: state.root,
-        buildingId: "dhaka-demo",
-        traceId: state.trace.traceId,
-      }),
-    )),
+    conversion: selected,
   });
 
   assert.equal(result.status, "candidate-requires-human-review");
@@ -101,23 +102,14 @@ test("turns a reviewed/calibrated private raster trace into a GLB candidate boun
   });
   assert.equal(candidate.plan.evidence.sha256, state.source.record.sha256);
   assert.equal(candidate.traceReview.traceId, state.trace.traceId);
-  assert.equal(candidate.traceReview.traceSha256, state.trace.sourceSha256.length === 64
-    ? result.transformationAudit.traceSha256
-    : null);
-  assert.deepEqual(candidate.traceReview.confirmedRoomIds, conversion(await import("../src/core/building-generation/floor-plan-raster-trace-job.mjs").then(
-    ({ loadFloorPlanRasterTrace }) => loadFloorPlanRasterTrace({
-      workspaceRoot: state.root,
-      buildingId: "dhaka-demo",
-      traceId: state.trace.traceId,
-    }),
-  )).confirmedRoomIds);
+  assert.equal(candidate.traceReview.traceSha256, result.transformationAudit.traceSha256);
+  assert.deepEqual(candidate.traceReview.confirmedRoomIds, selected.confirmedRoomIds);
 
   const candidateDirectory = path.join(
     state.root, ".building-engine", "floor-plan-candidates", "dhaka-demo", result.candidateId,
   );
   const reportOnDisk = JSON.parse(await readFile(path.join(candidateDirectory, "report.json"), "utf8"));
   const transformationBytes = await readFile(path.join(candidateDirectory, "trace-review.json"));
-  const { createHash } = await import("node:crypto");
   assert.equal(
     reportOnDisk.input.rasterTrace.transformationSha256,
     createHash("sha256").update(transformationBytes).digest("hex"),
@@ -127,7 +119,6 @@ test("turns a reviewed/calibrated private raster trace into a GLB candidate boun
 
 test("refuses a room selection when its boundary wall was not confirmed", async (t) => {
   const state = await setup(t);
-  const { loadFloorPlanRasterTrace } = await import("../src/core/building-generation/floor-plan-raster-trace-job.mjs");
   const trace = await loadFloorPlanRasterTrace({
     workspaceRoot: state.root,
     buildingId: "dhaka-demo",
