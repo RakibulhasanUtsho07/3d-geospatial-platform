@@ -103,3 +103,10 @@ A high-error cell may be caused by lighting, shadows, textures, windows, vegetat
 Each 16×16 cell additionally reports reference/candidate strong-edge counts, edge densities, the sample count, and the absolute density difference. The report summarizes the median and maximum per-cell edge-density difference and ranks the four cells with the largest difference. A `localized-edge-structure-difference-screening-hint` warns when the maximum local difference exceeds the configured threshold.
 
 This helps separate a broad luminance shift from changes in visible line structure: the two can have high pixel error but similar edge density. It is not a reliable classifier of lighting versus geometry and does not classify a building defect. Edge counts depend on a fixed gradient threshold and are sensitive to thin lines, anti-aliasing, texture and downsampling. These values remain diagnostic evidence only.
+
+
+## Global luminance-offset-normalized comparison
+
+The report retains its original raw MAE/RMSE/SSIM metrics and adds a separate brightness-normalized comparison. It estimates the median candidate-minus-reference luminance offset across the 64×64 previews, subtracts that offset from the candidate preview (bounded to the grayscale range), and reports normalized MAE/RMSE/SSIM plus the percentage reduction in MAE. When normalization materially reduces pixel error, the report adds `global-luminance-offset-reduces-pixel-error-screening-hint`.
+
+This is a diagnostic counterfactual only: neither source image is modified, and the raw values remain unchanged. It can help indicate when a broad brightness offset explains much of the error, but cannot prove the images match. Real lighting may vary by region; clipping, shadows, material colours, contrast and camera exposure can all leave residual differences. The warning never changes a human outcome or publication eligibility.
