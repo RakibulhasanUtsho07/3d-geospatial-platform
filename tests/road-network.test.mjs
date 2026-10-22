@@ -87,7 +87,7 @@ test("uses explicit OSM width ahead of typical road-class widths", () => {
   assert.equal(road.bridge, true);
 });
 
-test("road cache key distinguishes viewports that collide at three decimal places", () => {
+test("road cache key distinguishes nearby viewports while matching map request precision", () => {
   const first = {
     west: 90.4011,
     south: 23.7411,
@@ -103,6 +103,8 @@ test("road cache key distinguishes viewports that collide at three decimal place
 
   assert.equal(first.west.toFixed(3), second.west.toFixed(3));
   assert.equal(first.east.toFixed(3), second.east.toFixed(3));
+  assert.notEqual(first.west.toFixed(4), second.west.toFixed(4));
+  assert.notEqual(first.east.toFixed(4), second.east.toFixed(4));
   assert.notEqual(
     buildRoadNetworkCacheKey(first),
     buildRoadNetworkCacheKey(second),
