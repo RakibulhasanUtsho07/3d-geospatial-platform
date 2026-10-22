@@ -18,3 +18,9 @@ export function shouldContinueViewportLoad(
   currentRevision: number,
   buildingsLayerVisible: boolean,
 ): boolean;
+export function shouldContinueViewportStage(
+  requestRevision: number,
+  currentRevision: number,
+  buildingsLayerVisible: boolean,
+  viewerIsCurrent: boolean,
+): boolean;
