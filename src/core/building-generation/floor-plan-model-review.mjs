@@ -249,42 +249,53 @@ export async function getFloorPlanModelReviewStatus({ workspaceRoot, buildingId,
   let review = null;
   let attestationReady = false;
   let publication = null;
+  let savedReview = null;
 
   try {
     const bytes = await readCandidateArtifact(directory, "review.json", 2 * 1024 * 1024);
-    const saved = JSON.parse(bytes.toString("utf8"));
-    if (!isRecord(saved) || saved.schemaVersion !== "1.0.0" ||
-        saved.candidateId !== cid || saved.buildingId !== bid ||
-        !isRecord(saved.candidate) ||
-        saved.candidate.modelSha256 !== candidate.modelSha256 ||
-        saved.candidate.reportSha256 !== candidate.reportSha256 ||
-        saved.candidate.geometrySha256 !== candidate.geometrySha256 ||
-        saved.candidate.sourceSha256 !== candidate.report.input.verifiedSourceSha256) {
+    savedReview = JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  if (savedReview !== null) {
+    if (!isRecord(savedReview) || savedReview.schemaVersion !== "1.0.0" ||
+        typeof savedReview.reviewId !== "string" || !savedReview.reviewId.startsWith("floorplan-review-") ||
+        savedReview.candidateId !== cid || savedReview.buildingId !== bid ||
+        !isRecord(savedReview.candidate) ||
+        savedReview.candidate.modelSha256 !== candidate.modelSha256 ||
+        savedReview.candidate.reportSha256 !== candidate.reportSha256 ||
+        savedReview.candidate.geometrySha256 !== candidate.geometrySha256 ||
+        savedReview.candidate.sourceSha256 !== candidate.report.input.verifiedSourceSha256) {
       throw new TypeError("Floor-plan review record does not match the current candidate.");
     }
     review = {
-      reviewId: saved.reviewId,
-      decision: saved.decision,
-      reviewer: saved.reviewer,
-      reviewedAt: saved.reviewedAt,
-      notes: saved.notes,
-      checks: saved.checks,
-      candidateSha256: saved.candidate.modelSha256,
+      reviewId: savedReview.reviewId,
+      decision: savedReview.decision,
+      reviewer: savedReview.reviewer,
+      reviewedAt: savedReview.reviewedAt,
+      notes: savedReview.notes,
+      checks: savedReview.checks,
+      candidateSha256: savedReview.candidate.modelSha256,
       mapReady: false,
       publicationEligible: false,
     };
-    if (saved.decision === "approved") {
+    if (savedReview.decision === "approved") {
       const attestationBytes = await readCandidateArtifact(directory, "attestation.json", 2 * 1024 * 1024);
       const attestation = JSON.parse(attestationBytes.toString("utf8"));
-      if (!isRecord(attestation) || attestation.candidateSha256 !== candidate.modelSha256 ||
-          attestation.review?.reviewer !== saved.reviewer ||
-          attestation.review?.reviewedAt !== saved.reviewedAt) {
+      if (!isRecord(attestation) || attestation.schemaVersion !== "1.0.0" ||
+          attestation.candidateSha256 !== candidate.modelSha256 ||
+          attestation.model?.id !== savedReview.publication?.modelId ||
+          attestation.model?.name !== savedReview.publication?.modelName ||
+          attestation.review?.reviewer !== savedReview.reviewer ||
+          attestation.review?.reviewedAt !== savedReview.reviewedAt ||
+          attestation.review?.evidencePath !== savedReview.evidence?.path ||
+          attestation.review?.evidenceSha256 !== savedReview.evidence?.sha256 ||
+          REQUIRED_FLOOR_PLAN_REVIEW_CHECKS.some((key) => attestation.review?.checks?.[key] !== true)) {
         throw new TypeError("Floor-plan publication attestation does not match the approved review.");
       }
       attestationReady = true;
     }
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
   }
 
   try {
