@@ -253,7 +253,7 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
   const planBytes = await readCandidateFile(directory, "floor-plan.json", 2 * 1024 * 1024);
   const plan = JSON.parse(planBytes.toString("utf8"));
   if (!plan || typeof plan !== "object" || plan.id !== report.input.floorPlanId ||
-      plan.buildingId !== bid || plan.source?.sha256 !== report.input.verifiedSourceSha256 ||
+      plan.buildingId !== bid || plan.evidence?.sha256 !== report.input.verifiedSourceSha256 ||
       sha256(planBytes) !== report.input.normalizedGeometrySha256) {
     throw new TypeError("Floor-plan candidate geometry checksum or identity does not match its report.");
   }
