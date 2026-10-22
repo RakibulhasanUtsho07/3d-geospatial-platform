@@ -110,6 +110,7 @@
     "test:textured-glb-export": "node --test tests/textured-glb-export.test.mjs",
     "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
     "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs",
+    "test:generation-review": "node --test tests/generation-job-review.test.mjs tests/generation-api-auth.test.mjs",
     "run:generation-worker": "node scripts/run-generation-worker.mjs"
   },
   "dependencies": {
