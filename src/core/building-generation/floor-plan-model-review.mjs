@@ -12,7 +12,7 @@ import {
 import path from "node:path";
 
 import { loadVerifiedSource } from "./source-workflow.mjs";
-import { publishReviewedBuildingModel } from "./published-model-catalog.mjs";
+import { publishReviewedBuildingModel, validatePublishedModelCatalog } from "./published-model-catalog.mjs";
 import { loadFloorPlanModelCandidate } from "./floor-plan-model-job.mjs";
 
 export const FLOOR_PLAN_REVIEW_DECISIONS = Object.freeze(["approved", "rejected", "changes_requested"]);
@@ -556,6 +556,83 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     throw error;
   }
 
+  const evidence = await resolveRegularWorkspaceFile(root, review.evidence.path, "Review evidence", MAX_EVIDENCE_BYTES);
+  if (sha256(evidence.bytes) !== review.evidence.sha256) {
+    const error = new Error("Review evidence SHA-256 does not match the actual evidence file.");
+    error.code = "REVIEW_EVIDENCE_CHECKSUM_MISMATCH";
+    throw error;
+  }
+
+  const receiptPath = path.join(directory, "publication.json");
+  let previousReceipt;
+  try {
+    const previousBytes = await readCandidateArtifact(directory, "publication.json", 2 * 1024 * 1024);
+    previousReceipt = JSON.parse(previousBytes.toString("utf8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  if (previousReceipt !== undefined) {
+    const previous = previousReceipt;
+    if (!isRecord(previous) || previous.schemaVersion !== "1.0.0" ||
+        previous.candidateId !== cid || previous.buildingId !== bid ||
+        previous.reviewId !== review.reviewId ||
+        previous.reviewSha256 !== actualReviewHash ||
+        previous.modelSha256 !== candidate.modelSha256 ||
+        previous.reportSha256 !== candidate.reportSha256 ||
+        previous.geometrySha256 !== candidate.geometrySha256 ||
+        !isRecord(previous.publication) ||
+        previous.publication.modelId !== review.publication.modelId ||
+        previous.publication.sha256 !== candidate.modelSha256 ||
+        typeof previous.publication.versionId !== "string" ||
+        typeof previous.publication.assetUrl !== "string") {
+      const error = new Error("Existing publication receipt does not match this approved version.");
+      error.code = "PUBLICATION_RECEIPT_MISMATCH";
+      throw error;
+    }
+
+    // Idempotency must not silently re-activate a version after an operator has rolled it back.
+    const manifestPath = path.join(root, "public", "models", "generated", "manifest.json");
+    const catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
+    const model = catalog.models.find((item) => item.id === previous.publication.modelId);
+    const version = model?.versions.find((item) => item.versionId === previous.publication.versionId);
+    if (!version || version.url !== previous.publication.assetUrl ||
+        version.sha256 !== candidate.modelSha256) {
+      const error = new Error("Publication receipt does not match a version in the current catalog.");
+      error.code = "PUBLICATION_RECEIPT_MISMATCH";
+      throw error;
+    }
+    if (!/^\\/models\\/generated\\/[A-Za-z0-9._-]+-[a-f0-9]{12}\\.glb$/.test(version.url)) {
+      throw new TypeError("Published candidate asset URL is invalid.");
+    }
+    const assetPath = path.join(root, "public", "models", "generated", path.basename(version.url));
+    const assetEntry = await lstat(assetPath);
+    if (assetEntry.isSymbolicLink() || !assetEntry.isFile()) {
+      throw new TypeError("Published candidate asset must be a regular, non-symlink file.");
+    }
+    const realAssetPath = await realpath(assetPath);
+    const publicRoot = await realpath(path.join(root, "public"));
+    if (!inside(publicRoot, realAssetPath) || sha256(await readFile(realAssetPath)) !== version.sha256) {
+      const error = new Error("Published candidate asset checksum or path verification failed.");
+      error.code = "CANDIDATE_CHECKSUM_MISMATCH";
+      throw error;
+    }
+
+    return {
+      modelId: previous.publication.modelId,
+      versionId: previous.publication.versionId,
+      assetUrl: previous.publication.assetUrl,
+      sha256: previous.publication.sha256,
+      manifestPath,
+      candidateId: cid,
+      reviewId: review.reviewId,
+      reviewSha256: actualReviewHash,
+      mapReady: false,
+      publicationEligible: false,
+      alreadyPublished: true,
+    };
+  }
+
   const publicationTimestamp = publishedAt ?? new Date().toISOString();
   const result = await publishReviewedBuildingModel({
     workspaceRoot: root,
@@ -583,20 +660,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     mapReady: false,
     publicationEligible: false,
   };
-  const receiptPath = path.join(directory, "publication.json");
-  try {
-    const previous = JSON.parse(await readFile(receiptPath, "utf8"));
-    if (previous.reviewSha256 !== actualReviewHash ||
-        previous.modelSha256 !== candidate.modelSha256 ||
-        previous.publication?.versionId !== result.versionId) {
-      const error = new Error("Existing publication receipt does not match this approved version.");
-      error.code = "PUBLICATION_RECEIPT_MISMATCH";
-      throw error;
-    }
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-    await writeExclusiveAtomically(directory, "publication.json", Buffer.from(JSON.stringify(receipt, null, 2) + "\n", "utf8"));
-  }
+  await writeExclusiveAtomically(directory, "publication.json", Buffer.from(JSON.stringify(receipt, null, 2) + "\\n", "utf8"));
   return {
     ...result,
     candidateId: cid,
@@ -604,5 +668,6 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     reviewSha256: actualReviewHash,
     mapReady: false,
     publicationEligible: false,
+    alreadyPublished: false,
   };
 }
