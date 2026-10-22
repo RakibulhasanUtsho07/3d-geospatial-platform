@@ -200,6 +200,15 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       "candidateEdgeOrientationHistogram", "edgeOrientationHistogramDistance",
     ];
     const structureMetricsPresent = structureMetricKeys.some((key) => Object.hasOwn(metrics, key));
+    const spatialMetricKeys = [
+      "referenceSpatialEdgePixelCount", "candidateSpatialEdgePixelCount",
+      "referenceSpatialActiveEdgeCellCount", "candidateSpatialActiveEdgeCellCount",
+      "referenceSpatialEdgeCoverage", "candidateSpatialEdgeCoverage",
+      "referenceSpatialEdgeDistribution", "candidateSpatialEdgeDistribution",
+      "referenceSpatialActiveCells", "candidateSpatialActiveCells",
+      "spatialEdgeDistributionDistance", "activeEdgeCellJaccardDistance",
+    ];
+    const spatialMetricsPresent = spatialMetricKeys.some((key) => Object.hasOwn(metrics, key));
     const validHistogram = (histogram) => {
       if (!Array.isArray(histogram) || histogram.length !== 8 ||
         !histogram.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
@@ -236,6 +245,66 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       histogramDistanceMatches(metrics.referenceEdgeOrientationHistogram,
         metrics.candidateEdgeOrientationHistogram, metrics.edgeOrientationHistogramDistance)
     );
+    const validSpatialDistribution = (distribution) => {
+      if (!Array.isArray(distribution) || distribution.length !== 16 ||
+        !distribution.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
+      const total = distribution.reduce((sum, value) => sum + value, 0);
+      return total <= 1e-9 || Math.abs(total - 1) <= 0.02;
+    };
+    const spatialDistributionDistanceMatches = (left, right, expectedDistance) => {
+      if (!validSpatialDistribution(left) || !validSpatialDistribution(right) || !finite(expectedDistance)) return false;
+      const leftTotal = left.reduce((sum, value) => sum + value, 0);
+      const rightTotal = right.reduce((sum, value) => sum + value, 0);
+      const distance = leftTotal <= 1e-9 && rightTotal <= 1e-9 ? 0 :
+        leftTotal <= 1e-9 || rightTotal <= 1e-9 ? 1 :
+        left.reduce((sum, value, index) => sum + Math.abs(value - right[index]), 0) / 2;
+      return Math.abs(distance - expectedDistance) <= 0.02;
+    };
+    const activeCellDistanceMatches = (left, right, expectedDistance) => {
+      if (!Array.isArray(left) || left.length !== 16 || !left.every((value) => typeof value === "boolean") ||
+        !Array.isArray(right) || right.length !== 16 || !right.every((value) => typeof value === "boolean") ||
+        !finite(expectedDistance)) return false;
+      let intersection = 0;
+      let union = 0;
+      for (let index = 0; index < left.length; index++) {
+        if (left[index] || right[index]) union++;
+        if (left[index] && right[index]) intersection++;
+      }
+      const distance = union === 0 ? 0 : 1 - intersection / union;
+      return Math.abs(distance - expectedDistance) <= 0.02;
+    };
+    const spatialMetricsValid = !spatialMetricsPresent || (
+      Number.isSafeInteger(metrics.referenceSpatialEdgePixelCount) &&
+      metrics.referenceSpatialEdgePixelCount >= 0 && metrics.referenceSpatialEdgePixelCount <= 3844 &&
+      Number.isSafeInteger(metrics.candidateSpatialEdgePixelCount) &&
+      metrics.candidateSpatialEdgePixelCount >= 0 && metrics.candidateSpatialEdgePixelCount <= 3844 &&
+      Number.isSafeInteger(metrics.referenceSpatialActiveEdgeCellCount) &&
+      metrics.referenceSpatialActiveEdgeCellCount >= 0 && metrics.referenceSpatialActiveEdgeCellCount <= 16 &&
+      Number.isSafeInteger(metrics.candidateSpatialActiveEdgeCellCount) &&
+      metrics.candidateSpatialActiveEdgeCellCount >= 0 && metrics.candidateSpatialActiveEdgeCellCount <= 16 &&
+      finite(metrics.referenceSpatialEdgeCoverage) && metrics.referenceSpatialEdgeCoverage >= 0 && metrics.referenceSpatialEdgeCoverage <= 1 &&
+      finite(metrics.candidateSpatialEdgeCoverage) && metrics.candidateSpatialEdgeCoverage >= 0 && metrics.candidateSpatialEdgeCoverage <= 1 &&
+      Math.abs(metrics.referenceSpatialEdgeCoverage - metrics.referenceSpatialActiveEdgeCellCount / 16) <= 0.01 &&
+      Math.abs(metrics.candidateSpatialEdgeCoverage - metrics.candidateSpatialActiveEdgeCellCount / 16) <= 0.01 &&
+      Array.isArray(metrics.referenceSpatialActiveCells) &&
+      metrics.referenceSpatialActiveCells.length === 16 &&
+      metrics.referenceSpatialActiveCells.every((value) => typeof value === "boolean") &&
+      metrics.referenceSpatialActiveCells.filter(Boolean).length === metrics.referenceSpatialActiveEdgeCellCount &&
+      Array.isArray(metrics.candidateSpatialActiveCells) &&
+      metrics.candidateSpatialActiveCells.length === 16 &&
+      metrics.candidateSpatialActiveCells.every((value) => typeof value === "boolean") &&
+      metrics.candidateSpatialActiveCells.filter(Boolean).length === metrics.candidateSpatialActiveEdgeCellCount &&
+      validSpatialDistribution(metrics.referenceSpatialEdgeDistribution) &&
+      validSpatialDistribution(metrics.candidateSpatialEdgeDistribution) &&
+      finite(metrics.spatialEdgeDistributionDistance) &&
+      metrics.spatialEdgeDistributionDistance >= 0 && metrics.spatialEdgeDistributionDistance <= 1 &&
+      spatialDistributionDistanceMatches(metrics.referenceSpatialEdgeDistribution,
+        metrics.candidateSpatialEdgeDistribution, metrics.spatialEdgeDistributionDistance) &&
+      finite(metrics.activeEdgeCellJaccardDistance) &&
+      metrics.activeEdgeCellJaccardDistance >= 0 && metrics.activeEdgeCellJaccardDistance <= 1 &&
+      activeCellDistanceMatches(metrics.referenceSpatialActiveCells,
+        metrics.candidateSpatialActiveCells, metrics.activeEdgeCellJaccardDistance)
+    );
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
       finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
@@ -246,6 +315,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       finite(report.comparability?.aspectRatioDifferencePercent) &&
       report.comparability.aspectRatioDifferencePercent >= 0 &&
       structureMetricsValid &&
+      spatialMetricsValid &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
     if (!candidateMatches || !referenceMatches || !metricsValid) continue;
@@ -276,6 +346,20 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
           referenceEdgeOrientationHistogram: [...metrics.referenceEdgeOrientationHistogram],
           candidateEdgeOrientationHistogram: [...metrics.candidateEdgeOrientationHistogram],
           edgeOrientationHistogramDistance: metrics.edgeOrientationHistogramDistance,
+        } : {}),
+        ...(spatialMetricsPresent ? {
+          referenceSpatialEdgePixelCount: metrics.referenceSpatialEdgePixelCount,
+          candidateSpatialEdgePixelCount: metrics.candidateSpatialEdgePixelCount,
+          referenceSpatialActiveEdgeCellCount: metrics.referenceSpatialActiveEdgeCellCount,
+          candidateSpatialActiveEdgeCellCount: metrics.candidateSpatialActiveEdgeCellCount,
+          referenceSpatialEdgeCoverage: metrics.referenceSpatialEdgeCoverage,
+          candidateSpatialEdgeCoverage: metrics.candidateSpatialEdgeCoverage,
+          referenceSpatialEdgeDistribution: [...metrics.referenceSpatialEdgeDistribution],
+          candidateSpatialEdgeDistribution: [...metrics.candidateSpatialEdgeDistribution],
+          referenceSpatialActiveCells: [...metrics.referenceSpatialActiveCells],
+          candidateSpatialActiveCells: [...metrics.candidateSpatialActiveCells],
+          spatialEdgeDistributionDistance: metrics.spatialEdgeDistributionDistance,
+          activeEdgeCellJaccardDistance: metrics.activeEdgeCellJaccardDistance,
         } : {}),
       },
       comparability: {

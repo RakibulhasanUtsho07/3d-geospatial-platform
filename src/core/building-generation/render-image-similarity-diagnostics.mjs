@@ -136,6 +136,55 @@ function edgeOrientationHistogramDistance(left, right) {
   return distance / 2;
 }
 
+function spatialEdgeCoverage(pixels) {
+  const gridSize = 4;
+  const cellSize = SAMPLE_WIDTH / gridSize;
+  const edgeCounts = Array(gridSize * gridSize).fill(0);
+  const eligibleCounts = Array(gridSize * gridSize).fill(0);
+
+  for (let y = 1; y < SAMPLE_HEIGHT - 1; y++) {
+    for (let x = 1; x < SAMPLE_WIDTH - 1; x++) {
+      const cell = Math.floor(y / cellSize) * gridSize + Math.floor(x / cellSize);
+      eligibleCounts[cell]++;
+      const index = y * SAMPLE_WIDTH + x;
+      const gx = pixels[index + 1] - pixels[index - 1];
+      const gy = pixels[index + SAMPLE_WIDTH] - pixels[index - SAMPLE_WIDTH];
+      if (Math.hypot(gx, gy) / 2 >= 18) edgeCounts[cell]++;
+    }
+  }
+
+  const totalEdges = edgeCounts.reduce((sum, value) => sum + value, 0);
+  const distribution = totalEdges > 0
+    ? edgeCounts.map((value) => value / totalEdges)
+    : Array(edgeCounts.length).fill(0);
+  const activeCells = edgeCounts.map((value) => value >= 4);
+  return {
+    distribution,
+    activeCells,
+    activeCellCount: activeCells.filter(Boolean).length,
+    coverage: activeCells.filter(Boolean).length / activeCells.length,
+    edgePixelCount: totalEdges,
+  };
+}
+
+function normalizedDistributionDistance(left, right) {
+  const leftTotal = left.reduce((sum, value) => sum + value, 0);
+  const rightTotal = right.reduce((sum, value) => sum + value, 0);
+  if (leftTotal === 0 && rightTotal === 0) return 0;
+  if (leftTotal === 0 || rightTotal === 0) return 1;
+  return left.reduce((sum, value, index) => sum + Math.abs(value - right[index]), 0) / 2;
+}
+
+function activeCellJaccardDistance(left, right) {
+  let intersection = 0;
+  let union = 0;
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] || right[index]) union++;
+    if (left[index] && right[index]) intersection++;
+  }
+  return union === 0 ? 0 : 1 - intersection / union;
+}
+
 /**
  * Compare two decoded 64x64 grayscale previews. These values are triage signals,
  * not a calibrated architectural/geometry accuracy metric.
@@ -166,6 +215,8 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const maximumEdgeOrientationHistogramDistance = options.maximumEdgeOrientationHistogramDistance ?? 0.35;
   const minimumSharpnessRatio = options.minimumSharpnessRatio ?? 0.5;
   const minimumReferenceLaplacianVariance = options.minimumReferenceLaplacianVariance ?? 18;
+  const maximumSpatialEdgeDistributionDistance = options.maximumSpatialEdgeDistributionDistance ?? 0.35;
+  const maximumActiveEdgeCellJaccardDistance = options.maximumActiveEdgeCellJaccardDistance ?? 0.5;
   if (!Number.isFinite(maxAspectRatioDifferencePercent) || maxAspectRatioDifferencePercent < 0 || maxAspectRatioDifferencePercent > 100) {
     throw new RangeError("maxAspectRatioDifferencePercent must be between 0 and 100");
   }
@@ -189,6 +240,14 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     minimumReferenceLaplacianVariance < 0 || minimumReferenceLaplacianVariance > 1000000) {
     throw new RangeError("minimumReferenceLaplacianVariance must be between 0 and 1000000");
   }
+  if (!Number.isFinite(maximumSpatialEdgeDistributionDistance) ||
+    maximumSpatialEdgeDistributionDistance < 0 || maximumSpatialEdgeDistributionDistance > 1) {
+    throw new RangeError("maximumSpatialEdgeDistributionDistance must be between 0 and 1");
+  }
+  if (!Number.isFinite(maximumActiveEdgeCellJaccardDistance) ||
+    maximumActiveEdgeCellJaccardDistance < 0 || maximumActiveEdgeCellJaccardDistance > 1) {
+    throw new RangeError("maximumActiveEdgeCellJaccardDistance must be between 0 and 1");
+  }
 
   const referenceStructure = edgeStructure(referencePixels);
   const candidateStructure = edgeStructure(candidatePixels);
@@ -200,6 +259,16 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const candidateToReferenceSharpnessRatio = referenceStructure.laplacianVariance > 1e-9
     ? candidateStructure.laplacianVariance / referenceStructure.laplacianVariance
     : null;
+  const referenceSpatialCoverage = spatialEdgeCoverage(referencePixels);
+  const candidateSpatialCoverage = spatialEdgeCoverage(candidatePixels);
+  const spatialEdgeDistributionDistance = normalizedDistributionDistance(
+    referenceSpatialCoverage.distribution,
+    candidateSpatialCoverage.distribution,
+  );
+  const activeEdgeCellJaccardDistance = activeCellJaccardDistance(
+    referenceSpatialCoverage.activeCells,
+    candidateSpatialCoverage.activeCells,
+  );
   const mse = meanSquaredError(referencePixels, candidatePixels);
   const mae = meanAbsoluteError(referencePixels, candidatePixels);
   const ssim = localSsim(referencePixels, candidatePixels);
@@ -222,6 +291,17 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     referenceStructure.laplacianVariance >= minimumReferenceLaplacianVariance &&
     candidateToReferenceSharpnessRatio < minimumSharpnessRatio) {
     warnings.push("candidate-lower-sharpness-screening-hint");
+  }
+  if (referenceSpatialCoverage.edgePixelCount < 16 || candidateSpatialCoverage.edgePixelCount < 16) {
+    warnings.push("low-edge-content-comparability-screening-hint");
+  }
+  if (referenceSpatialCoverage.edgePixelCount >= 16 && candidateSpatialCoverage.edgePixelCount >= 16 &&
+    spatialEdgeDistributionDistance > maximumSpatialEdgeDistributionDistance) {
+    warnings.push("spatial-edge-layout-difference-screening-hint");
+  }
+  if (referenceSpatialCoverage.activeCellCount >= 2 && candidateSpatialCoverage.activeCellCount >= 2 &&
+    activeEdgeCellJaccardDistance > maximumActiveEdgeCellJaccardDistance) {
+    warnings.push("spatial-edge-coverage-difference-screening-hint");
   }
 
   return {
@@ -261,6 +341,18 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       referenceEdgeOrientationHistogram: referenceStructure.orientationHistogram.map((value) => Number(value.toFixed(4))),
       candidateEdgeOrientationHistogram: candidateStructure.orientationHistogram.map((value) => Number(value.toFixed(4))),
       edgeOrientationHistogramDistance: Number(orientationDistance.toFixed(4)),
+      referenceSpatialEdgePixelCount: referenceSpatialCoverage.edgePixelCount,
+      candidateSpatialEdgePixelCount: candidateSpatialCoverage.edgePixelCount,
+      referenceSpatialActiveEdgeCellCount: referenceSpatialCoverage.activeCellCount,
+      candidateSpatialActiveEdgeCellCount: candidateSpatialCoverage.activeCellCount,
+      referenceSpatialEdgeCoverage: Number(referenceSpatialCoverage.coverage.toFixed(4)),
+      candidateSpatialEdgeCoverage: Number(candidateSpatialCoverage.coverage.toFixed(4)),
+      referenceSpatialEdgeDistribution: referenceSpatialCoverage.distribution.map((value) => Number(value.toFixed(4))),
+      candidateSpatialEdgeDistribution: candidateSpatialCoverage.distribution.map((value) => Number(value.toFixed(4))),
+      referenceSpatialActiveCells: referenceSpatialCoverage.activeCells,
+      candidateSpatialActiveCells: candidateSpatialCoverage.activeCells,
+      spatialEdgeDistributionDistance: Number(spatialEdgeDistributionDistance.toFixed(4)),
+      activeEdgeCellJaccardDistance: Number(activeEdgeCellJaccardDistance.toFixed(4)),
     },
     thresholds: {
       minimumLocalSsim,
@@ -269,6 +361,8 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       maximumEdgeOrientationHistogramDistance,
       minimumSharpnessRatio,
       minimumReferenceLaplacianVariance,
+      maximumSpatialEdgeDistributionDistance,
+      maximumActiveEdgeCellJaccardDistance,
     },
     warnings,
     interpretation: warnings.length ? "review-recommended" : "no-screening-warning",
@@ -283,6 +377,8 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       "The tool resizes each image into a bounded 64x64 grayscale preview with aspect-ratio-preserving padding; it does not align cameras or register image features.",
       "Edge density, orientation histograms and Laplacian variance are coarse, downsampled screening signals; they can be affected by texture, noise, lighting, crop and unrelated scene content.",
       "Edge orientation measures image-gradient direction, not compass heading or a verified building-facade orientation. The sharpness ratio is not a calibrated blur measurement.",
+      "The 4x4 spatial edge grid screens for differences in where edge structure appears within a padded preview; it is not image registration, crop estimation, or proof that two views share a pose.",
+      "The tool does not estimate or repair an image crop. Matching aspect ratios and spatial edge layouts still do not prove that the same facade or camera view is being compared.",
       "Use only reference/render pairs showing the same facade from a closely matched pose, with similar crop and exposure.",
       "Different illumination, shadows, weather, lens distortion, perspective, vegetation and occlusion can dominate the metrics even when geometry is sound.",
       "Similar pixel values can be caused by texture or background and do not establish correct 3D geometry, dimensions, building identity or heritage fidelity.",

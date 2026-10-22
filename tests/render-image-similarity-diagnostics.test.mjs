@@ -60,6 +60,10 @@ test("identical normalized previews produce zero error and a maximum local SSIM"
   assert.equal(result.metrics.edgeOrientationHistogramDistance, 0);
   assert.equal(result.metrics.candidateToReferenceSharpnessRatio, 1);
   assert.equal(result.metrics.referenceEdgeOrientationHistogram.length, 8);
+  assert.equal(result.metrics.spatialEdgeDistributionDistance, 0);
+  assert.equal(result.metrics.activeEdgeCellJaccardDistance, 0);
+  assert.equal(result.metrics.referenceSpatialEdgeDistribution.length, 16);
+  assert.equal(result.metrics.referenceSpatialActiveCells.length, 16);
   assert.equal(result.comparability.aspectRatioWithinScreeningThreshold, true);
   assert.equal(result.policy.automaticMatch, false);
   assert.equal(result.policy.publicationEligible, false);
@@ -80,6 +84,33 @@ test("changed pixels reduce structural similarity and produce diagnostic warning
   assert.ok(result.warnings.includes("low-grayscale-ssim-screening-hint"));
   assert.ok(result.warnings.includes("high-grayscale-pixel-error-screening-hint"));
   assert.equal(result.policy.architecturalAccuracyCertified, false);
+});
+
+test("detects spatial edge-layout differences that aspect ratio alone cannot reveal", () => {
+  const leftFramed = pattern((x) => x < 32 ? (Math.floor(x / 4) % 2 ? 230 : 25) : 128);
+  const rightFramed = pattern((x) => x >= 32 ? (Math.floor(x / 4) % 2 ? 230 : 25) : 128);
+  const result = compareGrayscaleImageSamples(leftFramed, rightFramed, {
+    reference: { width: 1600, height: 1200 },
+    candidate: { width: 800, height: 600 },
+  }, { maximumSpatialEdgeDistributionDistance: 0.2, maximumActiveEdgeCellJaccardDistance: 0.2 });
+  assert.equal(result.comparability.aspectRatioWithinScreeningThreshold, true);
+  assert.ok(result.metrics.spatialEdgeDistributionDistance > 0.2);
+  assert.ok(result.metrics.activeEdgeCellJaccardDistance > 0.2);
+  assert.ok(result.warnings.includes("spatial-edge-layout-difference-screening-hint"));
+  assert.ok(result.warnings.includes("spatial-edge-coverage-difference-screening-hint"));
+  assert.equal(result.policy.automaticMatch, false);
+});
+
+test("low-edge previews are flagged as weak comparison evidence", () => {
+  const flat = Buffer.alloc(4096, 128);
+  const result = compareGrayscaleImageSamples(flat, Buffer.from(flat), {
+    reference: { width: 1600, height: 1200 },
+    candidate: { width: 800, height: 600 },
+  });
+  assert.equal(result.metrics.spatialEdgeDistributionDistance, 0);
+  assert.equal(result.metrics.referenceSpatialActiveEdgeCellCount, 0);
+  assert.ok(result.warnings.includes("low-edge-content-comparability-screening-hint"));
+  assert.equal(result.policy.publicationEligible, false);
 });
 
 test("detects a lower-sharpness candidate against a structured reference", () => {
@@ -127,6 +158,8 @@ test("rejects invalid preview buffers, dimensions and thresholds", () => {
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { minimumLocalSsim: 2 }), /between -1 and 1/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumEdgeDensityDifference: 2 }), /between 0 and 1/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { minimumSharpnessRatio: -1 }), /between 0 and 1/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumSpatialEdgeDistributionDistance: 2 }), /between 0 and 1/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumActiveEdgeCellJaccardDistance: -1 }), /between 0 and 1/);
 });
 
 test("decodes bounded grayscale previews, hashes both files and records safe FFmpeg args", async (t) => {
