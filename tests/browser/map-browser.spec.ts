@@ -65,7 +65,7 @@ function roadBoundsKey(url: URL): string {
     .join("|");
 }
 
-test("3D map initializes and layer switches remain in sync", async ({ page }) => {
+test("3D map initializes and imagery/building layer switches remain in sync", async ({ page }) => {
   const observed = await stubMapNetwork(page);
   await openReadyMap(page);
 
@@ -78,30 +78,39 @@ test("3D map initializes and layer switches remain in sync", async ({ page }) =>
   await expect(imagery).toBeChecked();
   await expect(roads).toBeChecked();
   await expect(buildings).toBeChecked();
-  await expect(
-    page.getByRole("button", { name: "Zoom in" }),
-  ).toBeEnabled();
-  await expect(
-    page.getByRole("button", { name: "Zoom out" }),
-  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled();
 
-  await imagery.uncheck();
+  // Change imagery and buildings separately from road requests. This keeps
+  // visibility assertions focused on the selected layer, not network timing.
+  await imagery.uncheck({ noWaitAfter: true });
   await expect(imagery).not.toBeChecked();
-  await imagery.check();
+  await imagery.check({ noWaitAfter: true });
   await expect(imagery).toBeChecked();
 
-  await roads.uncheck();
-  await expect(roads).not.toBeChecked();
-  await roads.check();
-  await expect(roads).toBeChecked();
-
-  await buildings.uncheck();
+  await buildings.uncheck({ noWaitAfter: true });
   await expect(buildings).not.toBeChecked();
-  await buildings.check();
+  await buildings.check({ noWaitAfter: true });
   await expect(buildings).toBeChecked();
 
-  expect(observed.buildings.length).toBeGreaterThan(0);
-  expect(observed.roads.length).toBeGreaterThan(0);
+  await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+});
+
+test("road visibility can be disabled and restored", async ({ page }) => {
+  const observed = await stubMapNetwork(page);
+  await openReadyMap(page);
+
+  const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  await roads.uncheck({ noWaitAfter: true });
+  await expect(roads).not.toBeChecked();
+
+  // Route the re-enable query to the deterministic empty response as well.
+  await roads.check({ noWaitAfter: true });
+  await expect(roads).toBeChecked();
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(1);
 });
 
 test("zooming and dragging the map request fresh road viewport bounds", async ({ page }) => {
@@ -142,7 +151,7 @@ test("zooming and dragging the map request fresh road viewport bounds", async ({
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(startX + 320, startY + 70, { steps: 10 });
+  await page.mouse.move(startX + 160, startY + 40);
   await page.mouse.up();
 
   await expect.poll(
