@@ -51,7 +51,7 @@ Example request:
 }
 ```
 
-Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload/ingest the media into the private workspace first; this API does not itself accept binary media uploads.
+Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload the media with `POST /api/building-generation/uploads` or ingest it through the local CLI first. Before writing a queued job, the server verifies that every source already exists under the private workspace, is a non-empty regular file with no symbolic-link path components, and is within the media-kind size limit. The generation worker still rechecks the actual file signature and checksum during intake; queue preflight is not a replacement for that validation. For API upload details and the 50 MiB request cap, see [Building Generation Engine](BUILDING-GENERATION-ENGINE.md#10-authenticated-media-upload-api).
 
 For photogrammetry, include at least three `viewSourceIds`, and explicitly set `confirmSameBuilding`, `confirmOverlapReviewed`, `confirmUpAxisReviewed`, and `upAxis`. For single-image AI inference, provide exactly one selected view and set `confirmSingleViewInference: true`. These flags are operator attestations, not independent proof.
 
