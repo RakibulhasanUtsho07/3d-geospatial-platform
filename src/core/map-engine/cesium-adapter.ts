@@ -16,6 +16,7 @@ import {
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
 import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
+import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
@@ -157,6 +158,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 export class CesiumAdapter implements MapEngine {
+  private initializationRevision = 0;
   private viewer: CesiumViewer | null = null;
   private cesium: CesiumModule | null = null;
   private heritageModel: import("cesium").Model | null = null;
@@ -272,9 +274,18 @@ export class CesiumAdapter implements MapEngine {
       );
     }
 
+    // Invalidate overlapping initialize() calls and allow destroy() to cancel
+    // an import that has not resolved yet.
+    const initializationRevision = ++this.initializationRevision;
     window.CESIUM_BASE_URL = "/cesium/";
 
     const Cesium = await import("cesium");
+    if (!shouldContinueMapInitialization(
+      initializationRevision,
+      this.initializationRevision,
+    )) {
+      return;
+    }
     this.cesium = Cesium;
 
     const viewer = new Cesium.Viewer(container, {
@@ -2947,6 +2958,9 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    // Invalidate a pending dynamic import before it can create a new viewer.
+    this.initializationRevision += 1;
+
     // Do not schedule React state updates during component teardown.
     this.ahsanManzilOrbitStoppedCallback = null;
     this.stopAhsanManzilOrbitTour();
