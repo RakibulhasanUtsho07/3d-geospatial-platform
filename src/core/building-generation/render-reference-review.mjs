@@ -209,6 +209,11 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       "spatialEdgeDistributionDistance", "activeEdgeCellJaccardDistance",
     ];
     const spatialMetricsPresent = spatialMetricKeys.some((key) => Object.hasOwn(metrics, key));
+    const localDifferenceMetricKeys = [
+      "spatialCellDiagnostics", "spatialCellMaeMedian", "spatialCellMaeMaximum",
+      "spatialCellMaeMedianGap", "highestDifferenceCells",
+    ];
+    const localDifferenceMetricsPresent = localDifferenceMetricKeys.some((key) => Object.hasOwn(metrics, key));
     const validHistogram = (histogram) => {
       if (!Array.isArray(histogram) || histogram.length !== 8 ||
         !histogram.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
@@ -305,6 +310,33 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       activeCellDistanceMatches(metrics.referenceSpatialActiveCells,
         metrics.candidateSpatialActiveCells, metrics.activeEdgeCellJaccardDistance)
     );
+    const localDifferenceMetricsValid = !localDifferenceMetricsPresent || (() => {
+      const cells = metrics.spatialCellDiagnostics;
+      if (!Array.isArray(cells) || cells.length !== 16 ||
+        !cells.every((cell, index) => cell && typeof cell === "object" &&
+          cell.cellX === index % 4 && cell.cellY === Math.floor(index / 4) &&
+          finite(cell.meanAbsoluteError) && cell.meanAbsoluteError >= 0 && cell.meanAbsoluteError <= 255 &&
+          finite(cell.meanSignedLuminanceOffset) && cell.meanSignedLuminanceOffset >= -255 &&
+          cell.meanSignedLuminanceOffset <= 255 &&
+          finite(cell.localSsim16x16) && cell.localSsim16x16 >= -1 && cell.localSsim16x16 <= 1)) return false;
+      const errorsByCell = cells.map((cell) => cell.meanAbsoluteError);
+      const ordered = [...errorsByCell].sort((left, right) => left - right);
+      const middle = ordered.length / 2;
+      const calculatedMedian = (ordered[middle - 1] + ordered[middle]) / 2;
+      const calculatedMaximum = Math.max(...errorsByCell);
+      const calculatedGap = calculatedMaximum - calculatedMedian;
+      if (!finite(metrics.spatialCellMaeMedian) || Math.abs(metrics.spatialCellMaeMedian - calculatedMedian) > 0.01 ||
+        !finite(metrics.spatialCellMaeMaximum) || Math.abs(metrics.spatialCellMaeMaximum - calculatedMaximum) > 0.01 ||
+        !finite(metrics.spatialCellMaeMedianGap) || Math.abs(metrics.spatialCellMaeMedianGap - calculatedGap) > 0.02) return false;
+      if (!Array.isArray(metrics.highestDifferenceCells) || metrics.highestDifferenceCells.length !== 4) return false;
+      const expected = cells
+        .map((cell) => ({ cellX: cell.cellX, cellY: cell.cellY, meanAbsoluteError: cell.meanAbsoluteError }))
+        .sort((left, right) => right.meanAbsoluteError - left.meanAbsoluteError ||
+          left.cellY - right.cellY || left.cellX - right.cellX)
+        .slice(0, 4);
+      return metrics.highestDifferenceCells.every((cell, index) =>
+        cell && cell.cellX === expected[index].cellX && cell.cellY === expected[index].cellY);
+    })();
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
       finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
@@ -316,6 +348,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       report.comparability.aspectRatioDifferencePercent >= 0 &&
       structureMetricsValid &&
       spatialMetricsValid &&
+      localDifferenceMetricsValid &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
     if (!candidateMatches || !referenceMatches || !metricsValid) continue;
@@ -360,6 +393,22 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
           candidateSpatialActiveCells: [...metrics.candidateSpatialActiveCells],
           spatialEdgeDistributionDistance: metrics.spatialEdgeDistributionDistance,
           activeEdgeCellJaccardDistance: metrics.activeEdgeCellJaccardDistance,
+        } : {}),
+        ...(localDifferenceMetricsPresent ? {
+          spatialCellDiagnostics: metrics.spatialCellDiagnostics.map((cell) => ({
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+            meanAbsoluteError: cell.meanAbsoluteError,
+            meanSignedLuminanceOffset: cell.meanSignedLuminanceOffset,
+            localSsim16x16: cell.localSsim16x16,
+          })),
+          spatialCellMaeMedian: metrics.spatialCellMaeMedian,
+          spatialCellMaeMaximum: metrics.spatialCellMaeMaximum,
+          spatialCellMaeMedianGap: metrics.spatialCellMaeMedianGap,
+          highestDifferenceCells: metrics.highestDifferenceCells.map((cell) => ({
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+          })),
         } : {}),
       },
       comparability: {
