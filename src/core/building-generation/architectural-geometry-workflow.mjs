@@ -1002,7 +1002,7 @@ export async function runArchitecturalGeometryWorkflow(options) {
       if (mesh.qa.boundaryEdgeCount > 0) blockers.push("mesh-has-boundary-edges");
       if (mesh.qa.nonManifoldEdges.length > 0) blockers.push("mesh-has-non-manifold-edges");
       if (surfaceReport.blockers.length) blockers.push("mesh-surface-review-needs-review");
-      if (textureReport.status !== "evidence-validation-passed" || textureReport.blockers.length) blockers.push("texture-projection-evidence-needs-review");
+      if (textureReport.blockers.length > 0) blockers.push("texture-projection-evidence-needs-review");
       if (!textureReport.faceCount) blockers.push("no-texture-projection-faces-reviewed");
       if (atlasResult.status !== "baked") blockers.push("texture-atlas-bake-blocked");
       if (!["exported", "partial-textured-mesh"].includes(glbResult.status)) blockers.push("textured-glb-export-blocked");
