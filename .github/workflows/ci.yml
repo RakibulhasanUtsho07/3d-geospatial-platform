@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
       - rakibul-hasan
@@ -86,6 +87,9 @@ jobs:
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
+
+      - name: Test reviewed generated-model catalog publishing and rollback
+        run: npm run test:published-model-catalog
 
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
