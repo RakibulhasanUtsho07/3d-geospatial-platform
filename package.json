@@ -116,7 +116,8 @@
     "publish:building-model": "node scripts/publish-reviewed-building-model.mjs",
     "activate:building-model-version": "node scripts/activate-published-model-version.mjs",
     "test:publish-approved-generation-job": "node --test tests/publish-approved-generation-job.test.mjs",
-    "publish:approved-generation-job": "node scripts/publish-approved-generation-job.mjs"
+    "publish:approved-generation-job": "node scripts/publish-approved-generation-job.mjs",
+    "test:generation-media-upload": "node --test tests/generation-media-upload.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
