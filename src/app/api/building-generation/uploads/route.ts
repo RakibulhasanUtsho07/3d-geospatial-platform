@@ -6,9 +6,6 @@ import {
   MAX_GENERATION_MEDIA_UPLOAD_BYTES,
 } from "@/core/building-generation/generation-media-upload.mjs";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 const MAX_MULTIPART_OVERHEAD_BYTES = 128 * 1024;
 const MAX_REQUEST_BODY_BYTES = MAX_GENERATION_MEDIA_UPLOAD_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
 
