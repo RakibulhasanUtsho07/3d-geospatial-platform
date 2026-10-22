@@ -108,7 +108,10 @@
     "test:reconstruction-job-state": "node --test tests/reconstruction-job-state.test.mjs",
     "test:architectural-geometry-workflow": "node --test tests/architectural-geometry-workflow.test.mjs",
     "test:textured-glb-export": "node --test tests/textured-glb-export.test.mjs",
-    "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs"
+    "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
+    "test:published-model-catalog": "node --test tests/published-model-catalog.test.mjs",
+    "publish:building-model": "node scripts/publish-reviewed-building-model.mjs",
+    "activate:building-model-version": "node scripts/activate-published-model-version.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
