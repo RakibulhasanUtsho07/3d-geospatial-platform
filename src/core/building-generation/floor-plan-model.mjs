@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const EPSILON = 1e-8;
 const MATERIALS = [
   { key: "wall", name: "Interior Wall", color: "#E5E0D6", roughness: 0.9 },
@@ -349,8 +348,6 @@ function createGeometry() {
 }
 
 function addFloorSlab(geometry, room, y, thickness) {
-  const top = room.polygon.map((p) => [p.x, y, p.z]);
-  const bottom = room.polygon.map((p) => [p.x, y - thickness, p.z]);
   const triangles = triangulate(room.polygon, "room '" + room.id + "'");
   for (const tri of triangles) {
     geometry.triangle("floor", [tri[0].x, y, tri[0].z], [tri[1].x, y, tri[1].z], [tri[2].x, y, tri[2].z], [0, 1, 0]);
