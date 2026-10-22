@@ -16,7 +16,8 @@ Every completed result keeps `mapReady=false` and `publicationEligible=false`. A
 
 Set these server-side environment variables:
 
-- `GENERATION_API_TOKEN`: a secret bearer token of at least 32 characters. Never expose it to browser JavaScript or commit it to Git.
+- `GENERATION_API_TOKEN`: a secret bearer token of at least 32 characters for creating/listing generation jobs. Never expose it to browser JavaScript or commit it to Git.
+- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.
 - `BUILDING_ENGINE_WORKSPACE`: an existing, writable directory shared by the Next.js server and generation worker. Keep this workspace private.
 - Optional worker settings: `BUILDING_ENGINE_QUALITY` (`LOW`, `MEDIUM`, `HIGH` or `EXTREME`), `BUILDING_ENGINE_COLMAP_PATH`, `BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT`, `BUILDING_ENGINE_PYTHON_EXECUTABLE`, and `BUILDING_ENGINE_DEVICE`.
 
@@ -28,7 +29,8 @@ All routes require `Authorization: Bearer <GENERATION_API_TOKEN>`. If the secret
 
 - `POST /api/building-generation/jobs` — enqueue a JSON request and return HTTP 202.
 - `GET /api/building-generation/jobs?limit=20` — list up to 100 recent jobs.
-- `GET /api/building-generation/jobs/<jobId>` — retrieve status/result/error for a job.
+- `GET /api/building-generation/jobs/<jobId>` — retrieve status/result/error/review summary for a job.
+- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.
 
 Example request:
 
@@ -52,6 +54,33 @@ Example request:
 Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload/ingest the media into the private workspace first; this API does not itself accept binary media uploads.
 
 For photogrammetry, include at least three `viewSourceIds`, and explicitly set `confirmSameBuilding`, `confirmOverlapReviewed`, `confirmUpAxisReviewed`, and `upAxis`. For single-image AI inference, provide exactly one selected view and set `confirmSingleViewInference: true`. These flags are operator attestations, not independent proof.
+
+
+## Record a human review
+
+Send a review decision only after inspecting the GLB candidate and its QA report. The request must provide an operator label, explanatory notes, and an explicit boolean for each check:
+
+```json
+{
+  "decision": "approved",
+  "reviewer": "operator-handle",
+  "notes": "Reviewed the candidate and supporting evidence.",
+  "checks": {
+    "rightsVerified": true,
+    "sourceIdentityVerified": true,
+    "architectureReviewed": true,
+    "metricScaleVerified": true,
+    "horizontalGeoreferenceVerified": true,
+    "verticalDatumVerified": true,
+    "qaReportReviewed": true
+  }
+}
+```
+
+Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
+
+The review API writes an audit record under the private job workspace and returns its hash. It deliberately **does not** set `mapReady` or `publicationEligible` to true, and it does not publish. The separate publication CLI still requires a catalog placement and its own evidence-backed attestation. The `reviewer` value is an operator-supplied label, not an identity-provider-verified account; the review token grants review permission to anyone who holds it.
+
 
 ## Run the worker
 
