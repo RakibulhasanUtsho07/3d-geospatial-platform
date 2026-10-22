@@ -44,9 +44,7 @@ test("CLI writes a GLB and report and marks original-source hash as verified onl
   const report = JSON.parse(await readFile(outputPath + ".report.json", "utf8"));
   assert.equal(glb.readUInt32LE(0), 0x46546c67);
   assert.equal(report.input.sourceEvidenceVerified, true);
-  assert.equal(report.input.verifiedSourceSha256, fixture.source.sha256 === report.input.verifiedSourceSha256
-    ? fixture.source.sha256
-    : createHash("sha256").update(sourceBytes).digest("hex"));
+  assert.equal(report.input.verifiedSourceSha256, createHash("sha256").update(sourceBytes).digest("hex"));
   assert.ok(!report.warnings.some((warning) => warning.startsWith("A source SHA-256 is metadata")));
   assert.equal(report.mapReady, false);
   assert.equal(report.publicationEligible, false);
