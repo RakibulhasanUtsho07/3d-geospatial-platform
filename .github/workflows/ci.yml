@@ -91,6 +91,9 @@ jobs:
       - name: Test reviewed generated-model catalog publishing and rollback
         run: npm run test:published-model-catalog
 
+      - name: Test approved generation review to explicit map publication
+        run: npm run test:publish-approved-generation-job
+
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
