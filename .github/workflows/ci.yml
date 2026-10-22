@@ -177,6 +177,9 @@ jobs:
       - name: Test render/reference image similarity diagnostics
         run: npm run test:render-image-similarity-diagnostics
 
+      - name: Test bounded batch render/reference diagnostic planning
+        run: npm run test:render-reference-batch
+
       - name: Test evidence-linked similarity diagnostics in the reference-review workflow
         run: npm run test:render-reference-diagnostics-attachment
       - name: Test evidence-linked render correction task backlog
