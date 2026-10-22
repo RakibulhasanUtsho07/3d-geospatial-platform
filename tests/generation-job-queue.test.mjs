@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -58,6 +58,74 @@ test("rejects source path traversal, unknown licence, and missing rights attesta
     workspaceRoot,
     input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0" }], confirmRights: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
   }), /at least three selected/);
+});
+
+test("rejects missing source media before creating a queue job", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  await assert.rejects(
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    /does not exist in workspaceRoot/,
+  );
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot, limit: 5 }), []);
+});
+
+test("rejects symlinked sources and sources that are not regular files", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  const outside = path.join(workspaceRoot, "outside.png");
+  await writeFile(outside, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
+  await symlink(outside, path.join(workspaceRoot, "uploads", "front.png"));
+  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  await assert.rejects(
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    /symbolic links/,
+  );
+  await rm(path.join(workspaceRoot, "uploads", "front.png"));
+  await assert.rejects(
+    enqueueGenerationJob({
+      workspaceRoot,
+      input: basicInput({
+        sources: [{ ...source, relativePath: "uploads" }],
+        confirmRights: true,
+      }),
+    }),
+    /regular file/,
+  );
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot, limit: 5 }), []);
+});
+
+test("accepts existing media files and rejects empty or oversized sources", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  const filePath = path.join(workspaceRoot, "uploads", "front.png");
+  await writeFile(filePath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
+  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const job = await enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({ sources: [source], confirmRights: true }),
+  });
+  assert.equal(job.status, "queued");
+
+  const emptyPath = path.join(workspaceRoot, "uploads", "empty.png");
+  await writeFile(emptyPath, Buffer.alloc(0));
+  await assert.rejects(
+    enqueueGenerationJob({
+      workspaceRoot,
+      input: basicInput({
+        sources: [{ ...source, sourceId: "empty", relativePath: "uploads/empty.png" }],
+        confirmRights: true,
+      }),
+    }),
+    /is empty/,
+  );
+
+  await truncate(filePath, 20 * 1024 * 1024 + 1);
+  await assert.rejects(
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    /exceeds the 20971520-byte image intake limit/,
+  );
+  assert.equal((await listGenerationJobs({ workspaceRoot, limit: 5 })).length, 1);
 });
 
 test("claims, completes and records a fail-closed review candidate", async (t) => {
