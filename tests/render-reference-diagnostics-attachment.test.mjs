@@ -42,7 +42,7 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       candidateToReferenceSharpnessRatio: 0.84,
       referenceEdgeOrientationHistogram: [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1],
       candidateEdgeOrientationHistogram: [0.15, 0.1, 0.1, 0.15, 0.2, 0.1, 0.1, 0.1],
-      edgeOrientationHistogramDistance: 0.12,
+      edgeOrientationHistogramDistance: 0.05,
     },
     warnings,
     policy: {
@@ -129,7 +129,7 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.reviewStatus, "reviewer-reported-matches");
   assert.equal(report.comparisons[0].outcome, "match");
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.localSsim8x8, 0.83);
-  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.edgeOrientationHistogramDistance, 0.12);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.edgeOrientationHistogramDistance, 0.05);
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.candidateToReferenceSharpnessRatio, 0.84);
   assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.referenceEdgeOrientationHistogram,
     [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1]);
