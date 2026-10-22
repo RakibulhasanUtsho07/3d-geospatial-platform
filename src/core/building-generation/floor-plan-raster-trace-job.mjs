@@ -101,6 +101,10 @@ export async function traceFloorPlanImageSource({ workspaceRoot, buildingId, sou
     throw error;
   }
   if (loaded.bytes > 50 * 1024 * 1024) throw new RangeError("source exceeds the 50 MiB decoded image input limit.");
+  const maxEdge = options.maxEdge ?? 2048;
+  if (!Number.isSafeInteger(maxEdge) || maxEdge < 256 || maxEdge > 4096) {
+    throw new RangeError("maxEdge must be an integer between 256 and 4096.");
+  }
 
   const sourceBytes = await readFile(loaded.assetPath);
   if (sha256(sourceBytes) !== loaded.sha256) {
@@ -122,8 +126,8 @@ export async function traceFloorPlanImageSource({ workspaceRoot, buildingId, sou
       .rotate()
       .greyscale()
       .resize({
-        width: options.maxEdge ?? 2048,
-        height: options.maxEdge ?? 2048,
+        width: maxEdge,
+        height: maxEdge,
         fit: "inside",
         withoutEnlargement: true,
       })
