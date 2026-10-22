@@ -320,6 +320,9 @@ jobs:
       - name: Build production app
         run: npm run build
 
+      - name: Install Chromium for map browser integration tests
+        run: npx playwright install chromium
+
       - name: Verify viewport API against the production server
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
@@ -465,3 +468,4 @@ jobs:
           NODE
 
           npm run test:geospatial-api
+          npm run test:map-browser

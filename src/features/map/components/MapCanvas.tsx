@@ -687,6 +687,7 @@ export default function MapCanvas({
       {/* This ref belongs to the same component as the initialization effect. */}
       <div
         ref={containerRef}
+        data-testid="cesium-map-container"
         className="absolute inset-0"
       />
 
