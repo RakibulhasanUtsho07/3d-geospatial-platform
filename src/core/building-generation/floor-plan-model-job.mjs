@@ -243,8 +243,19 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
       report.input?.floorPlanId === undefined ||
       report.output?.format !== "glb" ||
       typeof report.output?.sha256 !== "string" ||
-      !/^[a-f0-9]{64}$/.test(report.output.sha256)) {
+      !/^[a-f0-9]{64}$/.test(report.output.sha256) ||
+      typeof report.input?.verifiedSourceSha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(report.input.verifiedSourceSha256) ||
+      typeof report.input?.normalizedGeometrySha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(report.input.normalizedGeometrySha256)) {
     throw new TypeError("Floor-plan candidate report is invalid.");
+  }
+  const planBytes = await readCandidateFile(directory, "floor-plan.json", 2 * 1024 * 1024);
+  const plan = JSON.parse(planBytes.toString("utf8"));
+  if (!plan || typeof plan !== "object" || plan.id !== report.input.floorPlanId ||
+      plan.buildingId !== bid || plan.source?.sha256 !== report.input.verifiedSourceSha256 ||
+      sha256(planBytes) !== report.input.normalizedGeometrySha256) {
+    throw new TypeError("Floor-plan candidate geometry checksum or identity does not match its report.");
   }
   const modelBytes = await readCandidateFile(directory, "model.glb", 200 * 1024 * 1024);
   const actualSha256 = sha256(modelBytes);
@@ -256,7 +267,10 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
   return {
     candidateId: cid,
     buildingId: bid,
+    plan,
     report,
+    reportSha256: sha256(reportBytes),
+    geometrySha256: report.input.normalizedGeometrySha256,
     modelBytes,
     modelSha256: actualSha256,
     mapReady: false,
