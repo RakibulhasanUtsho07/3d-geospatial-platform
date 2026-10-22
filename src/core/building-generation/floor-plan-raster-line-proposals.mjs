@@ -4,6 +4,7 @@ import sharp from "sharp";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_SOURCE_PIXELS = 40_000_000;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_RUN_SEGMENTS_PER_AXIS = 50_000;
 const SHA256 = /^[a-f0-9]{64}$/i;
 
 function clamp(value, min, max) {
@@ -84,6 +85,9 @@ function scanHorizontalRuns(mask, width, height, minimumLength) {
       while (x < width && mask[rowStart + x] !== 0) x += 1;
       if (x - start >= minimumLength) {
         runs.push({ fixed: y, start, end: x - 1, length: x - start });
+        if (runs.length > MAX_RUN_SEGMENTS_PER_AXIS) {
+          throw new RangeError("Raster contains too many horizontal fragments; increase minLineLengthPx or reduce maxDimension.");
+        }
       }
     }
   }
@@ -100,6 +104,9 @@ function scanVerticalRuns(mask, width, height, minimumLength) {
       while (y < height && mask[y * width + x] !== 0) y += 1;
       if (y - start >= minimumLength) {
         runs.push({ fixed: x, start, end: y - 1, length: y - start });
+        if (runs.length > MAX_RUN_SEGMENTS_PER_AXIS) {
+          throw new RangeError("Raster contains too many vertical fragments; increase minLineLengthPx or reduce maxDimension.");
+        }
       }
     }
   }
@@ -115,22 +122,48 @@ function overlapRatio(aStart, aEnd, bStart, bEnd) {
 function mergeRuns(runs, mergeGapPx) {
   const ordered = runs.slice().sort((a, b) => a.fixed - b.fixed || a.start - b.start);
   const clusters = [];
+  const active = new Map();
+  const bucketSize = 32;
+  const bucketFor = (fixed, start) => fixed + ":" + Math.floor(start / bucketSize);
+  function removeActive(cluster) {
+    const key = bucketFor(cluster.lastFixed, cluster.bucketStart);
+    const bucket = active.get(key);
+    if (!bucket) return;
+    const index = bucket.indexOf(cluster);
+    if (index >= 0) bucket.splice(index, 1);
+    if (bucket.length === 0) active.delete(key);
+  }
+  function addActive(cluster) {
+    cluster.bucketStart = Math.floor(cluster.start / bucketSize) * bucketSize;
+    const key = bucketFor(cluster.lastFixed, cluster.bucketStart);
+    if (!active.has(key)) active.set(key, []);
+    active.get(key).push(cluster);
+  }
+
   for (const run of ordered) {
     let best = null;
     let bestScore = 0;
-    for (let index = clusters.length - 1; index >= 0; index -= 1) {
-      const cluster = clusters[index];
-      if (run.fixed - cluster.lastFixed > mergeGapPx + 1) break;
-      const overlap = overlapRatio(run.start, run.end, cluster.start, cluster.end);
-      if (overlap < 0.55) continue;
-      const score = overlap - Math.abs(((run.start + run.end) / 2) - ((cluster.start + cluster.end) / 2)) / 100000;
-      if (score > bestScore) {
-        best = cluster;
-        bestScore = score;
+    const currentBucket = Math.floor(run.start / bucketSize);
+    const firstFixed = Math.max(0, run.fixed - mergeGapPx - 1);
+    for (let fixed = firstFixed; fixed <= run.fixed; fixed += 1) {
+      for (let bin = Math.max(0, currentBucket - 1); bin <= currentBucket + 1; bin += 1) {
+        const bucket = active.get(fixed + ":" + (bin * bucketSize)) ?? [];
+        for (const cluster of bucket) {
+          const overlap = overlapRatio(run.start, run.end, cluster.start, cluster.end);
+          if (overlap < 0.55) continue;
+          const score = overlap - Math.abs(
+            ((run.start + run.end) / 2) - ((cluster.start + cluster.end) / 2),
+          ) / 100000;
+          if (score > bestScore) {
+            best = cluster;
+            bestScore = score;
+          }
+        }
       }
     }
+
     if (!best) {
-      clusters.push({
+      const cluster = {
         fixedMin: run.fixed,
         fixedMax: run.fixed,
         lastFixed: run.fixed,
@@ -138,10 +171,13 @@ function mergeRuns(runs, mergeGapPx) {
         end: run.end,
         runCount: 1,
         totalLength: run.length,
-        lengthSamples: [run.length],
-      });
+      };
+      clusters.push(cluster);
+      addActive(cluster);
       continue;
     }
+
+    removeActive(best);
     best.fixedMin = Math.min(best.fixedMin, run.fixed);
     best.fixedMax = Math.max(best.fixedMax, run.fixed);
     best.lastFixed = run.fixed;
@@ -149,7 +185,7 @@ function mergeRuns(runs, mergeGapPx) {
     best.end = Math.max(best.end, run.end);
     best.runCount += 1;
     best.totalLength += run.length;
-    best.lengthSamples.push(run.length);
+    addActive(best);
   }
   return clusters;
 }
