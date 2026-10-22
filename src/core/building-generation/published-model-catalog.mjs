@@ -55,6 +55,44 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function assertPlausibleGlb2(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 24 || bytes.toString("ascii", 0, 4) !== "glTF" ||
+    bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) {
+    throw new Error("Candidate must be a structurally plausible GLB 2.0 file.");
+  }
+  let offset = 12;
+  let jsonSeen = false;
+  while (offset < bytes.length) {
+    if (offset + 8 > bytes.length) throw new Error("Candidate GLB has a truncated chunk header.");
+    const chunkLength = bytes.readUInt32LE(offset);
+    const chunkType = bytes.readUInt32LE(offset + 4);
+    const chunkStart = offset + 8;
+    const chunkEnd = chunkStart + chunkLength;
+    if (chunkLength % 4 !== 0 || chunkEnd > bytes.length) {
+      throw new Error("Candidate GLB has an invalid or truncated chunk.");
+    }
+    if (!jsonSeen) {
+      if (chunkType !== 0x4e4f534a || chunkLength === 0) {
+        throw new Error("Candidate GLB must begin with a JSON chunk.");
+      }
+      let json;
+      try {
+        json = JSON.parse(bytes.toString("utf8", chunkStart, chunkEnd).trimEnd());
+      } catch {
+        throw new Error("Candidate GLB JSON chunk is invalid.");
+      }
+      if (!isRecord(json) || !isRecord(json.asset) || json.asset.version !== "2.0") {
+        throw new Error("Candidate GLB must declare asset.version 2.0.");
+      }
+      jsonSeen = true;
+    } else if (chunkType === 0x4e4f534a) {
+      throw new Error("Candidate GLB must not contain multiple JSON chunks.");
+    }
+    offset = chunkEnd;
+  }
+  if (!jsonSeen || offset !== bytes.length) throw new Error("Candidate GLB chunk boundaries do not match its declared length.");
+}
+
 function validateReview(review, label, options = {}) {
   if (!isRecord(review)) throw new TypeError(label + ".review must be an object.");
   if (!nonEmptyString(review.reviewer) || review.reviewer.length > 200) {
@@ -236,10 +274,7 @@ export async function publishReviewedBuildingModel({
   const candidate = await resolveWorkspaceFile(root, candidatePath, "candidatePath", true);
   const attestationFile = await resolveWorkspaceFile(root, attestationPath, "attestationPath", true);
   const candidateBytes = await readFile(candidate.real);
-  if (candidateBytes.length < 12 || candidateBytes.toString("ascii", 0, 4) !== "glTF" ||
-    candidateBytes.readUInt32LE(4) !== 2 || candidateBytes.readUInt32LE(8) !== candidateBytes.length) {
-    throw new Error("Candidate must be a structurally plausible GLB 2.0 file.");
-  }
+  assertPlausibleGlb2(candidateBytes);
   const actualCandidateHash = sha256(candidateBytes);
   const attestation = JSON.parse(await readFile(attestationFile.real, "utf8"));
   if (!isRecord(attestation) || attestation.schemaVersion !== "1.0.0") {
@@ -297,7 +332,10 @@ export async function publishReviewedBuildingModel({
   const assetUrl = "/models/generated/" + assetName;
   const destination = path.join(catalogDir, assetName);
   try {
-    await lstat(destination);
+    const existingStat = await lstat(destination);
+    if (!existingStat.isFile() || existingStat.isSymbolicLink()) {
+      throw new Error("Existing versioned asset is not a regular file.");
+    }
     const existingBytes = await readFile(destination);
     if (sha256(existingBytes) !== actualCandidateHash) {
       throw new Error("Refusing to overwrite an existing versioned GLB whose bytes do not match its filename.");
