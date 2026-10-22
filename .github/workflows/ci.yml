@@ -254,6 +254,9 @@ jobs:
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
+      - name: Test dynamic map performance telemetry and baseline aggregation
+        run: npm run test:map-performance
+
       - name: Test map initialization cancellation policy
         run: npm run test:map-initialization-policy
 
