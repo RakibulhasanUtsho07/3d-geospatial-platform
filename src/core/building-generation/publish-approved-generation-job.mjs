@@ -186,7 +186,7 @@ export async function publishApprovedGenerationJob({ workspaceRoot, jobId, place
       evidencePath: reviewPath,
       evidenceSha256: recordSha256,
       checks: reviewChecks,
-      notes: record.notes + "\nGeneration QA report SHA-256: " + reportHash,
+      notes: record.notes,
     },
   };
 
