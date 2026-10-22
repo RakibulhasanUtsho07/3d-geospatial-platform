@@ -56,6 +56,30 @@ Use a complete valid BuildingSpec. For supplied media, each source must have a u
 For photogrammetry, include at least three `viewSourceIds`, and explicitly set `confirmSameBuilding`, `confirmOverlapReviewed`, `confirmUpAxisReviewed`, and `upAxis`. For single-image AI inference, provide exactly one selected view and set `confirmSingleViewInference: true`. These flags are operator attestations, not independent proof.
 
 
+## Upload first, then queue the source
+
+The upload response contains `source.relativePath`. Copy that exact workspace-relative value into the generation request; do not guess or reconstruct the content-addressed asset path. Keep the uploaded `sourceId` the same in both requests.
+
+Example request shape (replace the placeholder with the exact path returned by the upload API and use your complete, validated BuildingSpec):
+
+```json
+{
+  "buildingSpec": { "...": "complete BuildingSpec fields" },
+  "strategy": "procedural",
+  "sources": [
+    {
+      "sourceId": "front-photo",
+      "relativePath": ".building-engine/media/dhaka-demo/assets/<sha256-returned-by-upload>.jpg",
+      "kind": "image",
+      "licence": "CC BY 4.0"
+    }
+  ],
+  "confirmRights": true
+}
+```
+
+The JSON above is a shape example, not a ready-to-submit BuildingSpec. The placeholder path must be replaced with the exact `source.relativePath` from the upload response; the queue will reject a missing file before writing a job. Check the file source's actual reuse rights before setting `confirmRights: true`.
+
 ## Record a human review
 
 Send a review decision only after inspecting the GLB candidate and its QA report. The request must provide an operator label, explanatory notes, and an explicit boolean for each check:
