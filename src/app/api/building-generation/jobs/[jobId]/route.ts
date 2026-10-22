@@ -7,7 +7,6 @@ import {
 } from "@/core/building-generation/generation-api-auth.mjs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ jobId: string }> };
 
