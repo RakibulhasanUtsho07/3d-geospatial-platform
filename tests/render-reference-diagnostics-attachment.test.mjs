@@ -43,6 +43,18 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       referenceEdgeOrientationHistogram: [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1],
       candidateEdgeOrientationHistogram: [0.15, 0.1, 0.1, 0.15, 0.2, 0.1, 0.1, 0.1],
       edgeOrientationHistogramDistance: 0.05,
+      referenceSpatialEdgePixelCount: 200,
+      candidateSpatialEdgePixelCount: 190,
+      referenceSpatialActiveEdgeCellCount: 4,
+      candidateSpatialActiveEdgeCellCount: 4,
+      referenceSpatialEdgeCoverage: 0.25,
+      candidateSpatialEdgeCoverage: 0.25,
+      referenceSpatialEdgeDistribution: [0.25, 0.25, 0.25, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      candidateSpatialEdgeDistribution: [0.25, 0.25, 0.25, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      referenceSpatialActiveCells: [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false],
+      candidateSpatialActiveCells: [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false],
+      spatialEdgeDistributionDistance: 0,
+      activeEdgeCellJaccardDistance: 0,
     },
     warnings,
     policy: {
@@ -133,6 +145,10 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.candidateToReferenceSharpnessRatio, 0.84);
   assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.referenceEdgeOrientationHistogram,
     [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1]);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.spatialEdgeDistributionDistance, 0);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.activeEdgeCellJaccardDistance, 0);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.referenceSpatialEdgeCoverage, 0.25);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.referenceSpatialEdgeDistribution.length, 16);
   assert.equal(report.comparisons[0].similarityDiagnostics.renderSha256, frontRenderHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.referenceSha256, referenceHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.automaticMatch, false);
@@ -199,6 +215,24 @@ test("rejects malformed edge-structure metrics instead of attaching untrusted va
   const input = fixture();
   const badMetric = diagnostic();
   badMetric.metrics.edgeOrientationHistogramDistance = 1.25;
+  const report = buildRenderReferenceReview({
+    ...input,
+    similarityDiagnostics: [{
+      viewId: "front",
+      referenceImageId: "reference-front-01",
+      report: badMetric,
+      reportSha256: "f".repeat(64),
+    }],
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
+  assert.equal(report.comparisons[0].similarityDiagnostics, null);
+});
+
+test("rejects malformed spatial edge-layout evidence and inconsistent derived distances", () => {
+  const input = fixture();
+  const badMetric = diagnostic();
+  badMetric.metrics.referenceSpatialEdgeDistribution = [1.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   const report = buildRenderReferenceReview({
     ...input,
     similarityDiagnostics: [{
