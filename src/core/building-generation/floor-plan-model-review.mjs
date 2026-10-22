@@ -354,8 +354,8 @@ function catalogAttestation({ record, candidate, publication }) {
       reviewer: record.reviewer,
       reviewedAt: record.reviewedAt,
       evidenceId: record.reviewId,
-      evidencePath: input.evidencePath,
-      evidenceSha256: input.evidenceSha256,
+      evidencePath: record.evidence.path,
+      evidenceSha256: record.evidence.sha256,
       checks: Object.fromEntries([
         "rightsVerified",
         "sourceIdentityVerified",
