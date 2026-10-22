@@ -1083,12 +1083,12 @@ export class CesiumAdapter implements MapEngine {
         if (this.activeViewportEndpoint === activeEndpoint) {
           this.activeViewportEndpoint = null;
         }
-  
+
         this.viewportLoadInProgress = false;
-  
+
         const pendingRequest = this.pendingViewportRequest;
         this.pendingViewportRequest = null;
-  
+
         // Always service the latest queued camera intent, even if its predecessor
         // was cancelled or failed. A null-bounds request means the wide view needs
         // the full pilot dataset; never downgrade it to a bounded viewport.
