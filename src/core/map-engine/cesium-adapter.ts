@@ -13,6 +13,7 @@ import {
 import {
   shouldAbortViewportRequest,
   shouldContinueViewportLoad,
+  shouldContinueViewportStage,
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
 import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
@@ -251,6 +252,7 @@ export class CesiumAdapter implements MapEngine {
   private loadedViewportFeatureLimit: number | null = null;
   private hasLoadedBuildings = false;
   private viewportLoadInProgress = false;
+  private viewportLoadToken = 0;
   private activeViewportEndpoint: string | null = null;
   private viewportRequestAbortController: AbortController | null = null;
   // Invalidates payloads that have left fetch but are still staging as Cesium entities.
@@ -664,6 +666,7 @@ export class CesiumAdapter implements MapEngine {
     }
 
     this.viewportLoadInProgress = true;
+    const loadToken = ++this.viewportLoadToken;
     const requestRevision = this.viewportIntentRevision;
     let stagedDataSource: CesiumDataSource | null = null;
     let activeEndpoint: string | null = null;
@@ -734,106 +737,29 @@ export class CesiumAdapter implements MapEngine {
 
       // Cancel network work only until the payload is ready. After that, stage
       // the data source and coalesce later camera moves into a single follow-up.
-      if (this.viewportRequestAbortController === requestController) {
-        this.viewportRequestAbortController = null;
-      }
-
-      console.info("[Overture] Viewport API response received.", {
-        dataSource: responseHeaders?.get("X-Building-Data-Source"),
-        selectedTiles: responseHeaders?.get("X-Building-Tile-Count"),
-        candidateFeatures: responseHeaders?.get(
-          "X-Building-Candidate-Feature-Count",
-        ),
-        matchedFeatures: responseHeaders?.get(
-          "X-Building-Matched-Feature-Count",
-        ),
-        returnedFeatures: responseHeaders?.get("X-Building-Feature-Count"),
-        featureLimit: responseHeaders?.get("X-Building-Feature-Limit"),
-        truncated: responseHeaders?.get("X-Building-Truncated"),
-        tileCacheHits: responseHeaders?.get("X-Building-Tile-Cache-Hits"),
-      });
-
-      if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
-      ) {
-        return;
-      }
-
-      const dataSource = await Cesium.GeoJsonDataSource.load(
-        geoJson as Parameters<
-          typeof Cesium.GeoJsonDataSource.load
-        >[0],
-        {
-          clampToGround: false,
-          stroke: Cesium.Color.fromCssColorString(
-            WALL_OUTLINE_COLOR,
+      // An old load may finish after destroy() and a re-initialize on the same
+      // adapter instance. Only the load that still owns this token may mutate
+      // shared in-flight state or dispatch the newest queued viewport.
+      if (this.viewportLoadToken === loadToken) {
+        if (this.viewportRequestAbortController === requestController) {
+          this.viewportRequestAbortController = null;
+        }
+  
+        console.info("[Overture] Viewport API response received.", {
+          dataSource: responseHeaders?.get("X-Building-Data-Source"),
+          selectedTiles: responseHeaders?.get("X-Building-Tile-Count"),
+          candidateFeatures: responseHeaders?.get(
+            "X-Building-Candidate-Feature-Count",
           ),
-          strokeWidth: 1,
-          fill: Cesium.Color.fromCssColorString("#d2d8dc"),
-        },
-      );
-
-      if (!this.isViewportLoadCurrent(requestRevision)) return;
-
-      if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
-      ) {
-        return;
-      }
-
-      dataSource.name = requestedBounds
-        ? "Overture 3D Viewport Buildings"
-        : "Overture 3D Pilot Buildings";
-      // Stage the next viewport invisibly so the current view stays usable.
-      dataSource.show = false;
-      await viewer.dataSources.add(dataSource);
-      stagedDataSource = dataSource;
-
-      // Hiding the layer or queuing a different viewport while Cesium was
-      // staging this datasource makes it obsolete; finally removes it safely.
-      if (!this.isViewportLoadCurrent(requestRevision)) return;
-
-      if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
-      ) {
-        viewer.dataSources.remove(dataSource, true);
-        return;
-      }
-
-      const time = Cesium.JulianDate.now();
-      const entities = [...dataSource.entities.values];
-      const lodRecords: BuildingLodRecord[] = [];
-      this.lodGraphicsCacheMetrics = {
-        polygonStyleCachesCreated: 0,
-        detailedWallsCreated: 0,
-        detailedWallCacheHits: 0,
-        roofEquipmentCreated: 0,
-        roofEquipmentCacheHits: 0,
-      };
-
-      let renderedBuildings = 0;
-      let renderedParts = 0;
-      let renderedExtrusions = 0;
-      let hiddenParents = 0;
-      let hiddenUnderground = 0;
-      let invalidPolygons = 0;
-
-      console.info(
-        "[Overture] Building features loaded; preparing lightweight geometry...",
-        { totalFeatures: entities.length },
-      );
-
-      for (
-        let start = 0;
-        start < entities.length;
-        start += BATCH_SIZE
-      ) {
+          matchedFeatures: responseHeaders?.get(
+            "X-Building-Matched-Feature-Count",
+          ),
+          returnedFeatures: responseHeaders?.get("X-Building-Feature-Count"),
+          featureLimit: responseHeaders?.get("X-Building-Feature-Limit"),
+          truncated: responseHeaders?.get("X-Building-Truncated"),
+          tileCacheHits: responseHeaders?.get("X-Building-Tile-Cache-Hits"),
+        });
+  
         if (
           !this.viewer ||
           this.viewer !== viewer ||
@@ -841,272 +767,365 @@ export class CesiumAdapter implements MapEngine {
         ) {
           return;
         }
-
-        const batch = entities.slice(start, start + BATCH_SIZE);
-        dataSource.entities.suspendEvents();
-
-        try {
-          for (const entity of batch) {
-            const polygon = entity.polygon;
-
-            if (!polygon) {
-              continue;
-            }
-
-            const properties = this.readProperties(entity, time);
-
-            if (this.isUnderground(properties)) {
-              entity.show = false;
-              hiddenUnderground += 1;
-              continue;
-            }
-
-            const role =
-              typeof properties._renderRole === "string"
-                ? properties._renderRole
-                : "building";
-            const partCount =
-              this.getPositiveNumber(properties, ["_renderPartCount"]) ?? 0;
-
-            // Avoid drawing a parent and its supplied building parts together.
-            if (role === "building_parent" && partCount > 0) {
-              entity.show = false;
-              hiddenParents += 1;
-              continue;
-            }
-
-            const sourceHeightInfo = this.getBuildingHeight(properties);
-            const savedStyleAssignment = this.buildingStyleAssignments.get(entity.id);
-            const sourceVisualStyle = resolveBuildingVisualStyle(
-              properties,
-              entity.id,
-              sourceHeightInfo.meters,
-            );
-            const visualStyle = savedStyleAssignment?.style ?? sourceVisualStyle;
-            const heightInfo = this.getResearchAdjustedBuildingHeight(
-              sourceHeightInfo,
-              savedStyleAssignment?.style,
-            );
-            const topHeight = heightInfo.baseHeight + heightInfo.meters;
-            const hierarchy = polygon.hierarchy?.getValue(time);
-
-            let wallPositions: CesiumCartesian3[] | null = null;
-            let center: CesiumCartesian3 | null = null;
-
-            if (hierarchy && hierarchy.positions.length >= 3) {
-              wallPositions = [...hierarchy.positions];
-
-              const firstPosition = wallPositions[0];
-              const lastPosition = wallPositions[wallPositions.length - 1];
-
-              if (
-                Cesium.Cartesian3.distance(firstPosition, lastPosition) > 0.05
-              ) {
-                wallPositions.push(
-                  Cesium.Cartesian3.clone(firstPosition),
-                );
-              }
-
-              const bounds = Cesium.BoundingSphere.fromPoints(
-                hierarchy.positions,
-              );
-              center = Cesium.Cartesian3.clone(bounds.center);
-            } else {
-              invalidPolygons += 1;
-            }
-
-            const record: BuildingLodRecord = {
-              entity,
-              heightInfo,
-              sourceHeightInfo,
-              baseHeight: heightInfo.baseHeight,
-              topHeight,
-              visualStyle,
-              baseVisualStyle: visualStyle,
-              sourceVisualStyle,
-              wallPositions,
-              center,
-              isPart: role === "building_part",
-              isDetailed: false,
-              polygonStyleCache: null,
-              detailedWall: null,
-              roofEquipmentBox: null,
-              roofEquipmentPosition: null,
-            };
-
-            this.applyLightweightBuildingStyle(record, Cesium);
-            lodRecords.push(record);
-            renderedExtrusions += 1;
-
-            if (record.isPart) {
-              renderedParts += 1;
-            } else {
-              renderedBuildings += 1;
-            }
-          }
-        } finally {
-          dataSource.entities.resumeEvents();
-        }
-
-        viewer.scene.requestRender();
-
-        // Yield between batches so the map remains interactive during setup.
-        await new Promise<void>((resolve) => {
-          window.requestAnimationFrame(() => resolve());
-        });
-      }
-
-      if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
-      ) {
-        return;
-      }
-
-      const previousDataSource = this.overtureBuildings;
-
-      // Invalidate any selection owned by the outgoing viewport before swapping.
-      this.restoreSelectedBuilding();
-      this.selectedBuilding = null;
-      this.selectedBuildingOriginalMaterial = null;
-      this.selectedBuildingOriginalWallMaterial = null;
-      this.emitFeatureSelection(null);
-
-      this.overtureBuildings = dataSource;
-      this.buildingLodRecords = lodRecords;
-      this.renderedBuildingMetadata.clear();
-
-      for (const record of lodRecords) {
-        this.renderedBuildingMetadata.set(
-          record.entity.id,
-          record.heightInfo,
-        );
-      }
-
-      this.loadedViewportBounds = requestedBounds;
-      this.loadedViewportFeatureLimit = requestedFeatureLimit;
-      this.hasLoadedBuildings = true;
-      this.lastLodOrigin = null;
-      this.lastLodBudget = null;
-
-      // Choose facade detail from the live camera, rather than a fixed Dhaka sort.
-      this.updateBuildingLod(viewer, Cesium, true);
-
-      dataSource.show = this.isLayerVisible(
-        MAP_LAYER_IDS.overtureBuildings,
-      );
-      viewer.scene.requestRender();
-
-      if (previousDataSource && previousDataSource !== dataSource) {
-        viewer.dataSources.remove(previousDataSource, true);
-      }
-
-      stagedDataSource = null;
-
-      console.info("[Overture] Building viewport rendered.", {
-        returnedFeatures: entities.length,
-        viewport: requestedBounds,
-        renderedBuildings,
-        renderedParts,
-        renderedExtrusions,
-        detailedFacades: lodRecords.filter((record) => record.isDetailed).length,
-        graphicsCache: { ...this.lodGraphicsCacheMetrics },
-        hiddenParents,
-        hiddenUnderground,
-        invalidPolygons,
-        cameraAwareLod: true,
-      });
-    } catch (error: unknown) {
-      if (isAbortError(error)) {
-        console.info("[Overture] Cancelled an obsolete viewport request.", {
-          endpoint: activeEndpoint,
-        });
-      } else {
-        console.error(
-          "[Overture] Building rendering failed:",
-          error instanceof Error
-            ? {
-                name: error.name,
-                message: error.message,
-              }
-            : String(error),
-        );
-      }
-
-      if (
-        stagedDataSource &&
-        this.viewer === viewer &&
-        !viewer.isDestroyed() &&
-        this.overtureBuildings !== stagedDataSource
-      ) {
-        viewer.dataSources.remove(stagedDataSource, true);
-        stagedDataSource = null;
-      }
-
-      if (!isAbortError(error)) {
-        throw error;
-      }
-    } finally {
-      // Clean hidden staging data even when setup exits through an early return.
-      if (
-        stagedDataSource &&
-        this.viewer === viewer &&
-        !viewer.isDestroyed() &&
-        this.overtureBuildings !== stagedDataSource
-      ) {
-        viewer.dataSources.remove(stagedDataSource, true);
-        stagedDataSource = null;
-      }
-
-      if (this.viewportRequestAbortController === requestController) {
-        this.viewportRequestAbortController = null;
-      }
-      if (this.activeViewportEndpoint === activeEndpoint) {
-        this.activeViewportEndpoint = null;
-      }
-
-      this.viewportLoadInProgress = false;
-
-      const pendingRequest = this.pendingViewportRequest;
-      this.pendingViewportRequest = null;
-
-      // Always service the latest queued camera intent, even if its predecessor
-      // was cancelled or failed. A null-bounds request means the wide view needs
-      // the full pilot dataset; never downgrade it to a bounded viewport.
-      if (
-        pendingRequest &&
-        pendingRequest.bounds === null &&
-        (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
-      ) {
-        void this.loadOvertureBuildings(viewer, Cesium, null).catch(
-          (error: unknown) => {
-            if (isAbortError(error)) return;
-            console.error(
-              "[Overture] Follow-up full-dataset load failed.",
-              error instanceof Error ? error.message : String(error),
-            );
+  
+        const dataSource = await Cesium.GeoJsonDataSource.load(
+          geoJson as Parameters<
+            typeof Cesium.GeoJsonDataSource.load
+          >[0],
+          {
+            clampToGround: false,
+            stroke: Cesium.Color.fromCssColorString(
+              WALL_OUTLINE_COLOR,
+            ),
+            strokeWidth: 1,
+            fill: Cesium.Color.fromCssColorString("#d2d8dc"),
           },
         );
-      } else if (
-        pendingRequest?.bounds &&
-        !this.isViewportCoveredByLoadedData(
-          pendingRequest.bounds,
-          pendingRequest.featureLimit ??
-            getViewportFeatureLimit(viewer.camera.positionCartographic.height),
-        )
-      ) {
-        void this.loadOvertureBuildings(
-          viewer,
-          Cesium,
-          pendingRequest.bounds,
-        ).catch((error: unknown) => {
-          if (isAbortError(error)) return;
-          console.error(
-            "[Overture] Follow-up viewport load failed.",
-            error instanceof Error ? error.message : String(error),
+  
+        if (!this.isViewportLoadCurrent(requestRevision)) return;
+  
+        if (
+          !this.viewer ||
+          this.viewer !== viewer ||
+          viewer.isDestroyed()
+        ) {
+          return;
+        }
+  
+        dataSource.name = requestedBounds
+          ? "Overture 3D Viewport Buildings"
+          : "Overture 3D Pilot Buildings";
+        // Stage the next viewport invisibly so the current view stays usable.
+        dataSource.show = false;
+        await viewer.dataSources.add(dataSource);
+        stagedDataSource = dataSource;
+  
+        // Hiding the layer or queuing a different viewport while Cesium was
+        // staging this datasource makes it obsolete; finally removes it safely.
+        if (!this.isViewportLoadCurrent(requestRevision)) return;
+  
+        if (
+          !this.viewer ||
+          this.viewer !== viewer ||
+          viewer.isDestroyed()
+        ) {
+          viewer.dataSources.remove(dataSource, true);
+          return;
+        }
+  
+        const time = Cesium.JulianDate.now();
+        const entities = [...dataSource.entities.values];
+        const lodRecords: BuildingLodRecord[] = [];
+        this.lodGraphicsCacheMetrics = {
+          polygonStyleCachesCreated: 0,
+          detailedWallsCreated: 0,
+          detailedWallCacheHits: 0,
+          roofEquipmentCreated: 0,
+          roofEquipmentCacheHits: 0,
+        };
+  
+        let renderedBuildings = 0;
+        let renderedParts = 0;
+        let renderedExtrusions = 0;
+        let hiddenParents = 0;
+        let hiddenUnderground = 0;
+        let invalidPolygons = 0;
+  
+        console.info(
+          "[Overture] Building features loaded; preparing lightweight geometry...",
+          { totalFeatures: entities.length },
+        );
+  
+        for (
+          let start = 0;
+          start < entities.length;
+          start += BATCH_SIZE
+        ) {
+          // Camera movement or a layer toggle can invalidate a staged viewport
+          // after the network request has completed. Stop before preparing more
+          // geometry rather than spending CPU on a viewport that cannot commit.
+          if (
+            !shouldContinueViewportStage(
+              requestRevision,
+              this.viewportIntentRevision,
+              this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+              this.viewer === viewer && !viewer.isDestroyed(),
+            )
+          ) {
+            return;
+          }
+  
+          const batch = entities.slice(start, start + BATCH_SIZE);
+          dataSource.entities.suspendEvents();
+  
+          try {
+            for (const entity of batch) {
+              const polygon = entity.polygon;
+  
+              if (!polygon) {
+                continue;
+              }
+  
+              const properties = this.readProperties(entity, time);
+  
+              if (this.isUnderground(properties)) {
+                entity.show = false;
+                hiddenUnderground += 1;
+                continue;
+              }
+  
+              const role =
+                typeof properties._renderRole === "string"
+                  ? properties._renderRole
+                  : "building";
+              const partCount =
+                this.getPositiveNumber(properties, ["_renderPartCount"]) ?? 0;
+  
+              // Avoid drawing a parent and its supplied building parts together.
+              if (role === "building_parent" && partCount > 0) {
+                entity.show = false;
+                hiddenParents += 1;
+                continue;
+              }
+  
+              const sourceHeightInfo = this.getBuildingHeight(properties);
+              const savedStyleAssignment = this.buildingStyleAssignments.get(entity.id);
+              const sourceVisualStyle = resolveBuildingVisualStyle(
+                properties,
+                entity.id,
+                sourceHeightInfo.meters,
+              );
+              const visualStyle = savedStyleAssignment?.style ?? sourceVisualStyle;
+              const heightInfo = this.getResearchAdjustedBuildingHeight(
+                sourceHeightInfo,
+                savedStyleAssignment?.style,
+              );
+              const topHeight = heightInfo.baseHeight + heightInfo.meters;
+              const hierarchy = polygon.hierarchy?.getValue(time);
+  
+              let wallPositions: CesiumCartesian3[] | null = null;
+              let center: CesiumCartesian3 | null = null;
+  
+              if (hierarchy && hierarchy.positions.length >= 3) {
+                wallPositions = [...hierarchy.positions];
+  
+                const firstPosition = wallPositions[0];
+                const lastPosition = wallPositions[wallPositions.length - 1];
+  
+                if (
+                  Cesium.Cartesian3.distance(firstPosition, lastPosition) > 0.05
+                ) {
+                  wallPositions.push(
+                    Cesium.Cartesian3.clone(firstPosition),
+                  );
+                }
+  
+                const bounds = Cesium.BoundingSphere.fromPoints(
+                  hierarchy.positions,
+                );
+                center = Cesium.Cartesian3.clone(bounds.center);
+              } else {
+                invalidPolygons += 1;
+              }
+  
+              const record: BuildingLodRecord = {
+                entity,
+                heightInfo,
+                sourceHeightInfo,
+                baseHeight: heightInfo.baseHeight,
+                topHeight,
+                visualStyle,
+                baseVisualStyle: visualStyle,
+                sourceVisualStyle,
+                wallPositions,
+                center,
+                isPart: role === "building_part",
+                isDetailed: false,
+                polygonStyleCache: null,
+                detailedWall: null,
+                roofEquipmentBox: null,
+                roofEquipmentPosition: null,
+              };
+  
+              this.applyLightweightBuildingStyle(record, Cesium);
+              lodRecords.push(record);
+              renderedExtrusions += 1;
+  
+              if (record.isPart) {
+                renderedParts += 1;
+              } else {
+                renderedBuildings += 1;
+              }
+            }
+          } finally {
+            dataSource.entities.resumeEvents();
+          }
+  
+          viewer.scene.requestRender();
+  
+          // Yield between batches so the map remains interactive during setup.
+          await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => resolve());
+          });
+        }
+  
+        // Re-check after the final animation-frame yield and before replacing the
+        // current datasource: an obsolete viewport must never become the active map.
+        if (
+          !shouldContinueViewportStage(
+            requestRevision,
+            this.viewportIntentRevision,
+            this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+            this.viewer === viewer && !viewer.isDestroyed(),
+          )
+        ) {
+          return;
+        }
+  
+        const previousDataSource = this.overtureBuildings;
+  
+        // Invalidate any selection owned by the outgoing viewport before swapping.
+        this.restoreSelectedBuilding();
+        this.selectedBuilding = null;
+        this.selectedBuildingOriginalMaterial = null;
+        this.selectedBuildingOriginalWallMaterial = null;
+        this.emitFeatureSelection(null);
+  
+        this.overtureBuildings = dataSource;
+        this.buildingLodRecords = lodRecords;
+        this.renderedBuildingMetadata.clear();
+  
+        for (const record of lodRecords) {
+          this.renderedBuildingMetadata.set(
+            record.entity.id,
+            record.heightInfo,
           );
+        }
+  
+        this.loadedViewportBounds = requestedBounds;
+        this.loadedViewportFeatureLimit = requestedFeatureLimit;
+        this.hasLoadedBuildings = true;
+        this.lastLodOrigin = null;
+        this.lastLodBudget = null;
+  
+        // Choose facade detail from the live camera, rather than a fixed Dhaka sort.
+        this.updateBuildingLod(viewer, Cesium, true);
+  
+        dataSource.show = this.isLayerVisible(
+          MAP_LAYER_IDS.overtureBuildings,
+        );
+        viewer.scene.requestRender();
+  
+        if (previousDataSource && previousDataSource !== dataSource) {
+          viewer.dataSources.remove(previousDataSource, true);
+        }
+  
+        stagedDataSource = null;
+  
+        console.info("[Overture] Building viewport rendered.", {
+          returnedFeatures: entities.length,
+          viewport: requestedBounds,
+          renderedBuildings,
+          renderedParts,
+          renderedExtrusions,
+          detailedFacades: lodRecords.filter((record) => record.isDetailed).length,
+          graphicsCache: { ...this.lodGraphicsCacheMetrics },
+          hiddenParents,
+          hiddenUnderground,
+          invalidPolygons,
+          cameraAwareLod: true,
         });
+      } catch (error: unknown) {
+        if (isAbortError(error)) {
+          console.info("[Overture] Cancelled an obsolete viewport request.", {
+            endpoint: activeEndpoint,
+          });
+        } else {
+          console.error(
+            "[Overture] Building rendering failed:",
+            error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                }
+              : String(error),
+          );
+        }
+  
+        if (
+          stagedDataSource &&
+          this.viewer === viewer &&
+          !viewer.isDestroyed() &&
+          this.overtureBuildings !== stagedDataSource
+        ) {
+          viewer.dataSources.remove(stagedDataSource, true);
+          stagedDataSource = null;
+        }
+  
+        if (!isAbortError(error)) {
+          throw error;
+        }
+      } finally {
+        // Clean hidden staging data even when setup exits through an early return.
+        if (
+          stagedDataSource &&
+          this.viewer === viewer &&
+          !viewer.isDestroyed() &&
+          this.overtureBuildings !== stagedDataSource
+        ) {
+          viewer.dataSources.remove(stagedDataSource, true);
+          stagedDataSource = null;
+        }
+  
+        if (this.viewportRequestAbortController === requestController) {
+          this.viewportRequestAbortController = null;
+        }
+        if (this.activeViewportEndpoint === activeEndpoint) {
+          this.activeViewportEndpoint = null;
+        }
+  
+        this.viewportLoadInProgress = false;
+  
+        const pendingRequest = this.pendingViewportRequest;
+        this.pendingViewportRequest = null;
+  
+        // Always service the latest queued camera intent, even if its predecessor
+        // was cancelled or failed. A null-bounds request means the wide view needs
+        // the full pilot dataset; never downgrade it to a bounded viewport.
+        if (
+          pendingRequest &&
+          pendingRequest.bounds === null &&
+          (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
+        ) {
+          void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+            (error: unknown) => {
+              if (isAbortError(error)) return;
+              console.error(
+                "[Overture] Follow-up full-dataset load failed.",
+                error instanceof Error ? error.message : String(error),
+              );
+            },
+          );
+        } else if (
+          pendingRequest?.bounds &&
+          !this.isViewportCoveredByLoadedData(
+            pendingRequest.bounds,
+            pendingRequest.featureLimit ??
+              getViewportFeatureLimit(viewer.camera.positionCartographic.height),
+          )
+        ) {
+          void this.loadOvertureBuildings(
+            viewer,
+            Cesium,
+            pendingRequest.bounds,
+          ).catch((error: unknown) => {
+            if (isAbortError(error)) return;
+            console.error(
+              "[Overture] Follow-up viewport load failed.",
+              error instanceof Error ? error.message : String(error),
+            );
+          });
+        }
       }
     }
   }
@@ -2978,6 +2997,7 @@ export class CesiumAdapter implements MapEngine {
 
     // Prevent requests and any post-fetch staging from surviving teardown.
     this.viewportIntentRevision += 1;
+    this.viewportLoadToken += 1;
     this.viewportRequestAbortController?.abort();
     this.viewportRequestAbortController = null;
     this.activeViewportEndpoint = null;
