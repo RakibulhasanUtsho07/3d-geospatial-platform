@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { reviewUvSeams } from "./uv-seam-review.mjs";
 import { reviewTextureImageContent } from "./texture-image-content-review.mjs";
+import { reviewTexturePixelSeams } from "./texture-pixel-seam-review.mjs";
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -231,6 +232,7 @@ export function reviewGlbTextureBindings(input, options = {}) {
   const errors = [...initialErrors], warnings = [], images = [], usedImageIndices = new Set();
   const views = gltf.bufferViews ?? [], accessors = gltf.accessors ?? [], textures = gltf.textures ?? [], materials = gltf.materials ?? [];
   const sourceBytes = [];
+  const decodedImagePixels = [];
   (gltf.images ?? []).forEach((image,index) => {
     const bytes = getImageBytes(image,gltf,binary,bufferLength,index,errors,warnings);
     sourceBytes.push(bytes);
@@ -239,7 +241,11 @@ export function reviewGlbTextureBindings(input, options = {}) {
     const contentReview = bytes ? reviewTextureImageContent(bytes,mimeType, {
       minRecommendedDimension: options.minRecommendedTextureDimension ?? 512,
       maxPixels: options.maxTextureAnalysisPixels ?? 16_777_216,
+      includePixelData: options.texturePixelSeamReview !== false,
+      maxPixelDataPixels: options.maxTextureSeamAnalysisPixels ?? 4_194_304,
     }) : null;
+    decodedImagePixels[index] = contentReview?.pixelData ?? null;
+    if (contentReview?.pixelData) delete contentReview.pixelData;
     if (contentReview) {
       for (const risk of contentReview.risks) {
         if (risk !== "pixel-content-not-analysed-for-this-image-format") warnings.push(`image-${index}-${risk}`);
@@ -291,8 +297,9 @@ export function reviewGlbTextureBindings(input, options = {}) {
       }
       const material = Number.isSafeInteger(materialIndex) ? materials[materialIndex] : null;
       const refs = material ? materialTextureRefs(material) : [];
-      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[], uvSeamReviews:[] };
+      const report = { meshIndex, primitiveIndex, materialIndex:materialIndex ?? null, textureBindings:[], uvAttributes:[], uvSeamReviews:[], texturePixelSeamReviews:[] };
       const seamReviewByTexCoord = new Map();
+      const pixelSeamReviewByBinding = new Map();
       if (refs.length === 0) {
         untexturedPrimitiveCount++;
         warnings.push(`${key}-no-supported-material-textures`);
@@ -332,6 +339,8 @@ export function reviewGlbTextureBindings(input, options = {}) {
             readIndexAccessor(indexAccessor,views,binary,bufferLength,position?.count ?? 0,key,errors);
           let degenerateUvTriangles = 0;
           let uvSeamReview = null;
+          let pixelSeamReview = null;
+          let positionDataForSeams = null;
           if (uv && indices && !uv.nonFiniteCount && position?.count === uv.count) {
             for (let i=0;i+2<indices.length;i+=3) {
               const a=uv.values[indices[i]], b=uv.values[indices[i+1]], c=uv.values[indices[i+2]];
@@ -340,15 +349,15 @@ export function reviewGlbTextureBindings(input, options = {}) {
               if (area <= 1e-12) degenerateUvTriangles++;
             }
             if (degenerateUvTriangles) warnings.push(`${key}-degenerate-uv-triangles`);
+            positionDataForSeams = reportedPositionAccessors.get(positionIndex);
+            if (!positionDataForSeams) {
+              positionDataForSeams = readPositionAccessor(position,views,binary,bufferLength,`${key}-POSITION`,errors);
+              reportedPositionAccessors.set(positionIndex,positionDataForSeams);
+            }
             if (!seamReviewByTexCoord.has(texCoord)) {
-              let positionData = reportedPositionAccessors.get(positionIndex);
-              if (!positionData) {
-                positionData = readPositionAccessor(position,views,binary,bufferLength,`${key}-POSITION`,errors);
-                reportedPositionAccessors.set(positionIndex,positionData);
-              }
-              if (positionData && positionData.count === uv.count) {
+              if (positionDataForSeams && positionDataForSeams.count === uv.count) {
                 try {
-                  const review = reviewUvSeams({ positions:positionData.values, uvs:uv.values, indices }, options.uvSeamReview ?? {});
+                  const review = reviewUvSeams({ positions:positionDataForSeams.values, uvs:uv.values, indices }, options.uvSeamReview ?? {});
                   seamReviewByTexCoord.set(texCoord,review);
                   report.uvSeamReviews.push({ texCoord, ...review });
                   if (review.seamCandidateCount > 0) warnings.push(`${key}-uv-seam-review-candidates-present`);
@@ -358,8 +367,46 @@ export function reviewGlbTextureBindings(input, options = {}) {
               }
             }
             uvSeamReview = seamReviewByTexCoord.get(texCoord) ?? null;
+
+            if (ref.property === "pbrMetallicRoughness.baseColorTexture" &&
+                uvSeamReview?.seamCandidateCount > 0 && positionDataForSeams &&
+                positionDataForSeams.count === uv.count && sourceIndex !== undefined) {
+              const bindingKey = `${texCoord}:${sourceIndex}`;
+              if (!pixelSeamReviewByBinding.has(bindingKey)) {
+                try {
+                  const review = reviewTexturePixelSeams({
+                    positions:positionDataForSeams.values,
+                    uvs:uv.values,
+                    indices,
+                    pixelData:decodedImagePixels[sourceIndex],
+                  }, options.texturePixelSeamReviewOptions ?? {});
+                  pixelSeamReviewByBinding.set(bindingKey,review);
+                  report.texturePixelSeamReviews.push({ sourceImageIndex:sourceIndex, texCoord, ...review });
+                  if (review.highDiscontinuityCount > 0) warnings.push(`${key}-high-texture-pixel-seam-discontinuity-review-required`);
+                  if (review.moderateDiscontinuityCount > 0) warnings.push(`${key}-moderate-texture-pixel-seam-discontinuity-review-required`);
+                  if (["pixel-analysis-unavailable","insufficient-resolution","analysis-truncated"].includes(review.status)) {
+                    warnings.push(`${key}-texture-pixel-seam-analysis-${review.status}`);
+                  }
+                } catch {
+                  errors.push(`${key}-texture-pixel-seam-review-failed`);
+                }
+              }
+              pixelSeamReview = pixelSeamReviewByBinding.get(bindingKey) ?? null;
+            }
           }
-          report.textureBindings.push({ property:ref.property, textureIndex, sourceImageIndex:sourceIndex ?? null, texCoord, valid:Boolean(uv && sourceIndex !== undefined), uvBounds:uv?.bounds ?? null, degenerateUvTriangles, uvSeamCandidateCount:uvSeamReview?.seamCandidateCount ?? null });
+          report.textureBindings.push({
+            property:ref.property,
+            textureIndex,
+            sourceImageIndex:sourceIndex ?? null,
+            texCoord,
+            valid:Boolean(uv && sourceIndex !== undefined),
+            uvBounds:uv?.bounds ?? null,
+            degenerateUvTriangles,
+            uvSeamCandidateCount:uvSeamReview?.seamCandidateCount ?? null,
+            pixelSeamReviewStatus:pixelSeamReview?.status ?? null,
+            highPixelDiscontinuityCount:pixelSeamReview?.highDiscontinuityCount ?? null,
+            moderatePixelDiscontinuityCount:pixelSeamReview?.moderateDiscontinuityCount ?? null,
+          });
         });
       }
       report.uvAttributes = Object.keys(primitive.attributes ?? {}).filter(name=>/^TEXCOORD_\d+$/.test(name));
@@ -396,11 +443,15 @@ export function reviewGlbTextureBindings(input, options = {}) {
     counts:{ meshCount:gltf.meshes?.length ?? 0, materialCount:materials.length, textureCount:textures.length, imageCount:images.length,
       texturedPrimitiveCount, untexturedPrimitiveCount, uvAccessorCount:uvAttributeCount, uvVertexCount,
       uvSeamCandidateCount:primitiveReports.reduce((sum, item) => sum + item.uvSeamReviews.reduce((part, review) => part + review.seamCandidateCount, 0), 0),
+      texturePixelSeamCandidateCount:primitiveReports.reduce((sum, item) => sum + item.texturePixelSeamReviews.reduce((part, review) => part + review.uvSeamCandidateCount, 0), 0),
+      highTexturePixelSeamCount:primitiveReports.reduce((sum, item) => sum + item.texturePixelSeamReviews.reduce((part, review) => part + review.highDiscontinuityCount, 0), 0),
+      moderateTexturePixelSeamCount:primitiveReports.reduce((sum, item) => sum + item.texturePixelSeamReviews.reduce((part, review) => part + review.moderateDiscontinuityCount, 0), 0),
       textureContentRiskCount:images.reduce((sum, image) => sum + (image.contentReview?.risks?.length ?? 0), 0) },
     images, primitiveReports, errors:[...new Set(errors)], warnings:[...new Set(warnings)],
     limitations:[
       "This audit validates glTF resource references and UV numeric ranges; it does not render the model or determine whether the photo belongs to the corresponding facade.",
-      "Texture seams, wrong orientation, blur, lighting mismatch, perspective distortion and architectural fidelity require rendered visual review.",
+      "UV seam candidates also receive bounded pixel samples along mapped atlas edges, but color difference is a heuristic and intentional facade color/lighting changes can be flagged.",
+      "This stage does not render the model, repaint gutters or repair UVs; wrong orientation, blur, perspective distortion and architectural fidelity still require rendered visual review.",
       "UV-overlap analysis is intentionally not used to reject overlapping UVs because some models intentionally share texture regions.",
       "Publication eligibility remains false until geometry, scale, provenance and visual review gates pass."
     ]

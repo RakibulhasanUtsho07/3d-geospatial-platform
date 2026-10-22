@@ -162,6 +162,9 @@ jobs:
       - name: Test mesh UV seam candidates
         run: npm run test:uv-seam-review
 
+      - name: Test texture pixel seam quality diagnostics
+        run: npm run test:texture-pixel-seam-review
+
       - name: Test texture pixel content and resolution risk hints
         run: npm run test:texture-image-content-review
 
