@@ -65,8 +65,8 @@ Save an attestation JSON file inside the workspace, for example \`review/dhaka-b
 Hash values can be collected in PowerShell:
 
 \`\`\`powershell
-(Get-FileHash .\\.building-engine\\jobs\\<building-id>\\<job-id>-workflow\\model.glb -Algorithm SHA256).Hash.ToLowerInvariant()
-(Get-FileHash .\\review\\<evidence-file>.json -Algorithm SHA256).Hash.ToLowerInvariant()
+(Get-FileHash .\.building-engine\jobs\<building-id>\<job-id>-workflow\model.glb -Algorithm SHA256).Hash.ToLowerInvariant()
+(Get-FileHash .\review\<evidence-file>.json -Algorithm SHA256).Hash.ToLowerInvariant()
 \`\`\`
 
 The sample coordinates, names, IDs, notes and hashes are placeholders, not verified data for a real building. The evidence path is used by the local command and is **not copied into the public catalog**; the catalog stores an evidence ID and checksum only. Use a team ID or public reviewer handle rather than a private person's name.
