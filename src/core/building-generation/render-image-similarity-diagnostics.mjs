@@ -190,6 +190,7 @@ function spatialCellDifferences(referencePixels, candidatePixels) {
         meanAbsoluteError: Number(cellMae.toFixed(3)),
         meanSignedLuminanceOffset: Number((signedOffsetSum / reference.length).toFixed(3)),
         localSsim16x16: Number((denominator === 0 ? 1 : numerator / denominator).toFixed(6)),
+        edgeSampleCount: edgeEligibleCount,
         referenceEdgePixelCount: referenceEdgeCount,
         candidateEdgePixelCount: candidateEdgeCount,
         referenceEdgeDensity: edgeEligibleCount ? Number((referenceEdgeCount / edgeEligibleCount).toFixed(4)) : 0,
