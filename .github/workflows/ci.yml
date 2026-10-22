@@ -144,14 +144,9 @@ jobs:
         run: npm run test:reconstruction-job-state
 
       - name: Install FFmpeg for deterministic texture atlas baking
-        run: |
-          if command -v ffmpeg >/dev/null 2>&1; then
-            ffmpeg -version | head -n 1
-          else
-            sudo timeout 600s apt-get update
-            sudo timeout 600s apt-get install --yes ffmpeg
-            ffmpeg -version | head -n 1
-          fi
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        with:
+          ffmpeg-version: release
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -282,6 +277,9 @@ jobs:
 
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
+
+      - name: Test stale road viewport request cancellation
+        run: npm run test:road-request-policy
 
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
