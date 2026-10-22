@@ -18,6 +18,7 @@ export default defineConfig({
     launchOptions: {
       args: [
         "--use-gl=swiftshader",
+        "--enable-unsafe-swiftshader",
         "--enable-webgl",
         "--ignore-gpu-blocklist",
         "--no-sandbox",
