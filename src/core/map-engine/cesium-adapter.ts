@@ -29,6 +29,7 @@ import {
 } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
+import { resolveBuildingHeight } from "../buildings/building-height.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
@@ -2061,46 +2062,7 @@ export class CesiumAdapter implements MapEngine {
   private getBuildingHeight(
     properties: BuildingProperties,
   ): BuildingHeight {
-    const height = this.getPositiveNumber(properties, [
-      "height",
-      "height_m",
-      "heightMeters",
-    ]);
-
-    const minHeight =
-      this.getPositiveNumber(properties, [
-        "min_height",
-        "minHeight",
-      ]) ?? 0;
-
-    if (height !== null) {
-      return {
-        meters: Math.min(Math.max(height, 3), 300),
-        baseHeight: Math.min(minHeight, 100),
-        source: "overture-height",
-      };
-    }
-
-    const floors = this.getPositiveNumber(properties, [
-      "num_floors",
-      "numFloors",
-      "building:levels",
-      "levels",
-    ]);
-
-    if (floors !== null) {
-      return {
-        meters: Math.min(Math.max(floors * 3, 3), 300),
-        baseHeight: Math.min(minHeight, 100),
-        source: "floor-estimate",
-      };
-    }
-
-    return {
-      meters: 9,
-      baseHeight: Math.min(minHeight, 100),
-      source: "fallback-estimate",
-    };
+    return resolveBuildingHeight(properties);
   }
 
   private getResearchAdjustedBuildingHeight(
