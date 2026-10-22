@@ -187,7 +187,7 @@ function normalizeOptionalDiagnosticMetrics(metrics, label) {
     luminanceOffsetNormalizedMeanAbsoluteError: [0, 255],
     luminanceOffsetNormalizedRootMeanSquaredError: [0, 255],
     luminanceOffsetNormalizedSsim8x8: [-1, 1],
-    luminanceOffsetNormalizedMaeReductionPercent: [0, 100.1],
+    luminanceOffsetNormalizedMaeReductionPercent: [-0.1, 100.1],
     edgeDensityAbsoluteDifference: [0, 1],
     edgeOrientationHistogramDistance: [0, 1],
     spatialEdgeDistributionDistance: [0, 1],
