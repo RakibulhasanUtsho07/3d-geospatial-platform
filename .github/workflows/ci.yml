@@ -278,6 +278,9 @@ jobs:
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
 
+      - name: Test shared request cancellation lifecycle
+        run: npm run test:shared-request-lifecycle
+
       - name: Test stale road viewport request cancellation
         run: npm run test:road-request-policy
 
