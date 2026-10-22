@@ -214,6 +214,14 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       "spatialCellMaeMedianGap", "highestDifferenceCells",
     ];
     const localDifferenceMetricsPresent = localDifferenceMetricKeys.some((key) => Object.hasOwn(metrics, key));
+    const localEdgeMetricsPresent =
+      Object.hasOwn(metrics, "localEdgeDensityDifferenceMedian") ||
+      Object.hasOwn(metrics, "localEdgeDensityDifferenceMaximum") ||
+      Object.hasOwn(metrics, "highestEdgeDifferenceCells") ||
+      (Array.isArray(metrics.spatialCellDiagnostics) && metrics.spatialCellDiagnostics.some((cell) =>
+        cell && ["edgeSampleCount", "referenceEdgePixelCount", "candidateEdgePixelCount",
+          "referenceEdgeDensity", "candidateEdgeDensity", "edgeDensityAbsoluteDifference"]
+          .some((key) => Object.hasOwn(cell, key))));
     const validHistogram = (histogram) => {
       if (!Array.isArray(histogram) || histogram.length !== 8 ||
         !histogram.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
@@ -337,6 +345,50 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       return metrics.highestDifferenceCells.every((cell, index) =>
         cell && cell.cellX === expected[index].cellX && cell.cellY === expected[index].cellY);
     })();
+    const localEdgeMetricsValid = !localEdgeMetricsPresent || (() => {
+      const cells = metrics.spatialCellDiagnostics;
+      if (!Array.isArray(cells) || cells.length !== 16 ||
+        !cells.every((cell, index) => {
+          if (!cell || typeof cell !== "object") return false;
+          const cellX = index % 4;
+          const cellY = Math.floor(index / 4);
+          const expectedSampleCount = (cellX === 0 || cellX === 3 ? 15 : 16) *
+            (cellY === 0 || cellY === 3 ? 15 : 16);
+          if (cell.cellX !== cellX || cell.cellY !== cellY ||
+            cell.edgeSampleCount !== expectedSampleCount ||
+            !Number.isSafeInteger(cell.referenceEdgePixelCount) || cell.referenceEdgePixelCount < 0 ||
+            cell.referenceEdgePixelCount > expectedSampleCount ||
+            !Number.isSafeInteger(cell.candidateEdgePixelCount) || cell.candidateEdgePixelCount < 0 ||
+            cell.candidateEdgePixelCount > expectedSampleCount ||
+            !finite(cell.referenceEdgeDensity) || cell.referenceEdgeDensity < 0 || cell.referenceEdgeDensity > 1 ||
+            !finite(cell.candidateEdgeDensity) || cell.candidateEdgeDensity < 0 || cell.candidateEdgeDensity > 1 ||
+            !finite(cell.edgeDensityAbsoluteDifference) || cell.edgeDensityAbsoluteDifference < 0 ||
+            cell.edgeDensityAbsoluteDifference > 1) return false;
+          const referenceDensity = cell.referenceEdgePixelCount / expectedSampleCount;
+          const candidateDensity = cell.candidateEdgePixelCount / expectedSampleCount;
+          const difference = Math.abs(cell.referenceEdgePixelCount - cell.candidateEdgePixelCount) / expectedSampleCount;
+          return Math.abs(cell.referenceEdgeDensity - referenceDensity) <= 0.001 &&
+            Math.abs(cell.candidateEdgeDensity - candidateDensity) <= 0.001 &&
+            Math.abs(cell.edgeDensityAbsoluteDifference - difference) <= 0.001;
+        })) return false;
+      const differences = cells.map((cell) => cell.edgeDensityAbsoluteDifference);
+      const ordered = [...differences].sort((left, right) => left - right);
+      const middle = ordered.length / 2;
+      const calculatedMedian = (ordered[middle - 1] + ordered[middle]) / 2;
+      const calculatedMaximum = Math.max(...differences);
+      if (!finite(metrics.localEdgeDensityDifferenceMedian) ||
+        Math.abs(metrics.localEdgeDensityDifferenceMedian - calculatedMedian) > 0.001 ||
+        !finite(metrics.localEdgeDensityDifferenceMaximum) ||
+        Math.abs(metrics.localEdgeDensityDifferenceMaximum - calculatedMaximum) > 0.001) return false;
+      if (!Array.isArray(metrics.highestEdgeDifferenceCells) || metrics.highestEdgeDifferenceCells.length !== 4) return false;
+      const expected = cells
+        .map((cell) => ({ cellX: cell.cellX, cellY: cell.cellY, edgeDensityAbsoluteDifference: cell.edgeDensityAbsoluteDifference }))
+        .sort((left, right) => right.edgeDensityAbsoluteDifference - left.edgeDensityAbsoluteDifference ||
+          left.cellY - right.cellY || left.cellX - right.cellX)
+        .slice(0, 4);
+      return metrics.highestEdgeDifferenceCells.every((cell, index) =>
+        cell && cell.cellX === expected[index].cellX && cell.cellY === expected[index].cellY);
+    })();
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
       finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
@@ -349,6 +401,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       structureMetricsValid &&
       spatialMetricsValid &&
       localDifferenceMetricsValid &&
+      localEdgeMetricsValid &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
     if (!candidateMatches || !referenceMatches || !metricsValid) continue;
@@ -408,6 +461,27 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
           highestDifferenceCells: metrics.highestDifferenceCells.map((cell) => ({
             cellX: cell.cellX,
             cellY: cell.cellY,
+          })),
+        } : {}),
+        ...(localEdgeMetricsPresent ? {
+          localEdgeDensityDifferenceMedian: metrics.localEdgeDensityDifferenceMedian,
+          localEdgeDensityDifferenceMaximum: metrics.localEdgeDensityDifferenceMaximum,
+          highestEdgeDifferenceCells: metrics.highestEdgeDifferenceCells.map((cell) => ({
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+          })),
+          spatialCellDiagnostics: metrics.spatialCellDiagnostics.map((cell) => ({
+            cellX: cell.cellX,
+            cellY: cell.cellY,
+            meanAbsoluteError: cell.meanAbsoluteError,
+            meanSignedLuminanceOffset: cell.meanSignedLuminanceOffset,
+            localSsim16x16: cell.localSsim16x16,
+            edgeSampleCount: cell.edgeSampleCount,
+            referenceEdgePixelCount: cell.referenceEdgePixelCount,
+            candidateEdgePixelCount: cell.candidateEdgePixelCount,
+            referenceEdgeDensity: cell.referenceEdgeDensity,
+            candidateEdgeDensity: cell.candidateEdgeDensity,
+            edgeDensityAbsoluteDifference: cell.edgeDensityAbsoluteDifference,
           })),
         } : {}),
       },

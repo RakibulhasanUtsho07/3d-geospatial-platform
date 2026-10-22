@@ -66,6 +66,13 @@ test("identical normalized previews produce zero error and a maximum local SSIM"
   assert.equal(result.metrics.referenceSpatialActiveCells.length, 16);
   assert.equal(result.metrics.spatialCellDiagnostics.length, 16);
   assert.equal(result.metrics.spatialCellMaeMedianGap, 0);
+  assert.equal(result.metrics.localEdgeDensityDifferenceMaximum, 0);
+  assert.equal(result.metrics.spatialCellDiagnostics[0].referenceEdgePixelCount,
+    result.metrics.spatialCellDiagnostics[0].candidateEdgePixelCount);
+  assert.deepEqual(result.metrics.highestEdgeDifferenceCells, [
+    { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
+    { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
+  ]);
   assert.deepEqual(result.metrics.highestDifferenceCells, [
     { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
     { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
@@ -139,6 +146,38 @@ test("low-edge previews are flagged as weak comparison evidence", () => {
   assert.equal(result.policy.publicationEligible, false);
 });
 
+test("brightness-only shifts do not become local edge-structure warnings", () => {
+  const reference = pattern((x, y) => (Math.floor(x / 2) % 2 ? 180 : 40) + y);
+  const candidate = pattern((x, y) => (Math.floor(x / 2) % 2 ? 200 : 60) + y);
+  const result = compareGrayscaleImageSamples(reference, candidate, {
+    reference: { width: 1600, height: 1200 },
+    candidate: { width: 800, height: 600 },
+  });
+  assert.ok(result.metrics.meanAbsoluteError > 0);
+  assert.equal(result.metrics.localEdgeDensityDifferenceMaximum, 0);
+  assert.equal(result.metrics.spatialCellDiagnostics.length, 16);
+  assert.ok(!result.warnings.includes("localized-edge-structure-difference-screening-hint"));
+});
+
+test("localizes edge-structure changes to the affected 4x4 cell", () => {
+  const reference = pattern((x) => Math.floor(x / 2) % 2 ? 240 : 12);
+  const candidate = Buffer.from(reference);
+  for (let y = 16; y < 32; y++) {
+    for (let x = 32; x < 48; x++) candidate[y * 64 + x] = 128;
+  }
+  const result = compareGrayscaleImageSamples(reference, candidate, {
+    reference: { width: 1600, height: 1200 },
+    candidate: { width: 800, height: 600 },
+  }, { maximumLocalEdgeDensityDifference: 0.1 });
+  assert.equal(result.metrics.spatialCellDiagnostics.length, 16);
+  assert.equal(result.metrics.highestEdgeDifferenceCells[0].cellX, 2);
+  assert.equal(result.metrics.highestEdgeDifferenceCells[0].cellY, 1);
+  assert.ok(result.metrics.localEdgeDensityDifferenceMaximum > 0.1);
+  assert.ok(result.warnings.includes("localized-edge-structure-difference-screening-hint"));
+  assert.equal(result.policy.automaticMatch, false);
+  assert.equal(result.policy.publicationEligible, false);
+});
+
 test("detects a lower-sharpness candidate against a structured reference", () => {
   const reference = pattern((x) => Math.floor(x / 8) % 2 ? 230 : 24);
   const blurredCandidate = Buffer.alloc(4096, 128);
@@ -187,6 +226,7 @@ test("rejects invalid preview buffers, dimensions and thresholds", () => {
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumSpatialEdgeDistributionDistance: 2 }), /between 0 and 1/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumActiveEdgeCellJaccardDistance: -1 }), /between 0 and 1/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumSpatialCellMaeMedianGap: 256 }), /between 0 and 255/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumLocalEdgeDensityDifference: 2 }), /between 0 and 1/);
 });
 
 test("decodes bounded grayscale previews, hashes both files and records safe FFmpeg args", async (t) => {

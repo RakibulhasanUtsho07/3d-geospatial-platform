@@ -96,3 +96,10 @@ The similarity report now includes sixteen row-major cell summaries for a 4×4 s
 A `localized-image-difference-screening-hint` is emitted when the highest-error cell is substantially worse than the median cell by the configured threshold. In JSON, `cellX` and `cellY` range from 0 through 3 starting at the top-left. These summaries help a reviewer prioritize a region for inspection, but do not generate a graphical heatmap or mask.
 
 A high-error cell may be caused by lighting, shadows, textures, windows, vegetation, crop, or background—not necessarily geometry. The metrics remain heuristic, do not alter the reviewer-entered comparison outcome, and do not change `publicationEligible: false`.
+
+
+## Per-cell edge-structure comparison
+
+Each 16×16 cell additionally reports reference/candidate strong-edge counts, edge densities, the sample count, and the absolute density difference. The report summarizes the median and maximum per-cell edge-density difference and ranks the four cells with the largest difference. A `localized-edge-structure-difference-screening-hint` warns when the maximum local difference exceeds the configured threshold.
+
+This helps separate a broad luminance shift from changes in visible line structure: the two can have high pixel error but similar edge density. It is not a reliable classifier of lighting versus geometry and does not classify a building defect. Edge counts depend on a fixed gradient threshold and are sensitive to thin lines, anti-aliasing, texture and downsampling. These values remain diagnostic evidence only.
