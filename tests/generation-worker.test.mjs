@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { enqueueGenerationJob, getGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
 import { runGenerationWorker } from "../scripts/run-generation-worker.mjs";
+import { getGenerationWorkerStatus } from "../src/core/building-generation/generation-worker-status.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 
@@ -32,4 +33,9 @@ test("worker runs a durable procedural job and leaves the GLB gated for human re
   const report = JSON.parse(await readFile(path.join(workspaceRoot, job.result.reportPath), "utf8"));
   assert.equal(report.mapReady, false);
   assert.equal(report.publicationEligible, false);
+  const workerStatus = await getGenerationWorkerStatus({ workspaceRoot });
+  assert.equal(workerStatus.availability, "stopped");
+  assert.equal(workerStatus.online, false);
+  assert.equal(workerStatus.phase, "stopped");
+  assert.equal(workerStatus.currentJobId, null);
 });
