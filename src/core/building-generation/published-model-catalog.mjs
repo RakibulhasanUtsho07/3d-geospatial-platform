@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import { copyFile, lstat, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeGeneratedModelDefinition } from "../map-engine/generated-model-policy.mjs";
+import { PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, validatePublishedModelCatalog } from "./published-model-catalog-reader.mjs";
+export { getActivePublishedModels, validatePublishedModelCatalog } from "./published-model-catalog-reader.mjs";
 
-export const PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION = "1.0.0";
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
 const VERSION_PATTERN = /^[a-f0-9]{16}$/;
@@ -114,126 +115,6 @@ function validateReview(review, label, options = {}) {
   if (!nonEmptyString(review.notes) || review.notes.length > 4000) {
     throw new TypeError(label + ".review.notes is required (max 4000 characters).");
   }
-}
-
-function validateVersion(model, version, index) {
-  const label = "models[" + index + "].versions";
-  if (!isRecord(version)) throw new TypeError(label + " must contain objects.");
-  if (typeof version.versionId !== "string" || !VERSION_PATTERN.test(version.versionId)) {
-    throw new TypeError(label + ".versionId must be 16 lowercase hexadecimal characters.");
-  }
-  if (typeof version.url !== "string" ||
-    !/^\/models\/generated\/[A-Za-z0-9._-]+\.glb$/.test(version.url) ||
-    version.url.includes("..")) {
-    throw new TypeError(label + ".url must target a versioned GLB under /models/generated/.");
-  }
-  if (!isHash(version.sha256)) throw new TypeError(label + ".sha256 must be a SHA-256 hash.");
-  if (!Number.isSafeInteger(version.bytes) || version.bytes < 12) {
-    throw new TypeError(label + ".bytes must be a valid GLB byte count.");
-  }
-  if (!isIsoDate(version.publishedAt)) throw new TypeError(label + ".publishedAt must be a valid timestamp.");
-  validateReview(version.review, label);
-
-  const definition = normalizeGeneratedModelDefinition({
-    id: model.id,
-    name: model.name,
-    url: version.url,
-    position: version.position,
-    headingDegrees: version.headingDegrees,
-    pitchDegrees: version.pitchDegrees,
-    rollDegrees: version.rollDegrees,
-    scale: version.scale,
-    upAxis: version.upAxis,
-    forwardAxis: version.forwardAxis,
-    minimumPixelSize: 0,
-    show: true,
-  });
-  return definition;
-}
-
-/**
- * Fail-closed structural validator for the public, read-only model catalog.
- * It verifies release metadata and placement but intentionally does not assert
- * that human review claims are true in the real world.
- */
-export function validatePublishedModelCatalog(raw) {
-  if (!isRecord(raw)) throw new TypeError("Published model catalog must be an object.");
-  if (raw.schemaVersion !== PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION) {
-    throw new TypeError("Unsupported published model catalog schemaVersion.");
-  }
-  if (!Array.isArray(raw.models) || raw.models.length > 5000) {
-    throw new TypeError("Published model catalog models must be an array with at most 5000 entries.");
-  }
-
-  const modelIds = new Set();
-  let totalVersions = 0;
-  const models = raw.models.map((model, modelIndex) => {
-    const label = "models[" + modelIndex + "]";
-    if (!isRecord(model) || typeof model.id !== "string" || !ID_PATTERN.test(model.id)) {
-      throw new TypeError(label + ".id is invalid.");
-    }
-    if (modelIds.has(model.id)) throw new Error("Duplicate published model id: " + model.id);
-    modelIds.add(model.id);
-    if (!nonEmptyString(model.name) || model.name.length > 200) {
-      throw new TypeError(label + ".name is required (max 200 characters).");
-    }
-    if (!Array.isArray(model.versions) || model.versions.length < 1 || model.versions.length > 100) {
-      throw new TypeError(label + ".versions must contain between 1 and 100 versions.");
-    }
-    if (typeof model.activeVersion !== "string" || !VERSION_PATTERN.test(model.activeVersion)) {
-      throw new TypeError(label + ".activeVersion must point to a valid version id.");
-    }
-
-    const versionIds = new Set();
-    const versions = model.versions.map((version) => {
-      totalVersions += 1;
-      if (totalVersions > 10000) throw new RangeError("Published model catalog contains too many versions.");
-      if (!isRecord(version) || typeof version.versionId !== "string" || versionIds.has(version.versionId)) {
-        throw new Error(label + " contains a duplicate or malformed version.");
-      }
-      versionIds.add(version.versionId);
-      validateVersion(model, version, modelIndex);
-      return version;
-    });
-    if (!versionIds.has(model.activeVersion)) {
-      throw new Error(label + ".activeVersion does not identify an available version.");
-    }
-    return { id: model.id, name: model.name, activeVersion: model.activeVersion, versions };
-  });
-
-  return { schemaVersion: PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, models };
-}
-
-export function getActivePublishedModels(raw) {
-  const catalog = validatePublishedModelCatalog(raw);
-  return catalog.models.map((model) => {
-    const version = model.versions.find((item) => item.versionId === model.activeVersion);
-    const definition = normalizeGeneratedModelDefinition({
-      id: model.id,
-      name: model.name,
-      url: version.url,
-      position: version.position,
-      headingDegrees: version.headingDegrees,
-      pitchDegrees: version.pitchDegrees,
-      rollDegrees: version.rollDegrees,
-      scale: version.scale,
-      upAxis: version.upAxis,
-      forwardAxis: version.forwardAxis,
-      show: true,
-    });
-    return {
-      definition,
-      versionId: version.versionId,
-      sha256: version.sha256,
-      bytes: version.bytes,
-      publishedAt: version.publishedAt,
-      review: {
-        reviewer: version.review.reviewer,
-        reviewedAt: version.review.reviewedAt,
-        checks: { ...version.review.checks },
-      },
-    };
-  });
 }
 
 function buildVersionId(modelId, candidateHash, placement, evidenceHash) {
