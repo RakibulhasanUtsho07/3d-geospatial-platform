@@ -130,6 +130,7 @@
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
     "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs",
+    "test:map-performance": "node --test tests/map-performance-telemetry.test.mjs",
     "test:map-browser": "playwright test --config=playwright.config.ts"
   },
   "dependencies": {
