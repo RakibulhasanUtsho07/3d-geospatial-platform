@@ -207,7 +207,7 @@ This is a single-view inference route, appropriate for visual preview/asset draf
 
 The generated model registry already added to the map engine is in-memory only. This reconstruction worker is not an authorization layer or public upload endpoint. Do not expose unauthenticated model generation, arbitrary asset URLs or publishing controls.
 
-## 8. Authenticated media upload API
+## 10. Authenticated media upload API
 
 The Node.js route `POST /api/building-generation/uploads` accepts multipart form data using the existing `GENERATION_API_TOKEN`. Required fields are `buildingId`, `sourceId`, and `file`; optional fields include `kind` (`auto`, `image`, `video`, or `floor-plan`), `licence`, `author`, `attribution`, `sourceUrl`, `capturedAt`, and `description`.
 
@@ -226,3 +226,10 @@ curl.exe -X POST "http://localhost:3000/api/building-generation/uploads" `
 ~~~
 
 Use the returned `source.relativePath` in a later `POST /api/building-generation/jobs` request. The source ID must match the upload response. Supply a real permission/licence basis and `confirmRights: true` only after you have checked reuse rights for each source. Uploading alone never approves rights or starts generation. The same API token must remain server-side; do not place it in browser code. The HTTP upload endpoint caps video uploads at 50 MiB even though the local CLI intake supports larger files.
+
+
+## 11. Queue source preflight
+
+Before a generation job is persisted, the queue validates every supplied source path against the configured workspace. It rejects missing files, empty files, directories, symbolic links in any path segment, paths resolving outside the workspace, and files that exceed the per-kind intake limit (image 20 MiB, video 500 MiB, floor-plan 50 MiB; `auto` uses the 500 MiB cap). This prevents broken requests from consuming a worker retry.
+
+Preflight is a file/path/size check, not a file-content or rights decision. The worker still runs media signature detection, hashes the bytes, checks the media kind, and syncs the source through the existing provenance workflow. A caller's licence string and `confirmRights` flag remain an operator attestation, not independent legal verification.

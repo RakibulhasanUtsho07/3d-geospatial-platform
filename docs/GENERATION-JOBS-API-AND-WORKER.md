@@ -51,10 +51,34 @@ Example request:
 }
 ```
 
-Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload/ingest the media into the private workspace first; this API does not itself accept binary media uploads.
+Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload the media with `POST /api/building-generation/uploads` or ingest it through the local CLI first. Before writing a queued job, the server verifies that every source already exists under the private workspace, is a non-empty regular file with no symbolic-link path components, and is within the media-kind size limit. The generation worker still rechecks the actual file signature and checksum during intake; queue preflight is not a replacement for that validation. For API upload details and the 50 MiB request cap, see [Building Generation Engine](BUILDING-GENERATION-ENGINE.md#10-authenticated-media-upload-api).
 
 For photogrammetry, include at least three `viewSourceIds`, and explicitly set `confirmSameBuilding`, `confirmOverlapReviewed`, `confirmUpAxisReviewed`, and `upAxis`. For single-image AI inference, provide exactly one selected view and set `confirmSingleViewInference: true`. These flags are operator attestations, not independent proof.
 
+
+## Upload first, then queue the source
+
+The upload response contains `source.relativePath`. Copy that exact workspace-relative value into the generation request; do not guess or reconstruct the content-addressed asset path. Keep the uploaded `sourceId` the same in both requests.
+
+Example request shape (replace the placeholder with the exact path returned by the upload API and use your complete, validated BuildingSpec):
+
+```json
+{
+  "buildingSpec": { "...": "complete BuildingSpec fields" },
+  "strategy": "procedural",
+  "sources": [
+    {
+      "sourceId": "front-photo",
+      "relativePath": ".building-engine/media/dhaka-demo/assets/<sha256-returned-by-upload>.jpg",
+      "kind": "image",
+      "licence": "CC BY 4.0"
+    }
+  ],
+  "confirmRights": true
+}
+```
+
+The JSON above is a shape example, not a ready-to-submit BuildingSpec. The placeholder path must be replaced with the exact `source.relativePath` from the upload response; the queue will reject a missing file before writing a job. Check the file source's actual reuse rights before setting `confirmRights: true`.
 
 ## Record a human review
 

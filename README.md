@@ -215,3 +215,6 @@ Generation requests are persisted in a local file-backed queue and run by `scrip
 ### Authenticated generation media upload
 
 The backend also provides `POST /api/building-generation/uploads` for authenticated multipart uploads of building photos, videos and floor-plan PDFs. It enforces a bounded request body, validates file signatures, writes a private content-addressed source record, and leaves its rights status `unreviewed`. Set `GENERATION_API_TOKEN` and keep it on the server; never embed it in browser JavaScript. The API upload limit is 50 MiB per file (images retain the intake module's 20 MiB limit). See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md#8-authenticated-media-upload-api) for usage.
+
+
+Generation job enqueueing now preflights each supplied source: the path must already exist inside the private workspace as a non-empty regular file, with no symlink path components, and must stay within the source-kind size limit. Actual media signature and provenance validation still runs in the worker.
