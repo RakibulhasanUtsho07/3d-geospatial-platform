@@ -2,13 +2,16 @@ import { timingSafeEqual } from "node:crypto";
 
 const MIN_TOKEN_LENGTH = 32;
 
-export function authorizeGenerationApiRequest(request, env = process.env) {
-  const expected = typeof env.GENERATION_API_TOKEN === "string"
-    ? env.GENERATION_API_TOKEN
-    : "";
+export function authorizeGenerationApiRequest(
+  request,
+  env = process.env,
+  { tokenEnvName = "GENERATION_API_TOKEN", serviceName = "Generation API" } = {},
+) {
+  const token = env[tokenEnvName];
+  const expected = typeof token === "string" ? token : "";
 
   if (expected.length < MIN_TOKEN_LENGTH) {
-    return { allowed: false, status: 503, error: "Generation API authentication is not configured." };
+    return { allowed: false, status: 503, error: serviceName + " authentication is not configured." };
   }
 
   const header = request?.headers?.get?.("authorization") ?? "";
