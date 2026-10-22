@@ -3,8 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
-import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
-import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
+import { inspectRenderCorrectionArtifactEvidence } from "../src/core/building-generation/render-correction-artifact-evidence.mjs";
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -13,10 +12,11 @@ const safePngName = (value) => typeof value === "string" &&
   !value.includes("..") && !value.includes("/") && !value.includes("\\");
 
 async function main() {
-  const [glbArg, renderDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, outputArg] = process.argv.slice(2);
-  if (!glbArg || !renderDirArg || !reviewArg || !backlogArg || !verificationArg || !accuracyEvidenceArg || !outputArg ||
-    process.argv.length !== 9) {
-    throw new Error("Usage: node scripts/build-building-release-readiness.mjs <candidate.glb> <render-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json>");
+  const [glbArg, renderDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, geometryQaArg, textureQaArg, outputArg] =
+    process.argv.slice(2);
+  if (!glbArg || !renderDirArg || !reviewArg || !backlogArg || !verificationArg ||
+    !accuracyEvidenceArg || !geometryQaArg || !textureQaArg || !outputArg || process.argv.length !== 11) {
+    throw new Error("Usage: node scripts/build-building-release-readiness.mjs <candidate.glb> <render-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <geometry-qa-report.json> <texture-qa-report.json> <release-readiness-report.json>");
   }
 
   const glbPath = path.resolve(glbArg);
@@ -26,23 +26,40 @@ async function main() {
   const backlogPath = path.resolve(backlogArg);
   const verificationPath = path.resolve(verificationArg);
   const accuracyEvidencePath = path.resolve(accuracyEvidenceArg);
+  const geometryQaPath = path.resolve(geometryQaArg);
+  const textureQaPath = path.resolve(textureQaArg);
   const outputPath = path.resolve(outputArg);
 
-  const [glbBytes, manifestBytes, reviewBytes, backlogBytes, verificationBytes, accuracyEvidenceBytes] = await Promise.all([
-    readFile(glbPath),
-    readFile(manifestPath),
+  const [reviewBytes, backlogBytes, verificationBytes, accuracyEvidenceBytes] = await Promise.all([
     readFile(reviewPath),
     readFile(backlogPath),
     readFile(verificationPath),
     readFile(accuracyEvidencePath),
   ]);
-  const renderManifest = JSON.parse(manifestBytes.toString("utf8"));
   const renderReferenceReview = JSON.parse(reviewBytes.toString("utf8"));
   const correctionTaskBacklog = JSON.parse(backlogBytes.toString("utf8"));
   const correctionVerification = JSON.parse(verificationBytes.toString("utf8"));
   const accuracyEvidence = JSON.parse(accuracyEvidenceBytes.toString("utf8"));
+  const inspected = await inspectRenderCorrectionArtifactEvidence({
+    candidateModelPath: glbPath,
+    renderManifestPath: manifestPath,
+    geometryQaReportPath: geometryQaPath,
+    textureQaReportPath: textureQaPath,
+    reviewReport: renderReferenceReview,
+  });
+  const {
+    candidateModelBytes: glbBytes,
+    renderManifestBytes: manifestBytes,
+    renderManifest,
+    geometryQa,
+    textureQa,
+    artifactEvidence: correctionArtifactEvidence,
+  } = inspected;
 
-  const baseInputPaths = [glbPath, manifestPath, reviewPath, backlogPath, verificationPath, accuracyEvidencePath];
+  const baseInputPaths = [
+    glbPath, manifestPath, reviewPath, backlogPath, verificationPath, accuracyEvidencePath,
+    geometryQaPath, textureQaPath,
+  ];
   const actualRenderFiles = [];
   const renderFilePaths = [];
   for (const view of Array.isArray(renderManifest?.views) ? renderManifest.views : []) {
@@ -61,21 +78,15 @@ async function main() {
         bytes: bytes.length,
       });
     } catch {
-      // Missing or unreadable render files remain absent in the evidence list;
-      // the readiness gate records a blocker instead of trusting the manifest.
+      // Missing or unreadable render files remain absent; the readiness gate blocks release.
     }
   }
   if ([...baseInputPaths, ...renderFilePaths].includes(outputPath)) {
-    throw new Error("Output path must differ from every input file, including rendered PNGs.");
+    throw new Error("Output path must differ from every input file, including QA reports and rendered PNGs.");
   }
 
   const candidateGlbSha256 = sha256(glbBytes);
   const renderManifestSha256 = sha256(manifestBytes);
-
-  // Re-run both structural audits from the exact candidate bytes, rather than
-  // trusting separate QA reports that may have been created from another GLB.
-  const geometryQa = analyzeGlbQuality(glbBytes);
-  const textureQa = reviewGlbTextureBindings(glbBytes);
   const readiness = buildBuildingReleaseReadiness({
     buildingId: renderReferenceReview.buildingId,
     candidateGlbSha256,
@@ -87,6 +98,7 @@ async function main() {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    correctionArtifactEvidence,
     accuracyEvidence,
   });
 
@@ -105,6 +117,7 @@ async function main() {
     requiredRenderViews: readiness.counts.requiredRenderViews,
     qualifyingReviewedViews: readiness.counts.qualifyingReviewedViews,
     actualRenderFilesRead: readiness.counts.actualRenderFilesRead,
+    correctionArtifactIntegrity: correctionArtifactEvidence.validated ? "validated" : "invalid",
     accuracyBenchmarkChecks: readiness.counts.accuracyBenchmarkChecks,
     groundControlPoints: readiness.counts.groundControlPoints,
     publicationEligible: readiness.publicationEligible,

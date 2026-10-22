@@ -149,8 +149,17 @@ async function createFixture() {
     tasks: [],
     automationPolicy: { publicationEligible: false },
   };
-  // The fixture uses an empty backlog; any non-empty backlog must have verification results before the release gate can pass.
-  const verification = verifyRenderCorrectionTasks(backlog, review);
+  // These hash fields describe the exact QA report-file bytes used by the package builder.
+  const correctionArtifactEvidence = {
+    validated: true,
+    candidateGlbSha256: candidateHash,
+    renderManifestSha256: manifestHash,
+    geometryQaReportSha256: hash(JSON_BYTES(geometryQa)),
+    textureQaReportSha256: hash(JSON_BYTES(textureQa)),
+    qaReportsRecomputedFromCandidateModel: true,
+  };
+  // The fixture uses an empty backlog; any non-empty backlog must have file-backed evidence for every correction task.
+  const verification = verifyRenderCorrectionTasks(backlog, review, correctionArtifactEvidence);
   const actualRenderFiles = views.map((view) => ({
     filename: view.filename,
     sha256: renderBuffers.get(view.id).sha256,
@@ -166,6 +175,7 @@ async function createFixture() {
     renderReferenceReview: review,
     correctionTaskBacklog: backlog,
     correctionVerification: verification,
+    correctionArtifactEvidence,
     accuracyEvidence,
   });
 

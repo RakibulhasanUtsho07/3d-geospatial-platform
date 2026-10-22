@@ -478,7 +478,7 @@ function validIsoTimestamp(value) {
  * hashes to the fresh report. QA files themselves are not opened or cryptographically
  * attested by this command; their SHA-256 values remain auditable evidence references.
  */
-function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestSha256) {
+function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestSha256, artifactEvidence) {
   const proposal = checklist?.correctionProposal;
   const approval = proposal?.approval;
   const implementation = checklist?.implementationEvidence;
@@ -513,11 +513,30 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
   const renderManifestMatchesVerificationReport =
     validHash(implementation?.generatedRenderManifestSha256) &&
     implementation.generatedRenderManifestSha256.toLowerCase() === renderManifestSha256;
+  const artifactEvidenceValidated = artifactEvidence?.validated === true &&
+    artifactEvidence?.qaReportsRecomputedFromCandidateModel === true;
+  const candidateGlbFileMatchesReview = artifactEvidenceValidated &&
+    validHash(artifactEvidence?.candidateGlbSha256) &&
+    artifactEvidence.candidateGlbSha256.toLowerCase() === sourceModelSha256;
+  const renderManifestFileMatchesReview = artifactEvidenceValidated &&
+    validHash(artifactEvidence?.renderManifestSha256) &&
+    artifactEvidence.renderManifestSha256.toLowerCase() === renderManifestSha256;
+  const geometryQaArtifactMatchesChecklist = artifactEvidenceValidated &&
+    validHash(artifactEvidence?.geometryQaReportSha256) &&
+    validHash(implementation?.geometryQaReportSha256) &&
+    artifactEvidence.geometryQaReportSha256.toLowerCase() === implementation.geometryQaReportSha256.toLowerCase();
+  const textureQaArtifactMatchesChecklist = implementation?.textureChangeApplicable === false ||
+    artifactEvidenceValidated &&
+    validHash(artifactEvidence?.textureQaReportSha256) &&
+    validHash(implementation?.textureQaReportSha256) &&
+    artifactEvidence.textureQaReportSha256.toLowerCase() === implementation.textureQaReportSha256.toLowerCase();
+  const actualArtifactFilesMatchChecklist = candidateGlbFileMatchesReview &&
+    renderManifestFileMatchesReview && geometryQaArtifactMatchesChecklist && textureQaArtifactMatchesChecklist;
   const approvedProposalAndQaEvidenceComplete = proposalWritten && proposalApproved &&
     approvalBeforeImplementation && implementationQaMarkedComplete &&
     geometryQaEvidencePresent && textureChangeApplicabilityRecorded && textureQaEvidencePresent &&
     outputModelMatchesVerificationReport && renderManifestMatchesVerificationReport &&
-    implementationTimestampRecorded;
+    implementationTimestampRecorded && actualArtifactFilesMatchChecklist;
   return {
     proposalWritten,
     proposalApproved,
@@ -530,6 +549,12 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
     textureQaEvidencePresent,
     outputModelMatchesVerificationReport,
     renderManifestMatchesVerificationReport,
+    artifactEvidenceValidated,
+    candidateGlbFileMatchesReview,
+    renderManifestFileMatchesReview,
+    geometryQaArtifactMatchesChecklist,
+    textureQaArtifactMatchesChecklist,
+    actualArtifactFilesMatchChecklist,
     approvedProposalAndQaEvidenceComplete,
   };
 }
@@ -539,7 +564,7 @@ function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestS
  * The function produces an immutable verification snapshot; it never edits the backlog,
  * source model, mesh, GLB, textures or UVs.
  */
-export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
+export function verifyRenderCorrectionTasks(backlog, verificationReviewReport, artifactEvidence = null) {
   validateBacklog(backlog);
   validateReviewReport(verificationReviewReport);
 
@@ -597,7 +622,7 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
     let status;
     let reason;
     const correctionReadiness = task.kind === "model-correction-review"
-      ? assessCorrectionReadiness(task.reviewChecklist, sourceModelSha256, renderManifestSha256)
+      ? assessCorrectionReadiness(task.reviewChecklist, sourceModelSha256, renderManifestSha256, artifactEvidence)
       : null;
 
     if (!comparison) {
@@ -697,6 +722,23 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
     sourceBacklogSha256: backlogSha256,
     sourceBacklogReviewReportSha256: backlog.createdFromReviewReportSha256,
     verificationReviewReportSha256,
+    artifactIntegrity: {
+      status: backlog.tasks.some((task) => task.kind === "model-correction-review")
+        ? artifactEvidence?.validated === true && artifactEvidence?.qaReportsRecomputedFromCandidateModel === true
+          ? "candidate-and-qa-files-validated"
+          : "required-files-not-validated"
+        : "not-required",
+      candidateGlbSha256: validHash(artifactEvidence?.candidateGlbSha256)
+        ? artifactEvidence.candidateGlbSha256.toLowerCase() : null,
+      renderManifestSha256: validHash(artifactEvidence?.renderManifestSha256)
+        ? artifactEvidence.renderManifestSha256.toLowerCase() : null,
+      geometryQaReportSha256: validHash(artifactEvidence?.geometryQaReportSha256)
+        ? artifactEvidence.geometryQaReportSha256.toLowerCase() : null,
+      textureQaReportSha256: validHash(artifactEvidence?.textureQaReportSha256)
+        ? artifactEvidence.textureQaReportSha256.toLowerCase() : null,
+      qaReportsRecomputedFromCandidateModel: artifactEvidence?.qaReportsRecomputedFromCandidateModel === true,
+      note: "File-backed context is supplied by a CLI that hashes the candidate and manifest bytes, then recomputes geometry/texture QA from those exact candidate bytes before accepting the report files.",
+    },
     provenance: {
       originalSourceModelSha256: backlog.provenance.sourceModelSha256,
       originalRenderManifestSha256: backlog.provenance.renderManifestSha256,
@@ -739,6 +781,8 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       geometryQaEvidenceRequired: true,
       textureChangeApplicabilityMustBeRecorded: true,
       implementationHashesMustMatchFreshReport: true,
+      actualCandidateAndManifestFilesRequiredForModelCorrections: true,
+      qaReportFilesMustMatchRecomputedCandidateQa: true,
       qaArtifactsIndependentlyOpenedOrAttested: false,
       publicationEligible: false,
       note: "Verification is an evidence-gated snapshot. Model-correction tasks require an exact-pair human-reported match, changed model/manifest, unchanged reference hash, a recorded proposal approved before implementation, and QA/hash evidence bound to the fresh report. QA artifacts are not independently opened or attested by this command. Diagnostics and hotspot overlap never determine verification status.",
