@@ -312,3 +312,25 @@ Then send the measured geometry to the candidate endpoint. Reuse the actual sour
 Submit the complete geometry in floorPlan; the short JSON above shows the fields and must be adjusted to the measured plan. API resource limits are 2 MiB JSON, 100 rooms, 500 walls, 4,000 room vertices total (at most 64 per room) and 1,000 openings. Candidate artifacts are stored privately under .building-engine/floor-plan-candidates/<buildingId>/<candidateId>/; they are not copied into public/. Report and GLB download endpoints use the bearer token and verify the saved model checksum.
 
 This API does not trace room or wall geometry out of a PDF/image, approve rights, survey the origin/heading, or publish the GLB. Source-use status is included in the report, and an unreviewed source adds a warning. Candidate status remains mapReady=false and publicationEligible=false.
+
+
+## 14. Floor-plan candidate review and explicit publishing
+
+A generated floor-plan candidate stays private and unpublished until a separate operator review is recorded. Review uses the separate `GENERATION_REVIEW_API_TOKEN` (not `GENERATION_API_TOKEN`) at:
+
+- `POST /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/review` — write one immutable review record.
+- `GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/review` — retrieve sanitized review status.
+
+The POST body is capped at 32 KiB and must include `decision` (`approved`, `rejected`, or `changes_requested`), `reviewer`, `notes`, an `evidencePath` and its exact SHA-256, explicit boolean values for all seven checks, and (for approval only) an explicit `publication` object with model ID/name, surveyed position, heading/pitch/roll, scale and axes.
+
+Approval requires that the source has already been through the existing source-rights review (`usageStatus=approved` with a known licence) *before the candidate is generated*. If the candidate report predates rights review, rebuild the candidate after source review. The application checks the original source, normalized geometry, report, generated GLB and review-evidence hashes. Reviewer names are operator-supplied labels; they are not verified by an identity provider, and review checklist values remain attestations that the operator must substantiate.
+
+After an approved review creates a private `attestation.json`, publication stays a separate explicit operation:
+
+~~~powershell
+npm run publish:floor-plan-candidate -- E:\\Building-Engine-Workspace dhaka-demo <candidateId>
+~~~
+
+The command calls the existing versioned generated-model catalog publisher, which rechecks candidate and evidence hashes and placement. Rejected or changes-requested reviews do not create a publication attestation. Reviews are immutable; create a new candidate for a replacement trace. Published versions are written to `public/models/generated/` and can be rolled back with the existing catalog activation command. The private candidate's `mapReady` and `publicationEligible` flags remain false so the candidate itself is never silently treated as map-ready.
+
+This workflow does not automatically trace walls and room polygons from a raster/PDF, independently verify permissions or survey measurements, or sign the reviewer identity. Those remain separate responsibilities.
