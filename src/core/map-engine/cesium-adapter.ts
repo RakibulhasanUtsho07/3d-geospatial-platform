@@ -18,6 +18,12 @@ import {
 } from "./viewport-load-policy.mjs";
 import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
 import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
+import { createMapPerformanceTelemetry } from "./performance-telemetry.mjs";
+import type {
+  MapPerformanceMetric,
+  MapPerformanceOutcome,
+  MapPerformanceSnapshot,
+} from "./performance-telemetry.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
@@ -59,6 +65,15 @@ type CesiumDataSource = import("cesium").GeoJsonDataSource;
 type CesiumMaterialProperty = import("cesium").MaterialProperty;
 type CesiumCartesian3 = import("cesium").Cartesian3;
 type CesiumCartesian2 = import("cesium").Cartesian2;
+
+type MapPerformanceDiagnosticsHandle = {
+  snapshot: () => MapPerformanceSnapshot;
+  reset: () => void;
+};
+
+type PerformanceDiagnosticsWindow = Window & {
+  __MAP_ENGINE_PERFORMANCE__?: MapPerformanceDiagnosticsHandle;
+};
 
 type BuildingProperties = Record<string, unknown>;
 
@@ -258,12 +273,45 @@ export class CesiumAdapter implements MapEngine {
   // Invalidates payloads that have left fetch but are still staging as Cesium entities.
   private viewportIntentRevision = 0;
   private readonly viewportResponseCache = new Map<string, unknown>();
+  private readonly performanceTelemetry = createMapPerformanceTelemetry();
+  private performanceDiagnosticsHandle: MapPerformanceDiagnosticsHandle | null = null;
   // The pending request is the latest camera intent. Null bounds means the
   // full pilot dataset; a null request means no work is queued.
   private pendingViewportRequest: {
     bounds: ViewportBounds | null;
     featureLimit: number | null;
   } | null = null;
+
+  private installMapPerformanceDiagnostics(): void {
+    if (typeof window === "undefined" || process.env.NODE_ENV === "production") {
+      return;
+    }
+
+    const target = window as PerformanceDiagnosticsWindow;
+    const handle: MapPerformanceDiagnosticsHandle = {
+      snapshot: () => this.performanceTelemetry.getSnapshot(),
+      reset: () => this.performanceTelemetry.reset(),
+    };
+    target.__MAP_ENGINE_PERFORMANCE__ = handle;
+    this.performanceDiagnosticsHandle = handle;
+  }
+
+  private recordMapPerformance(
+    metric: MapPerformanceMetric,
+    outcome: MapPerformanceOutcome,
+    durationMs: number,
+    details: {
+      cacheHit?: boolean;
+      featureCount?: number;
+      returnedWays?: number;
+      statusCode?: number;
+    } = {},
+  ): void {
+    const event = this.performanceTelemetry.record(metric, outcome, durationMs, details);
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+      window.dispatchEvent(new CustomEvent("map:performance", { detail: event }));
+    }
+  }
 
   async initialize(container: HTMLElement): Promise<void> {
     if (this.viewer && !this.viewer.isDestroyed()) {
@@ -275,6 +323,8 @@ export class CesiumAdapter implements MapEngine {
         "CesiumAdapter can only be initialized in the browser.",
       );
     }
+
+    this.installMapPerformanceDiagnostics();
 
     // Invalidate overlapping initialize() calls and allow destroy() to cancel
     // an import that has not resolved yet.
@@ -666,6 +716,12 @@ export class CesiumAdapter implements MapEngine {
     }
 
     this.viewportLoadInProgress = true;
+    const fetchStartedAt = performance.now();
+    let fetchTelemetryRecorded = false;
+    let cacheHit = false;
+    let viewportFeatureCount: number | undefined;
+    let stageStartedAt: number | null = null;
+    let stageTelemetryRecorded = false;
     const loadToken = ++this.viewportLoadToken;
     const requestRevision = this.viewportIntentRevision;
     let stagedDataSource: CesiumDataSource | null = null;
@@ -701,6 +757,7 @@ export class CesiumAdapter implements MapEngine {
       );
 
       if (cachedGeoJson !== undefined) {
+        cacheHit = true;
         geoJson = cachedGeoJson;
         console.info("[Overture] Reusing cached viewport payload.", {
           endpoint,
@@ -733,6 +790,21 @@ export class CesiumAdapter implements MapEngine {
         );
       }
 
+      const featureCollection = geoJson as { features?: unknown[] } | null;
+      viewportFeatureCount = featureCollection && Array.isArray(featureCollection.features)
+        ? featureCollection.features.length
+        : undefined;
+      this.recordMapPerformance(
+        "viewport.fetch",
+        cacheHit ? "cache-hit" : "success",
+        performance.now() - fetchStartedAt,
+        {
+          cacheHit,
+          ...(viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount }),
+        },
+      );
+      fetchTelemetryRecorded = true;
+
       if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       // Cancel network work only until the payload is ready. After that, stage
@@ -764,6 +836,7 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
+      stageStartedAt = performance.now();
       const dataSource = await Cesium.GeoJsonDataSource.load(
         geoJson as Parameters<
           typeof Cesium.GeoJsonDataSource.load
@@ -1017,6 +1090,13 @@ export class CesiumAdapter implements MapEngine {
       }
 
       stagedDataSource = null;
+      this.recordMapPerformance(
+        "viewport.stage",
+        "success",
+        performance.now() - (stageStartedAt ?? performance.now()),
+        { featureCount: entities.length },
+      );
+      stageTelemetryRecorded = true;
 
       console.info("[Overture] Building viewport rendered.", {
         returnedFeatures: entities.length,
@@ -1032,6 +1112,25 @@ export class CesiumAdapter implements MapEngine {
         cameraAwareLod: true,
       });
     } catch (error: unknown) {
+      if (!fetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.fetch",
+          isAbortError(error) ? "cancelled" : "error",
+          performance.now() - fetchStartedAt,
+          { cacheHit },
+        );
+        fetchTelemetryRecorded = true;
+      }
+      if (stageStartedAt !== null && !stageTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.stage",
+          isAbortError(error) ? "cancelled" : "error",
+          performance.now() - stageStartedAt,
+          viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount },
+        );
+        stageTelemetryRecorded = true;
+      }
+
       if (isAbortError(error)) {
         console.info("[Overture] Cancelled an obsolete viewport request.", {
           endpoint: activeEndpoint,
@@ -1062,6 +1161,25 @@ export class CesiumAdapter implements MapEngine {
         throw error;
       }
     } finally {
+      if (!fetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.fetch",
+          "cancelled",
+          performance.now() - fetchStartedAt,
+          { cacheHit },
+        );
+        fetchTelemetryRecorded = true;
+      }
+      if (stageStartedAt !== null && !stageTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.stage",
+          "cancelled",
+          performance.now() - stageStartedAt,
+          viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount },
+        );
+        stageTelemetryRecorded = true;
+      }
+
       // Clean hidden staging data even when setup exits through an early return.
       if (
         stagedDataSource &&
@@ -1196,6 +1314,7 @@ export class CesiumAdapter implements MapEngine {
       this.loadedRoadBounds &&
       this.roadBoundsContain(this.loadedRoadBounds, bounds)
     ) {
+      this.recordMapPerformance("roads.coverage", "cache-hit", 0, { cacheHit: true });
       // Reusing rendered geometry is also a new camera intent. Cancel a
       // different viewport request so its late response cannot replace these
       // roads after the camera has returned to the already-covered area.
@@ -1232,6 +1351,12 @@ export class CesiumAdapter implements MapEngine {
       north: String(bounds.north),
       limit: "1000",
     });
+    const roadFetchStartedAt = performance.now();
+    let roadFetchTelemetryRecorded = false;
+    let roadRenderStartedAt: number | null = null;
+    let roadRenderTelemetryRecorded = false;
+    let roadWaysCount: number | undefined;
+    let roadCacheHit = false;
 
     try {
       const response = await fetch(
@@ -1254,6 +1379,16 @@ export class CesiumAdapter implements MapEngine {
       if (!Array.isArray(payload.results)) {
         throw new Error("Road network API returned invalid GeoJSON-like results.");
       }
+      roadWaysCount = payload.results.length;
+      const roadCacheStatus = response.headers.get("X-Road-Network-Cache");
+      roadCacheHit = roadCacheStatus === "HIT" || roadCacheStatus === "COALESCED";
+      this.recordMapPerformance("roads.fetch", "success", performance.now() - roadFetchStartedAt, {
+        cacheHit: roadCacheHit,
+        returnedWays: roadWaysCount,
+        statusCode: response.status,
+      });
+      roadFetchTelemetryRecorded = true;
+
       if (
         this.viewer !== viewer ||
         viewer.isDestroyed() ||
@@ -1263,6 +1398,7 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
+      roadRenderStartedAt = performance.now();
       let dataSource = this.roadNetworkDataSource;
       if (!dataSource) {
         dataSource = new Cesium.CustomDataSource("OpenStreetMap detailed road network");
@@ -1399,6 +1535,10 @@ export class CesiumAdapter implements MapEngine {
       dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.roads);
       this.loadedRoadBounds = bounds;
       viewer.scene.requestRender();
+      this.recordMapPerformance("roads.render", "success", performance.now() - (roadRenderStartedAt ?? performance.now()), {
+        returnedWays: payload.results.length,
+      });
+      roadRenderTelemetryRecorded = true;
       console.info("[Roads] Vector road viewport rendered.", {
         requested: bounds,
         returnedWays: payload.results.length,
@@ -1406,14 +1546,51 @@ export class CesiumAdapter implements MapEngine {
         attribution: "© OpenStreetMap contributors",
       });
     } catch (error: unknown) {
+      const roadWasCancelled = typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+      if (!roadFetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.fetch",
+          roadWasCancelled ? "cancelled" : "error",
+          performance.now() - roadFetchStartedAt,
+          { cacheHit: roadCacheHit },
+        );
+        roadFetchTelemetryRecorded = true;
+      }
+      if (roadRenderStartedAt !== null && !roadRenderTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.render",
+          roadWasCancelled ? "cancelled" : "error",
+          performance.now() - roadRenderStartedAt,
+          roadWaysCount === undefined ? {} : { returnedWays: roadWaysCount },
+        );
+        roadRenderTelemetryRecorded = true;
+      }
       if (
-        !(typeof error === "object" && error !== null && "name" in error && error.name === "AbortError") &&
+        !roadWasCancelled &&
         this.viewer === viewer &&
         !viewer.isDestroyed()
       ) {
         console.warn("[Roads] Detailed road layer could not refresh.", error instanceof Error ? error.message : String(error));
       }
     } finally {
+      if (!roadFetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.fetch",
+          "cancelled",
+          performance.now() - roadFetchStartedAt,
+          { cacheHit: roadCacheHit },
+        );
+        roadFetchTelemetryRecorded = true;
+      }
+      if (roadRenderStartedAt !== null && !roadRenderTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.render",
+          "cancelled",
+          performance.now() - roadRenderStartedAt,
+          roadWaysCount === undefined ? {} : { returnedWays: roadWaysCount },
+        );
+        roadRenderTelemetryRecorded = true;
+      }
       if (this.roadRequestAbortController === controller) {
         this.roadRequestAbortController = null;
         this.activeRoadRequestKey = null;
