@@ -146,8 +146,7 @@ jobs:
       - name: Install FFmpeg for deterministic texture atlas baking
         uses: FedericoCarboni/setup-ffmpeg@v3
         with:
-          ffmpeg-version: 6.1.1
-          linking-type: static
+          ffmpeg-version: release
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
