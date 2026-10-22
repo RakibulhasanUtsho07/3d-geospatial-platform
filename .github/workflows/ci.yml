@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/generation-queue-worker
       - dev
       - rakibul-hasan
       - feat/generated-building-model-layer
@@ -106,6 +107,9 @@ jobs:
 
       - name: Test end-to-end media-to-model orchestration
         run: npm run test:media-to-model-workflow
+
+      - name: Test durable generation queue, authenticated API gate and end-to-end worker
+        run: npm run test:generation-queue
 
       - name: Test image quality preflight and near-duplicate view detection
         run: npm run test:image-quality-preflight
