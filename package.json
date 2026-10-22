@@ -20,6 +20,7 @@
     "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs",
     "test:building-search": "node --test tests/building-search.test.mjs",
     "test:footprint-area": "node --test tests/footprint-area.test.mjs",
+    "test:building-height": "node --test tests/building-height.test.mjs",
     "test:nearby-places": "node --test tests/nearby-places.test.mjs",
     "test:property-listings": "node --test tests/property-listings.test.mjs",
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
