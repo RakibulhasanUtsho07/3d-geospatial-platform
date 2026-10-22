@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -170,7 +170,7 @@ test("publishes a candidate with matching checksums, preserves versions and supp
   });
   assert.equal(first.modelId, "test-building");
   assert.match(first.assetUrl, /^\/models\/generated\/test-building-[a-f0-9]{12}\.glb$/);
-  assert.equal(hash(await readFile(path.join(root, "public", first.assetUrl.slice(1))), first.sha256);
+  assert.equal(hash(await readFile(path.join(root, "public", first.assetUrl.slice(1)))), first.sha256);
   const manifestPath = path.join(root, "public", "models", "generated", "manifest.json");
   let catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
   assert.equal(catalog.models[0].versions.length, 1);
