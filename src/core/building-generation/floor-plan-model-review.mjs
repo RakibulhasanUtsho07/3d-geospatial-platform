@@ -227,11 +227,11 @@ async function writeExclusiveAtomically(directory, name, bytes) {
 }
 
 async function sourceForCandidate(workspaceRoot, candidate) {
-  const sourceId = candidate.plan.source?.sourceId;
+  const sourceId = candidate.plan.evidence?.sourceId;
   if (!sourceId) throw new TypeError("Candidate geometry has no verified source ID.");
   const source = await loadVerifiedSource(workspaceRoot, candidate.buildingId, sourceId);
   if (source.sha256 !== candidate.report.input.verifiedSourceSha256 ||
-      source.sha256 !== candidate.plan.source.sha256) {
+      source.sha256 !== candidate.plan.evidence.sha256) {
     const error = new Error("The candidate's original uploaded source changed after generation.");
     error.code = "SOURCE_CHECKSUM_MISMATCH";
     throw error;
