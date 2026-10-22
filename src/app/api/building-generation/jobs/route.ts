@@ -10,7 +10,6 @@ import {
 } from "@/core/building-generation/generation-api-auth.mjs";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 
