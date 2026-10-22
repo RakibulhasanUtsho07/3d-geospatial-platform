@@ -147,6 +147,9 @@ function spatialCellDifferences(referencePixels, candidatePixels) {
       const candidate = [];
       let absoluteErrorSum = 0;
       let signedOffsetSum = 0;
+      let referenceEdgeCount = 0;
+      let candidateEdgeCount = 0;
+      let edgeEligibleCount = 0;
       for (let y = cellY * cellSize; y < (cellY + 1) * cellSize; y++) {
         for (let x = cellX * cellSize; x < (cellX + 1) * cellSize; x++) {
           const index = y * SAMPLE_WIDTH + x;
@@ -156,6 +159,15 @@ function spatialCellDifferences(referencePixels, candidatePixels) {
           candidate.push(right);
           absoluteErrorSum += Math.abs(right - left);
           signedOffsetSum += right - left;
+          if (x > 0 && x < SAMPLE_WIDTH - 1 && y > 0 && y < SAMPLE_HEIGHT - 1) {
+            const refGx = referencePixels[index + 1] - referencePixels[index - 1];
+            const refGy = referencePixels[index + SAMPLE_WIDTH] - referencePixels[index - SAMPLE_WIDTH];
+            const candidateGx = candidatePixels[index + 1] - candidatePixels[index - 1];
+            const candidateGy = candidatePixels[index + SAMPLE_WIDTH] - candidatePixels[index - SAMPLE_WIDTH];
+            if (Math.hypot(refGx, refGy) / 2 >= 18) referenceEdgeCount++;
+            if (Math.hypot(candidateGx, candidateGy) / 2 >= 18) candidateEdgeCount++;
+            edgeEligibleCount++;
+          }
         }
       }
 
@@ -178,6 +190,12 @@ function spatialCellDifferences(referencePixels, candidatePixels) {
         meanAbsoluteError: Number(cellMae.toFixed(3)),
         meanSignedLuminanceOffset: Number((signedOffsetSum / reference.length).toFixed(3)),
         localSsim16x16: Number((denominator === 0 ? 1 : numerator / denominator).toFixed(6)),
+        referenceEdgePixelCount: referenceEdgeCount,
+        candidateEdgePixelCount: candidateEdgeCount,
+        referenceEdgeDensity: edgeEligibleCount ? Number((referenceEdgeCount / edgeEligibleCount).toFixed(4)) : 0,
+        candidateEdgeDensity: edgeEligibleCount ? Number((candidateEdgeCount / edgeEligibleCount).toFixed(4)) : 0,
+        edgeDensityAbsoluteDifference: edgeEligibleCount
+          ? Number((Math.abs(referenceEdgeCount - candidateEdgeCount) / edgeEligibleCount).toFixed(4)) : 0,
       });
     }
   }
@@ -282,6 +300,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const maximumSpatialEdgeDistributionDistance = options.maximumSpatialEdgeDistributionDistance ?? 0.35;
   const maximumActiveEdgeCellJaccardDistance = options.maximumActiveEdgeCellJaccardDistance ?? 0.5;
   const maximumSpatialCellMaeMedianGap = options.maximumSpatialCellMaeMedianGap ?? 16;
+  const maximumLocalEdgeDensityDifference = options.maximumLocalEdgeDensityDifference ?? 0.2;
   if (!Number.isFinite(maxAspectRatioDifferencePercent) || maxAspectRatioDifferencePercent < 0 || maxAspectRatioDifferencePercent > 100) {
     throw new RangeError("maxAspectRatioDifferencePercent must be between 0 and 100");
   }
@@ -317,6 +336,10 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     maximumSpatialCellMaeMedianGap < 0 || maximumSpatialCellMaeMedianGap > 255) {
     throw new RangeError("maximumSpatialCellMaeMedianGap must be between 0 and 255");
   }
+  if (!Number.isFinite(maximumLocalEdgeDensityDifference) ||
+    maximumLocalEdgeDensityDifference < 0 || maximumLocalEdgeDensityDifference > 1) {
+    throw new RangeError("maximumLocalEdgeDensityDifference must be between 0 and 1");
+  }
 
   const referenceStructure = edgeStructure(referencePixels);
   const candidateStructure = edgeStructure(candidatePixels);
@@ -343,6 +366,14 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const spatialCellMaeMedian = median(spatialCellMaeValues);
   const spatialCellMaeMaximum = Math.max(...spatialCellMaeValues);
   const spatialCellMaeMedianGap = spatialCellMaeMaximum - spatialCellMaeMedian;
+  const cellEdgeDensityDifferences = spatialCellDiagnostics.map((cell) => cell.edgeDensityAbsoluteDifference);
+  const localEdgeDensityDifferenceMedian = median(cellEdgeDensityDifferences);
+  const localEdgeDensityDifferenceMaximum = Math.max(...cellEdgeDensityDifferences);
+  const highestEdgeDifferenceCells = [...spatialCellDiagnostics]
+    .sort((left, right) => right.edgeDensityAbsoluteDifference - left.edgeDensityAbsoluteDifference ||
+      left.cellY - right.cellY || left.cellX - right.cellX)
+    .slice(0, 4)
+    .map(({ cellX, cellY }) => ({ cellX, cellY }));
   const mse = meanSquaredError(referencePixels, candidatePixels);
   const mae = meanAbsoluteError(referencePixels, candidatePixels);
   const ssim = localSsim(referencePixels, candidatePixels);
@@ -379,6 +410,9 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   }
   if (spatialCellMaeMedianGap > maximumSpatialCellMaeMedianGap) {
     warnings.push("localized-image-difference-screening-hint");
+  }
+  if (localEdgeDensityDifferenceMaximum > maximumLocalEdgeDensityDifference) {
+    warnings.push("localized-edge-structure-difference-screening-hint");
   }
 
   return {
@@ -435,6 +469,9 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       spatialCellMaeMaximum: Number(spatialCellMaeMaximum.toFixed(3)),
       spatialCellMaeMedianGap: Number(spatialCellMaeMedianGap.toFixed(3)),
       highestDifferenceCells: topDifferenceCells(spatialCellDiagnostics),
+      localEdgeDensityDifferenceMedian: Number(localEdgeDensityDifferenceMedian.toFixed(4)),
+      localEdgeDensityDifferenceMaximum: Number(localEdgeDensityDifferenceMaximum.toFixed(4)),
+      highestEdgeDifferenceCells,
     },
     thresholds: {
       minimumLocalSsim,
@@ -446,6 +483,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       maximumSpatialEdgeDistributionDistance,
       maximumActiveEdgeCellJaccardDistance,
       maximumSpatialCellMaeMedianGap,
+      maximumLocalEdgeDensityDifference,
     },
     warnings,
     interpretation: warnings.length ? "review-recommended" : "no-screening-warning",
@@ -462,6 +500,7 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       "Edge orientation measures image-gradient direction, not compass heading or a verified building-facade orientation. The sharpness ratio is not a calibrated blur measurement.",
       "The 4x4 spatial edge grid screens for differences in where edge structure appears within a padded preview; it is not image registration, crop estimation, or proof that two views share a pose.",
       "Per-cell 16x16 MAE and SSIM summaries localize pixel differences only within the normalized preview. They do not isolate the building from background, and a localized brightness/texture/shadow difference is not automatically a geometry defect.",
+      "Per-cell edge-density differences can highlight changed line structure, but may also respond to anti-aliasing, texture frequency, shadows, and threshold-crossing noise. They are not a facade correctness score.",
       "The tool does not estimate or repair an image crop. Matching aspect ratios and spatial edge layouts still do not prove that the same facade or camera view is being compared.",
       "Use only reference/render pairs showing the same facade from a closely matched pose, with similar crop and exposure.",
       "Different illumination, shadows, weather, lens distortion, perspective, vegetation and occlusion can dominate the metrics even when geometry is sound.",
