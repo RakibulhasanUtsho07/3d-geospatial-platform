@@ -46,7 +46,8 @@ Task status starts at `open`; `verificationStatus` starts at `not-verified`; `au
 2. Review the diagnostic hotspots in the actual images. Have a reviewer propose a concrete change (for example, geometry proportions, camera orientation, texture projection or UV layout) and approve it before editing.
 3. Apply the approved correction in the relevant modelling tool. This command does not change the model.
 4. Run the relevant geometry/texture QA and generate a new render set.
-5. Create a new render/reference report from the new hashes. Only this new evidence can support verification of the revised result.
+5. Record the implementation timestamp, output-model SHA-256, geometry QA report SHA-256, an explicit yes/no decision for whether textures changed, the texture QA report SHA-256 when they did, and the generated render-manifest SHA-256.
+6. Create a new render/reference report from the new hashes. Its source-model and render-manifest hashes must exactly match the checklist implementation hashes, and the exact reference image SHA-256 must remain unchanged.
 
 The review source is required to be structurally valid and to contain valid model/manifest hashes. Human-entered comparison outcomes remain human judgements: this tool does not independently establish visual accuracy, source rights, camera pose, georeferencing or heritage fidelity.
 
@@ -72,4 +73,8 @@ Each `model-correction-review` task now includes a `reviewChecklist` template wi
 
 Use the checklist fields to record the human workflow in the correction-task JSON or in a tracked review artifact. Do not erase original evidence fields when adding progress. The checklist is a hand-off template, not a persistent database or workflow service: generating it does not save later edits automatically.
 
-The checklist does not change task priority, decide a correction category from metrics, authorize edits, or mark a task verified. A person must write and approve a concrete proposal before implementation. After geometry/texture QA and re-rendering, the separate verification command decides whether evidence gates pass; publication eligibility remains false.
+The checklist does not change task priority, decide a correction category from metrics, authorize edits, or mark a task verified. A person must write and approve a concrete proposal before implementation. The proposal needs a named proposer and valid timestamp; approval needs a named approver, timestamp and rationale. The implementation timestamp must be at or after the approval timestamp. The implementation evidence includes an output-model SHA-256, geometry QA report SHA-256, an explicit `textureChangeApplicable: true|false` choice, a texture QA report SHA-256 when true, and the generated render-manifest SHA-256.
+
+The separate verification command now requires every one of these gates in addition to a fresh exact-pair `match`, changed source-model and render-manifest hashes, and an unchanged reference-image hash. It reports `awaiting-approved-proposal`, `approval-order-violation`, or `incomplete-implementation-evidence` rather than `verified` when the corresponding gate fails. The recorded output-model and render-manifest hashes must equal the fresh review report provenance.
+
+**Evidence boundary:** this command validates the recorded SHA-256 values and their linkage to the fresh review report; it does not open the geometry/texture QA files or independently attest their contents, and it does not cryptographically authenticate the human identities or approval record. Keep the QA reports and signed/controlled human review records alongside the task JSON for audit. Publication eligibility remains false.
