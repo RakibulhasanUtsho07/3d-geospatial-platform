@@ -49,3 +49,12 @@ Task status starts at `open`; `verificationStatus` starts at `not-verified`; `au
 5. Create a new render/reference report from the new hashes. Only this new evidence can support verification of the revised result.
 
 The review source is required to be structurally valid and to contain valid model/manifest hashes. Human-entered comparison outcomes remain human judgements: this tool does not independently establish visual accuracy, source rights, camera pose, georeferencing or heritage fidelity.
+
+
+## Compare diagnostics in the verification cycle
+
+The verification command can carry the correction task's original `evidence.similarityDiagnostics.spatialHotspots` beside the new review report's validated spatial diagnostics. Each task result includes `diagnosticHotspotComparison` when either review cycle provides hotspots. It records original and verification hotspot cells plus the shared-cell count and cells unique to either report, separately for pixel-error and edge-density rankings.
+
+The comparison stays in the normalized 4×4 grayscale-preview coordinate space. An overlap or a change in the highest-ranked cells does not reveal the physical facade region, prove that a correction worked, or alter `verified` / `needs-more-work` / other task states. Both the original stored hotspots and the new diagnostics are checked for valid cell coordinates, ranking consistency and bounded metric values; malformed evidence is rejected. Older backlogs and new reports without hotspot metrics remain supported.
+
+The verification summary reports how many new comparisons include spatial hotspots and how many task results include a before/after hotspot comparison. The output's automation policy explicitly keeps hotspot overlap and all similarity diagnostics outside the verification decision gates.
