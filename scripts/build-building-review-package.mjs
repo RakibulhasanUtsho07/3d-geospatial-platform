@@ -79,17 +79,30 @@ async function main() {
   const correctionTaskBacklog = JSON.parse(backlogBytes.toString("utf8"));
   const readinessReport = JSON.parse(readinessBytes.toString("utf8"));
   const accuracyEvidence = JSON.parse(accuracyEvidenceBytes.toString("utf8"));
-  const correctionVerification = verifyRenderCorrectionTasks(correctionTaskBacklog, renderReferenceReview);
-  const verificationBytes = Buffer.from(JSON.stringify(correctionVerification, null, 2) + "\n");
   const verificationDiskBytes = await readRegularFile(path.resolve(verificationArg), "correction verification report");
-  if (sha256(verificationDiskBytes) !== sha256(verificationBytes)) {
-    throw new Error("Correction verification report does not match a fresh recomputation from the supplied backlog and review report.");
-  }
 
   const candidateGlbSha256 = sha256(glbBytes);
   const renderManifestSha256 = sha256(manifestBytes);
   const geometryQa = analyzeGlbQuality(glbBytes);
   const textureQa = reviewGlbTextureBindings(glbBytes);
+  // These are the exact report-file bytes included in the immutable package.
+  const geometryBytes = Buffer.from(JSON.stringify(geometryQa, null, 2) + "\n");
+  const textureBytes = Buffer.from(JSON.stringify(textureQa, null, 2) + "\n");
+  const correctionArtifactEvidence = {
+    validated: true,
+    candidateGlbSha256,
+    renderManifestSha256,
+    geometryQaReportSha256: sha256(geometryBytes),
+    textureQaReportSha256: sha256(textureBytes),
+    qaReportsRecomputedFromCandidateModel: true,
+  };
+  const correctionVerification = verifyRenderCorrectionTasks(
+    correctionTaskBacklog, renderReferenceReview, correctionArtifactEvidence,
+  );
+  const verificationBytes = Buffer.from(JSON.stringify(correctionVerification, null, 2) + "\n");
+  if (sha256(verificationDiskBytes) !== sha256(verificationBytes)) {
+    throw new Error("Correction verification report does not match fresh recomputation from the actual candidate, manifest and candidate-bound QA artifacts.");
+  }
 
   const actualRenderFiles = [];
   const renderFileBytes = new Map();
@@ -116,6 +129,7 @@ async function main() {
     renderReferenceReview,
     correctionTaskBacklog,
     correctionVerification,
+    correctionArtifactEvidence,
     accuracyEvidence,
   });
   if (semanticDigest(readinessReport) !== semanticDigest(recomputedReadiness)) {
@@ -150,8 +164,6 @@ async function main() {
     artifactType: "candidate-glb", sourcePath: glbPath, relativePath: "model/candidate.glb", bytes: glbBytes,
   });
 
-  const geometryBytes = Buffer.from(JSON.stringify(geometryQa, null, 2) + "\n");
-  const textureBytes = Buffer.from(JSON.stringify(textureQa, null, 2) + "\n");
   const reportItems = [
     ["geometry-qa", "reports/geometry-qa.json", geometryBytes, geometryQa],
     ["texture-qa", "reports/texture-qa.json", textureBytes, textureQa],
