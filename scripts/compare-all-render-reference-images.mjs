@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,12 +30,18 @@ async function readRegularFile(filePath, label, maxBytes = 10 * 1024 * 1024) {
   return { path: absolutePath, bytes: await readFile(absolutePath) };
 }
 
-async function assertImageReady(imagePath, label) {
+async function assertImageReady(imagePath, label, allowedRoot) {
   const entry = await lstat(imagePath);
   if (entry.isSymbolicLink() || !entry.isFile()) {
     throw new TypeError(label + " must be a regular image file and must not be a symlink");
   }
-  const fileStats = await stat(imagePath);
+  const [resolvedRoot, resolvedImage] = await Promise.all([realpath(allowedRoot), realpath(imagePath)]);
+  const relative = path.relative(resolvedRoot, resolvedImage);
+  if (!relative || relative === "." || relative === ".." ||
+    relative.startsWith(".." + path.sep) || path.isAbsolute(relative)) {
+    throw new TypeError(label + " resolves outside its permitted source directory");
+  }
+  const fileStats = await stat(resolvedImage);
   if (fileStats.size < 1 || fileStats.size > 250 * 1024 * 1024) {
     throw new RangeError(label + " must be non-empty and no larger than 250 MB");
   }
@@ -109,8 +115,8 @@ async function main() {
   await ensureDoesNotExist(plan.reviewInputWithDiagnosticsPath, "Generated review input");
 
   for (const pair of plan.pairs) {
-    await assertImageReady(pair.renderPath, "render " + pair.viewId);
-    await assertImageReady(pair.referencePath, "reference " + pair.referenceImageId);
+    await assertImageReady(pair.renderPath, "render " + pair.viewId, renderDirectory);
+    await assertImageReady(pair.referencePath, "reference " + pair.referenceImageId, path.dirname(reviewInputPath));
   }
 
   let reviewInputWritten = false;
