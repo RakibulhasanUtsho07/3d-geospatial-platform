@@ -129,7 +129,8 @@
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
-    "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs"
+    "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs",
+    "test:map-browser": "playwright test --config=playwright.config.ts"
   },
   "dependencies": {
     "cesium": "^1.146.0",
@@ -139,6 +140,7 @@
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
