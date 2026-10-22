@@ -15,6 +15,11 @@ const SAMPLE_BUILDING_FEATURE_COLLECTION = {
         id: "qa-building-01",
         height: 16,
         building: "residential",
+        "building:colour": "#2F6C96",
+        "roof:colour": "#D8B044",
+        "facade:material": "brick",
+        architecture_style: "painted-mid-rise-apartment",
+        facade_features: "symmetrical blue and yellow facade with balconies",
         subtype: "residential",
         _renderRole: "building",
         _renderPartCount: 0,
@@ -57,6 +62,30 @@ const SAMPLE_ROADS = [
     bridge: false,
     tunnel: false,
     coordinates: [[90.4060, 23.70840], [90.4061, 23.70857], [90.4062, 23.70878]],
+  },
+  {
+    id: "qa-bridge-road",
+    name: "QA Elevated Connector",
+    highway: "secondary",
+    roadClass: "collector",
+    widthMeters: 5,
+    surface: "paving_stones",
+    layer: 2,
+    bridge: true,
+    tunnel: false,
+    coordinates: [[90.4058, 23.70850], [90.4059, 23.70864], [90.4060, 23.70880]],
+  },
+  {
+    id: "qa-tunnel-path",
+    name: "QA Underpass Walkway",
+    highway: "footway",
+    roadClass: "path",
+    widthMeters: 1.2,
+    surface: "gravel",
+    layer: -1,
+    bridge: false,
+    tunnel: true,
+    coordinates: [[90.4062, 23.70843], [90.40615, 23.70858], [90.4061, 23.70874]],
   },
 ];
 
@@ -219,18 +248,37 @@ test("canvas drag stays interactive and zooming requests fresh road viewport bou
 
 test("fixture building and roads pass through Cesium geometry staging with expected visual counts", async ({ page }) => {
   const summaries: {
-    buildings: Array<{ returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number }>;
-    roads: Array<{ returnedWays?: number; renderedWays?: number; labelledRoads?: number }>;
+    buildings: Array<{
+      returnedFeatures?: number;
+      renderedBuildings?: number;
+      renderedExtrusions?: number;
+      visualStyleSummary?: { facadePatterns?: string[]; facadeColors?: string[]; roofColors?: string[] };
+    }>;
+    roads: Array<{
+      returnedWays?: number;
+      renderedWays?: number;
+      labelledRoads?: number;
+      styleSummary?: {
+        byClass?: Partial<Record<"arterial" | "collector" | "local" | "path", number>>;
+        centreLineRoads?: number;
+        taggedSurfaceRoads?: number;
+        elevatedRoads?: number;
+        tunnelRoads?: number;
+        uniqueColors?: number;
+        minWidthMeters?: number | null;
+        maxWidthMeters?: number | null;
+      };
+    }>;
   } = { buildings: [], roads: [] };
 
   page.on("console", (message) => {
     const args = message.args();
     void Promise.all(args.map((arg) => arg.jsonValue().catch(() => null))).then((values) => {
       if (values[0] === "[Overture] Building viewport rendered." && values[1] && typeof values[1] === "object") {
-        summaries.buildings.push(values[1] as { returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number });
+        summaries.buildings.push(values[1] as typeof summaries.buildings[number]);
       }
       if (values[0] === "[Roads] Vector road viewport rendered." && values[1] && typeof values[1] === "object") {
-        summaries.roads.push(values[1] as { returnedWays?: number; renderedWays?: number; labelledRoads?: number });
+        summaries.roads.push(values[1] as typeof summaries.roads[number]);
       }
     });
   });
@@ -249,10 +297,39 @@ test("fixture building and roads pass through Cesium geometry staging with expec
 
   await expect.poll(
     () => summaries.roads.some((summary) =>
-      summary.returnedWays === 2 &&
-      summary.renderedWays === 2 &&
+      summary.returnedWays === 4 &&
+      summary.renderedWays === 4 &&
       (summary.labelledRoads ?? 0) >= 1
     ),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  // Inspect the runtime summaries emitted after the Cesium entities are built.
+  // This checks actual style-policy application, not only the standalone style function.
+  await expect.poll(
+    () => summaries.buildings.some((summary) =>
+      summary.visualStyleSummary?.facadePatterns?.includes("painted-balcony") &&
+      summary.visualStyleSummary?.facadeColors?.includes("#2f6c96") &&
+      summary.visualStyleSummary?.roofColors?.includes("#d8b044")
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  await expect.poll(
+    () => summaries.roads.some((summary) => {
+      const styles = summary.styleSummary;
+      return styles?.byClass?.arterial === 1 &&
+        styles.byClass?.collector === 1 &&
+        styles.byClass?.local === 1 &&
+        styles.byClass?.path === 1 &&
+        styles.centreLineRoads === 1 &&
+        styles.taggedSurfaceRoads === 4 &&
+        styles.elevatedRoads === 1 &&
+        styles.tunnelRoads === 1 &&
+        styles.uniqueColors === 4 &&
+        styles.minWidthMeters === 1.2 &&
+        styles.maxWidthMeters === 8;
+    }),
     { timeout: 20_000 },
   ).toBe(true);
 });
