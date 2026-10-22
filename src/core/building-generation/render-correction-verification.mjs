@@ -466,6 +466,71 @@ function validateBacklog(backlog) {
   }
 }
 
+
+function validIsoTimestamp(value) {
+  return nonEmptyString(value) &&
+    /^\\d{4}-\\d{2}-\\d{2}T/.test(value) &&
+    Number.isFinite(Date.parse(value));
+}
+
+/**
+ * These checks validate human-recorded workflow fields and bind their model/manifest
+ * hashes to the fresh report. QA files themselves are not opened or cryptographically
+ * attested by this command; their SHA-256 values remain auditable evidence references.
+ */
+function assessCorrectionReadiness(checklist, sourceModelSha256, renderManifestSha256) {
+  const proposal = checklist?.correctionProposal;
+  const approval = proposal?.approval;
+  const implementation = checklist?.implementationEvidence;
+  const proposalWritten = nonEmptyString(proposal?.proposalText) &&
+    nonEmptyString(proposal?.proposedBy) &&
+    validIsoTimestamp(proposal?.proposedAt);
+  const proposalApproved = approval?.status === "approved" &&
+    nonEmptyString(approval?.approvedBy) &&
+    validIsoTimestamp(approval?.approvedAt) &&
+    nonEmptyString(approval?.rationale);
+  const implementationTimestampRecorded = validIsoTimestamp(implementation?.implementedAt);
+  const proposalTime = Date.parse(proposal?.proposedAt ?? "");
+  const approvalTime = Date.parse(approval?.approvedAt ?? "");
+  const implementationTime = Date.parse(implementation?.implementedAt ?? "");
+  const proposalAndApprovalChronologyValid = proposalWritten && proposalApproved &&
+    approvalTime >= proposalTime;
+  const approvalBeforeImplementation = proposalAndApprovalChronologyValid &&
+    implementationTimestampRecorded && approvalTime <= implementationTime;
+  const approvalOrderViolation = proposalWritten && proposalApproved &&
+    ((Number.isFinite(proposalTime) && Number.isFinite(approvalTime) && approvalTime < proposalTime) ||
+      (Number.isFinite(approvalTime) && Number.isFinite(implementationTime) && approvalTime > implementationTime));
+  const geometryQaEvidencePresent = validHash(implementation?.geometryQaReportSha256);
+  const textureChangeApplicabilityRecorded =
+    implementation?.textureChangeApplicable === true || implementation?.textureChangeApplicable === false;
+  const textureQaEvidencePresent = implementation?.textureChangeApplicable === false ||
+    implementation?.textureChangeApplicable === true && validHash(implementation?.textureQaReportSha256);
+  const outputModelMatchesVerificationReport =
+    validHash(implementation?.outputModelSha256) &&
+    implementation.outputModelSha256.toLowerCase() === sourceModelSha256;
+  const renderManifestMatchesVerificationReport =
+    validHash(implementation?.generatedRenderManifestSha256) &&
+    implementation.generatedRenderManifestSha256.toLowerCase() === renderManifestSha256;
+  const approvedProposalAndQaEvidenceComplete = proposalWritten && proposalApproved &&
+    approvalBeforeImplementation && geometryQaEvidencePresent &&
+    textureChangeApplicabilityRecorded && textureQaEvidencePresent &&
+    outputModelMatchesVerificationReport && renderManifestMatchesVerificationReport &&
+    implementationTimestampRecorded;
+  return {
+    proposalWritten,
+    proposalApproved,
+    approvalBeforeImplementation,
+    approvalOrderViolation,
+    implementationTimestampRecorded,
+    geometryQaEvidencePresent,
+    textureChangeApplicabilityRecorded,
+    textureQaEvidencePresent,
+    outputModelMatchesVerificationReport,
+    renderManifestMatchesVerificationReport,
+    approvedProposalAndQaEvidenceComplete,
+  };
+}
+
 /**
  * Evaluate correction tasks against a separate, valid report from the next review cycle.
  * The function produces an immutable verification snapshot; it never edits the backlog,
@@ -528,6 +593,9 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
 
     let status;
     let reason;
+    const correctionReadiness = task.kind === "model-correction-review"
+      ? assessCorrectionReadiness(task.reviewChecklist, sourceModelSha256, renderManifestSha256)
+      : null;
 
     if (!comparison) {
       status = "missing-evidence";
@@ -540,12 +608,21 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
         status = "blocked";
         reason = "The current render/reference pair is not comparable; geometry correctness remains unverified.";
       } else if (comparison.outcome === "match") {
-        if (sourceModelChanged && renderManifestChanged && referenceImageHashUnchanged) {
-          status = "verified";
-          reason = "A human reported a match for the exact view/reference pair on a changed model and render manifest, using the unchanged reference image hash.";
-        } else {
+        if (!(sourceModelChanged && renderManifestChanged && referenceImageHashUnchanged)) {
           status = "stale-evidence";
           reason = "A match was recorded, but verification requires changed model and render-manifest hashes plus the same reference image SHA-256 as the original task.";
+        } else if (!correctionReadiness.proposalWritten || !correctionReadiness.proposalApproved) {
+          status = "awaiting-approved-proposal";
+          reason = "A fresh render match is not enough: the task needs a written proposal, named proposer, valid timestamps, and explicit human approval with rationale.";
+        } else if (correctionReadiness.approvalOrderViolation) {
+          status = "approval-order-violation";
+          reason = "The checklist records approval after implementation or approval before the proposal timestamp; review the correction history instead of verifying it.";
+        } else if (!correctionReadiness.approvedProposalAndQaEvidenceComplete) {
+          status = "incomplete-implementation-evidence";
+          reason = "The proposal/approval chronology, implementation timestamp, geometry QA hash, explicit texture-change applicability, optional texture QA hash, or model/render-manifest hash binding is incomplete.";
+        } else {
+          status = "verified";
+          reason = "A human reported a match for the exact view/reference pair on changed model/render-manifest hashes, with the unchanged reference hash, an approved proposal recorded before implementation, and complete hash-bound QA evidence.";
         }
       } else {
         status = "needs-more-work";
@@ -588,6 +665,7 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       observedOutcome: comparison?.outcome ?? null,
       matchedEvidence,
       diagnosticHotspotComparison,
+      correctionReadiness,
       gates: {
         freshReviewReport: true,
         exactViewReferencePairMatched: Boolean(comparison),
@@ -595,6 +673,7 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
         sourceModelChanged,
         renderManifestChanged,
         modelCorrectionRequiresNewModelAndManifest: task.kind === "model-correction-review",
+        ...(correctionReadiness ?? {}),
       },
       reason,
       verified: status === "verified",
@@ -640,6 +719,9 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       blocked: taskResults.filter((item) => item.status === "blocked").length,
       missingEvidence: taskResults.filter((item) => item.status === "missing-evidence").length,
       staleEvidence: taskResults.filter((item) => item.status === "stale-evidence").length,
+      awaitingApprovedProposal: taskResults.filter((item) => item.status === "awaiting-approved-proposal").length,
+      approvalOrderViolation: taskResults.filter((item) => item.status === "approval-order-violation").length,
+      incompleteImplementationEvidence: taskResults.filter((item) => item.status === "incomplete-implementation-evidence").length,
       completed: taskResults.filter((item) => item.status === "completed").length,
       resolved: taskResults.filter((item) => item.status === "resolved").length,
       byStatus: statusCounts,
@@ -650,8 +732,13 @@ export function verifyRenderCorrectionTasks(backlog, verificationReviewReport) {
       geometryOrTextureEditsApplied: false,
       similarityDiagnosticsAffectVerificationStatus: false,
       hotspotOverlapAffectsVerificationStatus: false,
+      approvedProposalRequiredBeforeVerification: true,
+      geometryQaEvidenceRequired: true,
+      textureChangeApplicabilityMustBeRecorded: true,
+      implementationHashesMustMatchFreshReport: true,
+      qaArtifactsIndependentlyOpenedOrAttested: false,
       publicationEligible: false,
-      note: "Verification is an evidence-gated snapshot. Only exact-pair reviewer-reported matches on a changed model and changed render manifest can verify a model-correction task; diagnostic metrics and descriptive normalized-image hotspot overlap are carried for audit and never determine verification status. It is not an automated assessment of visual or heritage accuracy.",
+      note: "Verification is an evidence-gated snapshot. Model-correction tasks require an exact-pair human-reported match, changed model/manifest, unchanged reference hash, a recorded proposal approved before implementation, and QA/hash evidence bound to the fresh report. QA artifacts are not independently opened or attested by this command. Diagnostics and hotspot overlap never determine verification status.",
     },
   };
 }
