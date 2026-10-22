@@ -191,6 +191,40 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       referencePair.bytes === actualReference.bytes;
     if (!candidateMatches) errors.push("similarity-diagnostic-render-bytes-mismatch:" + viewId);
     if (!referenceMatches) errors.push("similarity-diagnostic-reference-bytes-mismatch:" + referenceImageId);
+    const structureMetricKeys = [
+      "referenceEdgePixelCount", "candidateEdgePixelCount",
+      "referenceEdgeDensity", "candidateEdgeDensity", "edgeDensityAbsoluteDifference",
+      "referenceMeanGradientMagnitude", "candidateMeanGradientMagnitude",
+      "referenceLaplacianVariance", "candidateLaplacianVariance",
+      "candidateToReferenceSharpnessRatio", "referenceEdgeOrientationHistogram",
+      "candidateEdgeOrientationHistogram", "edgeOrientationHistogramDistance",
+    ];
+    const structureMetricsPresent = structureMetricKeys.some((key) => Object.hasOwn(metrics, key));
+    const validHistogram = (histogram) => {
+      if (!Array.isArray(histogram) || histogram.length !== 8 ||
+        !histogram.every((value) => finite(value) && value >= 0 && value <= 1)) return false;
+      const total = histogram.reduce((sum, value) => sum + value, 0);
+      return total <= 1e-9 || Math.abs(total - 1) <= 0.01;
+    };
+    const structureMetricsValid = !structureMetricsPresent || (
+      Number.isSafeInteger(metrics.referenceEdgePixelCount) &&
+      metrics.referenceEdgePixelCount >= 0 && metrics.referenceEdgePixelCount <= 3844 &&
+      Number.isSafeInteger(metrics.candidateEdgePixelCount) &&
+      metrics.candidateEdgePixelCount >= 0 && metrics.candidateEdgePixelCount <= 3844 &&
+      finite(metrics.referenceEdgeDensity) && metrics.referenceEdgeDensity >= 0 && metrics.referenceEdgeDensity <= 1 &&
+      finite(metrics.candidateEdgeDensity) && metrics.candidateEdgeDensity >= 0 && metrics.candidateEdgeDensity <= 1 &&
+      finite(metrics.edgeDensityAbsoluteDifference) && metrics.edgeDensityAbsoluteDifference >= 0 && metrics.edgeDensityAbsoluteDifference <= 1 &&
+      finite(metrics.referenceMeanGradientMagnitude) && metrics.referenceMeanGradientMagnitude >= 0 && metrics.referenceMeanGradientMagnitude <= 255 &&
+      finite(metrics.candidateMeanGradientMagnitude) && metrics.candidateMeanGradientMagnitude >= 0 && metrics.candidateMeanGradientMagnitude <= 255 &&
+      finite(metrics.referenceLaplacianVariance) && metrics.referenceLaplacianVariance >= 0 && metrics.referenceLaplacianVariance <= 1000000 &&
+      finite(metrics.candidateLaplacianVariance) && metrics.candidateLaplacianVariance >= 0 && metrics.candidateLaplacianVariance <= 1000000 &&
+      (metrics.candidateToReferenceSharpnessRatio === null ||
+        finite(metrics.candidateToReferenceSharpnessRatio) && metrics.candidateToReferenceSharpnessRatio >= 0) &&
+      validHistogram(metrics.referenceEdgeOrientationHistogram) &&
+      validHistogram(metrics.candidateEdgeOrientationHistogram) &&
+      finite(metrics.edgeOrientationHistogramDistance) &&
+      metrics.edgeOrientationHistogramDistance >= 0 && metrics.edgeOrientationHistogramDistance <= 1
+    );
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
       finite(metrics.rootMeanSquaredError) && metrics.rootMeanSquaredError >= 0 && metrics.rootMeanSquaredError <= 255 &&
@@ -200,6 +234,7 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       metrics.differenceHashHammingDistance >= 0 && metrics.differenceHashHammingDistance <= 64 &&
       finite(report.comparability?.aspectRatioDifferencePercent) &&
       report.comparability.aspectRatioDifferencePercent >= 0 &&
+      structureMetricsValid &&
       report.warnings.every((warning) => typeof warning === "string");
     if (!metricsValid) errors.push("similarity-diagnostic-metrics-invalid:" + viewId + ":" + referenceImageId);
     if (!candidateMatches || !referenceMatches || !metricsValid) continue;
@@ -216,6 +251,21 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
         psnrDb: metrics.psnrDb,
         localSsim8x8: metrics.localSsim8x8,
         differenceHashHammingDistance: metrics.differenceHashHammingDistance,
+        ...(structureMetricsPresent ? {
+          referenceEdgePixelCount: metrics.referenceEdgePixelCount,
+          candidateEdgePixelCount: metrics.candidateEdgePixelCount,
+          referenceEdgeDensity: metrics.referenceEdgeDensity,
+          candidateEdgeDensity: metrics.candidateEdgeDensity,
+          edgeDensityAbsoluteDifference: metrics.edgeDensityAbsoluteDifference,
+          referenceMeanGradientMagnitude: metrics.referenceMeanGradientMagnitude,
+          candidateMeanGradientMagnitude: metrics.candidateMeanGradientMagnitude,
+          referenceLaplacianVariance: metrics.referenceLaplacianVariance,
+          candidateLaplacianVariance: metrics.candidateLaplacianVariance,
+          candidateToReferenceSharpnessRatio: metrics.candidateToReferenceSharpnessRatio,
+          referenceEdgeOrientationHistogram: [...metrics.referenceEdgeOrientationHistogram],
+          candidateEdgeOrientationHistogram: [...metrics.candidateEdgeOrientationHistogram],
+          edgeOrientationHistogramDistance: metrics.edgeOrientationHistogramDistance,
+        } : {}),
       },
       comparability: {
         aspectRatioDifferencePercent: report.comparability.aspectRatioDifferencePercent,
