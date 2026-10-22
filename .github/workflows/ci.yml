@@ -104,6 +104,8 @@ jobs:
         run: npm run test:floor-plan-model
       - name: Test uploaded-source verification and private floor-plan candidate API service
         run: npm run test:floor-plan-model-api
+      - name: Test immutable floor-plan review and gated publication lifecycle
+        run: npm run test:floor-plan-review
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
