@@ -114,7 +114,9 @@
     "run:generation-worker": "node scripts/run-generation-worker.mjs",
     "test:published-model-catalog": "node --test tests/published-model-catalog.test.mjs",
     "publish:building-model": "node scripts/publish-reviewed-building-model.mjs",
-    "activate:building-model-version": "node scripts/activate-published-model-version.mjs"
+    "activate:building-model-version": "node scripts/activate-published-model-version.mjs",
+    "test:publish-approved-generation-job": "node --test tests/publish-approved-generation-job.test.mjs",
+    "publish:approved-generation-job": "node scripts/publish-approved-generation-job.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
