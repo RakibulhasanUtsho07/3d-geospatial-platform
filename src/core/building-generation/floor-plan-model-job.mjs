@@ -33,6 +33,31 @@ function safeId(value, label) {
   return value;
 }
 
+function assertApiGeometryBudget(floorPlan) {
+  if (!Array.isArray(floorPlan.rooms) || floorPlan.rooms.length > 100) {
+    throw new RangeError("API floor plans may contain at most 100 rooms.");
+  }
+  if (!Array.isArray(floorPlan.walls) || floorPlan.walls.length > 500) {
+    throw new RangeError("API floor plans may contain at most 500 walls.");
+  }
+  let vertexCount = 0;
+  for (const room of floorPlan.rooms) {
+    if (!room || !Array.isArray(room.polygon) || room.polygon.length > 64) {
+      throw new RangeError("Each API room polygon may contain at most 64 vertices.");
+    }
+    vertexCount += room.polygon.length;
+  }
+  if (vertexCount > 4000) throw new RangeError("API floor plans may contain at most 4000 room vertices in total.");
+  let openingCount = 0;
+  for (const wall of floorPlan.walls) {
+    if (!wall || !Array.isArray(wall.openings)) {
+      throw new TypeError("Every API wall must provide an openings array.");
+    }
+    openingCount += wall.openings.length;
+  }
+  if (openingCount > 1000) throw new RangeError("API floor plans may contain at most 1000 openings.");
+}
+
 async function ensurePrivateDirectory(root, segments) {
   let current = root;
   for (const segment of segments) {
@@ -94,6 +119,7 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     throw new TypeError("source.sha256 must be a 64-character SHA-256 hash.");
   }
 
+  assertApiGeometryBudget(floorPlan);
   const loadedSource = await loadVerifiedSource(root, buildingId, sourceId);
   if (loadedSource.record.kind !== "floor-plan") {
     const error = new Error("The referenced source must have been uploaded with kind=floor-plan.");
@@ -165,8 +191,75 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     geometrySha256,
     sourceSha256: loadedSource.sha256,
     sourceUsageStatus: generated.report.input.sourceUsageStatus,
+    candidateUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId,
+    modelUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId + "/model",
     mapReady: false,
     publicationEligible: false,
     report: generated.report,
+  };
+}
+
+async function resolveCandidateDirectory(root, buildingId, candidateId) {
+  let current = root;
+  for (const segment of [".building-engine", "floor-plan-candidates", buildingId, candidateId]) {
+    const next = path.join(current, segment);
+    const entry = await lstat(next);
+    if (entry.isSymbolicLink() || !entry.isDirectory()) {
+      throw new TypeError("Floor-plan candidate path must contain only regular directories.");
+    }
+    const actual = await realpath(next);
+    if (!inside(root, actual)) throw new TypeError("Floor-plan candidate resolves outside workspaceRoot.");
+    current = actual;
+  }
+  return current;
+}
+
+async function readCandidateFile(candidateDirectory, name, maximumBytes) {
+  const filePath = path.join(candidateDirectory, name);
+  const entry = await lstat(filePath);
+  if (entry.isSymbolicLink() || !entry.isFile()) {
+    throw new TypeError("Floor-plan candidate artifact must be a regular file.");
+  }
+  if (entry.size <= 0 || entry.size > maximumBytes) {
+    throw new RangeError("Floor-plan candidate artifact size is invalid.");
+  }
+  const actual = await realpath(filePath);
+  if (!inside(candidateDirectory, actual)) {
+    throw new TypeError("Floor-plan candidate artifact resolves outside its candidate directory.");
+  }
+  return readFile(actual);
+}
+
+/** Load a private candidate and verify its GLB bytes against the saved report before serving it. */
+export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, candidateId }) {
+  const root = await realpath(path.resolve(workspaceRoot));
+  const bid = safeId(buildingId, "buildingId");
+  const cid = safeId(candidateId, "candidateId");
+  const directory = await resolveCandidateDirectory(root, bid, cid);
+  const reportBytes = await readCandidateFile(directory, "report.json", 2 * 1024 * 1024);
+  const report = JSON.parse(reportBytes.toString("utf8"));
+  if (!report || typeof report !== "object" ||
+      report.input?.buildingId !== bid ||
+      report.input?.floorPlanId === undefined ||
+      report.output?.format !== "glb" ||
+      typeof report.output?.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(report.output.sha256)) {
+    throw new TypeError("Floor-plan candidate report is invalid.");
+  }
+  const modelBytes = await readCandidateFile(directory, "model.glb", 200 * 1024 * 1024);
+  const actualSha256 = sha256(modelBytes);
+  if (actualSha256 !== report.output.sha256) {
+    const error = new Error("Stored floor-plan candidate GLB checksum does not match its report.");
+    error.code = "CANDIDATE_CHECKSUM_MISMATCH";
+    throw error;
+  }
+  return {
+    candidateId: cid,
+    buildingId: bid,
+    report,
+    modelBytes,
+    modelSha256: actualSha256,
+    mapReady: false,
+    publicationEligible: false,
   };
 }
