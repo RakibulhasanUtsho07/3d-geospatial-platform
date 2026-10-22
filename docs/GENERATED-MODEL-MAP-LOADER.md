@@ -47,7 +47,10 @@ PowerShell can compute the file digests:
 Run from the project root:
 
 \`\`\`powershell
-npm run publish:building-model -- . .\\.building-engine\\jobs\\<building-id>\\<job-id>-workflow\\model.glb .\\review\\<attestation>.json
+$workspace = (Get-Location).Path
+$candidate = ".building-engine/jobs/$buildingId/$jobId-workflow/model.glb"
+$attestation = "review/$attestationFile"
+npm run publish:building-model -- $workspace $candidate $attestation
 \`\`\`
 
 The command verifies the actual candidate bytes, evidence bytes, GLB 2.0 container, catalog structure and placement constraints. It copies a content-addressed GLB into \`public/models/generated/\` and updates \`public/models/generated/manifest.json\` with a version record. If the same model ID has an existing release, the new version becomes active and earlier versions are retained.
@@ -65,7 +68,10 @@ The catalog is versioned in the manifest, but models currently loaded into Cesiu
 If a newer version has a problem, read its prior \`versionId\` from the manifest and run:
 
 \`\`\`powershell
-npm run activate:building-model-version -- . <model-id> <previous-version-id>
+$workspace = (Get-Location).Path
+$modelId = "your-reviewed-model-id"
+$previousVersionId = "16-character-version-id-from-manifest"
+npm run activate:building-model-version -- $workspace $modelId $previousVersionId
 \`\`\`
 
 The command verifies the selected static GLB still matches its recorded SHA-256 before changing the catalog's \`activeVersion\`. Commit/deploy the changed manifest for a hosted deployment.
