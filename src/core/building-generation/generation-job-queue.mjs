@@ -298,6 +298,7 @@ export function getGenerationJobView(state) {
     nextAttemptAt: state.nextAttemptAt,
     lastError: state.lastError,
     result: state.result,
+    ...(state.review === undefined ? {} : { review: state.review }),
     mapReady: false,
     publicationEligible: false,
   };
