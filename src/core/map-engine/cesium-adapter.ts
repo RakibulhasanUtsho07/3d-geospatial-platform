@@ -188,6 +188,7 @@ export class CesiumAdapter implements MapEngine {
 
   private overtureBuildings: CesiumDataSource | null = null;
   private nearbyPlacesDataSource: import("cesium").CustomDataSource | null = null;
+  private nearbyPlacesRevision = 0;
   private readonly nearbyPlaceByEntityId = new Map<string, NearbyPlace>();
   private readonly placeSelectionListeners = new Set<
     (place: NearbyPlace | null) => void
@@ -2196,16 +2197,31 @@ export class CesiumAdapter implements MapEngine {
     const Cesium = this.cesium;
     if (!viewer || !Cesium || viewer.isDestroyed()) return;
 
+    const requestRevision = ++this.nearbyPlacesRevision;
     let dataSource = this.nearbyPlacesDataSource;
     if (!dataSource) {
-      dataSource = new Cesium.CustomDataSource("OpenStreetMap Nearby Places");
-      await viewer.dataSources.add(dataSource);
-      if (this.viewer !== viewer || viewer.isDestroyed()) {
-        viewer.dataSources.remove(dataSource, true);
+      const candidate = new Cesium.CustomDataSource("OpenStreetMap Nearby Places");
+      await viewer.dataSources.add(candidate);
+      if (
+        this.viewer !== viewer ||
+        viewer.isDestroyed() ||
+        requestRevision !== this.nearbyPlacesRevision
+      ) {
+        viewer.dataSources.remove(candidate, true);
         return;
       }
-      this.nearbyPlacesDataSource = dataSource;
+
+      // Another concurrent call may have created the shared source first.
+      if (this.nearbyPlacesDataSource) {
+        viewer.dataSources.remove(candidate, true);
+        dataSource = this.nearbyPlacesDataSource;
+      } else {
+        this.nearbyPlacesDataSource = candidate;
+        dataSource = candidate;
+      }
     }
+
+    if (requestRevision !== this.nearbyPlacesRevision) return;
 
     dataSource.entities.removeAll();
     this.nearbyPlaceByEntityId.clear();
@@ -2972,6 +2988,7 @@ export class CesiumAdapter implements MapEngine {
     this.loadedRoadBounds = null;
     this.roadNetworkDataSource = null;
     this.overtureBuildings = null;
+    this.nearbyPlacesRevision += 1;
     this.nearbyPlacesDataSource = null;
     this.propertyListingsDataSource = null;
     this.propertyNavigationEntity = null;
