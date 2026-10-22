@@ -1101,10 +1101,14 @@ export class CesiumAdapter implements MapEngine {
       );
       stageTelemetryRecorded = true;
 
+      const facadeColors = [...new Set(lodRecords.map((record) => record.visualStyle.facadeColor.toLowerCase()))].sort();
+      const roofColors = [...new Set(lodRecords.map((record) => record.visualStyle.roofColor.toLowerCase()))].sort();
       const visualStyleSummary = {
         facadePatterns: [...new Set(lodRecords.map((record) => record.visualStyle.pattern))].sort(),
-        facadeColors: [...new Set(lodRecords.map((record) => record.visualStyle.facadeColor.toLowerCase()))].sort(),
-        roofColors: [...new Set(lodRecords.map((record) => record.visualStyle.roofColor.toLowerCase()))].sort(),
+        facadeColors: facadeColors.slice(0, 8),
+        roofColors: roofColors.slice(0, 8),
+        uniqueFacadeColors: facadeColors.length,
+        uniqueRoofColors: roofColors.length,
       };
 
       console.info("[Overture] Building viewport rendered.", {
