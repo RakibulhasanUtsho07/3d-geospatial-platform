@@ -116,7 +116,7 @@ test("rejects a tampered private report or changed original source", async (t) =
     buildingId: "dhaka-demo",
     sourceId: second.source.record.id,
   });
-  await writeFile(second.source.assetPath, Buffer.concat([sourceBytes, Buffer.from("changed")]));
+  await writeFile(second.source.absoluteAssetPath, Buffer.concat([sourceBytes, Buffer.from("changed")]));
   await assert.rejects(
     loadFloorPlanRasterLineProposal({
       workspaceRoot: second.root,
