@@ -318,10 +318,11 @@ test("fixture building and roads pass through Cesium geometry staging with expec
   await expect.poll(
     () => summaries.roads.some((summary) => {
       const styles = summary.styleSummary;
-      return styles?.byClass?.arterial === 1 &&
-        styles.byClass?.collector === 1 &&
-        styles.byClass?.local === 1 &&
-        styles.byClass?.path === 1 &&
+      if (!styles?.byClass) return false;
+      return styles.byClass.arterial === 1 &&
+        styles.byClass.collector === 1 &&
+        styles.byClass.local === 1 &&
+        styles.byClass.path === 1 &&
         styles.centreLineRoads === 1 &&
         styles.taggedSurfaceRoads === 4 &&
         styles.elevatedRoads === 1 &&
