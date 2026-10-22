@@ -222,6 +222,8 @@ export async function proposeFloorPlanRasterLines({
 
   const config = normalizedOptions(options);
   let decoded;
+  let originalWidth;
+  let originalHeight;
   try {
     const image = sharp(imageBytes, {
       failOn: "error",
@@ -232,6 +234,8 @@ export async function proposeFloorPlanRasterLines({
     if (!metadata.width || !metadata.height || metadata.width < 1 || metadata.height < 1) {
       throw new TypeError("Source image dimensions are missing or invalid.");
     }
+    originalWidth = metadata.width;
+    originalHeight = metadata.height;
     if (metadata.width * metadata.height > MAX_SOURCE_PIXELS) {
       throw new RangeError("Source raster exceeds the 40 megapixel limit.");
     }
@@ -315,8 +319,8 @@ export async function proposeFloorPlanRasterLines({
     raster: {
       width,
       height,
-      originalWidth: decoded.info.width === width ? width : undefined,
-      originalHeight: decoded.info.height === height ? height : undefined,
+      originalWidth,
+      originalHeight,
       pixelUnits: "px",
       thresholdMethod: "otsu-global-grayscale",
       threshold,
