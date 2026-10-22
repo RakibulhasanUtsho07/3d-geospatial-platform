@@ -3154,6 +3154,14 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    if (this.performanceDiagnosticsHandle && typeof window !== "undefined") {
+      const target = window as PerformanceDiagnosticsWindow;
+      if (target.__MAP_ENGINE_PERFORMANCE__ === this.performanceDiagnosticsHandle) {
+        delete target.__MAP_ENGINE_PERFORMANCE__;
+      }
+      this.performanceDiagnosticsHandle = null;
+    }
+
     // Invalidate a pending dynamic import before it can create a new viewer.
     this.initializationRevision += 1;
 
