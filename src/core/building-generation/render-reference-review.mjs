@@ -473,6 +473,9 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
           spatialCellDiagnostics: metrics.spatialCellDiagnostics.map((cell) => ({
             cellX: cell.cellX,
             cellY: cell.cellY,
+            meanAbsoluteError: cell.meanAbsoluteError,
+            meanSignedLuminanceOffset: cell.meanSignedLuminanceOffset,
+            localSsim16x16: cell.localSsim16x16,
             edgeSampleCount: cell.edgeSampleCount,
             referenceEdgePixelCount: cell.referenceEdgePixelCount,
             candidateEdgePixelCount: cell.candidateEdgePixelCount,
