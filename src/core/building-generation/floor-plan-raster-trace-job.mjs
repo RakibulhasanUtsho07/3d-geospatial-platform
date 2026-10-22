@@ -226,6 +226,7 @@ export async function loadFloorPlanRasterTrace({ workspaceRoot, buildingId, trac
     throw error;
   }
   const trace = JSON.parse(bytes.toString("utf8"));
+  trace.artifactSha256 = sha256(bytes);
   if (!trace || trace.traceId !== tid || trace.buildingId !== bid ||
       trace.status !== "needs-human-trace-review" ||
       trace.source?.sha256 !== trace.sourceEvidence?.sha256 ||
