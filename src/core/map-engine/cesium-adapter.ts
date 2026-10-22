@@ -12,6 +12,7 @@ import {
 } from "./viewport-response-cache.mjs";
 import {
   shouldAbortViewportRequest,
+  shouldContinueViewportLoad,
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
 import {
@@ -248,6 +249,8 @@ export class CesiumAdapter implements MapEngine {
   private viewportLoadInProgress = false;
   private activeViewportEndpoint: string | null = null;
   private viewportRequestAbortController: AbortController | null = null;
+  // Invalidates payloads that have left fetch but are still staging as Cesium entities.
+  private viewportIntentRevision = 0;
   private readonly viewportResponseCache = new Map<string, unknown>();
   // The pending request is the latest camera intent. Null bounds means the
   // full pilot dataset; a null request means no work is queued.
@@ -648,6 +651,7 @@ export class CesiumAdapter implements MapEngine {
     }
 
     this.viewportLoadInProgress = true;
+    const requestRevision = this.viewportIntentRevision;
     let stagedDataSource: CesiumDataSource | null = null;
     let activeEndpoint: string | null = null;
     let requestController: AbortController | null = null;
@@ -704,6 +708,7 @@ export class CesiumAdapter implements MapEngine {
         }
 
         geoJson = await response.json();
+        if (!this.isViewportLoadCurrent(requestRevision)) return;
         cacheViewportResponse(
           this.viewportResponseCache,
           endpoint,
@@ -711,6 +716,8 @@ export class CesiumAdapter implements MapEngine {
           MAX_CACHED_VIEWPORT_RESPONSES,
         );
       }
+
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       // Cancel network work only until the payload is ready. After that, stage
       // the data source and coalesce later camera moves into a single follow-up.
@@ -755,6 +762,8 @@ export class CesiumAdapter implements MapEngine {
         },
       );
 
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
+
       if (
         !this.viewer ||
         this.viewer !== viewer ||
@@ -770,6 +779,10 @@ export class CesiumAdapter implements MapEngine {
       dataSource.show = false;
       await viewer.dataSources.add(dataSource);
       stagedDataSource = dataSource;
+
+      // Hiding the layer or queuing a different viewport while Cesium was
+      // staging this datasource makes it obsolete; finally removes it safely.
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       if (
         !this.viewer ||
@@ -1477,6 +1490,14 @@ export class CesiumAdapter implements MapEngine {
     );
   }
 
+  private isViewportLoadCurrent(requestRevision: number): boolean {
+    return shouldContinueViewportLoad(
+      requestRevision,
+      this.viewportIntentRevision,
+      this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+    );
+  }
+
   private queuePendingViewport(
     bounds: ViewportBounds,
     featureLimit: number,
@@ -1490,6 +1511,7 @@ export class CesiumAdapter implements MapEngine {
         nextEndpoint,
       )
     ) {
+      this.viewportIntentRevision += 1;
       this.viewportRequestAbortController?.abort();
     }
   }
@@ -1504,6 +1526,7 @@ export class CesiumAdapter implements MapEngine {
         nextEndpoint,
       )
     ) {
+      this.viewportIntentRevision += 1;
       this.viewportRequestAbortController?.abort();
     }
   }
@@ -2913,7 +2936,8 @@ export class CesiumAdapter implements MapEngine {
     for (const record of this.generatedModels.values()) record.revision += 1;
     this.generatedModels.clear();
 
-    // Prevent requests from surviving a retry or component unmount.
+    // Prevent requests and any post-fetch staging from surviving teardown.
+    this.viewportIntentRevision += 1;
     this.viewportRequestAbortController?.abort();
     this.viewportRequestAbortController = null;
     this.activeViewportEndpoint = null;
@@ -3547,7 +3571,8 @@ export class CesiumAdapter implements MapEngine {
       }
 
       if (!visible) {
-        // Do not keep fetching obsolete viewports while the building layer is hidden.
+        // Stop network work and invalidate GeoJSON staging that has already left fetch.
+        this.viewportIntentRevision += 1;
         this.pendingViewportRequest = null;
         this.viewportRequestAbortController?.abort();
       }

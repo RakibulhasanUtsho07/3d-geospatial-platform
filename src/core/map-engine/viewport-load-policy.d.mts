@@ -12,3 +12,9 @@ export function shouldLoadFullDatasetForWideViewport(
     north: number;
   } | null,
 ): boolean;
+
+export function shouldContinueViewportLoad(
+  requestRevision: number,
+  currentRevision: number,
+  buildingsLayerVisible: boolean,
+): boolean;
