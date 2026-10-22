@@ -167,7 +167,7 @@ test("road visibility can be disabled and restored", async ({ page }) => {
   await roads.uncheck({ noWaitAfter: true });
   await expect(roads).not.toBeChecked();
 
-  // Route the re-enable query to the deterministic empty response as well.
+  // Re-enable and reuse the same deterministic sample-road response.
   await roads.check({ noWaitAfter: true });
   await expect(roads).toBeChecked();
   // The adapter may reuse its already-loaded road viewport when toggling back
