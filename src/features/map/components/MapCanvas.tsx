@@ -12,6 +12,7 @@ import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type { RoadFeature } from "@/core/geospatial/road-network.mjs";
 import type {
   BuildingStyleAssignment,
+  GeneratedModelDefinition,
   MapFeatureSelection,
   MapLayer,
 } from "@/core/map-engine/types";
@@ -22,6 +23,7 @@ import PropertyListingsPanel from "./PropertyListingsPanel";
 import MapControls from "./MapControls";
 import MapLayersPanel from "./MapLayersPanel";
 import BuildingDetailsPanel from "./BuildingDetailsPanel";
+import GeneratedModelPanel from "./GeneratedModelPanel";
 import RoadDetailsPanel from "./RoadDetailsPanel";
 
 type MapStatus = "loading" | "ready" | "error";
@@ -605,6 +607,36 @@ export default function MapCanvas({
     });
   }
 
+  async function handleAddGeneratedModel(definition: GeneratedModelDefinition): Promise<void> {
+    const engine = engineRef.current;
+    if (!engine) throw new Error("The 3D map is not ready yet.");
+    await engine.addGeneratedModel(definition);
+  }
+
+  function handleGeneratedModelVisibility(id: string, visible: boolean): boolean {
+    return engineRef.current?.setGeneratedModelVisibility(id, visible) ?? false;
+  }
+
+  function handleRemoveGeneratedModel(id: string): boolean {
+    return engineRef.current?.removeGeneratedModel(id) ?? false;
+  }
+
+  function focusGeneratedModel(definition: GeneratedModelDefinition) {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.flyTo({
+      destination: {
+        longitude: definition.position.longitude,
+        latitude: definition.position.latitude,
+        height: Math.max(100, (definition.position.height ?? 0) + 100),
+      },
+      heading: definition.headingDegrees ?? 0,
+      pitch: -38,
+      roll: 0,
+      durationMs: 1000,
+    });
+  }
+
   return (
     <div className="relative h-full min-h-[600px] w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
       {/* This ref belongs to the same component as the initialization effect. */}
@@ -637,6 +669,15 @@ export default function MapCanvas({
         onSelectProperty={focusProperty}
         onCheckNearbyServices={checkNearbyServicesForProperty}
         onClearSelectedProperty={clearSelectedProperty}
+      />
+
+      <GeneratedModelPanel
+        key={retryKey}
+        disabled={status !== "ready"}
+        onAdd={handleAddGeneratedModel}
+        onSetVisibility={handleGeneratedModelVisibility}
+        onRemove={handleRemoveGeneratedModel}
+        onFocus={focusGeneratedModel}
       />
 
       {layers.length > 0 && (
