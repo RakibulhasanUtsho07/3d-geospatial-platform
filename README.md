@@ -17,6 +17,7 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 - A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output, and source/confidence + geometry-integrity QA reports.
 - A map-side **Generated models** loader for placing already-reviewed GLB assets at explicit WGS84 coordinates, with focus, visibility and removal controls; loading is session-only and does not publish candidate files.
+- A checksum-verified, versioned **published model catalog** with explicit human-review attestations and rollback; see [Published Generated Model Workflow](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md).
 - Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
 - Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion, an FFmpeg-based image-quality preflight, and a shared GLB integrity/geometry QA report for procedural, photogrammetry, and single-image AI outputs.
 - Evidence-based Building Accuracy Benchmark that reports dimension errors, horizontal ground-control residuals, and human visual-review outcomes separately; it never calculates an unsupported single accuracy percentage.
