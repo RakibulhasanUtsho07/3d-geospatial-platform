@@ -205,3 +205,8 @@ Use `npm run benchmark:building-accuracy -- <candidate.glb> <benchmark.json> [re
 Use `npm run compare:render-reference-images -- <reference.jpg|png> <candidate-render.jpg|png> [report.json]` to calculate bounded grayscale MAE/RMSE, PSNR, local SSIM and difference-hash diagnostics for one manually paired view. These are diagnostic hints only: same-facade/camera alignment remains a human responsibility, and the metrics never certify architectural accuracy or approve publication. See [the diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
 
 Optional per-view similarity diagnostics can be attached to the existing reference-review report using `similarityDiagnosticsPath` in each comparison. The workflow validates that report metrics identify the exact render/reference bytes and leaves all human review outcomes unchanged. See the [image diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
+
+
+### Durable building generation, review and map publishing
+
+Generation requests are persisted in a local file-backed queue and run by `scripts/run-generation-worker.mjs`. The separate review API verifies the completed GLB and QA report hashes before recording an explicit decision. To publish a reviewed job to the map's versioned GLB catalog, use `npm run publish:approved-generation-job` with the job ID and explicit surveyed placement. Read the [generation queue/worker guide](docs/GENERATION-JOBS-API-AND-WORKER.md), [reviewed model catalog guide](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md), and [map loader guide](docs/GENERATED-MODEL-MAP-LOADER.md). The job itself remains fail-closed after publication; catalog publication does not bypass the review evidence gate.
