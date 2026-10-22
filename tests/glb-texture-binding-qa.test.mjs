@@ -109,5 +109,11 @@ test("includes UV seam review candidates for adjacent faces mapped differently",
   assert.equal(report.valid,true);
   assert.equal(report.counts.uvSeamCandidateCount,1);
   assert.equal(report.primitiveReports[0].uvSeamReviews[0].seamCandidateCount,1);
+  assert.equal(report.counts.texturePixelSeamCandidateCount,1);
+  assert.equal(report.primitiveReports[0].texturePixelSeamReviews.length,1);
+  assert.ok(["insufficient-resolution","pixel-analysis-unavailable"].includes(
+    report.primitiveReports[0].texturePixelSeamReviews[0].status,
+  ));
   assert.ok(report.warnings.includes("mesh-0-primitive-0-uv-seam-review-candidates-present"));
+  assert.ok(report.warnings.some((warning) => warning.startsWith("mesh-0-primitive-0-texture-pixel-seam-analysis-")));
 });

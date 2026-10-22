@@ -16,10 +16,15 @@ export function reviewTextureImageContent(bytes, mimeType, options = {}) {
   if (!Buffer.isBuffer(bytes)) throw new TypeError("image bytes must be a Buffer");
   const minRecommendedDimension = options.minRecommendedDimension ?? 512;
   const maxPixels = options.maxPixels ?? 16_777_216;
+  const includePixelData = options.includePixelData === true;
+  const maxPixelDataPixels = options.maxPixelDataPixels ?? 4_194_304;
   if (!Number.isSafeInteger(minRecommendedDimension) || minRecommendedDimension < 1) {
     throw new RangeError("minRecommendedDimension must be a positive integer");
   }
   if (!Number.isSafeInteger(maxPixels) || maxPixels < 1) throw new RangeError("maxPixels must be a positive integer");
+  if (!Number.isSafeInteger(maxPixelDataPixels) || maxPixelDataPixels < 1) {
+    throw new RangeError("maxPixelDataPixels must be a positive integer");
+  }
   const result = { format: null, width: null, height: null, pixelAnalysis: "not-available", risks: [] };
   if (mimeType !== "image/png" || bytes.length < 24 || !bytes.subarray(0,8).equals(PNG_SIGNATURE)) {
     result.risks.push("pixel-content-not-analysed-for-this-image-format");
@@ -128,5 +133,10 @@ export function reviewTextureImageContent(bytes, mimeType, options = {}) {
   result.opaquePixelRatio = Number(opaquePixelRatio.toFixed(5));
   if (count === 0 || opaquePixelRatio < 0.01) result.risks.push("mostly-transparent-or-empty-texture-review");
   else if (standardDeviation < 1 && luminanceBuckets.size <= 1) result.risks.push("near-uniform-texture-review");
+  if (includePixelData && width * height <= maxPixelDataPixels) {
+    // The caller must consume and strip this transient pixel payload before serializing
+    // the review report. It is intended only for bounded in-memory seam sampling.
+    result.pixelData = { width, height, channels, colorType, pixels };
+  }
   return result;
 }
