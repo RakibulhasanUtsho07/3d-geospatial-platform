@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { getActivePublishedModels } from "@/core/building-generation/published-model-catalog-reader.mjs";
 
 import type { GeneratedModelDefinition } from "@/core/map-engine/types";
 
@@ -10,6 +11,15 @@ interface GeneratedModelPanelProps {
   onSetVisibility: (id: string, visible: boolean) => boolean;
   onRemove: (id: string) => boolean;
   onFocus: (definition: GeneratedModelDefinition) => void;
+}
+
+interface PublishedCatalogModel {
+  definition: GeneratedModelDefinition;
+  versionId: string;
+  sha256: string;
+  bytes: number;
+  publishedAt: string;
+  review: { reviewer: string; reviewedAt: string; checks: Record<string, boolean> };
 }
 
 interface LoadedGeneratedModel {
@@ -44,6 +54,44 @@ export default function GeneratedModelPanel({
   const [height, setHeight] = useState("0");
   const [heading, setHeading] = useState("0");
   const [scale, setScale] = useState("1");
+  const [catalogModels, setCatalogModels] = useState<PublishedCatalogModel[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [selectedCatalogModelId, setSelectedCatalogModelId] = useState("");
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setCatalogLoading(true);
+    setCatalogError(null);
+
+    fetch("/models/generated/manifest.json", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Published model catalog could not be loaded (HTTP " + response.status + ").");
+        return response.json() as Promise<unknown>;
+      })
+      .then((payload) => {
+        const active = getActivePublishedModels(payload) as PublishedCatalogModel[];
+        if (cancelled) return;
+        setCatalogModels(active);
+        setSelectedCatalogModelId((current) =>
+          current && active.some((item) => item.definition.id === current)
+            ? current
+            : active[0]?.definition.id ?? ""
+        );
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          setCatalogError(cause instanceof Error ? cause.message : "Published model catalog is invalid.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [open, catalogRefreshKey]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -87,6 +135,35 @@ export default function GeneratedModelPanel({
       setId(nextId);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Could not load this GLB model.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleLoadPublishedModel() {
+    setError(null);
+    setMessage(null);
+    const published = catalogModels.find((item) => item.definition.id === selectedCatalogModelId);
+    if (!published) {
+      setError("Choose a published model version first.");
+      return;
+    }
+    if (models.some((item) => item.definition.id === published.definition.id)) {
+      setError("This model is already loaded in the current map session. Remove it before reloading.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await onAdd(published.definition);
+      setModels((current) => [...current, { definition: published.definition, visible: true }]);
+      onFocus(published.definition);
+      setMessage(
+        (published.definition.name ?? published.definition.id) +
+        " published version " + published.versionId + " loaded. SHA-256: " + published.sha256.slice(0, 12) + "…"
+      );
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Could not load this published model.");
     } finally {
       setBusy(false);
     }
@@ -170,6 +247,70 @@ export default function GeneratedModelPanel({
 
             <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/5 px-3 py-2.5 text-xs leading-5 text-amber-100">
               The generator output in <code>.building-engine/jobs/</code> is a review candidate, not a public asset. After review, place the approved GLB under <code>public/</code> and enter its URL below. This panel does not publish, copy, or approve model files.
+            </div>
+
+            <section className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.04] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-emerald-100">Published model catalog</h3>
+                  <p className="mt-1 text-xs leading-5 text-zinc-400">
+                    Loads the active version recorded in the reviewed catalog and shows its checksum.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={catalogLoading || busy}
+                  onClick={() => {
+                    setCatalogModels([]);
+                    setCatalogError(null);
+                    setCatalogRefreshKey((current) => current + 1);
+                  }}
+                  className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-zinc-200 hover:bg-white/10 disabled:opacity-40"
+                >
+                  Refresh catalog
+                </button>
+              </div>
+              {catalogError && <p role="alert" className="mt-2 text-xs leading-5 text-red-200">{catalogError}</p>}
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <select
+                  value={selectedCatalogModelId}
+                  onChange={(event) => setSelectedCatalogModelId(event.target.value)}
+                  disabled={catalogLoading || busy || catalogModels.length === 0}
+                  aria-label="Published model to load"
+                  className="min-w-0 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-emerald-300/60 disabled:opacity-50"
+                >
+                  {catalogModels.length === 0 ? (
+                    <option value="">{catalogLoading ? "Loading catalog…" : "No published models yet"}</option>
+                  ) : catalogModels.map((item) => (
+                    <option key={item.definition.id} value={item.definition.id}>
+                      {(item.definition.name ?? item.definition.id) + " · v" + item.versionId}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={catalogLoading || busy || catalogModels.length === 0 || !selectedCatalogModelId}
+                  onClick={handleLoadPublishedModel}
+                  className="rounded-lg bg-emerald-300 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {catalogLoading ? "Loading catalog…" : "Load published model"}
+                </button>
+              </div>
+              {catalogModels.find((item) => item.definition.id === selectedCatalogModelId) && (
+                <p className="mt-2 break-all text-[11px] leading-5 text-zinc-400">
+                  SHA-256 {catalogModels.find((item) => item.definition.id === selectedCatalogModelId)?.sha256} · reviewed by {catalogModels.find((item) => item.definition.id === selectedCatalogModelId)?.review.reviewer}
+                </p>
+              )}
+              <p className="mt-2 text-[11px] leading-5 text-zinc-500">
+                Catalog review claims are operator-supplied attestations. Publishing checks the recorded file hashes; it does not independently prove rights, architecture or survey quality.
+              </p>
+            </section>
+
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <h3 className="text-sm font-semibold text-zinc-200">Manual / development preview</h3>
+              <p className="mt-1 text-xs leading-5 text-amber-100/80">
+                This path bypasses the publication catalog. Use it only for local review; production map content should be loaded from the published catalog above.
+              </p>
             </div>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
