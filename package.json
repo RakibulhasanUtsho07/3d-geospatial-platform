@@ -127,7 +127,8 @@
     "test:floor-plan-raster-line-proposals": "node --test tests/floor-plan-raster-line-proposals.test.mjs",
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
-    "test:road-request-policy": "node --test tests/road-request-policy.test.mjs"
+    "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
+    "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
