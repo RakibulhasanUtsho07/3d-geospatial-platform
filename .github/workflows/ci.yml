@@ -283,6 +283,9 @@ jobs:
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
 
+      - name: Test stale road viewport request cancellation
+        run: npm run test:road-request-policy
+
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
 
