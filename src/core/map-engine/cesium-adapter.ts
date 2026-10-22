@@ -67,6 +67,10 @@ type BuildingHeight = {
     | "fallback-estimate"
     | "reference-reported-height"
     | "reference-reported-floors";
+  unclampedMeters: number;
+  heightWasClamped: boolean;
+  unclampedBaseHeight: number;
+  baseHeightWasClamped: boolean;
 };
 
 type BuildingPolygonLodStyleCache = {
@@ -2075,10 +2079,13 @@ export class CesiumAdapter implements MapEngine {
       (style.reportedHeightMeters as number) >= 3 &&
       (style.reportedHeightMeters as number) <= 300
     ) {
+      const reportedHeight = style.reportedHeightMeters as number;
       return {
-        meters: style.reportedHeightMeters as number,
-        baseHeight: sourceHeight.baseHeight,
+        ...sourceHeight,
+        meters: reportedHeight,
         source: "reference-reported-height",
+        unclampedMeters: reportedHeight,
+        heightWasClamped: false,
       };
     }
 
@@ -2088,10 +2095,13 @@ export class CesiumAdapter implements MapEngine {
       (style.reportedFloorCount as number) >= 1 &&
       (style.reportedFloorCount as number) <= 100
     ) {
+      const estimatedHeight = (style.reportedFloorCount as number) * 3;
       return {
-        meters: Math.min(300, Math.max(3, (style.reportedFloorCount as number) * 3)),
-        baseHeight: sourceHeight.baseHeight,
+        ...sourceHeight,
+        meters: Math.min(300, Math.max(3, estimatedHeight)),
         source: "reference-reported-floors",
+        unclampedMeters: estimatedHeight,
+        heightWasClamped: estimatedHeight < 3 || estimatedHeight > 300,
       };
     }
 
@@ -2719,6 +2729,10 @@ export class CesiumAdapter implements MapEngine {
           overture_feature_id: entity.id,
           rendered_height_m: heightInfo.meters,
           height_source: heightInfo.source,
+          rendered_height_unclamped_m: heightInfo.unclampedMeters,
+          rendered_height_was_clamped: heightInfo.heightWasClamped,
+          rendered_base_height_unclamped_m: heightInfo.unclampedBaseHeight,
+          rendered_base_height_was_clamped: heightInfo.baseHeightWasClamped,
         };
 
         const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
