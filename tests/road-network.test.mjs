@@ -133,3 +133,23 @@ test("road cache key rejects malformed bounds or feature limits", () => {
     /positive integer limit/,
   );
 });
+
+test("road cache key uses the map's four-decimal request identity", () => {
+  const request = {
+    west: 90.400049,
+    south: 23.740051,
+    east: 90.420149,
+    north: 23.760151,
+    limit: 900,
+  };
+  assert.equal(
+    buildRoadNetworkCacheKey(request),
+    [
+      request.west.toFixed(4),
+      request.south.toFixed(4),
+      request.east.toFixed(4),
+      request.north.toFixed(4),
+      request.limit,
+    ].join("|"),
+  );
+});
