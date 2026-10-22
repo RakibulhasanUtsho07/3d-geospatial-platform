@@ -110,3 +110,15 @@ This helps separate a broad luminance shift from changes in visible line structu
 The report retains its original raw MAE/RMSE/SSIM metrics and adds a separate brightness-normalized comparison. It estimates the median candidate-minus-reference luminance offset across the 64×64 previews, subtracts that offset from the candidate preview (bounded to the grayscale range), and reports normalized MAE/RMSE/SSIM plus the percentage reduction in MAE. When normalization materially reduces pixel error, the report adds `global-luminance-offset-reduces-pixel-error-screening-hint`.
 
 This is a diagnostic counterfactual only: neither source image is modified, and the raw values remain unchanged. It can help indicate when a broad brightness offset explains much of the error, but cannot prove the images match. Real lighting may vary by region; clipping, shadows, material colours, contrast and camera exposure can all leave residual differences. The warning never changes a human outcome or publication eligibility.
+
+
+## Batch diagnostics for all declared comparisons
+
+Use the batch command when a review input contains several explicit render/reference pairs. It computes bounded similarity diagnostics for each pair, saves one JSON report per pair, creates a **new copy** of the review input with **similarityDiagnosticsPath** attached to each comparison, and delegates final evidence/hash validation to the existing review CLI. The original review input and source images are left untouched.
+
+    npm run test:render-reference-batch
+    npm run compare:render-reference-batch -- ".\\building-review\\renders" ".\\building-review\\review-input.json" ".\\building-review\\review-report.json" "diagnostics-run-01"
+
+Arguments are the render directory, the review input JSON, a **new** output report path, and an optional new diagnostics-directory name. The render directory must contain render-review-manifest.json; reference image paths in the input are relative to the review-input directory. Every comparison must explicitly name an existing **viewId** and **referenceImageId**. Unknown IDs, duplicate pairs, unsafe paths, symlinked images/reports, missing files, an existing diagnostics directory, or an existing output report are rejected instead of guessed or overwritten. The batch is capped at 250 declared comparisons per run.
+
+On success, the command prints the generated diagnostics directory and the path to the copied review-input JSON, then writes the regular review report. The report's **valid** flag and existing human-entered outcomes still determine review status; similarity metrics do not automatically turn a comparison into a match or certify publication eligibility. Use a new diagnostics directory and output report for a new run so prior evidence remains intact.
