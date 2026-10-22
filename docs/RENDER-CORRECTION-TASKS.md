@@ -78,3 +78,16 @@ The checklist does not change task priority, decide a correction category from m
 The separate verification command now requires every one of these gates in addition to a fresh exact-pair `match`, changed source-model and render-manifest hashes, and an unchanged reference-image hash. It reports `awaiting-approved-proposal`, `approval-order-violation`, or `incomplete-implementation-evidence` rather than `verified` when the corresponding gate fails. The recorded output-model and render-manifest hashes must equal the fresh review report provenance. Existing model-correction tasks without a completed checklist remain readable, but they will not pass verification until a human records the required proposal, approval and implementation evidence.
 
 **Evidence boundary:** this command validates the recorded SHA-256 values and their linkage to the fresh review report; it does not open the geometry/texture QA files or independently attest their contents, and it does not cryptographically authenticate the human identities or approval record. Keep the QA reports and signed/controlled human review records alongside the task JSON for audit. Publication eligibility remains false.
+
+
+## File-backed implementation evidence
+
+Generate the QA report files from the corrected candidate before recording their hashes:
+
+```powershell
+npm run create:render-correction-qa-evidence -- ".\\candidate-next.glb" ".\\geometry-qa-next.json" ".\\texture-qa-next.json"
+```
+
+The command prints the candidate GLB SHA-256 and the raw SHA-256 of each generated QA report file. Copy the exact hashes into `reviewChecklist.implementationEvidence`; set `textureChangeApplicable` to `true` or `false` based on the actual approved scope. Use the render-manifest raw file hash recorded by the fresh review report for `generatedRenderManifestSha256`.
+
+Before verification, preserve these files and run the expanded command documented in [Render correction verification](./RENDER-CORRECTION-VERIFICATION.md). The verifier rejects symbolic links, a candidate/manifest that differs from the fresh review provenance, and QA JSON that does not exactly match reports recomputed from the candidate bytes. QA checks are therefore tied to the on-disk candidate, not merely to editable hash fields in the task JSON. Use new output paths for each model revision; generated evidence is never silently overwritten.
