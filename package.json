@@ -119,7 +119,8 @@
     "publish:approved-generation-job": "node scripts/publish-approved-generation-job.mjs",
     "test:generation-media-upload": "node --test tests/generation-media-upload.test.mjs",
     "test:floor-plan-model": "node --test tests/floor-plan-model.test.mjs tests/floor-plan-model-cli.test.mjs",
-    "generate:floor-plan-model": "node scripts/generate-floor-plan-model.mjs"
+    "generate:floor-plan-model": "node scripts/generate-floor-plan-model.mjs",
+    "test:floor-plan-model-api": "node --test tests/floor-plan-model-job.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

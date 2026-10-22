@@ -260,3 +260,55 @@ npm run generate:floor-plan-model -- .\floor-plan-geometry.json .\output\ground-
 ~~~
 
 A source checksum in JSON is treated as metadata unless this optional original-file check succeeds. The generated GLB is always a candidate with `mapReady=false` and `publicationEligible=false`; it is not automatically published or georeferenced by itself. Verify the trace, metres, heading, origin, dimensions, doors/windows and source rights before review. Furniture, stairs, ceilings, electrical/plumbing systems and automatic PDF/image wall extraction are not included in this worker.
+
+
+## 13. Authenticated floor-plan candidate API
+
+After uploading the source file with kind=floor-plan, the authenticated backend can build a private candidate from an explicit traced geometry JSON. The original uploaded file is checked through the protected media-intake record; the JSON floorPlan.source.sha256 must match the actual stored source bytes.
+
+Endpoints use Authorization: Bearer GENERATION_API_TOKEN:
+
+- POST /api/building-generation/floor-plan-models — submit a { "floorPlan": { ... } } JSON body; returns a private candidate ID, report and model URL.
+- GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId> — return the saved report after verifying the saved GLB hash.
+- GET /api/building-generation/floor-plan-models/<buildingId>/<candidateId>/model — download the private GLB after checking its SHA-256 against the report.
+
+Example source upload (use the SHA-256 returned in the JSON response):
+
+~~~powershell
+$env:GENERATION_API_TOKEN = "<server-configured-token>"
+curl.exe -X POST "http://localhost:3000/api/building-generation/uploads" `
+  -H "Authorization: Bearer $env:GENERATION_API_TOKEN" `
+  -F "buildingId=dhaka-demo" `
+  -F "sourceId=measured-plan-pdf" `
+  -F "kind=floor-plan" `
+  -F "licence=CC BY 4.0" `
+  -F "file=@E:\\Building-Engine-Workspace\\uploads\\floor-plan.pdf"
+~~~
+
+Then send the measured geometry to the candidate endpoint. Reuse the actual source.sha256 from the upload response; the placeholder below is not a real hash:
+
+~~~json
+{
+  "floorPlan": {
+    "schemaVersion": "1.0.0",
+    "id": "ground-floor",
+    "buildingId": "dhaka-demo",
+    "name": "Ground Floor",
+    "units": "m",
+    "origin": { "longitude": 90.406, "latitude": 23.709, "heightM": 3.5, "headingDegrees": 0 },
+    "level": { "elevationM": 0, "wallHeightM": 3, "wallThicknessM": 0.15, "floorThicknessM": 0.12 },
+    "source": { "sourceId": "measured-plan-pdf", "sha256": "<exact-upload-source-sha256>" },
+    "rooms": [{ "id": "living", "name": "Living", "polygon": [[0,0],[5,0],[5,4],[0,4]] }],
+    "walls": [
+      { "id": "north", "start": [0,0], "end": [5,0], "openings": [] },
+      { "id": "east", "start": [5,0], "end": [5,4], "openings": [] },
+      { "id": "south", "start": [5,4], "end": [0,4], "openings": [] },
+      { "id": "west", "start": [0,4], "end": [0,0], "openings": [] }
+    ]
+  }
+}
+~~~
+
+Submit the complete geometry in floorPlan; the short JSON above shows the fields and must be adjusted to the measured plan. API resource limits are 2 MiB JSON, 100 rooms, 500 walls, 4,000 room vertices total (at most 64 per room) and 1,000 openings. Candidate artifacts are stored privately under .building-engine/floor-plan-candidates/<buildingId>/<candidateId>/; they are not copied into public/. Report and GLB download endpoints use the bearer token and verify the saved model checksum.
+
+This API does not trace room or wall geometry out of a PDF/image, approve rights, survey the origin/heading, or publish the GLB. Source-use status is included in the report, and an unreviewed source adds a warning. Candidate status remains mapReady=false and publicationEligible=false.

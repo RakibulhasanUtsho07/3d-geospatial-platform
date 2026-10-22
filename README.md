@@ -223,3 +223,8 @@ Generation job enqueueing now preflights each supplied source: the path must alr
 ### Measured floor-plan to interior GLB
 
 A deterministic shell builder now extrudes **explicit measured/vector floor-plan geometry** into a reviewable GLB with rooms, floor slabs, walls, doors and windows: `npm run generate:floor-plan-model -- <geometry.json> <output.glb> [original-source-file]`. It does not infer room walls from a PDF/image; floor-plan tracing/conversion and human review are still required. See the [engine guide](docs/BUILDING-GENERATION-ENGINE.md#12-measured-floor-plan-vectors-to-interior-glb).
+
+
+### Authenticated floor-plan candidate API
+
+The backend can create a private interior GLB candidate from a complete measured/vector floor-plan JSON tied to an uploaded source classified as floor-plan. It verifies the source checksum against the protected intake store, saves a report/model privately, and offers bearer-token-protected report and GLB retrieval endpoints. This does not extract vector geometry from a raster/PDF automatically or publish models to the map. See the engine guide section 13, Authenticated floor-plan candidate API.
