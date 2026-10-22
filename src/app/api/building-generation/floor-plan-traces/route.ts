@@ -93,13 +93,14 @@ export async function POST(request: Request) {
   if (!options || typeof options !== "object" || Array.isArray(options)) {
     return NextResponse.json({ error: "options must be an object." }, { status: 400 });
   }
-  for (const key of Object.keys(options)) {
+  const optionRecord = options as Record<string, unknown>;
+  for (const key of Object.keys(optionRecord)) {
     if (!ALLOWED_OPTIONS.has(key)) {
       return NextResponse.json({ error: "Unsupported trace option: " + key }, { status: 400 });
     }
   }
-  if (options.maxEdge !== undefined &&
-      (typeof options.maxEdge !== "number" || !Number.isSafeInteger(options.maxEdge) || options.maxEdge < 256 || options.maxEdge > 4096)) {
+  if (optionRecord.maxEdge !== undefined &&
+      (typeof optionRecord.maxEdge !== "number" || !Number.isSafeInteger(optionRecord.maxEdge) || optionRecord.maxEdge < 256 || optionRecord.maxEdge > 4096)) {
     return NextResponse.json({ error: "maxEdge must be an integer between 256 and 4096." }, { status: 400 });
   }
 
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
       workspaceRoot,
       buildingId: input.buildingId,
       sourceId: input.sourceId,
-      options: options as Record<string, number>,
+      options: optionRecord as Record<string, number>,
     });
     return NextResponse.json(result, {
       status: 201,
