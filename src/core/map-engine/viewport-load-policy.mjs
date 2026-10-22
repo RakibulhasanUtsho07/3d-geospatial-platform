@@ -10,3 +10,47 @@ export function shouldAbortViewportRequest(activeEndpoint, nextEndpoint) {
   return activeEndpoint !== null &&
     activeEndpoint !== nextEndpoint;
 }
+
+
+/**
+ * A wide camera view needs the full pilot dataset unless it is already active.
+ * A bounded viewport cannot guarantee coverage for a world-scale view.
+ */
+export function shouldLoadFullDatasetForWideViewport(
+  hasLoadedBuildings,
+  loadedViewportBounds,
+) {
+  return !hasLoadedBuildings || loadedViewportBounds !== null;
+}
+
+
+/**
+ * Keep an in-flight viewport stage only while its intent is current and the
+ * building layer is visible. This also covers work after fetch has completed,
+ * when there is no longer an AbortController to stop GeoJSON staging.
+ */
+export function shouldContinueViewportLoad(
+  requestRevision,
+  currentRevision,
+  buildingsLayerVisible,
+) {
+  return requestRevision === currentRevision && buildingsLayerVisible === true;
+}
+
+
+/**
+ * A viewport batch/stage may continue only while its camera intent, layer
+ * visibility, and viewer instance all remain current.
+ */
+export function shouldContinueViewportStage(
+  requestRevision,
+  currentRevision,
+  buildingsLayerVisible,
+  viewerIsCurrent,
+) {
+  return shouldContinueViewportLoad(
+    requestRevision,
+    currentRevision,
+    buildingsLayerVisible,
+  ) && viewerIsCurrent === true;
+}

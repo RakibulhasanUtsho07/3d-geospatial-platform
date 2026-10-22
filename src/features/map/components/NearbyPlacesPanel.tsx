@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+
+import { isCurrentAsyncRequest } from "@/core/geospatial/async-request-policy.mjs";
 
 import {
   NEARBY_PLACE_CATEGORIES,
@@ -50,7 +52,13 @@ export default function NearbyPlacesPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const activeSearchControllerRef = useRef<AbortController | null>(null);
   const results = loadedPlaces ?? localResults;
+
+  useEffect(() => () => {
+    activeSearchControllerRef.current?.abort();
+    activeSearchControllerRef.current = null;
+  }, []);
 
   function toggleCategory(category: NearbyPlaceCategory, checked: boolean) {
     setCategories((previous) => checked
@@ -71,6 +79,19 @@ export default function NearbyPlacesPanel({
       return;
     }
 
+    activeSearchControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeSearchControllerRef.current = controller;
+    const requestSignal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(30_000),
+    ]);
+    const isCurrentRequest = () => isCurrentAsyncRequest(
+      controller,
+      activeSearchControllerRef.current,
+      controller.signal.aborted,
+    );
+
     setIsLoading(true);
     setErrorMessage(null);
     setHasSearched(true);
@@ -85,9 +106,11 @@ export default function NearbyPlacesPanel({
       });
       const response = await fetch(
         "/api/geospatial/nearby-places?" + params.toString(),
-        { signal: AbortSignal.timeout(30_000) },
+        { signal: requestSignal },
       );
       const payload = (await response.json()) as PlacesResponse;
+
+      if (!isCurrentRequest()) return;
 
       if (!response.ok) {
         throw new Error(payload.error ?? "Nearby-place search failed.");
@@ -100,6 +123,8 @@ export default function NearbyPlacesPanel({
       onClearSelectedPlace();
       await onPlacesLoaded(payload.results);
     } catch (error: unknown) {
+      if (!isCurrentRequest()) return;
+
       setResults([]);
       try {
         await onPlacesLoaded([]);
@@ -110,7 +135,10 @@ export default function NearbyPlacesPanel({
         error instanceof Error ? error.message : "Nearby-place search failed.",
       );
     } finally {
-      setIsLoading(false);
+      if (activeSearchControllerRef.current === controller) {
+        activeSearchControllerRef.current = null;
+        setIsLoading(false);
+      }
     }
   }
 

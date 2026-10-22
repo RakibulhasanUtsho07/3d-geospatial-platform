@@ -16,6 +16,8 @@ An experimental browser-based 3D geospatial app focused on exploring Dhaka build
 - Selectable property map pins and a geodesic straight-line indicator from the discovery centre, plus nearest-per-category matching against loaded OpenStreetMap services within 1.5 km.
 - A generated spatial-tile pipeline with a GeoJSON-index fallback and API diagnostics.
 - A deterministic Building Generation Engine core: validated versioned BuildingSpec, procedural GLB output, and source/confidence + geometry-integrity QA reports.
+- A map-side **Generated models** loader for placing already-reviewed GLB assets at explicit WGS84 coordinates, with focus, visibility and removal controls; loading is session-only and does not publish candidate files.
+- A checksum-verified, versioned **published model catalog** with explicit human-review attestations and rollback; see [Published Generated Model Workflow](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md).
 - Local media intake with file-signature checking, SHA-256 content-addressed storage and licence/reuse status tracking; bounded video-to-frame extraction through FFmpeg.
 - Multi-view COLMAP reconstruction adapter with textured PLY-to-GLB conversion, an FFmpeg-based image-quality preflight, and a shared GLB integrity/geometry QA report for procedural, photogrammetry, and single-image AI outputs.
 - Evidence-based Building Accuracy Benchmark that reports dimension errors, horizontal ground-control residuals, and human visual-review outcomes separately; it never calculates an unsupported single accuracy percentage.
@@ -52,6 +54,12 @@ Open [http://localhost:3000/map](http://localhost:3000/map). The `predev` script
 
 
 If the app reports that the Overture pilot dataset is missing, ensure the source GeoJSON file exists at `data/overture/dhaka-buildings-3d-pilot.geojson`, then run the tile build command below.
+
+## Loading a reviewed generated model in the map
+
+The `/map` view includes a **Generated models** panel that loads an existing GLB static asset and lets you set its WGS84 origin, height, heading and scale. For safety, it does not upload files or automatically expose output from the local generation workspace.
+
+Only after appropriate review, place the approved GLB under `public/models/generated/`, open `/map`, and enter its same-origin URL (for example `/models/generated/my-building.glb`). Model placements exist only in the current map session. See [Generated Model Map Loader](docs/GENERATED-MODEL-MAP-LOADER.md) for the full workflow and limits.
 
 ## Building Generation Engine
 
@@ -197,3 +205,42 @@ Use `npm run benchmark:building-accuracy -- <candidate.glb> <benchmark.json> [re
 Use `npm run compare:render-reference-images -- <reference.jpg|png> <candidate-render.jpg|png> [report.json]` to calculate bounded grayscale MAE/RMSE, PSNR, local SSIM and difference-hash diagnostics for one manually paired view. These are diagnostic hints only: same-facade/camera alignment remains a human responsibility, and the metrics never certify architectural accuracy or approve publication. See [the diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
 
 Optional per-view similarity diagnostics can be attached to the existing reference-review report using `similarityDiagnosticsPath` in each comparison. The workflow validates that report metrics identify the exact render/reference bytes and leaves all human review outcomes unchanged. See the [image diagnostics guide](docs/RENDER-IMAGE-SIMILARITY-DIAGNOSTICS.md).
+
+
+### Durable building generation, review and map publishing
+
+Generation requests are persisted in a local file-backed queue and run by `scripts/run-generation-worker.mjs`. The separate review API verifies the completed GLB and QA report hashes before recording an explicit decision. To publish a reviewed job to the map's versioned GLB catalog, use `npm run publish:approved-generation-job` with the job ID and explicit surveyed placement. Read the [generation queue/worker guide](docs/GENERATION-JOBS-API-AND-WORKER.md), [reviewed model catalog guide](docs/PUBLISHED-GENERATED-MODEL-WORKFLOW.md), and [map loader guide](docs/GENERATED-MODEL-MAP-LOADER.md). The job itself remains fail-closed after publication; catalog publication does not bypass the review evidence gate.
+
+
+### Authenticated generation media upload
+
+The backend also provides `POST /api/building-generation/uploads` for authenticated multipart uploads of building photos, videos and floor-plan PDFs. It enforces a bounded request body, validates file signatures, writes a private content-addressed source record, and leaves its rights status `unreviewed`. Set `GENERATION_API_TOKEN` and keep it on the server; never embed it in browser JavaScript. The API upload limit is 50 MiB per file (images retain the intake module's 20 MiB limit). See [Building Generation Engine](docs/BUILDING-GENERATION-ENGINE.md#8-authenticated-media-upload-api) for usage.
+
+
+Generation job enqueueing now preflights each supplied source: the path must already exist inside the private workspace as a non-empty regular file, with no symlink path components, and must stay within the source-kind size limit. Actual media signature and provenance validation still runs in the worker.
+
+
+### Measured floor-plan to interior GLB
+
+A deterministic shell builder now extrudes **explicit measured/vector floor-plan geometry** into a reviewable GLB with rooms, floor slabs, walls, doors and windows: `npm run generate:floor-plan-model -- <geometry.json> <output.glb> [original-source-file]`. It does not infer room walls from a PDF/image; floor-plan tracing/conversion and human review are still required. See the [engine guide](docs/BUILDING-GENERATION-ENGINE.md#12-measured-floor-plan-vectors-to-interior-glb).
+
+
+### Authenticated floor-plan candidate API
+
+The backend can create a private interior GLB candidate from a complete measured/vector floor-plan JSON tied to an uploaded source classified as floor-plan. It verifies the source checksum against the protected intake store, saves a report/model privately, and offers bearer-token-protected report and GLB retrieval endpoints. This does not extract vector geometry from a raster/PDF automatically or publish models to the map. See the engine guide section 13, Authenticated floor-plan candidate API.
+
+
+### Floor-plan review and publication
+
+Candidates created from measured floor-plan vectors can be reviewed through a separate authenticated review API, then published only via an explicit hash-verified catalog command after approval. Source rights must be reviewed before candidate generation; rejected or changes-requested reviews do not create a publishing attestation. Run `npm run publish:floor-plan-candidate -- <workspaceRoot> <buildingId> <candidateId>` only after an approved review. Automatic PDF/image-to-vector tracing remains unimplemented. See section 14 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
+
+
+### Raster floor-plan line proposals
+
+A new authenticated endpoint analyzes an already-ingested JPEG/PNG/WebP floor-plan raster and returns a hash-verified private report of long horizontal/vertical line candidates. It deliberately does not claim to infer rooms, wall semantics, metric scale or geospatial placement. PDF pages must first be rasterized separately. Review the [engine guide, section 15](docs/BUILDING-GENERATION-ENGINE.md) before using proposals; they remain unpublished and `mapReady=false`.
+
+
+## Dynamic map performance and release validation
+
+- [Dynamic Map Performance Baseline](docs/MAP-PERFORMANCE-BASELINE.md) — inspect local viewport/building/road timings and run reference-vs-optimized CPU microbenchmarks.
+- [Dynamic Map Release Checklist](docs/DYNAMIC-MAP-RELEASE-CHECKLIST.md) — pre-release browser, real-data visual QA, attribution, resilience checks, rollback guidance and known limitations.

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildOverpassRoadQuery,
+  buildRoadNetworkCacheKey,
   normalizeOverpassRoadElements,
   parseRoadNetworkParams,
 } from "../src/core/geospatial/road-network.mjs";
@@ -84,4 +85,71 @@ test("uses explicit OSM width ahead of typical road-class widths", () => {
   assert.equal(road.widthSource, "tagged");
   assert.equal(road.layer, 1);
   assert.equal(road.bridge, true);
+});
+
+test("road cache key distinguishes nearby viewports while matching map request precision", () => {
+  const first = {
+    west: 90.4011,
+    south: 23.7411,
+    east: 90.4211,
+    north: 23.7611,
+    limit: 900,
+  };
+  const second = {
+    ...first,
+    west: 90.4014,
+    east: 90.4214,
+  };
+
+  assert.equal(first.west.toFixed(3), second.west.toFixed(3));
+  assert.equal(first.east.toFixed(3), second.east.toFixed(3));
+  assert.notEqual(first.west.toFixed(4), second.west.toFixed(4));
+  assert.notEqual(first.east.toFixed(4), second.east.toFixed(4));
+  assert.notEqual(
+    buildRoadNetworkCacheKey(first),
+    buildRoadNetworkCacheKey(second),
+  );
+});
+
+test("road cache key is stable for identical viewports and includes feature limit", () => {
+  const request = { ...defaultBounds };
+  assert.equal(
+    buildRoadNetworkCacheKey(request),
+    buildRoadNetworkCacheKey({ ...request }),
+  );
+  assert.notEqual(
+    buildRoadNetworkCacheKey(request),
+    buildRoadNetworkCacheKey({ ...request, limit: 899 }),
+  );
+});
+
+test("road cache key rejects malformed bounds or feature limits", () => {
+  assert.throws(
+    () => buildRoadNetworkCacheKey({ ...defaultBounds, west: Number.NaN }),
+    /finite bounds/,
+  );
+  assert.throws(
+    () => buildRoadNetworkCacheKey({ ...defaultBounds, limit: 0 }),
+    /positive integer limit/,
+  );
+});
+
+test("road cache key uses the map's four-decimal request identity", () => {
+  const request = {
+    west: 90.400049,
+    south: 23.740051,
+    east: 90.420149,
+    north: 23.760151,
+    limit: 900,
+  };
+  assert.equal(
+    buildRoadNetworkCacheKey(request),
+    [
+      request.west.toFixed(4),
+      request.south.toFixed(4),
+      request.east.toFixed(4),
+      request.north.toFixed(4),
+      request.limit,
+    ].join("|"),
+  );
 });

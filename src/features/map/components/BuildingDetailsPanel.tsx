@@ -1,6 +1,7 @@
 "use client";
 
 import { SQUARE_METERS_TO_SQUARE_FEET } from "@/core/geospatial/footprint-area.mjs";
+import { resolveRenderedHeightForDisplay } from "@/core/buildings/rendered-height-display.mjs";
 import type { MapFeatureSelection } from "@/core/map-engine/types";
 import StreetImageryPanel from "./StreetImageryPanel";
 
@@ -171,22 +172,10 @@ export default function BuildingDetailsPanel({
       "buildingname",
     ]) ?? "Selected 3D Building";
 
-  const referenceReportedHeight = findNumericProperty(feature.properties, [
-    "architecture_profile_reported_height_m",
-  ]);
   const referenceReportedFloors = findNumericProperty(feature.properties, [
     "architecture_profile_reported_floor_count",
   ]);
-  const sourceRenderedHeight = findNumericProperty(feature.properties, [
-    "rendered_height_m",
-    "height_m",
-    "height",
-  ]);
-  const height = referenceReportedHeight ?? (
-    referenceReportedFloors !== null
-      ? referenceReportedFloors * 3
-      : sourceRenderedHeight
-  );
+  const height = resolveRenderedHeightForDisplay(feature.properties);
   const floorCount = referenceReportedFloors ?? findNumericProperty(feature.properties, [
     "num_floors",
     "numfloors",
@@ -200,6 +189,14 @@ export default function BuildingDetailsPanel({
     feature.properties.architecture_profile_reported_metadata,
   );
   const heightSource = findProperty(feature.properties, ["height_source"]);
+  const renderedHeightWasClamped = feature.properties.rendered_height_was_clamped === true;
+  const unclampedRenderedHeight = findNumericProperty(feature.properties, [
+    "rendered_height_unclamped_m",
+  ]);
+  const renderedBaseHeightWasClamped = feature.properties.rendered_base_height_was_clamped === true;
+  const unclampedRenderedBaseHeight = findNumericProperty(feature.properties, [
+    "rendered_base_height_unclamped_m",
+  ]);
   const footprintAreaM2 =
     typeof feature.footprintAreaM2 === "number" &&
     Number.isFinite(feature.footprintAreaM2) &&
@@ -334,6 +331,16 @@ export default function BuildingDetailsPanel({
                 <p className="mt-1 text-[11px] text-slate-500">
                   {getHeightSourceLabel(heightSource)}
                 </p>
+                {renderedHeightWasClamped && unclampedRenderedHeight !== null && (
+                  <p className="mt-2 text-[11px] leading-4 text-amber-200">
+                    Input/estimate: {unclampedRenderedHeight.toFixed(1)} m. Display capped to {height.toFixed(1)} m.
+                  </p>
+                )}
+                {renderedBaseHeightWasClamped && unclampedRenderedBaseHeight !== null && (
+                  <p className="mt-2 text-[11px] leading-4 text-amber-200">
+                    Base-height input: {unclampedRenderedBaseHeight.toFixed(1)} m. Display capped to 100 m.
+                  </p>
+                )}
               </div>
             )}
 

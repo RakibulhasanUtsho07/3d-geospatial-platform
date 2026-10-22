@@ -10,7 +10,20 @@ import {
   cacheViewportResponse,
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
-import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
+import {
+  shouldAbortViewportRequest,
+  shouldContinueViewportLoad,
+  shouldContinueViewportStage,
+  shouldLoadFullDatasetForWideViewport,
+} from "./viewport-load-policy.mjs";
+import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
+import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
+import { createMapPerformanceTelemetry } from "./performance-telemetry.mjs";
+import type {
+  MapPerformanceMetric,
+  MapPerformanceOutcome,
+  MapPerformanceSnapshot,
+} from "./performance-telemetry.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
@@ -26,9 +39,13 @@ import {
 } from "../geospatial/heritage-landmarks.mjs";
 
 import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
+import { resolveBuildingHeight } from "../buildings/building-height.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
+import { flattenRoadCoordinates } from "../geospatial/flatten-road-coordinates.mjs";
+import { selectNearestLodRecords } from "./lod-record-selection.mjs";
+import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import { normalizeGeneratedModelDefinition } from "./generated-model-policy.mjs";
 import type {
@@ -52,6 +69,15 @@ type CesiumMaterialProperty = import("cesium").MaterialProperty;
 type CesiumCartesian3 = import("cesium").Cartesian3;
 type CesiumCartesian2 = import("cesium").Cartesian2;
 
+type MapPerformanceDiagnosticsHandle = {
+  snapshot: () => MapPerformanceSnapshot;
+  reset: () => void;
+};
+
+type PerformanceDiagnosticsWindow = Window & {
+  __MAP_ENGINE_PERFORMANCE__?: MapPerformanceDiagnosticsHandle;
+};
+
 type BuildingProperties = Record<string, unknown>;
 
 type BuildingHeight = {
@@ -63,6 +89,10 @@ type BuildingHeight = {
     | "fallback-estimate"
     | "reference-reported-height"
     | "reference-reported-floors";
+  unclampedMeters: number;
+  heightWasClamped: boolean;
+  unclampedBaseHeight: number;
+  baseHeightWasClamped: boolean;
 };
 
 type BuildingPolygonLodStyleCache = {
@@ -147,6 +177,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 export class CesiumAdapter implements MapEngine {
+  private initializationRevision = 0;
   private viewer: CesiumViewer | null = null;
   private cesium: CesiumModule | null = null;
   private heritageModel: import("cesium").Model | null = null;
@@ -179,6 +210,7 @@ export class CesiumAdapter implements MapEngine {
 
   private overtureBuildings: CesiumDataSource | null = null;
   private nearbyPlacesDataSource: import("cesium").CustomDataSource | null = null;
+  private nearbyPlacesRevision = 0;
   private readonly nearbyPlaceByEntityId = new Map<string, NearbyPlace>();
   private readonly placeSelectionListeners = new Set<
     (place: NearbyPlace | null) => void
@@ -238,11 +270,51 @@ export class CesiumAdapter implements MapEngine {
   private loadedViewportFeatureLimit: number | null = null;
   private hasLoadedBuildings = false;
   private viewportLoadInProgress = false;
+  private viewportLoadToken = 0;
   private activeViewportEndpoint: string | null = null;
   private viewportRequestAbortController: AbortController | null = null;
+  // Invalidates payloads that have left fetch but are still staging as Cesium entities.
+  private viewportIntentRevision = 0;
   private readonly viewportResponseCache = new Map<string, unknown>();
-  private pendingViewportBounds: ViewportBounds | null = null;
-  private pendingViewportFeatureLimit: number | null = null;
+  private readonly performanceTelemetry = createMapPerformanceTelemetry();
+  private performanceDiagnosticsHandle: MapPerformanceDiagnosticsHandle | null = null;
+  // The pending request is the latest camera intent. Null bounds means the
+  // full pilot dataset; a null request means no work is queued.
+  private pendingViewportRequest: {
+    bounds: ViewportBounds | null;
+    featureLimit: number | null;
+  } | null = null;
+
+  private installMapPerformanceDiagnostics(): void {
+    if (typeof window === "undefined" || process.env.NODE_ENV === "production") {
+      return;
+    }
+
+    const target = window as PerformanceDiagnosticsWindow;
+    const handle: MapPerformanceDiagnosticsHandle = {
+      snapshot: () => this.performanceTelemetry.getSnapshot(),
+      reset: () => this.performanceTelemetry.reset(),
+    };
+    target.__MAP_ENGINE_PERFORMANCE__ = handle;
+    this.performanceDiagnosticsHandle = handle;
+  }
+
+  private recordMapPerformance(
+    metric: MapPerformanceMetric,
+    outcome: MapPerformanceOutcome,
+    durationMs: number,
+    details: {
+      cacheHit?: boolean;
+      featureCount?: number;
+      returnedWays?: number;
+      statusCode?: number;
+    } = {},
+  ): void {
+    const event = this.performanceTelemetry.record(metric, outcome, durationMs, details);
+    if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+      window.dispatchEvent(new CustomEvent("map:performance", { detail: event }));
+    }
+  }
 
   async initialize(container: HTMLElement): Promise<void> {
     if (this.viewer && !this.viewer.isDestroyed()) {
@@ -255,9 +327,20 @@ export class CesiumAdapter implements MapEngine {
       );
     }
 
+    this.installMapPerformanceDiagnostics();
+
+    // Invalidate overlapping initialize() calls and allow destroy() to cancel
+    // an import that has not resolved yet.
+    const initializationRevision = ++this.initializationRevision;
     window.CESIUM_BASE_URL = "/cesium/";
 
     const Cesium = await import("cesium");
+    if (!shouldContinueMapInitialization(
+      initializationRevision,
+      this.initializationRevision,
+    )) {
+      return;
+    }
     this.cesium = Cesium;
 
     const viewer = new Cesium.Viewer(container, {
@@ -629,11 +712,21 @@ export class CesiumAdapter implements MapEngine {
               viewer.camera.positionCartographic.height,
             ),
         );
+      } else {
+        this.queuePendingFullDataset();
       }
       return;
     }
 
     this.viewportLoadInProgress = true;
+    const fetchStartedAt = performance.now();
+    let fetchTelemetryRecorded = false;
+    let cacheHit = false;
+    let viewportFeatureCount: number | undefined;
+    let stageStartedAt: number | null = null;
+    let stageTelemetryRecorded = false;
+    const loadToken = ++this.viewportLoadToken;
+    const requestRevision = this.viewportIntentRevision;
     let stagedDataSource: CesiumDataSource | null = null;
     let activeEndpoint: string | null = null;
     let requestController: AbortController | null = null;
@@ -667,6 +760,7 @@ export class CesiumAdapter implements MapEngine {
       );
 
       if (cachedGeoJson !== undefined) {
+        cacheHit = true;
         geoJson = cachedGeoJson;
         console.info("[Overture] Reusing cached viewport payload.", {
           endpoint,
@@ -690,6 +784,7 @@ export class CesiumAdapter implements MapEngine {
         }
 
         geoJson = await response.json();
+        if (!this.isViewportLoadCurrent(requestRevision)) return;
         cacheViewportResponse(
           this.viewportResponseCache,
           endpoint,
@@ -697,6 +792,23 @@ export class CesiumAdapter implements MapEngine {
           MAX_CACHED_VIEWPORT_RESPONSES,
         );
       }
+
+      const featureCollection = geoJson as { features?: unknown[] } | null;
+      viewportFeatureCount = featureCollection && Array.isArray(featureCollection.features)
+        ? featureCollection.features.length
+        : undefined;
+      this.recordMapPerformance(
+        "viewport.fetch",
+        cacheHit ? "cache-hit" : "success",
+        performance.now() - fetchStartedAt,
+        {
+          cacheHit,
+          ...(viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount }),
+        },
+      );
+      fetchTelemetryRecorded = true;
+
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       // Cancel network work only until the payload is ready. After that, stage
       // the data source and coalesce later camera moves into a single follow-up.
@@ -727,6 +839,7 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
+      stageStartedAt = performance.now();
       const dataSource = await Cesium.GeoJsonDataSource.load(
         geoJson as Parameters<
           typeof Cesium.GeoJsonDataSource.load
@@ -740,6 +853,8 @@ export class CesiumAdapter implements MapEngine {
           fill: Cesium.Color.fromCssColorString("#d2d8dc"),
         },
       );
+
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       if (
         !this.viewer ||
@@ -756,6 +871,10 @@ export class CesiumAdapter implements MapEngine {
       dataSource.show = false;
       await viewer.dataSources.add(dataSource);
       stagedDataSource = dataSource;
+
+      // Hiding the layer or queuing a different viewport while Cesium was
+      // staging this datasource makes it obsolete; finally removes it safely.
+      if (!this.isViewportLoadCurrent(requestRevision)) return;
 
       if (
         !this.viewer ||
@@ -794,10 +913,16 @@ export class CesiumAdapter implements MapEngine {
         start < entities.length;
         start += BATCH_SIZE
       ) {
+        // Camera movement or a layer toggle can invalidate a staged viewport
+        // after the network request has completed. Stop before preparing more
+        // geometry rather than spending CPU on a viewport that cannot commit.
         if (
-          !this.viewer ||
-          this.viewer !== viewer ||
-          viewer.isDestroyed()
+          !shouldContinueViewportStage(
+            requestRevision,
+            this.viewportIntentRevision,
+            this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+            this.viewer === viewer && !viewer.isDestroyed(),
+          )
         ) {
           return;
         }
@@ -916,10 +1041,15 @@ export class CesiumAdapter implements MapEngine {
         });
       }
 
+      // Re-check after the final animation-frame yield and before replacing the
+      // current datasource: an obsolete viewport must never become the active map.
       if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
+        !shouldContinueViewportStage(
+          requestRevision,
+          this.viewportIntentRevision,
+          this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+          this.viewer === viewer && !viewer.isDestroyed(),
+        )
       ) {
         return;
       }
@@ -963,6 +1093,23 @@ export class CesiumAdapter implements MapEngine {
       }
 
       stagedDataSource = null;
+      this.recordMapPerformance(
+        "viewport.stage",
+        "success",
+        performance.now() - (stageStartedAt ?? performance.now()),
+        { featureCount: entities.length },
+      );
+      stageTelemetryRecorded = true;
+
+      const facadeColors = [...new Set(lodRecords.map((record) => record.visualStyle.facadeColor.toLowerCase()))].sort();
+      const roofColors = [...new Set(lodRecords.map((record) => record.visualStyle.roofColor.toLowerCase()))].sort();
+      const visualStyleSummary = {
+        facadePatterns: [...new Set(lodRecords.map((record) => record.visualStyle.pattern))].sort(),
+        facadeColors: facadeColors.slice(0, 8),
+        roofColors: roofColors.slice(0, 8),
+        uniqueFacadeColors: facadeColors.length,
+        uniqueRoofColors: roofColors.length,
+      };
 
       console.info("[Overture] Building viewport rendered.", {
         returnedFeatures: entities.length,
@@ -976,8 +1123,28 @@ export class CesiumAdapter implements MapEngine {
         hiddenUnderground,
         invalidPolygons,
         cameraAwareLod: true,
+        visualStyleSummary,
       });
     } catch (error: unknown) {
+      if (!fetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.fetch",
+          isAbortError(error) ? "cancelled" : "error",
+          performance.now() - fetchStartedAt,
+          { cacheHit },
+        );
+        fetchTelemetryRecorded = true;
+      }
+      if (stageStartedAt !== null && !stageTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.stage",
+          isAbortError(error) ? "cancelled" : "error",
+          performance.now() - stageStartedAt,
+          viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount },
+        );
+        stageTelemetryRecorded = true;
+      }
+
       if (isAbortError(error)) {
         console.info("[Overture] Cancelled an obsolete viewport request.", {
           endpoint: activeEndpoint,
@@ -1008,6 +1175,25 @@ export class CesiumAdapter implements MapEngine {
         throw error;
       }
     } finally {
+      if (!fetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.fetch",
+          "cancelled",
+          performance.now() - fetchStartedAt,
+          { cacheHit },
+        );
+        fetchTelemetryRecorded = true;
+      }
+      if (stageStartedAt !== null && !stageTelemetryRecorded) {
+        this.recordMapPerformance(
+          "viewport.stage",
+          "cancelled",
+          performance.now() - stageStartedAt,
+          viewportFeatureCount === undefined ? {} : { featureCount: viewportFeatureCount },
+        );
+        stageTelemetryRecorded = true;
+      }
+
       // Clean hidden staging data even when setup exits through an early return.
       if (
         stagedDataSource &&
@@ -1019,43 +1205,59 @@ export class CesiumAdapter implements MapEngine {
         stagedDataSource = null;
       }
 
-      if (this.viewportRequestAbortController === requestController) {
-        this.viewportRequestAbortController = null;
-      }
-      if (this.activeViewportEndpoint === activeEndpoint) {
-        this.activeViewportEndpoint = null;
-      }
+      // An old load may finish after destroy() and a re-initialize on the same
+      // adapter instance. Only the load that still owns this token may mutate
+      // shared in-flight state or dispatch the newest queued viewport.
+      if (this.viewportLoadToken === loadToken) {
+        if (this.viewportRequestAbortController === requestController) {
+          this.viewportRequestAbortController = null;
+        }
+        if (this.activeViewportEndpoint === activeEndpoint) {
+          this.activeViewportEndpoint = null;
+        }
 
-      this.viewportLoadInProgress = false;
+        this.viewportLoadInProgress = false;
 
-      const pendingBounds = this.pendingViewportBounds;
-      const pendingFeatureLimit = this.pendingViewportFeatureLimit;
-      this.pendingViewportBounds = null;
-      this.pendingViewportFeatureLimit = null;
-      const requiredFeatureLimit =
-        pendingFeatureLimit ??
-        getViewportFeatureLimit(viewer.camera.positionCartographic.height);
+        const pendingRequest = this.pendingViewportRequest;
+        this.pendingViewportRequest = null;
 
-      // Always service the latest queued viewport, even if its predecessor was
-      // cancelled or failed. The coverage check prevents redundant reloads.
-      if (
-        pendingBounds &&
-        !this.isViewportCoveredByLoadedData(
-          pendingBounds,
-          requiredFeatureLimit,
-        )
-      ) {
-        void this.loadOvertureBuildings(
-          viewer,
-          Cesium,
-          pendingBounds,
-        ).catch((error: unknown) => {
-          if (isAbortError(error)) return;
-          console.error(
-            "[Overture] Follow-up viewport load failed:",
-            error instanceof Error ? error.message : String(error),
+        // Always service the latest queued camera intent, even if its predecessor
+        // was cancelled or failed. A null-bounds request means the wide view needs
+        // the full pilot dataset; never downgrade it to a bounded viewport.
+        if (
+          pendingRequest &&
+          pendingRequest.bounds === null &&
+          (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
+        ) {
+          void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+            (error: unknown) => {
+              if (isAbortError(error)) return;
+              console.error(
+                "[Overture] Follow-up full-dataset load failed.",
+                error instanceof Error ? error.message : String(error),
+              );
+            },
           );
-        });
+        } else if (
+          pendingRequest?.bounds &&
+          !this.isViewportCoveredByLoadedData(
+            pendingRequest.bounds,
+            pendingRequest.featureLimit ??
+              getViewportFeatureLimit(viewer.camera.positionCartographic.height),
+          )
+        ) {
+          void this.loadOvertureBuildings(
+            viewer,
+            Cesium,
+            pendingRequest.bounds,
+          ).catch((error: unknown) => {
+            if (isAbortError(error)) return;
+            console.error(
+              "[Overture] Follow-up viewport load failed.",
+              error instanceof Error ? error.message : String(error),
+            );
+          });
+        }
       }
     }
   }
@@ -1126,6 +1328,18 @@ export class CesiumAdapter implements MapEngine {
       this.loadedRoadBounds &&
       this.roadBoundsContain(this.loadedRoadBounds, bounds)
     ) {
+      this.recordMapPerformance("roads.coverage", "cache-hit", 0, { cacheHit: true });
+      // Reusing rendered geometry is also a new camera intent. Cancel a
+      // different viewport request so its late response cannot replace these
+      // roads after the camera has returned to the already-covered area.
+      const hasActiveRoadRequest =
+        this.roadRequestAbortController !== null ||
+        this.activeRoadRequestKey !== null;
+      if (shouldCancelRoadRequestForCachedViewport(true, hasActiveRoadRequest)) {
+        this.roadRequestAbortController?.abort();
+        this.roadRequestAbortController = null;
+        this.activeRoadRequestKey = null;
+      }
       return;
     }
 
@@ -1151,6 +1365,12 @@ export class CesiumAdapter implements MapEngine {
       north: String(bounds.north),
       limit: "1000",
     });
+    const roadFetchStartedAt = performance.now();
+    let roadFetchTelemetryRecorded = false;
+    let roadRenderStartedAt: number | null = null;
+    let roadRenderTelemetryRecorded = false;
+    let roadWaysCount: number | undefined;
+    let roadCacheHit = false;
 
     try {
       const response = await fetch(
@@ -1173,6 +1393,16 @@ export class CesiumAdapter implements MapEngine {
       if (!Array.isArray(payload.results)) {
         throw new Error("Road network API returned invalid GeoJSON-like results.");
       }
+      roadWaysCount = payload.results.length;
+      const roadCacheStatus = response.headers.get("X-Road-Network-Cache");
+      roadCacheHit = roadCacheStatus === "HIT" || roadCacheStatus === "COALESCED";
+      this.recordMapPerformance("roads.fetch", "success", performance.now() - roadFetchStartedAt, {
+        cacheHit: roadCacheHit,
+        returnedWays: roadWaysCount,
+        statusCode: response.status,
+      });
+      roadFetchTelemetryRecorded = true;
+
       if (
         this.viewer !== viewer ||
         viewer.isDestroyed() ||
@@ -1182,6 +1412,7 @@ export class CesiumAdapter implements MapEngine {
         return;
       }
 
+      roadRenderStartedAt = performance.now();
       let dataSource = this.roadNetworkDataSource;
       if (!dataSource) {
         dataSource = new Cesium.CustomDataSource("OpenStreetMap detailed road network");
@@ -1197,142 +1428,196 @@ export class CesiumAdapter implements MapEngine {
         this.roadNetworkDataSource = dataSource;
       }
 
-      dataSource.entities.removeAll();
-      this.roadByEntityId.clear();
-      const labelCandidates = payload.results
-        .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
-        .slice(0, 40);
-      const labelIds = new Set(labelCandidates.map((road) => road.id));
-
-      const roadColors: Record<RoadFeature["roadClass"], string> = {
-        arterial: "#84919D",
-        collector: "#AAB4BD",
-        local: "#D3D9DE",
-        path: "#BBB6A9",
+      // Suspend Cesium collection events while replacing a whole viewport.
+      // This coalesces many entity add/remove notifications into one flush.
+      dataSource.entities.suspendEvents();
+      let renderedRoads = 0;
+      const roadStyleSummary = {
+        byClass: { arterial: 0, collector: 0, local: 0, path: 0 },
+        centreLineRoads: 0,
+        taggedSurfaceRoads: 0,
+        elevatedRoads: 0,
+        tunnelRoads: 0,
       };
-      const surfaceColors: Record<string, string> = {
-        asphalt: "#69757F",
-        concrete: "#A9B0B7",
-        paving_stones: "#B9B5AD",
-        cobblestone: "#8B8580",
-        gravel: "#9B8F7B",
-        unpaved: "#B99B75",
-        ground: "#AA8D6A",
-        dirt: "#AA8D6A",
-        earth: "#AA8D6A",
-        sand: "#D0B88C",
-        grass: "#72936A",
-      };
+      const roadStyleColors = new Set<string>();
+      let minimumRoadWidthMeters = Number.POSITIVE_INFINITY;
+      let maximumRoadWidthMeters = 0;
+      try {
+        dataSource.entities.removeAll();
+        this.roadByEntityId.clear();
+        const labelCandidates = payload.results
+          .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
+          .slice(0, 40);
+        const labelIds = new Set(labelCandidates.map((road) => road.id));
 
-      for (const road of payload.results) {
-        if (
-          !road ||
-          !Array.isArray(road.coordinates) ||
-          road.coordinates.length < 2 ||
-          !Number.isFinite(road.widthMeters)
-        ) {
-          continue;
-        }
+        for (const road of payload.results) {
+          if (
+            !road ||
+            !Array.isArray(road.coordinates) ||
+            road.coordinates.length < 2 ||
+            !Number.isFinite(road.widthMeters)
+          ) {
+            continue;
+          }
 
-        const positions = Cesium.Cartesian3.fromDegreesArray(
-          road.coordinates.flatMap(([longitude, latitude]) => [longitude, latitude]),
-        );
-        if (positions.length < 2) continue;
+          // A preallocated flat buffer avoids one intermediate [lon, lat]
+          // array allocation per vertex on large road ways.
+          const flattenedCoordinates = flattenRoadCoordinates(road.coordinates);
+          if (flattenedCoordinates.length < 4) continue;
+          const positions = Cesium.Cartesian3.fromDegreesArray(flattenedCoordinates);
+          if (positions.length < 2) continue;
 
-        const centerIndex = Math.min(
-          road.coordinates.length - 1,
-          Math.floor(road.coordinates.length / 2),
-        );
-        const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
-        const roadColor = Cesium.Color.fromCssColorString(
-          (road.surface ? surfaceColors[road.surface.toLowerCase()] : null)
-            ?? roadColors[road.roadClass]
-            ?? roadColors.local,
-        ) ?? Cesium.Color.LIGHTGRAY;
-        const renderHeight = road.bridge
-          ? Math.max(3, (road.layer ?? 1) * 3)
-          : road.tunnel
-            ? -3
-            : 0;
-        const roadwayWidth = Math.max(1.1, Math.min(24, road.widthMeters));
-        const safeName = road.name
-          ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
-          : null;
+          const visualStyle = resolveRoadVisualStyle(road);
+          if (visualStyle.roadClass === "arterial") roadStyleSummary.byClass.arterial += 1;
+          else if (visualStyle.roadClass === "collector") roadStyleSummary.byClass.collector += 1;
+          else if (visualStyle.roadClass === "local") roadStyleSummary.byClass.local += 1;
+          else roadStyleSummary.byClass.path += 1;
+          if (visualStyle.hasCentreLine) roadStyleSummary.centreLineRoads += 1;
+          if (typeof road.surface === "string" && road.surface.trim()) roadStyleSummary.taggedSurfaceRoads += 1;
+          if (visualStyle.renderHeight > 0) roadStyleSummary.elevatedRoads += 1;
+          if (visualStyle.renderHeight < 0) roadStyleSummary.tunnelRoads += 1;
+          roadStyleColors.add(visualStyle.color.toLowerCase());
+          minimumRoadWidthMeters = Math.min(minimumRoadWidthMeters, visualStyle.widthMeters);
+          maximumRoadWidthMeters = Math.max(maximumRoadWidthMeters, visualStyle.widthMeters);
 
-        this.roadByEntityId.set(road.id, road);
-        dataSource.entities.add({
-          id: road.id,
-          name: safeName ?? road.highway + " road",
-          position: labelIds.has(road.id)
-            ? Cesium.Cartesian3.fromDegrees(labelLongitude, labelLatitude, 1)
-            : undefined,
-          corridor: {
-            positions,
-            width: roadwayWidth,
-            height: renderHeight,
-            cornerType: Cesium.CornerType.ROUNDED,
-            material: new Cesium.ColorMaterialProperty(
-              roadColor.withAlpha(road.roadClass === "path" ? 0.72 : 0.9),
-            ),
-            outline: true,
-            outlineColor: new Cesium.ConstantProperty(
-              Cesium.Color.fromCssColorString("#44515E")?.withAlpha(0.56) ?? Cesium.Color.GRAY,
-            ),
-            outlineWidth: 1,
-          },
-          label: labelIds.has(road.id) && safeName
-            ? {
-                text: safeName,
-                font: "11px sans-serif",
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.fromCssColorString("#25313D") ?? Cesium.Color.BLACK,
-                outlineWidth: 3,
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                showBackground: true,
-                backgroundColor: Cesium.Color.fromCssColorString("#293746")?.withAlpha(0.82) ?? Cesium.Color.BLACK,
-                pixelOffset: new Cesium.Cartesian2(0, -4),
-                scaleByDistance: new Cesium.NearFarScalar(150, 1, 1800, 0.35),
-                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5500),
-                disableDepthTestDistance: 1800,
-              }
-            : undefined,
-        });
+          const centerIndex = Math.min(
+            road.coordinates.length - 1,
+            Math.floor(road.coordinates.length / 2),
+          );
+          const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
+          const roadColor = Cesium.Color.fromCssColorString(visualStyle.color) ?? Cesium.Color.LIGHTGRAY;
+          const roadwayWidth = visualStyle.widthMeters;
+          const safeName = road.name
+            ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
+            : null;
 
-        // A thin centre highlight improves road hierarchy at ground-level zoom;
-        // physical-width corridor geometry remains the controlling road surface.
-        if (road.roadClass === "arterial" && road.widthMeters >= 5) {
-          this.roadByEntityId.set(road.id + "-centre-line", road);
+          this.roadByEntityId.set(road.id, road);
           dataSource.entities.add({
-            id: road.id + "-centre-line",
-            name: (safeName ?? "Road") + " centre detail",
-            polyline: {
+            id: road.id,
+            name: safeName ?? road.highway + " road",
+            position: labelIds.has(road.id)
+              ? Cesium.Cartesian3.fromDegrees(labelLongitude, labelLatitude, 1)
+              : undefined,
+            corridor: {
               positions,
-              width: 1.2,
-              material: Cesium.Color.WHITE.withAlpha(0.58),
-              clampToGround: true,
+              width: roadwayWidth,
+              height: visualStyle.renderHeight,
+              cornerType: Cesium.CornerType.ROUNDED,
+              material: new Cesium.ColorMaterialProperty(
+                roadColor.withAlpha(visualStyle.opacity),
+              ),
+              outline: true,
+              outlineColor: new Cesium.ConstantProperty(
+                Cesium.Color.fromCssColorString("#344653")?.withAlpha(visualStyle.outlineOpacity) ?? Cesium.Color.GRAY,
+              ),
+              outlineWidth: 1,
             },
+            label: labelIds.has(road.id) && safeName
+              ? {
+                  text: safeName,
+                  font: "11px sans-serif",
+                  fillColor: Cesium.Color.WHITE,
+                  outlineColor: Cesium.Color.fromCssColorString("#25313D") ?? Cesium.Color.BLACK,
+                  outlineWidth: 3,
+                  style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                  showBackground: true,
+                  backgroundColor: Cesium.Color.fromCssColorString("#293746")?.withAlpha(0.82) ?? Cesium.Color.BLACK,
+                  pixelOffset: new Cesium.Cartesian2(0, -4),
+                  scaleByDistance: new Cesium.NearFarScalar(150, 1, 1800, 0.35),
+                  distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5500),
+                  disableDepthTestDistance: 1800,
+                }
+              : undefined,
           });
+          renderedRoads += 1;
+
+          // Arterials get a fine centre highlight without adding a thick second road.
+          if (visualStyle.hasCentreLine) {
+            this.roadByEntityId.set(road.id + "-centre-line", road);
+            dataSource.entities.add({
+              id: road.id + "-centre-line",
+              name: (safeName ?? "Road") + " centre detail",
+              polyline: {
+                positions,
+                width: 1.2,
+                material: Cesium.Color.fromCssColorString("#F2F6F8")?.withAlpha(0.64) ?? Cesium.Color.WHITE,
+                clampToGround: true,
+              },
+            });
+          }
         }
+      } finally {
+        dataSource.entities.resumeEvents();
       }
 
       dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.roads);
       this.loadedRoadBounds = bounds;
       viewer.scene.requestRender();
+      this.recordMapPerformance("roads.render", "success", performance.now() - (roadRenderStartedAt ?? performance.now()), {
+        returnedWays: payload.results.length,
+      });
+      roadRenderTelemetryRecorded = true;
       console.info("[Roads] Vector road viewport rendered.", {
         requested: bounds,
         returnedWays: payload.results.length,
-        labelledRoads: labelCandidates.length,
+        renderedWays: renderedRoads,
+        labelledRoads: Math.min(40, payload.results.filter((road) =>
+          road.name && (road.roadClass === "arterial" || road.roadClass === "collector")
+        ).length),
+        styleSummary: {
+          ...roadStyleSummary,
+          uniqueColors: roadStyleColors.size,
+          minWidthMeters: renderedRoads > 0 ? Number(minimumRoadWidthMeters.toFixed(2)) : null,
+          maxWidthMeters: renderedRoads > 0 ? Number(maximumRoadWidthMeters.toFixed(2)) : null,
+        },
         attribution: "© OpenStreetMap contributors",
       });
     } catch (error: unknown) {
+      const roadWasCancelled = typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+      if (!roadFetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.fetch",
+          roadWasCancelled ? "cancelled" : "error",
+          performance.now() - roadFetchStartedAt,
+          { cacheHit: roadCacheHit },
+        );
+        roadFetchTelemetryRecorded = true;
+      }
+      if (roadRenderStartedAt !== null && !roadRenderTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.render",
+          roadWasCancelled ? "cancelled" : "error",
+          performance.now() - roadRenderStartedAt,
+          roadWaysCount === undefined ? {} : { returnedWays: roadWaysCount },
+        );
+        roadRenderTelemetryRecorded = true;
+      }
       if (
-        !(typeof error === "object" && error !== null && "name" in error && error.name === "AbortError") &&
+        !roadWasCancelled &&
         this.viewer === viewer &&
         !viewer.isDestroyed()
       ) {
         console.warn("[Roads] Detailed road layer could not refresh.", error instanceof Error ? error.message : String(error));
       }
     } finally {
+      if (!roadFetchTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.fetch",
+          "cancelled",
+          performance.now() - roadFetchStartedAt,
+          { cacheHit: roadCacheHit },
+        );
+        roadFetchTelemetryRecorded = true;
+      }
+      if (roadRenderStartedAt !== null && !roadRenderTelemetryRecorded) {
+        this.recordMapPerformance(
+          "roads.render",
+          "cancelled",
+          performance.now() - roadRenderStartedAt,
+          roadWaysCount === undefined ? {} : { returnedWays: roadWaysCount },
+        );
+        roadRenderTelemetryRecorded = true;
+      }
       if (this.roadRequestAbortController === controller) {
         this.roadRequestAbortController = null;
         this.activeRoadRequestKey = null;
@@ -1452,12 +1737,19 @@ export class CesiumAdapter implements MapEngine {
     );
   }
 
+  private isViewportLoadCurrent(requestRevision: number): boolean {
+    return shouldContinueViewportLoad(
+      requestRevision,
+      this.viewportIntentRevision,
+      this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+    );
+  }
+
   private queuePendingViewport(
     bounds: ViewportBounds,
     featureLimit: number,
   ): void {
-    this.pendingViewportBounds = bounds;
-    this.pendingViewportFeatureLimit = featureLimit;
+    this.pendingViewportRequest = { bounds, featureLimit };
 
     const nextEndpoint = this.getViewportEndpoint(bounds, featureLimit);
     if (
@@ -1466,6 +1758,22 @@ export class CesiumAdapter implements MapEngine {
         nextEndpoint,
       )
     ) {
+      this.viewportIntentRevision += 1;
+      this.viewportRequestAbortController?.abort();
+    }
+  }
+
+  private queuePendingFullDataset(): void {
+    this.pendingViewportRequest = { bounds: null, featureLimit: null };
+
+    const nextEndpoint = "/api/geospatial/overture-buildings";
+    if (
+      shouldAbortViewportRequest(
+        this.activeViewportEndpoint,
+        nextEndpoint,
+      )
+    ) {
+      this.viewportIntentRevision += 1;
       this.viewportRequestAbortController?.abort();
     }
   }
@@ -1487,8 +1795,24 @@ export class CesiumAdapter implements MapEngine {
     const requestedBounds = this.getPaddedViewportBounds(viewer, Cesium);
 
     if (!requestedBounds) {
-      // Very wide views use the compatible full-dataset fallback.
-      this.updateBuildingLod(viewer, Cesium);
+      // A wide view needs all pilot buildings unless the full dataset is active.
+      if (!shouldLoadFullDatasetForWideViewport(
+        this.hasLoadedBuildings,
+        this.loadedViewportBounds,
+      )) {
+        this.updateBuildingLod(viewer, Cesium);
+        return;
+      }
+
+      void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+        (error: unknown) => {
+          if (isAbortError(error)) return;
+          console.error(
+            "[Overture] Full-dataset fallback failed.",
+            error instanceof Error ? error.message : String(error),
+          );
+        },
+      );
       return;
     }
 
@@ -1595,25 +1919,16 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodOrigin = Cesium.Cartesian3.clone(origin);
     this.lastLodBudget = detailBudget;
 
-    const nearestBuildings = this.buildingLodRecords
-      .filter((record) => record.center && record.wallPositions)
-      .map((record) => ({
-        record,
-        distance: Cesium.Cartesian3.distance(record.center!, origin),
-      }))
-      .sort((left, right) => {
-        // Keep real building parts detailed before complete building shells.
-        if (left.record.isPart !== right.record.isPart) {
-          return left.record.isPart ? -1 : 1;
-        }
-
-        return left.distance - right.distance;
-      });
-
     const desiredDetailed = new Set(
-      nearestBuildings
-        .slice(0, detailBudget)
-        .map((entry) => entry.record),
+      selectNearestLodRecords(
+        this.buildingLodRecords,
+        detailBudget,
+        (record) => (
+          record.center && record.wallPositions
+            ? Cesium.Cartesian3.distance(record.center, origin)
+            : null
+        ),
+      ),
     );
 
     // A selected building stays detailed even if it is outside the current budget.
@@ -2012,46 +2327,7 @@ export class CesiumAdapter implements MapEngine {
   private getBuildingHeight(
     properties: BuildingProperties,
   ): BuildingHeight {
-    const height = this.getPositiveNumber(properties, [
-      "height",
-      "height_m",
-      "heightMeters",
-    ]);
-
-    const minHeight =
-      this.getPositiveNumber(properties, [
-        "min_height",
-        "minHeight",
-      ]) ?? 0;
-
-    if (height !== null) {
-      return {
-        meters: Math.min(Math.max(height, 3), 300),
-        baseHeight: Math.min(minHeight, 100),
-        source: "overture-height",
-      };
-    }
-
-    const floors = this.getPositiveNumber(properties, [
-      "num_floors",
-      "numFloors",
-      "building:levels",
-      "levels",
-    ]);
-
-    if (floors !== null) {
-      return {
-        meters: Math.min(Math.max(floors * 3, 3), 300),
-        baseHeight: Math.min(minHeight, 100),
-        source: "floor-estimate",
-      };
-    }
-
-    return {
-      meters: 9,
-      baseHeight: Math.min(minHeight, 100),
-      source: "fallback-estimate",
-    };
+    return resolveBuildingHeight(properties);
   }
 
   private getResearchAdjustedBuildingHeight(
@@ -2064,10 +2340,13 @@ export class CesiumAdapter implements MapEngine {
       (style.reportedHeightMeters as number) >= 3 &&
       (style.reportedHeightMeters as number) <= 300
     ) {
+      const reportedHeight = style.reportedHeightMeters as number;
       return {
-        meters: style.reportedHeightMeters as number,
-        baseHeight: sourceHeight.baseHeight,
+        ...sourceHeight,
+        meters: reportedHeight,
         source: "reference-reported-height",
+        unclampedMeters: reportedHeight,
+        heightWasClamped: false,
       };
     }
 
@@ -2077,10 +2356,13 @@ export class CesiumAdapter implements MapEngine {
       (style.reportedFloorCount as number) >= 1 &&
       (style.reportedFloorCount as number) <= 100
     ) {
+      const estimatedHeight = (style.reportedFloorCount as number) * 3;
       return {
-        meters: Math.min(300, Math.max(3, (style.reportedFloorCount as number) * 3)),
-        baseHeight: sourceHeight.baseHeight,
+        ...sourceHeight,
+        meters: Math.min(300, Math.max(3, estimatedHeight)),
         source: "reference-reported-floors",
+        unclampedMeters: estimatedHeight,
+        heightWasClamped: estimatedHeight < 3 || estimatedHeight > 300,
       };
     }
 
@@ -2152,16 +2434,31 @@ export class CesiumAdapter implements MapEngine {
     const Cesium = this.cesium;
     if (!viewer || !Cesium || viewer.isDestroyed()) return;
 
+    const requestRevision = ++this.nearbyPlacesRevision;
     let dataSource = this.nearbyPlacesDataSource;
     if (!dataSource) {
-      dataSource = new Cesium.CustomDataSource("OpenStreetMap Nearby Places");
-      await viewer.dataSources.add(dataSource);
-      if (this.viewer !== viewer || viewer.isDestroyed()) {
-        viewer.dataSources.remove(dataSource, true);
+      const candidate = new Cesium.CustomDataSource("OpenStreetMap Nearby Places");
+      await viewer.dataSources.add(candidate);
+      if (
+        this.viewer !== viewer ||
+        viewer.isDestroyed() ||
+        requestRevision !== this.nearbyPlacesRevision
+      ) {
+        viewer.dataSources.remove(candidate, true);
         return;
       }
-      this.nearbyPlacesDataSource = dataSource;
+
+      // Another concurrent call may have created the shared source first.
+      if (this.nearbyPlacesDataSource) {
+        viewer.dataSources.remove(candidate, true);
+        dataSource = this.nearbyPlacesDataSource;
+      } else {
+        this.nearbyPlacesDataSource = candidate;
+        dataSource = candidate;
+      }
     }
+
+    if (requestRevision !== this.nearbyPlacesRevision) return;
 
     dataSource.entities.removeAll();
     this.nearbyPlaceByEntityId.clear();
@@ -2423,6 +2720,7 @@ export class CesiumAdapter implements MapEngine {
     this.emitFeatureSelection(null);
     this.emitPlaceSelection(null);
     this.emitRoadSelection(null);
+    this.emitPropertySelection(null);
 
     if (
       hadSelection &&
@@ -2629,6 +2927,7 @@ export class CesiumAdapter implements MapEngine {
         const picked = viewer.scene.pick(movement.position);
         if (!picked) {
           this.clearFeatureSelection();
+          this.setNavigationPath(null, null);
           return;
         }
 
@@ -2639,7 +2938,6 @@ export class CesiumAdapter implements MapEngine {
 
         if (nearbyEntity?.point) {
           this.clearFeatureSelection();
-          this.emitPropertySelection(null);
           this.emitPlaceSelection(
             this.nearbyPlaceByEntityId.get(nearbyEntity.id) ?? null,
           );
@@ -2652,7 +2950,6 @@ export class CesiumAdapter implements MapEngine {
           : null;
         if (propertyEntity?.point) {
           this.clearFeatureSelection();
-          this.emitPlaceSelection(null);
           this.emitPropertySelection(this.propertyByEntityId.get(propertyEntity.id) ?? null);
           return;
         }
@@ -2664,8 +2961,6 @@ export class CesiumAdapter implements MapEngine {
         const road = roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
         if (road) {
           this.clearFeatureSelection();
-          this.emitPlaceSelection(null);
-          this.emitPropertySelection(null);
           this.emitRoadSelection(road);
           return;
         }
@@ -2708,6 +3003,10 @@ export class CesiumAdapter implements MapEngine {
           overture_feature_id: entity.id,
           rendered_height_m: heightInfo.meters,
           height_source: heightInfo.source,
+          rendered_height_unclamped_m: heightInfo.unclampedMeters,
+          rendered_height_was_clamped: heightInfo.heightWasClamped,
+          rendered_base_height_unclamped_m: heightInfo.unclampedBaseHeight,
+          rendered_base_height_was_clamped: heightInfo.baseHeightWasClamped,
         };
 
         const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
@@ -2873,6 +3172,17 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    if (this.performanceDiagnosticsHandle && typeof window !== "undefined") {
+      const target = window as PerformanceDiagnosticsWindow;
+      if (target.__MAP_ENGINE_PERFORMANCE__ === this.performanceDiagnosticsHandle) {
+        delete target.__MAP_ENGINE_PERFORMANCE__;
+      }
+      this.performanceDiagnosticsHandle = null;
+    }
+
+    // Invalidate a pending dynamic import before it can create a new viewer.
+    this.initializationRevision += 1;
+
     // Do not schedule React state updates during component teardown.
     this.ahsanManzilOrbitStoppedCallback = null;
     this.stopAhsanManzilOrbitTour();
@@ -2888,7 +3198,9 @@ export class CesiumAdapter implements MapEngine {
     for (const record of this.generatedModels.values()) record.revision += 1;
     this.generatedModels.clear();
 
-    // Prevent requests from surviving a retry or component unmount.
+    // Prevent requests and any post-fetch staging from surviving teardown.
+    this.viewportIntentRevision += 1;
+    this.viewportLoadToken += 1;
     this.viewportRequestAbortController?.abort();
     this.viewportRequestAbortController = null;
     this.activeViewportEndpoint = null;
@@ -2914,8 +3226,7 @@ export class CesiumAdapter implements MapEngine {
     this.loadedViewportFeatureLimit = null;
     this.hasLoadedBuildings = false;
     this.viewportLoadInProgress = false;
-    this.pendingViewportBounds = null;
-    this.pendingViewportFeatureLimit = null;
+    this.pendingViewportRequest = null;
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 
@@ -2926,6 +3237,7 @@ export class CesiumAdapter implements MapEngine {
     this.loadedRoadBounds = null;
     this.roadNetworkDataSource = null;
     this.overtureBuildings = null;
+    this.nearbyPlacesRevision += 1;
     this.nearbyPlacesDataSource = null;
     this.propertyListingsDataSource = null;
     this.propertyNavigationEntity = null;
@@ -3523,9 +3835,9 @@ export class CesiumAdapter implements MapEngine {
       }
 
       if (!visible) {
-        // Do not keep fetching obsolete viewports while the building layer is hidden.
-        this.pendingViewportBounds = null;
-        this.pendingViewportFeatureLimit = null;
+        // Stop network work and invalidate GeoJSON staging that has already left fetch.
+        this.viewportIntentRevision += 1;
+        this.pendingViewportRequest = null;
         this.viewportRequestAbortController?.abort();
       }
     } else if (layerId === MAP_LAYER_IDS.nearbyPlaces) {
