@@ -63,12 +63,12 @@ export async function inspectRenderCorrectionArtifactEvidence({
     throw new Error("artifact-render-manifest-does-not-bind-to-candidate-model");
   }
 
-  const geometryQa = analyzeGlbQuality(candidateModelBytes);
+  const geometryQa = JSON.parse(JSON.stringify(analyzeGlbQuality(candidateModelBytes)));
   if (!isDeepStrictEqual(suppliedGeometryQa, geometryQa)) {
     throw new Error("artifact-geometry-qa-does-not-match-recomputed-candidate-report");
   }
 
-  const textureQa = reviewGlbTextureBindings(candidateModelBytes);
+  const textureQa = JSON.parse(JSON.stringify(reviewGlbTextureBindings(candidateModelBytes)));
   if (!isDeepStrictEqual(suppliedTextureQa, textureQa)) {
     throw new Error("artifact-texture-qa-does-not-match-recomputed-candidate-report");
   }
