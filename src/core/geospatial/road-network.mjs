@@ -89,6 +89,33 @@ export function parseRoadNetworkParams(params) {
   };
 }
 
+/**
+ * Build a stable cache key from the full viewport precision sent by the map.
+ * A coarse key can return roads normalized for a neighbouring, non-identical
+ * bbox and silently omit ways near the current viewport edges.
+ */
+export function buildRoadNetworkCacheKey(request) {
+  if (
+    !request ||
+    ![request.west, request.south, request.east, request.north].every(
+      (value) => typeof value === "number" && Number.isFinite(value),
+    ) ||
+    !Number.isInteger(request.limit) ||
+    request.limit < 1
+  ) {
+    throw new TypeError("Road cache key requires finite bounds and a positive integer limit.");
+  }
+
+  return [
+    request.west.toFixed(6),
+    request.south.toFixed(6),
+    request.east.toFixed(6),
+    request.north.toFixed(6),
+    request.limit,
+  ].join("|");
+}
+
+
 export function buildOverpassRoadQuery(request) {
   const highwayPattern = INCLUDED_HIGHWAYS.join("|");
   return [
