@@ -185,6 +185,7 @@ export async function writeGenerationWorkerStatus({
 /**
  * Read sanitized worker health. Missing, stopped, and stale workers are explicit,
  * so a queued job does not falsely imply that a worker is actually consuming it.
+ * @param {{ workspaceRoot: string, now?: Date | string | number, staleAfterMs?: number }} options
  */
 export async function getGenerationWorkerStatus({
   workspaceRoot,
