@@ -147,8 +147,8 @@ test("low-edge previews are flagged as weak comparison evidence", () => {
 });
 
 test("brightness-only shifts do not become local edge-structure warnings", () => {
-  const reference = pattern((x, y) => 20 + x * 2 + y);
-  const candidate = pattern((x, y) => 40 + x * 2 + y);
+  const reference = pattern((x, y) => (Math.floor(x / 2) % 2 ? 180 : 40) + y);
+  const candidate = pattern((x, y) => (Math.floor(x / 2) % 2 ? 200 : 60) + y);
   const result = compareGrayscaleImageSamples(reference, candidate, {
     reference: { width: 1600, height: 1200 },
     candidate: { width: 800, height: 600 },
