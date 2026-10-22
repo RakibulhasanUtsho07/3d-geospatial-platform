@@ -9,6 +9,20 @@ const renderSha256 = "c".repeat(64);
 const referenceSha256 = "d".repeat(64);
 const changedModelSha = "e".repeat(64);
 const changedManifestSha = "f".repeat(64);
+const geometryQaSha = "7".repeat(64);
+const textureQaSha = "8".repeat(64);
+
+function verifyWithArtifactEvidence(backlogValue, reportValue, evidenceOverride) {
+  const artifactEvidence = evidenceOverride ?? {
+    validated: true,
+    candidateGlbSha256: reportValue.provenance.sourceModelSha256,
+    renderManifestSha256: reportValue.provenance.renderManifestSha256,
+    geometryQaReportSha256: geometryQaSha,
+    textureQaReportSha256: textureQaSha,
+    qaReportsRecomputedFromCandidateModel: true,
+  };
+  return verifyRenderCorrectionTasks(backlogValue, reportValue, artifactEvidence);
+}
 
 function reviewReport(overrides = {}) {
   return {
@@ -104,8 +118,31 @@ function backlog(overrides = {}) {
   };
 }
 
-test("verifies a correction only with a fresh match for the exact pair and changed model plus render manifest", () => {
+test("does not verify from JSON hashes alone when the caller supplies no file-backed artifact context", () => {
   const result = verifyRenderCorrectionTasks(backlog(), reviewReport());
+  assert.equal(result.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(result.tasks[0].verified, false);
+  assert.equal(result.tasks[0].gates.artifactEvidenceValidated, false);
+  assert.equal(result.artifactIntegrity.status, "required-files-not-validated");
+});
+
+test("requires actual QA report hashes to match the checklist values", () => {
+  const evidence = {
+    validated: true,
+    candidateGlbSha256: changedModelSha,
+    renderManifestSha256: changedManifestSha,
+    geometryQaReportSha256: "0".repeat(64),
+    textureQaReportSha256: textureQaSha,
+    qaReportsRecomputedFromCandidateModel: true,
+  };
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport(), evidence);
+  assert.equal(result.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(result.tasks[0].gates.geometryQaArtifactMatchesChecklist, false);
+  assert.equal(result.artifactIntegrity.status, "candidate-and-qa-files-validated");
+});
+
+test("verifies a correction only with a fresh match for the exact pair and changed model plus render manifest", () => {
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport());
   assert.equal(result.engine, "render-correction-verification-v1");
   assert.equal(result.counts.verified, 1);
   assert.equal(result.tasks[0].status, "verified");
@@ -163,7 +200,7 @@ test("a changed model and fresh match still wait for an explicit approved propos
       },
     },
   });
-  const result = verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport());
+  const result = verifyWithArtifactEvidence(backlog({ tasks: [sourceTask] }), reviewReport());
   assert.equal(result.tasks[0].status, "awaiting-approved-proposal");
   assert.equal(result.tasks[0].verified, false);
   assert.equal(result.tasks[0].gates.proposalWritten, false);
@@ -184,7 +221,7 @@ test("rejects an approval timestamp that follows implementation", () => {
       },
     },
   });
-  const result = verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport());
+  const result = verifyWithArtifactEvidence(backlog({ tasks: [sourceTask] }), reviewReport());
   assert.equal(result.tasks[0].status, "approval-order-violation");
   assert.equal(result.tasks[0].verified, false);
   assert.equal(result.tasks[0].gates.approvalOrderViolation, true);
@@ -201,7 +238,7 @@ test("requires geometry QA and fresh report hashes to match implementation evide
       },
     },
   });
-  const noGeometryResult = verifyRenderCorrectionTasks(backlog({ tasks: [noGeometryQa] }), reviewReport());
+  const noGeometryResult = verifyWithArtifactEvidence(backlog({ tasks: [noGeometryQa] }), reviewReport());
   assert.equal(noGeometryResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(noGeometryResult.tasks[0].gates.geometryQaEvidencePresent, false);
 
@@ -214,7 +251,7 @@ test("requires geometry QA and fresh report hashes to match implementation evide
       },
     },
   });
-  const staleOutputResult = verifyRenderCorrectionTasks(backlog({ tasks: [staleOutputHash] }), reviewReport());
+  const staleOutputResult = verifyWithArtifactEvidence(backlog({ tasks: [staleOutputHash] }), reviewReport());
   assert.equal(staleOutputResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(staleOutputResult.tasks[0].gates.outputModelMatchesVerificationReport, false);
 
@@ -227,7 +264,7 @@ test("requires geometry QA and fresh report hashes to match implementation evide
       },
     },
   });
-  const staleManifestResult = verifyRenderCorrectionTasks(backlog({ tasks: [staleManifestHash] }), reviewReport());
+  const staleManifestResult = verifyWithArtifactEvidence(backlog({ tasks: [staleManifestHash] }), reviewReport());
   assert.equal(staleManifestResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(staleManifestResult.tasks[0].gates.renderManifestMatchesVerificationReport, false);
   assert.equal(staleManifestResult.counts.incompleteImplementationEvidence, 1);
@@ -243,7 +280,7 @@ test("does not verify QA hashes while implementation is still marked not-started
       },
     },
   });
-  const result = verifyRenderCorrectionTasks(backlog({ tasks: [incomplete] }), reviewReport());
+  const result = verifyWithArtifactEvidence(backlog({ tasks: [incomplete] }), reviewReport());
   assert.equal(result.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(result.tasks[0].gates.implementationQaMarkedComplete, false);
 });
@@ -258,7 +295,7 @@ test("requires an explicit texture-change decision and texture QA when textures 
       },
     },
   });
-  const missingApplicabilityResult = verifyRenderCorrectionTasks(
+  const missingApplicabilityResult = verifyWithArtifactEvidence(
     backlog({ tasks: [missingApplicability] }), reviewReport());
   assert.equal(missingApplicabilityResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(missingApplicabilityResult.tasks[0].gates.textureChangeApplicabilityRecorded, false);
@@ -273,7 +310,7 @@ test("requires an explicit texture-change decision and texture QA when textures 
       },
     },
   });
-  const textureQaResult = verifyRenderCorrectionTasks(backlog({ tasks: [textureChangedWithoutQa] }), reviewReport());
+  const textureQaResult = verifyWithArtifactEvidence(backlog({ tasks: [textureChangedWithoutQa] }), reviewReport());
   assert.equal(textureQaResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(textureQaResult.tasks[0].gates.textureQaEvidencePresent, false);
 
@@ -287,7 +324,7 @@ test("requires an explicit texture-change decision and texture QA when textures 
       },
     },
   });
-  assert.equal(verifyRenderCorrectionTasks(backlog({ tasks: [withTextureQa] }), reviewReport()).tasks[0].status, "verified");
+  assert.equal(verifyWithArtifactEvidence(backlog({ tasks: [withTextureQa] }), reviewReport()).tasks[0].status, "verified");
 });
 
 test("carries fresh similarity diagnostics into verification evidence without changing status", () => {
@@ -297,7 +334,7 @@ test("carries fresh similarity diagnostics into verification evidence without ch
       similarityDiagnostics: similarityDiagnostics(),
     }],
   });
-  const result = verifyRenderCorrectionTasks(backlog(), review);
+  const result = verifyWithArtifactEvidence(backlog(), review);
   assert.equal(result.tasks[0].status, "verified");
   assert.equal(result.tasks[0].verified, true);
   assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics.metrics.localSsim8x8, 0.12);
@@ -315,7 +352,7 @@ test("carries fresh similarity diagnostics into verification evidence without ch
 });
 
 test("rejects diagnostics that do not match the reviewed render/reference hashes", () => {
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({
     comparisons: [{
       ...reviewReport().comparisons[0],
       similarityDiagnostics: similarityDiagnostics({ referenceSha256: "8".repeat(64) }),
@@ -326,7 +363,7 @@ test("rejects diagnostics that do not match the reviewed render/reference hashes
 test("rejects malformed diagnostic metric ranges instead of silently trusting them", () => {
   const invalid = similarityDiagnostics();
   invalid.metrics.localSsim8x8 = 2;
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({
     comparisons: [{
       ...reviewReport().comparisons[0],
       similarityDiagnostics: invalid,
@@ -335,7 +372,7 @@ test("rejects malformed diagnostic metric ranges instead of silently trusting th
 });
 
 test("legacy verification reports without diagnostic metrics remain supported", () => {
-  const result = verifyRenderCorrectionTasks(backlog(), reviewReport());
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport());
   assert.equal(result.tasks[0].status, "verified");
   assert.equal(result.tasks[0].matchedEvidence.similarityDiagnostics, null);
   assert.equal(result.similarityDiagnosticsSummary.comparisonsWithDiagnostics, 0);
@@ -343,7 +380,7 @@ test("legacy verification reports without diagnostic metrics remain supported", 
 });
 
 test("does not verify a match when the source model has not changed", () => {
-  const result = verifyRenderCorrectionTasks(backlog(), reviewReport({
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport({
     provenance: { sourceModelSha256: modelSha, renderManifestSha256: changedManifestSha },
   }));
   assert.equal(result.tasks[0].status, "stale-evidence");
@@ -351,7 +388,7 @@ test("does not verify a match when the source model has not changed", () => {
 });
 
 test("does not verify a match when the render manifest has not changed", () => {
-  const result = verifyRenderCorrectionTasks(backlog(), reviewReport({
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport({
     provenance: { sourceModelSha256: changedModelSha, renderManifestSha256: manifestSha },
   }));
   assert.equal(result.tasks[0].status, "stale-evidence");
@@ -365,7 +402,7 @@ test("does not verify a match when the reference image hash changed", () => {
       referenceSha256: changedReference,
     }],
   });
-  const result = verifyRenderCorrectionTasks(backlog(), report);
+  const result = verifyWithArtifactEvidence(backlog(), report);
   assert.equal(result.tasks[0].status, "stale-evidence");
   assert.equal(result.tasks[0].gates.referenceImageHashUnchanged, false);
 });
@@ -377,14 +414,14 @@ test("keeps a task active when the latest comparison is partial or mismatch", ()
       outcome: "partial",
     }],
   });
-  assert.equal(verifyRenderCorrectionTasks(backlog(), partial).tasks[0].status, "needs-more-work");
+  assert.equal(verifyWithArtifactEvidence(backlog(), partial).tasks[0].status, "needs-more-work");
   const mismatch = reviewReport({
     comparisons: [reviewReport().comparisons[0] && {
       ...reviewReport().comparisons[0],
       outcome: "mismatch",
     }],
   });
-  assert.equal(verifyRenderCorrectionTasks(backlog(), mismatch).tasks[0].status, "needs-more-work");
+  assert.equal(verifyWithArtifactEvidence(backlog(), mismatch).tasks[0].status, "needs-more-work");
 });
 
 test("pending comparison waits and not-comparable evidence blocks model verification", () => {
@@ -401,7 +438,7 @@ test("pending comparison waits and not-comparable evidence blocks model verifica
       notes: "",
     }],
   });
-  assert.equal(verifyRenderCorrectionTasks(backlog(), pending).tasks[0].status, "awaiting-review");
+  assert.equal(verifyWithArtifactEvidence(backlog(), pending).tasks[0].status, "awaiting-review");
 
   const incomparable = reviewReport({
     comparisons: [{
@@ -416,11 +453,11 @@ test("pending comparison waits and not-comparable evidence blocks model verifica
       notes: "Camera orientation cannot be aligned.",
     }],
   });
-  assert.equal(verifyRenderCorrectionTasks(backlog(), incomparable).tasks[0].status, "blocked");
+  assert.equal(verifyWithArtifactEvidence(backlog(), incomparable).tasks[0].status, "blocked");
 });
 
 test("missing exact view/reference evidence cannot close a correction task", () => {
-  const result = verifyRenderCorrectionTasks(backlog(), reviewReport({
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport({
     comparisons: [{
       ...reviewReport().comparisons[0],
       viewId: "side",
@@ -442,7 +479,7 @@ test("review-only tasks can complete without claiming geometry correction", () =
       outcome: "mismatch",
     }],
   });
-  const result = verifyRenderCorrectionTasks(sourceBacklog, report);
+  const result = verifyWithArtifactEvidence(sourceBacklog, report);
   assert.equal(result.tasks[0].status, "completed");
   assert.equal(result.tasks[0].verified, false);
 });
@@ -460,7 +497,7 @@ test("uncovered-view task completes only after the new report has an outcome", (
       referenceImageId: "reference-back",
     }],
   });
-  assert.equal(verifyRenderCorrectionTasks(sourceBacklog, report).tasks[0].status, "completed");
+  assert.equal(verifyWithArtifactEvidence(sourceBacklog, report).tasks[0].status, "completed");
 });
 
 test("rejects same report reuse, wrong building, invalid hashes and duplicate comparisons", () => {
@@ -470,15 +507,15 @@ test("rejects same report reuse, wrong building, invalid hashes and duplicate co
   };
   // Explicitly reuse the exact source report digest to ensure it is not accepted as a fresh cycle.
   const exactDigest = createHash("sha256").update(JSON.stringify(sameReport)).digest("hex");
-  assert.throws(() => verifyRenderCorrectionTasks(backlog({
+  assert.throws(() => verifyWithArtifactEvidence(backlog({
     createdFromReviewReportSha256: exactDigest,
     tasks: [task({ evidence: { ...task().evidence, reviewReportSha256: exactDigest } })],
   }), sameReport), /must-be-new-review-evidence/);
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({ buildingId: "another-building" })), /does-not-match-backlog/);
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({ buildingId: "another-building" })), /does-not-match-backlog/);
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({
     provenance: { sourceModelSha256: "bad", renderManifestSha256: changedManifestSha },
   })), /source-model-sha256-invalid/);
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({
     comparisons: [
       reviewReport().comparisons[0],
       reviewReport().comparisons[0],
@@ -598,7 +635,7 @@ test("reports before/after hotspot overlap as image-space context without affect
     }],
   });
 
-  const result = verifyRenderCorrectionTasks(sourceBacklog, nextReport);
+  const result = verifyWithArtifactEvidence(sourceBacklog, nextReport);
   const taskResult = result.tasks[0];
   assert.equal(taskResult.status, "verified");
   assert.equal(taskResult.verified, true);
@@ -634,7 +671,7 @@ test("rejects malformed before/after hotspot evidence rather than comparing untr
       },
     },
   });
-  assert.throws(() => verifyRenderCorrectionTasks(backlog({ tasks: [sourceTask] }), reviewReport()),
+  assert.throws(() => verifyWithArtifactEvidence(backlog({ tasks: [sourceTask] }), reviewReport()),
     /backlog-spatial-hotspots-invalid/);
 
   const invalidFreshMetrics = spatialDiagnosticMetrics();
@@ -642,7 +679,7 @@ test("rejects malformed before/after hotspot evidence rather than comparing untr
     { cellX: 0, cellY: 0 }, { cellX: 1, cellY: 0 },
     { cellX: 2, cellY: 0 }, { cellX: 3, cellY: 0 },
   ];
-  assert.throws(() => verifyRenderCorrectionTasks(backlog(), reviewReport({
+  assert.throws(() => verifyWithArtifactEvidence(backlog(), reviewReport({
     comparisons: [{
       ...reviewReport().comparisons[0],
       similarityDiagnostics: similarityDiagnostics({
@@ -660,7 +697,7 @@ test("rejects malformed before/after hotspot evidence rather than comparing untr
 });
 
 test("legacy correction tasks without baseline hotspots remain verifiable and report no hotspot delta", () => {
-  const result = verifyRenderCorrectionTasks(backlog(), reviewReport());
+  const result = verifyWithArtifactEvidence(backlog(), reviewReport());
   assert.equal(result.tasks[0].status, "verified");
   assert.equal(result.tasks[0].diagnosticHotspotComparison, null);
   assert.equal(result.similarityDiagnosticsSummary.tasksWithHotspotComparison, 0);
