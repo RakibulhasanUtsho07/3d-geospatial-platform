@@ -238,3 +238,8 @@ Candidates created from measured floor-plan vectors can be reviewed through a se
 ### Raster floor-plan trace candidates
 
 The engine can analyze an uploaded floor-plan raster (JPEG/PNG/WebP) to propose horizontal/vertical wall lines and closed rectangular room candidates. Traces remain private, hash-checked, pixel-based and unreviewed until a human corrects them and supplies measured scale/georeferencing. The detector is a limited orthogonal-line heuristic; it does not read dimensions or infer angled walls, and it does not auto-publish. See section 15 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
+
+
+### Calibrated raster trace-to-GLB candidate flow
+
+After the trace is checked, an operator can provide selected line/room IDs, a known-distance pixel calibration, and a surveyed WGS84 origin to the trace generate endpoint. It creates a private GLB candidate and binds the transformation audit hash into the candidate report. This remains an unverified draft: rights, architectural fit, scale and georeferencing require review before explicit publication. See section 16 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
