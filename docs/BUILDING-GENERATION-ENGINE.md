@@ -233,3 +233,30 @@ Use the returned `source.relativePath` in a later `POST /api/building-generation
 Before a generation job is persisted, the queue validates every supplied source path against the configured workspace. It rejects missing files, empty files, directories, symbolic links in any path segment, paths resolving outside the workspace, and files that exceed the per-kind intake limit (image 20 MiB, video 500 MiB, floor-plan 50 MiB; `auto` uses the 500 MiB cap). This prevents broken requests from consuming a worker retry.
 
 Preflight is a file/path/size check, not a file-content or rights decision. The worker still runs media signature detection, hashes the bytes, checks the media kind, and syncs the source through the existing provenance workflow. A caller's licence string and `confirmRights` flag remain an operator attestation, not independent legal verification.
+
+
+## 12. Measured floor-plan vectors to interior GLB
+
+The floor-plan shell builder is a deterministic geometry adapter for a **measured/vector trace**, not an automatic PDF/image parser. It extrudes explicit room polygons into floor slabs and explicit wall centre-lines into walls, leaving openings for doors and windows and adding simple door/window geometry. This provides a reviewable interior shell where the room outlines, wall paths, openings and dimensions are already traced or supplied by a CAD/vector conversion step.
+
+Required geometry fields include:
+
+- `units: "m"`; coordinates are local `[x, z]` points in metres.
+- An explicit `origin` with WGS84 longitude/latitude, elevation and heading.
+- `level` values for elevation, wall height, wall thickness and floor thickness.
+- Room polygons and wall centre-lines; doors/windows use measured wall offsets, width, height and sill height.
+
+Generate the GLB and its JSON QA/provenance report:
+
+~~~powershell
+npm run test:floor-plan-model
+npm run generate:floor-plan-model -- .\floor-plan-geometry.json .\output\ground-floor.glb
+~~~
+
+The report is written beside the GLB as `ground-floor.glb.report.json`. To independently check the source PDF or source image checksum, provide the original source file as the third CLI argument; the input JSON must contain `source.sourceId` and the expected `source.sha256`:
+
+~~~powershell
+npm run generate:floor-plan-model -- .\floor-plan-geometry.json .\output\ground-floor.glb .\original-floor-plan.pdf
+~~~
+
+A source checksum in JSON is treated as metadata unless this optional original-file check succeeds. The generated GLB is always a candidate with `mapReady=false` and `publicationEligible=false`; it is not automatically published or georeferenced by itself. Verify the trace, metres, heading, origin, dimensions, doors/windows and source rights before review. Furniture, stairs, ceilings, electrical/plumbing systems and automatic PDF/image wall extraction are not included in this worker.

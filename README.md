@@ -218,3 +218,8 @@ The backend also provides `POST /api/building-generation/uploads` for authentica
 
 
 Generation job enqueueing now preflights each supplied source: the path must already exist inside the private workspace as a non-empty regular file, with no symlink path components, and must stay within the source-kind size limit. Actual media signature and provenance validation still runs in the worker.
+
+
+### Measured floor-plan to interior GLB
+
+A deterministic shell builder now extrudes **explicit measured/vector floor-plan geometry** into a reviewable GLB with rooms, floor slabs, walls, doors and windows: `npm run generate:floor-plan-model -- <geometry.json> <output.glb> [original-source-file]`. It does not infer room walls from a PDF/image; floor-plan tracing/conversion and human review are still required. See the [engine guide](docs/BUILDING-GENERATION-ENGINE.md#12-measured-floor-plan-vectors-to-interior-glb).
