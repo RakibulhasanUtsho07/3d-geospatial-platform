@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { copyFile, lstat, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeGeneratedModelDefinition } from "../map-engine/generated-model-policy.mjs";
 import { PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, validatePublishedModelCatalog } from "./published-model-catalog-reader.mjs";
@@ -223,7 +223,7 @@ export async function publishReviewedBuildingModel({
     }
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      await copyFile(candidate.real, destination);
+      await writeFile(destination, candidateBytes, { flag: "wx" });
     } else {
       throw error;
     }
@@ -234,7 +234,7 @@ export async function publishReviewedBuildingModel({
     versionId,
     url: assetUrl,
     sha256: actualCandidateHash,
-    bytes: candidate.details.size,
+    bytes: candidateBytes.length,
     publishedAt,
     position: placement.position,
     headingDegrees: placement.headingDegrees,
