@@ -90,9 +90,9 @@ export function parseRoadNetworkParams(params) {
 }
 
 /**
- * Build a stable cache key from the full viewport precision sent by the map.
- * A coarse key can return roads normalized for a neighbouring, non-identical
- * bbox and silently omit ways near the current viewport edges.
+ * Build a stable cache key using the same 4-decimal viewport precision as the
+ * map engine's in-flight request key. Finer keys could bypass useful coalescing;
+ * coarser keys could reuse roads normalized for a neighbouring viewport.
  */
 export function buildRoadNetworkCacheKey(request) {
   if (
@@ -107,10 +107,10 @@ export function buildRoadNetworkCacheKey(request) {
   }
 
   return [
-    request.west.toFixed(6),
-    request.south.toFixed(6),
-    request.east.toFixed(6),
-    request.north.toFixed(6),
+    request.west.toFixed(4),
+    request.south.toFixed(4),
+    request.east.toFixed(4),
+    request.north.toFixed(4),
     request.limit,
   ].join("|");
 }
