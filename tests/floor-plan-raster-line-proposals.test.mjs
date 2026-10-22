@@ -98,7 +98,7 @@ test("rejects invalid checksums, unsupported PDF input and invalid limits", asyn
       sourceSha256: sha256(Buffer.from("%PDF-1.7")),
       sourceMimeType: "application/pdf",
     }),
-    /support JPEG, PNG and WebP only/,
+    /Raster proposals support JPEG, PNG and WebP sources only/,
   );
   await assert.rejects(
     proposeFloorPlanRasterLines({
