@@ -10,7 +10,10 @@ import {
   cacheViewportResponse,
   getCachedViewportResponse,
 } from "./viewport-response-cache.mjs";
-import { shouldAbortViewportRequest } from "./viewport-load-policy.mjs";
+import {
+  shouldAbortViewportRequest,
+  shouldLoadFullDatasetForWideViewport,
+} from "./viewport-load-policy.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
   AHSAN_MANZIL_CAMERA_TARGET,
@@ -241,8 +244,12 @@ export class CesiumAdapter implements MapEngine {
   private activeViewportEndpoint: string | null = null;
   private viewportRequestAbortController: AbortController | null = null;
   private readonly viewportResponseCache = new Map<string, unknown>();
-  private pendingViewportBounds: ViewportBounds | null = null;
-  private pendingViewportFeatureLimit: number | null = null;
+  // The pending request is the latest camera intent. Null bounds means the
+  // full pilot dataset; a null request means no work is queued.
+  private pendingViewportRequest: {
+    bounds: ViewportBounds | null;
+    featureLimit: number | null;
+  } | null = null;
 
   async initialize(container: HTMLElement): Promise<void> {
     if (this.viewer && !this.viewer.isDestroyed()) {
@@ -629,6 +636,8 @@ export class CesiumAdapter implements MapEngine {
               viewer.camera.positionCartographic.height,
             ),
         );
+      } else {
+        this.queuePendingFullDataset();
       }
       return;
     }
@@ -1028,31 +1037,42 @@ export class CesiumAdapter implements MapEngine {
 
       this.viewportLoadInProgress = false;
 
-      const pendingBounds = this.pendingViewportBounds;
-      const pendingFeatureLimit = this.pendingViewportFeatureLimit;
-      this.pendingViewportBounds = null;
-      this.pendingViewportFeatureLimit = null;
-      const requiredFeatureLimit =
-        pendingFeatureLimit ??
-        getViewportFeatureLimit(viewer.camera.positionCartographic.height);
+      const pendingRequest = this.pendingViewportRequest;
+      this.pendingViewportRequest = null;
 
-      // Always service the latest queued viewport, even if its predecessor was
-      // cancelled or failed. The coverage check prevents redundant reloads.
+      // Always service the latest queued camera intent, even if its predecessor
+      // was cancelled or failed. A null-bounds request means the wide view needs
+      // the full pilot dataset; never downgrade it to a bounded viewport.
       if (
-        pendingBounds &&
+        pendingRequest &&
+        pendingRequest.bounds === null &&
+        (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
+      ) {
+        void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+          (error: unknown) => {
+            if (isAbortError(error)) return;
+            console.error(
+              "[Overture] Follow-up full-dataset load failed.",
+              error instanceof Error ? error.message : String(error),
+            );
+          },
+        );
+      } else if (
+        pendingRequest?.bounds &&
         !this.isViewportCoveredByLoadedData(
-          pendingBounds,
-          requiredFeatureLimit,
+          pendingRequest.bounds,
+          pendingRequest.featureLimit ??
+            getViewportFeatureLimit(viewer.camera.positionCartographic.height),
         )
       ) {
         void this.loadOvertureBuildings(
           viewer,
           Cesium,
-          pendingBounds,
+          pendingRequest.bounds,
         ).catch((error: unknown) => {
           if (isAbortError(error)) return;
           console.error(
-            "[Overture] Follow-up viewport load failed:",
+            "[Overture] Follow-up viewport load failed.",
             error instanceof Error ? error.message : String(error),
           );
         });
@@ -1456,10 +1476,23 @@ export class CesiumAdapter implements MapEngine {
     bounds: ViewportBounds,
     featureLimit: number,
   ): void {
-    this.pendingViewportBounds = bounds;
-    this.pendingViewportFeatureLimit = featureLimit;
+    this.pendingViewportRequest = { bounds, featureLimit };
 
     const nextEndpoint = this.getViewportEndpoint(bounds, featureLimit);
+    if (
+      shouldAbortViewportRequest(
+        this.activeViewportEndpoint,
+        nextEndpoint,
+      )
+    ) {
+      this.viewportRequestAbortController?.abort();
+    }
+  }
+
+  private queuePendingFullDataset(): void {
+    this.pendingViewportRequest = { bounds: null, featureLimit: null };
+
+    const nextEndpoint = "/api/geospatial/overture-buildings";
     if (
       shouldAbortViewportRequest(
         this.activeViewportEndpoint,
@@ -1487,8 +1520,24 @@ export class CesiumAdapter implements MapEngine {
     const requestedBounds = this.getPaddedViewportBounds(viewer, Cesium);
 
     if (!requestedBounds) {
-      // Very wide views use the compatible full-dataset fallback.
-      this.updateBuildingLod(viewer, Cesium);
+      // A wide view needs all pilot buildings unless the full dataset is active.
+      if (!shouldLoadFullDatasetForWideViewport(
+        this.hasLoadedBuildings,
+        this.loadedViewportBounds,
+      )) {
+        this.updateBuildingLod(viewer, Cesium);
+        return;
+      }
+
+      void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+        (error: unknown) => {
+          if (isAbortError(error)) return;
+          console.error(
+            "[Overture] Full-dataset fallback failed.",
+            error instanceof Error ? error.message : String(error),
+          );
+        },
+      );
       return;
     }
 
@@ -2914,8 +2963,7 @@ export class CesiumAdapter implements MapEngine {
     this.loadedViewportFeatureLimit = null;
     this.hasLoadedBuildings = false;
     this.viewportLoadInProgress = false;
-    this.pendingViewportBounds = null;
-    this.pendingViewportFeatureLimit = null;
+    this.pendingViewportRequest = null;
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 
@@ -3524,8 +3572,7 @@ export class CesiumAdapter implements MapEngine {
 
       if (!visible) {
         // Do not keep fetching obsolete viewports while the building layer is hidden.
-        this.pendingViewportBounds = null;
-        this.pendingViewportFeatureLimit = null;
+        this.pendingViewportRequest = null;
         this.viewportRequestAbortController?.abort();
       }
     } else if (layerId === MAP_LAYER_IDS.nearbyPlaces) {
