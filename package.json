@@ -86,6 +86,8 @@
     "test:render-correction-tasks": "node --test tests/render-correction-tasks.test.mjs",
     "create:render-correction-tasks": "node scripts/create-render-correction-tasks.mjs",
     "test:render-correction-verification": "node --test tests/render-correction-verification.test.mjs",
+    "test:render-correction-artifact-evidence": "node --test tests/render-correction-artifact-evidence.test.mjs",
+    "create:render-correction-qa-evidence": "node scripts/create-render-correction-qa-evidence.mjs",
     "verify:render-correction-tasks": "node scripts/verify-render-correction-tasks.mjs",
     "test:building-release-readiness": "node --test tests/building-release-readiness.test.mjs",
     "assess:building-release-readiness": "node scripts/build-building-release-readiness.mjs",
