@@ -43,6 +43,9 @@ import { resolveBuildingHeight } from "../buildings/building-height.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
+import { flattenRoadCoordinates } from "../geospatial/flatten-road-coordinates.mjs";
+import { selectNearestLodRecords } from "./lod-record-selection.mjs";
+import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import { normalizeGeneratedModelDefinition } from "./generated-model-policy.mjs";
 import type {
@@ -1414,122 +1417,104 @@ export class CesiumAdapter implements MapEngine {
         this.roadNetworkDataSource = dataSource;
       }
 
-      dataSource.entities.removeAll();
-      this.roadByEntityId.clear();
-      const labelCandidates = payload.results
-        .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
-        .slice(0, 40);
-      const labelIds = new Set(labelCandidates.map((road) => road.id));
+      // Suspend Cesium collection events while replacing a whole viewport.
+      // This coalesces many entity add/remove notifications into one flush.
+      dataSource.entities.suspendEvents();
+      let renderedRoads = 0;
+      try {
+        dataSource.entities.removeAll();
+        this.roadByEntityId.clear();
+        const labelCandidates = payload.results
+          .filter((road) => road.name && (road.roadClass === "arterial" || road.roadClass === "collector"))
+          .slice(0, 40);
+        const labelIds = new Set(labelCandidates.map((road) => road.id));
 
-      const roadColors: Record<RoadFeature["roadClass"], string> = {
-        arterial: "#84919D",
-        collector: "#AAB4BD",
-        local: "#D3D9DE",
-        path: "#BBB6A9",
-      };
-      const surfaceColors: Record<string, string> = {
-        asphalt: "#69757F",
-        concrete: "#A9B0B7",
-        paving_stones: "#B9B5AD",
-        cobblestone: "#8B8580",
-        gravel: "#9B8F7B",
-        unpaved: "#B99B75",
-        ground: "#AA8D6A",
-        dirt: "#AA8D6A",
-        earth: "#AA8D6A",
-        sand: "#D0B88C",
-        grass: "#72936A",
-      };
+        for (const road of payload.results) {
+          if (
+            !road ||
+            !Array.isArray(road.coordinates) ||
+            road.coordinates.length < 2 ||
+            !Number.isFinite(road.widthMeters)
+          ) {
+            continue;
+          }
 
-      for (const road of payload.results) {
-        if (
-          !road ||
-          !Array.isArray(road.coordinates) ||
-          road.coordinates.length < 2 ||
-          !Number.isFinite(road.widthMeters)
-        ) {
-          continue;
-        }
+          // A preallocated flat buffer avoids one intermediate [lon, lat]
+          // array allocation per vertex on large road ways.
+          const flattenedCoordinates = flattenRoadCoordinates(road.coordinates);
+          if (flattenedCoordinates.length < 4) continue;
+          const positions = Cesium.Cartesian3.fromDegreesArray(flattenedCoordinates);
+          if (positions.length < 2) continue;
 
-        const positions = Cesium.Cartesian3.fromDegreesArray(
-          road.coordinates.flatMap(([longitude, latitude]) => [longitude, latitude]),
-        );
-        if (positions.length < 2) continue;
+          const visualStyle = resolveRoadVisualStyle(road);
+          const centerIndex = Math.min(
+            road.coordinates.length - 1,
+            Math.floor(road.coordinates.length / 2),
+          );
+          const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
+          const roadColor = Cesium.Color.fromCssColorString(visualStyle.color) ?? Cesium.Color.LIGHTGRAY;
+          const roadwayWidth = visualStyle.widthMeters;
+          const safeName = road.name
+            ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
+            : null;
 
-        const centerIndex = Math.min(
-          road.coordinates.length - 1,
-          Math.floor(road.coordinates.length / 2),
-        );
-        const [labelLongitude, labelLatitude] = road.coordinates[centerIndex];
-        const roadColor = Cesium.Color.fromCssColorString(
-          (road.surface ? surfaceColors[road.surface.toLowerCase()] : null)
-            ?? roadColors[road.roadClass]
-            ?? roadColors.local,
-        ) ?? Cesium.Color.LIGHTGRAY;
-        const renderHeight = road.bridge
-          ? Math.max(3, (road.layer ?? 1) * 3)
-          : road.tunnel
-            ? -3
-            : 0;
-        const roadwayWidth = Math.max(1.1, Math.min(24, road.widthMeters));
-        const safeName = road.name
-          ? road.name.replace(/[<>\u0000-\u001f\u007f]/g, "").slice(0, 140)
-          : null;
-
-        this.roadByEntityId.set(road.id, road);
-        dataSource.entities.add({
-          id: road.id,
-          name: safeName ?? road.highway + " road",
-          position: labelIds.has(road.id)
-            ? Cesium.Cartesian3.fromDegrees(labelLongitude, labelLatitude, 1)
-            : undefined,
-          corridor: {
-            positions,
-            width: roadwayWidth,
-            height: renderHeight,
-            cornerType: Cesium.CornerType.ROUNDED,
-            material: new Cesium.ColorMaterialProperty(
-              roadColor.withAlpha(road.roadClass === "path" ? 0.72 : 0.9),
-            ),
-            outline: true,
-            outlineColor: new Cesium.ConstantProperty(
-              Cesium.Color.fromCssColorString("#44515E")?.withAlpha(0.56) ?? Cesium.Color.GRAY,
-            ),
-            outlineWidth: 1,
-          },
-          label: labelIds.has(road.id) && safeName
-            ? {
-                text: safeName,
-                font: "11px sans-serif",
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.fromCssColorString("#25313D") ?? Cesium.Color.BLACK,
-                outlineWidth: 3,
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                showBackground: true,
-                backgroundColor: Cesium.Color.fromCssColorString("#293746")?.withAlpha(0.82) ?? Cesium.Color.BLACK,
-                pixelOffset: new Cesium.Cartesian2(0, -4),
-                scaleByDistance: new Cesium.NearFarScalar(150, 1, 1800, 0.35),
-                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5500),
-                disableDepthTestDistance: 1800,
-              }
-            : undefined,
-        });
-
-        // A thin centre highlight improves road hierarchy at ground-level zoom;
-        // physical-width corridor geometry remains the controlling road surface.
-        if (road.roadClass === "arterial" && road.widthMeters >= 5) {
-          this.roadByEntityId.set(road.id + "-centre-line", road);
+          this.roadByEntityId.set(road.id, road);
           dataSource.entities.add({
-            id: road.id + "-centre-line",
-            name: (safeName ?? "Road") + " centre detail",
-            polyline: {
+            id: road.id,
+            name: safeName ?? road.highway + " road",
+            position: labelIds.has(road.id)
+              ? Cesium.Cartesian3.fromDegrees(labelLongitude, labelLatitude, 1)
+              : undefined,
+            corridor: {
               positions,
-              width: 1.2,
-              material: Cesium.Color.WHITE.withAlpha(0.58),
-              clampToGround: true,
+              width: roadwayWidth,
+              height: visualStyle.renderHeight,
+              cornerType: Cesium.CornerType.ROUNDED,
+              material: new Cesium.ColorMaterialProperty(
+                roadColor.withAlpha(visualStyle.opacity),
+              ),
+              outline: true,
+              outlineColor: new Cesium.ConstantProperty(
+                Cesium.Color.fromCssColorString("#344653")?.withAlpha(visualStyle.outlineOpacity) ?? Cesium.Color.GRAY,
+              ),
+              outlineWidth: 1,
             },
+            label: labelIds.has(road.id) && safeName
+              ? {
+                  text: safeName,
+                  font: "11px sans-serif",
+                  fillColor: Cesium.Color.WHITE,
+                  outlineColor: Cesium.Color.fromCssColorString("#25313D") ?? Cesium.Color.BLACK,
+                  outlineWidth: 3,
+                  style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                  showBackground: true,
+                  backgroundColor: Cesium.Color.fromCssColorString("#293746")?.withAlpha(0.82) ?? Cesium.Color.BLACK,
+                  pixelOffset: new Cesium.Cartesian2(0, -4),
+                  scaleByDistance: new Cesium.NearFarScalar(150, 1, 1800, 0.35),
+                  distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5500),
+                  disableDepthTestDistance: 1800,
+                }
+              : undefined,
           });
+          renderedRoads += 1;
+
+          // Arterials get a fine centre highlight without adding a thick second road.
+          if (visualStyle.hasCentreLine) {
+            this.roadByEntityId.set(road.id + "-centre-line", road);
+            dataSource.entities.add({
+              id: road.id + "-centre-line",
+              name: (safeName ?? "Road") + " centre detail",
+              polyline: {
+                positions,
+                width: 1.2,
+                material: Cesium.Color.fromCssColorString("#F2F6F8")?.withAlpha(0.64) ?? Cesium.Color.WHITE,
+                clampToGround: true,
+              },
+            });
+          }
         }
+      } finally {
+        dataSource.entities.resumeEvents();
       }
 
       dataSource.show = this.isLayerVisible(MAP_LAYER_IDS.roads);
@@ -1542,7 +1527,10 @@ export class CesiumAdapter implements MapEngine {
       console.info("[Roads] Vector road viewport rendered.", {
         requested: bounds,
         returnedWays: payload.results.length,
-        labelledRoads: labelCandidates.length,
+        renderedWays: renderedRoads,
+        labelledRoads: Math.min(40, payload.results.filter((road) =>
+          road.name && (road.roadClass === "arterial" || road.roadClass === "collector")
+        ).length),
         attribution: "© OpenStreetMap contributors",
       });
     } catch (error: unknown) {
@@ -1892,25 +1880,16 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodOrigin = Cesium.Cartesian3.clone(origin);
     this.lastLodBudget = detailBudget;
 
-    const nearestBuildings = this.buildingLodRecords
-      .filter((record) => record.center && record.wallPositions)
-      .map((record) => ({
-        record,
-        distance: Cesium.Cartesian3.distance(record.center!, origin),
-      }))
-      .sort((left, right) => {
-        // Keep real building parts detailed before complete building shells.
-        if (left.record.isPart !== right.record.isPart) {
-          return left.record.isPart ? -1 : 1;
-        }
-
-        return left.distance - right.distance;
-      });
-
     const desiredDetailed = new Set(
-      nearestBuildings
-        .slice(0, detailBudget)
-        .map((entry) => entry.record),
+      selectNearestLodRecords(
+        this.buildingLodRecords,
+        detailBudget,
+        (record) => (
+          record.center && record.wallPositions
+            ? Cesium.Cartesian3.distance(record.center, origin)
+            : null
+        ),
+      ),
     );
 
     // A selected building stays detailed even if it is outside the current budget.
