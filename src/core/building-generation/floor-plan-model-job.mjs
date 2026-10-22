@@ -173,7 +173,7 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, 
         !Array.isArray(transformation.confirmedRoomIds)) {
       throw new TypeError("traceEvidence does not match this source and measured transformation.");
     }
-    traceReviewBytes = Buffer.from(JSON.stringify(transformation, null, 2) + "\\n", "utf8");
+    traceReviewBytes = Buffer.from(JSON.stringify(transformation, null, 2) + "\n", "utf8");
     traceReviewSha256 = sha256(traceReviewBytes);
     generated.report.input.rasterTrace = {
       traceId: traceEvidence.traceId,
