@@ -66,15 +66,15 @@ function pngRgba(width, height) {
 }
 
 const cameras = [
-  { id: "left", projection: [[1,0,0,0],[0,1,0,0],[0,0,1,0]] },
-  { id: "right", projection: [[1,0,0,-1],[0,1,0,0],[0,0,1,0]] },
+  { id: "left", projection: [[1000,0,320,0],[0,1000,240,0],[0,0,1,0]] },
+  { id: "right", projection: [[1000,0,320,-1000],[0,1000,240,0],[0,0,1,0]] },
 ];
 
 const features = [
-  { id: "a", observations: [{cameraId:"left",x:0,y:0},{cameraId:"right",x:-0.2,y:0}] },
-  { id: "b", observations: [{cameraId:"left",x:0.2,y:0},{cameraId:"right",x:0,y:0}] },
-  { id: "c", observations: [{cameraId:"left",x:0,y:0.2},{cameraId:"right",x:-0.2,y:0.2}] },
-  { id: "d", observations: [{cameraId:"left",x:0,y:0},{cameraId:"right",x:-1/6,y:0}] },
+  { id: "a", observations: [{cameraId:"left",x:320,y:240},{cameraId:"right",x:120,y:240}] },
+  { id: "b", observations: [{cameraId:"left",x:520,y:240},{cameraId:"right",x:320,y:240}] },
+  { id: "c", observations: [{cameraId:"left",x:320,y:440},{cameraId:"right",x:120,y:440}] },
+  { id: "d", observations: [{cameraId:"left",x:420,y:390},{cameraId:"right",x:320,y:390}] },
 ];
 
 const edges = [
@@ -108,9 +108,9 @@ async function fixture(t, { textureStatus = "verified" } = {}) {
     }],
     faces: faces.map((vertices) => ({
       vertices,
-      uv: [[0,0],[1,0],[0.5,1]],
       sourceImageId: "front",
       cameraCalibrationId: "left",
+      visibilityReviewed: true,
     })),
   };
   const inputPath = path.join(root, "geometry-input.json");
@@ -151,7 +151,9 @@ test("runs registration, wireframe QA, explicit-face meshing, surface review and
   assert.equal(result.report.checks.acceptedMeshTriangleCount, 4);
   assert.equal(result.report.checks.boundaryEdgeCount, 0);
   assert.equal(result.report.checks.nonManifoldEdgeCount, 0);
-  assert.equal(result.report.checks.textureProjectionEvidenceStatus, "evidence-validation-passed");
+  assert.equal(result.report.checks.textureProjectionEvidenceStatus, "uv-projection-complete-requires-human-review");
+  assert.equal(result.report.checks.calibratedUvProjectionPerformed, true);
+  assert.equal(result.report.checks.projectedTextureFaceCount, 4);
   assert.equal(result.report.checks.textureAtlasBakingPerformed, true);
   assert.equal(result.report.checks.glbTextureBindingQaValid, true);
   assert.equal(result.report.checks.texturedTriangleCount, 4);

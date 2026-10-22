@@ -18,6 +18,7 @@ import { runWireframeQaRepairPasses } from "./wireframe-qa-repair-passes.mjs";
 import { buildMeshFromReviewedWireframe } from "./wireframe-to-mesh.mjs";
 import { reviewMeshSurfaces } from "./mesh-surface-review.mjs";
 import { reviewTextureProjection } from "./texture-projection-review.mjs";
+import { projectTextureFaces } from "./calibrated-texture-uv-projection.mjs";
 import { buildTexturedGlb } from "./textured-glb-export.mjs";
 import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
@@ -572,17 +573,53 @@ export async function runArchitecturalGeometryWorkflow(options) {
       { maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx },
     ),
     execute: async () => {
-      const report = reviewTextureProjection(input.textureCandidate, {
+      const projection = projectTextureFaces({
+        cameras: input.cameras,
+        vertices: geometryPayload.mesh.vertices,
+        candidate: input.textureCandidate,
+        options: {
+          maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
+          minProjectedTriangleAreaPx: input.options?.minProjectedTriangleAreaPx ?? 0.5,
+        },
+      });
+      const projectedCandidate = { ...input.textureCandidate, faces: projection.faces };
+      const evidenceReport = reviewTextureProjection(projectedCandidate, {
         maxReprojectionErrorPx: config.maxTextureReprojectionErrorPx,
       });
+      const blockers = [...new Set([...projection.blockers, ...evidenceReport.blockers])];
+      const report = {
+        ...evidenceReport,
+        status: blockers.length ? "review-required" : "uv-projection-complete-requires-human-review",
+        blockers,
+        calibratedUvProjection: {
+          status: projection.status,
+          projectedFaceCount: projection.projectedFaceCount,
+          rejectedFaces: projection.rejectedFaces,
+          policy: projection.policy,
+          limitations: projection.limitations,
+        },
+        policy: {
+          ...evidenceReport.policy,
+          generatesUvs: true,
+          usesSuppliedUvs: false,
+          automaticOcclusionDetection: false,
+        },
+        limitations: [...projection.limitations, ...evidenceReport.limitations],
+      };
       return {
-        payload: { report, meshSha256: meshStage.artifact.contentSha256 },
+        payload: {
+          report,
+          projectedFaces: projection.faces,
+          meshSha256: meshStage.artifact.contentSha256,
+        },
         outputs: {
           status: report.status,
           inputFaceCount: report.faceCount,
-          evidenceEligibleFaceCount: report.evidenceEligibleFaceIndices.length,
-          rejectedFaceCount: report.rejectedFaces.length,
-          blockerCount: report.blockers.length,
+          projectedFaceCount: projection.projectedFaceCount,
+          evidenceEligibleFaceCount: evidenceReport.evidenceEligibleFaceIndices.length,
+          rejectedFaceCount: blockers.length ? report.rejectedFaces.length + projection.rejectedFaces.length : 0,
+          blockerCount: blockers.length,
+          calibratedUvProjectionPerformed: projection.projectedFaceCount > 0,
           texturePixelProjectionPerformed: false,
           atlasBakingPerformed: false,
         },
@@ -620,8 +657,9 @@ export async function runArchitecturalGeometryWorkflow(options) {
       const reviewedFaceIndices = new Set(texturePayload.report?.evidenceEligibleFaceIndices ?? []);
       const mesh = geometryPayload.mesh;
       const meshKeys = new Set(mesh.triangles.map((triangle) => canonicalFaceKey(triangle.vertices)).filter(Boolean));
-      const candidateFaces = input.textureCandidate.faces.filter((face, index) =>
-        reviewedFaceIndices.has(index) && meshKeys.has(canonicalFaceKey(face?.vertices)));
+      const candidateFaces = (texturePayload.projectedFaces ?? []).filter((face, index) =>
+        reviewedFaceIndices.has(index) && meshKeys.has(canonicalFaceKey(face?.vertices)) &&
+        Array.isArray(face.uv) && face.uv.length === 3);
       const usedImageIds = new Set(candidateFaces.map((face) => face.sourceImageId));
       const images = input.textureCandidate.images.filter((image) => usedImageIds.has(image.id));
       if (!candidateFaces.length || !images.length) {
@@ -1024,6 +1062,9 @@ export async function runArchitecturalGeometryWorkflow(options) {
           textureProjectionEvidenceStatus: textureReport.status,
           textureProjectionFaceCount: textureReport.faceCount,
           textureEvidenceEligibleFaceCount: textureReport.evidenceEligibleFaceIndices.length,
+          calibratedUvProjectionPerformed: textureReport.calibratedUvProjection?.projectedFaceCount > 0,
+          projectedTextureFaceCount: textureReport.calibratedUvProjection?.projectedFaceCount ?? 0,
+          rejectedTextureProjectionFaceCount: textureReport.calibratedUvProjection?.rejectedFaces?.length ?? 0,
           textureAtlasBakingPerformed: atlasResult.status === "baked",
           textureAtlasSha256: atlasStage.artifact.outputs.atlasSha256 ?? null,
           glbExportStatus: glbResult.status,
@@ -1044,7 +1085,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
           "Calibration, cross-view feature matching, explicit faces, per-face UVs and texture evidence are supplied by the operator and are not independently surveyed by this workflow.",
           "The wireframe repair worker only removes malformed/duplicate edges; it never moves coordinates or invents architecture.",
           "Mesh generation uses explicit triangular faces only. Missing surfaces are not guessed or auto-filled.",
-          "The atlas baker composites verified source images and remaps supplied UVs; it does not solve camera poses, project pixels from photographs, or infer missing facade texture.",
+          "Per-face UV coordinates are computed from calibrated camera projection matrices, but the source camera is assigned by the operator and per-face visibility/occlusion is not inferred automatically.",
+          "The atlas baker composites verified source images and remaps generated UVs; it does not correct lens distortion, blend seams, relight photographs, or infer missing facade texture.",
           "The exporter writes only triangles with matching texture evidence. Any uncovered mesh triangles remain a blocker and are listed in the GLB export artifact.",
           "Render images are generated only when renderReview is true and Blender is configured. A render manifest or clean texture QA does not establish architectural fidelity.",
           "A clean topology or low reprojection error does not establish real-world dimensions, building identity or geographic accuracy.",

@@ -13,9 +13,9 @@ npm run generate:building-model -- tests/fixtures/demo-building-spec.json artifa
 
 ## 2. Resumable geometry evidence workflow
 
-runArchitecturalGeometryWorkflow uses the existing multi-view triangulation, bounded wireframe QA/repair, explicit-face mesh builder, mesh surface review and texture projection evidence review modules under the same versioned reconstruction state machine. It requires calibrated camera matrices, manually verified feature correspondences, explicit triangular faces and verified local texture-source metadata; it does not infer or fabricate those inputs.
+runArchitecturalGeometryWorkflow uses multi-view triangulation, bounded wireframe QA/repair, explicit-face mesh building, surface review, calibrated camera-to-UV projection, texture-atlas baking, self-contained textured GLB export, embedded-texture QA and optional Blender render review under the same versioned reconstruction state machine. It computes per-corner UVs from calibrated 3×4 projection matrices rather than trusting supplied UV arrays. The operator must still supply reviewed face-to-camera/source-image assignments and set `visibilityReviewed: true` for each face; view selection and occlusion are not inferred.
 
-npm run test:architectural-geometry-workflow covers end-to-end stage execution, resume/reuse, changed-input rejection, evidence blockers and fail-closed map/publication flags. Texture projection in this workflow is evidence validation only: it does not bake atlas pixels. A technically clean mesh remains a candidate that needs human review and independent dimension/georeferencing evidence.
+npm run test:architectural-geometry-workflow and `npm run test:calibrated-texture-uv-projection` cover end-to-end stage execution, calibrated UV generation, source/camera evidence gates, resume/reuse, changed-input rejection and fail-closed map/publication flags. The atlas baker embeds a baked PNG into the exported GLB; incomplete face-to-view coverage is reported, never fabricated. A technically clean textured mesh remains a candidate that needs human review and independent dimension/georeferencing evidence.
 
 ## 3. Unified media-to-model workflow
 
