@@ -108,7 +108,9 @@
     "test:reconstruction-job-state": "node --test tests/reconstruction-job-state.test.mjs",
     "test:architectural-geometry-workflow": "node --test tests/architectural-geometry-workflow.test.mjs",
     "test:textured-glb-export": "node --test tests/textured-glb-export.test.mjs",
-    "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs"
+    "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
+    "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs",
+    "run:generation-worker": "node scripts/run-generation-worker.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
