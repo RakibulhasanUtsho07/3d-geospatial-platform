@@ -162,11 +162,12 @@ async function resolveRegularWorkspaceFile(root, relativePath, label, maximumByt
   const absolute = path.resolve(root, ...relativePath.split("/"));
   if (!inside(root, absolute)) throw new TypeError(label + " escapes the workspace.");
   let current = root;
-  for (const segment of relativePath.split("/")) {
-    current = path.join(current, segment);
+  const segments = relativePath.split("/");
+  for (let index = 0; index < segments.length; index += 1) {
+    current = path.join(current, segments[index]);
     const entry = await lstat(current);
     if (entry.isSymbolicLink()) throw new TypeError(label + " must not contain symbolic links.");
-    const last = segment === relativePath.split("/").at(-1);
+    const last = index === segments.length - 1;
     if (!last && !entry.isDirectory()) throw new TypeError(label + " contains a non-directory path component.");
     if (last && !entry.isFile()) throw new TypeError(label + " must be a regular file.");
     const actual = await realpath(current);
@@ -222,7 +223,7 @@ async function sourceForCandidate(workspaceRoot, candidate) {
   return source;
 }
 
-function catalogAttestation({ input, record, candidate, publication }) {
+function catalogAttestation({ record, candidate, publication }) {
   return {
     schemaVersion: "1.0.0",
     candidateSha256: candidate.modelSha256,
@@ -250,6 +251,7 @@ function catalogAttestation({ input, record, candidate, publication }) {
         "metricScaleVerified",
         "horizontalGeoreferenceVerified",
         "verticalDatumVerified",
+        "qaReportReviewed",
       ].map((key) => [key, true])),
       notes: record.notes,
     },
@@ -349,7 +351,7 @@ export async function reviewFloorPlanModelCandidate({ workspaceRoot, buildingId,
     const recordBytes = Buffer.from(JSON.stringify(record, null, 2) + "\n", "utf8");
     const recordSha256 = sha256(recordBytes);
     const attestation = parsed.decision === "approved"
-      ? catalogAttestation({ input: parsed, record, candidate, publication: parsed.publication })
+      ? catalogAttestation({ record, candidate, publication: parsed.publication })
       : null;
 
     try {
@@ -389,7 +391,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
   const review = JSON.parse(reviewBytes.toString("utf8"));
   const actualReviewHash = sha256(reviewBytes);
   if (!isRecord(review) || review.schemaVersion !== "1.0.0" ||
-      review.reviewId !== review.reviewId ||
+      typeof review.reviewId !== "string" || !review.reviewId.startsWith("floorplan-review-") ||
       review.candidateId !== cid || review.buildingId !== bid ||
       review.decision !== "approved" ||
       !isRecord(review.candidate) ||
@@ -428,17 +430,26 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
       attestation.review?.reviewedAt !== review.reviewedAt ||
       attestation.review?.evidencePath !== review.evidence?.path ||
       attestation.review?.evidenceSha256 !== review.evidence?.sha256 ||
-      REQUIRED_FLOOR_PLAN_REVIEW_CHECKS.some((key) => key !== "qaReportReviewed" && attestation.review?.checks?.[key] !== true)) {
+      REQUIRED_FLOOR_PLAN_REVIEW_CHECKS.some((key) => attestation.review?.checks?.[key] !== true) ||
+      JSON.stringify(attestation.model?.position) !== JSON.stringify(review.publication?.position) ||
+      attestation.model?.headingDegrees !== review.publication?.headingDegrees ||
+      attestation.model?.pitchDegrees !== review.publication?.pitchDegrees ||
+      attestation.model?.rollDegrees !== review.publication?.rollDegrees ||
+      attestation.model?.scale !== review.publication?.scale ||
+      attestation.model?.upAxis !== review.publication?.upAxis ||
+      attestation.model?.forwardAxis !== review.publication?.forwardAxis ||
+      attestation.review?.notes !== review.notes) {
     const error = new Error("Publication attestation does not match the approved review record.");
     error.code = "ATTESTATION_MISMATCH";
     throw error;
   }
 
+  const publicationTimestamp = publishedAt ?? new Date().toISOString();
   const result = await publishReviewedBuildingModel({
     workspaceRoot: root,
     candidatePath: path.posix.join(".building-engine", "floor-plan-candidates", bid, cid, "model.glb"),
     attestationPath: path.posix.join(".building-engine", "floor-plan-candidates", bid, cid, "attestation.json"),
-    ...(publishedAt === undefined ? {} : { publishedAt }),
+    publishedAt: publicationTimestamp,
   });
   const receipt = {
     schemaVersion: "1.0.0",
@@ -455,7 +466,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
       versionId: result.versionId,
       assetUrl: result.assetUrl,
       sha256: result.sha256,
-      publishedAt: publishedAt ?? new Date().toISOString(),
+      publishedAt: publicationTimestamp,
     },
     mapReady: false,
     publicationEligible: false,
