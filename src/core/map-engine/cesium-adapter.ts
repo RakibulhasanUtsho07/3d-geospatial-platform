@@ -13,6 +13,7 @@ import {
 import {
   shouldAbortViewportRequest,
   shouldContinueViewportLoad,
+  shouldContinueViewportStage,
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
 import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
@@ -251,6 +252,7 @@ export class CesiumAdapter implements MapEngine {
   private loadedViewportFeatureLimit: number | null = null;
   private hasLoadedBuildings = false;
   private viewportLoadInProgress = false;
+  private viewportLoadToken = 0;
   private activeViewportEndpoint: string | null = null;
   private viewportRequestAbortController: AbortController | null = null;
   // Invalidates payloads that have left fetch but are still staging as Cesium entities.
@@ -664,6 +666,7 @@ export class CesiumAdapter implements MapEngine {
     }
 
     this.viewportLoadInProgress = true;
+    const loadToken = ++this.viewportLoadToken;
     const requestRevision = this.viewportIntentRevision;
     let stagedDataSource: CesiumDataSource | null = null;
     let activeEndpoint: string | null = null;
@@ -834,10 +837,16 @@ export class CesiumAdapter implements MapEngine {
         start < entities.length;
         start += BATCH_SIZE
       ) {
+        // Camera movement or a layer toggle can invalidate a staged viewport
+        // after the network request has completed. Stop before preparing more
+        // geometry rather than spending CPU on a viewport that cannot commit.
         if (
-          !this.viewer ||
-          this.viewer !== viewer ||
-          viewer.isDestroyed()
+          !shouldContinueViewportStage(
+            requestRevision,
+            this.viewportIntentRevision,
+            this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+            this.viewer === viewer && !viewer.isDestroyed(),
+          )
         ) {
           return;
         }
@@ -956,10 +965,15 @@ export class CesiumAdapter implements MapEngine {
         });
       }
 
+      // Re-check after the final animation-frame yield and before replacing the
+      // current datasource: an obsolete viewport must never become the active map.
       if (
-        !this.viewer ||
-        this.viewer !== viewer ||
-        viewer.isDestroyed()
+        !shouldContinueViewportStage(
+          requestRevision,
+          this.viewportIntentRevision,
+          this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings),
+          this.viewer === viewer && !viewer.isDestroyed(),
+        )
       ) {
         return;
       }
@@ -1059,54 +1073,59 @@ export class CesiumAdapter implements MapEngine {
         stagedDataSource = null;
       }
 
-      if (this.viewportRequestAbortController === requestController) {
-        this.viewportRequestAbortController = null;
-      }
-      if (this.activeViewportEndpoint === activeEndpoint) {
-        this.activeViewportEndpoint = null;
-      }
-
-      this.viewportLoadInProgress = false;
-
-      const pendingRequest = this.pendingViewportRequest;
-      this.pendingViewportRequest = null;
-
-      // Always service the latest queued camera intent, even if its predecessor
-      // was cancelled or failed. A null-bounds request means the wide view needs
-      // the full pilot dataset; never downgrade it to a bounded viewport.
-      if (
-        pendingRequest &&
-        pendingRequest.bounds === null &&
-        (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
-      ) {
-        void this.loadOvertureBuildings(viewer, Cesium, null).catch(
-          (error: unknown) => {
+      // An old load may finish after destroy() and a re-initialize on the same
+      // adapter instance. Only the load that still owns this token may mutate
+      // shared in-flight state or dispatch the newest queued viewport.
+      if (this.viewportLoadToken === loadToken) {
+        if (this.viewportRequestAbortController === requestController) {
+          this.viewportRequestAbortController = null;
+        }
+        if (this.activeViewportEndpoint === activeEndpoint) {
+          this.activeViewportEndpoint = null;
+        }
+  
+        this.viewportLoadInProgress = false;
+  
+        const pendingRequest = this.pendingViewportRequest;
+        this.pendingViewportRequest = null;
+  
+        // Always service the latest queued camera intent, even if its predecessor
+        // was cancelled or failed. A null-bounds request means the wide view needs
+        // the full pilot dataset; never downgrade it to a bounded viewport.
+        if (
+          pendingRequest &&
+          pendingRequest.bounds === null &&
+          (!this.hasLoadedBuildings || this.loadedViewportBounds !== null)
+        ) {
+          void this.loadOvertureBuildings(viewer, Cesium, null).catch(
+            (error: unknown) => {
+              if (isAbortError(error)) return;
+              console.error(
+                "[Overture] Follow-up full-dataset load failed.",
+                error instanceof Error ? error.message : String(error),
+              );
+            },
+          );
+        } else if (
+          pendingRequest?.bounds &&
+          !this.isViewportCoveredByLoadedData(
+            pendingRequest.bounds,
+            pendingRequest.featureLimit ??
+              getViewportFeatureLimit(viewer.camera.positionCartographic.height),
+          )
+        ) {
+          void this.loadOvertureBuildings(
+            viewer,
+            Cesium,
+            pendingRequest.bounds,
+          ).catch((error: unknown) => {
             if (isAbortError(error)) return;
             console.error(
-              "[Overture] Follow-up full-dataset load failed.",
+              "[Overture] Follow-up viewport load failed.",
               error instanceof Error ? error.message : String(error),
             );
-          },
-        );
-      } else if (
-        pendingRequest?.bounds &&
-        !this.isViewportCoveredByLoadedData(
-          pendingRequest.bounds,
-          pendingRequest.featureLimit ??
-            getViewportFeatureLimit(viewer.camera.positionCartographic.height),
-        )
-      ) {
-        void this.loadOvertureBuildings(
-          viewer,
-          Cesium,
-          pendingRequest.bounds,
-        ).catch((error: unknown) => {
-          if (isAbortError(error)) return;
-          console.error(
-            "[Overture] Follow-up viewport load failed.",
-            error instanceof Error ? error.message : String(error),
-          );
-        });
+          });
+        }
       }
     }
   }
@@ -2978,6 +2997,7 @@ export class CesiumAdapter implements MapEngine {
 
     // Prevent requests and any post-fetch staging from surviving teardown.
     this.viewportIntentRevision += 1;
+    this.viewportLoadToken += 1;
     this.viewportRequestAbortController?.abort();
     this.viewportRequestAbortController = null;
     this.activeViewportEndpoint = null;
