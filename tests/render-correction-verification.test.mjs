@@ -62,7 +62,7 @@ function task(overrides = {}) {
     reviewChecklist: {
       schemaVersion: "1.0.0",
       correctionProposal: {
-        status: "proposed",
+        status: "approved",
         proposalText: "Adjust front facade opening proportions to match the approved reference.",
         proposedBy: "modeler-01",
         proposedAt: "2026-10-21T12:15:00Z",
@@ -231,6 +231,21 @@ test("requires geometry QA and fresh report hashes to match implementation evide
   assert.equal(staleManifestResult.tasks[0].status, "incomplete-implementation-evidence");
   assert.equal(staleManifestResult.tasks[0].gates.renderManifestMatchesVerificationReport, false);
   assert.equal(staleManifestResult.counts.incompleteImplementationEvidence, 1);
+});
+
+test("does not verify QA hashes while implementation is still marked not-started", () => {
+  const incomplete = task({
+    reviewChecklist: {
+      ...task().reviewChecklist,
+      implementationEvidence: {
+        ...task().reviewChecklist.implementationEvidence,
+        status: "not-started",
+      },
+    },
+  });
+  const result = verifyRenderCorrectionTasks(backlog({ tasks: [incomplete] }), reviewReport());
+  assert.equal(result.tasks[0].status, "incomplete-implementation-evidence");
+  assert.equal(result.tasks[0].gates.implementationQaMarkedComplete, false);
 });
 
 test("requires an explicit texture-change decision and texture QA when textures changed", () => {
