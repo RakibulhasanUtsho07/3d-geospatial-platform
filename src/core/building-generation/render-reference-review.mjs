@@ -206,6 +206,15 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       const total = histogram.reduce((sum, value) => sum + value, 0);
       return total <= 1e-9 || Math.abs(total - 1) <= 0.01;
     };
+    const histogramDistanceMatches = (left, right, expectedDistance) => {
+      if (!validHistogram(left) || !validHistogram(right) || !finite(expectedDistance)) return false;
+      const leftTotal = left.reduce((sum, value) => sum + value, 0);
+      const rightTotal = right.reduce((sum, value) => sum + value, 0);
+      const calculatedDistance = leftTotal <= 1e-9 && rightTotal <= 1e-9 ? 0 :
+        leftTotal <= 1e-9 || rightTotal <= 1e-9 ? 1 :
+        left.reduce((sum, value, index) => sum + Math.abs(value - right[index]), 0) / 2;
+      return Math.abs(calculatedDistance - expectedDistance) <= 0.01;
+    };
     const structureMetricsValid = !structureMetricsPresent || (
       Number.isSafeInteger(metrics.referenceEdgePixelCount) &&
       metrics.referenceEdgePixelCount >= 0 && metrics.referenceEdgePixelCount <= 3844 &&
@@ -223,7 +232,9 @@ export function buildRenderReferenceReview({ renderManifest, renderManifestSha25
       validHistogram(metrics.referenceEdgeOrientationHistogram) &&
       validHistogram(metrics.candidateEdgeOrientationHistogram) &&
       finite(metrics.edgeOrientationHistogramDistance) &&
-      metrics.edgeOrientationHistogramDistance >= 0 && metrics.edgeOrientationHistogramDistance <= 1
+      metrics.edgeOrientationHistogramDistance >= 0 && metrics.edgeOrientationHistogramDistance <= 1 &&
+      histogramDistanceMatches(metrics.referenceEdgeOrientationHistogram,
+        metrics.candidateEdgeOrientationHistogram, metrics.edgeOrientationHistogramDistance)
     );
     const metricsValid =
       finite(metrics.meanAbsoluteError) && metrics.meanAbsoluteError >= 0 && metrics.meanAbsoluteError <= 255 &&
