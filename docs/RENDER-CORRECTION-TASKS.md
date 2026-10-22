@@ -58,3 +58,18 @@ The verification command can carry the correction task's original `evidence.simi
 The comparison stays in the normalized 4×4 grayscale-preview coordinate space. An overlap or a change in the highest-ranked cells does not reveal the physical facade region, prove that a correction worked, or alter `verified` / `needs-more-work` / other task states. Both the original stored hotspots and the new diagnostics are checked for valid cell coordinates, ranking consistency and bounded metric values; malformed evidence is rejected. Older backlogs and new reports without hotspot metrics remain supported.
 
 The verification summary reports how many new comparisons include spatial hotspots and how many task results include a before/after hotspot comparison. The output's automation policy explicitly keeps hotspot overlap and all similarity diagnostics outside the verification decision gates.
+
+
+## Human correction-review checklist
+
+Each `model-correction-review` task now includes a `reviewChecklist` template with five separately tracked stages:
+
+1. **Issue assessment:** records the original reviewer's notes, outcome, identity and timestamp as evidence. It explicitly asks the next reviewer to confirm the semantic issue against both images; a note is not an automatically inferred defect label.
+2. **Source evidence:** pins the exact view, render/reference filenames and SHA-256 hashes plus the comparison basis. Diagnostic hotspot presence is marked as image-space context only.
+3. **Correction proposal:** starts at `awaiting-human-proposal`. A recorded `correctionRequest`, when present, is saved as `requestedScope` with its source path; it is **not** copied into `proposalText` or treated as approval. The proposal, author, timestamp and approval rationale remain empty until a human fills them in.
+4. **Implementation evidence:** starts `not-started`; output model hash and geometry/texture QA report hashes are null.
+5. **Fresh verification:** starts `not-started` with pending gates for changed source-model/render-manifest hashes, the unchanged reference SHA-256, the exact pair and a fresh human-reported outcome.
+
+Use the checklist fields to record the human workflow in the correction-task JSON or in a tracked review artifact. Do not erase original evidence fields when adding progress. The checklist is a hand-off template, not a persistent database or workflow service: generating it does not save later edits automatically.
+
+The checklist does not change task priority, decide a correction category from metrics, authorize edits, or mark a task verified. A person must write and approve a concrete proposal before implementation. After geometry/texture QA and re-rendering, the separate verification command decides whether evidence gates pass; publication eligibility remains false.
