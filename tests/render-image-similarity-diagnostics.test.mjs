@@ -56,6 +56,10 @@ test("identical normalized previews produce zero error and a maximum local SSIM"
   assert.equal(result.metrics.psnrDb, null);
   assert.equal(result.metrics.localSsim8x8, 1);
   assert.equal(result.metrics.differenceHashHammingDistance, 0);
+  assert.equal(result.metrics.edgeDensityAbsoluteDifference, 0);
+  assert.equal(result.metrics.edgeOrientationHistogramDistance, 0);
+  assert.equal(result.metrics.candidateToReferenceSharpnessRatio, 1);
+  assert.equal(result.metrics.referenceEdgeOrientationHistogram.length, 8);
   assert.equal(result.comparability.aspectRatioWithinScreeningThreshold, true);
   assert.equal(result.policy.automaticMatch, false);
   assert.equal(result.policy.publicationEligible, false);
@@ -78,6 +82,33 @@ test("changed pixels reduce structural similarity and produce diagnostic warning
   assert.equal(result.policy.architecturalAccuracyCertified, false);
 });
 
+test("detects a lower-sharpness candidate against a structured reference", () => {
+  const reference = pattern((x) => Math.floor(x / 8) % 2 ? 230 : 24);
+  const blurredCandidate = Buffer.alloc(4096, 128);
+  const result = compareGrayscaleImageSamples(reference, blurredCandidate, {
+    reference: { width: 1280, height: 720 },
+    candidate: { width: 1280, height: 720 },
+  }, { minimumReferenceLaplacianVariance: 1, minimumSharpnessRatio: 0.5 });
+  assert.ok(result.metrics.referenceLaplacianVariance > result.metrics.candidateLaplacianVariance);
+  assert.equal(result.metrics.candidateToReferenceSharpnessRatio, 0);
+  assert.ok(result.warnings.includes("candidate-lower-sharpness-screening-hint"));
+  assert.ok(result.warnings.includes("edge-density-difference-screening-hint"));
+  assert.equal(result.policy.publicationEligible, false);
+});
+
+test("flags different edge-orientation structure without claiming compass heading", () => {
+  const verticalFacadeBands = pattern((x) => Math.floor(x / 8) % 2 ? 255 : 12);
+  const horizontalFacadeBands = pattern((_x, y) => Math.floor(y / 8) % 2 ? 255 : 12);
+  const result = compareGrayscaleImageSamples(verticalFacadeBands, horizontalFacadeBands, {
+    reference: { width: 1024, height: 1024 },
+    candidate: { width: 1024, height: 1024 },
+  }, { maximumEdgeOrientationHistogramDistance: 0.2 });
+  assert.ok(result.metrics.edgeOrientationHistogramDistance > 0.2);
+  assert.ok(result.warnings.includes("edge-orientation-structure-difference-screening-hint"));
+  assert.equal(result.comparability.sameFacadeConfirmedByTool, false);
+  assert.equal(result.comparability.cameraPoseAlignmentVerifiedByTool, false);
+});
+
 test("flags aspect-ratio incompatibility instead of silently treating it as a match", () => {
   const pixels = Buffer.alloc(4096, 128);
   const result = compareGrayscaleImageSamples(pixels, Buffer.from(pixels), {
@@ -94,6 +125,8 @@ test("rejects invalid preview buffers, dimensions and thresholds", () => {
   assert.throws(() => compareGrayscaleImageSamples(Buffer.alloc(12), pixels, dimensions), /4096 grayscale bytes/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, { reference: { width: 0, height: 1 }, candidate: dimensions.candidate }), /positive integer/);
   assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { minimumLocalSsim: 2 }), /between -1 and 1/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { maximumEdgeDensityDifference: 2 }), /between 0 and 1/);
+  assert.throws(() => compareGrayscaleImageSamples(pixels, pixels, dimensions, { minimumSharpnessRatio: -1 }), /between 0 and 1/);
 });
 
 test("decodes bounded grayscale previews, hashes both files and records safe FFmpeg args", async (t) => {
@@ -110,6 +143,7 @@ test("decodes bounded grayscale previews, hashes both files and records safe FFm
   assert.match(result.pair.candidateRender.sha256, /^[a-f0-9]{64}$/);
   assert.ok(result.pair.reference.sha256 !== result.pair.candidateRender.sha256);
   assert.equal(result.metrics.localSsim8x8, 1);
+  assert.equal(result.metrics.edgeOrientationHistogramDistance, 0);
   assert.equal(result.policy.mapReady, false);
   assert.equal(result.policy.publicationEligible, false);
 });

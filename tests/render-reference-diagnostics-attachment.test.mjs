@@ -30,6 +30,19 @@ function diagnostic({ renderSha256 = frontRenderHash, referenceSha256 = referenc
       psnrDb: 21.184,
       localSsim8x8: 0.83,
       differenceHashHammingDistance: 12,
+      referenceEdgePixelCount: 512,
+      candidateEdgePixelCount: 450,
+      referenceEdgeDensity: 0.1332,
+      candidateEdgeDensity: 0.1171,
+      edgeDensityAbsoluteDifference: 0.0161,
+      referenceMeanGradientMagnitude: 35.2,
+      candidateMeanGradientMagnitude: 31.7,
+      referenceLaplacianVariance: 500,
+      candidateLaplacianVariance: 420,
+      candidateToReferenceSharpnessRatio: 0.84,
+      referenceEdgeOrientationHistogram: [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1],
+      candidateEdgeOrientationHistogram: [0.15, 0.1, 0.1, 0.15, 0.2, 0.1, 0.1, 0.1],
+      edgeOrientationHistogramDistance: 0.05,
     },
     warnings,
     policy: {
@@ -116,6 +129,10 @@ test("attaches diagnostic metrics only to the exact verified render/reference pa
   assert.equal(report.reviewStatus, "reviewer-reported-matches");
   assert.equal(report.comparisons[0].outcome, "match");
   assert.equal(report.comparisons[0].similarityDiagnostics.metrics.localSsim8x8, 0.83);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.edgeOrientationHistogramDistance, 0.05);
+  assert.equal(report.comparisons[0].similarityDiagnostics.metrics.candidateToReferenceSharpnessRatio, 0.84);
+  assert.deepEqual(report.comparisons[0].similarityDiagnostics.metrics.referenceEdgeOrientationHistogram,
+    [0.2, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1]);
   assert.equal(report.comparisons[0].similarityDiagnostics.renderSha256, frontRenderHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.referenceSha256, referenceHash);
   assert.equal(report.comparisons[0].similarityDiagnostics.automaticMatch, false);
@@ -176,6 +193,24 @@ test("rejects malformed metrics, invalid report hashes, duplicates and unknown p
   assert.ok(report.errors.includes("duplicate-similarity-diagnostic:front:reference-front-01"));
   assert.ok(report.errors.includes("similarity-diagnostic-unknown-reference-image:unknown-reference"));
   assert.ok(report.errors.includes("similarity-diagnostic-report-sha256-invalid:back:reference-front-01"));
+});
+
+test("rejects malformed edge-structure metrics instead of attaching untrusted values", () => {
+  const input = fixture();
+  const badMetric = diagnostic();
+  badMetric.metrics.edgeOrientationHistogramDistance = 1.25;
+  const report = buildRenderReferenceReview({
+    ...input,
+    similarityDiagnostics: [{
+      viewId: "front",
+      referenceImageId: "reference-front-01",
+      report: badMetric,
+      reportSha256: "f".repeat(64),
+    }],
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("similarity-diagnostic-metrics-invalid:front:reference-front-01"));
+  assert.equal(report.comparisons[0].similarityDiagnostics, null);
 });
 
 test("existing reviews remain valid and report no diagnostic when none is supplied", () => {

@@ -80,6 +80,62 @@ function localSsim(left, right) {
   return mean(values);
 }
 
+function edgeStructure(pixels) {
+  const orientationWeights = Array(8).fill(0);
+  const laplacianValues = [];
+  let gradientSum = 0;
+  let edgePixelCount = 0;
+  const sampleCount = (SAMPLE_WIDTH - 2) * (SAMPLE_HEIGHT - 2);
+
+  for (let y = 1; y < SAMPLE_HEIGHT - 1; y++) {
+    for (let x = 1; x < SAMPLE_WIDTH - 1; x++) {
+      const index = y * SAMPLE_WIDTH + x;
+      const left = pixels[index - 1];
+      const right = pixels[index + 1];
+      const up = pixels[index - SAMPLE_WIDTH];
+      const down = pixels[index + SAMPLE_WIDTH];
+      const center = pixels[index];
+      const gx = right - left;
+      const gy = down - up;
+      const magnitude = Math.hypot(gx, gy) / 2;
+      gradientSum += magnitude;
+      if (magnitude >= 18) {
+        edgePixelCount++;
+        const angle = Math.atan2(gy, gx);
+        const foldedAngle = ((angle % Math.PI) + Math.PI) % Math.PI;
+        const bin = Math.min(7, Math.floor(foldedAngle / Math.PI * 8));
+        orientationWeights[bin] += magnitude;
+      }
+      laplacianValues.push(4 * center - left - right - up - down);
+    }
+  }
+
+  const orientationTotal = orientationWeights.reduce((sum, value) => sum + value, 0);
+  const orientationHistogram = orientationTotal > 0
+    ? orientationWeights.map((value) => value / orientationTotal)
+    : Array(8).fill(0);
+  const meanLaplacian = mean(laplacianValues);
+  return {
+    meanGradientMagnitude: gradientSum / sampleCount,
+    edgePixelCount,
+    edgeDensity: edgePixelCount / sampleCount,
+    laplacianVariance: variance(laplacianValues, meanLaplacian),
+    orientationHistogram,
+  };
+}
+
+function edgeOrientationHistogramDistance(left, right) {
+  const leftTotal = left.reduce((sum, value) => sum + value, 0);
+  const rightTotal = right.reduce((sum, value) => sum + value, 0);
+  if (leftTotal === 0 && rightTotal === 0) return 0;
+  if (leftTotal === 0 || rightTotal === 0) return 1;
+  let distance = 0;
+  for (let index = 0; index < left.length; index++) {
+    distance += Math.abs(left[index] - right[index]);
+  }
+  return distance / 2;
+}
+
 /**
  * Compare two decoded 64x64 grayscale previews. These values are triage signals,
  * not a calibrated architectural/geometry accuracy metric.
@@ -106,6 +162,10 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   const maxAspectRatioDifferencePercent = options.maxAspectRatioDifferencePercent ?? 2;
   const minimumLocalSsim = options.minimumLocalSsim ?? 0.75;
   const maximumMeanAbsoluteError = options.maximumMeanAbsoluteError ?? 24;
+  const maximumEdgeDensityDifference = options.maximumEdgeDensityDifference ?? 0.15;
+  const maximumEdgeOrientationHistogramDistance = options.maximumEdgeOrientationHistogramDistance ?? 0.35;
+  const minimumSharpnessRatio = options.minimumSharpnessRatio ?? 0.5;
+  const minimumReferenceLaplacianVariance = options.minimumReferenceLaplacianVariance ?? 18;
   if (!Number.isFinite(maxAspectRatioDifferencePercent) || maxAspectRatioDifferencePercent < 0 || maxAspectRatioDifferencePercent > 100) {
     throw new RangeError("maxAspectRatioDifferencePercent must be between 0 and 100");
   }
@@ -115,7 +175,31 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   if (!Number.isFinite(maximumMeanAbsoluteError) || maximumMeanAbsoluteError < 0 || maximumMeanAbsoluteError > 255) {
     throw new RangeError("maximumMeanAbsoluteError must be between 0 and 255");
   }
+  if (!Number.isFinite(maximumEdgeDensityDifference) || maximumEdgeDensityDifference < 0 || maximumEdgeDensityDifference > 1) {
+    throw new RangeError("maximumEdgeDensityDifference must be between 0 and 1");
+  }
+  if (!Number.isFinite(maximumEdgeOrientationHistogramDistance) ||
+    maximumEdgeOrientationHistogramDistance < 0 || maximumEdgeOrientationHistogramDistance > 1) {
+    throw new RangeError("maximumEdgeOrientationHistogramDistance must be between 0 and 1");
+  }
+  if (!Number.isFinite(minimumSharpnessRatio) || minimumSharpnessRatio < 0 || minimumSharpnessRatio > 1) {
+    throw new RangeError("minimumSharpnessRatio must be between 0 and 1");
+  }
+  if (!Number.isFinite(minimumReferenceLaplacianVariance) ||
+    minimumReferenceLaplacianVariance < 0 || minimumReferenceLaplacianVariance > 1000000) {
+    throw new RangeError("minimumReferenceLaplacianVariance must be between 0 and 1000000");
+  }
 
+  const referenceStructure = edgeStructure(referencePixels);
+  const candidateStructure = edgeStructure(candidatePixels);
+  const edgeDensityAbsoluteDifference = Math.abs(referenceStructure.edgeDensity - candidateStructure.edgeDensity);
+  const orientationDistance = edgeOrientationHistogramDistance(
+    referenceStructure.orientationHistogram,
+    candidateStructure.orientationHistogram,
+  );
+  const candidateToReferenceSharpnessRatio = referenceStructure.laplacianVariance > 1e-9
+    ? candidateStructure.laplacianVariance / referenceStructure.laplacianVariance
+    : null;
   const mse = meanSquaredError(referencePixels, candidatePixels);
   const mae = meanAbsoluteError(referencePixels, candidatePixels);
   const ssim = localSsim(referencePixels, candidatePixels);
@@ -127,6 +211,18 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
   }
   if (ssim < minimumLocalSsim) warnings.push("low-grayscale-ssim-screening-hint");
   if (mae > maximumMeanAbsoluteError) warnings.push("high-grayscale-pixel-error-screening-hint");
+  if (edgeDensityAbsoluteDifference > maximumEdgeDensityDifference) {
+    warnings.push("edge-density-difference-screening-hint");
+  }
+  if (referenceStructure.edgePixelCount >= 16 && candidateStructure.edgePixelCount >= 16 &&
+    orientationDistance > maximumEdgeOrientationHistogramDistance) {
+    warnings.push("edge-orientation-structure-difference-screening-hint");
+  }
+  if (candidateToReferenceSharpnessRatio !== null &&
+    referenceStructure.laplacianVariance >= minimumReferenceLaplacianVariance &&
+    candidateToReferenceSharpnessRatio < minimumSharpnessRatio) {
+    warnings.push("candidate-lower-sharpness-screening-hint");
+  }
 
   return {
     schemaVersion: "1.0.0",
@@ -151,10 +247,28 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
       candidateDifferenceHash: candidateHash,
       differenceHashHammingDistance: hammingDistanceHex(referenceHash, candidateHash),
       maxDifferenceHashHammingDistance: 64,
+      referenceEdgePixelCount: referenceStructure.edgePixelCount,
+      candidateEdgePixelCount: candidateStructure.edgePixelCount,
+      referenceEdgeDensity: Number(referenceStructure.edgeDensity.toFixed(4)),
+      candidateEdgeDensity: Number(candidateStructure.edgeDensity.toFixed(4)),
+      edgeDensityAbsoluteDifference: Number(edgeDensityAbsoluteDifference.toFixed(4)),
+      referenceMeanGradientMagnitude: Number(referenceStructure.meanGradientMagnitude.toFixed(3)),
+      candidateMeanGradientMagnitude: Number(candidateStructure.meanGradientMagnitude.toFixed(3)),
+      referenceLaplacianVariance: Number(referenceStructure.laplacianVariance.toFixed(3)),
+      candidateLaplacianVariance: Number(candidateStructure.laplacianVariance.toFixed(3)),
+      candidateToReferenceSharpnessRatio: candidateToReferenceSharpnessRatio === null
+        ? null : Number(candidateToReferenceSharpnessRatio.toFixed(4)),
+      referenceEdgeOrientationHistogram: referenceStructure.orientationHistogram.map((value) => Number(value.toFixed(4))),
+      candidateEdgeOrientationHistogram: candidateStructure.orientationHistogram.map((value) => Number(value.toFixed(4))),
+      edgeOrientationHistogramDistance: Number(orientationDistance.toFixed(4)),
     },
     thresholds: {
       minimumLocalSsim,
       maximumMeanAbsoluteError,
+      maximumEdgeDensityDifference,
+      maximumEdgeOrientationHistogramDistance,
+      minimumSharpnessRatio,
+      minimumReferenceLaplacianVariance,
     },
     warnings,
     interpretation: warnings.length ? "review-recommended" : "no-screening-warning",
@@ -167,6 +281,8 @@ export function compareGrayscaleImageSamples(referencePixels, candidatePixels, d
     },
     limitations: [
       "The tool resizes each image into a bounded 64x64 grayscale preview with aspect-ratio-preserving padding; it does not align cameras or register image features.",
+      "Edge density, orientation histograms and Laplacian variance are coarse, downsampled screening signals; they can be affected by texture, noise, lighting, crop and unrelated scene content.",
+      "Edge orientation measures image-gradient direction, not compass heading or a verified building-facade orientation. The sharpness ratio is not a calibrated blur measurement.",
       "Use only reference/render pairs showing the same facade from a closely matched pose, with similar crop and exposure.",
       "Different illumination, shadows, weather, lens distortion, perspective, vegetation and occlusion can dominate the metrics even when geometry is sound.",
       "Similar pixel values can be caused by texture or background and do not establish correct 3D geometry, dimensions, building identity or heritage fidelity.",
