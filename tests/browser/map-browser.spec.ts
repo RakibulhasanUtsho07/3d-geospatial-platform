@@ -131,10 +131,36 @@ test("zooming and dragging the map request fresh road viewport bounds", async ({
   await expect.poll(() => observed.roads.length, { timeout: 20_000 }).toBeGreaterThan(0);
 
   // Let the initial camera preset settle so the next requests belong to this test.
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(700);
   const initialUrl = observed.roads.at(-1);
   expect(initialUrl).toBeDefined();
   const initialBounds = roadBoundsKey(initialUrl!);
+
+  // Exercise a local-scale pan before zooming out to a world-scale viewport.
+  // At wide zoom the engine intentionally uses a stable fallback road area.
+  const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+
+  const beforePanCount = observed.roads.length;
+  const startX = box!.x + box!.width * 0.52;
+  const startY = box!.y + box!.height * 0.48;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 320, startY + 80);
+  await page.mouse.up();
+
+  await expect.poll(
+    () => observed.roads.slice(beforePanCount).some(
+      (url) => roadBoundsKey(url) !== initialBounds,
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  // Capture the most recent local viewport only after pan-triggered requests settle.
+  await page.waitForTimeout(500);
+  const boundsBeforeZoom = roadBoundsKey(observed.roads.at(-1)!);
   const beforeZoomCount = observed.roads.length;
 
   await page.getByRole("button", { name: "Zoom out" }).click();
@@ -143,32 +169,7 @@ test("zooming and dragging the map request fresh road viewport bounds", async ({
 
   await expect.poll(
     () => observed.roads.slice(beforeZoomCount).some(
-      (url) => roadBoundsKey(url) !== initialBounds,
-    ),
-    { timeout: 20_000 },
-  ).toBe(true);
-
-  // Wait out any additional move-end event before recording the pan baseline.
-  await page.waitForTimeout(400);
-  const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-
-  const lastRoadUrlBeforePan = observed.roads.at(-1);
-  expect(lastRoadUrlBeforePan).toBeDefined();
-  const boundsBeforePan = roadBoundsKey(lastRoadUrlBeforePan!);
-  const beforePanCount = observed.roads.length;
-  const startX = box!.x + box!.width * 0.45;
-  const startY = box!.y + box!.height * 0.5;
-
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 420, startY + 80);
-  await page.mouse.up();
-
-  await expect.poll(
-    () => observed.roads.slice(beforePanCount).some(
-      (url) => roadBoundsKey(url) !== boundsBeforePan,
+      (url) => roadBoundsKey(url) !== boundsBeforeZoom,
     ),
     { timeout: 20_000 },
   ).toBe(true);
