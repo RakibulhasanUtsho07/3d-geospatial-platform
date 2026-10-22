@@ -106,6 +106,10 @@ jobs:
         run: npm run test:floor-plan-model-api
       - name: Test immutable floor-plan review and gated publication lifecycle
         run: npm run test:floor-plan-review
+      - name: Test raster floor-plan line proposal extraction
+        run: npm run test:floor-plan-raster-line-proposals
+      - name: Test private raster proposal persistence and integrity
+        run: npm run test:floor-plan-raster-line-job
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media

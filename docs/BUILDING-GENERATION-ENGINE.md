@@ -334,3 +334,32 @@ npm run publish:floor-plan-candidate -- E:\\Building-Engine-Workspace dhaka-demo
 The command calls the existing versioned generated-model catalog publisher, which rechecks candidate and evidence hashes and placement. Rejected or changes-requested reviews do not create a publication attestation. Reviews are immutable; create a new candidate for a replacement trace. Published versions are written to `public/models/generated/` and can be rolled back with the existing catalog activation command. The private candidate's `mapReady` and `publicationEligible` flags remain false so the candidate itself is never silently treated as map-ready.
 
 This workflow does not automatically trace walls and room polygons from a raster/PDF, independently verify permissions or survey measurements, or sign the reviewer identity. Those remain separate responsibilities.
+
+
+## 15. Raster floor-plan line proposals (review aid only)
+
+The backend can now analyze a privately ingested **JPEG, PNG or WebP** floor-plan raster and suggest long horizontal/vertical line segments. It uses bounded image normalization, a global Otsu threshold and run-length scans, then stores the result as a hash-verified private report. This is a review aid for tracing, not a room/wall semantic model.
+
+After uploading a raster file through `/api/building-generation/uploads`, call the authenticated endpoint with `Authorization: Bearer <GENERATION_API_TOKEN>`:
+
+~~~json
+{
+  "buildingId": "dhaka-demo",
+  "sourceId": "measured-plan-image",
+  "options": {
+    "maxDimension": 2048,
+    "minLineLengthPx": 48,
+    "mergeGapPx": 2,
+    "maxCandidates": 300
+  }
+}
+~~~
+
+- `POST /api/building-generation/floor-plan-line-proposals` — analyzes an already-ingested source and returns the proposal report and `proposalId`.
+- `GET /api/building-generation/floor-plan-line-proposals/<buildingId>/<proposalId>` — retrieves the saved report after verifying its manifest hash and confirming the source bytes still match intake.
+
+The proposal report uses pixels in the normalized raster's coordinate frame. `raster.width`/`height` describe the resized image used for detection; `originalWidth`/`originalHeight` preserve the source dimensions. Line coordinates must be mapped/reviewed manually if the raster was resized. The `confidenceScore` is a heuristic ranking, not a probability that a line is a wall. Results may include dimension lines, text strokes, furniture, hatching or page borders.
+
+This stage does **not** create room polygons, identify doors/windows, infer wall thickness in metres, calibrate scale, infer north/elevation, or assign WGS84 placement. It does not feed the generated-model catalog automatically. The report is always `review-required-not-scaled`, `mapReady=false`, and `publicationEligible=false`.
+
+PDF is not decoded by this stage. Rasterize the specific PDF page using a trusted local PDF renderer, record the rendering/page choice and upload the resulting PNG/JPEG/WebP as a separate source before analysis. The original PDF should remain attached as provenance. Unknown or unreviewed source-use status remains explicit; do not publish/share imagery without resolving reuse rights. A human must trace and verify candidate lines, supply measured metre geometry, and use the measured-vector engine and review/publish gate described in sections 12–14.
