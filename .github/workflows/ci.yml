@@ -102,6 +102,8 @@ jobs:
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
+      - name: Test authenticated generation media upload storage
+        run: npm run test:generation-media-upload
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
