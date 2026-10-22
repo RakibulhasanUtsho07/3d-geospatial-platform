@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   shouldAbortViewportRequest,
   shouldContinueViewportLoad,
+  shouldContinueViewportStage,
   shouldLoadFullDatasetForWideViewport,
 } from "../src/core/map-engine/viewport-load-policy.mjs";
 
@@ -68,4 +69,12 @@ test("a hidden building layer discards a pending viewport stage", () => {
 
 test("a restored layer does not revive an older intent revision", () => {
   assert.equal(shouldContinueViewportLoad(4, 5, true), false);
+});
+
+
+test("a viewport stage continues only for the current visible viewer", () => {
+  assert.equal(shouldContinueViewportStage(7, 7, true, true), true);
+  assert.equal(shouldContinueViewportStage(7, 8, true, true), false);
+  assert.equal(shouldContinueViewportStage(7, 7, false, true), false);
+  assert.equal(shouldContinueViewportStage(7, 7, true, false), false);
 });
