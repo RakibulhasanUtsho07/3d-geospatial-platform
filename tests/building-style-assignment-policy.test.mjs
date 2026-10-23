@@ -61,7 +61,7 @@ test("assignment indexing ignores invalid entries and preserves last valid exact
 
   assert.equal(indexed.size, 2);
   assert.equal(indexed.get("building-1")?.style.id, "later");
-  assert.equal(indexed.has("building-1 "), true);
+  assert.equal(indexed.has(" building-1 "), true);
   assert.equal(resolveBuildingStyleBaseline(undefined, baseline), baseline);
   assert.equal(resolveBuildingStyleBaseline(indexed.get("building-1"), baseline), later);
 });
