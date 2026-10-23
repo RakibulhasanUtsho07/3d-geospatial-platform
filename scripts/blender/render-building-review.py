@@ -211,10 +211,15 @@ def main():
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
         bpy.ops.render.render(write_still=True)
-        result = bpy.data.images.get("Render Result")
-        if result is None:
-            raise RuntimeError("Blender did not provide a render result for " + view_id)
-        stats = sample_pixel_statistics(result, resolution)
+        # Blender's special "Render Result" datablock can be cleared after a
+        # write_still render in background mode. Re-open the exact PNG written
+        # to disk so statistics are collected from the durable output artifact.
+        rendered_path = scene.render.filepath
+        result = bpy.data.images.load(rendered_path, check_existing=False)
+        try:
+            stats = sample_pixel_statistics(result, resolution)
+        finally:
+            bpy.data.images.remove(result)
         view_direction = (center - camera.location).normalized()
         raw_views.append({
             "id": view_id,
