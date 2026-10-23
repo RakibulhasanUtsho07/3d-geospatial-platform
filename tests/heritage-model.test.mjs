@@ -93,6 +93,8 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(Math.abs(config.parameters.stair.stepCount.value * config.parameters.stair.treadDepth.value - 16) < 0.00001);
   const domeRings = config.parameters.dome.profileRings.value;
   assert.equal(domeRings[0][0], 6.9, "dome base radius nearly matches the 7 m drum radius");
+  assert.equal(domeRings[2][0], 6.8, "dome keeps a full rounded lower shoulder instead of pinching into a cone");
+  assert.ok(domeRings[6][0] > 4.8, "upper-mid dome remains full before narrowing toward the finial");
   assert.equal(domeRings[domeRings.length - 1][1], 6.53, "dome body profile height fits its peak-height budget");
   assert.ok(Math.abs(domeRings[0][0] * 2 - config.parameters.dome.drumWidth.value) <= 0.2);
   assert.equal(config.parameters.materials.facadePink.value, "#E1917D");
