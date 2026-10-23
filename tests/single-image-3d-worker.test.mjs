@@ -55,7 +55,8 @@ test("runs a mocked TripoSR command and emits an AI-proposed non-map-ready GLB r
  assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.executionEvidence.processAdapter,"injected-adapter-unverified");
  assert.equal(result.report.executionEvidence.workerStarted,true);assert.equal(result.report.executionEvidence.workerExitCode,0);
- assert.equal(result.report.executionEvidence.actualInferenceVerified,false);assert.match(result.report.executionEvidence.runnerScriptSha256,/^[a-f0-9]{64}$/);
+ assert.equal(result.report.executionEvidence.actualInferenceVerified,false);assert.equal(result.report.executionEvidence.dependencyPreflight.status,"skipped-injected-adapter");
+ assert.match(result.report.executionEvidence.runnerScriptSha256,/^[a-f0-9]{64}$/);
  assert.equal(result.report.source.sha256,buildingSpec.sources[0].assetId);assert.ok(result.report.outputs.glb.bytes>100);
  const persisted=JSON.parse(await readFile(result.reportPath,"utf8"));assert.equal(persisted.georeference.status,"not-solved");
 });
