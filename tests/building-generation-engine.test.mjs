@@ -136,3 +136,38 @@ test("generated entry door is positioned against the selected facade plane",()=>
  assert.ok(Math.abs(nearestFace-0.002)<0.0001,"door inner face meets the facade plane with 2 mm clearance");
  assert.ok(Math.abs(outerFace-0.072)<0.0001,"door outer face matches its depth");
 });
+
+
+test("front facade can be selected explicitly and is reported without guessing",()=>{
+ const explicitSpec={...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:1}};
+ const explicit=generateProceduralGlb(explicitSpec);
+ assert.deepEqual(explicit.report.facadeSelection,{
+  method:"explicit-edge-index",edgeIndex:1,confidence:"operator-specified"
+ });
+ assert.equal(explicit.normalizedSpec.architecture.frontFacadeEdgeIndex,1);
+ const inferred=generateProceduralGlb(fixture);
+ assert.deepEqual(inferred.report.facadeSelection,{
+  method:"longest-edge-inferred",edgeIndex:0,confidence:"estimated"
+ });
+ assert.ok(inferred.report.warnings.some(w=>w.includes("Front facade was inferred")));
+ assert.equal(inferred.report.reviewRequired,true);
+});
+
+test("BuildingSpec rejects a front facade index outside its footprint edges",()=>{
+ assert.throws(
+  ()=>normalizeBuildingSpec({...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:4}}),
+  /frontFacadeEdgeIndex must be between 0 and 3/
+ );
+ assert.throws(
+  ()=>normalizeBuildingSpec({...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:1.5}}),
+  /frontFacadeEdgeIndex must be an integer/
+ );
+});
+
+test("procedural generator rejects pitched roofs instead of silently emitting a flat cap",()=>{
+ const pitched={...fixture,architecture:{...fixture.architecture,roofType:"pitched"}};
+ assert.throws(
+  ()=>generateProceduralGlb(pitched),
+  /roofType 'pitched' is not supported by the procedural generator/
+ );
+});
