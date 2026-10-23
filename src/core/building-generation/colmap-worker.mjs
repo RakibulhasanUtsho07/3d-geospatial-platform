@@ -144,7 +144,7 @@ export async function runColmapReconstruction(options){
  await mkdir(jobDir,{recursive:false});const outputJobDir=await realpath(jobDir);if(!inside(root,outputJobDir))throw new TypeError("job directory resolved outside workspaceRoot");
  const imagesDir=path.join(outputJobDir,"images");await mkdir(imagesDir);const realImagesDir=await realpath(imagesDir);if(!inside(root,realImagesDir))throw new TypeError("staging directory resolved outside workspaceRoot");
  const startedAt=new Date().toISOString(),staged=[];
- let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},executionEvidence:{processAdapter:options.spawnImpl?"injected-adapter-unverified":"node-child-process.spawn",workerStarted:false,workerVersion:"not-queried",actualInferenceVerified:false,commands:[],caveat:"Command exit/output evidence cannot prove architectural accuracy; injected adapters are orchestration/test evidence, not a real COLMAP integration pass."},warnings:[],mapReady:false,outputs:{}};
+ let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},executionEvidence:{processAdapter:options.spawnImpl?"injected-adapter-unverified":"node-child-process.spawn",workerStarted:false,workerVersion:"not-queried",dependencyPreflight:{status:options.spawnImpl?"skipped-injected-adapter":"pending",executable:options.colmapPath||process.env.COLMAP_BIN||"colmap",check:"colmap -h",reason:options.spawnImpl?"Injected process adapters test orchestration and do not validate the real COLMAP executable.":null},actualInferenceVerified:false,commands:[],caveat:"Command exit/output evidence cannot prove architectural accuracy; injected adapters are orchestration/test evidence, not a real COLMAP integration pass."},warnings:[],mapReady:false,outputs:{}};
  const reportPath=path.join(outputJobDir,"report.json");
  try{
   for(const source of sources){const ext=source.record.mimeType==="image/png"?".png":".jpg",filename="view-"+String(source.index+1).padStart(4,"0")+ext,dest=path.join(realImagesDir,filename);await copyFile(source.absolute,dest);staged.push({sourceId:source.id,filename,sha256:source.record.sha256});}
@@ -173,7 +173,7 @@ export async function runColmapReconstruction(options){
    try{
     const result=await runProcess(colmapPath,args,budgetMs,spawnImpl);
     command.status="completed";command.exitCode=result.exitCode;command.signal=result.signal??null;command.durationMs=Date.now()-began;
-    report.executionEvidence.workerStarted=true;
+    if(args[0]!=="-h")report.executionEvidence.workerStarted=true;
     report.executionEvidence.lastExitCode=result.exitCode;
     await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
     return result;
@@ -187,6 +187,28 @@ export async function runColmapReconstruction(options){
     throw error;
    }
   };
+  if(!spawnImpl){
+   report.executionEvidence.dependencyPreflight.status="running";
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+   try{
+    const probe=await runColmapCommand(["-h"],Math.min(timeoutMs,15000));
+    const output=(probe.stdout+"\n"+probe.stderr).trim();
+    const versionLine=output.split(/\r?\n/).find(line=>/colmap/i.test(line));
+    report.executionEvidence.dependencyPreflight={
+     status:"passed",executable:colmapPath,check:"colmap -h",exitCode:probe.exitCode,
+     outputHead:output.slice(0,1200),completedAt:new Date().toISOString()
+    };
+    report.executionEvidence.workerVersion=versionLine?versionLine.trim().slice(0,240):"executable-available-version-unparsed";
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+   }catch(preflightError){
+    report.executionEvidence.dependencyPreflight={
+     status:"failed",executable:colmapPath,check:"colmap -h",
+     failureMessage:preflightError instanceof Error?preflightError.message:String(preflightError),
+     completedAt:new Date().toISOString()
+    };
+    throw new Error("COLMAP runtime preflight failed: "+report.executionEvidence.dependencyPreflight.failureMessage);
+   }
+  }
   const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
   const reconstructStart=Date.now();await runColmapCommand(reconstructionArgs,timeoutMs);report.timingsMs={reconstruction:Date.now()-reconstructStart};
   // A zero exit code only means COLMAP completed; it does not mean enough input views
