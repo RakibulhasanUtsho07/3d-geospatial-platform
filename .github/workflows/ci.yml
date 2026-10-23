@@ -48,6 +48,7 @@ on:
   pull_request:
     branches:
       - main
+      - refactor/p1-road-layer-manager-sync
       - refactor/p1-building-viewport-manager-sync
       - refactor/p1-feature-picking-controller
       - refactor/p1-feature-pick-geometry
@@ -107,6 +108,9 @@ jobs:
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
+
+      - name: Test heritage camera controller boundary
+        run: npm run test:heritage-camera-controller-boundary
 
       - name: Test reviewed generated-model catalog publishing and rollback
         run: npm run test:published-model-catalog
