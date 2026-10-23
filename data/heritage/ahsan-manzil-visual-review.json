@@ -29,7 +29,7 @@
       "id": "dome-drum",
       "status": "implemented-awaiting-build-and-render-verification",
       "change": "Use a provisional 11 m octagonal tower width from front-photo proportion; retain the separately shaped 8 m dome profile and verified 27.13 m peak.",
-      "acceptance": "Generated GLB drum extents match the parameter and the dome-to-tower silhouette is inspected."
+      "acceptance": "The square drum core spans the configured 11.0 m; outer GLB bounds may extend up to 0.15 m for the deliberately modeled corner columns and trim."
     },
     {
       "id": "stair-taper",
