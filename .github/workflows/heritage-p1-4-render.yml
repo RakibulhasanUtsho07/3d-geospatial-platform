@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: ahsan-manzil-p1-4-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   render-review:
@@ -60,8 +60,8 @@ jobs:
 
       - name: Install Blender and contact-sheet library
         run: |
-          sudo apt-get update
-          sudo apt-get install -y blender python3-pil python3-numpy libegl1
+          sudo apt-get update -qq
+          sudo apt-get install -y blender python3-pil python3-numpy libegl1 libgl1
 
       - name: Render all 13 review views
         run: |
