@@ -76,8 +76,8 @@ function validRenderSettings(settings, resolution, renderProfile) {
     !Array.isArray(settings.excludedRenderObjects) ||
     JSON.stringify(settings.excludedRenderObjects) !== JSON.stringify(EXCLUDED_RENDER_OBJECTS_BY_PROFILE[renderProfile]) ||
     settings.renderEngine !== "CYCLES" || settings.cyclesDevice !== "CPU" ||
-    !Number.isSafeInteger(settings.cyclesSamples) || settings.cyclesSamples < 1 || settings.cyclesSamples > 1024 ||
-    typeof settings.cyclesUseDenoising !== "boolean" ||
+    settings.cyclesSamples !== (renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1" ? 64 : 16) ||
+    settings.cyclesUseDenoising !== (renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1") ||
     !Number.isSafeInteger(settings.cyclesMaxBounces) || settings.cyclesMaxBounces < 0 || settings.cyclesMaxBounces > 64 ||
     settings.threadsMode !== "FIXED" || !Number.isSafeInteger(settings.threads) || settings.threads < 1 || settings.threads > 64 ||
     settings.resolutionX !== resolution || settings.resolutionY !== resolution ||

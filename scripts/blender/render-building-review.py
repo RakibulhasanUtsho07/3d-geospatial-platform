@@ -193,8 +193,12 @@ def main():
     # gives every fixed camera a real pixel buffer with fixed sampling settings.
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
-    scene.cycles.samples = 16
-    scene.cycles.use_denoising = False
+    heritage_review = render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
+    # The heritage facade has fine mouldings/arches: use higher fixed CPU
+    # sampling and OpenImageDenoise to keep those details readable in review.
+    # The generic deterministic QA profile retains its lighter 16-sample recipe.
+    scene.cycles.samples = 64 if heritage_review else 16
+    scene.cycles.use_denoising = heritage_review
     scene.cycles.max_bounces = 4
     scene.render.threads_mode = "FIXED"
     scene.render.threads = 2

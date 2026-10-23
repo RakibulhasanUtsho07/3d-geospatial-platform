@@ -167,6 +167,8 @@ async function main() {
   assert.match(renderManifest.modelSha256, /^[a-f0-9]{64}$/);
   assert.match(renderManifest.renderConfigSha256, /^[a-f0-9]{64}$/);
   assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative");
+  assert.equal(renderManifest.renderSettings.cyclesSamples, 64, "heritage facade review uses 64 CPU Cycles samples");
+  assert.equal(renderManifest.renderSettings.cyclesUseDenoising, true, "heritage facade review denoises the final view PNGs");
   assert.deepEqual(renderManifest.renderSettings.excludedRenderObjects, [
     "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
     "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",

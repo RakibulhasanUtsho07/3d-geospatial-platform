@@ -113,6 +113,8 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   const data = fixture();
   data.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
   data.rawManifest.renderSettings.cameraCoordinateConvention = "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative";
+  data.rawManifest.renderSettings.cyclesSamples = 64;
+  data.rawManifest.renderSettings.cyclesUseDenoising = true;
   data.rawManifest.renderSettings.frontViewFraming = "rangmahal-semantic-bounds-for-front-and-turntable-315;whole-palace-for-other-views";
   data.rawManifest.renderSettings.frontCameraOrthoScaleMultiplier = 1.12;
   data.rawManifest.renderSettings.excludedRenderObjects = [
