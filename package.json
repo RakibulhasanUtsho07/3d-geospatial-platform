@@ -18,6 +18,7 @@
     "prebuild": "npm run copy:cesium && npm run build:heritage-model",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
     "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs",
+    "test:building-viewport-manager": "node --test tests/building-viewport-manager-boundary.test.mjs",
     "test:map-initialization-policy": "node --test tests/map-initialization-policy.test.mjs",
     "test:building-search": "node --test tests/building-search.test.mjs",
     "test:footprint-area": "node --test tests/footprint-area.test.mjs",
