@@ -226,12 +226,16 @@ def main():
     light_size = lighting_dimension * 0.55
     # Blender's glTF importer converts the source Y-up model into Blender's
     # Z-up world before this point, so lights must use Blender-world Z as up.
+    # Scale heritage light distance to palace height as well; scaling only
+    # emitter size/power while leaving positions scaled to the 125 m footprint
+    # still left the facade lights hundreds of metres from this low-rise model.
+    light_distance_scale = lighting_dimension
     key_offset = Vector((1.0, -1.3, 1.7))
     fill_offset = Vector((-1.2, -0.25, 1.25))
     rim_offset = Vector((0.25, 1.1, 1.5))
-    key_light = add_area_light("ReviewKeyLight", center + key_offset * max_dimension, center, light_power, light_size)
-    fill_light = add_area_light("ReviewFillLight", center + fill_offset * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    rim_light = add_area_light("ReviewRimLight", center + rim_offset * max_dimension, center, light_power * 0.65, light_size)
+    key_light = add_area_light("ReviewKeyLight", center + key_offset * light_distance_scale, center, light_power, light_size)
+    fill_light = add_area_light("ReviewFillLight", center + fill_offset * light_distance_scale, center, light_power * 0.45, light_size * 1.2)
+    rim_light = add_area_light("ReviewRimLight", center + rim_offset * light_distance_scale, center, light_power * 0.65, light_size)
     lights = [light_manifest(light) for light in (key_light, fill_light, rim_light)]
     render_settings = {
         "renderEngine": scene.render.engine,
