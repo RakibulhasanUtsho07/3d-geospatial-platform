@@ -51,11 +51,18 @@ async function readGlb(relativePath) {
   const readMeshAttributes = (nodeName) => {
     const node = gltf.nodes.find((item) => item.name === nodeName);
     assert.ok(node && Number.isSafeInteger(node.mesh), relativePath + " must contain mesh node " + nodeName);
-    const primitive = gltf.meshes[node.mesh].primitives[0];
+    const primitives = gltf.meshes[node.mesh].primitives;
+    assert.ok(primitives.length > 0, relativePath + " mesh node must have a primitive " + nodeName);
+    const readAll = (attributeName) => primitives.flatMap((primitive) => {
+      const accessorIndex = primitive.attributes[attributeName];
+      assert.ok(Number.isSafeInteger(accessorIndex),
+        relativePath + " " + nodeName + " primitive must contain " + attributeName);
+      return readAccessor(accessorIndex);
+    });
     return {
-      positions: readAccessor(primitive.attributes.POSITION),
-      normals: readAccessor(primitive.attributes.NORMAL),
-      colors: readAccessor(primitive.attributes.COLOR_0),
+      positions: readAll("POSITION"),
+      normals: readAll("NORMAL"),
+      colors: readAll("COLOR_0"),
     };
   };
   return { gltf, readMeshAttributes };
