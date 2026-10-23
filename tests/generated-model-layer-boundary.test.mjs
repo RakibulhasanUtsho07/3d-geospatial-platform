@@ -17,6 +17,7 @@ test("CesiumAdapter delegates generated-model lifecycle to GeneratedModelLayer",
   assert.match(source, /removeGeneratedModel\(id: string\): boolean\s*\{\s*return this\.generatedModelLayer\.remove\(id\);/);
   assert.match(source, /getGeneratedModelIds\(\): string\[\]\s*\{\s*return this\.generatedModelLayer\.getIds\(\);/);
   assert.doesNotMatch(source, /private readonly generatedModels\s*=\s*new Map/);
+  assert.doesNotMatch(source, /this\.generatedModels/);
 });
 
 test("GeneratedModelLayer retains race protection, URL policy, and staged replacement semantics", async () => {
