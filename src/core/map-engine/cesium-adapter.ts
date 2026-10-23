@@ -44,7 +44,10 @@ import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
 import type { RoadFeature } from "../geospatial/road-network.mjs";
 import { flattenRoadCoordinates } from "../geospatial/flatten-road-coordinates.mjs";
-import { selectNearestLodRecords } from "./lod-record-selection.mjs";
+import {
+  selectDetailedBuildingRecords,
+  shouldRecomputeBuildingLod,
+} from "./building-lod-policy.mjs";
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import { normalizeGeneratedModelDefinition } from "./generated-model-policy.mjs";
@@ -1908,37 +1911,33 @@ export class CesiumAdapter implements MapEngine {
       Cesium.Cartesian3.distance(this.lastLodOrigin, origin) >=
         LOD_ORIGIN_MOVE_THRESHOLD_METERS;
 
-    if (
-      !force &&
-      !originMoved &&
-      this.lastLodBudget === detailBudget
-    ) {
+    if (!shouldRecomputeBuildingLod({
+      force,
+      originMoved,
+      previousBudget: this.lastLodBudget,
+      detailBudget,
+    })) {
       return;
     }
 
     this.lastLodOrigin = Cesium.Cartesian3.clone(origin);
     this.lastLodBudget = detailBudget;
 
-    const desiredDetailed = new Set(
-      selectNearestLodRecords(
-        this.buildingLodRecords,
-        detailBudget,
-        (record) => (
-          record.center && record.wallPositions
-            ? Cesium.Cartesian3.distance(record.center, origin)
-            : null
-        ),
-      ),
-    );
-
     // A selected building stays detailed even if it is outside the current budget.
     const selectedRecord = this.buildingLodRecords.find(
       (record) => record.entity === this.selectedBuilding,
     );
 
-    if (selectedRecord?.center && selectedRecord.wallPositions) {
-      desiredDetailed.add(selectedRecord);
-    }
+    const desiredDetailed = selectDetailedBuildingRecords(
+      this.buildingLodRecords,
+      detailBudget,
+      (record) => (
+        record.center && record.wallPositions
+          ? Cesium.Cartesian3.distance(record.center, origin)
+          : null
+      ),
+      selectedRecord,
+    );
 
     const dataSource = this.overtureBuildings;
     dataSource?.entities.suspendEvents();
