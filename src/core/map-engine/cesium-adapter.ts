@@ -2565,6 +2565,12 @@ export class CesiumAdapter implements MapEngine {
         }
 
         const entity = route.entity;
+        // Keep the type guard at the adapter boundary as route results are
+        // intentionally generic and the router must not own selection effects.
+        if (!entity.polygon) {
+          this.clearFeatureSelection();
+          return;
+        }
 
         this.restoreSelectedBuilding();
         this.emitPlaceSelection(null);
