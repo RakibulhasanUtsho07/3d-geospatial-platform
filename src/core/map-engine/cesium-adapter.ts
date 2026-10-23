@@ -51,6 +51,7 @@ import { BuildingSelectionMaterialController } from "./building-selection-materi
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
 import { dispatchSelectionListeners } from "./dispatch-selection-listeners.mjs";
+import { FeaturePickingController } from "./feature-picking-controller.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
@@ -186,9 +187,7 @@ export class CesiumAdapter implements MapEngine {
     [MAP_LAYER_IDS.propertyListings, false],
   ]);
 
-  private clickHandler:
-    | import("cesium").ScreenSpaceEventHandler
-    | null = null;
+  private featurePickingController: FeaturePickingController | null = null;
 
   private selectedBuilding: CesiumEntity | null = null;
 
@@ -2495,272 +2494,273 @@ export class CesiumAdapter implements MapEngine {
     viewer: CesiumViewer,
     Cesium: CesiumModule,
   ): void {
-    this.clickHandler?.destroy();
+    this.featurePickingController?.destroy();
+    const controller = new FeaturePickingController({
+      createHandler: (canvas) => new Cesium.ScreenSpaceEventHandler(canvas),
+      leftClickType: Cesium.ScreenSpaceEventType.LEFT_CLICK,
+      isActive: () => !viewer.isDestroyed() && this.viewer === viewer,
+      onPick: (movement) => this.handleFeaturePick(viewer, Cesium, movement),
+    });
+    this.featurePickingController = controller;
+    controller.attach(viewer.scene.canvas);
+  }
 
-    const handler = new Cesium.ScreenSpaceEventHandler(
-      viewer.scene.canvas,
+  private handleFeaturePick(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+    movement: { position: import("cesium").Cartesian2 },
+  ): void {
+    if (
+      viewer.isDestroyed() ||
+      this.viewer !== viewer
+    ) {
+      return;
+    }
+
+    const picked = viewer.scene.pick(movement.position);
+    if (!picked) {
+      this.clearFeatureSelection();
+      this.setNavigationPath(null, null);
+      return;
+    }
+
+    const route = resolveFeaturePickRoute({
+      resolveNearbyPlace: () => {
+        const source = this.nearbyPlacesDataSource;
+        return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+      },
+      resolvePropertyListing: () => {
+        const source = this.propertyListingsDataSource;
+        return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+      },
+      resolveRoad: () => {
+        const source = this.roadNetworkDataSource;
+        const roadEntity = source ? this.getEntityFromPick(picked, Cesium, source) : null;
+        return roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
+      },
+      resolveBuilding: () => {
+        const source = this.overtureBuildings;
+        return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+      },
+    });
+
+    if (route.kind === "nearby-place") {
+      this.clearFeatureSelection();
+      this.emitPlaceSelection(
+        this.nearbyPlaceByEntityId.get(route.entity.id) ?? null,
+      );
+      return;
+    }
+
+    if (route.kind === "property-listing") {
+      this.clearFeatureSelection();
+      this.emitPropertySelection(
+        this.propertyByEntityId.get(route.entity.id) ?? null,
+      );
+      return;
+    }
+
+    if (route.kind === "road") {
+      this.clearFeatureSelection();
+      this.emitRoadSelection(route.road);
+      return;
+    }
+
+    if (route.kind !== "building") {
+      this.clearFeatureSelection();
+      return;
+    }
+
+    const entity = route.entity;
+    // Keep the type guard at the adapter boundary as route results are
+    // intentionally generic and the router must not own selection effects.
+    if (!entity.polygon) {
+      this.clearFeatureSelection();
+      return;
+    }
+
+    this.restoreSelectedBuilding();
+    this.emitPlaceSelection(null);
+    this.emitPropertySelection(null);
+
+    this.selectedBuilding = entity;
+    this.emitRoadSelection(null);
+
+    const properties = this.readProperties(
+      entity,
+      Cesium.JulianDate.now(),
     );
 
-    handler.setInputAction(
-      (movement: {
-        position: import("cesium").Cartesian2;
-      }) => {
-        if (
-          viewer.isDestroyed() ||
-          this.viewer !== viewer
-        ) {
-          return;
-        }
+    const heightInfo =
+      this.renderedBuildingMetadata.get(entity.id) ??
+      this.getBuildingHeight(properties);
 
-        const picked = viewer.scene.pick(movement.position);
-        if (!picked) {
-          this.clearFeatureSelection();
-          this.setNavigationPath(null, null);
-          return;
-        }
+    const selectedProperties: Record<string, unknown> = {
+      ...properties,
+      overture_feature_id: entity.id,
+      rendered_height_m: heightInfo.meters,
+      height_source: heightInfo.source,
+      rendered_height_unclamped_m: heightInfo.unclampedMeters,
+      rendered_height_was_clamped: heightInfo.heightWasClamped,
+      rendered_base_height_unclamped_m: heightInfo.unclampedBaseHeight,
+      rendered_base_height_was_clamped: heightInfo.baseHeightWasClamped,
+    };
 
-        const route = resolveFeaturePickRoute({
-          resolveNearbyPlace: () => {
-            const source = this.nearbyPlacesDataSource;
-            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
-          },
-          resolvePropertyListing: () => {
-            const source = this.propertyListingsDataSource;
-            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
-          },
-          resolveRoad: () => {
-            const source = this.roadNetworkDataSource;
-            const roadEntity = source ? this.getEntityFromPick(picked, Cesium, source) : null;
-            return roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
-          },
-          resolveBuilding: () => {
-            const source = this.overtureBuildings;
-            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
-          },
-        });
+    const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
+    if (savedArchitectureProfile) {
+      const sourceGeometryHeight = this.buildingLodRecords.find(
+        (record) => record.entity === entity,
+      )?.sourceHeightInfo;
+      selectedProperties.source_rendered_height_m =
+        sourceGeometryHeight?.meters ?? heightInfo.meters;
+      selectedProperties.source_height_source =
+        sourceGeometryHeight?.source ?? heightInfo.source;
+      selectedProperties.architecture_profile_id = savedArchitectureProfile.referenceId;
+      selectedProperties.architecture_profile_title = savedArchitectureProfile.referenceTitle;
+      selectedProperties.architecture_profile_source = savedArchitectureProfile.sourceUrl;
+      selectedProperties.architecture_profile_license = savedArchitectureProfile.license ?? "Not recorded";
+      selectedProperties.architecture_profile_confidence =
+        "User-confirmed visual association; not survey-verified";
+      selectedProperties.architecture_profile_reported_floor_count =
+        savedArchitectureProfile.style.reportedFloorCount;
+      selectedProperties.architecture_profile_reported_height_m =
+        savedArchitectureProfile.style.reportedHeightMeters;
+      selectedProperties.architecture_profile_reported_building_area_sqm =
+        savedArchitectureProfile.style.reportedBuildingAreaSqM;
+      selectedProperties.architecture_profile_reported_metadata =
+        savedArchitectureProfile.reportedBuildingMetadata ?? {};
+    }
 
-        if (route.kind === "nearby-place") {
-          this.clearFeatureSelection();
-          this.emitPlaceSelection(
-            this.nearbyPlaceByEntityId.get(route.entity.id) ?? null,
-          );
-          return;
-        }
+    const names = properties.names;
 
-        if (route.kind === "property-listing") {
-          this.clearFeatureSelection();
-          this.emitPropertySelection(
-            this.propertyByEntityId.get(route.entity.id) ?? null,
-          );
-          return;
-        }
+    if (
+      names &&
+      typeof names === "object" &&
+      "primary" in names &&
+      typeof names.primary === "string"
+    ) {
+      selectedProperties.display_name = names.primary;
+    } else if (typeof properties.name === "string") {
+      selectedProperties.display_name = properties.name;
+    }
 
-        if (route.kind === "road") {
-          this.clearFeatureSelection();
-          this.emitRoadSelection(route.road);
-          return;
-        }
+    let coordinates: MapFeatureSelection["coordinates"] = null;
 
-        if (route.kind !== "building") {
-          this.clearFeatureSelection();
-          return;
-        }
+    try {
+      const worldPosition =
+        viewer.scene.pickPositionSupported
+          ? viewer.scene.pickPosition(movement.position)
+          : undefined;
 
-        const entity = route.entity;
-        // Keep the type guard at the adapter boundary as route results are
-        // intentionally generic and the router must not own selection effects.
-        if (!entity.polygon) {
-          this.clearFeatureSelection();
-          return;
-        }
-
-        this.restoreSelectedBuilding();
-        this.emitPlaceSelection(null);
-        this.emitPropertySelection(null);
-
-        this.selectedBuilding = entity;
-        this.emitRoadSelection(null);
-
-        const properties = this.readProperties(
-          entity,
-          Cesium.JulianDate.now(),
+      const position =
+        worldPosition ??
+        viewer.camera.pickEllipsoid(
+          movement.position,
+          viewer.scene.globe.ellipsoid,
         );
 
-        const heightInfo =
-          this.renderedBuildingMetadata.get(entity.id) ??
-          this.getBuildingHeight(properties);
+      if (position) {
+        const cartographic =
+          Cesium.Cartographic.fromCartesian(position);
 
-        const selectedProperties: Record<string, unknown> = {
-          ...properties,
-          overture_feature_id: entity.id,
-          rendered_height_m: heightInfo.meters,
-          height_source: heightInfo.source,
-          rendered_height_unclamped_m: heightInfo.unclampedMeters,
-          rendered_height_was_clamped: heightInfo.heightWasClamped,
-          rendered_base_height_unclamped_m: heightInfo.unclampedBaseHeight,
-          rendered_base_height_was_clamped: heightInfo.baseHeightWasClamped,
+        coordinates = {
+          longitude: Cesium.Math.toDegrees(
+            cartographic.longitude,
+          ),
+          latitude: Cesium.Math.toDegrees(
+            cartographic.latitude,
+          ),
+          height: cartographic.height,
+        };
+      }
+    } catch (error: unknown) {
+      console.debug(
+        "[Map] Could not determine click coordinates:",
+        error instanceof Error
+          ? error.message
+          : String(error),
+      );
+    }
+
+    let focusCoordinates: MapFeatureSelection["focusCoordinates"] = null;
+    let footprintAreaM2: number | null = null;
+
+    try {
+      const hierarchy = entity.polygon.hierarchy?.getValue(
+        Cesium.JulianDate.now(),
+      );
+
+      if (hierarchy && hierarchy.positions.length >= 3) {
+        const bounds = Cesium.BoundingSphere.fromPoints(
+          hierarchy.positions,
+        );
+        const center = Cesium.Cartographic.fromCartesian(
+          bounds.center,
+        );
+
+        focusCoordinates = {
+          longitude: Cesium.Math.toDegrees(center.longitude),
+          latitude: Cesium.Math.toDegrees(center.latitude),
+          height: heightInfo.baseHeight + heightInfo.meters,
         };
 
-        const savedArchitectureProfile = this.buildingStyleAssignments.get(entity.id);
-        if (savedArchitectureProfile) {
-          const sourceGeometryHeight = this.buildingLodRecords.find(
-            (record) => record.entity === entity,
-          )?.sourceHeightInfo;
-          selectedProperties.source_rendered_height_m =
-            sourceGeometryHeight?.meters ?? heightInfo.meters;
-          selectedProperties.source_height_source =
-            sourceGeometryHeight?.source ?? heightInfo.source;
-          selectedProperties.architecture_profile_id = savedArchitectureProfile.referenceId;
-          selectedProperties.architecture_profile_title = savedArchitectureProfile.referenceTitle;
-          selectedProperties.architecture_profile_source = savedArchitectureProfile.sourceUrl;
-          selectedProperties.architecture_profile_license = savedArchitectureProfile.license ?? "Not recorded";
-          selectedProperties.architecture_profile_confidence =
-            "User-confirmed visual association; not survey-verified";
-          selectedProperties.architecture_profile_reported_floor_count =
-            savedArchitectureProfile.style.reportedFloorCount;
-          selectedProperties.architecture_profile_reported_height_m =
-            savedArchitectureProfile.style.reportedHeightMeters;
-          selectedProperties.architecture_profile_reported_building_area_sqm =
-            savedArchitectureProfile.style.reportedBuildingAreaSqM;
-          selectedProperties.architecture_profile_reported_metadata =
-            savedArchitectureProfile.reportedBuildingMetadata ?? {};
-        }
-
-        const names = properties.names;
-
-        if (
-          names &&
-          typeof names === "object" &&
-          "primary" in names &&
-          typeof names.primary === "string"
-        ) {
-          selectedProperties.display_name = names.primary;
-        } else if (typeof properties.name === "string") {
-          selectedProperties.display_name = properties.name;
-        }
-
-        let coordinates: MapFeatureSelection["coordinates"] = null;
-
-        try {
-          const worldPosition =
-            viewer.scene.pickPositionSupported
-              ? viewer.scene.pickPosition(movement.position)
-              : undefined;
-
-          const position =
-            worldPosition ??
-            viewer.camera.pickEllipsoid(
-              movement.position,
-              viewer.scene.globe.ellipsoid,
-            );
-
-          if (position) {
-            const cartographic =
-              Cesium.Cartographic.fromCartesian(position);
-
-            coordinates = {
-              longitude: Cesium.Math.toDegrees(
-                cartographic.longitude,
-              ),
-              latitude: Cesium.Math.toDegrees(
-                cartographic.latitude,
-              ),
-              height: cartographic.height,
+        const toDegreesRing = (positions: CesiumCartesian3[]) =>
+          positions.map((position) => {
+            const cartographic = Cesium.Cartographic.fromCartesian(position);
+            return {
+              longitude: Cesium.Math.toDegrees(cartographic.longitude),
+              latitude: Cesium.Math.toDegrees(cartographic.latitude),
             };
-          }
-        } catch (error: unknown) {
-          console.debug(
-            "[Map] Could not determine click coordinates:",
-            error instanceof Error
-              ? error.message
-              : String(error),
-          );
-        }
+          });
+        const rings = [
+          toDegreesRing(hierarchy.positions),
+          ...(hierarchy.holes ?? []).map(
+            (hole: { positions: CesiumCartesian3[] }) =>
+              toDegreesRing(hole.positions),
+          ),
+        ];
+        footprintAreaM2 = calculateFootprintAreaM2(rings);
+      }
+    } catch (error: unknown) {
+      console.debug(
+        "[Map] Could not calculate building footprint measurements:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
 
-        let focusCoordinates: MapFeatureSelection["focusCoordinates"] = null;
-        let footprintAreaM2: number | null = null;
+    this.emitFeatureSelection({
+      source: "overture-local-buildings",
+      properties: selectedProperties,
+      coordinates,
+      focusCoordinates,
+      footprintAreaM2,
+    });
 
-        try {
-          const hierarchy = entity.polygon.hierarchy?.getValue(
-            Cesium.JulianDate.now(),
-          );
-
-          if (hierarchy && hierarchy.positions.length >= 3) {
-            const bounds = Cesium.BoundingSphere.fromPoints(
-              hierarchy.positions,
-            );
-            const center = Cesium.Cartographic.fromCartesian(
-              bounds.center,
-            );
-
-            focusCoordinates = {
-              longitude: Cesium.Math.toDegrees(center.longitude),
-              latitude: Cesium.Math.toDegrees(center.latitude),
-              height: heightInfo.baseHeight + heightInfo.meters,
-            };
-
-            const toDegreesRing = (positions: CesiumCartesian3[]) =>
-              positions.map((position) => {
-                const cartographic = Cesium.Cartographic.fromCartesian(position);
-                return {
-                  longitude: Cesium.Math.toDegrees(cartographic.longitude),
-                  latitude: Cesium.Math.toDegrees(cartographic.latitude),
-                };
-              });
-            const rings = [
-              toDegreesRing(hierarchy.positions),
-              ...(hierarchy.holes ?? []).map(
-                (hole: { positions: CesiumCartesian3[] }) =>
-                  toDegreesRing(hole.positions),
-              ),
-            ];
-            footprintAreaM2 = calculateFootprintAreaM2(rings);
-          }
-        } catch (error: unknown) {
-          console.debug(
-            "[Map] Could not calculate building footprint measurements:",
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-
-        this.emitFeatureSelection({
-          source: "overture-local-buildings",
-          properties: selectedProperties,
-          coordinates,
-          focusCoordinates,
-          footprintAreaM2,
-        });
-
-        // A saved research profile may use a full-height texture. Force a
-        // selected-only detail rebuild so ground-floor arches and upper-floor
-        // patterns become visible without keeping large textures for every LOD.
-        const selectedRecord = this.buildingLodRecords.find(
-          (record) => record.entity === entity,
-        );
-        if (selectedRecord?.visualStyle.fullHeightTexture && selectedRecord.isDetailed) {
-          selectedRecord.detailedWall = null;
-          selectedRecord.polygonStyleCache = null;
-          selectedRecord.roofEquipmentBox = null;
-          selectedRecord.roofEquipmentPosition = null;
-          selectedRecord.entity.wall = undefined;
-          selectedRecord.entity.box = undefined;
-          selectedRecord.entity.position = undefined;
-          selectedRecord.isDetailed = false;
-        }
-
-        this.updateBuildingLod(viewer, Cesium, true);
-        this.buildingSelectionMaterials.applySelectionHighlight(entity, Cesium);
-        viewer.scene.requestRender();
-
-        console.info(
-          "[Map] Overture building selected:",
-          selectedProperties,
-        );
-      },
-      Cesium.ScreenSpaceEventType.LEFT_CLICK,
+    // A saved research profile may use a full-height texture. Force a
+    // selected-only detail rebuild so ground-floor arches and upper-floor
+    // patterns become visible without keeping large textures for every LOD.
+    const selectedRecord = this.buildingLodRecords.find(
+      (record) => record.entity === entity,
     );
+    if (selectedRecord?.visualStyle.fullHeightTexture && selectedRecord.isDetailed) {
+      selectedRecord.detailedWall = null;
+      selectedRecord.polygonStyleCache = null;
+      selectedRecord.roofEquipmentBox = null;
+      selectedRecord.roofEquipmentPosition = null;
+      selectedRecord.entity.wall = undefined;
+      selectedRecord.entity.box = undefined;
+      selectedRecord.entity.position = undefined;
+      selectedRecord.isDetailed = false;
+    }
 
-    this.clickHandler = handler;
+    this.updateBuildingLod(viewer, Cesium, true);
+    this.buildingSelectionMaterials.applySelectionHighlight(entity, Cesium);
+    viewer.scene.requestRender();
+
+    console.info(
+      "[Map] Overture building selected:",
+      selectedProperties,
+    );
   }
 
   destroy(): void {
@@ -2798,8 +2798,8 @@ export class CesiumAdapter implements MapEngine {
     this.activeViewportEndpoint = null;
     this.viewportResponseCache.clear();
 
-    this.clickHandler?.destroy();
-    this.clickHandler = null;
+    this.featurePickingController?.destroy();
+    this.featurePickingController = null;
 
     this.cameraMoveEndUnsubscribe?.();
     this.cameraMoveEndUnsubscribe = null;
