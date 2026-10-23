@@ -336,6 +336,7 @@ jobs:
         run: npm run test:heritage-model
 
       - name: Upload generated Ahsan Manzil GLB assets
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ahsan-manzil-generated-glb

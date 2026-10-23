@@ -132,9 +132,9 @@ test("central pavilion, dome drum and tapered stair implement the photo-estimate
   const actualDrumX = Math.max(...xValues) - Math.min(...xValues);
   const actualDrumZ = Math.max(...zValues) - Math.min(...zValues);
   assert.ok(Math.abs(actualDrumX - expectedDrumWidth) < 0.05,
-    "dome drum east-west extent follows its confidence-tagged parameter");
+    `dome drum east-west extent follows parameter: expected=${expectedDrumWidth}, actual=${actualDrumX}, bounds=[${Math.min(...xValues)}, ${Math.max(...xValues)}]`);
   assert.ok(Math.abs(actualDrumZ - expectedDrumWidth) < 0.05,
-    "dome drum north-south extent follows its confidence-tagged parameter");
+    `dome drum north-south extent follows parameter: expected=${expectedDrumWidth}, actual=${actualDrumZ}, bounds=[${Math.min(...zValues)}, ${Math.max(...zValues)}]`);
   const stair = (await readMeshAttributes("Stair_S")).positions;
   const stairX = stair.map((point) => point[0]);
   const actualStairWidth = Math.max(...stairX) - Math.min(...stairX);
