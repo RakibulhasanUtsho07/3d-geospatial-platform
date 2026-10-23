@@ -153,10 +153,8 @@ export async function runColmapReconstruction(options){
   const useGpu=options.useGpu===true;
   const reconstructionArgs=[
    "automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality,
-   "--FeatureExtraction.use_gpu",useGpu?"1":"0",
-   "--FeatureMatching.use_gpu",useGpu?"1":"0",
-   "--FeatureExtraction.max_image_size",String(options.maxImageSize??1600),
-   "--FeatureExtraction.num_threads",String(options.featureThreads??4),
+   "--use_gpu",useGpu?"1":"0",
+   "--num_threads",String(options.featureThreads??4),
   ];
   const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
   // A zero exit code only means COLMAP completed; it does not mean enough input views
