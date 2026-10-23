@@ -1,0 +1,70 @@
+{
+  "building": "Ahsan Manzil (Pink Palace), Kumartuli, Dhaka, Bangladesh",
+  "purpose": "Exploratory real-image COLMAP reconstruction. This is not a surveyed/cadastral model and is not map-ready.",
+  "independentReferenceDimensions": {
+    "overallLengthM": 125.4,
+    "overallDepthM": 28.75,
+    "plinthHeightM": 1.0,
+    "groundFloorClearHeightM": 5.0,
+    "firstFloorClearHeightM": 5.8,
+    "domePeakHeightAboveGroundM": 27.13,
+    "dimensionSources": [
+      "https://beautifulbangladesh.gov.bd/district-destination/dhaka/heritage/3",
+      "https://parjatan.gov.bd/pages/static-pages/6922ddbe933eb65569e16134",
+      "https://beautifulbangladesh.gov.bd/newsletter/single/479"
+    ],
+    "caveat": "These published dimensions are a reference baseline, not a survey. Some sources use a slightly different overall-depth figure; this experiment uses 28.75 m as the declared comparison value."
+  },
+  "inputImages": [
+    {
+      "id": "ahsan003",
+      "file": "Ahsan_Manzil_003.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_003.jpg",
+      "creator": "Ranadipam Basu",
+      "capturedAt": "2010-12-31T03:05:08",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    },
+    {
+      "id": "ahsan004",
+      "file": "Ahsan_Manzil_004.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_004.jpg",
+      "creator": "Ranadipam Basu",
+      "capturedAt": "2010-12-31T03:05:42",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    },
+    {
+      "id": "ahsan005",
+      "file": "Ahsan_Manzil_005.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_005.jpg",
+      "creator": "Ranadipam Basu",
+      "capturedAt": "2010-12-31T03:07:09",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    },
+    {
+      "id": "ahsan006",
+      "file": "Ahsan_Manzil_006.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_006.jpg",
+      "creator": "Ranadipam Basu",
+      "capturedAt": "2010-12-31T03:08:03",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    }
+  ],
+  "reviewMethod": {
+    "scaleCalibration": "The first-pass reconstruction is measured in model units. A second run scales only the longest horizontal dimension to the published 125.4 m length. The calibrated long-axis match is therefore not independent accuracy evidence.",
+    "independentDimensionChecks": [
+      "short horizontal principal dimension versus 28.75 m overall depth",
+      "vertical axis extent versus 27.13 m dome peak"
+    ],
+    "axisAssumption": "The run declares Y as the candidate up axis to satisfy the worker contract. COLMAP's local reconstruction frame is not inherently WGS84-oriented, so this assumption must be checked in the orthographic previews.",
+    "georeferencing": "Not claimed. Scale calibration alone does not solve horizontal WGS84 placement or vertical datum.",
+    "visualReview": "The artifact includes the licensed reference photographs plus front, side and top orthographic previews of the output GLB for direct visual comparison."
+  }
+}
