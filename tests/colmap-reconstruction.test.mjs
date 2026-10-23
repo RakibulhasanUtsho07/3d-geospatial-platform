@@ -107,11 +107,20 @@ test("requires explicit operator review and approved asset provenance",async t=>
 });
 test("runs mocked COLMAP reconstruction, converts texture atlas and marks model review-only",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
+ const observedCommands=[];
  const result=await runColmapReconstruction({
   workspaceRoot:root,buildingSpec,buildingId:buildingSpec.id,jobId:"successful-job",sourceIds:["view-1","view-2","view-3"],
   upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,quality:"LOW",
-  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input),
+  scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},
+  spawnImpl:(executable,args,spawnOptions)=>{observedCommands.push([...args]);return mockedColmapSpawn(executable,args,spawnOptions);},
+  qualityAnalyzer:async input=>mockImageQuality(input),
  });
+ const autoArgs=observedCommands.find(args=>args[0]==="automatic_reconstructor");
+ assert.ok(autoArgs,"automatic_reconstructor was invoked");
+ assert.equal(autoArgs[autoArgs.indexOf("--FeatureExtraction.use_gpu")+1],"0","CPU feature extraction is the headless-safe default");
+ assert.equal(autoArgs[autoArgs.indexOf("--FeatureMatching.use_gpu")+1],"0","CPU feature matching is the headless-safe default");
+ assert.equal(autoArgs[autoArgs.indexOf("--FeatureExtraction.max_image_size")+1],"1600");
+ assert.equal(autoArgs[autoArgs.indexOf("--FeatureExtraction.num_threads")+1],"4");
  assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
  assert.equal(result.report.reconstructionDiagnostics.status,"review-recommended");
