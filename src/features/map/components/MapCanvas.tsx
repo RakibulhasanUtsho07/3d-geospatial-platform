@@ -16,6 +16,7 @@ import type {
   GeneratedModelDefinition,
   MapFeatureSelection,
   MapLayer,
+  MAP_LAYER_IDS,
 } from "@/core/map-engine/types";
 
 import BuildingSearchPanel from "./BuildingSearchPanel";
@@ -501,6 +502,26 @@ export default function MapCanvas({
 
     engine.setLayerVisibility(layerId, visible);
     setLayers(engine.getLayers());
+
+    if (visible) return;
+
+    // A hidden layer must not leave a stale details panel or building preview
+    // active for a feature the user can no longer see or select.
+    const hidesCurrentSelection =
+      (layerId === MAP_LAYER_IDS.overtureBuildings && selectedFeature !== null) ||
+      (layerId === MAP_LAYER_IDS.roads && selectedRoad !== null) ||
+      (layerId === MAP_LAYER_IDS.nearbyPlaces && selectedPlace !== null) ||
+      (layerId === MAP_LAYER_IDS.propertyListings && selectedProperty !== null);
+
+    if (!hidesCurrentSelection) return;
+
+    if (layerId === MAP_LAYER_IDS.propertyListings) {
+      cancelNearbyServiceRequest();
+    }
+    engine.clearFeatureSelection();
+    if (layerId === MAP_LAYER_IDS.overtureBuildings) {
+      onSelectedFeatureChangeRef.current?.(null);
+    }
   }
 
   function cancelNearbyServiceRequest() {
