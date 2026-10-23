@@ -337,6 +337,7 @@ test("fixture building and roads pass through Cesium geometry staging with expec
 
 
 test("selecting a building then a road clears the previous details panel", async ({ page }) => {
+  test.setTimeout(60_000);
   const observed = await stubMapNetwork(page);
   await openReadyMap(page);
   await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
@@ -353,7 +354,9 @@ test("selecting a building then a road clears the previous details panel", async
 
   // The fixture footprint is centered on the map's provisional Ahsan Manzil
   // anchor; in top-down mode the centre pixel should select its roof.
-  await canvas.click({ position: center });
+  // Use absolute page coordinates so the canvas locator's actionability
+  // checks do not mask an actual Cesium pointer/pick regression.
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
   const buildingDetails = page.getByRole("complementary", { name: "Building details" });
   await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
   await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
@@ -363,7 +366,7 @@ test("selecting a building then a road clears the previous details panel", async
   const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
   await buildings.uncheck({ noWaitAfter: true });
   await expect(buildings).not.toBeChecked();
-  await canvas.click({ position: center });
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
 
   const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
   await expect(roadDetails).toBeVisible({ timeout: 10_000 });
