@@ -100,3 +100,39 @@ test("generated window glass meets the exterior wall plane without the previous 
   assert.ok(Math.max(...distances)>0.055&&Math.max(...distances)<0.059,"glass thickness extends outward from wall plane, edge "+edgeIndex);
  }
 });
+
+
+test("generated entry door is positioned against the selected facade plane",()=>{
+ const built=generateProceduralGlb(fixture);
+ const glb=built.glb;
+ const jsonLength=glb.readUInt32LE(12);
+ const gltf=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+ const binaryStart=28+jsonLength;
+ const doorMesh=gltf.meshes.find(mesh=>mesh.name.endsWith("-door"));
+ assert.ok(doorMesh,"generated GLB includes a door mesh");
+ const accessor=gltf.accessors[doorMesh.primitives[0].attributes.POSITION];
+ const view=gltf.bufferViews[accessor.bufferView];
+ const start=binaryStart+(view.byteOffset||0)+(accessor.byteOffset||0);
+ const vertices=[];
+ for(let i=0;i<accessor.count;i++){
+  const offset=start+i*12;
+  vertices.push({x:glb.readFloatLE(offset),y:glb.readFloatLE(offset+4),z:glb.readFloatLE(offset+8)});
+ }
+ const {derived}=normalizeBuildingSpec(fixture);
+ const edges=derived.localFootprint.map((p,i)=>({p,n:derived.localFootprint[(i+1)%derived.localFootprint.length]}));
+ const front=edges.reduce((best,e,i,all)=>{
+  const length=Math.hypot(e.n.x-e.p.x,e.n.z-e.p.z);
+  const bestEdge=all[best],bestLength=Math.hypot(bestEdge.n.x-bestEdge.p.x,bestEdge.n.z-bestEdge.p.z);
+  return length>bestLength?i:best;
+ },0);
+ const {p,n}=edges[front],frame=createFacadeFrame(p,n);
+ const distances=vertices.map(point=>{
+  const dx=point.x-p.x,dz=point.z-p.z;
+  return {along:dx*frame.tangent.x+dz*frame.tangent.z,outward:dx*frame.out.x+dz*frame.out.z};
+ }).filter(value=>value.along>0.1&&value.along<frame.len-0.1&&value.outward>0&&value.outward<0.1)
+   .map(value=>value.outward);
+ assert.ok(distances.length>0,"door vertices must lie on the selected entrance facade");
+ const nearestFace=Math.min(...distances),outerFace=Math.max(...distances);
+ assert.ok(Math.abs(nearestFace-0.002)<0.0001,"door inner face meets the facade plane with 2 mm clearance");
+ assert.ok(Math.abs(outerFace-0.072)<0.0001,"door outer face matches its depth");
+});
