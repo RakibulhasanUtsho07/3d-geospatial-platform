@@ -16,7 +16,7 @@ function executionReport({requestedStrategy,actualStrategy,worker,workerReport,s
     actualStrategy,
     worker,
     workerStarted: evidence.workerStarted ?? true,
-    workerStatus: report.status ?? "completed-without-worker-status",
+    workerStatus: report.status ?? (actualStrategy === "procedural" ? "completed" : "completed-without-worker-status"),
     workerExitCode: evidence.workerExitCode ?? evidence.lastExitCode ?? (commands.length ? commands[commands.length-1].exitCode ?? null : null),
     processAdapter: evidence.processAdapter ?? "not-reported",
     workerVersion: evidence.workerVersion ?? "not-queried",
