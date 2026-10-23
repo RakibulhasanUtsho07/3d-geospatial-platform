@@ -1,23 +1,23 @@
 {
   "task": "P1.4",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "81dac8b57a5916bd447b209bfa1874860d0fb64a",
-  "reviewGeneratedAt": "2026-10-23T10:15:40.167Z",
+  "sourceCommit": "fdf63047ca808c22237b2c73b0f060222039405d",
+  "reviewGeneratedAt": "2026-10-23T11:05:29.879Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
-    "proportional 18.6 m triple-arch portico and stair landing",
+    "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
     "16 m ceremonial stair run with 28 shallow treads",
     "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
     "profile-aligned dome mouldings, improved review contrast, and stylized column capitals"
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "7ef19265af6316d0e3d6b3b15ab2cb3d5f98fe74e0d0716aa1d02811f13d9b75",
+    "sha256": "3b2e7e773992104b4b964159bf4f02c7dee0c1562e43ca56d71227d708c961bc",
     "byteLength": 6692916
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "da404f6413923390be15321d6f0109c619fa2e07d58128af2e2c621ad4118699",
+    "sha256": "f71a54331b38c0727c9e233b70b74bde769ef4299d65d3ac2d1051b5b506361f",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -44,7 +44,7 @@
   "qa": {
     "geometry": {
       "filename": "geometry-qa-report.json",
-      "sha256": "c013d27884bdb7e0652e97c760b7bced77aabddcc4721c5a0bf842f35d6a37c2",
+      "sha256": "d989db2aaae6e03790535540f6927896e06486b0c30e003652272beb820bdd10",
       "valid": true,
       "status": "review-recommended",
       "errors": [],
@@ -99,96 +99,106 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "4cd249a742ee1e3de1a43e98d6d5e960e0adc3371b76a4dda3cad25cf3ab1fd6"
+      "sha256": "6b83f5b880b2e7996cc8252ee90d3d320fcdf9150bea92a84d640b6e2cc7c3ce"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b2fe3facc4d910e934e4e6c473fa9500ee9795596ce915e4ce4dd0c0f2b7edd9"
+      "sha256": "cce01b400ea60fee752bea26fce666b05b22683808b1a1bda7a277715b58a58e"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "90d6577ead84d57cce65d86c860bcf5df009d4204273c50a555e54bb0fad5105"
+      "sha256": "412019ec723c9bcc997a4beedf6f9413add745a407f9e3a061227d9547b06283"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9f9f556e62946efbdfef0a1c1b684731a730634b6247b7bd85a00bc9612460af"
+      "sha256": "9d10d97bc5c18bf4703ce4a6c1f3706d1359b4b8d1cc4dec87d3dcdb27d9fd29"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "e2853dedf57bba11ec1b7546853e623548fc4482a8859d1a99a5c7daa1b73073"
+      "sha256": "ecdab359a78b94bcf2b64045fba85d7c16d757998f74cf89acd21541bed1f727"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c09229ff8ffcb5589a6bb023cb7531cd8e9ce3b6a2c5b1b9f098b7acbdf6163c"
+      "sha256": "33ea21bf18c64e43db3592eb7c5f82d4663231ff345d863684399005aeb63842"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "1a888f2a98f24d8797cefc41f5c29cb2521a6f97a785bc086d5be0a1e7e05db7"
+      "sha256": "69b8d824a8448185dcab8ac9090ec9bb0581cfd48e65258d9a9e1c66c6a180e5"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "7c21e405d01c7ae1cbbbf9a01ebc9738bfcb7efd2f41627e3f8f256a48fbed27"
+      "sha256": "669860ba83c733c1f1bf798e5f85a4fa8dee7d36f5cf174ed33847bc72c5d885"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "621a88fbe70c93a9fbeced997e5e701b3174a1c1190b9c630899cbad9776a5bc"
+      "sha256": "7fc9fd2ef872c7904d1c3d7c857a914f1db763e114aed2bb295605e12aae898b"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "aff4095981d5e21ce9cca6f1e6618171b62c62d01660c7ccc4d2b5deb9010817"
+      "sha256": "693859ec101201c08388284dc099209d73c05488b22d6db0f00ff440551c051b"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "86786e1ff666865832a55b4fe6c1561694650012e3d66b8c873921c6d2fc87cc"
+      "sha256": "d930564482ebd976df7fd397eeec4325167da0a4f56ecac042285c6f2b89baaa"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "91484585bf2f254b5340288014df838d08698ab3f486baf2e107cfa26cbf9369"
+      "sha256": "e50f5227393748fc0fa3b9947ef17b57d8c050a807d6870c47396ea097f77d51"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b620a43af35214b890975c1aa63d15dc78cdffc634c2da578e5fa2a7f433c21f"
+      "sha256": "896e1a892f3ab08b471605a55e30e1fbda4f3bed35ad1cbe0a70e9e5908eb778"
     }
   ],
   "visualReview": {
     "contactSheet": "contact-sheet.png",
-    "status": "rendered; human comparison with heritage references is still required",
-    "policy": "Hashes and QA metrics prove artifact integrity, not historical accuracy. Values tagged [E], [C] or [?] remain unverified."
+    "status": "13-view render and hash validation passed; visual comparison was performed against a published front exterior photo; survey-grade validation remains open",
+    "findings": [
+      "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
+      "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
+      "Review lighting was raised because the first contact sheet under-lit facade and roof detail.",
+      "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
+    ],
+    "residualRisks": [
+      "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
+      "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
+    ],
+    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
   }
 }
