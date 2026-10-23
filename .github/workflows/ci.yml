@@ -47,6 +47,7 @@ on:
     branches:
       - main
       - test/p1-building-selection-lifecycle
+      - test/p1-selection-browser-lifecycle
       - dev
       - refactor/p1-building-lod-policy
       - refactor/p1-building-lod-renderer
