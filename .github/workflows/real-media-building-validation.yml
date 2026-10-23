@@ -60,6 +60,18 @@ jobs:
             Creator: Mrpluto11; License: CC BY-SA 4.0
             License URL: https://creativecommons.org/licenses/by-sa/4.0/
             Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg
+          Ahasan_Manzil_east_side_building.jpg:
+            Creator: Farhan alvee; License: CC BY-SA 4.0
+            Page: https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg
+          Ahasan_Manzil_east_side_corner_view.jpg:
+            Creator: Farhan alvee; License: CC BY-SA 4.0
+            Page: https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg
+          Ahsan_Manjeel_2023.jpg:
+            Creator: Md Joni Hossain; License: CC BY-SA 4.0
+            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg
+          Ahsan_Manjil_Angled_view.jpg:
+            Creator: Samiha Ahmed Rafa; License: CC BY-SA 4.0
+            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg
           This artifact preserves the source originals and per-image attribution for this validation run.
           ATTRIBUTION
           while IFS='|' read -r source_id filename; do
@@ -77,6 +89,10 @@ jobs:
           ahsan006|Ahsan_Manzil_006.jpg
           ahsan007|Ahsan_Manzil_Side_View.jpg
           ahsan008|Ahsan_Manzil_(side).jpg
+          ahsan009|Ahasan_Manzil_east_side_building.jpg
+          ahsan010|Ahasan_Manzil_east_side_corner_view.jpg
+          ahsan011|Ahsan_Manjeel_2023.jpg
+          ahsan012|Ahsan_Manjil_Angled_view.jpg
           FILES
           sha256sum "$WORKSPACE"/uploads/*.jpg > validation-output/reference-image-sha256.txt
           python - <<'PY'
@@ -127,35 +143,57 @@ jobs:
             --source "ahsan006=uploads/Ahsan_Manzil_006.jpg" \
             --source "ahsan007=uploads/Ahsan_Manzil_Side_View.jpg" \
             --source "ahsan008=uploads/Ahsan_Manzil_(side).jpg" \
+            --source "ahsan009=uploads/Ahasan_Manzil_east_side_building.jpg" \
+            --source "ahsan010=uploads/Ahasan_Manzil_east_side_corner_view.jpg" \
+            --source "ahsan011=uploads/Ahsan_Manjeel_2023.jpg" \
+            --source "ahsan012=uploads/Ahsan_Manjil_Angled_view.jpg" \
             --licence "ahsan003=CC BY-SA 3.0" \
             --licence "ahsan004=CC BY-SA 3.0" \
             --licence "ahsan005=CC BY-SA 3.0" \
             --licence "ahsan006=CC BY-SA 3.0" \
             --licence "ahsan007=CC BY-SA 4.0" \
             --licence "ahsan008=CC BY-SA 4.0" \
+            --licence "ahsan009=CC BY-SA 4.0" \
+            --licence "ahsan010=CC BY-SA 4.0" \
+            --licence "ahsan011=CC BY-SA 4.0" \
+            --licence "ahsan012=CC BY-SA 4.0" \
             --author "ahsan003=Ranadipam Basu" \
             --author "ahsan004=Ranadipam Basu" \
             --author "ahsan005=Ranadipam Basu" \
             --author "ahsan006=Ranadipam Basu" \
             --author "ahsan007=Parvezahmed" \
             --author "ahsan008=Mrpluto11" \
+            --author "ahsan009=Farhan alvee" \
+            --author "ahsan010=Farhan alvee" \
+            --author "ahsan011=Md Joni Hossain" \
+            --author "ahsan012=Samiha Ahmed Rafa" \
             --attribution "ahsan003=Ranadipam Basu, CC BY-SA 3.0" \
             --attribution "ahsan004=Ranadipam Basu, CC BY-SA 3.0" \
             --attribution "ahsan005=Ranadipam Basu, CC BY-SA 3.0" \
             --attribution "ahsan006=Ranadipam Basu, CC BY-SA 3.0" \
             --attribution "ahsan007=Parvezahmed, CC BY-SA 4.0" \
             --attribution "ahsan008=Mrpluto11, CC BY-SA 4.0" \
+            --attribution "ahsan009=Farhan alvee, CC BY-SA 4.0" \
+            --attribution "ahsan010=Farhan alvee, CC BY-SA 4.0" \
+            --attribution "ahsan011=Md Joni Hossain, CC BY-SA 4.0" \
+            --attribution "ahsan012=Samiha Ahmed Rafa, CC BY-SA 4.0" \
             --source-url "ahsan003=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg" \
             --source-url "ahsan004=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg" \
             --source-url "ahsan005=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg" \
             --source-url "ahsan006=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg" \
             --source-url "ahsan007=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg" \
             --source-url "ahsan008=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg" \
+            --source-url "ahsan009=https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg" \
+            --source-url "ahsan010=https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg" \
+            --source-url "ahsan011=https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg" \
+            --source-url "ahsan012=https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg" \
             --kind "ahsan003=image" --kind "ahsan004=image" \
             --kind "ahsan005=image" --kind "ahsan006=image" \
             --kind "ahsan007=image" --kind "ahsan008=image" \
+            --kind "ahsan009=image" --kind "ahsan010=image" \
+            --kind "ahsan011=image" --kind "ahsan012=image" \
             --confirm-rights --strategy photogrammetry \
-            --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008" \
+            --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008,ahsan009,ahsan010,ahsan011,ahsan012" \
             --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
             --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
             2>&1 | tee validation-output/logs/first-pass.log
