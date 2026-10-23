@@ -393,8 +393,26 @@ def main():
         output_glb = Path(args.output)
         output_glb.parent.mkdir(parents=True, exist_ok=True)
         output_glb.write_bytes(calibrated_glb)
-        calibrated_gltf = read_glb(calibrated_glb)[1]
-        calibration_metadata = calibrated_gltf.get("asset", {}).get("extras", {}).get("scaleCalibration", {})
+        _, calibrated_gltf, calibrated_binary = read_glb(calibrated_glb)
+        calibrated_positions, calibrated_uvs, calibrated_triangles, calibrated_texture_id, calibrated_color, calibrated_primitive_count = extract_geometry(calibrated_gltf, calibrated_binary)
+        calibrated_metrics = calculate_metrics(calibrated_positions)
+        calibrated_extras = calibrated_gltf.get("asset", {}).get("extras", {})
+        calibration_metadata = calibrated_extras.get("scaleCalibration", {})
+        # The report itself must describe the emitted GLB, not the pre-calibration input.
+        # Keep original units/extents nested inside scaleCalibration as provenance.
+        report.update({
+            "file": output_glb.name,
+            "bytes": len(calibrated_glb),
+            "sha256": hashlib.sha256(calibrated_glb).hexdigest(),
+            "scaleCalibrated": calibrated_extras.get("scaleCalibrated"),
+            "metresPerModelUnit": calibrated_extras.get("metresPerModelUnit"),
+            "sourceUpAxis": calibrated_extras.get("sourceUpAxis"),
+            "meshCount": len(calibrated_gltf.get("meshes", [])),
+            "primitiveCount": calibrated_primitive_count,
+            "triangleCount": int(len(calibrated_triangles)),
+            "embeddedTextureCount": len(calibrated_gltf.get("images", [])),
+            **calibrated_metrics,
+        })
         report["scaleCalibration"] = {
             "method": "operator-supplied-published-overall-length",
             "referenceLengthM": args.reference_length_m,
