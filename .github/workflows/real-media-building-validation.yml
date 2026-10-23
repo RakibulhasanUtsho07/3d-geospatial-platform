@@ -34,7 +34,7 @@ jobs:
           mkdir -p validation-output/logs
           npm install --no-audit --no-fund 2>&1 | tee validation-output/logs/dependencies.log
           python -m pip install --upgrade pip
-          python -m pip install numpy pillow
+          python -m pip install numpy pillow open3d
 
       - name: Prepare workspace and download licensed source photographs
         shell: bash
@@ -153,7 +153,7 @@ jobs:
             --confirm-rights --strategy photogrammetry \
             --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008" \
             --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
-            --quality LOW --colmap-path colmap --reconstruction-timeout-ms 2400000 \
+            --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
             2>&1 | tee validation-output/logs/first-pass.log
 
       - name: Capture raw reconstruction workspace diagnostics even when no mesh is produced
@@ -263,7 +263,7 @@ jobs:
             --confirm-rights --strategy photogrammetry \
             --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008" \
             --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
-            --quality LOW --colmap-path colmap --reconstruction-timeout-ms 2400000 \
+            --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
             --model-distance "$RAW_LONG" --real-distance-m 125.4 \
             2>&1 | tee validation-output/logs/scaled-pass.log
 
