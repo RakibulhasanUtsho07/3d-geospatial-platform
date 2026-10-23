@@ -15,6 +15,9 @@ The integration step downloads two CC BY-SA 4.0 Wikimedia Commons images, verifi
 
 The generated artifact `artifacts/ahsan-manzil-review` contains the LOD3 model copy, confidence-tagged parameter JSON, 13 PNG renders, source photographs, attribution, render manifest, review input and hash-linked report. Both reference comparisons deliberately start as `pending`; a correctly linked source/render pair is not itself a visual pass. Open the source and mapped render side by side, enter a reviewer-authored outcome and notes, then regenerate the report with a new output file. Other render views remain unassessed because the pinned reference set does not document those facades.
 
+
+A first-pass generated bundle exposed an important visual QA case: a command can produce valid PNG files whose pixels show almost only the background. The Y-up profile therefore frames from the palace-only semantic nodes rather than the entire scene context; its lights are placed above the building in Y-up coordinates; CI rejects render sets where any of the 13 views has near-flat pixel luminance. Always open the latest artifact and compare it with the reference images—the automated contrast check is only a technical gate, not architectural acceptance.
+
 ## Licensing and acceptance boundaries
 
 - Front image: Mahbub Hossain Shaheed (mahosha), “Ahsan Manzil-Front View.jpg”, [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ahsan_Manzil-Front_View.jpg), CC BY-SA 4.0.
