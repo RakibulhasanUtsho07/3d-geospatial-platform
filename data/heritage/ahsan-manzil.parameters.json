@@ -391,11 +391,11 @@
         "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 39,
+        "value": 26,
         "unit": "m",
         "confidence": "[E]",
         "source": "Approximate base-to-frontage ratio from the south-elevation reference image",
-        "note": "Broad lower flight is approximately 70% of the 55.8 m provisional Rangmahal frontage; estimate only until photo rectification or survey."
+        "note": "The south-elevation reference image suggests a base width of roughly 46% of the 55.8 m provisional facade (~26 m); visual estimate only until rectified imagery or survey."
       },
       "sideRail": {
         "value": "simple low side rails",
