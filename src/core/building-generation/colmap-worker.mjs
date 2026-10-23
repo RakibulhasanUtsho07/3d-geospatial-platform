@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawn as nodeSpawn } from "node:child_process";
 import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
@@ -232,14 +233,50 @@ export async function runColmapReconstruction(options){
   for(const warning of report.reconstructionDiagnostics.warnings||[])report.warnings.push("Reconstruction diagnostics: "+warning);
   for(const warning of report.cameraCoverage.warnings||[])report.warnings.push("Camera coverage: "+warning);
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
-  const inputMesh=await locateMesh(outputJobDir),denseWorkspace=path.dirname(inputMesh),texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
+  let inputMesh=null,denseWorkspace=null;
+  try{
+   inputMesh=await locateMesh(outputJobDir);
+   denseWorkspace=path.dirname(inputMesh);
+   report.geometryStrategy="colmap-dense-mvs";
+  }catch(meshError){
+   if(options.allowSparseMeshFallback!==true||!sparseModelDir)throw meshError;
+   // Ubuntu's packaged COLMAP may be built without CUDA/HIP, so automatic_reconstructor
+   // can complete sparse SfM but cannot produce a dense fused cloud/mesh. The explicitly
+   // opted-in fallback creates a review-only Poisson surface from sparse points; it must
+   // never be mistaken for full dense MVS reconstruction.
+   const fallbackStart=Date.now();
+   report.progress="experimental-sparse-poisson-fallback";
+   report.geometryStrategy="experimental-sparse-poisson-fallback";
+   report.warnings.push("Dense COLMAP MVS mesh was unavailable. An experimental Poisson surface was generated from sparse SfM points; it can invent surfaces and is not accuracy evidence.");
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+   denseWorkspace=path.join(outputJobDir,"dense");
+   await mkdir(denseWorkspace,{recursive:true});
+   await runProcess(colmapPath,[
+    "image_undistorter","--image_path",realImagesDir,"--input_path",sparseModelDir,
+    "--output_path",denseWorkspace,"--output_type","COLMAP","--max_image_size",String(options.maxImageSize??1600)
+   ],Math.min(timeoutMs,600000),spawnImpl);
+   const sparsePointsPath=path.join(outputJobDir,"sparse-reconstruction-points.ply");
+   await runProcess(colmapPath,[
+    "model_converter","--input_path",sparseModelDir,"--output_path",sparsePointsPath,"--output_type","PLY"
+   ],Math.min(timeoutMs,120000),spawnImpl);
+   const meshScript=options.sparseMeshScript||path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../../../scripts/create-sparse-poisson-mesh.py");
+   inputMesh=path.join(denseWorkspace,"meshed-poisson.ply");
+   const fallbackSummaryPath=path.join(outputJobDir,"sparse-mesh-fallback-report.json");
+   await runProcess(options.pythonPath||"python3",[
+    meshScript,"--input",sparsePointsPath,"--output",inputMesh,"--summary",fallbackSummaryPath
+   ],Math.min(timeoutMs,600000),spawnImpl);
+   report.sparseMeshFallback=JSON.parse(await readFile(fallbackSummaryPath,"utf8"));
+   report.timingsMs.sparseMeshFallback=Date.now()-fallbackStart;
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+  }
+  const texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
   const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
   const texturedMesh=path.join(texturedDir,"mesh.ply"),texturePath=path.join(texturedDir,"texture.png");
   if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
   const modelPath=path.join(outputJobDir,"model.glb"),converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
   await writeFile(modelPath,converted.glb,{flag:"wx",mode:0o600});
   const glbSha256=createHash("sha256").update(converted.glb).digest("hex"),modelQuality=analyzeGlbQuality(converted.glb);
-  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
+  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");if(report.geometryStrategy==="experimental-sparse-poisson-fallback")report.warnings.push("This GLB was generated from sparse points with experimental Poisson filling; it is not a dense photogrammetry mesh and must not be published without independent review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
   report.warnings.push("Photogrammetry was run, but this worker does not compute ground-control-point registration to WGS84; the BuildingSpec location is a placement hint only.");
   report.warnings.push("Human review is required for scale, vertical axis, front-facing heading, mesh completeness, texture seams, occlusion and same-building identity.");
   if(!calibration.scaleCalibrated)report.warnings.push("No real-world scale was supplied; 1 model unit was provisionally treated as 1 metre for preview only.");
