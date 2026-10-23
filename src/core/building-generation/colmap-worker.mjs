@@ -158,7 +158,19 @@ export async function runColmapReconstruction(options){
    "--random_seed",String(options.randomSeed??0),
    "--num_threads",String(options.featureThreads??4),
   ];
-  const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
+  const reconstructStart=Date.now();
+  const reconstructionProcess=await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);
+  report.timingsMs={reconstruction:Date.now()-reconstructStart};
+  // Preserve a bounded tail of COLMAP's own messages in the job report. A zero exit code
+  // with no sparse model is otherwise difficult to diagnose from a runner log because
+  // the worker's process wrapper intentionally captures stdout/stderr.
+  report.colmapProcess={
+   command:"automatic_reconstructor",
+   exitCode:0,
+   stdoutTail:(reconstructionProcess.stdout||"").slice(-8000),
+   stderrTail:(reconstructionProcess.stderr||"").slice(-16000),
+   args:reconstructionArgs.map((arg,index)=>index===2||index===4?arg:arg)
+  };
   // A zero exit code only means COLMAP completed; it does not mean enough input views
   // registered or that the sparse reconstruction is strong enough for stable geometry.
   report.progress="reconstruction-quality-diagnostics";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
