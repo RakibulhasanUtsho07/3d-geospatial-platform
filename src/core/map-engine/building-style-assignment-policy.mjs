@@ -6,7 +6,7 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 /** Reject malformed assignments before they can become the active baseline. */
 export function isValidBuildingStyleAssignment(value: unknown): value is BuildingStyleAssignment {
   if (!value || typeof value !== "object") return false;
-  const assignment = value as Partial<BuildingStyleAssignment>;
+  const assignment = value;
   if (
     typeof assignment.featureId !== "string" ||
     !assignment.featureId.trim() ||
@@ -16,7 +16,7 @@ export function isValidBuildingStyleAssignment(value: unknown): value is Buildin
     return false;
   }
 
-  const style = assignment.style as Partial<BuildingVisualStyle>;
+  const style = assignment.style;
   return (
     typeof style.facadeColor === "string" &&
     HEX_COLOR.test(style.facadeColor) &&
