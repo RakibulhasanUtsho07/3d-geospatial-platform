@@ -41,7 +41,10 @@ on:
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
+      - feat/p0-real-dhaka-baseline
       - feat/final-merge-cleanup
+      - feat/p0-real-dhaka-baseline
+      - refactor/p1-generated-model-layer
       - feat/texture-projection-validation
   pull_request:
     branches:
