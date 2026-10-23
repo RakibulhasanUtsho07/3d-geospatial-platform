@@ -320,14 +320,14 @@ async function newInstrumentedPage(browser, viewport) {
   const counters = createNetworkCounters();
   page.on("response", (response) => {
     try {
-      counters.recordResponse(response.url(), new URL(response.url()).origin, response.status());
+      counters.recordResponse(response.url(), new URL(page.url()).origin, response.status());
     } catch {
       // Ignore malformed resource URLs in instrumentation.
     }
   });
   page.on("requestfailed", (request) => {
     try {
-      counters.recordFailure(request.url(), new URL(request.url()).origin);
+      counters.recordFailure(request.url(), new URL(page.url()).origin);
     } catch {
       counters.recordFailure("", "");
     }
@@ -417,15 +417,17 @@ async function runBenchmark() {
   const results = [];
   try {
     for (let index = 1; index <= coldCount; index += 1) {
-      const startedAt = performance.now();
+      const setupStartedAt = performance.now();
       const label = "cold-" + String(index).padStart(2, "0");
       const screenshotPath = path.join(outputDirectory, label + ".png");
       let session = null;
+      let startedAt = null;
       try {
         session = await newInstrumentedPage(browser, viewport);
         const cdp = await session.context.newCDPSession(session.page);
         await cdp.send("Network.enable");
         await cdp.send("Network.clearBrowserCache");
+        startedAt = performance.now();
         await session.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
         await waitForMapReady(session.page, readyTimeoutMs);
         if (settleMs > 0) await session.page.waitForTimeout(settleMs);
@@ -438,7 +440,7 @@ async function runBenchmark() {
           mode: "cold",
           status: "error",
           error: sanitizeError(error),
-          loadToFailureMs: roundMs(performance.now() - startedAt),
+          loadToFailureMs: roundMs(performance.now() - (startedAt ?? setupStartedAt)),
         });
       } finally {
         if (session) await session.context.close().catch(() => {});
