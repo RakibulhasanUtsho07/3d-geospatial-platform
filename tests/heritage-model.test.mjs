@@ -68,7 +68,10 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Eight open arched bays"));
   assert.ok(builder.includes("addFacadeDisk("));
   assert.ok(builder.includes("const stairBaseWidth = DIM.stairWidth;"));
-  assert.ok(builder.includes('box(stair,domeX,top/2,z,width,top,stepDepth,"stair")'));
+  assert.ok(builder.includes("const riserCenter=(riserBottom+riserTop)/2;"));
+  assert.ok(builder.includes('box(stair,domeX,riserCenter,z,width,rise,stepDepth,"stair")'));
+  assert.ok(builder.includes('box(stair,domeX,riserTop-.018,z+stepDepth*.32,width,.036,stepDepth*.16,"trim")'));
+  assert.ok(!builder.includes('box(stair,domeX,top/2,z,width,top,stepDepth,"stair")'));
   assert.ok(builder.includes("Upper veranda balustrades"));
   assert.ok(builder.includes("const andarRoofTop=andarFf.base+andarFf.height+DIM.slab;"));
   assert.ok(builder.includes("Align decorative rings with the actual lotus-bud profile samples"));
