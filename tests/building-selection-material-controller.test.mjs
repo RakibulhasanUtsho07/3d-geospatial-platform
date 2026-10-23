@@ -32,8 +32,8 @@ test("CesiumAdapter delegates selected-building material snapshots and highlight
 
 test("material controller preserves one-time snapshot, selected-only highlight and restore contracts", () => {
   for (const contract of [
-    "this.originalPolygonMaterial: CesiumMaterialProperty | null = null",
-    "this.originalWallMaterial: CesiumMaterialProperty | null = null",
+    "private originalPolygonMaterial: CesiumMaterialProperty | null = null",
+    "private originalWallMaterial: CesiumMaterialProperty | null = null",
     "if (!this.isSelected(entity)) return",
     "this.originalPolygonMaterial !== null",
     "this.originalPolygonMaterial = entity.polygon.material",
