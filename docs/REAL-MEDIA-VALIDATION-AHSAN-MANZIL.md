@@ -34,6 +34,18 @@ The long-axis length was calibrated to 125.4 m. Its match is **by construction**
 
 The [latest front/side/top orthographic previews and GLB](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900708592/artifacts/12479066236) show a sparse, facade-dominated surface with disconnected islands and severe vertical distortion, not a credible complete palace volume. The same four selected inputs produced materially different dimensions despite identical downloaded source-photo SHA-256 manifests: run #39899992722 measured depth/height 87.16 m / 44.01 m; run #39900331596 measured 26.70 m / 48.43 m; latest run #39900708592 measured 37.33 m / 40.85 m. This is an explicit repeatability failure, separate from the dimension-gate failures. A full ten-image experiment ([run evidence](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39897870892)) also failed to find a good initial image pair because the selected still photos form disconnected feature-matching clusters.
 
+## Final dataset follow-up: same-photographer image set
+
+After the dimensional-failure run above, a second source set from Saeed Ahmad's Wikimedia Commons files `Ahsan_Manzil_view_02.jpg` through `Ahsan_Manzil_view_07.jpg` was tested. The runner downloaded all six source files, recorded SHA-256 checksums, and passed the basic image-quality preflight. However, COLMAP's actual `automatic_reconstructor` log ended with **`No good initial image pair found`**; no sparse model files were written, so the worker could not make a mesh or GLB. The fallback cannot recover a building surface without a registered sparse reconstruction. See [run #39901431757](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39901431757) and its [source/log artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39901431757/artifacts/12479131245).
+
+This distinguishes two independent failure modes:
+- **Four-image facade control:** it produced a review GLB, but independent dimensions, mesh topology and full-building camera coverage failed.
+- **Six-image same-photographer set:** it did not form a viable COLMAP initial pair; there is no GLB on which to run dimensional checks.
+
+The basic image preflight only checks resolution, luminance, contrast, sharpness heuristics and near-duplicates. It does not prove geometric overlap. The available still images do not establish a connected walk-around sequence, so adding more photographs did not guarantee a reconstructable multi-view set.
+
+`real-media-building-validation.yml` is now **manual-dispatch only**. Further experiments must be deliberately started from GitHub Actions; ordinary report/code edits will not automatically trigger another 3-hour validation workflow.
+
 ## Fixes made while validating
 
 1. Default COLMAP extraction/matching to CPU for headless runners and use supported `automatic_reconstructor` arguments.
