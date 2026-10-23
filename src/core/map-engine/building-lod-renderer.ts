@@ -133,7 +133,7 @@ export class BuildingLodRenderer {
     return record.polygonStyleCache;
   }
 
-  private applyLightweightBuildingStyle(
+  applyLightweightBuildingStyle(
     record: BuildingLodRecord,
     Cesium: CesiumModule,
   ): void {
@@ -165,7 +165,7 @@ export class BuildingLodRenderer {
     this.dependencies.applySelectionHighlight(entity, Cesium);
   }
 
-  private applyDetailedBuildingStyle(
+  applyDetailedBuildingStyle(
     record: BuildingLodRecord,
     Cesium: CesiumModule,
   ): void {
