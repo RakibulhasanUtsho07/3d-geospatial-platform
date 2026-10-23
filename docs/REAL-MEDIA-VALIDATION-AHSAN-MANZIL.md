@@ -9,7 +9,7 @@ The generated GLB is retained for review only. It must not be published to the l
 - Reference dimensions used in this experiment: overall length 125.4 m, overall depth 28.75 m, dome peak height 27.13 m. These are published reference values, not a new survey; see the Bangladesh Tourism Board / Parjatan references in [the input source manifest](../validation/ahsan-manzil-media-sources.json).
 - Input media: images downloaded from Wikimedia Commons with the creator and CC BY-SA license recorded in the artifact's attribution manifest.
 - External tools: FFmpeg and Ubuntu-packaged COLMAP. The packaged COLMAP build does not provide the dense CUDA/HIP MVS path or `mesh_texturer`, so the workflow used an explicitly labelled sparse-SfM-to-Poisson surface fallback. That fallback can invent geometry and is not equivalent to dense photogrammetry.
-- Reproducible runner and all source files: [four-view control run artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39898969228).
+- Reproducible runner and all source files: [four-view control run](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39898969228) and its [downloadable evidence artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39898969228/artifacts/12477604298).
 
 ## Main measured result
 
@@ -32,7 +32,7 @@ The long-axis length was calibrated to 125.4 m. Its match is **by construction**
 - Texture: unavailable in this COLMAP build. The emitted GLB uses a neutral review material; texture match against the source photos was **not tested**.
 - Georeferencing: not solved. Published site coordinates / the BuildingSpec anchor are only placement hints; there is no surveyed control-point registration.
 
-The [front orthographic preview](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39898969228) shows a warped, facade-like triangulated sheet rather than a credible complete palace volume. A full ten-image experiment also failed to find a good initial image pair because the selected still photos form disconnected feature-matching clusters.
+The [front orthographic preview and GLB](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39898969228/artifacts/12477604298) shows a warped, facade-like triangulated sheet rather than a credible complete palace volume. A full ten-image experiment ([run evidence](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39897870892)) also failed to find a good initial image pair because the selected still photos form disconnected feature-matching clusters.
 
 ## Fixes made while validating
 
