@@ -8,6 +8,10 @@ export const REQUIRED_REVIEW_VIEWS = Object.freeze([
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
+const RENDER_PROFILE_CONVENTIONS = Object.freeze({
+  "building-review-cycles-cpu-v1": "z-up;front-view-direction=+Y",
+  "ahsan-manzil-y-up-cycles-cpu-v1": "y-up;+X=east-west-eastward;+Z=south-riverfront",
+});
 
 function finiteVector3(value) {
   return Array.isArray(value) && value.length === 3 && value.every(finite);
@@ -31,18 +35,26 @@ function validCameraPose(pose) {
   return directionError <= 0.02;
 }
 
-function requiredViewDirection(viewId, turntableElevationDegrees) {
-  if (viewId === "front") return [0, 1, 0];
-  if (viewId === "back") return [0, -1, 0];
+function requiredViewDirection(viewId, turntableElevationDegrees, renderProfile) {
+  const yUp = renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1";
+  if (viewId === "front") return yUp ? [0, 0, -1] : [0, 1, 0];
+  if (viewId === "back") return yUp ? [0, 0, 1] : [0, -1, 0];
   if (viewId === "left") return [1, 0, 0];
   if (viewId === "right") return [-1, 0, 0];
-  if (viewId === "top") return [0, 0, -1];
+  if (viewId === "top") return yUp ? [0, -1, 0] : [0, 0, -1];
   const match = /^turntable-(\d{3})$/.exec(viewId);
   if (!match || !finite(turntableElevationDegrees)) return null;
   const angleDegrees = Number(match[1]);
   if (angleDegrees < 0 || angleDegrees >= 360 || angleDegrees % 45 !== 0) return null;
   const azimuth = angleDegrees * Math.PI / 180;
   const elevation = turntableElevationDegrees * Math.PI / 180;
+  if (yUp) {
+    return [
+      -Math.sin(azimuth) * Math.cos(elevation),
+      -Math.sin(elevation),
+      -Math.cos(azimuth) * Math.cos(elevation),
+    ];
+  }
   return [
     -Math.cos(azimuth) * Math.cos(elevation),
     -Math.sin(azimuth) * Math.cos(elevation),
@@ -50,15 +62,17 @@ function requiredViewDirection(viewId, turntableElevationDegrees) {
   ];
 }
 
-function cameraMatchesRequiredView(viewId, pose, settings) {
-  const expected = requiredViewDirection(viewId, settings?.turntableElevationDegrees);
+function cameraMatchesRequiredView(viewId, pose, settings, renderProfile) {
+  const expected = requiredViewDirection(viewId, settings?.turntableElevationDegrees, renderProfile);
   if (!expected || !validCameraPose(pose)) return false;
   return Math.hypot(...expected.map((value, index) => value - pose.viewDirectionWorld[index])) <= 0.02;
 }
 
-function validRenderSettings(settings, resolution) {
+function validRenderSettings(settings, resolution, renderProfile) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return false;
-  if (settings.renderEngine !== "CYCLES" || settings.cyclesDevice !== "CPU" ||
+  if (!Object.hasOwn(RENDER_PROFILE_CONVENTIONS, renderProfile) ||
+    settings.cameraCoordinateConvention !== RENDER_PROFILE_CONVENTIONS[renderProfile] ||
+    settings.renderEngine !== "CYCLES" || settings.cyclesDevice !== "CPU" ||
     !Number.isSafeInteger(settings.cyclesSamples) || settings.cyclesSamples < 1 || settings.cyclesSamples > 1024 ||
     typeof settings.cyclesUseDenoising !== "boolean" ||
     !Number.isSafeInteger(settings.cyclesMaxBounces) || settings.cyclesMaxBounces < 0 || settings.cyclesMaxBounces > 64 ||
@@ -112,10 +126,10 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   const views = [];
   const byId = new Map();
 
-  if (rawManifest.renderProfile !== "building-review-cycles-cpu-v1") {
+  if (!Object.hasOwn(RENDER_PROFILE_CONVENTIONS, rawManifest.renderProfile)) {
     errors.push("render-profile-missing-or-unsupported");
   }
-  const settingsValid = validRenderSettings(rawManifest.renderSettings, resolution);
+  const settingsValid = validRenderSettings(rawManifest.renderSettings, resolution, rawManifest.renderProfile);
   if (!settingsValid) errors.push("render-settings-invalid-or-incomplete");
   if (!geometryQaSummary || typeof geometryQaSummary !== "object" || Array.isArray(geometryQaSummary)) {
     errors.push("geometry-qa-missing");
@@ -176,7 +190,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     if (!sha256Pattern.test(file.sha256 ?? "")) errors.push("render-sha256-invalid:" + id);
     if (!Number.isSafeInteger(file.bytes) || file.bytes < 1) errors.push("render-byte-length-invalid:" + id);
     if (view.renderComplete !== true) errors.push("render-not-complete:" + id);
-    if (!cameraMatchesRequiredView(id, view.cameraPose, rawManifest.renderSettings)) {
+    if (!cameraMatchesRequiredView(id, view.cameraPose, rawManifest.renderSettings, rawManifest.renderProfile)) {
       errors.push("render-camera-pose-invalid:" + id);
     }
     const stats = view.pixelStatistics ?? {};

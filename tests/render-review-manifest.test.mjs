@@ -70,6 +70,7 @@ function fixture(overrides = {}) {
         filmTransparent: false,
         viewTransform: "AgX",
         cameraProjection: "ORTHO",
+        cameraCoordinateConvention: "z-up;front-view-direction=+Y",
         cameraDistanceMultiplier: 3,
         cameraOrthoScaleMultiplier: 1.45,
         turntableElevationDegrees: 22,
@@ -102,6 +103,51 @@ function fixture(overrides = {}) {
     files: overrides.files ?? files,
   };
 }
+
+
+test("validates the Ahsan Manzil Y-up profile with south-front and overhead cameras", () => {
+  const data = fixture();
+  data.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
+  data.rawManifest.renderSettings.cameraCoordinateConvention = "y-up;+X=east-west-eastward;+Z=south-riverfront";
+  const elevation = 22 * Math.PI / 180;
+  data.rawManifest.views = data.rawManifest.views.map((view) => {
+    let direction;
+    if (view.id === "front") direction = [0, 0, -1];
+    else if (view.id === "back") direction = [0, 0, 1];
+    else if (view.id === "left") direction = [1, 0, 0];
+    else if (view.id === "right") direction = [-1, 0, 0];
+    else if (view.id === "top") direction = [0, -1, 0];
+    else {
+      const azimuth = Number(view.id.slice("turntable-".length)) * Math.PI / 180;
+      direction = [
+        -Math.sin(azimuth) * Math.cos(elevation),
+        -Math.sin(elevation),
+        -Math.cos(azimuth) * Math.cos(elevation),
+      ];
+    }
+    const position = [10, 20, 30];
+    return {
+      ...view,
+      cameraPose: {
+        ...view.cameraPose,
+        positionWorld: position,
+        targetWorld: position.map((value, axis) => value + direction[axis]),
+        viewDirectionWorld: direction,
+      },
+    };
+  });
+  const report = finalizeRenderReviewManifest(data);
+  assert.equal(report.valid, true);
+  assert.equal(report.renderProfile, "ahsan-manzil-y-up-cycles-cpu-v1");
+  assert.equal(report.renderSettings.cameraCoordinateConvention, "y-up;+X=east-west-eastward;+Z=south-riverfront");
+  assert.equal(report.errors.length, 0);
+
+  const wrongConvention = fixture();
+  wrongConvention.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
+  const rejected = finalizeRenderReviewManifest(wrongConvention);
+  assert.equal(rejected.valid, false);
+  assert.ok(rejected.errors.includes("render-settings-invalid-or-incomplete"));
+});
 
 test("finalizes the full five-axis plus eight-angle render set", () => {
   const report = finalizeRenderReviewManifest(fixture());

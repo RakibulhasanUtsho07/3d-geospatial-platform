@@ -16,6 +16,10 @@ def parse_args():
     required = ["--model", "--output-dir", "--resolution"]
     if any(key not in values for key in required):
         raise RuntimeError("Missing --model, --output-dir or --resolution")
+    values.setdefault("--render-profile", "building-review-cycles-cpu-v1")
+    allowed_profiles = ("building-review-cycles-cpu-v1", "ahsan-manzil-y-up-cycles-cpu-v1")
+    if values["--render-profile"] not in allowed_profiles:
+        raise RuntimeError("Unsupported render profile: " + values["--render-profile"])
     return values
 
 def ensure_world(scene):
@@ -108,6 +112,7 @@ def main():
     model_path = os.path.abspath(opts["--model"])
     output_dir = os.path.abspath(opts["--output-dir"])
     resolution = int(opts["--resolution"])
+    render_profile = opts["--render-profile"]
     if not os.path.isfile(model_path):
         raise RuntimeError("Input model does not exist: " + model_path)
     if not os.path.isdir(output_dir):
@@ -176,26 +181,49 @@ def main():
         "worldBackgroundRgba": [0.38, 0.40, 0.43, 1.0],
         "worldBackgroundStrength": 0.7,
         "cameraProjection": "ORTHO",
+        "cameraCoordinateConvention": (
+            "y-up;+X=east-west-eastward;+Z=south-riverfront"
+            if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
+            else "z-up;front-view-direction=+Y"
+        ),
         "cameraDistanceMultiplier": 3.0,
         "cameraOrthoScaleMultiplier": 1.45,
         "turntableElevationDegrees": 22.0,
         "lights": lights,
     }
 
-    views = [
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
-        ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
-        ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
-        ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
-        ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
-    ]
     elevation = math.radians(22.0)
-    for angle in range(0, 360, 45):
-        azimuth = math.radians(angle)
-        direction = Vector((math.cos(azimuth) * math.cos(elevation),
-                            math.sin(azimuth) * math.cos(elevation),
-                            math.sin(elevation)))
-        views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
+    if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
+        # This heritage GLB declares Y-up, +X east, +Z south.
+        # Its front camera stands south of the river-facing facade (+Z);
+        # the overhead camera is above the model (+Y).
+        views = [
+            ("front", Vector((0.0, 0.0, 1.0)), "ORTHO"),
+            ("back", Vector((0.0, 0.0, -1.0)), "ORTHO"),
+            ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
+            ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 1.0, 0.0)), "ORTHO"),
+        ]
+        for angle in range(0, 360, 45):
+            azimuth = math.radians(angle)
+            direction = Vector((math.sin(azimuth) * math.cos(elevation),
+                                math.sin(elevation),
+                                math.cos(azimuth) * math.cos(elevation)))
+            views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
+    else:
+        views = [
+            ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+            ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
+            ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
+            ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
+        ]
+        for angle in range(0, 360, 45):
+            azimuth = math.radians(angle)
+            direction = Vector((math.cos(azimuth) * math.cos(elevation),
+                                math.sin(azimuth) * math.cos(elevation),
+                                math.sin(elevation)))
+            views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
 
     raw_views = []
     for view_id, direction, camera_type in views:
@@ -245,7 +273,7 @@ def main():
         "schemaVersion": "1.0.0",
         "renderer": "Blender",
         "rendererVersion": bpy.app.version_string,
-        "renderProfile": "building-review-cycles-cpu-v1",
+        "renderProfile": render_profile,
         "renderSettings": render_settings,
         "width": resolution,
         "height": resolution,
