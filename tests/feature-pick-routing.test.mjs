@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveFeaturePickRoute } from "../src/core/map-engine/feature-pick-routing.mjs";
@@ -119,4 +120,28 @@ test("the no-match route does not mutate candidates or invoke selection callback
   assert.deepEqual(route, { kind: "none" });
   assert.deepEqual(candidate, { id: "not-selectable", label: {} });
   assert.deepEqual(calls, ["nearby", "property", "road", "building"]);
+});
+
+test("CesiumAdapter delegates layer priority to the route helper and owns side effects", async () => {
+  const adapter = await readFile(
+    new URL("../src/core/map-engine/cesium-adapter.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(adapter, /from "\.\/feature-pick-routing\.mjs"/);
+
+  const start = adapter.indexOf("private installFeaturePicking(");
+  const end = adapter.indexOf("\n  destroy(): void {", start);
+  assert.ok(start >= 0 && end > start, "feature-picking handler should be present");
+  const clickHandler = adapter.slice(start, end);
+  assert.match(clickHandler, /const route = resolveFeaturePickRoute\(/);
+  assert.match(clickHandler, /resolveNearbyPlace:/);
+  assert.match(clickHandler, /resolvePropertyListing:/);
+  assert.match(clickHandler, /resolveRoad:/);
+  assert.match(clickHandler, /resolveBuilding:/);
+  assert.match(clickHandler, /if \(route\.kind === "nearby-place"\)/);
+  assert.match(clickHandler, /if \(route\.kind === "property-listing"\)/);
+  assert.match(clickHandler, /if \(route\.kind === "road"\)/);
+  assert.match(clickHandler, /if \(route\.kind !== "building"\)/);
+  assert.match(clickHandler, /this\.clearFeatureSelection\(\)/);
+  assert.match(clickHandler, /this\.emitFeatureSelection\(/);
 });
