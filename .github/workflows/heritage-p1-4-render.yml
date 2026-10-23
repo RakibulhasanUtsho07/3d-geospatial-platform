@@ -18,7 +18,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ahsan-manzil-p1-4-${{ github.ref }}
+  group: ahsan-manzil-p1-4-render-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,10 +60,13 @@ jobs:
 
       - name: Install Blender and contact-sheet library
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y blender python3-pil python3-numpy libegl1 libgl1
+          timeout 300s sudo apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive timeout 300s sudo apt-get install -y blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
 
       - name: Render all 13 review views
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
         run: |
           npm run render:building-review -- \
             public/models/ahsan-manzil-lod3.glb \
