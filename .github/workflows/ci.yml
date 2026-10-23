@@ -151,11 +151,15 @@ jobs:
             # Avoid slow Ubuntu mirror installs of dozens of codec libraries on
             # a time-limited runner. Install a pinned static binary ephemerally;
             # do not modify package.json or package-lock.json for this CI-only tool.
-            npm install --no-save --package-lock=false ffmpeg-static@5.3.0
+            npm install --no-save --package-lock=false ffmpeg-static@5.3.0 @ffprobe-installer/ffprobe@2.1.2
             ffmpeg_path="$(node -p "require('ffmpeg-static')")"
+            ffprobe_path="$(node -p "require('@ffprobe-installer/ffprobe').path")"
             test -x "$ffmpeg_path"
+            test -x "$ffprobe_path"
             sudo ln -sf "$ffmpeg_path" /usr/local/bin/ffmpeg
+            sudo ln -sf "$ffprobe_path" /usr/local/bin/ffprobe
             ffmpeg -version | head -n 1
+            ffprobe -version | head -n 1
           fi
 
       - name: Test textured GLB exporter and embedded texture contract
