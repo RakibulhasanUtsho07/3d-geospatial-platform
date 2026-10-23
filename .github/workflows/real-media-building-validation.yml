@@ -119,7 +119,7 @@ jobs:
 
       - name: Validate analyzer syntax and run local quality-policy tests
         run: |
-          python -m py_compile validation/analyze-real-glb.py scripts/create-sparse-poisson-mesh.py
+          python -m py_compile validation/analyze-real-glb.py scripts/create-sparse-poisson-mesh.py validation/evaluate-real-validation.py validation/build-review-contact-sheet.py
           python - <<'PY'
           import open3d as o3d
           print("Open3D:", o3d.__version__)
@@ -285,6 +285,10 @@ jobs:
             --render-dir validation-output/calibrated/previews \
             --reference-length-m 125.4 --reference-depth-m 28.75 --reference-height-m 27.13 \
             --depth-tolerance-percent 20 --height-tolerance-percent 20
+          python validation/build-review-contact-sheet.py \
+            --references validation-output/reference-images \
+            --previews validation-output/calibrated/previews \
+            --output validation-output/review-contact-sheet.png
 
       - name: Summarize real-media validation result
         if: always()
@@ -292,20 +296,20 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f validation-output/dimension-comparison.json ]; then
-            python - <<'PY'
-          import json, pathlib
-          data = json.loads(pathlib.Path("validation-output/dimension-comparison.json").read_text())
-          result = data.get("dimensionComparison", {})
-          print("DIMENSION GATE:", result.get("dimensionGate", "unknown"))
-          print(json.dumps(result, indent=2))
-          if result.get("dimensionGate") != "pass":
-              print("::error title=Real media validation::Depth/vertical dimensions are outside the exploratory tolerance or the comparison report is incomplete.")
-              raise SystemExit(1)
-          else:
-              print("::notice title=Real media validation::Independent depth and vertical checks are within exploratory tolerance; visual review and WGS84 registration remain required.")
-          PY
+            if [ ! -s validation-output/calibrated/colmap-worker-report.json ]; then
+              echo "::error title=Real media validation::COLMAP worker report is missing; image-coverage gate cannot be evaluated."
+              exit 1
+            fi
+            python validation/evaluate-real-validation.py \
+              --dimensions validation-output/dimension-comparison.json \
+              --worker-report validation-output/calibrated/colmap-worker-report.json \
+              --output validation-output/overall-validation.json \
+              --minimum-registered-ratio 0.75 \
+              --minimum-registered-images 6 \
+              --minimum-view-direction-spread-degrees 20
           elif [ -f validation-output/unscaled/measurements.json ]; then
-            echo "::warning title=Real media validation::First-pass real-media candidate exists, but calibrated run/comparison did not complete. Check logs/reports."
+            echo "::error title=Real media validation::A candidate exists but calibration/dimension comparison did not complete; this run is incomplete."
+            exit 1
           else
             echo "::error title=Real media validation::No reconstruction GLB was produced. Check the first-pass log and workflow reports."
             exit 1
