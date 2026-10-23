@@ -169,4 +169,4 @@ Every PR must run:
 - COLMAP tutorial: https://colmap.github.io/tutorial.html
 - glTF 2.0 specification: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
 
-**Current stage:** Plan saved to this branch; next work item is P0.1. The plan is not a statement that fixes or tests have already passed.
+**Current stage:** P0.1 facade insert placement changes and regression tests are committed; the focused building-generation CI step passed on the current approach, while the full CI production build has not yet returned a final result. P0.2 explicit front-facade selection and fail-closed pitched-roof behavior are now implemented on the same branch and awaiting CI verification. Do not mark either work package complete until the latest full CI run passes.
