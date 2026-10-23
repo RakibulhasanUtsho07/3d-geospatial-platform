@@ -132,8 +132,8 @@ jobs:
               "Rangmahal and Andarmahal roof-height separation",
               "proportional 18.6 m triple-arch portico and stair landing",
               "16 m ceremonial stair run with 28 shallow treads",
-              "14 m octagonal drum and 6.9 m dome-base radius",
-              "profile-aligned dome mouldings and stylized column capitals"
+              "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
+              "profile-aligned dome mouldings, improved review contrast, and stylized column capitals"
             ],
             model: {
               filename: "ahsan-manzil-lod3.glb",
