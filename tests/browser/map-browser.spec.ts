@@ -49,7 +49,7 @@ const SAMPLE_ROADS = [
     layer: 0,
     bridge: false,
     tunnel: false,
-    coordinates: [[90.4057, 23.70845], [90.4060, 23.70860], [90.4063, 23.70874]],
+    coordinates: [[90.4057, 23.70845], [90.40606, 23.70860], [90.4063, 23.70874]],
   },
   {
     id: "qa-local-road",
@@ -374,9 +374,9 @@ test("selecting a building then a road clears the previous details panel", async
     { timeout: 20_000 },
   ).toBe(true);
 
-  // Bring the fixed fixture into view. The road crosses near the building's
-  // west edge, so click slightly east of the camera centre to test the roof
-  // without letting the narrow road corridor win the initial pick.
+  // Focus the fixture anchor in a repeatable north-up camera view.
+  // The test road passes through this point, so hide roads while selecting
+  // the building to make the intended first pick unambiguous.
   await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
   await page.waitForTimeout(1_250);
 
@@ -384,22 +384,29 @@ test("selecting a building then a road clears the previous details panel", async
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
+  const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
+  const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
+
+  await roads.uncheck({ noWaitAfter: true });
+  await expect(roads).not.toBeChecked();
 
   // Use absolute page coordinates so canvas-locator actionability checks do
-  // not mask an actual Cesium pointer/pick regression.
-  await page.mouse.click(box!.x + center.x + 10, box!.y + center.y);
+  // not mask an actual Cesium pointer/pick regression. The canvas centre is
+  // the shared fixture anchor for both selections.
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
   const buildingDetails = page.getByRole("complementary", { name: "Building details" });
   await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
   await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
 
-  // Hide the selected footprint to expose the road corridor beneath it.
-  // A click on that same fixture location should replace—not stack—the panel.
-  const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
+  // Hiding the selected building must clear its details panel immediately.
   await buildings.uncheck({ noWaitAfter: true });
   await expect(buildings).not.toBeChecked();
   await expect(buildingDetails).toHaveCount(0);
-  // With the building hidden, click the road's fixture centreline.
-  await page.mouse.click(box!.x + center.x - 15, box!.y + center.y);
+
+  // Restore the road layer at the same map point and pick its centreline.
+  await roads.check({ noWaitAfter: true });
+  await expect(roads).toBeChecked();
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
 
   const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
   await expect(roadDetails).toBeVisible({ timeout: 10_000 });
