@@ -196,6 +196,12 @@ test("preview and assignment reset restore selection before invalidating cached 
   const preview = adapter.slice(previewStart, previewEnd);
   assert.ok(preview.indexOf("this.restoreSelectedBuilding();") < preview.indexOf("record.visualStyle = style ?? record.baseVisualStyle;"));
   assert.ok(preview.indexOf("this.selectedBuilding = record.entity;") < preview.indexOf("this.buildingLodRenderer.applyDetailedBuildingStyle"));
+  const previewRenderEnd = preview.indexOf("viewer.scene.requestRender();");
+  assert.ok(
+    preview.indexOf("this.buildingSelectionMaterials.applySelectionHighlight(record.entity, Cesium);") > preview.indexOf("this.buildingLodRenderer.applyLightweightBuildingStyle"),
+    "preview must reapply selection highlight after refreshing the base/preview roof material",
+  );
+  assert.ok(previewRenderEnd > preview.indexOf("this.buildingSelectionMaterials.applySelectionHighlight(record.entity, Cesium);"));
 
   const assignmentStart = adapter.indexOf("setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void {");
   const assignmentEnd = adapter.indexOf("previewSelectedBuildingStyle(", assignmentStart);
