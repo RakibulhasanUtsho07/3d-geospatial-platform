@@ -49,6 +49,7 @@ on:
       - dev
       - refactor/p1-building-lod-policy
       - refactor/p1-building-lod-renderer
+      - refactor/p1-building-style-assignment-policy
       - refactor/p1-building-selection-materials
       - rakibul-hasan
       - feat/building-review-package-signatures
