@@ -49,6 +49,7 @@ import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { BuildingLodRenderer } from "./building-lod-renderer";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
+import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
@@ -2516,56 +2517,54 @@ export class CesiumAdapter implements MapEngine {
           return;
         }
 
-        const nearbySource = this.nearbyPlacesDataSource;
-        const nearbyEntity = nearbySource
-          ? this.getEntityFromPick(picked, Cesium, nearbySource)
-          : null;
+        const route = resolveFeaturePickRoute({
+          resolveNearbyPlace: () => {
+            const source = this.nearbyPlacesDataSource;
+            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+          },
+          resolvePropertyListing: () => {
+            const source = this.propertyListingsDataSource;
+            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+          },
+          resolveRoad: () => {
+            const source = this.roadNetworkDataSource;
+            const roadEntity = source ? this.getEntityFromPick(picked, Cesium, source) : null;
+            return roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
+          },
+          resolveBuilding: () => {
+            const source = this.overtureBuildings;
+            return source ? this.getEntityFromPick(picked, Cesium, source) : null;
+          },
+        });
 
-        if (nearbyEntity?.point) {
+        if (route.kind === "nearby-place") {
           this.clearFeatureSelection();
           this.emitPlaceSelection(
-            this.nearbyPlaceByEntityId.get(nearbyEntity.id) ?? null,
+            this.nearbyPlaceByEntityId.get(route.entity.id) ?? null,
           );
           return;
         }
 
-        const propertySource = this.propertyListingsDataSource;
-        const propertyEntity = propertySource
-          ? this.getEntityFromPick(picked, Cesium, propertySource)
-          : null;
-        if (propertyEntity?.point) {
+        if (route.kind === "property-listing") {
           this.clearFeatureSelection();
-          this.emitPropertySelection(this.propertyByEntityId.get(propertyEntity.id) ?? null);
+          this.emitPropertySelection(
+            this.propertyByEntityId.get(route.entity.id) ?? null,
+          );
           return;
         }
 
-        const roadSource = this.roadNetworkDataSource;
-        const roadEntity = roadSource
-          ? this.getEntityFromPick(picked, Cesium, roadSource)
-          : null;
-        const road = roadEntity ? this.roadByEntityId.get(roadEntity.id) ?? null : null;
-        if (road) {
+        if (route.kind === "road") {
           this.clearFeatureSelection();
-          this.emitRoadSelection(road);
+          this.emitRoadSelection(route.road);
           return;
         }
 
-        const dataSource = this.overtureBuildings;
-        if (!dataSource) {
+        if (route.kind !== "building") {
           this.clearFeatureSelection();
           return;
         }
 
-        const entity = this.getEntityFromPick(
-          picked,
-          Cesium,
-          dataSource,
-        );
-
-        if (!entity?.polygon) {
-          this.clearFeatureSelection();
-          return;
-        }
+        const entity = route.entity;
 
         this.restoreSelectedBuilding();
         this.emitPlaceSelection(null);
