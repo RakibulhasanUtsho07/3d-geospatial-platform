@@ -255,6 +255,9 @@ jobs:
       - name: Test building LOD decision and selection policy
         run: npm run test:building-lod-policy
 
+      - name: Test building LOD renderer ownership and delegation
+        run: npm run test:building-lod-renderer
+
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 
