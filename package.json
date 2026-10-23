@@ -28,6 +28,7 @@
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
     "test:architecture-research": "node --test tests/architecture-research.test.mjs",
     "test:road-network": "node --test tests/road-network.test.mjs",
+    "test:road-layer-manager": "node --test tests/road-layer-manager-boundary.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
     "pretest:heritage-model": "npm run build:heritage-model",
     "test:heritage-model": "node --test tests/heritage-model.test.mjs",
