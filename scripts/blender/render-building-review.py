@@ -163,11 +163,12 @@ def main():
 
     # The previous 50k cap under-lit a 126 m scene under AgX; raise key/fill
     # energy for inspection while keeping the source scale deterministic.
-    light_power = max(500.0, min(150000.0, max_dimension * max_dimension * 180.0))
-    light_size = max_dimension * 1.2
-    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    light_power = max(1500.0, min(1500000.0, max_dimension * max_dimension * 180.0))
+    light_size = max_dimension * 0.8
+    light_offset = max_dimension * 0.65
+    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.55, light_size * 1.2)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.75, light_size)
 
     views = [
         ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
