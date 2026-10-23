@@ -212,10 +212,25 @@ test("preview and assignment reset restore selection before invalidating cached 
 });
 
 test("viewport data-source replacement clears selected material state before swapping entities", () => {
-  const restore = adapter.indexOf(
-    "this.restoreSelectedBuilding();\n      this.selectedBuilding = null;\n      this.emitFeatureSelection(null);\n\n      this.overtureBuildings = dataSource;",
+  // The staging/commit transaction may be owned by the adapter directly or
+  // delegated to BuildingViewportManager through stageBuildingViewport.
+  const stageStart = adapter.indexOf("private async stageBuildingViewport(");
+  const loadStart = adapter.indexOf("private async loadOvertureBuildings(");
+  const methodStart = stageStart >= 0 ? stageStart : loadStart;
+  assert.ok(methodStart >= 0, "viewport staging implementation should exist");
+
+  const methodEnd = adapter.indexOf("\n  private getRoadViewportBounds(", methodStart);
+  assert.ok(methodEnd > methodStart, "viewport staging method boundary should exist");
+  const viewportStage = adapter.slice(methodStart, methodEnd);
+  const restore = viewportStage.indexOf("this.restoreSelectedBuilding();");
+  const clearSelection = viewportStage.indexOf("this.selectedBuilding = null;", restore);
+  const emitClear = viewportStage.indexOf("this.emitFeatureSelection(null);", clearSelection);
+  const swap = viewportStage.indexOf("this.overtureBuildings = dataSource;", emitClear);
+
+  assert.ok(
+    restore >= 0 && clearSelection > restore && emitClear > clearSelection && swap > emitClear,
+    "viewport staging must restore material, clear selection, emit the clear event, then swap datasources",
   );
-  assert.ok(restore >= 0, "viewport staging must restore selection before data-source swap");
   assert.ok(controllerSource.includes("this.originalMaterialEntity"));
   assert.doesNotMatch(controllerSource, /fetch\s*\(/);
   assert.doesNotMatch(controllerSource, /MAP_LAYER_IDS/);
