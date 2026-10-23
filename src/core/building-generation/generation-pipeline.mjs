@@ -50,7 +50,7 @@ export async function generateBuildingAsset(rawSpec, options = {}) {
   if (strategy === "photogrammetry" || autoPhotogrammetryRequested) {
     if (plan.visualReferences.approvedImageCount < 3 || !Array.isArray(selectedViews) || selectedViews.length < 3) {
       throw new TypeError(
-        "photogrammetry requires at least three selected, approved image/video-frame sources with known licences; source planner route is "
+        "photogrammetry strategy requires at least three selected, approved image/video-frame sources with known licences; source planner route is "
         + plan.sourceRoute
       );
     }
