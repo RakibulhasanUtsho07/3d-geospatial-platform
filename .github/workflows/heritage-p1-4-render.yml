@@ -134,7 +134,8 @@ jobs:
               "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
               "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
               "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
-              "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses"
+              "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
+              "lower 8-degree south-elevation review camera so the flat roof deck no longer dominates the facade-detail view"
             ],
             model: {
               filename: "ahsan-manzil-lod3.glb",
@@ -166,6 +167,7 @@ jobs:
                 "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
                 "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
                 "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
+                "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
                 "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
               ],
               residualRisks: [
