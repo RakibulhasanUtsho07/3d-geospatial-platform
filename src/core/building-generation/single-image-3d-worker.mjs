@@ -151,15 +151,15 @@ export async function runSingleImage3D(options){
     "if missing:",
     "  print('Missing TripoSR runtime module(s): '+', '.join(missing),file=sys.stderr)",
     "  sys.exit(2)"
-   ].join("\\n");
+   ].join("\n");
    report.executionEvidence.dependencyPreflight.status="running";
-   await writeFile(reportPath,JSON.stringify(report,null,2)+"\\n");
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
    try{
     const preflight=await processRun(pythonPath,["-c",preflightCode],path.dirname(runner.path),Math.min(timeoutMs,30000));
-    const details=JSON.parse(preflight.stdout.trim().split(/\\r?\\n/).at(-1));
+    const details=JSON.parse(preflight.stdout.trim().split(/\r?\n/).at(-1));
     report.executionEvidence.dependencyPreflight={status:"passed",executable:pythonPath,checks:["python executable","torch module","tsr module"],pythonVersion:details.pythonVersion,pythonExecutable:details.pythonExecutable,modules:details.modules,completedAt:new Date().toISOString()};
     report.executionEvidence.workerVersion="Python "+details.pythonVersion+"; TripoSR code revision not pinned";
-    await writeFile(reportPath,JSON.stringify(report,null,2)+"\\n");
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
    }catch(preflightError){
     report.executionEvidence.dependencyPreflight={status:"failed",executable:pythonPath,checks:["python executable","torch module","tsr module"],failureMessage:preflightError instanceof Error?preflightError.message:String(preflightError),completedAt:new Date().toISOString()};
     throw new Error("TripoSR runtime preflight failed: "+report.executionEvidence.dependencyPreflight.failureMessage);
