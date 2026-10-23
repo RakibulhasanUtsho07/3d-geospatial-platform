@@ -339,15 +339,46 @@ test("fixture building and roads pass through Cesium geometry staging with expec
 test("selecting a building then a road clears the previous details panel", async ({ page }) => {
   test.setTimeout(60_000);
   const observed = await stubMapNetwork(page);
+  const staged: {
+    buildings: Array<{ returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number }>;
+    roads: Array<{ returnedWays?: number; renderedWays?: number }>;
+  } = { buildings: [], roads: [] };
+
+  // A request reaching the fixture is not enough: wait until Cesium has staged
+  // the actual pickable building and road entities before driving the camera.
+  page.on("console", (message) => {
+    const args = message.args();
+    void Promise.all(args.map((arg) => arg.jsonValue().catch(() => null))).then((values) => {
+      if (values[0] === "[Overture] Building viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.buildings.push(values[1] as typeof staged.buildings[number]);
+      }
+      if (values[0] === "[Roads] Vector road viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.roads.push(values[1] as typeof staged.roads[number]);
+      }
+    });
+  });
+
   await openReadyMap(page);
   await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(
+    () => staged.buildings.some((summary) =>
+      summary.returnedFeatures === 1 &&
+      summary.renderedBuildings === 1 &&
+      summary.renderedExtrusions === 1
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+  await expect.poll(
+    () => staged.roads.some((summary) => summary.returnedWays === 4 && summary.renderedWays === 4),
+    { timeout: 20_000 },
+  ).toBe(true);
 
-  // Center the test fixture in the viewport so canvas clicks are deterministic.
-  // Regression: the top-down control must remain directly clickable even
-  // when the generated-model launcher is visible near the bottom-right corner.
+  // Center the staged fixtures in the viewport so clicks target rendered geometry.
+  // This direct pointer click also guards against the floating launcher covering
+  // the camera control on short CI viewports.
   await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
-  await page.waitForTimeout(1_000);
+  await page.waitForTimeout(1_250);
 
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   const box = await canvas.boundingBox();
