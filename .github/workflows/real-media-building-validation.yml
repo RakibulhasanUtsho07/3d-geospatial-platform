@@ -45,34 +45,23 @@ jobs:
           printf '%s\n' "$WORKSPACE" > validation-output/workspace-path.txt
           cat > validation-output/reference-image-attribution.txt <<'ATTRIBUTION'
           Building: Ahsan Manzil (Pink Palace), Dhaka, Bangladesh
-          Ahsan_Manzil_003.jpg through Ahsan_Manzil_006.jpg:
-            Creator: Ranadipam Basu; License: CC BY-SA 3.0
-            License URL: https://creativecommons.org/licenses/by-sa/3.0/
-            Pages: https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg
-                   https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg
-                   https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg
-                   https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg
-          Ahsan_Manzil_Side_View.jpg:
-            Creator: Parvezahmed; License: CC BY-SA 4.0
-            License URL: https://creativecommons.org/licenses/by-sa/4.0/
-            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg
-          Ahsan_Manzil_(side).jpg:
-            Creator: Mrpluto11; License: CC BY-SA 4.0
-            License URL: https://creativecommons.org/licenses/by-sa/4.0/
-            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg
-          Ahasan_Manzil_east_side_building.jpg:
-            Creator: Farhan alvee; License: CC BY-SA 4.0
-            Page: https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg
-          Ahasan_Manzil_east_side_corner_view.jpg:
-            Creator: Farhan alvee; License: CC BY-SA 4.0
-            Page: https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg
-          Ahsan_Manjeel_2023.jpg:
-            Creator: Md Joni Hossain; License: CC BY-SA 4.0
-            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg
-          Ahsan_Manjil_Angled_view.jpg:
-            Creator: Samiha Ahmed Rafa; License: CC BY-SA 4.0
-            Page: https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg
-          This artifact preserves the source originals and per-image attribution for this validation run.
+          Same-photographer controlled view set: Ahsan Manzil view 02–07.jpg
+          Photographer: Saeed Ahmad; Date: 30 September 2016 (Commons metadata)
+          License: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
+          License URL: https://creativecommons.org/licenses/by-sa/4.0/
+          Source pages:
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_02.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_03.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_04.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_05.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_06.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_07.jpg
+          View coverage observed from thumbnails:
+          view 02 and 06: dome/tower-focused; view 03 and 07: broad front/corner views;
+          view 04: long side-wing; view 05: broad facade with oblique angle.
+          Commons reports the same camera-location coordinate for all six images. This is
+          not treated as surveyed camera-pose evidence or a reliable translation baseline.
+          The set consists of still photographs, not a continuous walk-around sequence.
           ATTRIBUTION
           while IFS='|' read -r source_id filename; do
             [ -n "$source_id" ] || continue
@@ -83,16 +72,12 @@ jobs:
             test -s "$WORKSPACE/uploads/$filename"
             cp "$WORKSPACE/uploads/$filename" "validation-output/reference-images/$filename"
           done <<'FILES'
-          ahsan003|Ahsan_Manzil_003.jpg
-          ahsan004|Ahsan_Manzil_004.jpg
-          ahsan005|Ahsan_Manzil_005.jpg
-          ahsan006|Ahsan_Manzil_006.jpg
-          ahsan007|Ahsan_Manzil_Side_View.jpg
-          ahsan008|Ahsan_Manzil_(side).jpg
-          ahsan009|Ahasan_Manzil_east_side_building.jpg
-          ahsan010|Ahasan_Manzil_east_side_corner_view.jpg
-          ahsan011|Ahsan_Manjeel_2023.jpg
-          ahsan012|Ahsan_Manjil_Angled_view.jpg
+          saeed02|Ahsan_Manzil_view_02.jpg
+          saeed03|Ahsan_Manzil_view_03.jpg
+          saeed04|Ahsan_Manzil_view_04.jpg
+          saeed05|Ahsan_Manzil_view_05.jpg
+          saeed06|Ahsan_Manzil_view_06.jpg
+          saeed07|Ahsan_Manzil_view_07.jpg
           FILES
           sha256sum "$WORKSPACE"/uploads/*.jpg > validation-output/reference-image-sha256.txt
           python - <<'PY'
@@ -137,66 +122,48 @@ jobs:
           WORKSPACE="$(cat validation-output/workspace-path.txt)"
           # COLMAP's Qt-linked binary otherwise attempts to connect to X11 on headless runners.
           export QT_QPA_PLATFORM=offscreen
-          # The all-image and six-view runs found no good initial pair.
-          # Use only the four strongly-overlapping front views for a facade-only pipeline control.
+          # Controlled follow-up: use six same-photographer CC BY-SA 4.0 views.
+          # They cover front, oblique corner, long wing and dome details, but are not
+          # a continuous walk-around sequence; pose spread and dimensional gates remain mandatory.
           npm run build:building-from-media -- "$WORKSPACE" validation/ahsan-manzil-building-spec.json ahsan-unscaled \
-            --source "ahsan003=uploads/Ahsan_Manzil_003.jpg" \
-            --source "ahsan004=uploads/Ahsan_Manzil_004.jpg" \
-            --source "ahsan005=uploads/Ahsan_Manzil_005.jpg" \
-            --source "ahsan006=uploads/Ahsan_Manzil_006.jpg" \
-            --source "ahsan007=uploads/Ahsan_Manzil_Side_View.jpg" \
-            --source "ahsan008=uploads/Ahsan_Manzil_(side).jpg" \
-            --source "ahsan009=uploads/Ahasan_Manzil_east_side_building.jpg" \
-            --source "ahsan010=uploads/Ahasan_Manzil_east_side_corner_view.jpg" \
-            --source "ahsan011=uploads/Ahsan_Manjeel_2023.jpg" \
-            --source "ahsan012=uploads/Ahsan_Manjil_Angled_view.jpg" \
-            --licence "ahsan003=CC BY-SA 3.0" \
-            --licence "ahsan004=CC BY-SA 3.0" \
-            --licence "ahsan005=CC BY-SA 3.0" \
-            --licence "ahsan006=CC BY-SA 3.0" \
-            --licence "ahsan007=CC BY-SA 4.0" \
-            --licence "ahsan008=CC BY-SA 4.0" \
-            --licence "ahsan009=CC BY-SA 4.0" \
-            --licence "ahsan010=CC BY-SA 4.0" \
-            --licence "ahsan011=CC BY-SA 4.0" \
-            --licence "ahsan012=CC BY-SA 4.0" \
-            --author "ahsan003=Ranadipam Basu" \
-            --author "ahsan004=Ranadipam Basu" \
-            --author "ahsan005=Ranadipam Basu" \
-            --author "ahsan006=Ranadipam Basu" \
-            --author "ahsan007=Parvezahmed" \
-            --author "ahsan008=Mrpluto11" \
-            --author "ahsan009=Farhan alvee" \
-            --author "ahsan010=Farhan alvee" \
-            --author "ahsan011=Md Joni Hossain" \
-            --author "ahsan012=Samiha Ahmed Rafa" \
-            --attribution "ahsan003=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan004=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan005=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan006=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan007=Parvezahmed, CC BY-SA 4.0" \
-            --attribution "ahsan008=Mrpluto11, CC BY-SA 4.0" \
-            --attribution "ahsan009=Farhan alvee, CC BY-SA 4.0" \
-            --attribution "ahsan010=Farhan alvee, CC BY-SA 4.0" \
-            --attribution "ahsan011=Md Joni Hossain, CC BY-SA 4.0" \
-            --attribution "ahsan012=Samiha Ahmed Rafa, CC BY-SA 4.0" \
-            --source-url "ahsan003=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg" \
-            --source-url "ahsan004=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg" \
-            --source-url "ahsan005=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg" \
-            --source-url "ahsan006=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg" \
-            --source-url "ahsan007=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg" \
-            --source-url "ahsan008=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg" \
-            --source-url "ahsan009=https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg" \
-            --source-url "ahsan010=https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg" \
-            --source-url "ahsan011=https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg" \
-            --source-url "ahsan012=https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg" \
-            --kind "ahsan003=image" --kind "ahsan004=image" \
-            --kind "ahsan005=image" --kind "ahsan006=image" \
-            --kind "ahsan007=image" --kind "ahsan008=image" \
-            --kind "ahsan009=image" --kind "ahsan010=image" \
-            --kind "ahsan011=image" --kind "ahsan012=image" \
+            --source "saeed02=uploads/Ahsan_Manzil_view_02.jpg" \
+            --source "saeed03=uploads/Ahsan_Manzil_view_03.jpg" \
+            --source "saeed04=uploads/Ahsan_Manzil_view_04.jpg" \
+            --source "saeed05=uploads/Ahsan_Manzil_view_05.jpg" \
+            --source "saeed06=uploads/Ahsan_Manzil_view_06.jpg" \
+            --source "saeed07=uploads/Ahsan_Manzil_view_07.jpg" \
+            --licence "saeed02=CC BY-SA 4.0" \
+            --licence "saeed03=CC BY-SA 4.0" \
+            --licence "saeed04=CC BY-SA 4.0" \
+            --licence "saeed05=CC BY-SA 4.0" \
+            --licence "saeed06=CC BY-SA 4.0" \
+            --licence "saeed07=CC BY-SA 4.0" \
+            --author "saeed02=Saeed Ahmad" \
+            --author "saeed03=Saeed Ahmad" \
+            --author "saeed04=Saeed Ahmad" \
+            --author "saeed05=Saeed Ahmad" \
+            --author "saeed06=Saeed Ahmad" \
+            --author "saeed07=Saeed Ahmad" \
+            --attribution "saeed02=Saeed Ahmad, CC BY-SA 4.0" \
+            --attribution "saeed03=Saeed Ahmad, CC BY-SA 4.0" \
+            --attribution "saeed04=Saeed Ahmad, CC BY-SA 4.0" \
+            --attribution "saeed05=Saeed Ahmad, CC BY-SA 4.0" \
+            --attribution "saeed06=Saeed Ahmad, CC BY-SA 4.0" \
+            --attribution "saeed07=Saeed Ahmad, CC BY-SA 4.0" \
+            --source-url "saeed02=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_02.jpg" \
+            --source-url "saeed03=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_03.jpg" \
+            --source-url "saeed04=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_04.jpg" \
+            --source-url "saeed05=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_05.jpg" \
+            --source-url "saeed06=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_06.jpg" \
+            --source-url "saeed07=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_07.jpg" \
+            --kind "saeed02=image" \
+            --kind "saeed03=image" \
+            --kind "saeed04=image" \
+            --kind "saeed05=image" \
+            --kind "saeed06=image" \
+            --kind "saeed07=image" \
             --confirm-rights --strategy photogrammetry \
-            --views "ahsan003,ahsan004,ahsan005,ahsan006" \
+            --views "saeed02,saeed03,saeed04,saeed05,saeed06,saeed07" \
             --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
             --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
             2>&1 | tee validation-output/logs/first-pass.log
