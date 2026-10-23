@@ -4,7 +4,7 @@ import { copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFil
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
-import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
+import { convertPlyToUntexturedGlb, convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
@@ -270,13 +270,27 @@ export async function runColmapReconstruction(options){
    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   }
   const texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
-  const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
   const texturedMesh=path.join(texturedDir,"mesh.ply"),texturePath=path.join(texturedDir,"texture.png");
-  if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
-  const modelPath=path.join(outputJobDir,"model.glb"),converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
+  const textureStart=Date.now();let converted=null,textureStatus="textured";
+  try{
+   await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);
+   if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
+   converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
+  }catch(textureError){
+   if(options.allowSparseMeshFallback!==true||report.geometryStrategy!=="experimental-sparse-poisson-fallback")throw textureError;
+   // Old distro COLMAP releases do not ship the mesh_texturer command. Preserve the
+   // actual photogrammetry-derived geometry as a neutral-material GLB rather than
+   // pretending that the original photographs were baked into a texture atlas.
+   converted=await convertPlyToUntexturedGlb({plyPath:inputMesh,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
+   textureStatus="not-available";
+   report.warnings.push("Texture baking unavailable in this COLMAP build; the output GLB has a neutral material and must be visually compared as a silhouette only. Reference-photo texture accuracy was not validated.");
+   report.textureFailure=textureError instanceof Error?textureError.message:String(textureError);
+  }
+  report.timingsMs.texturing=Date.now()-textureStart;report.textureStatus=textureStatus;
+  const modelPath=path.join(outputJobDir,"model.glb");
   await writeFile(modelPath,converted.glb,{flag:"wx",mode:0o600});
   const glbSha256=createHash("sha256").update(converted.glb).digest("hex"),modelQuality=analyzeGlbQuality(converted.glb);
-  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");if(report.geometryStrategy==="experimental-sparse-poisson-fallback")report.warnings.push("This GLB was generated from sparse points with experimental Poisson filling; it is not a dense photogrammetry mesh and must not be published without independent review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
+  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");if(report.geometryStrategy==="experimental-sparse-poisson-fallback")report.warnings.push("This GLB was generated from sparse points with experimental Poisson filling; it is not a dense photogrammetry mesh and must not be published without independent review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},sourceMesh:{relativePath:path.relative(root,inputMesh).split(path.sep).join("/")},...(textureStatus==="textured"?{texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")}}:{}),geometry:converted.geometry,bounds:converted.bounds};
   report.warnings.push("Photogrammetry was run, but this worker does not compute ground-control-point registration to WGS84; the BuildingSpec location is a placement hint only.");
   report.warnings.push("Human review is required for scale, vertical axis, front-facing heading, mesh completeness, texture seams, occlusion and same-building identity.");
   if(!calibration.scaleCalibrated)report.warnings.push("No real-world scale was supplied; 1 model unit was provisionally treated as 1 metre for preview only.");
