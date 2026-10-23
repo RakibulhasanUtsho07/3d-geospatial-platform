@@ -334,3 +334,42 @@ test("fixture building and roads pass through Cesium geometry staging with expec
     { timeout: 20_000 },
   ).toBe(true);
 });
+
+
+test("selecting a building then a road clears the previous details panel", async ({ page }) => {
+  const observed = await stubMapNetwork(page);
+  await openReadyMap(page);
+  await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  // Center the test fixture in the viewport so canvas clicks are deterministic.
+  await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
+  await page.waitForTimeout(1_000);
+
+  const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const center = { x: box!.width / 2, y: box!.height / 2 };
+
+  // The fixture footprint is centered on the map's provisional Ahsan Manzil
+  // anchor; in top-down mode the centre pixel should select its roof.
+  await canvas.click({ position: center });
+  const buildingDetails = page.getByRole("complementary", { name: "Building details" });
+  await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
+  await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
+
+  // Hide the selected footprint to expose the road corridor beneath it.
+  // A click on that same fixture location should replace—not stack—the panel.
+  const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
+  await buildings.uncheck({ noWaitAfter: true });
+  await expect(buildings).not.toBeChecked();
+  await canvas.click({ position: center });
+
+  const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
+  await expect(roadDetails).toBeVisible({ timeout: 10_000 });
+  await expect(roadDetails.getByRole("heading", { name: "QA Main Road" })).toBeVisible();
+  await expect(buildingDetails).toHaveCount(0);
+
+  await roadDetails.getByRole("button", { name: "Close road details" }).click();
+  await expect(roadDetails).toHaveCount(0);
+});
