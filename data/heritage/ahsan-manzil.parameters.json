@@ -391,11 +391,11 @@
         "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 26,
+        "value": 39,
         "unit": "m",
         "confidence": "[E]",
         "source": "Approximate base-to-frontage ratio from the south-elevation reference image",
-        "note": "The south-elevation reference image suggests a base width of roughly 46% of the 55.8 m provisional facade (~26 m); visual estimate only until rectified imagery or survey."
+        "note": "The published front exterior image shows a broad flared stair base occupying roughly two-thirds to three-quarters of the 55.8 m Rangmahal frontage. Working width is 39 m (~70%); estimate only until photo rectification or survey."
       },
       "sideRail": {
         "value": "simple low side rails",
