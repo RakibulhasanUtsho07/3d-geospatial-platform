@@ -348,11 +348,12 @@ jobs:
         run: npm run test:ahsan-manzil-review-integration
 
       - name: Upload Ahsan Manzil reference/render review bundle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ahsan-manzil-review-evidence
           path: artifacts/ahsan-manzil-review
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Build Overture spatial tiles
