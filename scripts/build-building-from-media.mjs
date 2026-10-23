@@ -19,6 +19,7 @@ const {values,positionals}=parseArgs({
   "confirm-up-axis-reviewed":{type:"boolean",default:false},
   "up-axis":{type:"string"}, "model-distance":{type:"string"}, "real-distance-m":{type:"string"},
   quality:{type:"string",default:"MEDIUM"}, "colmap-path":{type:"string"},
+  "colmap-use-gpu":{type:"boolean",default:false},
   "runner-script":{type:"string"}, python:{type:"string"}, device:{type:"string",default:"cuda:0"},
   resolution:{type:"string",default:"256"}, model:{type:"string",default:"stabilityai/TripoSR"},
   fps:{type:"string",default:"0.5"}, "max-frames":{type:"string",default:"60"},
@@ -33,7 +34,7 @@ const {values,positionals}=parseArgs({
  }
 });
 function usage(){
- console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --control-points <gcp.json> --max-gcp-rms-m 0.5 --max-gcp-residual-m 1.0\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable>\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
+ console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --control-points <gcp.json> --max-gcp-rms-m 0.5 --max-gcp-residual-m 1.0\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable> --colmap-use-gpu (explicit opt-in; default is CPU for headless safety)\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
 }
 function asList(value){return value===undefined?[]:Array.isArray(value)?value:[value];}
 function parsePairs(raw,label){
@@ -87,6 +88,7 @@ try{
   mcResolution:numeric(values.resolution,"--resolution"),pretrainedModelNameOrPath:values.model,
   fps:numeric(values.fps,"--fps"),maxFrames:numeric(values["max-frames"],"--max-frames"),
   maxWidth:numeric(values["frame-width"],"--frame-width"),ffmpegPath:values.ffmpeg,
+  colmapUseGpu:values["colmap-use-gpu"]===true,
   frameTimeoutMs:numeric(values["frame-timeout-ms"],"--frame-timeout-ms"),
   reconstructionTimeoutMs:numeric(values["reconstruction-timeout-ms"],"--reconstruction-timeout-ms"),
   singleImageTimeoutMs:numeric(values["ai-timeout-ms"],"--ai-timeout-ms"),
