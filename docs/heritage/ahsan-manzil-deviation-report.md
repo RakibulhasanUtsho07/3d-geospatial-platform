@@ -21,11 +21,11 @@ Build assets with `npm run build:heritage-model`. All models include nodes `Plin
 
 - GLB units are meters, Y is up, X is the approximate east-west long axis, and +Z is the south/river-front side. Natural ground is Y=0; plinth top is Y=1.0 m.
 - The provisional anchor is 23.7086, 90.40606 [C]; it is not yet proven to be the traced footprint centroid.
-- The initial map view and Home control focus the main river-facing Rangmahal. **Top view** is a north-up whole-footprint view, and **360° tour** starts a slow guided orbit from the south facade. Manual rotation controls return to a low oblique inspection angle.
+- The initial map view and Home control focus the main river-facing Rangmahal. **Top view** is a north-up whole-footprint view, and **360° tour** starts a slow guided orbit from the south facade. The deterministic Blender front-review camera uses an approximately 8° elevation to prioritize the facade; the 12 other review views retain the whole-model and angled coverage. Manual rotation controls return to a low oblique inspection angle.
 - The model uses the 183 ft (55.8 m) working Rangmahal frontage [C] and derives the adjoining west Andarmahal length as 69.6 m [E] so the full reported east-west extent is 125.4 m. Andarmahal is provisionally set back to the north by 14.375 m in a stepped/L-shaped footprint [E]. This is a reconciliation hypothesis, not a traced survey footprint.
 - The dome, upper portal and broad staircase share the centreline of the 55.8 m Rangmahal front. The overall-footprint camera origin remains at the provisional extents centre; the front camera has a separate 34.8 m eastward view offset [E] and does not change the georeferenced building anchor.
 - The exposed Rangmahal west end is modelled only where it is visible beside the rear-set Andarmahal; short-end walls and the north/south parapets follow the stepped plan rather than occupying the same volume twice.
-- LOD3 includes recessed arches/pilasters, timber-and-glass portal door, upper louvered end windows, small upper-arch balustrades, central balcony/oculus/pinnacles, an eight-sided open drum, stair cheek rails/lamp posts, and the salmon-pink palette. The precise historical mouldings, glazing pattern, colours, and bay counts remain [E]/[?].
+- LOD3 includes recessed arches/pilasters, arch keystones and impost blocks, timber-and-glass portal door, upper louvered end windows, small upper-arch balustrades, central balcony/oculus/pinnacles, an eight-sided open drum, profile-following dome meridian ribs, stair cheek rails/lamp posts, and the salmon-pink palette. The review lighting has also been rebalanced to preserve facade colour and recessed-opening contrast. A second visual pass raises the first-floor arch crown to 5.3 m (an estimate) so it terminates closer to the cornice. The precise historical mouldings, glazing pattern, colours, and bay counts remain [E]/[?]. P1.4's close render review also found that the original stair generator stacked cumulative-height blocks, hiding the treads behind a continuous ramp face. The stair generator now emits one riser-height block per step with discrete tread nosing; the corrected 28-step assembly is included in the refreshed 13-view hash set. The older Andarmahal's floor-height stack uses a provisional 0.94 scale (about 0.65 m lower at the roof deck) to separate its roofline from Rangmahal; this is an estimate, not a surveyed dimension.
 - The central portico continues through the upper storey with a second triple-arched loggia and a triangular pediment above it; the pediment peak is parameterized at 15.2 m [E] pending a rectified facade.
 - Camera presets are intentionally split: Front frames the south-facing Rangmahal; Full model and every manual orbit step frame the complete stepped footprint; Top view shows the north-up plan; the guided 360° tour revolves around the footprint centre at a 205 m range. The tour pauses on direct pointer, touch, or wheel input so users can take control.
 - LOD model loading/unloading uses camera distance and camera altitude thresholds [E] to avoid loading detailed geometry when the view is in Bagerhat or far from Old Dhaka.
@@ -66,15 +66,15 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | vertical.rooflineHeight | [E] | 13.6 m | Calculated vertical stack including slabs and parapet | Derived, not surveyed. |
 | vertical.porticoHeight | [V] | 5 m | Bangladesh Tourism Board |  |
 | facade.openingsHead | [V] | semicircular arches | Supplied brief |  |
-| facade.gfOpeningWidth | [E] | 1.2 m | Supplied brief |  |
-| facade.gfOpeningCrownHeight | [E] | 3.2 m | Supplied brief |  |
-| facade.ffOpeningWidth | [E] | 1.3 m | Supplied brief |  |
-| facade.ffOpeningCrownHeight | [E] | 3.8 m | Supplied brief |  |
+| facade.gfOpeningWidth | [E] | 1.65 m | Published south-elevation photo visual refinement | Widened from the early placeholder to improve the arched-opening-to-pier ratio; verify from a rectified facade. |
+| facade.gfOpeningCrownHeight | [E] | 3.8 m | Published south-elevation photo visual refinement | Raised to reduce excessive blank spandrel wall; estimate until a rectified elevation is available. |
+| facade.ffOpeningWidth | [E] | 2.0 m | Second visual-refinement pass against published south-elevation photographs | Slightly widened in tandem with the higher crown to improve the upper arcade proportions; verify from a rectified facade. |
+| facade.ffOpeningCrownHeight | [E] | 5.3 m | Second visual-refinement pass against published south-elevation photographs | Arch crown now sits about 0.5 m below the 5.8 m first-floor clear-storey top, reducing the excessive blank spandrel seen in review; still requires rectified-elevation validation. |
 | facade.verandaArchSpan | [E] | 3.3 m | Midpoint of supplied 3.0–3.5 m range |  |
 | facade.pilasterOrder | [V] | simplified Corinthian-type | Supplied brief | Fine capital and fluting geometry simplified. |
 | facade.capitalFluting | [?] | smooth simplified capital | Placeholder; needs close-up |  |
 | facade.coloredGlazing | [?] | dark rose/amber panels with simple mullions | Placeholder; exact pattern unknown |  |
-| facade.porticoWidth | [E] | 16.5 m | Single south-elevation reference image, ±20% estimate | Working width for the projecting central three-arch pavilion; recalibrate against a straight-on facade. |
+| facade.porticoWidth | [E] | 18.6 m | 15-bay Rangmahal frontage estimate: 55.8 m / 15 = 3.72 m bay pitch | Five estimated bay pitches align the central triple-arch pavilion with the openings it replaces; verify from a rectified south elevation. |
 | facade.porticoDepth | [E] | 4 m | Procedural placeholder until footprint/photo calibration | Projection depth of the central portico. | 
 | facade.balustradeHeight | [E] | 0.9 m | Visible upper-veranda guardrail proportion in exterior photographs | Approximate guardrail height above veranda floor. |
 | facade.balusterSpacing | [E] | 0.85 m | Procedural rendering parameter | Approximate post interval; replace after elevation/photo calibration. |
@@ -83,13 +83,13 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | facade.doorBayInterval | [E] | 4 bays | Procedural modeling default until a rectified facade image is counted | Every fourth exterior bay is treated as a glazed door in LOD2/LOD3; actual count and placement require photo calibration. |
 | facade.stoneInlayBandWidth | [?] | 0.08 m | Procedural placeholder for the stone inlay described in the heritage brief | Band width and exact stone pattern are unknown; replace after close-up door photographs. |
 | facade.doorGlazingPattern | [?] | simple multi-panel colored glazing with vertical center stile | Placeholder derived from documented colored-glass doors | Do not treat panel count/color pattern as verified. |
-| stair.riserHeight | [E] | 0.23 m | Single reference photo estimate, ±20% | 28 risers produce about 6.44 m rise to the upper portal. |
-| stair.treadDepth | [E] | 0.57 m | 16 m total run / 28 steps | Working tread depth; the top step is aligned to the upper portal threshold. |
+| stair.riserHeight | [E] | 0.2286 m | 6.4 m upper portal datum / 28 estimated risers | Twenty-eight estimated risers align with the 6.4 m upper portal datum; verify the actual step count from a straight-on photograph. |
+| stair.treadDepth | [E] | 0.5714 m | 16.0 m horizontal run / 28 estimated steps | Restores the broad ceremonial run; the previous 0.34 m tread / 9.52 m run compressed the stair. Verify against measured plan imagery. |
 | stair.stepCount | [E] | 28 steps | Single front reference photo estimate (25–30 steps) | Count from a straight-on photograph to replace this estimate. |
-| stair.width | [E] | 16.5 m | Single front reference photo estimate | Width at the garden-facing base. |
+| stair.width | [E] | 39.0 m | Visual ratio from published south/front exterior photograph against the 55.8 m provisional Rangmahal frontage | The broad ceremonial stair base is estimated at about 70% of the frontage; the previous 26 m/46% version looked too narrow in the rendered comparison. Confirm from a rectified elevation or measured plan. |
 | stair.sideRail | [?] | simple low side rails | Stylized placeholder |  |
 | stair.runLength | [E] | 16 m | Single front reference photo estimate | Horizontal garden run toward the river; not site-surveyed. |
-| stair.topWidth | [E] | 13.5 m | Single front reference photo estimate | Tapered clear width at the upper portal. |
+| stair.topWidth | [E] | 18.6 m | Aligned to the provisional triple-arched portico width | The top landing aligns to the central portico and tapers from the broad base; verify from rectified elevation. |
 | dome.peakHeight | [V] | 27.13 m above ground | Bangladesh Tourism Board heritage newsletter |  |
 | dome.drumHeight | [E] | 5 m | Supplied placeholder |  |
 | dome.bodyHeight | [E] | 6.53 m | Derived to meet 27.13 m peak with 13.6 m roofline and 2 m finial |  |
@@ -99,7 +99,7 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | dome.drumOpeningCount | [E] | 8 open bays around octagonal drum | Reference-image interpretation of an open/fenestrated drum | One open arch per octagonal face is a procedural reconstruction; verify from oblique and elevation photographs. |
 | dome.drumOpeningWidth | [E] | 2.7 m | Single reference photo estimate for open colonnade bays | Wider openings deliberately read as a colonnade rather than small glazed windows. |
 | dome.drumOpeningCrownHeight | [E] | 2.8 m | Single reference photo estimate | Opening crown within the 5 m drum; measure from a rectified elevation. |
-| dome.profileRings | [E] | [[6.9,0],[6.7,0.35],[6.1,1.1],[5.4,2],[4.55,2.9],[3.55,3.8],[2.55,4.65],[1.55,5.45],[0.28,6.53]] [radius_m, height_above_dome_base_m] pairs | Procedural lotus-bud profile constrained to the 27.13 m peak | Control points are illustrative; replace with samples from a rectified elevation photo. |
+| dome.profileRings | [E] | [[6.9,0],[6.89,0.35],[6.8,1.1],[6.57,2],[6.18,2.9],[5.61,3.8],[4.89,4.65],[3.8,5.45],[0.28,6.53]] [radius_m, height_above_dome_base_m] pairs | Fuller oval/lotus-bud profile constrained by 14 m drum and the 27.13 m peak | Mid-body radii were enlarged because the first render review showed a visibly conical taper; the rounded curvature remains an estimate pending a rectified elevation. |
 | materials.facadePink | [E] | #E1917D | User-supplied daylight photo estimate | Warm salmon pink; final colour still needs a calibrated daylight sample. |
 | materials.trimOffWhite | [E] | #E99C8A | User-supplied daylight photo estimate | Trim intentionally stays in the same pink family; the old off-white trim was incorrect. |
 | materials.glass | [?] | #583943 | Generic dark glazing proxy |  |

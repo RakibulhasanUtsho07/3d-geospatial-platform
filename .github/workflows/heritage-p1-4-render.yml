@@ -1,0 +1,215 @@
+name: Ahsan Manzil P1.4 geometry and render review
+
+on:
+  push:
+    branches:
+      - feat/ahsan-manzil-p1-4
+    paths:
+      - 'data/heritage/ahsan-manzil.parameters.json'
+      - 'scripts/build-ahsan-manzil-model.mjs'
+      - 'scripts/blender/render-building-review.py'
+      - 'docs/BLENDER-RENDER-REVIEW.md'
+      - 'tests/heritage-model.test.mjs'
+      - 'docs/heritage/ahsan-manzil-deviation-report.md'
+      - '.github/workflows/heritage-p1-4-render.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ahsan-manzil-p1-4-v5-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-review:
+    name: Build corrected GLB, QA and render 13 views
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out correction branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Build corrected LOD models
+        run: npm run build:heritage-model
+
+      - name: Run model and GLB quality tests
+        run: |
+          npm run test:heritage-model
+          npm run test:glb-geometry-qa
+          npm run test:glb-texture-binding-qa
+
+      - name: Create QA reports for the exact candidate model
+        run: |
+          mkdir -p artifacts/p1-4-qa
+          node scripts/create-render-correction-qa-evidence.mjs \
+            public/models/ahsan-manzil-lod3.glb \
+            artifacts/p1-4-qa/geometry-qa-report.json \
+            artifacts/p1-4-qa/texture-qa-report.json
+
+      - name: Install Blender and contact-sheet library
+        run: |
+          timeout 60s sudo apt-get update -qq || echo 'Proceeding with the runner package index if update times out.'
+          DEBIAN_FRONTEND=noninteractive timeout 900s sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
+      - name: Render all 13 review views
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          npm run render:building-review -- \
+            public/models/ahsan-manzil-lod3.glb \
+            artifacts/p1-4-render-set \
+            --resolution=1024 --blender=blender
+          cp artifacts/p1-4-qa/geometry-qa-report.json artifacts/p1-4-render-set/
+          cp artifacts/p1-4-qa/texture-qa-report.json artifacts/p1-4-render-set/
+
+      - name: Build labeled contact sheet
+        run: |
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          root = Path("artifacts/p1-4-render-set")
+          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
+          thumb, label_h, cols = 256, 28, 4
+          rows = (len(views) + cols - 1) // cols
+          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 238, 232))
+          draw = ImageDraw.Draw(sheet)
+          for i, view_id in enumerate(views):
+              with Image.open(root / (view_id + ".png")) as source:
+                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
+              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
+              sheet.paste(image, (x, y))
+              draw.text((x + 8, y + thumb + 6), view_id, fill=(30, 30, 30))
+          sheet.save(root / "contact-sheet.png", optimize=True)
+          PY
+
+      - name: Record exact GLB, QA and render hashes
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile, writeFile } from "node:fs/promises";
+          import path from "node:path";
+          const out = "artifacts/p1-4-render-set";
+          const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          const manifestBytes = await readFile(path.join(out, "render-review-manifest.json"));
+          const manifest = JSON.parse(manifestBytes.toString("utf8"));
+          const geometryBytes = await readFile(path.join(out, "geometry-qa-report.json"));
+          const textureBytes = await readFile(path.join(out, "texture-qa-report.json"));
+          const geometry = JSON.parse(geometryBytes.toString("utf8"));
+          const texture = JSON.parse(textureBytes.toString("utf8"));
+          const views = (manifest.views || []).map((view) => ({
+            id: view.id,
+            filename: view.filename,
+            width: view.width,
+            height: view.height,
+            sha256: view.sha256
+          }));
+          if (views.length !== 13 || new Set(views.map((view) => view.id)).size !== 13) {
+            throw new Error("P1.4 expected 13 unique render views; got " + views.length);
+          }
+          const glbBytes = await readFile("public/models/ahsan-manzil-lod3.glb");
+          const summary = {
+            task: "P1.4",
+            building: "Ahsan Manzil (Pink Palace), Dhaka",
+            sourceCommit: process.env.SOURCE_COMMIT,
+            reviewGeneratedAt: new Date().toISOString(),
+            correctionScope: [
+              "Rangmahal and Andarmahal roof-height separation",
+              "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
+              "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
+              "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
+              "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
+              "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
+              "lower 8-degree south-elevation review camera so the flat roof deck no longer dominates the facade-detail view"
+            ],
+            model: {
+              filename: "ahsan-manzil-lod3.glb",
+              sha256: manifest.modelSha256,
+              byteLength: glbBytes.length
+            },
+            renderManifest: {
+              filename: "render-review-manifest.json",
+              sha256: hash(manifestBytes),
+              valid: manifest.valid,
+              status: manifest.status,
+              renderer: manifest.renderer,
+              rendererVersion: manifest.rendererVersion,
+              sceneBounds: manifest.sceneBounds
+            },
+            qa: {
+              geometry: {filename:"geometry-qa-report.json",sha256:hash(geometryBytes),valid:geometry.valid,status:geometry.status,errors:geometry.errors || [],warnings:geometry.warnings || []},
+              textures: {filename:"texture-qa-report.json",sha256:hash(textureBytes),valid:texture.valid,status:texture.status,errors:texture.errors || [],warnings:texture.warnings || []}
+            },
+            views,
+            visualReview: {
+              contactSheet: "contact-sheet.png",
+              status: "13-view render and hash validation passed; visual comparison was performed against a published front exterior photo; survey-grade validation remains open",
+              findings: [
+                "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
+                "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
+                "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
+                "Review lighting was raised and moved closer because the first contact sheet under-lit facade and roof detail.",
+                "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
+                "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
+                "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
+                "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
+                "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
+              ],
+              residualRisks: [
+                "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
+                "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
+              ],
+              policy: "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
+            }
+          };
+          const summaryText = JSON.stringify(summary, null, 2) + "\n";
+          await writeFile(path.join(out, "P1.4-render-review-summary.json"), summaryText, {flag:"wx"});
+          await writeFile("docs/heritage/p1.4-render-review-summary.json", summaryText, {flag:"w"});
+          NODE
+
+      - name: Copy visual review summary to the branch
+        run: |
+          cp artifacts/p1-4-render-set/contact-sheet.png docs/heritage/p1.4-render-contact-sheet.png
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/heritage/p1.4-render-review-summary.json docs/heritage/p1.4-render-contact-sheet.png public/models/ahsan-manzil-lod1.glb public/models/ahsan-manzil-lod2.glb public/models/ahsan-manzil-lod3.glb public/models/ahsan-manzil.glb public/models/ahsan-manzil.manifest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(heritage): record P1.4 render evidence [skip ci]"
+          fi
+          # The model builder may also touch auxiliary generated metadata. Keep
+          # the commit clean before rebasing it onto changes made during render.
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git stash push --include-untracked -m "P1.4 transient build outputs before rebase"
+          fi
+          git fetch origin "+refs/heads/${GITHUB_REF_NAME}:refs/remotes/origin/${GITHUB_REF_NAME}"
+          git rebase "origin/${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Upload review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-p1-4-render-review
+          path: |
+            artifacts/p1-4-render-set/
+            artifacts/p1-4-qa/
+            public/models/ahsan-manzil-lod1.glb
+            public/models/ahsan-manzil-lod2.glb
+            public/models/ahsan-manzil-lod3.glb
+          if-no-files-found: error
+          retention-days: 30
