@@ -106,7 +106,18 @@ def main():
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    # Keep site context in the source GLB, but hide it for model-detail review.
+    # Large Site_Ground / Site_River planes otherwise make the palace tiny.
+    site_context_meshes = [
+        obj for obj in imported_meshes
+        if obj.name.split(".")[0].startswith("Site_")
+    ]
+    for obj in site_context_meshes:
+        obj.hide_render = True
+    meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
+    if not meshes:
+        raise RuntimeError("The imported GLB has no palace meshes after excluding Site_ context nodes")
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
