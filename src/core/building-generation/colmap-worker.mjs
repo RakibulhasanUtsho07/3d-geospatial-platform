@@ -155,6 +155,7 @@ export async function runColmapReconstruction(options){
   const reconstructionArgs=[
    "automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality,
    "--use_gpu",useGpu?"1":"0",
+   "--random_seed",String(options.randomSeed??0),
    "--num_threads",String(options.featureThreads??4),
   ];
   const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
