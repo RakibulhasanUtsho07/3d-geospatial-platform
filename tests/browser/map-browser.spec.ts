@@ -368,6 +368,7 @@ test("selecting a building then a road clears the previous details panel", async
   const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
   await buildings.uncheck({ noWaitAfter: true });
   await expect(buildings).not.toBeChecked();
+  await expect(buildingDetails).toHaveCount(0);
   await page.mouse.click(box!.x + center.x, box!.y + center.y);
 
   const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
