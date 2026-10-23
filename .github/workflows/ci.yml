@@ -236,6 +236,16 @@ jobs:
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
 
+      - name: Install Blender for headless render integration
+        run: |
+          sudo apt-get install --no-install-recommends -y blender
+          blender --version
+
+      - name: Test end-to-end GLB render review and hash contract
+        env:
+          BLENDER_BIN: blender
+        run: npm run test:render-review-integration
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 

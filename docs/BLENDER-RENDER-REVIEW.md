@@ -13,6 +13,15 @@ npm run test:render-review-manifest
 npm run render:building-review -- ".\\building.glb" ".\\building-review" --resolution=1024
 ```
 
+Run the end-to-end integration check on a machine with Blender installed:
+
+```powershell
+$env:BLENDER_BIN = "blender"
+npm run test:render-review-integration
+```
+
+The integration check creates a synthetic BuildingSpec GLB, invokes the headless Blender CLI, and verifies the source model hash, all 13 real PNG outputs, their dimensions and SHA-256 hashes, the fixed-camera manifest, and `renderConfigSha256`. CI installs Blender and runs this integration check; a Python syntax check alone is not considered proof that rendering works.
+
 Use a new output directory that does not already exist. Resolution must be a power of two from 256 through 2048. The tool will not overwrite an existing review directory.
 
 Before creating the output directory or launching Blender, the command runs structural GLB geometry/topology QA. Malformed buffers, accessors, vertex coordinates or triangle indices cause the command to fail closed; topology warnings remain review findings rather than automatic rejection of legitimate separate architectural parts.
