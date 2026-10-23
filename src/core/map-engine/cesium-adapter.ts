@@ -50,6 +50,7 @@ import { BuildingLodRenderer } from "./building-lod-renderer";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
+import { dispatchSelectionListeners } from "./dispatch-selection-listeners.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
@@ -2030,16 +2031,16 @@ export class CesiumAdapter implements MapEngine {
   }
 
   private emitPlaceSelection(place: NearbyPlace | null): void {
-    for (const listener of this.placeSelectionListeners) {
-      try {
-        listener(place);
-      } catch (error: unknown) {
+    dispatchSelectionListeners(
+      this.placeSelectionListeners,
+      place,
+      (error) => {
         console.error(
           "[Map] Nearby-place selection listener failed:",
           error instanceof Error ? error.message : String(error),
         );
-      }
-    }
+      },
+    );
   }
 
   getGroundCenter(): import("./types").GeoCoordinate | null {
@@ -2160,18 +2161,16 @@ export class CesiumAdapter implements MapEngine {
   private emitFeatureSelection(
     selection: MapFeatureSelection | null,
   ): void {
-    for (const listener of this.featureSelectionListeners) {
-      try {
-        listener(selection);
-      } catch (error: unknown) {
+    dispatchSelectionListeners(
+      this.featureSelectionListeners,
+      selection,
+      (error) => {
         console.error(
           "[Map] Selection listener failed:",
-          error instanceof Error
-            ? error.message
-            : String(error),
+          error instanceof Error ? error.message : String(error),
         );
-      }
-    }
+      },
+    );
   }
 
   private restoreSelectedBuilding(): void {
@@ -2362,13 +2361,16 @@ export class CesiumAdapter implements MapEngine {
   }
 
   private emitRoadSelection(road: RoadFeature | null): void {
-    for (const listener of this.roadSelectionListeners) {
-      try {
-        listener(road);
-      } catch (error: unknown) {
-        console.error("[Map] Road selection listener failed:", error instanceof Error ? error.message : String(error));
-      }
-    }
+    dispatchSelectionListeners(
+      this.roadSelectionListeners,
+      road,
+      (error) => {
+        console.error(
+          "[Map] Road selection listener failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      },
+    );
   }
 
   onPropertySelected(listener: (property: PropertyListing | null) => void): () => void {
@@ -2377,16 +2379,16 @@ export class CesiumAdapter implements MapEngine {
   }
 
   private emitPropertySelection(property: PropertyListing | null): void {
-    for (const listener of this.propertySelectionListeners) {
-      try {
-        listener(property);
-      } catch (error: unknown) {
+    dispatchSelectionListeners(
+      this.propertySelectionListeners,
+      property,
+      (error) => {
         console.error(
           "[Map] Property-selection listener failed:",
           error instanceof Error ? error.message : String(error),
         );
-      }
-    }
+      },
+    );
   }
 
   async setPropertyListings(properties: PropertyListing[]): Promise<void> {
