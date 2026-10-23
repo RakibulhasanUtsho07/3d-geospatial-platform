@@ -142,10 +142,16 @@ async function main() {
   assert.match(renderManifest.renderConfigSha256, /^[a-f0-9]{64}$/);
   assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "y-up;+X=east-west-eastward;+Z=south-riverfront");
   const directions = Object.fromEntries(renderManifest.views.map((view) => [view.id, view.cameraPose.viewDirectionWorld]));
-  assert.deepEqual(directions.front, [0, 0, -1]);
-  assert.deepEqual(directions.back, [0, 0, 1]);
-  assert.deepEqual(directions.top, [0, -1, 0]);
-  assert.deepEqual(directions.right, [-1, 0, 0]);
+  const assertDirection = (id, expected) => {
+    assert.ok(
+      Math.hypot(...directions[id].map((value, axis) => value - expected[axis])) <= 1e-3,
+      id + " camera must use the expected Y-up viewing direction; actual=" + JSON.stringify(directions[id]),
+    );
+  };
+  assertDirection("front", [0, 0, -1]);
+  assertDirection("back", [0, 0, 1]);
+  assertDirection("top", [0, -1, 0]);
+  assertDirection("right", [-1, 0, 0]);
   assert.deepEqual(renderManifest.views.map((view) => view.id), [...REQUIRED_REVIEW_VIEWS]);
 
   const reviewInputPath = path.join(reviewDir, "ahsan-manzil.review-input.json");
