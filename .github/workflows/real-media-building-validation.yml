@@ -106,6 +106,8 @@ jobs:
         run: |
           set -euo pipefail
           WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          # COLMAP's Qt-linked binary otherwise attempts to connect to X11 on headless runners.
+          export QT_QPA_PLATFORM=offscreen
           npm run build:building-from-media -- "$WORKSPACE" validation/ahsan-manzil-building-spec.json ahsan-unscaled \
             --source "ahsan003=uploads/Ahsan_Manzil_003.jpg" \
             --source "ahsan004=uploads/Ahsan_Manzil_004.jpg" \
@@ -172,6 +174,8 @@ jobs:
         run: |
           set -euo pipefail
           WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          # Keep the actual reconstruction worker headless on GitHub-hosted Linux.
+          export QT_QPA_PLATFORM=offscreen
           RAW_LONG="$(python -c 'import json; print(format(json.load(open("validation-output/unscaled/measurements.json"))["longAxisModelUnits"], ".12g"))')"
           python - "$RAW_LONG" <<'PY'
           import sys
