@@ -13,7 +13,7 @@ function fixture(overrides = {}) {
     cameraPose: {
       projection: "ORTHO",
       positionWorld: [index + 2, -4, 2],
-      targetWorld: [index + 2, 0, 1],
+      targetWorld: [index + 2, 0, 2],
       viewDirectionWorld: [0, 1, 0],
       rotationEulerRadians: [0, 0, 0],
       orthographicScale: 3,
@@ -102,6 +102,12 @@ test("requires geometry QA and camera/settings evidence before calling a render 
   const poseReport = finalizeRenderReviewManifest(missingPose);
   assert.equal(poseReport.valid, false);
   assert.ok(poseReport.errors.includes("render-camera-pose-invalid:front"));
+
+  const inconsistentPose = fixture();
+  inconsistentPose.rawManifest.views[0].cameraPose.viewDirectionWorld = [1, 0, 0];
+  const inconsistentReport = finalizeRenderReviewManifest(inconsistentPose);
+  assert.equal(inconsistentReport.valid, false);
+  assert.ok(inconsistentReport.errors.includes("render-camera-pose-invalid:front"));
 
   const missingSettings = fixture();
   delete missingSettings.rawManifest.renderSettings.lights;

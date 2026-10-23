@@ -18,8 +18,13 @@ function validCameraPose(pose) {
     !finiteVector3(pose.positionWorld) || !finiteVector3(pose.targetWorld) ||
     !finiteVector3(pose.viewDirectionWorld) || !finiteVector3(pose.rotationEulerRadians) ||
     !finite(pose.orthographicScale) || pose.orthographicScale <= 0) return false;
+  const cameraToTarget = pose.targetWorld.map((value, index) => value - pose.positionWorld[index]);
   const directionLength = Math.hypot(...pose.viewDirectionWorld);
-  return Math.abs(directionLength - 1) <= 0.01;
+  const cameraDistance = Math.hypot(...cameraToTarget);
+  if (Math.abs(directionLength - 1) > 0.01 || cameraDistance <= 1e-8) return false;
+  const expectedDirection = cameraToTarget.map((value) => value / cameraDistance);
+  const directionError = Math.hypot(...expectedDirection.map((value, index) => value - pose.viewDirectionWorld[index]));
+  return directionError <= 0.02;
 }
 
 function validRenderSettings(settings, resolution) {
