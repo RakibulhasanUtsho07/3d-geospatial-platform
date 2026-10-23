@@ -51,9 +51,15 @@ function fixture(overrides = {}) {
     rawManifest: {
       schemaVersion: "1.0.0",
       rendererVersion: "4.5.0",
-      renderProfile: "building-review-fixed-cameras-v1",
+      renderProfile: "building-review-cycles-cpu-v1",
       renderSettings: {
-        renderEngine: "BLENDER_EEVEE_NEXT",
+        renderEngine: "CYCLES",
+        cyclesDevice: "CPU",
+        cyclesSamples: 16,
+        cyclesUseDenoising: false,
+        cyclesMaxBounces: 4,
+        threadsMode: "FIXED",
+        threads: 2,
         resolutionX: 512,
         resolutionY: 512,
         resolutionPercentage: 100,
@@ -135,6 +141,12 @@ test("requires geometry QA and camera/settings evidence before calling a render 
   const settingsReport = finalizeRenderReviewManifest(missingSettings);
   assert.equal(settingsReport.valid, false);
   assert.ok(settingsReport.errors.includes("render-settings-invalid-or-incomplete"));
+
+  const wrongRenderEngine = fixture();
+  wrongRenderEngine.rawManifest.renderSettings.renderEngine = "BLENDER_EEVEE";
+  const wrongEngineReport = finalizeRenderReviewManifest(wrongRenderEngine);
+  assert.equal(wrongEngineReport.valid, false);
+  assert.ok(wrongEngineReport.errors.includes("render-settings-invalid-or-incomplete"));
 });
 
 test("flags geometry warnings for human review and fingerprints fixed render configuration", () => {

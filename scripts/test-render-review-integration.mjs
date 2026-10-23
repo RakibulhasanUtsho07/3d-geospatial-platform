@@ -65,7 +65,11 @@ async function main() {
     assert.equal(manifest.counts.generatedViews, REQUIRED_REVIEW_VIEWS.length);
     assert.deepEqual(manifest.views.map((view) => view.id), [...REQUIRED_REVIEW_VIEWS]);
     assert.match(manifest.renderConfigSha256, /^[a-f0-9]{64}$/);
-    assert.equal(manifest.renderProfile, "building-review-fixed-cameras-v1");
+    assert.equal(manifest.renderProfile, "building-review-cycles-cpu-v1");
+    assert.equal(manifest.renderSettings.renderEngine, "CYCLES");
+    assert.equal(manifest.renderSettings.cyclesDevice, "CPU");
+    assert.equal(manifest.renderSettings.cyclesSamples, 16);
+    assert.equal(manifest.renderSettings.threadsMode, "FIXED");
 
     const outputFiles = new Set(await readdir(outputDir));
     for (const view of manifest.views) {

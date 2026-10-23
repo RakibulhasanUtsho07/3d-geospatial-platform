@@ -58,7 +58,11 @@ function cameraMatchesRequiredView(viewId, pose, settings) {
 
 function validRenderSettings(settings, resolution) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return false;
-  if (typeof settings.renderEngine !== "string" || !settings.renderEngine.trim() ||
+  if (settings.renderEngine !== "CYCLES" || settings.cyclesDevice !== "CPU" ||
+    !Number.isSafeInteger(settings.cyclesSamples) || settings.cyclesSamples < 1 || settings.cyclesSamples > 1024 ||
+    typeof settings.cyclesUseDenoising !== "boolean" ||
+    !Number.isSafeInteger(settings.cyclesMaxBounces) || settings.cyclesMaxBounces < 0 || settings.cyclesMaxBounces > 64 ||
+    settings.threadsMode !== "FIXED" || !Number.isSafeInteger(settings.threads) || settings.threads < 1 || settings.threads > 64 ||
     settings.resolutionX !== resolution || settings.resolutionY !== resolution ||
     settings.resolutionPercentage !== 100 || settings.imageFormat !== "PNG" ||
     settings.imageColorMode !== "RGBA" || settings.imageColorDepth !== "8" ||
@@ -108,7 +112,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   const views = [];
   const byId = new Map();
 
-  if (rawManifest.renderProfile !== "building-review-fixed-cameras-v1") {
+  if (rawManifest.renderProfile !== "building-review-cycles-cpu-v1") {
     errors.push("render-profile-missing-or-unsupported");
   }
   const settingsValid = validRenderSettings(rawManifest.renderSettings, resolution);

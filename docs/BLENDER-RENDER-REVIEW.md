@@ -20,6 +20,8 @@ $env:BLENDER_BIN = "blender"
 npm run test:render-review-integration
 ```
 
+The renderer uses Blender CPU Cycles with a fixed 16-sample budget, denoising disabled, four maximum bounces and a fixed two-thread setting. Those engine/runtime controls are included in the render settings and therefore affect `renderConfigSha256`; the profile avoids depending on an interactive EGL/OpenGL context in headless CI.
+
 The integration check first passes a malformed GLB alongside a deliberately nonexistent Blender executable and verifies that geometry QA rejects the file before any renderer is launched or output directory is created. It then creates a synthetic BuildingSpec GLB, invokes the headless Blender CLI, and verifies the source model hash, all 13 real PNG outputs, their dimensions and SHA-256 hashes, the fixed-camera manifest, and `renderConfigSha256`. CI installs Blender and runs this integration check; a Python syntax check alone is not considered proof that rendering works.
 
 Use a new output directory that does not already exist. Resolution must be a power of two from 256 through 2048. The tool will not overwrite an existing review directory.

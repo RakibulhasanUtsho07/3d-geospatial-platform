@@ -124,10 +124,15 @@ def main():
     camera_distance = max_dimension * 3.0
     ortho_scale = max_dimension * 1.45
     scene = bpy.context.scene
-    try:
-        scene.render.engine = "BLENDER_EEVEE_NEXT"
-    except TypeError:
-        scene.render.engine = "BLENDER_EEVEE"
+    # Headless CI must not depend on a transient EGL/OpenGL context. CPU Cycles
+    # gives every fixed camera a real pixel buffer with fixed sampling settings.
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 16
+    scene.cycles.use_denoising = False
+    scene.cycles.max_bounces = 4
+    scene.render.threads_mode = "FIXED"
+    scene.render.threads = 2
     scene.render.resolution_x = resolution
     scene.render.resolution_y = resolution
     scene.render.resolution_percentage = 100
@@ -153,6 +158,12 @@ def main():
     lights = [light_manifest(light) for light in (key_light, fill_light, rim_light)]
     render_settings = {
         "renderEngine": scene.render.engine,
+        "cyclesDevice": scene.cycles.device,
+        "cyclesSamples": scene.cycles.samples,
+        "cyclesUseDenoising": scene.cycles.use_denoising,
+        "cyclesMaxBounces": scene.cycles.max_bounces,
+        "threadsMode": scene.render.threads_mode,
+        "threads": scene.render.threads,
         "resolutionX": resolution,
         "resolutionY": resolution,
         "resolutionPercentage": scene.render.resolution_percentage,
@@ -229,7 +240,7 @@ def main():
         "schemaVersion": "1.0.0",
         "renderer": "Blender",
         "rendererVersion": bpy.app.version_string,
-        "renderProfile": "building-review-fixed-cameras-v1",
+        "renderProfile": "building-review-cycles-cpu-v1",
         "renderSettings": render_settings,
         "width": resolution,
         "height": resolution,
