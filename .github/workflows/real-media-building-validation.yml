@@ -103,7 +103,11 @@ jobs:
 
       - name: Validate analyzer syntax and run local quality-policy tests
         run: |
-          python -m py_compile validation/analyze-real-glb.py
+          python -m py_compile validation/analyze-real-glb.py scripts/create-sparse-poisson-mesh.py
+          python - <<'PY'
+          import open3d as o3d
+          print("Open3D:", o3d.__version__)
+          PY
           npm run test:colmap-worker
           npm run test:glb-geometry-qa
 
