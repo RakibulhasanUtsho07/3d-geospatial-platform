@@ -74,12 +74,19 @@ function encodeGlb(spec, geo) {
 }
 export function generateProceduralGlb(rawSpec) {
   const {spec,derived}=normalizeBuildingSpec(rawSpec), warnings=[];
-  if(spec.architecture.roofType==="pitched")warnings.push("Pitched roofs are not implemented; a flat roof cap is emitted.");
+  if(spec.architecture.roofType==="pitched"){
+    throw new TypeError("roofType 'pitched' is not supported by the procedural generator; use 'flat'/'terrace' or implement pitched roof geometry before requesting it.");
+  }
+  if(spec.architecture.frontFacadeEdgeIndex===undefined){
+    warnings.push("Front facade was inferred from the longest footprint edge; set architecture.frontFacadeEdgeIndex to select the entrance facade explicitly.");
+  }
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
   const edges=points.map((p,i)=>{const n=points[(i+1)%points.length];return {p,n,...createFacadeFrame(p,n)};});
-  const front=edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0);
+  const front=spec.architecture.frontFacadeEdgeIndex===undefined
+    ? edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0)
+    : spec.architecture.frontFacadeEdgeIndex;
   for(let floor=0;floor<floorCount;floor++)for(let ei=0;ei<edges.length;ei++){
     const e=edges[ei],cx=(e.p.x+e.n.x)/2-e.out.x*wt/2,cz=(e.p.z+e.n.z)/2-e.out.z*wt/2;
     geo.box("wall",cx,floor*floorH+floorH/2,cz,e.len+wt*0.35,floorH,wt,e.yaw);
@@ -128,11 +135,18 @@ export function generateProceduralGlb(rawSpec) {
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
     geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo)},
+    facadeSelection:{
+      method:spec.architecture.frontFacadeEdgeIndex===undefined?"longest-edge-inferred":"explicit-edge-index",
+      edgeIndex:front,
+      confidence:spec.architecture.frontFacadeEdgeIndex===undefined?"estimated":"operator-specified",
+    },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
     sources:spec.sources.map(s=>({id:s.id,kind:s.kind, ...(s.url?{url:s.url}:{}),licence:s.licence||null,attribution:s.attribution||null,usageStatus:s.usageStatus})),
     confidenceSummary:Object.fromEntries(["verified","derived","estimated","ai-proposed","unknown"].map(level=>[level,spec.evidence.filter(e=>e.confidence===level).length])),
-    reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"),
+    reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||
+      spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
+      spec.architecture.frontFacadeEdgeIndex===undefined,
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
