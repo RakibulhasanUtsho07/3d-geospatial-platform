@@ -165,7 +165,7 @@ jobs:
       - name: Install FFmpeg for deterministic texture atlas baking
         uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
         with:
-          ffmpeg-version: "6.1.1"
+          ffmpeg-version: release
           architecture: x64
           linking-type: static
 
