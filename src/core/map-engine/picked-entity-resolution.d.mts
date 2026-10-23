@@ -1,4 +1,4 @@
-import type CesiumEntity = import("cesium").Entity;
+type CesiumEntity = import("cesium").Entity;
 
 /**
  * Resolve an entity/primitive/string ID returned by Scene.pick to the entity
