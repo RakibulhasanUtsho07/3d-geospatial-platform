@@ -48,6 +48,7 @@ on:
       - main
       - dev
       - refactor/p1-building-lod-policy
+      - refactor/p1-building-lod-renderer
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -257,6 +258,9 @@ jobs:
 
       - name: Test building LOD renderer ownership and delegation
         run: npm run test:building-lod-renderer
+
+      - name: Test building style assignment and preview policy
+        run: npm run test:building-style-assignment-policy
 
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
