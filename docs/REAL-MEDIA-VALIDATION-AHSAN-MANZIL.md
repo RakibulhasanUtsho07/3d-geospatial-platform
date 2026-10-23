@@ -9,7 +9,7 @@ The generated GLB is retained for review only. It must not be published to the l
 - Reference dimensions used in this experiment: overall length 125.4 m, overall depth 28.75 m, dome peak height 27.13 m. These are published reference values, not a new survey; see the Bangladesh Tourism Board / Parjatan references in [the input source manifest](../validation/ahsan-manzil-media-sources.json).
 - Input media: images downloaded from Wikimedia Commons with the creator and CC BY-SA license recorded in the artifact's attribution manifest.
 - External tools: FFmpeg and Ubuntu-packaged COLMAP. The packaged COLMAP build does not provide the dense CUDA/HIP MVS path or `mesh_texturer`, so the workflow used an explicitly labelled sparse-SfM-to-Poisson surface fallback. That fallback can invent geometry and is not equivalent to dense photogrammetry.
-- Latest completed run with the report fixes: [run #39900331596](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900331596) and its [downloadable model and evidence artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900331596/artifacts/12479010796). Earlier repeated attempts are linked for reproducibility comparison.
+- Latest completed run with the report fixes: [run #39900708592](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900708592) and its [downloadable model and evidence artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900708592/artifacts/12479066236). Earlier repeated attempts are linked below for reproducibility comparison.
 
 ## Main measured result
 
@@ -17,22 +17,22 @@ The four-photo control set is the connected cluster of the 2010 exterior/front v
 
 | Metric | Reference | Latest completed GLB | Absolute relative error |
 |---|---:|---:|---:|
-| Long horizontal axis | 125.4 m | 125.4000 m | 0.0000019% |
-| Short horizontal axis / depth proxy | 28.75 m | 26.7032 m | 7.12% |
-| Vertical extent / height proxy | 27.13 m | 48.4330 m | 78.52% |
+| Long horizontal axis | 125.4 m | 125.4000 m | 0.0000013% |
+| Short horizontal axis / depth proxy | 28.75 m | 37.3286 m | 29.84% |
+| Vertical extent / height proxy | 27.13 m | 40.8505 m | 50.57% |
 
-The long-axis length was calibrated to 125.4 m. Its match is **by construction**, not independent evidence. In the latest run depth is within the exploratory tolerance, but the dome-height proxy is 78.52% too high, so the overall dimensions gate still fails. The prior run #39899992722, using the same downloaded photo hashes and the same four selected source IDs, produced 87.1600 m depth and 44.0055 m height instead. That run-to-run variation is a serious repeatability warning: sparse-image geometry is not yet stable enough to treat as building reconstruction.
+The long-axis length was calibrated to 125.4 m. Its match is **by construction**, not independent evidence. The latest run fails both independent dimensions: depth is 29.84% high and vertical extent is 50.57% high. The configured tolerances are 20% for depth and height. The overall dimensions gate therefore fails.
 
 ## COLMAP and geometry diagnostics
 
 - Registered cameras: 4/4 in the facade-only control. The configured acceptance gate requires at least six registered images for a full-building candidate, so the set fails coverage even though the four selected photos registered.
-- Sparse SfM (latest completed run): 500 points, 1,541 observations, mean track length 3.082, mean reprojection error 0.643 px. A low reprojection error describes camera-fit residuals; it does not prove complete 3D shape.
-- Camera directions (latest completed run): maximum pairwise spread 21.053 degrees; median 10.633 degrees. The selected images still mainly see the front facade, and maximum spread only barely clears the review threshold.
-- Fallback mesh: 5,635 triangles; geometry QA found 125 open-boundary edges. It is a sparse-point Poisson surface, not a dense MVS reconstruction.
+- Sparse SfM (latest completed run): 270 points, 741 observations, mean track length 2.744, mean reprojection error 0.601 px. A low reprojection error describes camera-fit residuals; it does not prove complete 3D shape.
+- Camera directions (latest completed run): maximum pairwise spread 10.924 degrees; median 5.549 degrees. This fails the 20-degree overall view-spread gate and indicates that the chosen images mostly view one facade.
+- Fallback mesh: 4,416 triangles. Geometry QA found five connected components, four small detached components, 162 boundary edges and two non-manifold edges. It is a sparse-point Poisson surface, not a dense MVS reconstruction.
 - Texture: unavailable in this COLMAP build. The emitted GLB uses a neutral review material; texture match against the source photos was **not tested**.
 - Georeferencing: not solved. Published site coordinates / the BuildingSpec anchor are only placement hints; there is no surveyed control-point registration.
 
-The [latest front/side/top orthographic previews and GLB](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900331596/artifacts/12479010796) show a sparse, facade-dominated surface with severe vertical distortion, not a credible complete palace volume. The same four selected inputs also produced materially different dimensions across runs: #39899992722 depth/height 87.16 m / 44.01 m, versus #39900331596 26.70 m / 48.43 m. The manifests confirm identical downloaded source-photo SHA-256 hashes, yet results differ substantially. This is an explicit repeatability failure. A full ten-image experiment ([run evidence](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39897870892)) also failed to find a good initial image pair because the selected still photos form disconnected feature-matching clusters.
+The [latest front/side/top orthographic previews and GLB](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39900708592/artifacts/12479066236) show a sparse, facade-dominated surface with disconnected islands and severe vertical distortion, not a credible complete palace volume. The same four selected inputs produced materially different dimensions despite identical downloaded source-photo SHA-256 manifests: run #39899992722 measured depth/height 87.16 m / 44.01 m; run #39900331596 measured 26.70 m / 48.43 m; latest run #39900708592 measured 37.33 m / 40.85 m. This is an explicit repeatability failure, separate from the dimension-gate failures. A full ten-image experiment ([run evidence](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39897870892)) also failed to find a good initial image pair because the selected still photos form disconnected feature-matching clusters.
 
 ## Fixes made while validating
 
