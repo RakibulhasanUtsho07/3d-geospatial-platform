@@ -141,6 +141,20 @@
     "georeferencing": "Not claimed. Scale calibration alone does not solve horizontal WGS84 placement or vertical datum.",
     "visualReview": "The artifact includes the licensed reference photographs plus front, side and top orthographic previews of the output GLB for direct visual comparison.",
     "selectedViewCount": 10,
-    "note": "Expanded dataset adds four differently framed source photos. Multiple images from different capture sessions do not guarantee sufficient overlap; COLMAP registration ratios and viewing-direction spread remain the actual gate."
+    "note": "Ten openly licensed photos are retained as visual references, but the geometry run uses only the six-view subset that previously produced a sparse model. A ten-view combined run was attempted and produced no sparse COLMAP model, demonstrating that adding still photographs without verified overlap can make reconstruction fail.",
+    "activeReconstructionViews": [
+      "ahsan003",
+      "ahsan004",
+      "ahsan005",
+      "ahsan006",
+      "ahsan007",
+      "ahsan008"
+    ],
+    "referenceOnlyImages": [
+      "ahsan009",
+      "ahsan010",
+      "ahsan011",
+      "ahsan012"
+    ]
   }
 }
