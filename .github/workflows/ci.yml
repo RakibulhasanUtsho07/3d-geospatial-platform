@@ -144,9 +144,9 @@ jobs:
         run: npm run test:reconstruction-job-state
 
       - name: Install FFmpeg for deterministic texture atlas baking
-        uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          ffmpeg-version: release
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
