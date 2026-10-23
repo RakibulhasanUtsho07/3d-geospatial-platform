@@ -37,7 +37,7 @@ function requiredViewDirection(viewId, turntableElevationDegrees) {
   if (viewId === "left") return [1, 0, 0];
   if (viewId === "right") return [-1, 0, 0];
   if (viewId === "top") return [0, 0, -1];
-  const match = /^turntable-(\\d{3})$/.exec(viewId);
+  const match = /^turntable-(\d{3})$/.exec(viewId);
   if (!match || !finite(turntableElevationDegrees)) return null;
   const angleDegrees = Number(match[1]);
   if (angleDegrees < 0 || angleDegrees >= 360 || angleDegrees % 45 !== 0) return null;
