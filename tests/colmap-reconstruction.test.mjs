@@ -133,6 +133,7 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
  const autoArgs=observedCommands.find(args=>args[0]==="automatic_reconstructor");
  assert.ok(autoArgs,"automatic_reconstructor was invoked");
  assert.equal(autoArgs[autoArgs.indexOf("--use_gpu")+1],"0","CPU feature extraction/matching is the headless-safe default");
+ assert.equal(autoArgs[autoArgs.indexOf("--random_seed")+1],"0","COLMAP reconstruction uses a deterministic seed by default");
  assert.equal(autoArgs[autoArgs.indexOf("--num_threads")+1],"4");
  assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
