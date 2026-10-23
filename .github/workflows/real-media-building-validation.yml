@@ -306,6 +306,7 @@ jobs:
             python validation/evaluate-real-validation.py \
               --dimensions validation-output/dimension-comparison.json \
               --worker-report validation-output/calibrated/colmap-worker-report.json \
+              --calibration-report validation-output/calibrated/calibration-report.json \
               --output validation-output/overall-validation.json \
               --minimum-registered-ratio 0.75 \
               --minimum-registered-images 6 \
