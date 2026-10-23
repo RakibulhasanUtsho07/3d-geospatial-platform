@@ -107,6 +107,12 @@ export function normalizeBuildingSpec(raw) {
   const a = input.architecture === undefined ? {} : obj(input.architecture, "architecture");
   const roofType = (a.roofType || "flat").toLowerCase();
   if (!ROOFS.has(roofType)) throw new TypeError("unsupported roofType");
+  const frontFacadeEdgeIndex = a.frontFacadeEdgeIndex === undefined
+    ? undefined
+    : num(a.frontFacadeEdgeIndex, "frontFacadeEdgeIndex", 0, ring.length - 1);
+  if (frontFacadeEdgeIndex !== undefined && !Number.isInteger(frontFacadeEdgeIndex)) {
+    throw new RangeError("frontFacadeEdgeIndex must be an integer matching an outer footprint edge index");
+  }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
   const bool = (value, fallback, label) => {
@@ -117,6 +123,7 @@ export function normalizeBuildingSpec(raw) {
   const architecture = {
     style: a.style === undefined ? "dhaka-residential-modern" : str(a.style, "style", 80),
     roofType,
+    ...(frontFacadeEdgeIndex === undefined ? {} : { frontFacadeEdgeIndex }),
     wallColor: hex(a.wallColor, "#D8D2C8", "wallColor"),
     roofColor: hex(a.roofColor, "#B5B8BC", "roofColor"),
     glassColor: hex(a.glassColor, "#536D86", "glassColor"),

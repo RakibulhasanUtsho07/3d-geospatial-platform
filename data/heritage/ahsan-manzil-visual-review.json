@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0.0",
+  "buildingId": "ahsan-manzil-kumartuli-dhaka",
+  "reviewStage": "P1.4-candidate",
+  "status": "pending-render-and-human-review",
+  "publicationEligible": false,
+  "previousBaseline": "data/heritage/ahsan-manzil-visual-review-p1-3-baseline.json",
+  "baselineModelSha256": "220612219c008a46e3a2da18c3fe4100be85cb8df64a2a897abda3b192368f1f",
+  "candidateCorrections": [
+    {
+      "id": "front-reference-framing",
+      "status": "implemented-awaiting-render-verification",
+      "change": "Render front and southeast comparison views from Rangmahal semantic bounds; preserve whole-palace framing in the other fixed views.",
+      "acceptance": "Front and oblique focal targets/orthographic scales match the profile contract."
+    },
+    {
+      "id": "roof-deck-overlap",
+      "status": "implemented-awaiting-build-verification",
+      "change": "Move an 8 cm roof finish above the upper-floor slab instead of overlapping it with coplanar faces.",
+      "acceptance": "LOD3 GLB contains upward-facing roof-colored vertices at the finish top elevation."
+    },
+    {
+      "id": "central-pavilion",
+      "status": "implemented-awaiting-render-verification",
+      "change": "Use a provisional 12 m central portico width, scaled from the pinned front image against the provisional 55.8 m facade; confidence remains [E].",
+      "acceptance": "Three-arch pavilion reads as a distinct central mass in the newly framed front render."
+    },
+    {
+      "id": "dome-drum",
+      "status": "implemented-awaiting-build-and-render-verification",
+      "change": "Use a provisional 11 m octagonal tower width from front-photo proportion; retain the separately shaped 8 m dome profile and verified 27.13 m peak.",
+      "acceptance": "The square drum core spans the configured 11.0 m; outer GLB bounds may extend up to 0.15 m for the deliberately modeled corner columns and trim."
+    },
+    {
+      "id": "stair-taper",
+      "status": "implemented-awaiting-build-and-render-verification",
+      "change": "Keep the 16.5 m estimated base width but taper the upper stair to 11.5 m to match the photo-estimated ~70% top/base ratio.",
+      "acceptance": "Generated GLB preserves broad bottom, narrows at the upper portal, and remains aligned to the dome axis."
+    },
+    {
+      "id": "roof-and-facade-lighting",
+      "status": "implemented-awaiting-render-verification",
+      "change": "Scale heritage review lighting size, power, and placement from model height rather than the horizontal footprint length.",
+      "acceptance": "13 actual PNGs pass non-flat contrast checks and the latest front/southeast images are inspected."
+    }
+  ],
+  "dimensionConflict": {
+    "overallFootprint": "125.4 m × 28.75 m [C] (published overall dimension)",
+    "riverFacingRangmahal": "183 ft / 55.8 m [C] (published river-facing facade span)",
+    "decision": "Do not physically rescale the model until a north-up footprint trace or rectified plan resolves the conflict. Camera framing changes are not physical geometry changes."
+  },
+  "comparisons": [
+    {
+      "referenceImageId": "ahsan-manzil-front-mahosha-2012",
+      "viewId": "front",
+      "comparisonBasis": "pose-estimated",
+      "outcome": "pending",
+      "reason": "Revised front framing must be rendered and compared against the pinned source image."
+    },
+    {
+      "referenceImageId": "ahsan-manzil-east-side-parvezahmed-2019",
+      "viewId": "turntable-315",
+      "comparisonBasis": "pose-estimated",
+      "outcome": "pending",
+      "reason": "Updated roof finish and height-relative lighting must be rendered and compared against the pinned source image."
+    }
+  ],
+  "humanAcceptance": {
+    "status": "pending",
+    "note": "Independent heritage-architect/human review remains required. CI passing does not prove architectural fidelity."
+  },
+  "unassessedViews": [
+    "back",
+    "left",
+    "right",
+    "top",
+    "turntable-000",
+    "turntable-045",
+    "turntable-090",
+    "turntable-135",
+    "turntable-180",
+    "turntable-225",
+    "turntable-270"
+  ]
+}

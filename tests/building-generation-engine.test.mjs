@@ -4,6 +4,7 @@ import test from "node:test";
 import { normalizeBuildingSpec } from "../src/core/building-generation/building-spec.mjs";
 import { generateBuildingModel, planGeneration } from "../src/core/building-generation/generation-engine.mjs";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
+import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "../src/core/building-generation/facade-placement.mjs";
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 function parseGlb(buffer){
  assert.equal(buffer.readUInt32LE(0),0x46546c67);assert.equal(buffer.readUInt32LE(4),2);assert.equal(buffer.readUInt32LE(8),buffer.byteLength);
@@ -32,10 +33,152 @@ test("labels media route candidates without claiming photogrammetry ran",()=>{
  const withVisuals={...fixture,sources:[
  {id:"front-photo",kind:"image",url:"https://example.org/front.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.406,latitude:23.709}},
  {id:"side-photo",kind:"image",url:"https://example.org/side.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4061,latitude:23.709}},
- {id:"roof-video",kind:"video",url:"https://example.org/roof.mp4",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4062,latitude:23.709}}],
+ {id:"roof-frame",kind:"video-frame",url:"https://example.org/roof-frame.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4062,latitude:23.709}}],
  evidence:[{field:"floorCount",value:5,confidence:"derived",sourceIds:["front-photo"]}]};
- const plan=planGeneration(withVisuals);assert.equal(plan.sourceRoute,"multiview-photogrammetry-candidate");assert.equal(plan.additionalWorkersConfigured,false);
+ const plan=planGeneration(withVisuals);assert.equal(plan.sourceRoute,"multiview-photogrammetry-candidate");assert.equal(plan.additionalWorkersConfigured,false);assert.equal(plan.externalWorkerPreflight,"not-run-during-planning");assert.equal(plan.strategyCapabilities.photogrammetry.implemented,true);assert.deepEqual(plan.visualReferences.approvedImageSourceIds,["front-photo","side-photo","roof-frame"]);
  const result=generateBuildingModel(withVisuals);assert.equal(result.report.strategy,"reference-assisted-procedural");
  assert.ok(result.report.warnings.some(w=>w.includes("does not run image understanding")));assert.ok(result.report.limitations.some(s=>s.includes("not a photogrammetry")));
 });
 test("is deterministic for a fixed BuildingSpec",()=>assert.deepEqual(generateBuildingModel(fixture).glb,generateBuildingModel(fixture).glb));
+
+test("facade-local tangent and exterior normal remain orthogonal for rotated edges",()=>{
+ for(const degrees of [0,30,45,90,180,270]){
+  const angle=degrees*Math.PI/180;
+  const frame=createFacadeFrame({x:0,z:0},{x:10*Math.cos(angle),z:10*Math.sin(angle)});
+  assert.ok(Math.abs(frame.len-10)<1e-9,"edge length at "+degrees+" degrees");
+  assert.ok(Math.abs(frame.tangent.x*frame.out.x+frame.tangent.z*frame.out.z)<1e-9,"tangent/normal orthogonal at "+degrees+" degrees");
+  assert.ok(Math.abs(Math.hypot(frame.out.x,frame.out.z)-1)<1e-9,"unit exterior normal at "+degrees+" degrees");
+  const localXAxis={x:Math.cos(frame.yaw),z:-Math.sin(frame.yaw)};
+  assert.ok(Math.abs(localXAxis.x-frame.tangent.x)<1e-9,"box local X aligns with facade tangent at "+degrees+" degrees");
+  assert.ok(Math.abs(localXAxis.z-frame.tangent.z)<1e-9,"box local X aligns with facade tangent at "+degrees+" degrees");
+  const anchor={x:2.1,z:-4.2};
+  const moved=offsetFacadePoint(anchor,frame,1.75,0.12);
+  const dx=moved.x-anchor.x,dz=moved.z-anchor.z;
+  assert.ok(Math.abs(dx*frame.tangent.x+dz*frame.tangent.z-1.75)<1e-9,"tangent offset at "+degrees+" degrees");
+  assert.ok(Math.abs(dx*frame.out.x+dz*frame.out.z-0.12)<1e-9,"outward offset at "+degrees+" degrees");
+ }
+});
+
+test("surface inserts place the inner face at the configured wall-plane clearance",()=>{
+ for(const [depth,clearance] of [[0.055,0.002],[0.075,0.002],[0.09,0.003]]){
+  const center=surfaceInsertCenterOffset(depth,clearance);
+  assert.ok(Math.abs((center-depth/2)-clearance)<1e-12);
+ }
+ assert.throws(()=>surfaceInsertCenterOffset(0.05,-0.001),/between 0 and 0.05/);
+ assert.throws(()=>surfaceInsertCenterOffset(0,0.002),/greater than zero/);
+});
+
+test("generated window glass meets the exterior wall plane for either footprint winding",()=>{
+ const originalRing=fixture.footprint.coordinates[0].slice(0,-1);
+ const reversedOpen=[...originalRing].reverse();
+ const reversedRing=[...reversedOpen,reversedOpen[0]];
+ const reversedFixture={...fixture,footprint:{...fixture.footprint,coordinates:[reversedRing]}};
+
+ for(const [spec,label] of [[fixture,"normal winding"],[reversedFixture,"reversed winding"]]){
+  const built=generateProceduralGlb(spec);
+  const glb=built.glb;
+  const jsonLength=glb.readUInt32LE(12);
+  const gltf=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+  const binaryStart=28+jsonLength;
+  const glassMesh=gltf.meshes.find(mesh=>mesh.name.endsWith("-glass"));
+  assert.ok(glassMesh,label+" GLB includes a glass material mesh");
+  const positionAccessor=gltf.accessors[glassMesh.primitives[0].attributes.POSITION];
+  const view=gltf.bufferViews[positionAccessor.bufferView];
+  const start=binaryStart+(view.byteOffset||0)+(positionAccessor.byteOffset||0);
+  const positions=[];
+  for(let i=0;i<positionAccessor.count;i++){
+   const offset=start+i*12;
+   positions.push({x:glb.readFloatLE(offset),y:glb.readFloatLE(offset+4),z:glb.readFloatLE(offset+8)});
+  }
+  const {derived}=normalizeBuildingSpec(spec);
+  const signedArea=derived.localFootprint.reduce((sum,p,i)=>{
+   const n=derived.localFootprint[(i+1)%derived.localFootprint.length];
+   return sum+p.x*n.z-n.x*p.z;
+  },0)/2;
+  const outwardSign=signedArea>=0?1:-1;
+  for(let edgeIndex=0;edgeIndex<derived.localFootprint.length;edgeIndex++){
+   const p=derived.localFootprint[edgeIndex];
+   const n=derived.localFootprint[(edgeIndex+1)%derived.localFootprint.length];
+   const frame=createFacadeFrame(p,n,outwardSign);
+   const distances=positions.map(point=>{
+    const dx=point.x-p.x,dz=point.z-p.z;
+    return {along:dx*frame.tangent.x+dz*frame.tangent.z,outward:dx*frame.out.x+dz*frame.out.z};
+   }).filter(value=>value.along>0.25&&value.along<frame.len-0.25&&value.outward>0&&value.outward<0.1)
+     .map(value=>value.outward);
+   assert.ok(distances.length>0,label+" glass samples exist on facade edge "+edgeIndex);
+   const nearestFace=Math.min(...distances);
+   assert.ok(Math.abs(nearestFace-0.002)<0.0001,label+" glass inner face is 2 mm outside wall plane, edge "+edgeIndex+" measured "+nearestFace);
+   assert.ok(Math.max(...distances)>0.055&&Math.max(...distances)<0.059,label+" glass thickness extends outward from wall plane, edge "+edgeIndex);
+  }
+ }
+});
+
+test("generated entry door is positioned against the selected facade plane",()=>{
+ const built=generateProceduralGlb(fixture);
+ const glb=built.glb;
+ const jsonLength=glb.readUInt32LE(12);
+ const gltf=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+ const binaryStart=28+jsonLength;
+ const doorMesh=gltf.meshes.find(mesh=>mesh.name.endsWith("-door"));
+ assert.ok(doorMesh,"generated GLB includes a door mesh");
+ const accessor=gltf.accessors[doorMesh.primitives[0].attributes.POSITION];
+ const view=gltf.bufferViews[accessor.bufferView];
+ const start=binaryStart+(view.byteOffset||0)+(accessor.byteOffset||0);
+ const vertices=[];
+ for(let i=0;i<accessor.count;i++){
+  const offset=start+i*12;
+  vertices.push({x:glb.readFloatLE(offset),y:glb.readFloatLE(offset+4),z:glb.readFloatLE(offset+8)});
+ }
+ const {derived}=normalizeBuildingSpec(fixture);
+ const edges=derived.localFootprint.map((p,i)=>({p,n:derived.localFootprint[(i+1)%derived.localFootprint.length]}));
+ const front=edges.reduce((best,e,i,all)=>{
+  const length=Math.hypot(e.n.x-e.p.x,e.n.z-e.p.z);
+  const bestEdge=all[best],bestLength=Math.hypot(bestEdge.n.x-bestEdge.p.x,bestEdge.n.z-bestEdge.p.z);
+  return length>bestLength?i:best;
+ },0);
+ const {p,n}=edges[front],frame=createFacadeFrame(p,n);
+ const distances=vertices.map(point=>{
+  const dx=point.x-p.x,dz=point.z-p.z;
+  return {along:dx*frame.tangent.x+dz*frame.tangent.z,outward:dx*frame.out.x+dz*frame.out.z};
+ }).filter(value=>value.along>0.1&&value.along<frame.len-0.1&&value.outward>0&&value.outward<0.1)
+   .map(value=>value.outward);
+ assert.ok(distances.length>0,"door vertices must lie on the selected entrance facade");
+ const nearestFace=Math.min(...distances),outerFace=Math.max(...distances);
+ assert.ok(Math.abs(nearestFace-0.002)<0.0001,"door inner face meets the facade plane with 2 mm clearance");
+ assert.ok(Math.abs(outerFace-0.072)<0.0001,"door outer face matches its depth");
+});
+
+
+test("front facade can be selected explicitly and is reported without guessing",()=>{
+ const explicitSpec={...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:1}};
+ const explicit=generateProceduralGlb(explicitSpec);
+ assert.deepEqual(explicit.report.facadeSelection,{
+  method:"explicit-edge-index",edgeIndex:1,confidence:"operator-specified"
+ });
+ assert.equal(explicit.normalizedSpec.architecture.frontFacadeEdgeIndex,1);
+ const inferred=generateProceduralGlb(fixture);
+ assert.deepEqual(inferred.report.facadeSelection,{
+  method:"longest-edge-inferred",edgeIndex:0,confidence:"estimated"
+ });
+ assert.ok(inferred.report.warnings.some(w=>w.includes("Front facade was inferred")));
+ assert.equal(inferred.report.reviewRequired,true);
+});
+
+test("BuildingSpec rejects a front facade index outside its footprint edges",()=>{
+ assert.throws(
+  ()=>normalizeBuildingSpec({...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:4}}),
+  /frontFacadeEdgeIndex must be between 0 and 3/
+ );
+ assert.throws(
+  ()=>normalizeBuildingSpec({...fixture,architecture:{...fixture.architecture,frontFacadeEdgeIndex:1.5}}),
+  /frontFacadeEdgeIndex must be an integer/
+ );
+});
+
+test("procedural generator rejects pitched roofs instead of silently emitting a flat cap",()=>{
+ const pitched={...fixture,architecture:{...fixture.architecture,roofType:"pitched"}};
+ assert.throws(
+  ()=>generateProceduralGlb(pitched),
+  /roofType 'pitched' is not supported by the procedural generator/
+ );
+});

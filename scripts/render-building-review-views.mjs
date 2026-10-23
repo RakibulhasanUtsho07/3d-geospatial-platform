@@ -5,25 +5,35 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
+const RENDER_PROFILES = new Set([
+  "building-review-cycles-cpu-v1",
+  "ahsan-manzil-y-up-cycles-cpu-v1",
+]);
 
 function parseOptions(args) {
   let resolution = 1024;
   let blender = process.env.BLENDER_BIN || "blender";
+  let renderProfile = "building-review-cycles-cpu-v1";
   for (const arg of args) {
     if (arg.startsWith("--resolution=")) resolution = Number(arg.slice("--resolution=".length));
     else if (arg.startsWith("--blender=")) blender = arg.slice("--blender=".length);
+    else if (arg.startsWith("--render-profile=")) renderProfile = arg.slice("--render-profile=".length);
     else throw new Error("Unknown option: " + arg);
+  }
+  if (!RENDER_PROFILES.has(renderProfile)) {
+    throw new TypeError("Unsupported --render-profile; expected " + [...RENDER_PROFILES].join(" or "));
   }
   if (!Number.isSafeInteger(resolution) || resolution < 256 || resolution > 2048 ||
     (resolution & (resolution - 1)) !== 0) {
     throw new RangeError("resolution must be a power-of-two integer between 256 and 2048");
   }
   if (!blender.trim()) throw new TypeError("Blender executable cannot be empty");
-  return { resolution, blender };
+  return { resolution, blender, renderProfile };
 }
 
 function pngDimensions(bytes, label) {
@@ -47,12 +57,26 @@ function summarizeTextureQa(report) {
   };
 }
 
+function summarizeGeometryQa(report) {
+  return {
+    schemaVersion: report.schemaVersion,
+    engine: report.engine,
+    status: report.status,
+    valid: report.valid,
+    counts: report.counts,
+    bounds: report.bounds,
+    errors: [],
+    warnings: report.warnings,
+    limitations: report.limitations,
+  };
+}
+
 async function main() {
   const [modelArg, outputArg, ...flags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
-    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender]");
+    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--render-profile=building-review-cycles-cpu-v1|ahsan-manzil-y-up-cycles-cpu-v1]");
   }
-  const { resolution, blender } = parseOptions(flags);
+  const { resolution, blender, renderProfile } = parseOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
   const outputDir = path.resolve(outputArg);
@@ -66,9 +90,10 @@ async function main() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  await mkdir(outputDir, { recursive: false });
-
   const modelBytes = await readFile(modelPath);
+  // Fail closed before rendering if the input GLB has malformed structure or geometry.
+  const geometryQaSummary = summarizeGeometryQa(analyzeGlbQuality(modelBytes));
+  await mkdir(outputDir, { recursive: false });
   let textureQaSummary = null;
   try {
     textureQaSummary = summarizeTextureQa(reviewGlbTextureBindings(modelBytes));
@@ -85,6 +110,7 @@ async function main() {
       "--background", "--factory-startup", "--python-exit-code", "17",
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
+      "--render-profile", renderProfile,
     ];
     const result = spawnSync(blender, args, { encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
     if (result.error) {
@@ -115,6 +141,7 @@ async function main() {
       modelSha256: sha256(modelBytes),
       files: fileMetadata,
       resolution,
+      geometryQaSummary,
       textureQaSummary,
     });
     const reportPath = path.join(outputDir, "render-review-manifest.json");
@@ -126,6 +153,9 @@ async function main() {
       valid: report.valid,
       renderedViews: report.counts.generatedViews,
       resolution: resolution + "x" + resolution,
+      geometryQaStatus: report.geometryQaSummary.status,
+      geometryQaWarnings: report.geometryQaSummary.warnings.length,
+      renderConfigSha256: report.renderConfigSha256,
       errors: report.errors.length,
       warnings: report.warnings.length,
       publicationEligible: false,

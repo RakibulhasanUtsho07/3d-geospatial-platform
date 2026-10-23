@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "buildingId": "ahsan-manzil-kumartuli-dhaka",
+  "title": "Ahsan Manzil reference views for dedicated Y-up model review",
+  "modelCoordinateConvention": "Y-up; +X east; +Z south / riverfront",
+  "policy": "Source files are downloaded only for a repeatable review package. SHA-1 is pinned to the Commons-listed original-file checksum; SHA-256 is computed at run time and copied into the review manifest. No automated image-similarity score determines a match.",
+  "license": "Each source image is separately licensed CC BY-SA 4.0 by its listed author; image files must remain unmodified and must be accompanied by this attribution in every review package.",
+  "references": [
+    {
+      "id": "ahsan-manzil-front-mahosha-2012",
+      "filename": "ahsan-manzil-front-view-mahosha-2012.jpg",
+      "title": "Ahsan Manzil-Front View.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/1/16/Ahsan_Manzil-Front_View.jpg",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil-Front_View.jpg",
+      "expectedSha1": "2b618e39a6dd00c5781a0f21eb4b7b372a2e49b9",
+      "expectedBytes": 2036432,
+      "expectedWidth": 2512,
+      "expectedHeight": 1678,
+      "author": "Mahbub Hossain Shaheed (mahosha)",
+      "capturedOn": "2012-12-22",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attribution": "Mahbub Hossain Shaheed (mahosha), “Ahsan Manzil-Front View.jpg”, CC BY-SA 4.0, Wikimedia Commons. Source image retained unmodified.",
+      "facadeLabel": "south-riverfront-front-facade",
+      "mappedRenderViewId": "front",
+      "comparisonBasis": "pose-estimated",
+      "captureHeadingBasis": "unknown",
+      "note": "Commons caption identifies this as a front view. The centered dome/main stair composition is mapped to the model's south river-facing +Z facade; the image metadata does not independently provide a camera heading."
+    },
+    {
+      "id": "ahsan-manzil-east-side-parvezahmed-2019",
+      "filename": "ahsan-manzil-side-view-parvezahmed-2019.jpg",
+      "title": "Ahsan Manzil Side View.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ahsan_Manzil_Side_View.jpg",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+      "expectedSha1": "9b8ea70335c280a9dd4b9e9c3e87a03c20613711",
+      "expectedBytes": 2808254,
+      "expectedWidth": 4000,
+      "expectedHeight": 3000,
+      "author": "Parvezahmed",
+      "capturedOn": "2019-11-01",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attribution": "Parvezahmed, “Ahsan Manzil Side View.jpg”, CC BY-SA 4.0, Wikimedia Commons. Source image retained unmodified.",
+      "facadeLabel": "southeast-oblique-viewpoint-from-published-camera-location",
+      "mappedRenderViewId": "turntable-315",
+      "comparisonBasis": "pose-estimated",
+      "captureHeadingBasis": "unknown",
+      "cameraLocation": {
+        "latitude": 23.708196,
+        "longitude": 90.406732
+      },
+      "note": "Commons records a camera point at 23.708196 N, 90.406732 E. The model anchor is 23.7086 N, 90.40606 E with [C] confidence, placing the camera provisionally southeast of the site. The nearest fixed turntable camera is 315 degrees in Blender world; this is a best-estimate viewpoint match, not a calibrated camera pose.",
+      "mappingConfidence": "[C] approximate camera point and source georeference anchor; nearest available fixed azimuth is 315 degrees; camera heading and lens calibration unknown"
+    }
+  ]
+}

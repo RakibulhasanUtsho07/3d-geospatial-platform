@@ -60,7 +60,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-v4
   cancel-in-progress: true
 
 jobs:
@@ -143,10 +143,24 @@ jobs:
       - name: Test resumable reconstruction job state and immutable stage artifacts
         run: npm run test:reconstruction-job-state
 
-      - name: Install FFmpeg for deterministic texture atlas baking
-        uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          ffmpeg-version: release
+      - name: Ensure FFmpeg is available for texture atlas tests
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
+          else
+            # Avoid slow Ubuntu mirror installs of dozens of codec libraries on
+            # a time-limited runner. Install a pinned static binary ephemerally;
+            # do not modify package.json or package-lock.json for this CI-only tool.
+            npm install --no-save --package-lock=false ffmpeg-static@5.3.0 @ffprobe-installer/ffprobe@2.1.2
+            ffmpeg_path="$(node -p "require('ffmpeg-static')")"
+            ffprobe_path="$(node -p "require('@ffprobe-installer/ffprobe').path")"
+            test -x "$ffmpeg_path"
+            test -x "$ffprobe_path"
+            sudo ln -sf "$ffmpeg_path" /usr/local/bin/ffmpeg
+            sudo ln -sf "$ffprobe_path" /usr/local/bin/ffprobe
+            ffmpeg -version | head -n 1
+            ffprobe -version | head -n 1
+          fi
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -236,6 +250,21 @@ jobs:
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
 
+      - name: Install and verify Blender for headless render integration
+        run: |
+          # Ubuntu's Blender package pulls ~190 MB of archives on a cold runner.
+          # Keep explicit network timeouts, but allow enough wall time for slower mirrors.
+          sudo timeout 180s apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo timeout 1200s apt-get install --no-install-recommends -y blender python3-numpy libegl1 libgl1 libxkbcommon0 libsm6 libxext6 libxrender1
+          blender --version
+          blender --background --python-expr "import numpy; print('Blender NumPy:', numpy.__version__)"
+          ldconfig -p | grep -E 'libEGL[.]so[.]1|libGL[.]so[.]1'
+
+      - name: Test end-to-end GLB render review and hash contract
+        env:
+          BLENDER_BIN: blender
+        run: npm run test:render-review-integration
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
@@ -309,6 +338,7 @@ jobs:
         run: npm run test:heritage-model
 
       - name: Upload generated Ahsan Manzil GLB assets
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ahsan-manzil-generated-glb
@@ -319,6 +349,24 @@ jobs:
             public/models/ahsan-manzil.glb
           if-no-files-found: error
           retention-days: 2
+
+      - name: Test Ahsan Manzil reference source hashes, licenses and facade mapping
+        run: npm run test:ahsan-manzil-reference-sources
+
+      - name: Render Ahsan Manzil with Y-up cameras and build reference review evidence
+        env:
+          BLENDER_BIN: blender
+          AHSAN_MANZIL_REVIEW_OUTPUT: artifacts/ahsan-manzil-review
+        run: npm run test:ahsan-manzil-review-integration
+
+      - name: Upload Ahsan Manzil reference/render review bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-review-evidence
+          path: artifacts/ahsan-manzil-review
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Build Overture spatial tiles
         run: npm run build:geospatial-tiles

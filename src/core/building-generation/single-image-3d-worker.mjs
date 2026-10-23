@@ -12,16 +12,36 @@ function inside(root,candidate){const relative=path.relative(root,candidate);ret
 function requireConfirmed(value){if(value!==true)throw new TypeError("allowSingleViewInference must be explicitly true; single-view AI is approximate and can hallucinate unseen geometry");}
 async function processRun(executable,args,cwd,timeoutMs,spawnImpl=nodeSpawn){
  return await new Promise((resolve,reject)=>{
-  let child;try{child=spawnImpl(executable,args,{cwd,stdio:["ignore","pipe","pipe"],windowsHide:true});}catch(error){reject(error);return;}
+  let child;
+  try{child=spawnImpl(executable,args,{cwd,stdio:["ignore","pipe","pipe"],windowsHide:true});}
+  catch(error){
+   const wrapped=new Error("Could not start single-image runner '"+executable+"': "+error.message);
+   wrapped.processStarted=false;wrapped.spawnErrorCode=error?.code??null;reject(wrapped);return;
+  }
   let stdout="",stderr="",settled=false;
   const done=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
   child.stdout?.on("data",chunk=>{stdout=(stdout+chunk.toString()).slice(-12000);});
   child.stderr?.on("data",chunk=>{stderr=(stderr+chunk.toString()).slice(-20000);});
-  const timer=setTimeout(()=>{child.kill("SIGTERM");const killer=setTimeout(()=>child.kill("SIGKILL"),2500);killer.unref?.();done(reject,new Error("Single-image 3D runner timed out after "+timeoutMs+" ms"));},timeoutMs);
-  child.once("error",error=>done(reject,new Error("Could not start single-image runner '"+executable+"': "+error.message)));
-  child.once("close",(code,signal)=>code===0?done(resolve,{stdout,stderr}):done(reject,new Error("Single-image runner failed (exit "+code+(signal?", signal "+signal:"")+"): "+(stderr.trim().slice(-6000)||stdout.trim().slice(-2000)||"no diagnostic output"))));
+  const timer=setTimeout(()=>{
+   child.kill("SIGTERM");const killer=setTimeout(()=>child.kill("SIGKILL"),2500);killer.unref?.();
+   const error=new Error("Single-image 3D runner timed out after "+timeoutMs+" ms");
+   error.processStarted=true;error.timedOut=true;done(reject,error);
+  },timeoutMs);
+  child.once("error",error=>{
+   const wrapped=new Error("Could not start single-image runner '"+executable+"': "+error.message);
+   wrapped.processStarted=false;wrapped.spawnErrorCode=error?.code??null;done(reject,wrapped);
+  });
+  child.once("close",(code,signal)=>{
+   if(code===0)done(resolve,{stdout,stderr,exitCode:code,signal,processStarted:true});
+   else{
+    const error=new Error("Single-image runner failed (exit "+code+(signal?", signal "+signal:"")+"): "+(stderr.trim().slice(-6000)||stdout.trim().slice(-2000)||"no diagnostic output"));
+    error.processStarted=true;error.exitCode=code;error.signal=signal;
+    done(reject,error);
+   }
+  });
  });
 }
+
 async function requiredRegularFile(filePath,label,{allowSymlink=false}={}){
  const entry=await lstat(filePath);
  if((entry.isSymbolicLink()&&!allowSymlink)||!entry.isFile())throw new TypeError(label+" must be a regular file"+(allowSymlink?"":" and not a symlink"));
@@ -76,6 +96,7 @@ export async function runSingleImage3D(options){
  if(sourceFile.size>20*1024*1024)throw new RangeError("source image exceeds the 20 MB limit");
  const runnerRaw=path.resolve(options.runnerScript??"");
  const runner=await requiredRegularFile(runnerRaw,"TripoSR run.py");
+ const runnerBytes=await readFile(runner.path),runnerScriptSha256=createHash("sha256").update(runnerBytes).digest("hex");
  const jobsRoot=path.join(root,".building-engine","jobs",buildingId);
  await mkdir(jobsRoot,{recursive:true});
  const realJobsRoot=await realpath(jobsRoot);
@@ -88,35 +109,94 @@ export async function runSingleImage3D(options){
  const outputDir=path.join(realJobDir,"tripo-output");
  await mkdir(outputDir);
  const reportPath=path.join(realJobDir,"report.json"),startedAt=new Date().toISOString();
+ const pythonPath=options.pythonPath||process.env.TRIPOSR_PYTHON||"python";
  const report={
   schemaVersion:"1.0.0",engine:"single-image-ai-triposr-v1",modelImplementation:"VAST-AI-Research/TripoSR",
   modelLicense:"MIT (verify installed revision and notices)",buildingId,jobId,sourceId,status:"running",startedAt,
   source:{sha256:inputHash,licence:record.licence,usageStatus:record.usageStatus,mimeType:record.mimeType},
   modelParameters:{modelId,device,mcResolution:resolution,modelSaveFormat:"glb",backgroundRemoval:true},
-  confidence:"ai-proposed",scaleCalibration:{status:"not-calibrated"},georeference:{status:"not-solved"},
-  warnings:["Single-image AI inferred unseen surfaces; this is not measured or survey-accurate architecture.","Output scale, front-facing direction and georeference are not established by the input image.","Human review is mandatory before any use as a building model."],
+  confidence:"ai-proposed",
+  scaleCalibration:{status:"not-calibrated"},
+  georeference:{status:"not-solved"},
+  executionEvidence:{
+   processAdapter:options.spawnImpl?"injected-adapter-unverified":"node-child-process.spawn",
+   workerStarted:false,workerExitCode:null,workerVersion:"not-queried",
+   dependencyPreflight:{
+    status:options.spawnImpl?"skipped-injected-adapter":"pending",
+    executable:pythonPath,
+    checks:["python executable","torch module","tsr module"],
+    reason:options.spawnImpl?"Injected spawn adapter is reserved for orchestration tests; it cannot prove real dependency availability.":null
+   },
+   runnerScriptSha256,
+   actualInferenceVerified:false,
+   outputVerification:"GLB-structure-and-geometry-only",
+   caveat:"A successful process and parseable GLB do not independently prove that TripoSR inference or the requested model weights actually ran."
+  },
+  warnings:["Single-image AI inferred unseen surfaces; this is not measured or survey-accurate architecture.","Output scale, front-facing direction and georeference are not established by the input image.","Human review is mandatory before any use as a building model.","The worker does not independently attest model weights or the inference implementation; inspect executionEvidence and runner script hash."],
   mapReady:false,publicationEligible:false,
  };
  try{
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
-  const pythonPath=options.pythonPath||process.env.TRIPOSR_PYTHON||"python";
+  if(!options.spawnImpl){
+   const preflightCode=[
+    "import importlib.util,json,sys",
+    "required=['torch','tsr']",
+    "modules={}",
+    "missing=[]",
+    "for name in required:",
+    "  try: modules[name]=importlib.util.find_spec(name) is not None",
+    "  except (ImportError,ValueError): modules[name]=False",
+    "  if not modules[name]: missing.append(name)",
+    "print(json.dumps({'pythonVersion':sys.version.split()[0],'pythonExecutable':sys.executable,'modules':modules}))",
+    "if missing:",
+    "  print('Missing TripoSR runtime module(s): '+', '.join(missing),file=sys.stderr)",
+    "  sys.exit(2)"
+   ].join("\n");
+   report.executionEvidence.dependencyPreflight.status="running";
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+   try{
+    const preflight=await processRun(pythonPath,["-c",preflightCode],path.dirname(runner.path),Math.min(timeoutMs,30000));
+    const details=JSON.parse(preflight.stdout.trim().split(/\r?\n/).at(-1));
+    report.executionEvidence.dependencyPreflight={status:"passed",executable:pythonPath,checks:["python executable","torch module","tsr module"],pythonVersion:details.pythonVersion,pythonExecutable:details.pythonExecutable,modules:details.modules,completedAt:new Date().toISOString()};
+    report.executionEvidence.workerVersion="Python "+details.pythonVersion+"; TripoSR code revision not pinned";
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+   }catch(preflightError){
+    report.executionEvidence.dependencyPreflight={status:"failed",executable:pythonPath,checks:["python executable","torch module","tsr module"],failureMessage:preflightError instanceof Error?preflightError.message:String(preflightError),completedAt:new Date().toISOString()};
+    throw new Error("TripoSR runtime preflight failed: "+report.executionEvidence.dependencyPreflight.failureMessage);
+   }
+  }
   const args=[runner.path,sourceFile.path,"--output-dir",outputDir,"--model-save-format","glb","--mc-resolution",String(resolution),"--device",device,"--pretrained-model-name-or-path",modelId];
   const begin=Date.now();
   const processResult=await processRun(pythonPath,args,path.dirname(runner.path),timeoutMs,options.spawnImpl);
   report.durationMs=Date.now()-begin;
+  report.executionEvidence.workerStarted=processResult.processStarted===true;
+  report.executionEvidence.workerExitCode=processResult.exitCode;
+  report.executionEvidence.processStatus="exited-0";
   const outputPath=path.join(outputDir,"0","mesh.glb"),output=await requiredRegularFile(outputPath,"TripoSR GLB output");
   if(output.size>MAX_MODEL_BYTES)throw new RangeError("TripoSR GLB output exceeds 500 MB");
   const bytes=await readFile(output.path),parsed=parseGlb(bytes),modelQuality=analyzeGlbQuality(bytes),sha256=createHash("sha256").update(bytes).digest("hex");
   const modelPath=path.join(realJobDir,"model.glb");
   await writeFile(modelPath,bytes,{flag:"wx",mode:0o600});
-  report.status="ai-proposed-requires-review";report.completedAt=new Date().toISOString();
+  report.status=options.spawnImpl?"adapter-output-unverified":"ai-proposed-requires-review";
+  if(options.spawnImpl)report.confidence="unverified-adapter-output";
+  report.completedAt=new Date().toISOString();
   report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");
   report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:bytes.length,sha256,meshCount:parsed.meshCount}};
-  report.runner={executable:pythonPath,scriptPath:runner.path,stdoutTail:processResult.stdout.slice(-2000),stderrTail:processResult.stderr.slice(-4000)};
+  report.runner={executable:pythonPath,scriptPath:runner.path,scriptSha256:runnerScriptSha256,processAdapter:report.executionEvidence.processAdapter,exitCode:processResult.exitCode,stdoutTail:processResult.stdout.slice(-2000),stderrTail:processResult.stderr.slice(-4000)};
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   return {jobDir:realJobDir,modelPath,reportPath,report};
  }catch(error){
   report.status="failed";report.failedAt=new Date().toISOString();report.failureMessage=error instanceof Error?error.message:String(error);
+  if(error?.processStarted===true)report.executionEvidence.workerStarted=true;
+  if(Number.isInteger(error?.exitCode))report.executionEvidence.workerExitCode=error.exitCode;
+  if(report.executionEvidence.dependencyPreflight.status==="running"){
+   report.executionEvidence.dependencyPreflight.status="failed";
+   report.executionEvidence.dependencyPreflight.failureMessage=report.failureMessage;
+  }
+  if(report.executionEvidence.processStatus!=="exited-0"){
+   report.executionEvidence.processStatus=error?.processStarted===false?"not-started":error?.processStarted===true?"failed":"not-confirmed";
+  }
+  report.executionEvidence.failureMessage=report.failureMessage;
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n").catch(()=>{});
   error.reportPath=reportPath;throw error;
  }

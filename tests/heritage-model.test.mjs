@@ -12,14 +12,64 @@ const requiredNodes = [
   "Finial", "Andarmahal",
 ];
 
-async function readGlbNodes(relativePath) {
+async function readGlb(relativePath) {
   const bytes = await readFile(path.join(root, relativePath));
   assert.equal(bytes.readUInt32LE(0), 0x46546c67, relativePath + " GLB magic");
   assert.equal(bytes.readUInt32LE(4), 2, relativePath + " GLB version");
   assert.equal(bytes.readUInt32LE(8), bytes.length, relativePath + " total length");
   const jsonLength = bytes.readUInt32LE(12);
   assert.equal(bytes.readUInt32LE(16), 0x4e4f534a, relativePath + " JSON chunk type");
-  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8"));
+  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const binHeader = 20 + jsonLength;
+  assert.equal(bytes.readUInt32LE(binHeader + 4), 0x004e4942, relativePath + " BIN chunk type");
+  const binLength = bytes.readUInt32LE(binHeader);
+  const binary = bytes.subarray(binHeader + 8, binHeader + 8 + binLength);
+  const readAccessor = (accessorIndex) => {
+    const accessor = gltf.accessors[accessorIndex];
+    const view = gltf.bufferViews[accessor.bufferView];
+    const componentCount = ({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 })[accessor.type];
+    assert.ok(componentCount, relativePath + " supported accessor type");
+    const componentType = accessor.componentType;
+    const componentSize = ({ 5121: 1, 5123: 2, 5125: 4, 5126: 4 })[componentType];
+    assert.ok(componentSize, relativePath + " supported component type");
+    const stride = view.byteStride || componentCount * componentSize;
+    const start = (view.byteOffset || 0) + (accessor.byteOffset || 0);
+    const values = [];
+    for (let row = 0; row < accessor.count; row++) {
+      const tuple = [];
+      for (let column = 0; column < componentCount; column++) {
+        const offset = start + row * stride + column * componentSize;
+        if (componentType === 5121) tuple.push(binary.readUInt8(offset));
+        else if (componentType === 5123) tuple.push(binary.readUInt16LE(offset));
+        else if (componentType === 5125) tuple.push(binary.readUInt32LE(offset));
+        else tuple.push(binary.readFloatLE(offset));
+      }
+      values.push(tuple);
+    }
+    return values;
+  };
+  const readMeshAttributes = (nodeName) => {
+    const node = gltf.nodes.find((item) => item.name === nodeName);
+    assert.ok(node && Number.isSafeInteger(node.mesh), relativePath + " must contain mesh node " + nodeName);
+    const primitives = gltf.meshes[node.mesh].primitives;
+    assert.ok(primitives.length > 0, relativePath + " mesh node must have a primitive " + nodeName);
+    const readAll = (attributeName) => primitives.flatMap((primitive) => {
+      const accessorIndex = primitive.attributes[attributeName];
+      assert.ok(Number.isSafeInteger(accessorIndex),
+        relativePath + " " + nodeName + " primitive must contain " + attributeName);
+      return readAccessor(accessorIndex);
+    });
+    return {
+      positions: readAll("POSITION"),
+      normals: readAll("NORMAL"),
+      colors: readAll("COLOR_0"),
+    };
+  };
+  return { gltf, readMeshAttributes };
+}
+
+async function readGlbNodes(relativePath) {
+  const { gltf } = await readGlb(relativePath);
   return gltf.nodes.map((node) => node.name);
 }
 
@@ -52,10 +102,64 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
   }
 });
 
+test("Ahsan Manzil roof finish is a visible top-facing vertex-coloured surface above the upper slab", async () => {
+  const relativePath = "public/models/ahsan-manzil-lod3.glb";
+  const { readMeshAttributes } = await readGlb(relativePath);
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  const roofTop = config.parameters.vertical.rooflineHeight.value -
+    config.parameters.vertical.parapetHeight.value;
+  const expectedTop = roofTop + 0.08;
+  const roofHex = config.parameters.materials.roof.value;
+  const expectedColor = [1, 3, 5].map((index) => Number.parseInt(roofHex.slice(index, index + 2), 16));
+  const { positions, normals, colors } = await readMeshAttributes("Parapet");
+  let visibleRoofTopVertices = 0;
+  for (let index = 0; index < positions.length; index++) {
+    const normal = normals[index];
+    const color = colors[index];
+    if (Math.abs(positions[index][1] - expectedTop) < 1e-4 &&
+      normal[1] > 0.99 &&
+      color[0] === expectedColor[0] &&
+      color[1] === expectedColor[1] &&
+      color[2] === expectedColor[2] &&
+      color[3] === 255) {
+      visibleRoofTopVertices++;
+    }
+  }
+  assert.ok(visibleRoofTopVertices >= 12,
+    "both palace wings need visible, upward-facing roof-finish vertices above the upper slabs");
+});
+
+test("central pavilion, dome drum and tapered stair implement the photo-estimated dimensions", async () => {
+  const { readMeshAttributes } = await readGlb("public/models/ahsan-manzil-lod3.glb");
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  const expectedDrumWidth = config.parameters.dome.drumWidth.value;
+  const drum = (await readMeshAttributes("Dome_Drum")).positions;
+  const xValues = drum.map((point) => point[0]);
+  const zValues = drum.map((point) => point[2]);
+  const actualDrumX = Math.max(...xValues) - Math.min(...xValues);
+  const actualDrumZ = Math.max(...zValues) - Math.min(...zValues);
+  assert.ok(actualDrumX >= expectedDrumWidth - 0.05 && actualDrumX <= expectedDrumWidth + 0.15,
+    `dome drum east-west bounds retain core parameter with <=15 cm trim overhang: expected=${expectedDrumWidth}, actual=${actualDrumX}, bounds=[${Math.min(...xValues)}, ${Math.max(...xValues)}]`);
+  assert.ok(actualDrumZ >= expectedDrumWidth - 0.05 && actualDrumZ <= expectedDrumWidth + 0.15,
+    `dome drum north-south bounds retain core parameter with <=15 cm trim overhang: expected=${expectedDrumWidth}, actual=${actualDrumZ}, bounds=[${Math.min(...zValues)}, ${Math.max(...zValues)}]`);
+  const stair = (await readMeshAttributes("Stair_S")).positions;
+  const stairX = stair.map((point) => point[0]);
+  const actualStairWidth = Math.max(...stairX) - Math.min(...stairX);
+  assert.ok(actualStairWidth >= config.parameters.stair.width.value,
+    "stair retains the broad reference-elevation base width");
+  assert.ok(actualStairWidth < config.parameters.stair.width.value + 3.0,
+    "stair rails/lamp details stay within a bounded margin around the stair footprint");
+  assert.equal(config.parameters.facade.porticoWidth.value, 12.0);
+  assert.equal(config.parameters.stair.topWidth.value, 11.5);
+  assert.equal(config.parameters.dome.drumWidth.confidence, "[E]");
+});
+
 test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
   assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
   assert.ok(builder.includes("const split = xMin + andarLength;"));
+  assert.ok(builder.includes("const roofFinishThickness = 0.08;"));
+  assert.ok(builder.includes("const roofFinishCenterY = roofTop + roofFinishThickness / 2;"));
   assert.ok(builder.includes("const domeX = (split + xMax) / 2;"));
   assert.ok(builder.includes("const stairTopZ = half + 2.7;"));
   assert.ok(builder.includes("The projecting triple-arched portico is an open"));
@@ -78,9 +182,9 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.footprint.andarmahalDepth.value, 14.375);
   assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
   assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
-  assert.equal(config.parameters.facade.porticoWidth.value, 16.5);
+  assert.equal(config.parameters.facade.porticoWidth.value, 12.0);
   assert.equal(config.parameters.stair.width.value, 16.5);
-  assert.equal(config.parameters.stair.topWidth.value, 13.5);
+  assert.equal(config.parameters.stair.topWidth.value, 11.5);
   assert.equal(config.parameters.stair.stepCount.value, 28);
   assert.equal(config.parameters.stair.riserHeight.value, 0.23);
   assert.equal(config.parameters.stair.treadDepth.value, 0.34);
@@ -90,6 +194,10 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
   assert.equal(config.parameters.materials.glass.value, "#392B27");
+  assert.equal(config.parameters.dome.drumWidth.value, 11.0);
+  assert.equal(config.parameters.dome.drumWidth.confidence, "[E]");
+  assert.equal(config.parameters.facade.porticoWidth.confidence, "[E]");
+  assert.equal(config.parameters.stair.topWidth.confidence, "[E]");
   assert.equal(config.parameters.dome.drumOpeningCount.value, 8);
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);

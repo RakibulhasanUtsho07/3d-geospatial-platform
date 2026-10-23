@@ -695,11 +695,14 @@ function buildGlb(lod) {
   box(n.Andarmahal,andarCenterX,gfBase+gfHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
   box(n.Andarmahal,andarCenterX,ffBase+ffHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
 
-  // Separate roof decks preserve the stepped/L-shaped footprint: the main
-  // Rangmahal faces the river, while Andarmahal is set back to the north.
+  // The upper-floor slab already reaches roofTop. Keep a thin, visible roof
+  // finish above the slab rather than overlapping it with coplanar faces.
+  // The prior overlapping boxes produced black/unstable roof pixels in Cycles.
   const rangCenterX = (split + xMax) / 2;
-  box(n.Parapet,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
-  box(n.Parapet,andarCenterX,roofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
+  const roofFinishThickness = 0.08;
+  const roofFinishCenterY = roofTop + roofFinishThickness / 2;
+  box(n.Parapet,rangCenterX,roofFinishCenterY,0,rangLength,roofFinishThickness,D,"roof");
+  box(n.Parapet,andarCenterX,roofFinishCenterY,andarCenterZ,andarLength,roofFinishThickness,andarDepth,"roof");
 
   for(const side of [-1,1]){
     const rangZ=side*(half+.12);
