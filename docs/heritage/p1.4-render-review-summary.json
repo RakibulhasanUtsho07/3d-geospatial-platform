@@ -1,0 +1,194 @@
+{
+  "task": "P1.4",
+  "building": "Ahsan Manzil (Pink Palace), Dhaka",
+  "sourceCommit": "81dac8b57a5916bd447b209bfa1874860d0fb64a",
+  "reviewGeneratedAt": "2026-10-23T10:15:40.167Z",
+  "correctionScope": [
+    "Rangmahal and Andarmahal roof-height separation",
+    "proportional 18.6 m triple-arch portico and stair landing",
+    "16 m ceremonial stair run with 28 shallow treads",
+    "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
+    "profile-aligned dome mouldings, improved review contrast, and stylized column capitals"
+  ],
+  "model": {
+    "filename": "ahsan-manzil-lod3.glb",
+    "sha256": "7ef19265af6316d0e3d6b3b15ab2cb3d5f98fe74e0d0716aa1d02811f13d9b75",
+    "byteLength": 6692916
+  },
+  "renderManifest": {
+    "filename": "render-review-manifest.json",
+    "sha256": "da404f6413923390be15321d6f0109c619fa2e07d58128af2e2c621ad4118699",
+    "valid": true,
+    "status": "render-set-ready-for-human-review",
+    "renderer": "Blender",
+    "rendererVersion": "4.0.2",
+    "sceneBounds": {
+      "min": [
+        -63.46500015,
+        -33.73500061,
+        0
+      ],
+      "max": [
+        63.46500015,
+        19.41500092,
+        27.12999916
+      ],
+      "dimensions": [
+        126.93000031,
+        53.15000153,
+        27.12999916
+      ],
+      "coordinateUnits": "imported-model-units-unverified"
+    }
+  },
+  "qa": {
+    "geometry": {
+      "filename": "geometry-qa-report.json",
+      "sha256": "c013d27884bdb7e0652e97c760b7bced77aabddcc4721c5a0bf842f35d6a37c2",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "degenerate-triangles-present",
+        "degenerate-triangle-ratio-exceeds-threshold",
+        "long-triangle-edges-present",
+        "non-manifold-edges-present",
+        "disconnected-mesh-components-present",
+        "open-boundary-edges-present",
+        "small-detached-components-present",
+        "no-texture-atlas-embedded-or-declared"
+      ]
+    },
+    "textures": {
+      "filename": "texture-qa-report.json",
+      "sha256": "51ce3c38409927f6a548543ee3b1e6bcd6a1785da10e6bd9bb904e00b58ab6d3",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "mesh-0-primitive-0-no-supported-material-textures",
+        "mesh-1-primitive-0-no-supported-material-textures",
+        "mesh-2-primitive-0-no-supported-material-textures",
+        "mesh-3-primitive-0-no-supported-material-textures",
+        "mesh-4-primitive-0-no-supported-material-textures",
+        "mesh-5-primitive-0-no-supported-material-textures",
+        "mesh-6-primitive-0-no-supported-material-textures",
+        "mesh-7-primitive-0-no-supported-material-textures",
+        "mesh-8-primitive-0-no-supported-material-textures",
+        "mesh-9-primitive-0-no-supported-material-textures",
+        "mesh-10-primitive-0-no-supported-material-textures",
+        "mesh-11-primitive-0-no-supported-material-textures",
+        "mesh-12-primitive-0-no-supported-material-textures",
+        "mesh-13-primitive-0-no-supported-material-textures",
+        "mesh-14-primitive-0-no-supported-material-textures",
+        "mesh-15-primitive-0-no-supported-material-textures",
+        "mesh-16-primitive-0-no-supported-material-textures",
+        "mesh-17-primitive-0-no-supported-material-textures",
+        "mesh-18-primitive-0-no-supported-material-textures",
+        "mesh-19-primitive-0-no-supported-material-textures",
+        "mesh-20-primitive-0-no-supported-material-textures",
+        "no-images-declared",
+        "no-textures-declared",
+        "one-or-more-primitives-untextured"
+      ]
+    }
+  },
+  "views": [
+    {
+      "id": "front",
+      "filename": "front.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "4cd249a742ee1e3de1a43e98d6d5e960e0adc3371b76a4dda3cad25cf3ab1fd6"
+    },
+    {
+      "id": "back",
+      "filename": "back.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b2fe3facc4d910e934e4e6c473fa9500ee9795596ce915e4ce4dd0c0f2b7edd9"
+    },
+    {
+      "id": "left",
+      "filename": "left.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "90d6577ead84d57cce65d86c860bcf5df009d4204273c50a555e54bb0fad5105"
+    },
+    {
+      "id": "right",
+      "filename": "right.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "9f9f556e62946efbdfef0a1c1b684731a730634b6247b7bd85a00bc9612460af"
+    },
+    {
+      "id": "top",
+      "filename": "top.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "e2853dedf57bba11ec1b7546853e623548fc4482a8859d1a99a5c7daa1b73073"
+    },
+    {
+      "id": "turntable-000",
+      "filename": "turntable-000.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "c09229ff8ffcb5589a6bb023cb7531cd8e9ce3b6a2c5b1b9f098b7acbdf6163c"
+    },
+    {
+      "id": "turntable-045",
+      "filename": "turntable-045.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "1a888f2a98f24d8797cefc41f5c29cb2521a6f97a785bc086d5be0a1e7e05db7"
+    },
+    {
+      "id": "turntable-090",
+      "filename": "turntable-090.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "7c21e405d01c7ae1cbbbf9a01ebc9738bfcb7efd2f41627e3f8f256a48fbed27"
+    },
+    {
+      "id": "turntable-135",
+      "filename": "turntable-135.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "621a88fbe70c93a9fbeced997e5e701b3174a1c1190b9c630899cbad9776a5bc"
+    },
+    {
+      "id": "turntable-180",
+      "filename": "turntable-180.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "aff4095981d5e21ce9cca6f1e6618171b62c62d01660c7ccc4d2b5deb9010817"
+    },
+    {
+      "id": "turntable-225",
+      "filename": "turntable-225.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "86786e1ff666865832a55b4fe6c1561694650012e3d66b8c873921c6d2fc87cc"
+    },
+    {
+      "id": "turntable-270",
+      "filename": "turntable-270.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "91484585bf2f254b5340288014df838d08698ab3f486baf2e107cfa26cbf9369"
+    },
+    {
+      "id": "turntable-315",
+      "filename": "turntable-315.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b620a43af35214b890975c1aa63d15dc78cdffc634c2da578e5fa2a7f433c21f"
+    }
+  ],
+  "visualReview": {
+    "contactSheet": "contact-sheet.png",
+    "status": "rendered; human comparison with heritage references is still required",
+    "policy": "Hashes and QA metrics prove artifact integrity, not historical accuracy. Values tagged [E], [C] or [?] remain unverified."
+  }
+}
