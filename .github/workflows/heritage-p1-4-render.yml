@@ -170,14 +170,18 @@ jobs:
           cp artifacts/p1-4-render-set/contact-sheet.png docs/heritage/p1.4-render-contact-sheet.png
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/heritage/p1.4-render-review-summary.json docs/heritage/p1.4-render-contact-sheet.png public/models/ahsan-manzil-lod1.glb public/models/ahsan-manzil-lod2.glb public/models/ahsan-manzil-lod3.glb public/models/ahsan-manzil.glb
+          git add docs/heritage/p1.4-render-review-summary.json docs/heritage/p1.4-render-contact-sheet.png public/models/ahsan-manzil-lod1.glb public/models/ahsan-manzil-lod2.glb public/models/ahsan-manzil-lod3.glb public/models/ahsan-manzil.glb public/models/ahsan-manzil.manifest.json
           if ! git diff --cached --quiet; then
-            # First commit generated files so rebase sees a clean working tree.
             git commit -m "docs(heritage): record P1.4 render evidence [skip ci]"
-            git fetch origin "+refs/heads/${GITHUB_REF_NAME}:refs/remotes/origin/${GITHUB_REF_NAME}"
-            git rebase "origin/${GITHUB_REF_NAME}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
+          # The model builder may also touch auxiliary generated metadata. Keep
+          # the commit clean before rebasing it onto changes made during render.
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git stash push --include-untracked -m "P1.4 transient build outputs before rebase"
+          fi
+          git fetch origin "+refs/heads/${GITHUB_REF_NAME}:refs/remotes/origin/${GITHUB_REF_NAME}"
+          git rebase "origin/${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload review evidence
         if: always()
