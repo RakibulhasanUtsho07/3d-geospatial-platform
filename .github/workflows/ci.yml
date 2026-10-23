@@ -57,7 +57,6 @@ on:
       - refactor/p1-building-selection-materials
       - refactor/p1-picked-entity-resolution
       - refactor/p1-feature-pick-routing
-      - refactor/p1-selection-event-dispatch
       - refactor/p1-feature-picking-controller
       - refactor/p1-feature-pick-geometry
       - rakibul-hasan
