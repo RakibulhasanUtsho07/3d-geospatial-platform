@@ -1,40 +1,41 @@
 {
   "task": "P1.4",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "1cfb9d39845eb99a70ce763994900aaffd04f1c5",
-  "reviewGeneratedAt": "2026-10-23T11:21:01.103Z",
+  "sourceCommit": "f79efdbf7316e0b3d51ac506e17f57ef9bdc8d81",
+  "reviewGeneratedAt": "2026-10-23T11:35:35.247Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
     "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
     "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
     "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
-    "profile-aligned dome mouldings, improved review contrast, and stylized column capitals"
+    "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
+    "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses"
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "1c8c0acf767e6440761bf7456b5fa607ff3bce98c37a6d6faf6ffe205f37e9fd",
-    "byteLength": 6721140
+    "sha256": "bf06e7e622a681b553ff2e7f0f19e63bcccb273298405b8b30256a457910e855",
+    "byteLength": 7049748
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "b0815d99742465c2ea7b3f34dbe3890d54f2a1b2b3beeb2d473c51a86f2bb994",
+    "sha256": "c690d6a66d6046f29e824818d975c808d36c09e7168d1863b36af9fe20947d13",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
     "rendererVersion": "4.0.2",
     "sceneBounds": {
       "min": [
-        -63.46500015,
+        -63.74000168,
         -33.73500061,
         0
       ],
       "max": [
-        63.46500015,
+        63.74000168,
         19.41500092,
         27.12999916
       ],
       "dimensions": [
-        126.93000031,
+        127.48000336,
         53.15000153,
         27.12999916
       ],
@@ -44,7 +45,7 @@
   "qa": {
     "geometry": {
       "filename": "geometry-qa-report.json",
-      "sha256": "2a929473165ccd31888fb6dfb13c67d6557beb849e792c70a642012189d34bad",
+      "sha256": "7024a79c922694487ab9425b280d007fbf081b4b552492226539f4397dccf39d",
       "valid": true,
       "status": "review-recommended",
       "errors": [],
@@ -99,91 +100,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ebcac9afc8fef1fc483aac4428fc3f1673c3057e987e2972cf747440ae45eeaa"
+      "sha256": "943b87e3448d4c24a71b91ae420ac098641f1b58c4421e219d089d6df1a05c26"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "df0d8c09cf955817b09fa49e23b68e6f9dd94a5eb570751a97b0950a6f31f7af"
+      "sha256": "55e16ed0b133acb61b2cdfe48a470a86c7b94ff08065d3916caf37c8161a1664"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "77e59993b277fcbe17c9a000563c0b1d662b837840fc675576890fe45c990df2"
+      "sha256": "fd91ce56a5e9c0517f6e8664419ac99bfd358adaddf3607d6dd5bf8d6bcb79c2"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "3611fbb270aa05875e1b125cfa957ebce9e6d2ad99013905712a401a190e8076"
+      "sha256": "8d6e5b30118e162862eaf4b47875e82a16778a50b11a8d2ed924104e6edd559f"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "995e3673d541d16f428e1d049fd668eb03d663d49d9906171590ad8518b282d5"
+      "sha256": "85356c8ab1151c921e377b3ec598a11c8699f64c9f3e30f2aa8d7cf9e6d5a668"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ecba7ebacef3f499f075b08d110acc4f43c14b5d68bf85e2ad99445608666031"
+      "sha256": "7d1adcd7cc9124264112b809f8a0293f22eb8af08e1da10e51e1eb30df80558c"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "0552b9c67737484b044c33f7603e0f9429b43a987c38bd8bea494df84224c538"
+      "sha256": "b1f9ce7dcf6ccf5efa682a565ddf156bd1be7eaad485f65619690d7386b5a710"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ee60bd219f588e48945dc9b3903692ecfdfc30093a5a57c3d9a4fec01fb4e3fb"
+      "sha256": "61bce25d52ad5c4f8e131ee76d92f3ddc48d14318f8cb024ff527fe7a75efcd2"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d4b87c26c59999c3d6933bbb0c86b25c6541d8c1a006dde16925e61484f3f317"
+      "sha256": "ecc6551d0f219c7c0bff021aa37e43f44796d0bb2e971f0302a677cc246c1fc3"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "61b089cc9d04a93d2a345a23bc84cbeae671c2104d8d302e8bad9cbd3d6543a4"
+      "sha256": "c4b4b93d3aea32f294ad0ec7286c04d1c4c742b661f8fb62b6e9468f64fd4417"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d031fe3e79d4b418d9901cd2fe7dd4db1ec35b7a03a09f1d2f6b5aea959978ff"
+      "sha256": "1151b6636f7102fb01e6586f5b2a320528ad4f54b7622f209df2467da2a4ccba"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "e2be2ca2f3560b7021b0ca51150dd75df4522c4f5e053dedfbc1b33817972a6b"
+      "sha256": "9fa5695c57154d2f2cc358efc25c6ab71e5475983cb275e83c7e021ffdf47c2e"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d4fa95f095380eff619bc428852e20c06a66184492ccbd5d9973b3380c652c96"
+      "sha256": "0b2af90c6f99e1778558575503f9f863568cd8f8eea53c142f7f0756a5d0c14f"
     }
   ],
   "visualReview": {
@@ -194,6 +195,9 @@
       "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
       "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
       "Review lighting was raised and moved closer because the first contact sheet under-lit facade and roof detail.",
+      "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
+      "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
+      "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
     ],
     "residualRisks": [
