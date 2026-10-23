@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import struct
 import tempfile
 import unittest
 from pathlib import Path
-
-import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,14 +66,18 @@ def build_box_glb(length: float = 10.0, depth: float = 2.0, height: float = 4.0)
 class ScaleCalibrationTests(unittest.TestCase):
     def test_calibration_scales_vertices_and_sets_output_units_to_metres(self):
         raw = build_box_glb()
-        _, gltf, binary = ANALYZER.read_glb(Path(self._write_temp(raw)))
-        points, *_ = ANALYZER.extract_geometry(gltf, binary)
-        before = ANALYZER.calculate_metrics(points)
-        self.assertAlmostEqual(before["longAxisModelUnits"], 10.0, places=5)
-
-        calibrated, factor = ANALYZER.calibrate_glb_to_length(raw, gltf, binary, 100.0, before["longAxisModelUnits"])
-        self.assertAlmostEqual(factor, 10.0, places=6)
         with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "input.glb"
+            source.write_bytes(raw)
+            _, gltf, binary = ANALYZER.read_glb(source)
+            points, *_ = ANALYZER.extract_geometry(gltf, binary)
+            before = ANALYZER.calculate_metrics(points)
+            self.assertAlmostEqual(before["longAxisModelUnits"], 10.0, places=5)
+
+            calibrated, factor = ANALYZER.calibrate_glb_to_length(
+                raw, gltf, binary, 100.0, before["longAxisModelUnits"]
+            )
+            self.assertAlmostEqual(factor, 10.0, places=6)
             output = Path(directory) / "calibrated.glb"
             output.write_bytes(calibrated)
             _, calibrated_gltf, calibrated_bin = ANALYZER.read_glb(output)
@@ -84,22 +85,14 @@ class ScaleCalibrationTests(unittest.TestCase):
             measured = ANALYZER.calculate_metrics(calibrated_points)
             extras = calibrated_gltf["asset"]["extras"]
 
-        self.assertTrue(extras["scaleCalibrated"])
-        self.assertEqual(extras["metresPerModelUnit"], 1.0)
-        self.assertAlmostEqual(measured["longAxisModelUnits"], 100.0, places=3)
-        self.assertAlmostEqual(measured["shortAxisModelUnits"], 20.0, places=3)
-        self.assertAlmostEqual(measured["verticalAxisModelUnits"], 40.0, places=3)
-        self.assertFalse(extras["scaleCalibration"]["lengthAgreementIsIndependent"])
-        self.assertEqual(extras["scaleCalibration"]["coordinatesAfterCalibration"], "metres")
+            self.assertTrue(extras["scaleCalibrated"])
+            self.assertEqual(extras["metresPerModelUnit"], 1.0)
+            self.assertAlmostEqual(measured["longAxisModelUnits"], 100.0, places=3)
+            self.assertAlmostEqual(measured["shortAxisModelUnits"], 20.0, places=3)
+            self.assertAlmostEqual(measured["verticalAxisModelUnits"], 40.0, places=3)
+            self.assertFalse(extras["scaleCalibration"]["lengthAgreementIsIndependent"])
+            self.assertEqual(extras["scaleCalibration"]["coordinatesAfterCalibration"], "metres")
 
-    @staticmethod
-    def _write_temp(raw: bytes) -> str:
-        temp = tempfile.NamedTemporaryFile(suffix=".glb", delete=False)
-        try:
-            temp.write(raw)
-            return temp.name
-        finally:
-            temp.close()
 
 
 if __name__ == "__main__":
