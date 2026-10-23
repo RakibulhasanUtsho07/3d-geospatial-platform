@@ -173,7 +173,7 @@ def texture_fill(texture, uv_triangle, fallback):
         return fallback
     uv = np.mean(uv_triangle, axis=0)
     x = max(0, min(texture.width - 1, int(float(uv[0]) * (texture.width - 1))))
-    y = max(0, min(texture.height - 1, int((1.0 - float(uv[1])) * (texture.height - 1)))
+    y = max(0, min(texture.height - 1, int((1.0 - float(uv[1])) * (texture.height - 1))))
     return tuple(int(c) for c in texture.getpixel((x, y)))
 
 
