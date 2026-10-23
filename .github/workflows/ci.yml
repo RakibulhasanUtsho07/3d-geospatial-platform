@@ -53,6 +53,7 @@ on:
       - refactor/p1-building-style-assignment-policy
       - refactor/p1-building-selection-materials
       - refactor/p1-picked-entity-resolution
+      - refactor/p1-feature-pick-routing
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
