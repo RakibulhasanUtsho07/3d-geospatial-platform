@@ -160,7 +160,8 @@ Every PR must run:
 | P0.2 | Explicit front facade and honest roof contract | No silent direction/roof mismatch |
 | P1.1 | Strategy routing/preflight/report integrity | Real and mocked runs cannot be confused |
 | P1.2 | GLB QA and deterministic render harness | Reproducible hashed renders and QA reports |
-| P1.3 | Dedicated Ahsan Manzil route review | Heritage assets reviewed against matching views |
+| P1.3 | Dedicated Ahsan Manzil route review | Two pinned source views inspected; mismatch findings and reference/model/render hashes recorded |
+| P1.4 | Correct Ahsan Manzil silhouette, roof and facade mismatch | Fix evidence-backed proportions and facade issues; render and review again; human sign-off remains explicit |
 | P2.1 | Parliament / Dolonchapa specific geometry | Masses/openings/curved features represented and reviewed |
 | P2.2 | CI visual regression and release gates | Regression blocks release; approved baseline updates are auditable |
 
