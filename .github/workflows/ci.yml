@@ -49,6 +49,7 @@ on:
       - dev
       - refactor/p1-building-lod-policy
       - refactor/p1-building-lod-renderer
+      - refactor/p1-building-selection-materials
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -261,6 +262,9 @@ jobs:
 
       - name: Test building style assignment and preview policy
         run: npm run test:building-style-assignment-policy
+
+      - name: Test building selection material controller
+        run: npm run test:building-selection-materials
 
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
