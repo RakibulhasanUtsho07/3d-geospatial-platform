@@ -4,27 +4,46 @@ import { finalizeRenderReviewManifest, REQUIRED_REVIEW_VIEWS } from "../src/core
 
 const hash = "a".repeat(64);
 function fixture(overrides = {}) {
-  const views = REQUIRED_REVIEW_VIEWS.map((id, index) => ({
-    id,
-    filename: id + ".png",
-    width: 512,
-    height: 512,
-    renderComplete: true,
-    cameraPose: {
-      projection: "ORTHO",
-      positionWorld: [index + 2, -4, 2],
-      targetWorld: [index + 2, 0, 2],
-      viewDirectionWorld: [0, 1, 0],
-      rotationEulerRadians: [0, 0, 0],
-      orthographicScale: 3,
-    },
-    pixelStatistics: {
+  const views = REQUIRED_REVIEW_VIEWS.map((id, index) => {
+    let direction;
+    if (id === "front") direction = [0, 1, 0];
+    else if (id === "back") direction = [0, -1, 0];
+    else if (id === "left") direction = [1, 0, 0];
+    else if (id === "right") direction = [-1, 0, 0];
+    else if (id === "top") direction = [0, 0, -1];
+    else {
+      const angle = Number(id.slice("turntable-".length)) * Math.PI / 180;
+      const elevation = 22 * Math.PI / 180;
+      direction = [
+        -Math.cos(angle) * Math.cos(elevation),
+        -Math.sin(angle) * Math.cos(elevation),
+        -Math.sin(elevation),
+      ];
+    }
+    const position = [index + 2, -4, 2];
+    const target = position.map((value, axis) => value + direction[axis]);
+    return {
+      id,
+      filename: id + ".png",
+      width: 512,
+      height: 512,
+      renderComplete: true,
+      cameraPose: {
+        projection: "ORTHO",
+        positionWorld: position,
+        targetWorld: target,
+        viewDirectionWorld: direction,
+        rotationEulerRadians: [0, 0, 0],
+        orthographicScale: 3,
+      },
+      pixelStatistics: {
       sampledPixels: 50000,
       luminanceMean: 0.4,
       luminanceStandardDeviation: 0.15,
       transparentRatio: 0,
     },
-  }));
+  };
+  });
   const files = Object.fromEntries(views.map((view) => [view.filename, {
     width: 512, height: 512, bytes: 51200, sha256: hash,
   }]));
@@ -86,7 +105,9 @@ test("finalizes the full five-axis plus eight-angle render set", () => {
   assert.equal(report.publicationEligible, false);
   assert.match(report.renderConfigSha256, /^[a-f0-9]{64}$/);
   assert.equal(report.geometryQaSummary.engine, "glb-geometry-qa-v2");
+  assert.equal(report.modelSha256, hash);
   assert.ok(report.views.every((view) => view.cameraPose.projection === "ORTHO"));
+  assert.ok(report.views.every((view) => view.sha256 === hash && view.bytes > 0));
   assert.equal(report.humanReview.status, "pending");
   assert.equal(report.humanReview.checklist.length, 5);
 });

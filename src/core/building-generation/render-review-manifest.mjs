@@ -31,6 +31,31 @@ function validCameraPose(pose) {
   return directionError <= 0.02;
 }
 
+function requiredViewDirection(viewId, turntableElevationDegrees) {
+  if (viewId === "front") return [0, 1, 0];
+  if (viewId === "back") return [0, -1, 0];
+  if (viewId === "left") return [1, 0, 0];
+  if (viewId === "right") return [-1, 0, 0];
+  if (viewId === "top") return [0, 0, -1];
+  const match = /^turntable-(\\d{3})$/.exec(viewId);
+  if (!match || !finite(turntableElevationDegrees)) return null;
+  const angleDegrees = Number(match[1]);
+  if (angleDegrees < 0 || angleDegrees >= 360 || angleDegrees % 45 !== 0) return null;
+  const azimuth = angleDegrees * Math.PI / 180;
+  const elevation = turntableElevationDegrees * Math.PI / 180;
+  return [
+    -Math.cos(azimuth) * Math.cos(elevation),
+    -Math.sin(azimuth) * Math.cos(elevation),
+    -Math.sin(elevation),
+  ];
+}
+
+function cameraMatchesRequiredView(viewId, pose, settings) {
+  const expected = requiredViewDirection(viewId, settings?.turntableElevationDegrees);
+  if (!expected || !validCameraPose(pose)) return false;
+  return Math.hypot(...expected.map((value, index) => value - pose.viewDirectionWorld[index])) <= 0.02;
+}
+
 function validRenderSettings(settings, resolution) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return false;
   if (typeof settings.renderEngine !== "string" || !settings.renderEngine.trim() ||
@@ -147,7 +172,9 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     if (!sha256Pattern.test(file.sha256 ?? "")) errors.push("render-sha256-invalid:" + id);
     if (!Number.isSafeInteger(file.bytes) || file.bytes < 1) errors.push("render-byte-length-invalid:" + id);
     if (view.renderComplete !== true) errors.push("render-not-complete:" + id);
-    if (!validCameraPose(view.cameraPose)) errors.push("render-camera-pose-invalid:" + id);
+    if (!cameraMatchesRequiredView(id, view.cameraPose, rawManifest.renderSettings)) {
+      errors.push("render-camera-pose-invalid:" + id);
+    }
     const stats = view.pixelStatistics ?? {};
     if (!finite(stats.luminanceMean) || !finite(stats.luminanceStandardDeviation) ||
       !finite(stats.transparentRatio) || !Number.isSafeInteger(stats.sampledPixels) || stats.sampledPixels < 1) {
