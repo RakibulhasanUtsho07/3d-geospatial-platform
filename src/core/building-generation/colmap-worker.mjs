@@ -44,15 +44,35 @@ function validateCalibration(options){
 }
 async function runProcess(executable,args,timeoutMs,spawnImpl=nodeSpawn){
  return await new Promise((resolve,reject)=>{
-  let child;try{child=spawnImpl(executable,args,{stdio:["ignore","pipe","pipe"],windowsHide:true});}catch(error){reject(error);return;}
+  let child;
+  try{child=spawnImpl(executable,args,{stdio:["ignore","pipe","pipe"],windowsHide:true});}
+  catch(error){
+   const wrapped=new Error("Could not start "+executable+": "+error.message);
+   wrapped.processStarted=false;wrapped.spawnErrorCode=error?.code??null;reject(wrapped);return;
+  }
   let stdout="",stderr="",settled=false;
   const done=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value);};
   child.stdout?.on("data",chunk=>{stdout=(stdout+chunk.toString()).slice(-8000);});child.stderr?.on("data",chunk=>{stderr=(stderr+chunk.toString()).slice(-16000);});
-  const timer=setTimeout(()=>{child.kill("SIGTERM");setTimeout(()=>child.kill("SIGKILL"),2500).unref?.();done(reject,new Error(executable+" command timed out after "+timeoutMs+" ms"));},timeoutMs);
-  child.once("error",error=>done(reject,new Error("Could not start "+executable+": "+error.message)));
-  child.once("close",(code,signal)=>code===0?done(resolve,{stdout,stderr}):done(reject,new Error(executable+" "+args[0]+" failed (exit "+code+(signal?", signal "+signal:"")+"): "+(stderr.trim().slice(-4000)||stdout.trim().slice(-2000)||"no diagnostic output"))));
+  const timer=setTimeout(()=>{
+   child.kill("SIGTERM");setTimeout(()=>child.kill("SIGKILL"),2500).unref?.();
+   const error=new Error(executable+" command timed out after "+timeoutMs+" ms");
+   error.processStarted=true;error.timedOut=true;done(reject,error);
+  },timeoutMs);
+  child.once("error",error=>{
+   const wrapped=new Error("Could not start "+executable+": "+error.message);
+   wrapped.processStarted=false;wrapped.spawnErrorCode=error?.code??null;done(reject,wrapped);
+  });
+  child.once("close",(code,signal)=>{
+   if(code===0)done(resolve,{stdout,stderr,exitCode:code,signal,processStarted:true});
+   else{
+    const error=new Error(executable+" "+args[0]+" failed (exit "+code+(signal?", signal "+signal:"")+"): "+(stderr.trim().slice(-4000)||stdout.trim().slice(-2000)||"no diagnostic output"));
+    error.processStarted=true;error.exitCode=code;error.signal=signal;
+    done(reject,error);
+   }
+  });
  });
 }
+
 async function fileExists(file){try{const s=await stat(file);return s.isFile()&&s.size>0;}catch(error){if(error?.code==="ENOENT")return false;throw error;}}
 async function locateMesh(workspace){
  const directories=[path.join(workspace,"dense","0"),path.join(workspace,"dense")];
@@ -124,7 +144,7 @@ export async function runColmapReconstruction(options){
  await mkdir(jobDir,{recursive:false});const outputJobDir=await realpath(jobDir);if(!inside(root,outputJobDir))throw new TypeError("job directory resolved outside workspaceRoot");
  const imagesDir=path.join(outputJobDir,"images");await mkdir(imagesDir);const realImagesDir=await realpath(imagesDir);if(!inside(root,realImagesDir))throw new TypeError("staging directory resolved outside workspaceRoot");
  const startedAt=new Date().toISOString(),staged=[];
- let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},warnings:[],mapReady:false,outputs:{}};
+ let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},executionEvidence:{processAdapter:options.spawnImpl?"injected-adapter-unverified":"node-child-process.spawn",workerStarted:false,workerVersion:"not-queried",actualInferenceVerified:false,commands:[],caveat:"Command exit/output evidence cannot prove architectural accuracy; injected adapters are orchestration/test evidence, not a real COLMAP integration pass."},warnings:[],mapReady:false,outputs:{}};
  const reportPath=path.join(outputJobDir,"report.json");
  try{
   for(const source of sources){const ext=source.record.mimeType==="image/png"?".png":".jpg",filename="view-"+String(source.index+1).padStart(4,"0")+ext,dest=path.join(realImagesDir,filename);await copyFile(source.absolute,dest);staged.push({sourceId:source.id,filename,sha256:source.record.sha256});}
@@ -147,8 +167,28 @@ export async function runColmapReconstruction(options){
   }
   report.progress="reconstruction";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const colmapPath=options.colmapPath||process.env.COLMAP_BIN||"colmap",spawnImpl=options.spawnImpl;
+  const runColmapCommand=async(args,budgetMs)=>{
+   const command={executable:colmapPath,subcommand:args[0],status:"running",startedAt:new Date().toISOString()};
+   const began=Date.now();report.executionEvidence.commands.push(command);
+   try{
+    const result=await runProcess(colmapPath,args,budgetMs,spawnImpl);
+    command.status="completed";command.exitCode=result.exitCode;command.signal=result.signal??null;command.durationMs=Date.now()-began;
+    report.executionEvidence.workerStarted=true;
+    report.executionEvidence.lastExitCode=result.exitCode;
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
+    return result;
+   }catch(error){
+    command.status=error?.processStarted===false?"not-started":"failed";
+    command.exitCode=Number.isInteger(error?.exitCode)?error.exitCode:null;command.signal=error?.signal??null;
+    command.durationMs=Date.now()-began;command.failureMessage=error instanceof Error?error.message:String(error);
+    if(error?.processStarted===true)report.executionEvidence.workerStarted=true;
+    report.executionEvidence.lastExitCode=command.exitCode;
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\n").catch(()=>{});
+    throw error;
+   }
+  };
   const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
-  const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
+  const reconstructStart=Date.now();await runColmapCommand(reconstructionArgs,timeoutMs);report.timingsMs={reconstruction:Date.now()-reconstructStart};
   // A zero exit code only means COLMAP completed; it does not mean enough input views
   // registered or that the sparse reconstruction is strong enough for stable geometry.
   report.progress="reconstruction-quality-diagnostics";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
@@ -163,7 +203,7 @@ export async function runColmapReconstruction(options){
    };
   }else{
    try{
-    const modelAnalysis=await runProcess(colmapPath,["model_analyzer","--path",sparseModelDir],Math.min(timeoutMs,60000),spawnImpl);
+    const modelAnalysis=await runColmapCommand(["model_analyzer","--path",sparseModelDir],Math.min(timeoutMs,60000));
     report.reconstructionDiagnostics={
      ...assessColmapReconstruction({
       analysisText:modelAnalysis.stdout+"\n"+modelAnalysis.stderr,
@@ -199,7 +239,7 @@ export async function runColmapReconstruction(options){
    let coverageWorkspace=null;
    try{
     coverageWorkspace=await mkdtemp(path.join(outputJobDir,"colmap-view-coverage-"));
-    await runProcess(colmapPath,["model_converter","--input_path",sparseModelDir,"--output_path",coverageWorkspace,"--output_type","TXT"],Math.min(timeoutMs,120000),spawnImpl);
+    await runColmapCommand(["model_converter","--input_path",sparseModelDir,"--output_path",coverageWorkspace,"--output_type","TXT"],Math.min(timeoutMs,120000));
     const imagesPath=path.join(coverageWorkspace,"images.txt"),points3DPath=path.join(coverageWorkspace,"points3D.txt");
     if(!(await fileExists(imagesPath))||!(await fileExists(points3DPath)))throw new Error("COLMAP model_converter did not write images.txt and points3D.txt");
     report.cameraCoverage={
@@ -225,13 +265,13 @@ export async function runColmapReconstruction(options){
   for(const warning of report.cameraCoverage.warnings||[])report.warnings.push("Camera coverage: "+warning);
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const inputMesh=await locateMesh(outputJobDir),denseWorkspace=path.dirname(inputMesh),texturedDir=path.join(outputJobDir,"textured");await mkdir(texturedDir,{recursive:true});
-  const textureStart=Date.now();await runProcess(colmapPath,["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs,spawnImpl);report.timingsMs.texturing=Date.now()-textureStart;
+  const textureStart=Date.now();await runColmapCommand(["mesh_texturer","--workspace_path",denseWorkspace,"--input_path",inputMesh,"--output_path",texturedDir],timeoutMs);report.timingsMs.texturing=Date.now()-textureStart;
   const texturedMesh=path.join(texturedDir,"mesh.ply"),texturePath=path.join(texturedDir,"texture.png");
   if(!(await fileExists(texturedMesh))||!(await fileExists(texturePath)))throw new Error("COLMAP mesh_texturer did not produce textured/mesh.ply and textured/texture.png");
   const modelPath=path.join(outputJobDir,"model.glb"),converted=await convertTexturedPlyToGlb({plyPath:texturedMesh,texturePath,metresPerModelUnit:calibration.metresPerModelUnit,upAxis,scaleCalibrated:calibration.scaleCalibrated});
   await writeFile(modelPath,converted.glb,{flag:"wx",mode:0o600});
   const glbSha256=createHash("sha256").update(converted.glb).digest("hex"),modelQuality=analyzeGlbQuality(converted.glb);
-  report.status="completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
+  report.status=options.spawnImpl?"adapter-output-unverified":"completed-requires-review";report.completedAt=new Date().toISOString();report.modelQuality=modelQuality;if(modelQuality.warnings.length)report.warnings.push("GLB geometry QA flagged "+modelQuality.warnings.length+" issue(s) for human review.");report.outputs={glb:{relativePath:path.relative(root,modelPath).split(path.sep).join("/"),bytes:converted.glb.length,sha256:glbSha256},texturedMesh:{relativePath:path.relative(root,texturedMesh).split(path.sep).join("/")},texture:{relativePath:path.relative(root,texturePath).split(path.sep).join("/")},geometry:converted.geometry,bounds:converted.bounds};
   report.warnings.push("Photogrammetry was run, but this worker does not compute ground-control-point registration to WGS84; the BuildingSpec location is a placement hint only.");
   report.warnings.push("Human review is required for scale, vertical axis, front-facing heading, mesh completeness, texture seams, occlusion and same-building identity.");
   if(!calibration.scaleCalibrated)report.warnings.push("No real-world scale was supplied; 1 model unit was provisionally treated as 1 metre for preview only.");
@@ -249,5 +289,5 @@ export async function runColmapReconstruction(options){
   report.warnings.push("Model review triage: "+report.modelReview.priority+" priority; "+report.modelReview.findingCount+" finding(s); human review remains required.");
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   return {jobDir:outputJobDir,modelPath,reportPath,report};
- }catch(error){report.status="failed";report.failedAt=new Date().toISOString();report.failureMessage=error instanceof Error?error.message:String(error);report.mapReady=false;await writeFile(reportPath,JSON.stringify(report,null,2)+"\n").catch(()=>{});error.reportPath=reportPath;throw error;}
+ }catch(error){report.status="failed";report.failedAt=new Date().toISOString();report.failureMessage=error instanceof Error?error.message:String(error);if(error?.processStarted===true)report.executionEvidence.workerStarted=true;if(Number.isInteger(error?.exitCode))report.executionEvidence.lastExitCode=error.exitCode;report.executionEvidence.failureMessage=report.failureMessage;report.mapReady=false;await writeFile(reportPath,JSON.stringify(report,null,2)+"\n").catch(()=>{});error.reportPath=reportPath;throw error;}
 }

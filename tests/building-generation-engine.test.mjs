@@ -33,9 +33,9 @@ test("labels media route candidates without claiming photogrammetry ran",()=>{
  const withVisuals={...fixture,sources:[
  {id:"front-photo",kind:"image",url:"https://example.org/front.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.406,latitude:23.709}},
  {id:"side-photo",kind:"image",url:"https://example.org/side.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4061,latitude:23.709}},
- {id:"roof-video",kind:"video",url:"https://example.org/roof.mp4",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4062,latitude:23.709}}],
+ {id:"roof-frame",kind:"video-frame",url:"https://example.org/roof-frame.jpg",licence:"CC BY 4.0",attribution:"Example",usageStatus:"approved",location:{longitude:90.4062,latitude:23.709}}],
  evidence:[{field:"floorCount",value:5,confidence:"derived",sourceIds:["front-photo"]}]};
- const plan=planGeneration(withVisuals);assert.equal(plan.sourceRoute,"multiview-photogrammetry-candidate");assert.equal(plan.additionalWorkersConfigured,false);
+ const plan=planGeneration(withVisuals);assert.equal(plan.sourceRoute,"multiview-photogrammetry-candidate");assert.equal(plan.additionalWorkersConfigured,false);assert.equal(plan.externalWorkerPreflight,"not-run-during-planning");assert.equal(plan.strategyCapabilities.photogrammetry.implemented,true);assert.deepEqual(plan.visualReferences.approvedImageSourceIds,["front-photo","side-photo","roof-frame"]);
  const result=generateBuildingModel(withVisuals);assert.equal(result.report.strategy,"reference-assisted-procedural");
  assert.ok(result.report.warnings.some(w=>w.includes("does not run image understanding")));assert.ok(result.report.limitations.some(s=>s.includes("not a photogrammetry")));
 });

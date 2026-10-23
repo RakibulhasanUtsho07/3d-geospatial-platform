@@ -51,8 +51,11 @@ test("runs a mocked TripoSR command and emits an AI-proposed non-map-ready GLB r
   runnerScript:runner,allowSingleViewInference:true,device:"cpu",mcResolution:128,spawnImpl:mockedSpawn,
  });
  glbOkay(await readFile(result.modelPath));
- assert.equal(result.report.status,"ai-proposed-requires-review");assert.equal(result.report.confidence,"ai-proposed");
+ assert.equal(result.report.status,"adapter-output-unverified");assert.equal(result.report.confidence,"unverified-adapter-output");
  assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
+ assert.equal(result.report.executionEvidence.processAdapter,"injected-adapter-unverified");
+ assert.equal(result.report.executionEvidence.workerStarted,true);assert.equal(result.report.executionEvidence.workerExitCode,0);
+ assert.equal(result.report.executionEvidence.actualInferenceVerified,false);assert.match(result.report.executionEvidence.runnerScriptSha256,/^[a-f0-9]{64}$/);
  assert.equal(result.report.source.sha256,buildingSpec.sources[0].assetId);assert.ok(result.report.outputs.glb.bytes>100);
  const persisted=JSON.parse(await readFile(result.reportPath,"utf8"));assert.equal(persisted.georeference.status,"not-solved");
 });
@@ -62,7 +65,8 @@ test("generation strategy router can explicitly select the single-image AI previ
  const result=await generateBuildingAsset(buildingSpec,{strategy:"single-image-ai",singleImage:{
   workspaceRoot:root,jobId:"router-ai",sourceId:"facade-image",runnerScript:runner,allowSingleViewInference:true,device:"cpu",spawnImpl:mockedSpawn
  }});
- assert.equal(result.mode,"single-image-ai");assert.equal(result.report.confidence,"ai-proposed");
+ assert.equal(result.mode,"single-image-ai");assert.equal(result.report.confidence,"unverified-adapter-output");
+ assert.equal(result.report.strategyExecution.actualStrategy,"single-image-ai");assert.equal(result.report.strategyExecution.workerStatus,"adapter-output-unverified");
  assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
 });
 test("rejects a GLB without a mesh and records runner failure",async t=>{

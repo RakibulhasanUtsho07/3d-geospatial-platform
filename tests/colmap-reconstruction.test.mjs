@@ -112,7 +112,7 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
   upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,quality:"LOW",
   scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input),
  });
- assert.equal(result.report.status,"completed-requires-review");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
+ assert.equal(result.report.status,"adapter-output-unverified");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
  assert.equal(result.report.reconstructionDiagnostics.status,"review-recommended");
  assert.equal(result.report.reconstructionDiagnostics.metrics.registeredImages,2);
@@ -125,7 +125,7 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
  assert.ok(result.report.warnings.some(warning=>warning.startsWith("Reconstruction diagnostics:")));
  assert.equal(result.report.scaleCalibration.metresPerModelUnit,4);assert.ok(result.report.outputs.glb.bytes>100);
  assert.equal(glbJson(await readFile(result.modelPath)).asset.version,"2.0");
- assert.equal(JSON.parse(await readFile(result.reportPath,"utf8")).status,"completed-requires-review");
+ assert.equal(JSON.parse(await readFile(result.reportPath,"utf8")).status,"adapter-output-unverified");
 });
 test("fails closed when COLMAP cannot start and preserves failure diagnostics",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
@@ -140,6 +140,10 @@ test("strategy router defaults to procedural and gates the explicit photogrammet
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  const route=await generateBuildingAsset(buildingSpec);
  assert.equal(route.mode,"procedural");assert.equal(route.report.photogrammetryCandidateNotRun,true);
+ assert.equal(route.report.strategyExecution.requestedStrategy,"auto");assert.equal(route.report.strategyExecution.actualStrategy,"procedural");
+ assert.equal(route.report.strategyExecution.worker,"procedural-glb-generator");assert.equal(route.report.strategyExecution.workerStatus,"completed");
+ assert.match(route.report.strategyExecution.fallbackReason,/auto defaults to procedural/);
+ await assert.rejects(generateBuildingAsset({...buildingSpec,sources:buildingSpec.sources.slice(0,1)},{strategy:"auto",enablePhotogrammetry:true}),/refusing silent procedural fallback/);
  await assert.rejects(generateBuildingAsset({...buildingSpec,sources:buildingSpec.sources.slice(0,1)},{strategy:"photogrammetry",reconstruction:{
   workspaceRoot:root,jobId:"not-eligible",sourceIds:["view-1"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)
  }}),/photogrammetry strategy/);
@@ -147,4 +151,8 @@ test("strategy router defaults to procedural and gates the explicit photogrammet
   workspaceRoot:root,jobId:"routed-job",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)
  }});
  assert.equal(result.mode,"photogrammetry");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
+ assert.equal(result.report.status,"adapter-output-unverified");assert.equal(result.report.executionEvidence.processAdapter,"injected-adapter-unverified");
+ assert.equal(result.report.executionEvidence.actualInferenceVerified,false);assert.ok(result.report.executionEvidence.commands.some(command=>command.status==="completed"&&command.exitCode===0));
+ assert.equal(result.report.strategyExecution.requestedStrategy,"photogrammetry");assert.equal(result.report.strategyExecution.actualStrategy,"photogrammetry");
+ assert.deepEqual(result.report.strategyExecution.selectedSourceIds,["view-1","view-2","view-3"]);
 });
