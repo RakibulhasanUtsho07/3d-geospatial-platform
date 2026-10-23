@@ -83,23 +83,7 @@ type BuildingProperties = Record<string, unknown>;
 
 type BuildingHeight = BuildingHeightInfo;
 
-/* type BuildingHeight moved to building-lod-renderer.ts */
-/*REMOVED_BUILDING_HEIGHT_TYPE*/
-/* type BuildingHeight originally began here: */
-/*
-  meters: number;
-  baseHeight: number;
-  source:
-    | "overture-height"
-    | "floor-estimate"
-    | "fallback-estimate"
-    | "reference-reported-height"
-    | "reference-reported-floors";
-  unclampedMeters: number;
-  heightWasClamped: boolean;
-  unclampedBaseHeight: number;
-  baseHeightWasClamped: boolean;
-};*/
+
 
 type ViewportBounds = {
   west: number;
@@ -849,13 +833,7 @@ export class CesiumAdapter implements MapEngine {
       const time = Cesium.JulianDate.now();
       const entities = [...dataSource.entities.values];
       const lodRecords: BuildingLodRecord[] = [];
-      this.lodGraphicsCacheMetrics = {
-        polygonStyleCachesCreated: 0,
-        detailedWallsCreated: 0,
-        detailedWallCacheHits: 0,
-        roofEquipmentCreated: 0,
-        roofEquipmentCacheHits: 0,
-      };
+      this.buildingLodRenderer.resetMetrics();
 
       let renderedBuildings = 0;
       let renderedParts = 0;
