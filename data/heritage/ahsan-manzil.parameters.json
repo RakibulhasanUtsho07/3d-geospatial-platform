@@ -274,18 +274,18 @@
         "note": "Raised the ground-floor arch crown to reduce excessive blank spandrel wall; estimate pending rectified elevation."
       },
       "ffOpeningWidth": {
-        "value": 1.85,
+        "value": 2,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Visual refinement against published south-elevation exterior photographs",
-        "note": "Widened from the early placeholder to give the upper-storey arched openings a more monumental proportion; confirm from a rectified facade."
+        "source": "Second visual-refinement pass against published south-elevation exterior photographs",
+        "note": "Widened slightly and paired with a higher crown so the upper arches approach the floor cornice. Provisional photo-based estimate; confirm from a rectified facade."
       },
       "ffOpeningCrownHeight": {
-        "value": 4.7,
+        "value": 5.3,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Visual refinement against published south-elevation exterior photographs",
-        "note": "Raised the first-floor arch crown to reduce the oversized blank band below the roofline; estimate pending rectified elevation."
+        "source": "Second visual-refinement pass against published south-elevation exterior photographs",
+        "note": "Places the arch crown about 0.5 m below the 5.8 m clear-storey top to avoid the oversized blank spandrel band seen in the previous render. Rectified-elevation verification is still required."
       },
       "verandaArchSpan": {
         "value": 3.3,
