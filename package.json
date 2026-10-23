@@ -137,7 +137,12 @@
     "test:building-lod-policy": "node --test tests/building-lod-policy.test.mjs",
     "test:building-lod-renderer": "node --test tests/building-lod-renderer-boundary.test.mjs",
     "test:building-style-assignment-policy": "node --test tests/building-style-assignment-policy.test.mjs",
-    "test:building-selection-materials": "node --test tests/building-selection-material-controller.test.mjs"
+    "test:building-selection-materials": "node --test tests/building-selection-material-controller.test.mjs",
+    "test:picked-entity-resolution": "node --test tests/picked-entity-resolution.test.mjs",
+    "test:feature-pick-routing": "node --test tests/feature-pick-routing.test.mjs",
+    "test:selection-event-dispatch": "node --test tests/selection-event-dispatch.test.mjs",
+    "test:feature-picking-controller": "node --test tests/feature-picking-controller.test.mjs",
+    "test:feature-pick-geometry": "node --test tests/feature-pick-geometry.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
