@@ -1,0 +1,184 @@
+name: Ahsan Manzil P1.4 geometry and render review
+
+on:
+  push:
+    branches:
+      - feat/ahsan-manzil-p1-4
+    paths:
+      - 'data/heritage/ahsan-manzil.parameters.json'
+      - 'scripts/build-ahsan-manzil-model.mjs'
+      - 'tests/heritage-model.test.mjs'
+      - 'docs/heritage/ahsan-manzil-deviation-report.md'
+      - '.github/workflows/heritage-p1-4-render.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: ahsan-manzil-p1-4-\${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  render-review:
+    name: Build corrected GLB, QA and render 13 views
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out correction branch
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Build corrected LOD models
+        run: npm run build:heritage-model
+
+      - name: Run model and GLB quality tests
+        run: |
+          npm run test:heritage-model
+          npm run test:glb-geometry-qa
+          npm run test:glb-texture-binding-qa
+
+      - name: Create QA reports for the exact candidate model
+        run: |
+          mkdir -p artifacts/p1-4-qa
+          node scripts/create-render-correction-qa-evidence.mjs \
+            public/models/ahsan-manzil-lod3.glb \
+            artifacts/p1-4-qa/geometry-qa-report.json \
+            artifacts/p1-4-qa/texture-qa-report.json
+
+      - name: Install Blender and contact-sheet library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-pil
+
+      - name: Render all 13 review views
+        run: |
+          npm run render:building-review -- \
+            public/models/ahsan-manzil-lod3.glb \
+            artifacts/p1-4-render-set \
+            --resolution=512 --blender=blender
+          cp artifacts/p1-4-qa/geometry-qa-report.json artifacts/p1-4-render-set/
+          cp artifacts/p1-4-qa/texture-qa-report.json artifacts/p1-4-render-set/
+
+      - name: Build labeled contact sheet
+        run: |
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          root = Path("artifacts/p1-4-render-set")
+          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
+          thumb, label_h, cols = 256, 28, 4
+          rows = (len(views) + cols - 1) // cols
+          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 238, 232))
+          draw = ImageDraw.Draw(sheet)
+          for i, view_id in enumerate(views):
+              with Image.open(root / (view_id + ".png")) as source:
+                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
+              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
+              sheet.paste(image, (x, y))
+              draw.text((x + 8, y + thumb + 6), view_id, fill=(30, 30, 30))
+          sheet.save(root / "contact-sheet.png", optimize=True)
+          PY
+
+      - name: Record exact GLB, QA and render hashes
+        env:
+          SOURCE_COMMIT: \${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile, writeFile } from "node:fs/promises";
+          import path from "node:path";
+          const out = "artifacts/p1-4-render-set";
+          const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          const manifestBytes = await readFile(path.join(out, "render-review-manifest.json"));
+          const manifest = JSON.parse(manifestBytes.toString("utf8"));
+          const geometryBytes = await readFile(path.join(out, "geometry-qa-report.json"));
+          const textureBytes = await readFile(path.join(out, "texture-qa-report.json"));
+          const geometry = JSON.parse(geometryBytes.toString("utf8"));
+          const texture = JSON.parse(textureBytes.toString("utf8"));
+          const views = (manifest.views || []).map((view) => ({
+            id: view.id,
+            filename: view.filename,
+            width: view.width,
+            height: view.height,
+            sha256: view.sha256
+          }));
+          if (views.length !== 13 || new Set(views.map((view) => view.id)).size !== 13) {
+            throw new Error("P1.4 expected 13 unique render views; got " + views.length);
+          }
+          const glbBytes = await readFile("public/models/ahsan-manzil-lod3.glb");
+          const summary = {
+            task: "P1.4",
+            building: "Ahsan Manzil (Pink Palace), Dhaka",
+            sourceCommit: process.env.SOURCE_COMMIT,
+            reviewGeneratedAt: new Date().toISOString(),
+            correctionScope: [
+              "Rangmahal and Andarmahal roof-height separation",
+              "proportional 18.6 m triple-arch portico and stair landing",
+              "16 m ceremonial stair run with 28 shallow treads",
+              "14 m octagonal drum and 6.9 m dome-base radius",
+              "profile-aligned dome mouldings and stylized column capitals"
+            ],
+            model: {
+              filename: "ahsan-manzil-lod3.glb",
+              sha256: manifest.modelSha256,
+              byteLength: glbBytes.length
+            },
+            renderManifest: {
+              filename: "render-review-manifest.json",
+              sha256: hash(manifestBytes),
+              valid: manifest.valid,
+              status: manifest.status,
+              renderer: manifest.renderer,
+              rendererVersion: manifest.rendererVersion,
+              sceneBounds: manifest.sceneBounds
+            },
+            qa: {
+              geometry: {filename:"geometry-qa-report.json",sha256:hash(geometryBytes),valid:geometry.valid,status:geometry.status,errors:geometry.errors || [],warnings:geometry.warnings || []},
+              textures: {filename:"texture-qa-report.json",sha256:hash(textureBytes),valid:texture.valid,status:texture.status,errors:texture.errors || [],warnings:texture.warnings || []}
+            },
+            views,
+            visualReview: {
+              contactSheet: "contact-sheet.png",
+              status: "rendered; human comparison with heritage references is still required",
+              policy: "Hashes and QA metrics prove artifact integrity, not historical accuracy. Values tagged [E], [C] or [?] remain unverified."
+            }
+          };
+          const summaryText = JSON.stringify(summary, null, 2) + "\n";
+          await writeFile(path.join(out, "P1.4-render-review-summary.json"), summaryText, {flag:"wx"});
+          await writeFile("docs/heritage/p1.4-render-review-summary.json", summaryText, {flag:"w"});
+          NODE
+
+      - name: Copy visual review summary to the branch
+        run: |
+          cp artifacts/p1-4-render-set/contact-sheet.png docs/heritage/p1.4-render-contact-sheet.png
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/heritage/p1.4-render-review-summary.json docs/heritage/p1.4-render-contact-sheet.png
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(heritage): record P1.4 render evidence [skip ci]"
+            git push origin "HEAD:\${GITHUB_REF_NAME}"
+          fi
+
+      - name: Upload review evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-p1-4-render-review
+          path: |
+            artifacts/p1-4-render-set/
+            artifacts/p1-4-qa/
+            public/models/ahsan-manzil-lod1.glb
+            public/models/ahsan-manzil-lod2.glb
+            public/models/ahsan-manzil-lod3.glb
+          if-no-files-found: error
+          retention-days: 30

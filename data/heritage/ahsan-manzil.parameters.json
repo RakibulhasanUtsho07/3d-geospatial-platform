@@ -244,6 +244,13 @@
         "unit": "m",
         "confidence": "[V]",
         "source": "Bangladesh Tourism Board"
+      },
+      "andarmahalHeightScale": {
+        "value": 0.94,
+        "unit": "scale",
+        "confidence": "[E]",
+        "source": "Architectural descriptions characterize the older Andarmahal as slightly lower than Rangmahal",
+        "note": "Provisional 6% reduction in the clear-height stack (about 0.65 m lower roof deck); an estimate, not a surveyed height."
       }
     },
     "facade": {
@@ -299,11 +306,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 16.5,
+        "value": 18.6,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single south-elevation reference image, ±20% estimate",
-        "note": "Working projection width for the central three-arch pavilion; recalibrate by counting its three arches from a straight-on photo."
+        "source": "15-bay Rangmahal frontage estimate: 55.8 m / 15 bays = 3.72 m bay pitch",
+        "note": "Five estimated bay pitches align the central facade openings, triple-arched portico, and upper stair landing; verify from rectified elevation imagery."
       },
       "porticoDepth": {
         "value": 4,
@@ -363,18 +370,18 @@
     },
     "stair": {
       "riserHeight": {
-        "value": 0.23,
+        "value": 0.2285714286,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single reference photo, ±20% estimate",
-        "note": "28 risers at 0.23 m give approximately 6.44 m rise to the upper portal."
+        "source": "6.4 m upper portal datum / 28 estimated risers",
+        "note": "28 estimated risers align to a 6.4 m upper portal datum; confirm step count and datum from a measured elevation."
       },
       "treadDepth": {
-        "value": 0.34,
+        "value": 0.5714285714,
         "unit": "m",
         "confidence": "[E]",
-        "source": "16 m total stair run / 28 steps",
-        "note": "Matched to the reference HTML stair geometry (0.34 m per tread); visual estimate pending survey."
+        "source": "16.0 m horizontal stair run / 28 estimated steps",
+        "note": "Shallow ceremonial tread; replaces the compressed 9.52 m run. Visual estimate pending a measured plan."
       },
       "stepCount": {
         "value": 28,
@@ -384,11 +391,11 @@
         "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 16.5,
+        "value": 39,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single front reference photo estimate",
-        "note": "Approximate clear width at the garden-facing base of the stair."
+        "source": "Approximate base-to-frontage ratio from the south-elevation reference image",
+        "note": "Broad lower flight is approximately 70% of the 55.8 m provisional Rangmahal frontage; estimate only until photo rectification or survey."
       },
       "sideRail": {
         "value": "simple low side rails",
@@ -396,18 +403,18 @@
         "source": "Stylized placeholder"
       },
       "runLength": {
-        "value": 9.52,
+        "value": 16,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder",
-        "note": "Matched to the reference HTML: 28 steps × 0.34 m tread depth = 9.52 m horizontal run. Visual estimate; verify against measured site drawings."
+        "source": "Visual estimate from the broad river-facing stair reference image",
+        "note": "28 shallow treads at 0.5714285714 m give a 16 m horizontal run; verify against a measured plan."
       },
       "topWidth": {
-        "value": 13.5,
+        "value": 18.6,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single front reference photo estimate",
-        "note": "Approximate clear width at the upper portal; the stair tapers from 16.5 m at the base."
+        "source": "Aligned to the 18.6 m provisional triple-arched portico width",
+        "note": "Upper stair landing aligns with the central portico and tapers from the broad lower flight; visual estimate only."
       }
     },
     "dome": {
@@ -471,78 +478,46 @@
       "profileRings": {
         "value": [
           [
-            4,
+            6.9,
             0
           ],
           [
-            3.9922,
-            0.4131
+            6.7,
+            0.35
           ],
           [
-            3.9686,
-            0.8263
+            6.1,
+            1.1
           ],
           [
-            3.9291,
-            1.2394
+            5.4,
+            2
           ],
           [
-            3.873,
-            1.6525
+            4.55,
+            2.9
           ],
           [
-            3.7997,
-            2.0656
+            3.55,
+            3.8
           ],
           [
-            3.7081,
-            2.4788
+            2.55,
+            4.65
           ],
           [
-            3.5969,
-            2.8919
+            1.55,
+            5.45
           ],
           [
-            3.4641,
-            3.305
-          ],
-          [
-            3.3072,
-            3.7181
-          ],
-          [
-            3.1225,
-            4.1313
-          ],
-          [
-            2.9047,
-            4.5444
-          ],
-          [
-            2.6458,
-            4.9575
-          ],
-          [
-            2.3319,
-            5.3706
-          ],
-          [
-            1.9364,
-            5.7838
-          ],
-          [
-            1.3919,
-            6.1969
-          ],
-          [
-            0,
-            6.61
+            0.28,
+            6.53
           ]
         ],
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
-        "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
-        "note": "Profile samples approximate the stretched hemispherical SphereGeometry in the reference Three.js HTML scene (4.0 m base radius, 6.61 m rise). These are visual estimates, not survey-measured heritage dimensions."
+        "source": "Lotus-bud dome silhouette interpreted from published exterior photographs and constrained by 14 m drum width and 27.13 m peak",
+        "note": "Nine radial profile samples replace the undersized 4 m-radius profile. Base radius 6.9 m nearly matches the drum's 7 m radius; final curvature remains an estimate pending rectified elevation."
       }
     },
     "materials": {
