@@ -133,6 +133,7 @@
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
     "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs",
     "test:map-performance": "node --test tests/map-performance-telemetry.test.mjs",
+    "test:heritage-camera-controller-boundary": "node --test tests/heritage-camera-controller-boundary.test.mjs",
     "test:map-optimization": "node --test tests/lod-record-selection.test.mjs tests/flatten-road-coordinates.test.mjs tests/road-visual-style.test.mjs tests/map-optimization-benchmark.test.mjs",
     "benchmark:map-optimization": "node scripts/benchmark-map-optimization.mjs",
     "test:map-browser": "playwright test --config=playwright.config.ts",

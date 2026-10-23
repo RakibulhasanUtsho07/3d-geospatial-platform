@@ -16,14 +16,6 @@ import type {
 } from "./performance-telemetry.mjs";
 import {
   SHAT_GOMBUJ_CAMERA,
-  AHSAN_MANZIL_CAMERA_TARGET,
-  AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET,
-  AHSAN_MANZIL_CAMERA_RANGE_METERS,
-  AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS,
-  AHSAN_MANZIL_ORBIT_PITCH_DEGREES,
-  AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND,
-  AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS,
-  AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS,
   AHSAN_MANZIL_GEOREFERENCE,
   selectAhsanManzilLod,
 } from "../geospatial/heritage-landmarks.mjs";
@@ -40,6 +32,7 @@ import { BuildingLodRenderer } from "./building-lod-renderer";
 import { BuildingViewportManager } from "./building-viewport-manager";
 import type { BuildingViewportStageContext } from "./building-viewport-manager";
 import { RoadLayerManager } from "./road-layer-manager";
+import { HeritageCameraController } from "./heritage-camera-controller";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
@@ -133,15 +126,10 @@ export class CesiumAdapter implements MapEngine {
   private heritageModelLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadingLod: 1 | 2 | 3 | null = null;
   private heritageModelLoadToken = 0;
-  // Heading 157 approaches from the south-east, matching the reference HTML hero view.
-  private ahsanManzilOrbitHeadingDegrees = 157;
-  private ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-  private ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
-  private ahsanManzilOrbitFrame: number | null = null;
-  private ahsanManzilOrbitTourActive = false;
-  private ahsanManzilOrbitLastTimestamp: number | null = null;
-  private ahsanManzilOrbitInputUnsubscribe: (() => void) | null = null;
-  private ahsanManzilOrbitStoppedCallback: (() => void) | null = null;
+  private readonly heritageCameraController = new HeritageCameraController(
+    () => this.viewer,
+    () => this.cesium,
+  );
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
   private readonly generatedModels = new Map<string, GeneratedModelRecord>();
@@ -288,24 +276,7 @@ export class CesiumAdapter implements MapEngine {
 
     this.viewer = viewer;
     this.addHeritageLandmarkMarkers(viewer, Cesium);
-
-    // Start directly on the river-facing Rangmahal facade. The separate
-    // Full model / Top view presets frame the entire stepped footprint.
-    const ahsanManzilCenter = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_CAMERA_TARGET.longitude,
-      AHSAN_MANZIL_CAMERA_TARGET.latitude,
-      AHSAN_MANZIL_CAMERA_TARGET.height,
-    );
-    viewer.camera.lookAt(
-      ahsanManzilCenter,
-      new Cesium.HeadingPitchRange(
-        Cesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
-        Cesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
-        this.ahsanManzilOrbitRangeMeters,
-      ),
-    );
-    // Release lookAt's local transform so regular Cesium navigation remains free.
-    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    this.heritageCameraController.configureInitialCamera();
 
     try {
       const imageryProvider =
@@ -2002,9 +1973,8 @@ export class CesiumAdapter implements MapEngine {
     // Invalidate a pending dynamic import before it can create a new viewer.
     this.initializationRevision += 1;
 
-    // Do not schedule React state updates during component teardown.
-    this.ahsanManzilOrbitStoppedCallback = null;
-    this.stopAhsanManzilOrbitTour();
+    // Stop animation and clear the caller callback before component teardown.
+    this.heritageCameraController.destroy();
     this.restoreSelectedBuilding();
     this.heritageModelLoadToken += 1;
     this.heritageModel = null;
@@ -2216,185 +2186,44 @@ export class CesiumAdapter implements MapEngine {
    * for keeping the long facade, stairs, and dome in view at once.
    */
   /** Fit the complete stepped palace footprint from the river-facing side. */
+  /** Focus the river-facing front facade. */
   focusAhsanManzil(durationMs = 1200): void {
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 157;
-    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(durationMs, "front");
+    this.heritageCameraController.focusFront(durationMs);
   }
 
-  /** Match the rear-facing camera preset in the reference HTML scene. */
+  /** Focus the rear facade. */
   focusAhsanManzilRear(durationMs = 850): void {
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 9;
-    this.ahsanManzilOrbitPitchDegrees = -9;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(durationMs, "front");
+    this.heritageCameraController.focusRear(durationMs);
   }
 
-  /** Match the east/west side camera preset in the reference HTML scene. */
+  /** Focus the side facade. */
   focusAhsanManzilSide(durationMs = 850): void {
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 83;
-    this.ahsanManzilOrbitPitchDegrees = -10;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(durationMs, "front");
+    this.heritageCameraController.focusSide(durationMs);
   }
 
-  /**
-   * Frame the entire provisional palace footprint in a 3D oblique view.
-   * Use this instead of the closer facade view before orbiting the model.
-   */
+  /** Frame the entire stepped palace footprint. */
   focusAhsanManzilWhole(durationMs = 900): void {
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 145;
-    this.ahsanManzilOrbitPitchDegrees = -19;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(durationMs, "footprint");
+    this.heritageCameraController.focusWhole(durationMs);
   }
 
-  /** North-up orthographic-like view for checking the full footprint and orientation. */
+  /** North-up view for checking footprint and orientation. */
   focusAhsanManzilTopDown(durationMs = 850): void {
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees = 0;
-    this.ahsanManzilOrbitPitchDegrees = -88.5;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(durationMs, "footprint");
+    this.heritageCameraController.focusTopDown(durationMs);
   }
 
-  /** Orbit around the complete stepped footprint while keeping every wing visible. */
+  /** Orbit around the complete stepped footprint. */
   orbitAhsanManzil(stepDegrees: number): void {
-    if (!Number.isFinite(stepDegrees)) return;
-    this.stopAhsanManzilOrbitTour();
-    this.ahsanManzilOrbitHeadingDegrees =
-      ((this.ahsanManzilOrbitHeadingDegrees + stepDegrees) % 360 + 360) % 360;
-    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
-    this.flyToAhsanManzilOrbit(650, "footprint");
+    this.heritageCameraController.orbit(stepDegrees);
   }
 
-  /** Start a smooth 360-degree guided orbit around the whole palace. */
+  /** Start a smooth guided orbit around the whole palace. */
   startAhsanManzilOrbitTour(onStopped?: () => void): void {
-    const viewer = this.viewer;
-    const Cesium = this.cesium;
-    if (!viewer || !Cesium || viewer.isDestroyed() || this.ahsanManzilOrbitTourActive) return;
-
-    this.ahsanManzilOrbitTourActive = true;
-    this.ahsanManzilOrbitStoppedCallback = onStopped ?? null;
-    this.ahsanManzilOrbitHeadingDegrees = 157;
-    this.ahsanManzilOrbitPitchDegrees = AHSAN_MANZIL_ORBIT_PITCH_DEGREES;
-    this.ahsanManzilOrbitRangeMeters = AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS;
-    this.ahsanManzilOrbitLastTimestamp = null;
-    viewer.camera.cancelFlight();
-    viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-    const center = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude,
-      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.latitude,
-      AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.height,
-    );
-
-    // Any direct mouse/touch interaction pauses the guided tour so the user
-    // can take over instead of fighting an always-moving camera.
-    const canvas = viewer.scene.canvas;
-    const stopForUserInput = () => this.stopAhsanManzilOrbitTour();
-    canvas.addEventListener("pointerdown", stopForUserInput, { passive: true });
-    canvas.addEventListener("wheel", stopForUserInput, { passive: true });
-    canvas.addEventListener("touchstart", stopForUserInput, { passive: true });
-    this.ahsanManzilOrbitInputUnsubscribe = () => {
-      canvas.removeEventListener("pointerdown", stopForUserInput);
-      canvas.removeEventListener("wheel", stopForUserInput);
-      canvas.removeEventListener("touchstart", stopForUserInput);
-    };
-
-    const tick = (timestamp: number) => {
-      if (!this.ahsanManzilOrbitTourActive) return;
-      const activeViewer = this.viewer;
-      const activeCesium = this.cesium;
-      if (!activeViewer || !activeCesium || activeViewer.isDestroyed()) {
-        this.stopAhsanManzilOrbitTour();
-        return;
-      }
-
-      if (this.ahsanManzilOrbitLastTimestamp !== null) {
-        const elapsed = Math.min(50, Math.max(0, timestamp - this.ahsanManzilOrbitLastTimestamp));
-        // A complete lap takes about 36 seconds: slow enough to inspect details.
-        this.ahsanManzilOrbitHeadingDegrees =
-          (this.ahsanManzilOrbitHeadingDegrees + elapsed * AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND / 1000) % 360;
-      }
-      this.ahsanManzilOrbitLastTimestamp = timestamp;
-
-      activeViewer.camera.lookAt(
-        center,
-        new activeCesium.HeadingPitchRange(
-          activeCesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
-          activeCesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
-          this.ahsanManzilOrbitRangeMeters,
-        ),
-      );
-      activeViewer.scene.requestRender();
-      this.ahsanManzilOrbitFrame = requestAnimationFrame(tick);
-    };
-
-    this.ahsanManzilOrbitFrame = requestAnimationFrame(tick);
+    this.heritageCameraController.startOrbitTour(onStopped);
   }
 
   /** Stop guided orbit while preserving the current view. */
   stopAhsanManzilOrbitTour(): void {
-    const wasActive = this.ahsanManzilOrbitTourActive;
-    this.ahsanManzilOrbitTourActive = false;
-    this.ahsanManzilOrbitLastTimestamp = null;
-    if (this.ahsanManzilOrbitFrame !== null && typeof cancelAnimationFrame === "function") {
-      cancelAnimationFrame(this.ahsanManzilOrbitFrame);
-    }
-    this.ahsanManzilOrbitFrame = null;
-    this.ahsanManzilOrbitInputUnsubscribe?.();
-    this.ahsanManzilOrbitInputUnsubscribe = null;
-    const onStopped = this.ahsanManzilOrbitStoppedCallback;
-    this.ahsanManzilOrbitStoppedCallback = null;
-
-    const viewer = this.viewer;
-    const Cesium = this.cesium;
-    if (viewer && Cesium && !viewer.isDestroyed()) {
-      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-      viewer.scene.requestRender();
-    }
-    if (wasActive) onStopped?.();
-  }
-
-  private flyToAhsanManzilOrbit(
-    durationMs: number,
-    target: "front" | "footprint" = "front",
-  ): void {
-    const viewer = this.viewer;
-    const Cesium = this.cesium;
-    if (!viewer || !Cesium || viewer.isDestroyed()) return;
-
-    const focus = target === "front"
-      ? AHSAN_MANZIL_CAMERA_TARGET
-      : AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET;
-    const center = Cesium.Cartesian3.fromDegrees(
-      focus.longitude,
-      focus.latitude,
-      focus.height,
-    );
-    // The front target is offset to the dome axis, so a wider sphere keeps
-    // the west-set-back Andarmahal in the same camera composition.
-    const bounds = new Cesium.BoundingSphere(
-      center,
-      target === "front"
-        ? AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS
-        : AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS,
-    );
-    viewer.camera.flyToBoundingSphere(bounds, {
-      duration: Math.max(0, durationMs) / 1000,
-      offset: new Cesium.HeadingPitchRange(
-        Cesium.Math.toRadians(this.ahsanManzilOrbitHeadingDegrees),
-        Cesium.Math.toRadians(this.ahsanManzilOrbitPitchDegrees),
-        this.ahsanManzilOrbitRangeMeters,
-      ),
-    });
-    viewer.scene.requestRender();
+    this.heritageCameraController.stopOrbitTour();
   }
 
   getState(): MapEngineState {
