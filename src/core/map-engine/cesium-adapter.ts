@@ -47,6 +47,7 @@ import {
 } from "./building-lod-policy.mjs";
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { BuildingLodRenderer } from "./building-lod-renderer";
+import { BuildingSelectionMaterialController } from "./building-selection-material-controller";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
@@ -75,7 +76,6 @@ type CesiumModule = typeof import("cesium");
 type CesiumViewer = import("cesium").Viewer;
 type CesiumEntity = import("cesium").Entity;
 type CesiumDataSource = import("cesium").GeoJsonDataSource;
-type CesiumMaterialProperty = import("cesium").MaterialProperty;
 type CesiumCartesian3 = import("cesium").Cartesian3;
 
 type MapPerformanceDiagnosticsHandle = {
@@ -189,14 +189,6 @@ export class CesiumAdapter implements MapEngine {
 
   private selectedBuilding: CesiumEntity | null = null;
 
-  private selectedBuildingOriginalMaterial:
-    | CesiumMaterialProperty
-    | null = null;
-
-  private selectedBuildingOriginalWallMaterial:
-    | CesiumMaterialProperty
-    | null = null;
-
   private readonly featureSelectionListeners =
     new Set<FeatureSelectionListener>();
 
@@ -206,12 +198,15 @@ export class CesiumAdapter implements MapEngine {
   >();
 
   private buildingLodRecords: BuildingLodRecord[] = [];
+  private readonly buildingSelectionMaterials = new BuildingSelectionMaterialController(
+    (entity) => this.selectedBuilding === entity,
+  );
   private readonly buildingLodRenderer = new BuildingLodRenderer({
     isSelected: (entity) => this.selectedBuilding === entity,
     prepareSelectedBuildingForLodTransition: (record) =>
-      this.prepareSelectedBuildingForLodTransition(record),
+      this.buildingSelectionMaterials.prepareSelectedBuildingForLodTransition(record),
     applySelectionHighlight: (entity, Cesium) =>
-      this.applySelectionHighlight(entity, Cesium),
+      this.buildingSelectionMaterials.applySelectionHighlight(entity, Cesium),
   });
   private readonly buildingStyleAssignments = new Map<string, BuildingStyleAssignment>();
   private cameraMoveEndUnsubscribe: (() => void) | null = null;
@@ -1007,8 +1002,6 @@ export class CesiumAdapter implements MapEngine {
       // Invalidate any selection owned by the outgoing viewport before swapping.
       this.restoreSelectedBuilding();
       this.selectedBuilding = null;
-      this.selectedBuildingOriginalMaterial = null;
-      this.selectedBuildingOriginalWallMaterial = null;
       this.emitFeatureSelection(null);
 
       this.overtureBuildings = dataSource;
@@ -1930,62 +1923,6 @@ export class CesiumAdapter implements MapEngine {
     });
   }
 
-  private prepareSelectedBuildingForLodTransition(
-    record: BuildingLodRecord,
-  ): void {
-    const entity = record.entity;
-
-    if (this.selectedBuilding !== entity) {
-      return;
-    }
-
-    const originalPolygonMaterial = this.selectedBuildingOriginalMaterial;
-    const originalWallMaterial = this.selectedBuildingOriginalWallMaterial;
-
-    // The detailed wall may be detached while the selected building is in
-    // lightweight mode. Restore the cached object's original material too.
-    if (originalPolygonMaterial !== null && entity.polygon) {
-      entity.polygon.material = originalPolygonMaterial;
-    }
-
-    if (originalWallMaterial !== null) {
-      if (entity.wall) {
-        entity.wall.material = originalWallMaterial;
-      }
-      if (record.detailedWall) {
-        record.detailedWall.material = originalWallMaterial;
-      }
-    }
-
-    this.selectedBuildingOriginalMaterial = null;
-    this.selectedBuildingOriginalWallMaterial = null;
-  }
-
-  private applySelectionHighlight(
-    entity: CesiumEntity,
-    Cesium: CesiumModule,
-  ): void {
-    if (
-      this.selectedBuilding !== entity ||
-      !entity.polygon ||
-      this.selectedBuildingOriginalMaterial !== null
-    ) {
-      return;
-    }
-
-    // Capture the unhighlighted materials only once per selection. LOD
-    // transitions must not accidentally save the cyan highlight as original.
-    this.selectedBuildingOriginalMaterial = entity.polygon.material;
-    // Preserve the facade texture so researched source/material colours and
-    // temporary design previews remain visible while the building is selected.
-    this.selectedBuildingOriginalWallMaterial = null;
-
-    // A translucent roof tint signals selection without replacing the facade.
-    entity.polygon.material = new Cesium.ColorMaterialProperty(
-      Cesium.Color.CYAN.withAlpha(0.42),
-    );
-  }
-
   private readProperties(
     entity: CesiumEntity,
     time: import("cesium").JulianDate,
@@ -2240,20 +2177,8 @@ export class CesiumAdapter implements MapEngine {
     const selectedRecord = this.buildingLodRecords.find(
       (record) => record.entity === building,
     );
-    const originalRoof = this.selectedBuildingOriginalMaterial;
-    const originalWall = this.selectedBuildingOriginalWallMaterial;
-
-    if (building?.polygon && originalRoof !== null) {
-      building.polygon.material = originalRoof;
-    }
-
-    if (building?.wall && originalWall !== null) {
-      building.wall.material = originalWall;
-    }
-
+    this.buildingSelectionMaterials.restoreSelectedBuilding(building);
     this.selectedBuilding = null;
-    this.selectedBuildingOriginalMaterial = null;
-    this.selectedBuildingOriginalWallMaterial = null;
 
     // A preview is a temporary visual treatment. Restore the source-driven
     // style when the selected building is cleared or another feature is picked.
@@ -2351,7 +2276,7 @@ export class CesiumAdapter implements MapEngine {
 
     if (selectedEntity) {
       const selectedRecord = this.buildingLodRecords.find((record) => record.entity === selectedEntity);
-      if (selectedRecord) this.applySelectionHighlight(selectedEntity, Cesium);
+      if (selectedRecord) this.buildingSelectionMaterials.applySelectionHighlight(selectedEntity, Cesium);
     }
     viewer.scene.requestRender();
   }
@@ -2839,7 +2764,7 @@ export class CesiumAdapter implements MapEngine {
         }
 
         this.updateBuildingLod(viewer, Cesium, true);
-        this.applySelectionHighlight(entity, Cesium);
+        this.buildingSelectionMaterials.applySelectionHighlight(entity, Cesium);
         viewer.scene.requestRender();
 
         console.info(
