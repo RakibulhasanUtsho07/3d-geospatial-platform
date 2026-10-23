@@ -482,31 +482,31 @@
             0
           ],
           [
-            6.7,
+            6.89,
             0.35
           ],
           [
-            6.1,
+            6.8,
             1.1
           ],
           [
-            5.4,
+            6.57,
             2
           ],
           [
-            4.55,
+            6.18,
             2.9
           ],
           [
-            3.55,
+            5.61,
             3.8
           ],
           [
-            2.55,
+            4.89,
             4.65
           ],
           [
-            1.55,
+            3.8,
             5.45
           ],
           [
@@ -517,7 +517,7 @@
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
         "source": "Lotus-bud dome silhouette interpreted from published exterior photographs and constrained by 14 m drum width and 27.13 m peak",
-        "note": "Nine radial profile samples replace the undersized 4 m-radius profile. Base radius 6.9 m nearly matches the drum's 7 m radius; final curvature remains an estimate pending rectified elevation."
+        "note": "Nine radial profile samples approximate a fuller, rounded lotus-bud/ellipsoidal dome rather than the earlier visibly conical taper. The 6.9 m base radius nearly matches the 7 m drum radius and the 6.53 m body height remains constrained by the 27.13 m overall peak; the curvature is still an estimate pending rectified elevation imagery."
       }
     },
     "materials": {
