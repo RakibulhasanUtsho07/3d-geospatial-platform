@@ -149,12 +149,19 @@ def calibrate_glb_to_length(raw, gltf, binary, reference_length_m, long_axis_mod
                 accessor[key] = [float(v * factor) for v in accessor[key]]
 
     extras["scaleCalibrated"] = True
-    extras["metresPerModelUnit"] = float(previous_scale * factor)
+    # Vertex coordinates themselves are multiplied by the calibration factor.
+    # Therefore the emitted coordinates are now metres, rather than old model units;
+    # preserving oldMetresPerModelUnit * factor here would double-apply the scale in
+    # downstream consumers. Keep the conversion factor as provenance below instead.
+    extras["metresPerModelUnit"] = 1.0
     extras["scaleCalibration"] = {
         "method": "operator-supplied-published-overall-length",
         "referenceLengthM": float(reference_length_m),
         "modelLongAxisBeforeScale": float(long_axis_model_units),
         "scaleFactorApplied": float(factor),
+        "inputMetresPerModelUnit": float(previous_scale),
+        "outputMetresPerModelUnit": 1.0,
+        "coordinatesAfterCalibration": "metres",
         "lengthAgreementIsIndependent": False,
         "independentChecks": ["overall depth", "dome peak height"],
         "warning": "Only the long-axis reference was used for scale calibration. Depth and height remain independent error checks.",
@@ -384,11 +391,15 @@ def main():
         output_glb = Path(args.output)
         output_glb.parent.mkdir(parents=True, exist_ok=True)
         output_glb.write_bytes(calibrated_glb)
+        calibrated_gltf = read_glb(calibrated_glb)[1]
+        calibration_metadata = calibrated_gltf.get("asset", {}).get("extras", {}).get("scaleCalibration", {})
         report["scaleCalibration"] = {
             "method": "operator-supplied-published-overall-length",
             "referenceLengthM": args.reference_length_m,
             "inputLongAxisModelUnits": metrics["longAxisModelUnits"],
             "scaleFactorApplied": factor,
+            "inputMetresPerModelUnit": calibration_metadata.get("inputMetresPerModelUnit"),
+            "outputMetresPerModelUnit": calibrated_gltf.get("asset", {}).get("extras", {}).get("metresPerModelUnit"),
             "sameReconstructionReused": True,
             "lengthAgreementIsIndependent": False,
             "independentChecks": ["overall depth", "dome peak height"],
