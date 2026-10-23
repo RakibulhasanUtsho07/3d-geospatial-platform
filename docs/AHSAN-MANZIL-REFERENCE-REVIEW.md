@@ -16,7 +16,22 @@ The integration step downloads two CC BY-SA 4.0 Wikimedia Commons images, verifi
 The generated artifact `artifacts/ahsan-manzil-review` contains the LOD3 model copy, confidence-tagged parameter JSON, 13 PNG renders, the two pinned source photographs, attribution, render manifest, review input, visual findings and a hash-linked report. CI uploads this folder even if the heritage render step fails, so partial PNGs and manifests remain available to diagnose a failed visual gate. The front photo is mapped to `front`; the southeast-oblique photograph maps provisionally to `turntable-315`. Both comparison outcomes are now recorded as **`mismatch`**, not `match` or `pending`, in `data/heritage/ahsan-manzil-visual-review.json`. The generated report binds each finding to the actual reference-image SHA-256, render-image SHA-256, render-manifest SHA-256 and model SHA-256. The reviewer is explicitly labelled AI-assisted visual triage and independent human sign-off remains pending. The other 11 render views are unassessed because the pinned sources do not document those facades.
 
 
-A first-pass generated bundle exposed an important visual QA case: a command can produce valid PNG files whose pixels show almost only the background. The Y-up profile therefore frames from the palace-only semantic nodes rather than the entire scene context; its lights are placed above the building in Y-up coordinates; CI rejects render sets where any of the 13 views has near-flat pixel luminance. Always open the latest artifact and compare it with the reference images—the automated contrast check is only a technical gate, not architectural acceptance.
+A first-pass generated bundle exposed an important technical QA case: the renderer had created valid PNG files whose pixels showed almost only the background. The Y-up profile now frames from the palace-only semantic nodes rather than the entire scene context, uses lights above the palace in Blender Z-up coordinates after glTF import, and CI rejects any of the 13 views if it has near-flat pixel luminance. That technical gate passed, but the subsequent side-by-side visual review still found architectural mismatch.
+
+## Visual review findings — 23 October 2026
+
+**Overall status: `needs-model-or-reference-correction`.** The findings are recorded against the exact renders and source images in the generated report. This is AI-assisted visual triage, not independent heritage-architect sign-off.
+
+| Reference and render | Finding | Required correction |
+|---|---|---|
+| Straight-on front photograph -> `front.png` | **Mismatch.** The model reads as a very long, low facade. The central dome/pavilion and ceremonial stair are much less visually dominant than in the source; facade opening rhythm and articulated end pavilions are simplified. | Resolve the provisional 125.4 m overall extent versus the 55.8 m working Rangmahal frontage. Verify whether the Andarmahal has been represented as a continuous south-front facade rather than a set-back mass. Recalibrate vertical/width proportions, dome/pavilion, stair and openings from a rectified same-facade source. |
+| Southeast-oblique photograph -> `turntable-315.png` | **Mismatch.** The rendered composition has broad, nearly black flat-looking roof planes and simplified side/end articulation compared with the photo's corner pavilion, arches, columns and projections. | Inspect normals/material/light response and roof geometry; refine end pavilion, arched openings, lower-level projections and mass intersections from matching references. The source camera's heading and lens are unknown, so this view mapping remains estimated. |
+
+The machine-readable counterpart is `data/heritage/ahsan-manzil-visual-review.json`. Each finding has notes and a correction request; CI expects both outcomes to remain `mismatch` until a new model is generated and visually reviewed. No image-similarity percentage or measured dimension has been inferred.
+
+## Acceptance state
+
+P1.3's review deliverable is complete because the two best-supported source views were inspected and the mismatches were recorded with traceable image/model/render hashes. **The model itself has not passed architectural fidelity review.** Independent human confirmation is pending, 11 views remain unassessed, and `publicationEligible` must remain false. The follow-up task is P1.4: correct the documented Ahsan Manzil proportions, roof/lighting appearance and facade articulation, then repeat the fixed-view review.
 
 ## Licensing and acceptance boundaries
 
