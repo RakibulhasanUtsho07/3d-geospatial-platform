@@ -189,7 +189,7 @@ async function waitForMapReady(page, timeoutMs) {
   return state;
 }
 
-async function capturePageMetrics(page, counters, origin, screenshotPath, startedAt, mode, index, scenario) {
+async function capturePageMetrics(page, counters, origin, screenshotPath, loadToMapReadyMs, mode, index, scenario) {
   const metrics = await page.evaluate((pageOrigin) => {
     const nav = performance.getEntriesByType("navigation")[0];
     const paints = performance.getEntriesByType("paint");
@@ -287,7 +287,7 @@ async function capturePageMetrics(page, counters, origin, screenshotPath, starte
     mode,
     status: "ok",
     scenario,
-    loadToMapReadyMs: roundMs(performance.now() - startedAt),
+    loadToMapReadyMs,
     navigation: metrics.navigation,
     paintTimingsMs: metrics.paintTimingsMs,
     resources: metrics.resources,
@@ -430,9 +430,10 @@ async function runBenchmark() {
         startedAt = performance.now();
         await session.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
         await waitForMapReady(session.page, readyTimeoutMs);
+        const loadToMapReadyMs = roundMs(performance.now() - startedAt);
         if (settleMs > 0) await session.page.waitForTimeout(settleMs);
         results.push(await capturePageMetrics(
-          session.page, session.counters, origin, screenshotPath, startedAt, "cold", index, scenario,
+          session.page, session.counters, origin, screenshotPath, loadToMapReadyMs, "cold", index, scenario,
         ));
       } catch (error) {
         results.push({
@@ -461,9 +462,10 @@ async function runBenchmark() {
           warmSession.counters.reset();
           await warmSession.page.reload({ waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
           await waitForMapReady(warmSession.page, readyTimeoutMs);
+          const loadToMapReadyMs = roundMs(performance.now() - startedAt);
           if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
           results.push(await capturePageMetrics(
-            warmSession.page, warmSession.counters, origin, screenshotPath, startedAt, "warm", index, scenario,
+            warmSession.page, warmSession.counters, origin, screenshotPath, loadToMapReadyMs, "warm", index, scenario,
           ));
         } catch (error) {
           results.push({
