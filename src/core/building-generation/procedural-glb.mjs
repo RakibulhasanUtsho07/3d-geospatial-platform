@@ -1,4 +1,5 @@
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "./facade-placement.mjs";
 const MATERIALS = ["wall", "roof", "glass", "frame", "concrete", "door", "metal"];
 function rgba(hex) { const s = hex.slice(1); return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) / 255).concat(1); }
 function normal(a, b, c) {
@@ -77,18 +78,42 @@ export function generateProceduralGlb(rawSpec) {
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
-  const edges=points.map((p,i)=>{const n=points[(i+1)%points.length],dx=n.x-p.x,dz=n.z-p.z,len=Math.hypot(dx,dz),ux=dx/len,uz=dz/len;return {p,n,len,out:{x:uz,z:-ux},yaw:Math.atan2(-uz,ux)};});
+  const edges=points.map((p,i)=>{const n=points[(i+1)%points.length];return {p,n,...createFacadeFrame(p,n)};});
   const front=edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0);
   for(let floor=0;floor<floorCount;floor++)for(let ei=0;ei<edges.length;ei++){
     const e=edges[ei],cx=(e.p.x+e.n.x)/2-e.out.x*wt/2,cz=(e.p.z+e.n.z)/2-e.out.z*wt/2;
     geo.box("wall",cx,floor*floorH+floorH/2,cz,e.len+wt*0.35,floorH,wt,e.yaw);
     const w=spec.architecture.windows;if(!w.enabled||e.len<2.7)continue;
-    const bays=Math.max(1,Math.min(12,Math.floor(e.len/3.2))),ww=Math.min(w.widthM,e.len/(bays+1)*0.68),wh=Math.min(w.heightM,floorH*0.52);
-    for(let bay=0;bay<bays;bay++){if(floor===0&&ei===front&&bay===Math.floor(bays/2))continue;const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*(wt/2+0.035),z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*(wt/2+0.035),y=floor*floorH+floorH*0.56,f=0.055;
-      geo.box("glass",x,y,z,ww,wh,0.055,e.yaw);geo.box("frame",x,y+wh/2,z,ww+f,f,0.075,e.yaw);geo.box("frame",x,y-wh/2,z,ww+f,f,0.075,e.yaw);geo.box("frame",x-ww/2,y,z,f,wh,0.075,e.yaw);geo.box("frame",x+ww/2,y,z,f,wh,0.075,e.yaw);
+    const bays=Math.max(1,Math.min(12,Math.floor(e.len/3.2)));
+    const ww=Math.min(w.widthM,e.len/(bays+1)*0.68),wh=Math.min(w.heightM,floorH*0.52);
+    for(let bay=0;bay<bays;bay++){
+      if(floor===0&&ei===front&&bay===Math.floor(bays/2))continue;
+      const t=(bay+1)/(bays+1);
+      const edgePoint={x:e.p.x+(e.n.x-e.p.x)*t,z:e.p.z+(e.n.z-e.p.z)*t};
+      const y=floor*floorH+floorH*0.56;
+      const f=0.055,paneDepth=0.055,frameDepth=0.075;
+      const panePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(paneDepth));
+      const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(frameDepth));
+      const leftJamb=offsetFacadePoint(edgePoint,e,-ww/2,surfaceInsertCenterOffset(frameDepth));
+      const rightJamb=offsetFacadePoint(edgePoint,e,ww/2,surfaceInsertCenterOffset(frameDepth));
+      geo.box("glass",panePoint.x,y,panePoint.z,ww,wh,paneDepth,e.yaw);
+      geo.box("frame",framePoint.x,y+wh/2,framePoint.z,ww+f,f,frameDepth,e.yaw);
+      geo.box("frame",framePoint.x,y-wh/2,framePoint.z,ww+f,f,frameDepth,e.yaw);
+      geo.box("frame",leftJamb.x,y,leftJamb.z,f,wh,frameDepth,e.yaw);
+      geo.box("frame",rightJamb.x,y,rightJamb.z,f,wh,frameDepth,e.yaw);
     }
   }
-  if(spec.architecture.includeDoor&&edges[front].len>=2.5){const e=edges[front],x=(e.p.x+e.n.x)/2+e.out.x*(wt/2+0.04),z=(e.p.z+e.n.z)/2+e.out.z*(wt/2+0.04),w=Math.min(1.05,e.len*0.25);geo.box("door",x,1.08,z,w,2.16,0.07,e.yaw);geo.box("frame",x,2.19,z,w+0.14,0.08,0.09,e.yaw);geo.box("frame",x-w/2-0.035,1.08,z,0.07,2.16,0.09,e.yaw);geo.box("frame",x+w/2+0.035,1.08,z,0.07,2.16,0.09,e.yaw);}
+  if(spec.architecture.includeDoor&&edges[front].len>=2.5){
+    const e=edges[front],edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2},w=Math.min(1.05,e.len*0.25);
+    const doorPoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07));
+    const doorFramePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09));
+    const leftJamb=offsetFacadePoint(edgePoint,e,-(w/2+0.035),surfaceInsertCenterOffset(0.09));
+    const rightJamb=offsetFacadePoint(edgePoint,e,w/2+0.035,surfaceInsertCenterOffset(0.09));
+    geo.box("door",doorPoint.x,1.08,doorPoint.z,w,2.16,0.07,e.yaw);
+    geo.box("frame",doorFramePoint.x,2.19,doorFramePoint.z,w+0.14,0.08,0.09,e.yaw);
+    geo.box("frame",leftJamb.x,1.08,leftJamb.z,0.07,2.16,0.09,e.yaw);
+    geo.box("frame",rightJamb.x,1.08,rightJamb.z,0.07,2.16,0.09,e.yaw);
+  }
   if(spec.architecture.balcony.enabled&&floorCount>1){const e=edges[front],b=spec.architecture.balcony,bays=Math.max(1,Math.min(6,Math.floor(e.len/Math.max(2.4,b.widthM+0.7)))),bw=Math.min(b.widthM,e.len/(bays+0.35));
     for(let floor=1;floor<floorCount;floor+=b.everyFloors)for(let bay=0;bay<bays;bay++){const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*b.depthM*0.45,z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*b.depthM*0.45,y=floor*floorH+0.06,rx=x+e.out.x*b.depthM*0.85,rz=z+e.out.z*b.depthM*0.85;
       geo.box("concrete",x,y,z,bw,0.12,b.depthM,e.yaw);geo.box("metal",rx,y+0.48,rz,bw,0.08,0.06,e.yaw);geo.box("metal",rx,y+0.24,rz,bw,0.04,0.045,e.yaw);
