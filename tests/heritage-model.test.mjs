@@ -207,5 +207,9 @@ test("Blender front review view prioritizes the facade over the roof deck", asyn
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
   assert.ok(renderer.includes('("front", Vector((0.0, -0.990268, 0.139173)), "ORTHO")'));
   assert.ok(renderer.includes("Low-angle (~8 degree) south-elevation camera prioritizes the facade."));
+  assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.28'));
+  assert.ok(renderer.includes("max_dimension * max_dimension * 18.0"));
+  assert.ok(renderer.includes("light_power * 0.30, light_size * 1.05"));
+  assert.ok(renderer.includes("light_power * 0.32, light_size"));
   assert.ok(renderer.includes('("turntable-" + str(angle).zfill(3), direction, "ORTHO")'));
 });
