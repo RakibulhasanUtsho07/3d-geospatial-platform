@@ -29,8 +29,10 @@ COMPONENT_FORMATS = {
 }
 
 
-def read_glb(path: Path):
-    raw = path.read_bytes()
+def read_glb(path: Path | bytes | bytearray):
+    # The calibration path validates an output GLB before it is written to disk;
+    # accepting bytes also keeps this parser reusable for in-memory unit tests.
+    raw = bytes(path) if isinstance(path, (bytes, bytearray)) else path.read_bytes()
     if len(raw) < 20:
         raise ValueError("GLB is too short")
     magic, version, declared = struct.unpack_from("<III", raw, 0)
