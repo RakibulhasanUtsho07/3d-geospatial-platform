@@ -25,8 +25,8 @@ def ensure_world(scene):
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is not None:
-        background.inputs["Color"].default_value = (0.38, 0.40, 0.43, 1.0)
-        background.inputs["Strength"].default_value = 0.7
+        background.inputs["Color"].default_value = (0.20, 0.22, 0.25, 1.0)
+        background.inputs["Strength"].default_value = 0.65
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -156,6 +156,7 @@ def main():
     scene.render.resolution_percentage = 100
     try:
         scene.view_settings.view_transform = "AgX"
+        scene.view_settings.look = "AgX - Medium High Contrast"
     except Exception:
         pass
     ensure_world(scene)
