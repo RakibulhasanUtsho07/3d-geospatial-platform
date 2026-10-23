@@ -238,7 +238,7 @@ jobs:
 
       - name: Install Blender for headless render integration
         run: |
-          sudo apt-get install --no-install-recommends -y blender
+          sudo apt-get install --no-install-recommends -y blender python3-numpy
           blender --version
 
       - name: Test end-to-end GLB render review and hash contract
