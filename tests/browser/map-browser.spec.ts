@@ -374,9 +374,9 @@ test("selecting a building then a road clears the previous details panel", async
     { timeout: 20_000 },
   ).toBe(true);
 
-  // Center the staged fixtures in the viewport so clicks target rendered geometry.
-  // This direct pointer click also guards against the floating launcher covering
-  // the camera control on short CI viewports.
+  // Bring the fixed fixture into view. The road crosses near the building's
+  // west edge, so click slightly east of the camera centre to test the roof
+  // without letting the narrow road corridor win the initial pick.
   await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
   await page.waitForTimeout(1_250);
 
@@ -385,11 +385,9 @@ test("selecting a building then a road clears the previous details panel", async
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
 
-  // The fixture footprint is centered on the map's provisional Ahsan Manzil
-  // anchor; in top-down mode the centre pixel should select its roof.
-  // Use absolute page coordinates so the canvas locator's actionability
-  // checks do not mask an actual Cesium pointer/pick regression.
-  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+  // Use absolute page coordinates so canvas-locator actionability checks do
+  // not mask an actual Cesium pointer/pick regression.
+  await page.mouse.click(box!.x + center.x + 10, box!.y + center.y);
   const buildingDetails = page.getByRole("complementary", { name: "Building details" });
   await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
   await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
@@ -400,7 +398,8 @@ test("selecting a building then a road clears the previous details panel", async
   await buildings.uncheck({ noWaitAfter: true });
   await expect(buildings).not.toBeChecked();
   await expect(buildingDetails).toHaveCount(0);
-  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+  // With the building hidden, click the road's fixture centreline.
+  await page.mouse.click(box!.x + center.x - 15, box!.y + center.y);
 
   const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
   await expect(roadDetails).toBeVisible({ timeout: 10_000 });
