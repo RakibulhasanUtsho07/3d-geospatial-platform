@@ -27,7 +27,10 @@ def main():
     coverage = worker.get("cameraCoverage", {})
     texture_status = worker.get("textureStatus", "unknown")
     diagnostics_metrics = diagnostics.get("metrics", {})
-    source_count = int(diagnostics_metrics.get("totalImages", diagnostics.get("sourceImageCount", 0)) or 0)
+    # sourceImageCount is the number of selected inputs; metrics.totalImages in
+    # some COLMAP builds reports only database/registered images and must not
+    # silently lower the denominator.
+    source_count = int(diagnostics.get("sourceImageCount", diagnostics_metrics.get("totalImages", 0)) or 0)
     registered = int(diagnostics_metrics.get("registeredImages", coverage.get("registeredCameraPoseCount", 0)) or 0)
     ratio = diagnostics.get("registeredImageRatio")
     if ratio is None:
