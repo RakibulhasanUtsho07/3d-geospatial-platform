@@ -68,39 +68,50 @@ test("surface inserts place the inner face at the configured wall-plane clearanc
  assert.throws(()=>surfaceInsertCenterOffset(0,0.002),/greater than zero/);
 });
 
-test("generated window glass meets the exterior wall plane without the previous half-wall-thickness gap",()=>{
- const built=generateProceduralGlb(fixture);
- const glb=built.glb;
- const jsonLength=glb.readUInt32LE(12);
- const gltf=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
- const binaryStart=28+jsonLength;
- const glassMesh=gltf.meshes.find(mesh=>mesh.name.endsWith("-glass"));
- assert.ok(glassMesh,"generated GLB includes a glass material mesh");
- const positionAccessor=gltf.accessors[glassMesh.primitives[0].attributes.POSITION];
- const view=gltf.bufferViews[positionAccessor.bufferView];
- const start=binaryStart+(view.byteOffset||0)+(positionAccessor.byteOffset||0);
- const positions=[];
- for(let i=0;i<positionAccessor.count;i++){
-  const offset=start+i*12;
-  positions.push({x:glb.readFloatLE(offset),y:glb.readFloatLE(offset+4),z:glb.readFloatLE(offset+8)});
- }
- const {derived}=normalizeBuildingSpec(fixture);
- for(let edgeIndex=0;edgeIndex<derived.localFootprint.length;edgeIndex++){
-  const p=derived.localFootprint[edgeIndex];
-  const n=derived.localFootprint[(edgeIndex+1)%derived.localFootprint.length];
-  const frame=createFacadeFrame(p,n);
-  const distances=positions.map(point=>{
-   const dx=point.x-p.x,dz=point.z-p.z;
-   return {along:dx*frame.tangent.x+dz*frame.tangent.z,outward:dx*frame.out.x+dz*frame.out.z};
-  }).filter(value=>value.along>0.25&&value.along<frame.len-0.25&&value.outward>0&&value.outward<0.1)
-    .map(value=>value.outward);
-  assert.ok(distances.length>0,"glass samples exist on facade edge "+edgeIndex);
-  const nearestFace=Math.min(...distances);
-  assert.ok(Math.abs(nearestFace-0.002)<0.0001,"glass inner face is 2 mm outside wall plane, edge "+edgeIndex+" measured "+nearestFace);
-  assert.ok(Math.max(...distances)>0.055&&Math.max(...distances)<0.059,"glass thickness extends outward from wall plane, edge "+edgeIndex);
+test("generated window glass meets the exterior wall plane for either footprint winding",()=>{
+ const originalRing=fixture.footprint.coordinates[0].slice(0,-1);
+ const reversedOpen=[...originalRing].reverse();
+ const reversedRing=[...reversedOpen,reversedOpen[0]];
+ const reversedFixture={...fixture,footprint:{...fixture.footprint,coordinates:[reversedRing]}};
+
+ for(const [spec,label] of [[fixture,"normal winding"],[reversedFixture,"reversed winding"]]){
+  const built=generateProceduralGlb(spec);
+  const glb=built.glb;
+  const jsonLength=glb.readUInt32LE(12);
+  const gltf=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+  const binaryStart=28+jsonLength;
+  const glassMesh=gltf.meshes.find(mesh=>mesh.name.endsWith("-glass"));
+  assert.ok(glassMesh,label+" GLB includes a glass material mesh");
+  const positionAccessor=gltf.accessors[glassMesh.primitives[0].attributes.POSITION];
+  const view=gltf.bufferViews[positionAccessor.bufferView];
+  const start=binaryStart+(view.byteOffset||0)+(positionAccessor.byteOffset||0);
+  const positions=[];
+  for(let i=0;i<positionAccessor.count;i++){
+   const offset=start+i*12;
+   positions.push({x:glb.readFloatLE(offset),y:glb.readFloatLE(offset+4),z:glb.readFloatLE(offset+8)});
+  }
+  const {derived}=normalizeBuildingSpec(spec);
+  const signedArea=derived.localFootprint.reduce((sum,p,i)=>{
+   const n=derived.localFootprint[(i+1)%derived.localFootprint.length];
+   return sum+p.x*n.z-n.x*p.z;
+  },0)/2;
+  const outwardSign=signedArea>=0?1:-1;
+  for(let edgeIndex=0;edgeIndex<derived.localFootprint.length;edgeIndex++){
+   const p=derived.localFootprint[edgeIndex];
+   const n=derived.localFootprint[(edgeIndex+1)%derived.localFootprint.length];
+   const frame=createFacadeFrame(p,n,outwardSign);
+   const distances=positions.map(point=>{
+    const dx=point.x-p.x,dz=point.z-p.z;
+    return {along:dx*frame.tangent.x+dz*frame.tangent.z,outward:dx*frame.out.x+dz*frame.out.z};
+   }).filter(value=>value.along>0.25&&value.along<frame.len-0.25&&value.outward>0&&value.outward<0.1)
+     .map(value=>value.outward);
+   assert.ok(distances.length>0,label+" glass samples exist on facade edge "+edgeIndex);
+   const nearestFace=Math.min(...distances);
+   assert.ok(Math.abs(nearestFace-0.002)<0.0001,label+" glass inner face is 2 mm outside wall plane, edge "+edgeIndex+" measured "+nearestFace);
+   assert.ok(Math.max(...distances)>0.055&&Math.max(...distances)<0.059,label+" glass thickness extends outward from wall plane, edge "+edgeIndex);
+  }
  }
 });
-
 
 test("generated entry door is positioned against the selected facade plane",()=>{
  const built=generateProceduralGlb(fixture);
