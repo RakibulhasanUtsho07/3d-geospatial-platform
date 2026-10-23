@@ -48,6 +48,7 @@ import {
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { BuildingLodRenderer } from "./building-lod-renderer";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
+import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
@@ -2347,37 +2348,11 @@ export class CesiumAdapter implements MapEngine {
     Cesium: CesiumModule,
     dataSource: Pick<CesiumDataSource, "entities">,
   ): CesiumEntity | null {
-    if (!picked || typeof picked !== "object") {
-      return null;
-    }
-
-    if (picked instanceof Cesium.Entity) {
-      return dataSource.entities.getById(picked.id) ?? null;
-    }
-
-    const pickedObject = picked as {
-      id?: unknown;
-      primitive?: { id?: unknown };
-    };
-
-    for (const candidate of [
-      pickedObject.id,
-      pickedObject.primitive?.id,
-    ]) {
-      if (candidate instanceof Cesium.Entity) {
-        return dataSource.entities.getById(candidate.id) ?? null;
-      }
-
-      if (typeof candidate === "string") {
-        const entity = dataSource.entities.getById(candidate);
-
-        if (entity) {
-          return entity;
-        }
-      }
-    }
-
-    return null;
+    return resolvePickedEntity(
+      picked,
+      (candidate): candidate is CesiumEntity => candidate instanceof Cesium.Entity,
+      (id) => dataSource.entities.getById(id),
+    );
   }
 
   onRoadSelected(listener: (road: RoadFeature | null) => void): () => void {
