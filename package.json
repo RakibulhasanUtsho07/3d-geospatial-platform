@@ -135,7 +135,8 @@
     "benchmark:map-optimization": "node scripts/benchmark-map-optimization.mjs",
     "test:map-browser": "playwright test --config=playwright.config.ts",
     "benchmark:map-browser": "node scripts/benchmark-map-browser.mjs",
-    "test:map-browser-baseline": "node --test tests/map-browser-baseline.test.mjs"
+    "test:map-browser-baseline": "node --test tests/map-browser-baseline.test.mjs",
+    "test:generated-model-layer-boundary": "node --test tests/generated-model-layer-boundary.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
