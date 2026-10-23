@@ -12,6 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MODEL_PATH = path.join(ROOT, "public", "models", "ahsan-manzil-lod3.glb");
 const PARAMETERS_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil.parameters.json");
 const SOURCES_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil-reference-sources.json");
+const VISUAL_REVIEW_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil-visual-review.json");
 const OUT_ROOT = path.resolve(process.env.AHSAN_MANZIL_REVIEW_OUTPUT || path.join(ROOT, "artifacts", "ahsan-manzil-review"));
 const PROFILE = "ahsan-manzil-y-up-cycles-cpu-v1";
 const BLENDER_BIN = (process.env.BLENDER_BIN || "blender").trim();
@@ -78,7 +79,25 @@ async function main() {
   assert.ok(BLENDER_BIN, "BLENDER_BIN must not be empty");
   const parameters = JSON.parse(await readFile(PARAMETERS_PATH, "utf8"));
   const sourceManifest = JSON.parse(await readFile(SOURCES_PATH, "utf8"));
+  const visualReview = JSON.parse(await readFile(VISUAL_REVIEW_PATH, "utf8"));
   assert.equal(parameters.id, sourceManifest.buildingId);
+  assert.equal(visualReview.schemaVersion, "1.0.0");
+  assert.equal(visualReview.buildingId, sourceManifest.buildingId);
+  assert.equal(visualReview.overallStatus, "needs-model-or-reference-correction");
+  assert.equal(visualReview.publicationEligible, false);
+  assert.equal(visualReview.humanAcceptance.status, "pending");
+  assert.match(visualReview.reviewer, /AI-assisted visual triage/);
+  assert.match(visualReview.reviewedAt, /^2026-10-23T/);
+  assert.equal(visualReview.comparisons.length, 2);
+  for (const assessment of visualReview.comparisons) {
+    const reference = sourceManifest.references.find((item) => item.id === assessment.referenceImageId);
+    assert.ok(reference, "visual review references a pinned source image");
+    assert.equal(assessment.viewId, reference.mappedRenderViewId);
+    assert.equal(assessment.comparisonBasis, "pose-estimated");
+    assert.equal(assessment.outcome, "mismatch");
+    assert.ok(assessment.notes.trim());
+    assert.ok(assessment.correctionRequest.trim());
+  }
   assert.equal(parameters.units, "meters");
   assert.equal(parameters.georeference.axes.value, "X east-west; Y up; +Z south / river-front");
   assert.equal(parameters.modelAssets.defaultRuntimeAsset, "/models/ahsan-manzil-lod3.glb");
@@ -113,6 +132,7 @@ async function main() {
   await copyFile(MODEL_PATH, path.join(modelDir, "ahsan-manzil-lod3.glb"));
   await copyFile(PARAMETERS_PATH, path.join(parametersDir, "ahsan-manzil.parameters.json"));
   await copyFile(SOURCES_PATH, path.join(OUT_ROOT, "reference-sources.json"));
+  await copyFile(VISUAL_REVIEW_PATH, path.join(OUT_ROOT, "visual-review.json"));
 
   const downloaded = {};
   for (const reference of sourceManifest.references) {
@@ -195,11 +215,16 @@ async function main() {
       facadeLabel: reference.facadeLabel,
       captureHeadingBasis: reference.captureHeadingBasis,
     })),
-    comparisons: sourceManifest.references.map((reference) => ({
-      viewId: reference.mappedRenderViewId,
-      referenceImageId: reference.id,
-      comparisonBasis: reference.comparisonBasis,
-      outcome: "pending",
+    reviewer: visualReview.reviewer,
+    comparisons: visualReview.comparisons.map((assessment) => ({
+      viewId: assessment.viewId,
+      referenceImageId: assessment.referenceImageId,
+      comparisonBasis: assessment.comparisonBasis,
+      outcome: assessment.outcome,
+      reviewer: visualReview.reviewer,
+      reviewedAt: visualReview.reviewedAt,
+      notes: assessment.notes,
+      correctionRequest: assessment.correctionRequest,
     })),
   };
   await writeFile(reviewInputPath, JSON.stringify(reviewInput, null, 2) + "\n", { flag: "wx", mode: 0o600 });
@@ -216,14 +241,22 @@ async function main() {
   assert.equal(reviewReport.provenance.renderManifestSha256, sha256(renderManifestBytes));
   assert.equal(reviewReport.counts.referenceImageCount, 2);
   assert.equal(reviewReport.counts.comparisonCount, 2);
-  assert.equal(reviewReport.counts.pending, 2, "view pairing is prepared, but human comparison outcomes are intentionally pending");
+  assert.equal(reviewReport.reviewStatus, "needs-model-or-reference-correction");
+  assert.equal(reviewReport.counts.mismatch, visualReview.comparisons.length);
+  assert.equal(reviewReport.counts.pending, 0);
   assert.equal(reviewReport.counts.viewsWithoutComparisons, REQUIRED_REVIEW_VIEWS.length - 2);
-  assert.ok(reviewReport.comparisons.every((comparison) => comparison.outcome === "pending"));
+  assert.ok(reviewReport.comparisons.every((comparison) =>
+    comparison.outcome === "mismatch" &&
+    comparison.reviewer === visualReview.reviewer &&
+    comparison.notes.length > 0 &&
+    comparison.correctionRequest.length > 0
+  ));
+  assert.equal(reviewReport.publicationEligible, false);
 
   const attributions = [
     "# Ahsan Manzil reference-image attribution",
     "",
-    "The reference images in this package are unmodified copies used to support visual review.",
+    "The reference images in this package are unmodified copies used for a qualitative visual review.",
     "",
     ...sourceManifest.references.flatMap((reference) => [
       "## " + reference.title,
@@ -241,14 +274,57 @@ async function main() {
     ]),
     "## Review status",
     "",
-    "The manifest links source/reference/model hashes and maps the front photo to the south-front camera and the east-side photo to the east/right camera. Comparison outcomes remain pending until a reviewer opens the rendered PNGs alongside these source images. No similarity percentage or publication approval is inferred.",
+    "Outcome: NEEDS MODEL OR REFERENCE CORRECTION. Both source/render comparisons are recorded as mismatches in the separate visual-review file and in the generated hash-linked report. The reviewer is explicitly identified as AI-assisted visual triage; independent human sign-off remains pending. Camera poses are estimated, not calibrated, and publication eligibility remains false.",
+    "",
+    "## Recorded findings",
+    "",
+    ...visualReview.comparisons.flatMap((assessment) => {
+      const reference = sourceManifest.references.find((item) => item.id === assessment.referenceImageId);
+      return [
+        "### " + reference.title + " -> " + assessment.viewId + " (" + assessment.outcome.toUpperCase() + ")",
+        "",
+        assessment.notes,
+        "",
+        "**Correction request:** " + assessment.correctionRequest,
+        "",
+      ];
+    }),
+    "## Human acceptance gate",
+    "",
+    visualReview.humanAcceptance.note,
     "",
   ].join("\n");
   await writeFile(path.join(OUT_ROOT, "ATTRIBUTION-AND-REVIEW-STATUS.md"), attributions, { flag: "wx", mode: 0o600 });
+  await writeFile(path.join(OUT_ROOT, "VISUAL-REVIEW-FINDINGS.md"), [
+    "# Ahsan Manzil visual review findings",
+    "",
+    "- Reviewer: " + visualReview.reviewer,
+    "- Reviewed at: " + visualReview.reviewedAt,
+    "- Outcome: " + visualReview.overallStatus,
+    "- Human sign-off: pending",
+    "- Publication eligible: no",
+    "",
+    ...visualReview.comparisons.flatMap((assessment) => [
+      "## " + assessment.referenceImageId + " -> " + assessment.viewId + ": " + assessment.outcome.toUpperCase(),
+      "",
+      "**Observation:** " + assessment.notes,
+      "",
+      "**Requested correction:** " + assessment.correctionRequest,
+      "",
+    ]),
+    "## Unassessed views",
+    "",
+    ...visualReview.unassessedViews.map((id) => "- " + id),
+    "",
+    "## Limitations",
+    "",
+    ...visualReview.limitations.map((item) => "- " + item),
+    "",
+  ].join("\n"), { flag: "wx", mode: 0o600 });
   await writeFile(path.join(OUT_ROOT, "downloaded-reference-hashes.json"), JSON.stringify(downloaded, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 
   console.log(JSON.stringify({
-    status: "ahsan-manzil-coordinate-aware-review-package-ready",
+    status: "ahsan-manzil-visual-review-recorded-needs-correction",
     renderProfile: PROFILE,
     modelSha256: renderManifest.modelSha256,
     renderConfigSha256: renderManifest.renderConfigSha256,
@@ -257,7 +333,9 @@ async function main() {
     referencesPinnedAndHashed: sourceManifest.references.length,
     referenceReviewReportSha256: sha256(await readFile(reviewReportPath)),
     comparisonStatus: reviewReport.reviewStatus,
+    mismatchesRecorded: reviewReport.counts.mismatch,
     pendingHumanComparisons: reviewReport.counts.pending,
+    independentHumanSignoff: visualReview.humanAcceptance.status,
     unmatchedRenderViews: reviewReport.counts.viewsWithoutComparisons,
     publicationEligible: false,
     output: OUT_ROOT,
