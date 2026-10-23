@@ -16,7 +16,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ahsan-manzil-p1-4-\${{ github.ref }}
+  group: ahsan-manzil-p1-4-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
       - name: Check out correction branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.ref_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -92,7 +92,7 @@ jobs:
 
       - name: Record exact GLB, QA and render hashes
         env:
-          SOURCE_COMMIT: \${{ github.sha }}
+          SOURCE_COMMIT: ${{ github.sha }}
         run: |
           node --input-type=module <<'NODE'
           import { createHash } from "node:crypto";
@@ -167,7 +167,7 @@ jobs:
           git add docs/heritage/p1.4-render-review-summary.json docs/heritage/p1.4-render-contact-sheet.png
           if ! git diff --cached --quiet; then
             git commit -m "docs(heritage): record P1.4 render evidence [skip ci]"
-            git push origin "HEAD:\${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
       - name: Upload review evidence
