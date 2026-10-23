@@ -55,6 +55,28 @@
       "capturedAt": "2010-12-31T03:08:03",
       "license": "CC BY-SA 3.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    },
+    {
+      "id": "ahsan007",
+      "file": "Ahsan_Manzil_Side_View.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_Side_View.jpg",
+      "creator": "Parvezahmed",
+      "capturedAt": "2019-11-01T10:35:57",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "gps": { "latitude": 23.7081961, "longitude": 90.4067306 },
+      "note": "Wikimedia metadata reports a directly captured side-view photograph with GPS; retain actual image orientation and camera pose as unverified until matched."
+    },
+    {
+      "id": "ahsan008",
+      "file": "Ahsan_Manzil_(side).jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_(side).jpg",
+      "creator": "Mrpluto11",
+      "capturedAt": "2017-03-18T12:04:08",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
     }
   ],
   "reviewMethod": {
