@@ -26,7 +26,7 @@ def ensure_world(scene):
     background = world.node_tree.nodes.get("Background")
     if background is not None:
         background.inputs["Color"].default_value = (0.20, 0.22, 0.25, 1.0)
-        background.inputs["Strength"].default_value = 0.65
+        background.inputs["Strength"].default_value = 0.85
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -161,7 +161,9 @@ def main():
         pass
     ensure_world(scene)
 
-    light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
+    # The previous 50k cap under-lit a 126 m scene under AgX; raise key/fill
+    # energy for inspection while keeping the source scale deterministic.
+    light_power = max(500.0, min(150000.0, max_dimension * max_dimension * 180.0))
     light_size = max_dimension * 1.2
     add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
     add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
