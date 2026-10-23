@@ -83,7 +83,12 @@ export function generateProceduralGlb(rawSpec) {
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
-  const edges=points.map((p,i)=>{const n=points[(i+1)%points.length];return {p,n,...createFacadeFrame(p,n)};});
+  const footprintSignedArea=points.reduce((sum,p,i)=>{
+    const n=points[(i+1)%points.length];
+    return sum+p.x*n.z-n.x*p.z;
+  },0)/2;
+  const outwardSign=footprintSignedArea>=0?1:-1;
+  const edges=points.map((p,i)=>{const n=points[(i+1)%points.length];return {p,n,...createFacadeFrame(p,n,outwardSign)};});
   const front=spec.architecture.frontFacadeEdgeIndex===undefined
     ? edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0)
     : spec.architecture.frontFacadeEdgeIndex;
