@@ -104,6 +104,7 @@ type GeneratedModelRecord = {
 };
 
 // Detail budgets adapt to camera altitude to keep distant city views lightweight.
+const WALL_OUTLINE_COLOR = "#526575";
 const BATCH_SIZE = 200;
 const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
 const VIEWPORT_PADDING_FACTOR = 0.4;
