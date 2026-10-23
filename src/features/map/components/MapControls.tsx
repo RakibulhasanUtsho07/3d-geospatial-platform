@@ -69,7 +69,7 @@ export default function MapControls({
   onResetOrientation,
 }: MapControlsProps) {
   return (
-    <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-3">
+    <div className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-8rem)] flex-col items-end gap-3 overflow-y-auto overscroll-contain pb-2 pr-1">
       <div className="rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
         <ControlButton
           label="Zoom in"
