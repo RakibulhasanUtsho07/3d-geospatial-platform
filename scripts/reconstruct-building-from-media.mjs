@@ -12,11 +12,12 @@ const { values, positionals } = parseArgs({
     "confirm-up-axis-reviewed": { type: "boolean", default: false },
     "model-distance": { type: "string" }, "real-distance-m": { type: "string" },
     quality: { type: "string", default: "MEDIUM" }, "heading-degrees": { type: "string", default: "0" },
-    "colmap-path": { type: "string" }, "ffmpeg-path": { type: "string" }, "timeout-ms": { type: "string", default: "3600000" },
+    "colmap-path": { type: "string" }, "colmap-use-gpu": { type: "boolean", default: false },
+    "ffmpeg-path": { type: "string" }, "timeout-ms": { type: "string", default: "3600000" },
   },
 });
 if (positionals.length !== 5 || process.argv.includes("--help")) {
-  console.log("Usage: node scripts/reconstruct-building-from-media.mjs <workspaceRoot> <buildingSpec.json> <jobId> <sourceId1,sourceId2,sourceId3> <sourceUpAxis>\nRequired flags: --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\nOptional scale calibration: --model-distance <model units> --real-distance-m <metres>\nOptional: --quality LOW|MEDIUM|HIGH|EXTREME --heading-degrees <0..360> --colmap-path <executable> --ffmpeg-path <executable> --timeout-ms <ms>\nRequires COLMAP installed separately. Output is a review-only candidate GLB; no automatic /map publishing occurs.");
+  console.log("Usage: node scripts/reconstruct-building-from-media.mjs <workspaceRoot> <buildingSpec.json> <jobId> <sourceId1,sourceId2,sourceId3> <sourceUpAxis>\nRequired flags: --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\nOptional scale calibration: --model-distance <model units> --real-distance-m <metres>\nOptional: --quality LOW|MEDIUM|HIGH|EXTREME --heading-degrees <0..360> --colmap-path <executable> --colmap-use-gpu (explicit opt-in; CPU mode is the headless default) --ffmpeg-path <executable> --timeout-ms <ms>\nRequires COLMAP installed separately. Output is a review-only candidate GLB; no automatic /map publishing occurs.");
   process.exit(process.argv.includes("--help") ? 0 : 2);
 }
 const [workspaceRootArg, specPathArg, jobId, sourceIdsCsv, upAxis] = positionals;
