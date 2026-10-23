@@ -296,6 +296,9 @@ jobs:
       - name: Test stale road viewport request cancellation
         run: npm run test:road-request-policy
 
+      - name: Test road layer manager ownership and lifecycle
+        run: npm run test:road-layer-manager
+
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
 
