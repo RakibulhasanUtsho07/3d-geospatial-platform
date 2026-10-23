@@ -8,6 +8,7 @@ on:
       - feat/generation-queue-worker
       - dev
       - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
@@ -58,6 +59,7 @@ on:
       - refactor/p1-feature-pick-routing
       - refactor/p1-selection-event-dispatch
       - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -98,6 +100,9 @@ jobs:
 
       - name: Test feature picking controller lifecycle
         run: npm run test:feature-picking-controller
+
+      - name: Test feature pick geometry calculations
+        run: npm run test:feature-pick-geometry
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy

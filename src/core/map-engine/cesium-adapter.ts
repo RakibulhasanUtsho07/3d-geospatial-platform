@@ -35,7 +35,6 @@ import {
   selectAhsanManzilLod,
 } from "../geospatial/heritage-landmarks.mjs";
 
-import { calculateFootprintAreaM2 } from "../geospatial/footprint-area.mjs";
 import { resolveBuildingHeight } from "../buildings/building-height.mjs";
 import type { NearbyPlace } from "../geospatial/nearby-places.mjs";
 import type { PropertyListing } from "../geospatial/property-listings.mjs";
@@ -50,6 +49,7 @@ import { BuildingLodRenderer } from "./building-lod-renderer";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
+import { resolveFeaturePickGeometry } from "./feature-pick-geometry.mjs";
 import { dispatchSelectionListeners } from "./dispatch-selection-listeners.mjs";
 import { FeaturePickingController } from "./feature-picking-controller.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
@@ -2644,89 +2644,15 @@ export class CesiumAdapter implements MapEngine {
       selectedProperties.display_name = properties.name;
     }
 
-    let coordinates: MapFeatureSelection["coordinates"] = null;
-
-    try {
-      const worldPosition =
-        viewer.scene.pickPositionSupported
-          ? viewer.scene.pickPosition(movement.position)
-          : undefined;
-
-      const position =
-        worldPosition ??
-        viewer.camera.pickEllipsoid(
-          movement.position,
-          viewer.scene.globe.ellipsoid,
-        );
-
-      if (position) {
-        const cartographic =
-          Cesium.Cartographic.fromCartesian(position);
-
-        coordinates = {
-          longitude: Cesium.Math.toDegrees(
-            cartographic.longitude,
-          ),
-          latitude: Cesium.Math.toDegrees(
-            cartographic.latitude,
-          ),
-          height: cartographic.height,
-        };
-      }
-    } catch (error: unknown) {
-      console.debug(
-        "[Map] Could not determine click coordinates:",
-        error instanceof Error
-          ? error.message
-          : String(error),
-      );
-    }
-
-    let focusCoordinates: MapFeatureSelection["focusCoordinates"] = null;
-    let footprintAreaM2: number | null = null;
-
-    try {
-      const hierarchy = entity.polygon.hierarchy?.getValue(
-        Cesium.JulianDate.now(),
-      );
-
-      if (hierarchy && hierarchy.positions.length >= 3) {
-        const bounds = Cesium.BoundingSphere.fromPoints(
-          hierarchy.positions,
-        );
-        const center = Cesium.Cartographic.fromCartesian(
-          bounds.center,
-        );
-
-        focusCoordinates = {
-          longitude: Cesium.Math.toDegrees(center.longitude),
-          latitude: Cesium.Math.toDegrees(center.latitude),
-          height: heightInfo.baseHeight + heightInfo.meters,
-        };
-
-        const toDegreesRing = (positions: CesiumCartesian3[]) =>
-          positions.map((position) => {
-            const cartographic = Cesium.Cartographic.fromCartesian(position);
-            return {
-              longitude: Cesium.Math.toDegrees(cartographic.longitude),
-              latitude: Cesium.Math.toDegrees(cartographic.latitude),
-            };
-          });
-        const rings = [
-          toDegreesRing(hierarchy.positions),
-          ...(hierarchy.holes ?? []).map(
-            (hole: { positions: CesiumCartesian3[] }) =>
-              toDegreesRing(hole.positions),
-          ),
-        ];
-        footprintAreaM2 = calculateFootprintAreaM2(rings);
-      }
-    } catch (error: unknown) {
-      console.debug(
-        "[Map] Could not calculate building footprint measurements:",
-        error instanceof Error ? error.message : String(error),
-      );
-    }
+    const { coordinates, focusCoordinates, footprintAreaM2 } =
+      resolveFeaturePickGeometry({
+        viewer,
+        Cesium,
+        screenPosition: movement.position,
+        polygon: entity.polygon,
+        baseHeight: heightInfo.baseHeight,
+        heightMeters: heightInfo.meters,
+      });
 
     this.emitFeatureSelection({
       source: "overture-local-buildings",
