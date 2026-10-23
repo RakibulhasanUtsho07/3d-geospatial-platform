@@ -7,6 +7,8 @@ on:
     paths:
       - 'data/heritage/ahsan-manzil.parameters.json'
       - 'scripts/build-ahsan-manzil-model.mjs'
+      - 'scripts/blender/render-building-review.py'
+      - 'docs/BLENDER-RENDER-REVIEW.md'
       - 'tests/heritage-model.test.mjs'
       - 'docs/heritage/ahsan-manzil-deviation-report.md'
       - '.github/workflows/heritage-p1-4-render.yml'
