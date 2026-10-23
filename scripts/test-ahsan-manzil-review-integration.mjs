@@ -141,6 +141,14 @@ async function main() {
   assert.match(renderManifest.modelSha256, /^[a-f0-9]{64}$/);
   assert.match(renderManifest.renderConfigSha256, /^[a-f0-9]{64}$/);
   assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "y-up;+X=east-west-eastward;+Z=south-riverfront");
+  // Camera framing must use the named palace nodes, not the 440 m site-context bounds.
+  assert.ok(renderManifest.sceneBounds.dimensions[0] < 150, "palace width bounds must exclude large site-context objects");
+  assert.ok(renderManifest.sceneBounds.dimensions[1] < 40, "palace height bounds must exclude site/context height");
+  assert.ok(renderManifest.sceneBounds.dimensions[2] < 70, "palace depth bounds must exclude surrounding river/context extents");
+  assert.ok(
+    renderManifest.views.every((view) => view.pixelStatistics.luminanceStandardDeviation > 0.004),
+    "all 13 camera renders must contain image detail; a flat background-only image is a failure",
+  );
   const directions = Object.fromEntries(renderManifest.views.map((view) => [view.id, view.cameraPose.viewDirectionWorld]));
   const assertDirection = (id, expected) => {
     assert.ok(
