@@ -122,6 +122,22 @@ def main():
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
     ortho_scale = max_dimension * 1.45
+
+    # Match the real-world river-facing reference: the canonical front image is
+    # a detail view of Rangmahal, not a full-footprint view with the rear-set
+    # Andarmahal extension shifting the dome away from the centre of the frame.
+    rangmahal_review_names = {
+        "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+        "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
+    }
+    rangmahal_review_meshes = [
+        obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
+    ]
+    if not rangmahal_review_meshes:
+        raise RuntimeError("Could not find Rangmahal meshes for the focused front review view")
+    _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
+    rangmahal_camera_distance = max(rangmahal_dimensions) * 3.0
+    rangmahal_ortho_scale = max(rangmahal_dimensions) * 1.22
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -168,13 +184,17 @@ def main():
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
+        view_center = rangmahal_center if view_id == "front" else center
+        view_distance = rangmahal_camera_distance if view_id == "front" else camera_distance
+        view_scale = rangmahal_ortho_scale if view_id == "front" else ortho_scale
+        view_framing = "rangmahal-south-facade" if view_id == "front" else "whole-model"
         camera_data = bpy.data.cameras.new("ReviewCamera_" + view_id)
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
         camera_data.type = camera_type
-        camera_data.ortho_scale = ortho_scale
-        camera.location = center + direction * camera_distance
-        camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        camera_data.ortho_scale = view_scale
+        camera.location = view_center + direction * view_distance
+        camera.rotation_euler = (view_center - camera.location).to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
@@ -196,6 +216,7 @@ def main():
             "width": resolution,
             "height": resolution,
             "renderComplete": True,
+            "framing": view_framing,
             "pixelStatistics": stats,
         })
         bpy.data.objects.remove(camera, do_unlink=True)
