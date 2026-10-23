@@ -7,6 +7,7 @@ on:
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
+      - refactor/p1-feature-picking-controller
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
