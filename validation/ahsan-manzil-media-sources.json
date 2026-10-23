@@ -4,8 +4,8 @@
   "independentReferenceDimensions": {
     "overallLengthM": 125.4,
     "overallDepthM": 28.75,
-    "plinthHeightM": 1.0,
-    "groundFloorClearHeightM": 5.0,
+    "plinthHeightM": 1,
+    "groundFloorClearHeightM": 5,
     "firstFloorClearHeightM": 5.8,
     "domePeakHeightAboveGroundM": 27.13,
     "dimensionSources": [
@@ -65,7 +65,10 @@
       "capturedAt": "2019-11-01T10:35:57",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-      "gps": { "latitude": 23.7081961, "longitude": 90.4067306 },
+      "gps": {
+        "latitude": 23.7081961,
+        "longitude": 90.4067306
+      },
       "note": "Wikimedia metadata reports a directly captured side-view photograph with GPS; retain actual image orientation and camera pose as unverified until matched."
     },
     {
@@ -77,6 +80,55 @@
       "capturedAt": "2017-03-18T12:04:08",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "id": "ahsan009",
+      "file": "Ahasan_Manzil_east_side_building.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahasan_Manzil_east_side_building.jpg",
+      "creator": "Farhan alvee",
+      "capturedAt": "2015-10-09T16:57:08",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "gps": {
+        "latitude": 23.708578,
+        "longitude": 90.406031
+      }
+    },
+    {
+      "id": "ahsan010",
+      "file": "Ahasan_Manzil_east_side_corner_view.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahasan_Manzil_east_side_corner_view.jpg",
+      "creator": "Farhan alvee",
+      "capturedAt": "2015-10-09T17:08:32",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "gps": {
+        "latitude": 23.708578,
+        "longitude": 90.406031
+      }
+    },
+    {
+      "id": "ahsan011",
+      "file": "Ahsan_Manjeel_2023.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manjeel_2023.jpg",
+      "creator": "Md Joni Hossain",
+      "capturedAt": "2023-06-10T14:32:20",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+    },
+    {
+      "id": "ahsan012",
+      "file": "Ahsan_Manjil_Angled_view.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manjil_Angled_view.jpg",
+      "creator": "Samiha Ahmed Rafa",
+      "capturedAt": "2025-07-30",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "note": "Side of grand staircase; view angle is helpful but cross-photo overlap must be validated by COLMAP."
     }
   ],
   "reviewMethod": {
@@ -87,6 +139,8 @@
     ],
     "axisAssumption": "The run declares Y as the candidate up axis to satisfy the worker contract. COLMAP's local reconstruction frame is not inherently WGS84-oriented, so this assumption must be checked in the orthographic previews.",
     "georeferencing": "Not claimed. Scale calibration alone does not solve horizontal WGS84 placement or vertical datum.",
-    "visualReview": "The artifact includes the licensed reference photographs plus front, side and top orthographic previews of the output GLB for direct visual comparison."
+    "visualReview": "The artifact includes the licensed reference photographs plus front, side and top orthographic previews of the output GLB for direct visual comparison.",
+    "selectedViewCount": 10,
+    "note": "Expanded dataset adds four differently framed source photos. Multiple images from different capture sessions do not guarantee sufficient overlap; COLMAP registration ratios and viewing-direction spread remain the actual gate."
   }
 }
