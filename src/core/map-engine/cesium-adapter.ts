@@ -47,7 +47,7 @@ import {
 } from "./building-lod-policy.mjs";
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { BuildingLodRenderer } from "./building-lod-renderer";
-import { BuildingSelectionMaterialController } from "./building-selection-material-controller";
+import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
 import {
   areBuildingVisualStylesEqual,
