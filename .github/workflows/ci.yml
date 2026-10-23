@@ -46,6 +46,7 @@ on:
   pull_request:
     branches:
       - main
+      - test/p1-building-selection-lifecycle
       - dev
       - refactor/p1-building-lod-policy
       - refactor/p1-building-lod-renderer
