@@ -60,7 +60,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("const stairTopZ = half + 2.7;"));
   assert.ok(builder.includes("The projecting triple-arched portico is an open"));
   assert.ok(builder.includes("Recessed timber door with an arched glazed head"));
-  assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);'));
+  assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[andarGf,andarFf],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes("function fillRectLouverWindow("));
   assert.ok(builder.includes('"#45674D"'), "LOD3 facade includes green shutter details from the reference scene");
