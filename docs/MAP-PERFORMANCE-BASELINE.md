@@ -63,3 +63,11 @@ GitHub Actions run [#39831935488](https://github.com/RakibulhasanUtsho07/3d-geos
 | Coordinate flattening: 600 roads × 36 vertices | 1.202 / 1.245 ms | 0.126 / 0.222 ms | 89.5% |
 
 Both comparisons verified exact selected-record ordering / coordinate values before timing. Treat these as synthetic CPU algorithm measurements from one CI runner, not as an estimate of overall map load time or GPU rendering performance. Re-run the benchmark on the target machine, then use the development diagnostics snapshot with real Dhaka data to establish the local end-to-end change.
+
+## Real-browser P0 baseline
+
+The separate [REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md](./REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md) procedure adds real Chromium cold-context and warm-browser-cache samples to the existing telemetry. It records navigation/paint/resource timings, candidate Git SHA, local data hashes, and PNG screenshot evidence.
+
+Run **npm run test:map-browser-baseline** for offline helper tests. Start **npm run dev**, then run **npm run benchmark:map-browser** to create a report and screenshots under **artifacts/map-performance-baseline/**.
+
+No end-to-end performance number is claimed until the runner has executed against the local real-data runtime.
