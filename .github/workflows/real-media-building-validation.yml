@@ -156,6 +156,29 @@ jobs:
             --quality LOW --colmap-path colmap --reconstruction-timeout-ms 2400000 \
             2>&1 | tee validation-output/logs/first-pass.log
 
+      - name: Capture raw reconstruction workspace diagnostics even when no mesh is produced
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          JOB_ROOT="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv"
+          mkdir -p validation-output/raw-workspace
+          if [ -d "$JOB_ROOT" ]; then
+            find "$JOB_ROOT" -type f -printf '%P | %s bytes\\n' | sort > validation-output/raw-workspace/file-list.txt
+            cp -a "$JOB_ROOT/." validation-output/raw-workspace/
+            find validation-output/raw-workspace -type f -name workflow-report.json -o -name report.json | while read -r file; do
+              printf '\\n===== %s =====\\n' "$file"
+              cat "$file"
+            done > validation-output/raw-workspace/reports-summary.txt || true
+          else
+            printf 'Expected reconstruction job root was not created: %s\\n' "$JOB_ROOT" > validation-output/raw-workspace/file-list.txt
+          fi
+          colmap model_converter -h > validation-output/logs/model-converter-help.txt 2>&1 || true
+          colmap poisson_mesher -h > validation-output/logs/poisson-mesher-help.txt 2>&1 || true
+          colmap delaunay_mesher -h > validation-output/logs/delaunay-mesher-help.txt 2>&1 || true
+          echo "Captured raw workspace diagnostics; no candidate is considered release-ready from this step."
+
       - name: Inspect unscaled candidate and create orthographic previews
         id: measure
         if: steps.first.outcome == 'success'
