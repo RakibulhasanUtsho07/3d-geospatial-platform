@@ -193,7 +193,10 @@ jobs:
             --kind "ahsan009=image" --kind "ahsan010=image" \
             --kind "ahsan011=image" --kind "ahsan012=image" \
             --confirm-rights --strategy photogrammetry \
-            --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008,ahsan009,ahsan010,ahsan011,ahsan012" \
+            # Use only the feature-match connected component for this diagnostic solve.
+            # The COLMAP log for all 10 images reported "No good initial image pair found";
+            # the side-view cluster has no robust links into the main facade cluster.
+            --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan011,ahsan012" \
             --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
             --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
             2>&1 | tee validation-output/logs/first-pass.log
