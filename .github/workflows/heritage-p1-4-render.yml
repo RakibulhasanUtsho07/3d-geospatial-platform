@@ -18,7 +18,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: ahsan-manzil-p1-4-final-${{ github.ref }}
+  group: ahsan-manzil-p1-4-v3-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
