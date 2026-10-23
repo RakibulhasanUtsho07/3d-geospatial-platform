@@ -26,7 +26,7 @@ def ensure_world(scene):
     background = world.node_tree.nodes.get("Background")
     if background is not None:
         background.inputs["Color"].default_value = (0.13, 0.15, 0.18, 1.0)
-        background.inputs["Strength"].default_value = 0.28
+        background.inputs["Strength"].default_value = 0.45
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -163,12 +163,12 @@ def main():
 
     # Tune the inspection rig to retain the salmon facade, darker recesses and step shadows.
     # Power remains dimension-scaled and clamped so render reviews stay deterministic.
-    light_power = max(750.0, min(300000.0, max_dimension * max_dimension * 18.0))
+    light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
     light_size = max_dimension * 0.68
     light_offset = max_dimension * 0.65
     add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.30, light_size * 1.05)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.32, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
         # Low-angle (~8 degree) south-elevation camera prioritizes the facade.
