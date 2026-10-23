@@ -112,10 +112,15 @@ function makeGlb(positions,normals,uvs,texturePng,metresPerModelUnit,upAxis,scal
   for(let i=0;i<outputPositions.length;i+=3)for(let a=0;a<3;a++){pmin[a]=Math.min(pmin[a],outputPositions[i+a]);pmax[a]=Math.max(pmax[a],outputPositions[i+a]);}
   const positionAccessor=addAccessor(addView(writeBuffer(outputPositions,"float32"),34962),5126,outputPositions.length/3,"VEC3",{min:pmin,max:pmax});
   const normalAccessor=addAccessor(addView(writeBuffer(outputNormals,"float32"),34962),5126,outputNormals.length/3,"VEC3");
-  const uvAccessor=addAccessor(addView(writeBuffer(uvsOut,"float32"),34962),5126,uvsOut.length/2,"VEC2");
+  const uvAccessor=uvsOut.length?addAccessor(addView(writeBuffer(uvsOut,"float32"),34962),5126,uvsOut.length/2,"VEC2"):null;
   const indexAccessor=addAccessor(addView(writeBuffer(indices,useShort?"uint16":"uint32"),34963),useShort?5123:5125,indices.length,"SCALAR",{min:[0],max:[Math.max(0,indices.length-1)]});
-  const imageView=addView(texturePng,undefined),payloadLength=offset,binaryRaw=Buffer.concat(chunks),pad=(4-binaryRaw.length%4)%4,binary=pad?Buffer.concat([binaryRaw,Buffer.alloc(pad)]):binaryRaw;
-  const gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / COLMAP textured mesh adapter",extras:{scaleCalibrated,metresPerModelUnit,sourceUpAxis:upAxis}},scene:0,scenes:[{nodes:[0]}],nodes:[{name:"Photogrammetry Building Mesh",mesh:0}],meshes:[{name:"Textured Reconstruction",primitives:[{attributes:{POSITION:positionAccessor,NORMAL:normalAccessor,TEXCOORD_0:uvAccessor},indices:indexAccessor,material:0,mode:4}]}],materials:[{name:"COLMAP Texture Atlas",pbrMetallicRoughness:{baseColorFactor:[1,1,1,1],baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:0.9},doubleSided:true}],textures:[{sampler:0,source:0}],samplers:[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}],images:[{bufferView:imageView,mimeType:"image/png",name:"COLMAP Texture Atlas"}],accessors,bufferViews:views,buffers:[{byteLength:payloadLength}]};
+  const hasTexture=Buffer.isBuffer(texturePng)&&texturePng.length>0;
+  const imageView=hasTexture?addView(texturePng,undefined):null;
+  const payloadLength=offset,binaryRaw=Buffer.concat(chunks),pad=(4-binaryRaw.length%4)%4,binary=pad?Buffer.concat([binaryRaw,Buffer.alloc(pad)]):binaryRaw;
+  const attributes={POSITION:positionAccessor,NORMAL:normalAccessor};if(uvAccessor!==null)attributes.TEXCOORD_0=uvAccessor;
+  const material=hasTexture?{name:"COLMAP Texture Atlas",pbrMetallicRoughness:{baseColorFactor:[1,1,1,1],baseColorTexture:{index:0},metallicFactor:0,roughnessFactor:0.9},doubleSided:true}:{name:"Untextured Review Material",pbrMetallicRoughness:{baseColorFactor:[0.76,0.66,0.55,1],metallicFactor:0,roughnessFactor:0.95},doubleSided:true};
+  const gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / COLMAP mesh adapter",extras:{scaleCalibrated,metresPerModelUnit,sourceUpAxis:upAxis,textured:hasTexture}},scene:0,scenes:[{nodes:[0]}],nodes:[{name:"Photogrammetry Building Mesh",mesh:0}],meshes:[{name:hasTexture?"Textured Reconstruction":"Untextured Review Mesh",primitives:[{attributes,indices:indexAccessor,material:0,mode:4}]}],materials:[material],accessors,bufferViews:views,buffers:[{byteLength:payloadLength}]};
+  if(hasTexture){gltf.textures=[{sampler:0,source:0}];gltf.samplers=[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}];gltf.images=[{bufferView:imageView,mimeType:"image/png",name:"COLMAP Texture Atlas"}];}
   const jsonRaw=Buffer.from(JSON.stringify(gltf)),jsonPad=(4-jsonRaw.length%4)%4,json=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
   const total=12+8+json.length+8+binary.length,header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
   const jh=Buffer.alloc(8);jh.writeUInt32LE(json.length,0);jh.writeUInt32LE(0x4e4f534a,4);
@@ -155,4 +160,31 @@ export async function convertTexturedPlyToGlb(options) {
   if(!triangleCount)throw new RangeError("PLY has no triangulatable surface faces");
   const glb=makeGlb(positions,normals,uvs,texture,metresPerModelUnit,upAxis,options.scaleCalibrated===true);
   return {glb,geometry:{vertices:positions.length/3,triangles:triangleCount,materials:1,textureBytes:texture.length},bounds:{sourceUpAxis:upAxis,metresPerModelUnit,scaleCalibrated:options.scaleCalibrated===true}};
+}
+
+/** Convert a mesh PLY to a neutral-material GLB when texturing is unavailable. */
+export async function convertPlyToUntexturedGlb(options) {
+  if(!options||typeof options!=="object")throw new TypeError("options are required");
+  const metresPerModelUnit=options.metresPerModelUnit??1,upAxis=options.upAxis??"Z";
+  if(typeof metresPerModelUnit!=="number"||!Number.isFinite(metresPerModelUnit)||metresPerModelUnit<=0||metresPerModelUnit>1000)throw new RangeError("metresPerModelUnit must be between 0 and 1000");
+  if(!["X","Y","Z"].includes(upAxis))throw new TypeError("upAxis must be X, Y or Z");
+  const plyStat=await stat(options.plyPath);
+  if(plyStat.size<=0||plyStat.size>500*1024*1024)throw new RangeError("mesh must be non-empty and at most 500 MB");
+  const ply=await readFile(options.plyPath),{vertices,faces}=parsePlyBuffer(ply),positions=[],normals=[];
+  const pFor=i=>{if(!Number.isInteger(i)||i<0||i>=vertices.length)throw new RangeError("PLY face references an invalid vertex index");const v=vertices[i];return [v.x,v.y,v.z];};
+  let triangleCount=0;
+  for(const face of faces){
+    const ids=face.indices;if(!ids||ids.length<3)throw new TypeError("each PLY face must contain at least three vertex indices");
+    for(let k=1;k<ids.length-1;k++){
+      const corners=[0,k,k+1],pts=corners.map(ci=>pFor(ids[ci])),faceNormal=unitNormal(...pts);
+      for(let corner=0;corner<3;corner++){
+        const vertex=vertices[ids[corners[corner]]],n=[vertex.nx,vertex.ny,vertex.nz].every(Number.isFinite)?normalize([vertex.nx,vertex.ny,vertex.nz]):faceNormal;
+        positions.push(...pts[corner]);normals.push(...n);
+      }
+      triangleCount++;
+    }
+  }
+  if(!triangleCount)throw new RangeError("PLY has no triangulatable surface faces");
+  const glb=makeGlb(positions,normals,[],null,metresPerModelUnit,upAxis,options.scaleCalibrated===true);
+  return {glb,geometry:{vertices:positions.length/3,triangles:triangleCount,materials:1,textureBytes:0,textured:false},bounds:{sourceUpAxis:upAxis,metresPerModelUnit,scaleCalibrated:options.scaleCalibrated===true}};
 }
