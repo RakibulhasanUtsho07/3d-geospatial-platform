@@ -212,64 +212,24 @@ jobs:
             --output validation-output/unscaled/measurements.json \
             --render-dir validation-output/unscaled/previews
 
-      - name: Run second-pass reconstruction with length-based scale calibration
+      - name: Calibrate the existing GLB to the published length reference
         id: scaled
         if: steps.measure.outcome == 'success'
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          WORKSPACE="$(cat validation-output/workspace-path.txt)"
-          # Keep the actual reconstruction worker headless on GitHub-hosted Linux.
-          export QT_QPA_PLATFORM=offscreen
-          RAW_LONG="$(python -c 'import json; print(format(json.load(open("validation-output/unscaled/measurements.json"))["longAxisModelUnits"], ".12g"))')"
-          python - "$RAW_LONG" <<'PY'
-          import sys
-          value = float(sys.argv[1])
-          if not (value > 0 and value < 1e9):
-              raise SystemExit("unscaled long-axis extent is invalid: " + repr(value))
-          print("Unscaled longest horizontal principal extent:", value, "model units")
-          PY
-          npm run build:building-from-media -- "$WORKSPACE" validation/ahsan-manzil-building-spec.json ahsan-scaled \
-            --source "ahsan003=uploads/Ahsan_Manzil_003.jpg" \
-            --source "ahsan004=uploads/Ahsan_Manzil_004.jpg" \
-            --source "ahsan005=uploads/Ahsan_Manzil_005.jpg" \
-            --source "ahsan006=uploads/Ahsan_Manzil_006.jpg" \
-            --source "ahsan007=uploads/Ahsan_Manzil_Side_View.jpg" \
-            --source "ahsan008=uploads/Ahsan_Manzil_(side).jpg" \
-            --licence "ahsan003=CC BY-SA 3.0" \
-            --licence "ahsan004=CC BY-SA 3.0" \
-            --licence "ahsan005=CC BY-SA 3.0" \
-            --licence "ahsan006=CC BY-SA 3.0" \
-            --licence "ahsan007=CC BY-SA 4.0" \
-            --licence "ahsan008=CC BY-SA 4.0" \
-            --author "ahsan003=Ranadipam Basu" \
-            --author "ahsan004=Ranadipam Basu" \
-            --author "ahsan005=Ranadipam Basu" \
-            --author "ahsan006=Ranadipam Basu" \
-            --author "ahsan007=Parvezahmed" \
-            --author "ahsan008=Mrpluto11" \
-            --attribution "ahsan003=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan004=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan005=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan006=Ranadipam Basu, CC BY-SA 3.0" \
-            --attribution "ahsan007=Parvezahmed, CC BY-SA 4.0" \
-            --attribution "ahsan008=Mrpluto11, CC BY-SA 4.0" \
-            --source-url "ahsan003=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg" \
-            --source-url "ahsan004=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg" \
-            --source-url "ahsan005=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg" \
-            --source-url "ahsan006=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg" \
-            --source-url "ahsan007=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg" \
-            --source-url "ahsan008=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg" \
-            --kind "ahsan003=image" --kind "ahsan004=image" \
-            --kind "ahsan005=image" --kind "ahsan006=image" \
-            --kind "ahsan007=image" --kind "ahsan008=image" \
-            --confirm-rights --strategy photogrammetry \
-            --views "ahsan003,ahsan004,ahsan005,ahsan006,ahsan007,ahsan008" \
-            --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
-            --quality LOW --colmap-path colmap --sparse-mesh-fallback --python python3 --reconstruction-timeout-ms 2400000 \
-            --model-distance "$RAW_LONG" --real-distance-m 125.4 \
-            2>&1 | tee validation-output/logs/scaled-pass.log
+          mkdir -p validation-output/calibrated
+          python -m py_compile validation/analyze-real-glb.py
+          python validation/analyze-real-glb.py --mode calibrate \
+            --glb validation-output/unscaled/model.glb \
+            --output validation-output/calibrated/model.glb \
+            --report validation-output/calibrated/calibration-report.json \
+            --reference-length-m 125.4
+          cp validation-output/unscaled/workflow-report.json validation-output/calibrated/workflow-report.json
+          if [ -f validation-output/unscaled/colmap-worker-report.json ]; then
+            cp validation-output/unscaled/colmap-worker-report.json validation-output/calibrated/colmap-worker-report.json
+          fi
 
       - name: Compare dimensions and create calibrated orthographic previews
         id: compare
@@ -278,24 +238,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          WORKSPACE="$(cat validation-output/workspace-path.txt)"
-          MODEL="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/model.glb"
-          REPORT="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/workflow-report.json"
+          MODEL="validation-output/calibrated/model.glb"
           test -s "$MODEL"
-          mkdir -p validation-output/calibrated
-          cp "$MODEL" validation-output/calibrated/model.glb
-          cp "$REPORT" validation-output/calibrated/workflow-report.json
-          python - <<'PY'
-          import json, pathlib, shutil
-          root = pathlib.Path(pathlib.Path("validation-output/workspace-path.txt").read_text().strip())
-          report_path = root / ".building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/workflow-report.json"
-          report = json.loads(report_path.read_text())
-          worker_path = report.get("output", {}).get("reportPath")
-          if worker_path:
-              source = root / worker_path
-              if source.is_file():
-                  shutil.copy2(source, "validation-output/calibrated/colmap-worker-report.json")
-          PY
+          test -s validation-output/calibrated/calibration-report.json
           python validation/analyze-real-glb.py --mode compare \
             --glb validation-output/calibrated/model.glb \
             --output validation-output/dimension-comparison.json \
