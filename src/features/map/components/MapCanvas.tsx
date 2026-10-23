@@ -11,12 +11,12 @@ import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type { RoadFeature } from "@/core/geospatial/road-network.mjs";
+import { MAP_LAYER_IDS } from "@/core/map-engine/types";
 import type {
   BuildingStyleAssignment,
   GeneratedModelDefinition,
   MapFeatureSelection,
   MapLayer,
-  MAP_LAYER_IDS,
 } from "@/core/map-engine/types";
 
 import BuildingSearchPanel from "./BuildingSearchPanel";
