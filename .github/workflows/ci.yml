@@ -251,6 +251,9 @@ jobs:
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 
+      - name: Test OGC 3D Tiles 1.1 manifest contract
+        run: npm run test:3d-tiles-manifest
+
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
