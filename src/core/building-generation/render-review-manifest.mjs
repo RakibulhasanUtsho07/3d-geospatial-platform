@@ -13,6 +13,10 @@ function finiteVector3(value) {
   return Array.isArray(value) && value.length === 3 && value.every(finite);
 }
 
+function finiteVector4(value) {
+  return Array.isArray(value) && value.length === 4 && value.every(finite);
+}
+
 function validCameraPose(pose) {
   if (!pose || typeof pose !== "object" || Array.isArray(pose) || pose.projection !== "ORTHO" ||
     !finiteVector3(pose.positionWorld) || !finiteVector3(pose.targetWorld) ||
@@ -40,7 +44,7 @@ function validRenderSettings(settings, resolution) {
     !finite(settings.cameraDistanceMultiplier) || settings.cameraDistanceMultiplier <= 0 ||
     !finite(settings.cameraOrthoScaleMultiplier) || settings.cameraOrthoScaleMultiplier <= 0 ||
     !finite(settings.turntableElevationDegrees) ||
-    !finiteVector3(settings.worldBackgroundRgba) ||
+    !finiteVector4(settings.worldBackgroundRgba) ||
     !finite(settings.worldBackgroundStrength) ||
     !Array.isArray(settings.lights) || settings.lights.length !== 3) return false;
   return settings.lights.every((light) => light && light.type === "AREA" &&
