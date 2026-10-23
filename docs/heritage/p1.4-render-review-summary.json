@@ -1,15 +1,16 @@
 {
   "task": "P1.4",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "0801642a59068e28b36fc91dff98ab063d8af07d",
-  "reviewGeneratedAt": "2026-10-23T11:40:15.353Z",
+  "sourceCommit": "2120175dec9fe74aae3c9729238226902922e419",
+  "reviewGeneratedAt": "2026-10-23T11:45:34.063Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
     "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
     "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
     "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
     "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
-    "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses"
+    "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
+    "lower 8-degree south-elevation review camera so the flat roof deck no longer dominates the facade-detail view"
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
@@ -18,7 +19,7 @@
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "6f4acb6ea3ff20a7141b00da1eaf14b4515fca5c887f9613da4636b435a1e127",
+    "sha256": "3ed3f05587ff90b458980732533167794be41638cf1e6d67506a03db3741bad6",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -100,91 +101,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d1b3222264071841dd736cafdb65658eaa560f0a2bf8ff706cf775ff218b00b6"
+      "sha256": "c385693e80b8669b8cc916984690593ed20b80053cc15bb7d931c9cd8eaef0fd"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ff33bac245e284de7175701e2f8c73293e1fd44353845e8b19389d64e2a51aa6"
+      "sha256": "2c2effd49b6a0eac3e0a80b92f97d8280d66ca6d5ae9649fb6079732a27c288c"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "695d85286b3d070957df9d8e8416a58ab322a30471c8ec57c2068980ac3a34bd"
+      "sha256": "919d8e9092051d9b1c499b2011d6c42feec5bfe72d9bb07edcd263c1aca7fd82"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "17b7ac308b9d60d0fa6aa7f5d8c2fd714afb7c186066fa39307d2d8d4c429ed7"
+      "sha256": "ccf8a9c77de78d12fda3e48ec649ed5a5b01e6c93e43505dfb56c64122c4ce90"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "94dd797b644a24446b5c595e5406084f21104e91840966fb2a04b2bb5ae7371b"
+      "sha256": "534fc3060c3328beaae9b662742b1f331279f6fdb83faa9b2960c959daee0356"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "44869a026b84be6da8c559c9fc9ecc75b86fe61f0182d51fa51ba9468e2cfca9"
+      "sha256": "3bf06d5aa09fbdf7a1f0b770aef07b0d30e8c2276c1133b59cf50d360f909738"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b1803be43e154bb76636247b49733a9a85dd6ffaa6bd94eda953808a0b84091d"
+      "sha256": "0518dc258cd3e7492c9099b50d1514b161783f362b8b6cebbfc210087974ea81"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "0d32f8f1f83a6d54a6f87ef7a4ebb2d351cfcb759b11d2207d0b263cf2d0721d"
+      "sha256": "c45ef0a21b62dfe62a35980b1ae82855268f0dbb314c02e4aa89a3e37c8ff110"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2b10926fa575550515737e2cd8ee7f1b2cbb0ee5afc360c58a0e7a9b189b96be"
+      "sha256": "198e54b8c4d23a54e7580e07bd3fb5a373de392b13e01c34a942a253e85a37e4"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "02565b0ecca89440f741035fc373d26496da4d84977e5e763ea41905cb9f5bc5"
+      "sha256": "f2284f3ac60a363bb41358cc253c1aae72ea0d3efd21c97964a39932bde0d9a5"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9c60b0842753c4e91f6bebda6cac376f5c61426d0afbd9505cafd90216935dd0"
+      "sha256": "f11f72586d6bf361b7bef8044a1b9b9010956bffc012134377cb06ebc7e017a7"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "40abee898e82a3c81f9ec8fbe041e95dda19c6b4c1cf7bd52ba63e0d5ce5534c"
+      "sha256": "05c249627153be052edc697f8c507e0c135215993686d9cb2d16da45a64d7a17"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "17822cb191fb596babc17911c0f2e7c62239f57f1ce8083271a1bffbe4116de3"
+      "sha256": "f21fcb504ba3268eac9156fe8a4835331116dc7c9345d4550847042158ea8a20"
     }
   ],
   "visualReview": {
@@ -198,6 +199,7 @@
       "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
       "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
       "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
+      "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
     ],
     "residualRisks": [
