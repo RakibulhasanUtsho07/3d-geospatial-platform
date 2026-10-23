@@ -82,7 +82,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
   assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
   assert.equal(config.parameters.facade.porticoWidth.value, 18.6);
-  assert.equal(config.parameters.stair.width.value, 26);
+  assert.equal(config.parameters.stair.width.value, 39);
   assert.equal(config.parameters.stair.topWidth.value, 18.6);
   assert.equal(config.parameters.stair.stepCount.value, 28);
   assert.equal(config.parameters.stair.riserHeight.value, 0.2285714286);
