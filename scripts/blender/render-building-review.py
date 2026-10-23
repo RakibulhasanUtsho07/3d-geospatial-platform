@@ -123,7 +123,25 @@ def main():
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    all_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
+        # Site/context meshes (ground, river, trees, mosque and context blocks)
+        # must remain renderable, but must not dictate the camera framing.
+        # Frame from the named palace/plan nodes only, otherwise the 440 m
+        # context environment makes a ~126 m palace nearly disappear.
+        heritage_node_names = {
+            "Plinth", "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+            "Stair_S", "Veranda_S", "Veranda_N", "Parapet", "Dome_Drum",
+            "Dome", "Finial", "Andarmahal",
+        }
+        meshes = [obj for obj in all_meshes if obj.name.split(".")[0] in heritage_node_names]
+        missing_nodes = heritage_node_names - {obj.name.split(".")[0] for obj in meshes}
+        if missing_nodes:
+            raise RuntimeError("Ahsan Manzil GLB is missing camera-framing nodes: " + ", ".join(sorted(missing_nodes)))
+        if len(meshes) != len(heritage_node_names):
+            raise RuntimeError("Ahsan Manzil camera-framing nodes are duplicated or ambiguous")
+    else:
+        meshes = all_meshes
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
