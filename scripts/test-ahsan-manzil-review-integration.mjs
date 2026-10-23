@@ -149,6 +149,11 @@ async function main() {
     renderManifest.views.every((view) => view.pixelStatistics.luminanceStandardDeviation > 0.004),
     "all 13 camera renders must contain image detail; a flat background-only image is a failure",
   );
+  const palaceCenterY = (renderManifest.sceneBounds.min[1] + renderManifest.sceneBounds.max[1]) / 2;
+  assert.ok(
+    renderManifest.renderSettings.lights.every((light) => light.positionWorld[1] > palaceCenterY),
+    "Y-up heritage key/fill/rim lights must sit above the palace, not below it",
+  );
   const directions = Object.fromEntries(renderManifest.views.map((view) => [view.id, view.cameraPose.viewDirectionWorld]));
   const assertDirection = (id, expected) => {
     assert.ok(

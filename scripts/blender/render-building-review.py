@@ -175,9 +175,20 @@ def main():
 
     light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
     light_size = max_dimension * 1.2
-    key_light = add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
-    fill_light = add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    rim_light = add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
+        # Translate the key/fill/rim layout to Y-up: height belongs on +Y,
+        # not +Z as in the generic Z-up recipe. Keep all three lights above
+        # the palace bounds so the side/front renders are not under-lit.
+        key_offset = Vector((1.4, 2.2, 1.8))
+        fill_offset = Vector((-1.8, 1.0, -0.3))
+        rim_offset = Vector((0.3, 1.5, -1.7))
+    else:
+        key_offset = Vector((1.4, -1.8, 2.2))
+        fill_offset = Vector((-1.8, -0.3, 1.0))
+        rim_offset = Vector((0.3, 1.7, 1.5))
+    key_light = add_area_light("ReviewKeyLight", center + key_offset * max_dimension, center, light_power, light_size)
+    fill_light = add_area_light("ReviewFillLight", center + fill_offset * max_dimension, center, light_power * 0.45, light_size * 1.2)
+    rim_light = add_area_light("ReviewRimLight", center + rim_offset * max_dimension, center, light_power * 0.65, light_size)
     lights = [light_manifest(light) for light in (key_light, fill_light, rim_light)]
     render_settings = {
         "renderEngine": scene.render.engine,
