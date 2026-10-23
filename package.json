@@ -133,7 +133,8 @@
     "test:map-performance": "node --test tests/map-performance-telemetry.test.mjs",
     "test:map-optimization": "node --test tests/lod-record-selection.test.mjs tests/flatten-road-coordinates.test.mjs tests/road-visual-style.test.mjs tests/map-optimization-benchmark.test.mjs",
     "benchmark:map-optimization": "node scripts/benchmark-map-optimization.mjs",
-    "test:map-browser": "playwright test --config=playwright.config.ts"
+    "test:map-browser": "playwright test --config=playwright.config.ts",
+    "test:3d-tiles-manifest": "node --test tests/tileset-manifest-validation.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
