@@ -113,6 +113,8 @@ test("runs mocked COLMAP reconstruction, converts texture atlas and marks model 
   scaleCalibration:{modelDistanceUnits:1,realDistanceM:4},spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input),
  });
  assert.equal(result.report.status,"adapter-output-unverified");assert.equal(result.report.mapReady,false);assert.equal(result.report.publicationEligible,false);
+ assert.equal(result.report.executionEvidence.dependencyPreflight.status,"skipped-injected-adapter");
+ assert.equal(result.report.executionEvidence.actualInferenceVerified,false);
  assert.equal(result.report.imageQualityPreflight.views.length,3);assert.equal(result.report.imageQualityPreflight.flaggedViewCount,0);assert.equal(result.report.imageQualityPreflight.nearDuplicatePairCount,0);
  assert.equal(result.report.reconstructionDiagnostics.status,"review-recommended");
  assert.equal(result.report.reconstructionDiagnostics.metrics.registeredImages,2);
@@ -135,6 +137,10 @@ test("fails closed when COLMAP cannot start and preserves failure diagnostics",a
  }),/Could not start/);
  const report=JSON.parse(await readFile(path.join(root,".building-engine","jobs",buildingSpec.id,"missing-colmap","report.json"),"utf8"));
  assert.equal(report.status,"failed");assert.match(report.failureMessage,/Could not start/);
+ assert.equal(report.executionEvidence.dependencyPreflight.status,"failed");
+ assert.equal(report.executionEvidence.actualInferenceVerified,false);
+ assert.equal(report.executionEvidence.commands[0].subcommand,"-h");
+ assert.equal(report.executionEvidence.commands[0].status,"not-started");
 });
 test("strategy router defaults to procedural and gates the explicit photogrammetry route",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
