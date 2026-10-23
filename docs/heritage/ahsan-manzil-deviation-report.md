@@ -86,7 +86,7 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | stair.riserHeight | [E] | 0.2286 m | 6.4 m upper portal datum / 28 estimated risers | Twenty-eight estimated risers align with the 6.4 m upper portal datum; verify the actual step count from a straight-on photograph. |
 | stair.treadDepth | [E] | 0.5714 m | 16.0 m horizontal run / 28 estimated steps | Restores the broad ceremonial run; the previous 0.34 m tread / 9.52 m run compressed the stair. Verify against measured plan imagery. |
 | stair.stepCount | [E] | 28 steps | Single front reference photo estimate (25–30 steps) | Count from a straight-on photograph to replace this estimate. |
-| stair.width | [E] | 39.0 m | Approximate base-to-frontage ratio from the south-elevation reference image | Lower flight is provisionally about 70% of the 55.8 m Rangmahal frontage; an image-based estimate, not a measured width. |
+| stair.width | [E] | 26.0 m | Visual estimate from the south-elevation reference image | Base is approximately 46% of the 55.8 m provisional Rangmahal frontage, while the upper landing matches the 18.6 m central portico; image-based estimate, not a survey measurement. |
 | stair.sideRail | [?] | simple low side rails | Stylized placeholder |  |
 | stair.runLength | [E] | 16 m | Single front reference photo estimate | Horizontal garden run toward the river; not site-surveyed. |
 | stair.topWidth | [E] | 18.6 m | Aligned to the provisional triple-arched portico width | The top landing aligns to the central portico and tapers from the broad base; verify from rectified elevation. |
