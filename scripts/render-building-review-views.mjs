@@ -5,6 +5,7 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
 
@@ -47,6 +48,20 @@ function summarizeTextureQa(report) {
   };
 }
 
+function summarizeGeometryQa(report) {
+  return {
+    schemaVersion: report.schemaVersion,
+    engine: report.engine,
+    status: report.status,
+    valid: report.valid,
+    counts: report.counts,
+    bounds: report.bounds,
+    errors: [],
+    warnings: report.warnings,
+    limitations: report.limitations,
+  };
+}
+
 async function main() {
   const [modelArg, outputArg, ...flags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
@@ -66,9 +81,10 @@ async function main() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  await mkdir(outputDir, { recursive: false });
-
   const modelBytes = await readFile(modelPath);
+  // Fail closed before rendering if the input GLB has malformed structure or geometry.
+  const geometryQaSummary = summarizeGeometryQa(analyzeGlbQuality(modelBytes));
+  await mkdir(outputDir, { recursive: false });
   let textureQaSummary = null;
   try {
     textureQaSummary = summarizeTextureQa(reviewGlbTextureBindings(modelBytes));
@@ -115,6 +131,7 @@ async function main() {
       modelSha256: sha256(modelBytes),
       files: fileMetadata,
       resolution,
+      geometryQaSummary,
       textureQaSummary,
     });
     const reportPath = path.join(outputDir, "render-review-manifest.json");
@@ -126,6 +143,9 @@ async function main() {
       valid: report.valid,
       renderedViews: report.counts.generatedViews,
       resolution: resolution + "x" + resolution,
+      geometryQaStatus: report.geometryQaSummary.status,
+      geometryQaWarnings: report.geometryQaSummary.warnings.length,
+      renderConfigSha256: report.renderConfigSha256,
       errors: report.errors.length,
       warnings: report.warnings.length,
       publicationEligible: false,

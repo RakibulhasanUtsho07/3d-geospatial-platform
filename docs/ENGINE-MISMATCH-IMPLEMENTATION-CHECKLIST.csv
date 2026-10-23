@@ -1,8 +1,8 @@
 id,priority,work_package,primary_files,acceptance_criteria,blocks_merge,status
 P0.1,P0,"Fix window/door offsets and facade-local frame placement","src/core/building-generation/procedural-glb.mjs; tests","No floating inserts; frames align at 0/30/45/90/180/270 degrees",yes,DONE
 P0.2,P0,"Explicit front facade and roof type contract","building-spec.mjs; procedural-glb.mjs; tests","No silent longest-edge assumption when explicit direction exists; pitched roof implemented or rejected",yes,DONE
-P1.1,P1,"Strategy routing and real-worker preflight","generation-pipeline.mjs; media-to-model-workflow.mjs; worker tests","Requested/actual strategy and worker evidence match; no fake real-inference pass",yes,IN_PROGRESS
-P1.2,P1,"Geometry QA and deterministic render harness","glb-geometry-qa.mjs; render scripts; tests","Hashed six-view render manifest; invalid geometry detected; comparable references only",yes,NOT_STARTED
+P1.1,P1,"Strategy routing and real-worker preflight","generation-pipeline.mjs; media-to-model-workflow.mjs; worker tests","Requested/actual strategy and worker evidence match; dependency preflight is recorded; mocked outputs never claim real inference",yes,DONE
+P1.2,P1,"Geometry QA and deterministic render harness","glb-geometry-qa.mjs; render-review-manifest.mjs; render scripts; tests","13-view manifest includes camera pose and render settings; config/image/model hashes recorded; malformed GLB rejected before rendering",yes,IN_PROGRESS
 P1.3,P1,"Ahsan Manzil dedicated heritage route review","scripts/build-ahsan-manzil-model.mjs; data/heritage/ahsan-manzil.parameters.json","Dedicated model reviewed against correctly matched source views",yes,NOT_STARTED
 P2.1,P2,"Parliament and Dolonchapa architecture-specific geometry","BuildingSpec/schema; generation modules; tests","Complex masses, openings, multiple wings and curved balconies represented where evidenced",yes,NOT_STARTED
 P2.2,P2,"CI visual regression and release gates","CI workflow; visual fixtures; tests","Visual regression blocks accidental change; reviewed snapshot updates are auditable",yes,NOT_STARTED

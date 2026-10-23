@@ -15,7 +15,9 @@ npm run render:building-review -- ".\\building.glb" ".\\building-review" --resol
 
 Use a new output directory that does not already exist. Resolution must be a power of two from 256 through 2048. The tool will not overwrite an existing review directory.
 
-The output directory contains 13 PNG images and `render-review-manifest.json`. The manifest records the source GLB SHA-256, renderer version, imported-model bounds, image dimensions, each render SHA-256, sampled luminance statistics, warnings, texture-binding QA summary, and a human-review checklist. The image statistics only identify basic risks such as nearly uniform or mostly transparent renders; they are not image similarity scores.
+Before creating the output directory or launching Blender, the command runs structural GLB geometry/topology QA. Malformed buffers, accessors, vertex coordinates or triangle indices cause the command to fail closed; topology warnings remain review findings rather than automatic rejection of legitimate separate architectural parts.
+
+The output directory contains 13 PNG images and `render-review-manifest.json`. The manifest records the source GLB SHA-256, geometry-QA summary, renderer version, imported-model bounds, output-image hashes, sampled luminance statistics, texture-binding QA summary, fixed camera poses, declared render settings and a human-review checklist. `renderConfigSha256` fingerprints the renderer version/profile, camera poses and settings; each PNG has its own SHA-256. This makes the declared render recipe auditable, but does not guarantee pixel-identical output across different Blender builds or hardware. Image statistics only identify basic technical risks such as nearly uniform or mostly transparent renders; they are not image similarity scores.
 
 ## Human review
 

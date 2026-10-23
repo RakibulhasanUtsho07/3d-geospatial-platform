@@ -56,6 +56,18 @@ def scene_bounds(mesh_objects):
     center = Vector([(minimum[axis] + maximum[axis]) / 2.0 for axis in range(3)])
     return minimum, maximum, dimensions, center
 
+def rounded_vector(vector):
+    return [round(float(vector[axis]), 8) for axis in range(3)]
+
+def light_manifest(light):
+    return {
+        "name": light.name,
+        "type": light.data.type,
+        "positionWorld": rounded_vector(light.location),
+        "energy": round(float(light.data.energy), 6),
+        "size": round(float(light.data.size), 6),
+    }
+
 def sample_pixel_statistics(image, resolution):
     total = int(image.size[0] * image.size[1])
     if total < 1:
@@ -135,9 +147,29 @@ def main():
 
     light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
     light_size = max_dimension * 1.2
-    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    key_light = add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
+    fill_light = add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
+    rim_light = add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    lights = [light_manifest(light) for light in (key_light, fill_light, rim_light)]
+    render_settings = {
+        "renderEngine": scene.render.engine,
+        "resolutionX": resolution,
+        "resolutionY": resolution,
+        "resolutionPercentage": scene.render.resolution_percentage,
+        "imageFormat": scene.render.image_settings.file_format,
+        "imageColorMode": scene.render.image_settings.color_mode,
+        "imageColorDepth": scene.render.image_settings.color_depth,
+        "imageCompression": scene.render.image_settings.compression,
+        "filmTransparent": scene.render.film_transparent,
+        "viewTransform": scene.view_settings.view_transform,
+        "worldBackgroundRgba": [0.38, 0.40, 0.43, 1.0],
+        "worldBackgroundStrength": 0.7,
+        "cameraProjection": "ORTHO",
+        "cameraDistanceMultiplier": 3.0,
+        "cameraOrthoScaleMultiplier": 1.45,
+        "turntableElevationDegrees": 22.0,
+        "lights": lights,
+    }
 
     views = [
         ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
@@ -172,12 +204,21 @@ def main():
         if result is None:
             raise RuntimeError("Blender did not provide a render result for " + view_id)
         stats = sample_pixel_statistics(result, resolution)
+        view_direction = (center - camera.location).normalized()
         raw_views.append({
             "id": view_id,
             "filename": filename,
             "width": resolution,
             "height": resolution,
             "renderComplete": True,
+            "cameraPose": {
+                "projection": camera_data.type,
+                "positionWorld": rounded_vector(camera.location),
+                "targetWorld": rounded_vector(center),
+                "viewDirectionWorld": rounded_vector(view_direction),
+                "rotationEulerRadians": [round(float(value), 8) for value in camera.rotation_euler],
+                "orthographicScale": round(float(camera_data.ortho_scale), 8),
+            },
             "pixelStatistics": stats,
         })
         bpy.data.objects.remove(camera, do_unlink=True)
@@ -188,6 +229,8 @@ def main():
         "schemaVersion": "1.0.0",
         "renderer": "Blender",
         "rendererVersion": bpy.app.version_string,
+        "renderProfile": "building-review-fixed-cameras-v1",
+        "renderSettings": render_settings,
         "width": resolution,
         "height": resolution,
         "sceneBounds": {
