@@ -1,6 +1,6 @@
 # Ahsan Manzil dedicated render/reference review
 
-The Ahsan Manzil heritage GLB declares **Y-up, +X east, +Z south/riverside**. Do not use the generic Z-up render profile for this model: it would call the wrong direction "front" and "top". Use `ahsan-manzil-y-up-cycles-cpu-v1`, whose front camera is on the south/+Z side, looks toward -Z, and whose top camera looks toward -Y.
+The Ahsan Manzil source GLB declares **Y-up, +X east, +Z south/riverside**. Blender's glTF importer converts the source Y-up frame into Blender's **Z-up world** before rendering; source +Z/south becomes Blender world -Y. Use `ahsan-manzil-y-up-cycles-cpu-v1`: the front camera stands at Blender -Y and looks toward +Y, the top camera stands above the model at Blender +Z and looks toward -Z, and the east-side camera stands at +X and looks toward -X. The render manifest records both the selected profile and this post-import camera coordinate convention.
 
 ## Rebuild and review
 

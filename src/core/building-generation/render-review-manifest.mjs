@@ -10,7 +10,7 @@ const sha256Pattern = /^[a-f0-9]{64}$/i;
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const RENDER_PROFILE_CONVENTIONS = Object.freeze({
   "building-review-cycles-cpu-v1": "z-up;front-view-direction=+Y",
-  "ahsan-manzil-y-up-cycles-cpu-v1": "y-up;+X=east-west-eastward;+Z=south-riverfront",
+  "ahsan-manzil-y-up-cycles-cpu-v1": "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative",
 });
 
 function finiteVector3(value) {
@@ -36,25 +36,19 @@ function validCameraPose(pose) {
 }
 
 function requiredViewDirection(viewId, turntableElevationDegrees, renderProfile) {
-  const yUp = renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1";
-  if (viewId === "front") return yUp ? [0, 0, -1] : [0, 1, 0];
-  if (viewId === "back") return yUp ? [0, 0, 1] : [0, -1, 0];
+  // Validate camera poses in Blender world after the glTF importer performs
+  // the source GLTF Y-up -> Blender Z-up conversion for the heritage asset.
+  if (viewId === "front") return [0, 1, 0];
+  if (viewId === "back") return [0, -1, 0];
   if (viewId === "left") return [1, 0, 0];
   if (viewId === "right") return [-1, 0, 0];
-  if (viewId === "top") return yUp ? [0, -1, 0] : [0, 0, -1];
+  if (viewId === "top") return [0, 0, -1];
   const match = /^turntable-(\d{3})$/.exec(viewId);
   if (!match || !finite(turntableElevationDegrees)) return null;
   const angleDegrees = Number(match[1]);
   if (angleDegrees < 0 || angleDegrees >= 360 || angleDegrees % 45 !== 0) return null;
   const azimuth = angleDegrees * Math.PI / 180;
   const elevation = turntableElevationDegrees * Math.PI / 180;
-  if (yUp) {
-    return [
-      -Math.sin(azimuth) * Math.cos(elevation),
-      -Math.sin(elevation),
-      -Math.cos(azimuth) * Math.cos(elevation),
-    ];
-  }
   return [
     -Math.cos(azimuth) * Math.cos(elevation),
     -Math.sin(azimuth) * Math.cos(elevation),

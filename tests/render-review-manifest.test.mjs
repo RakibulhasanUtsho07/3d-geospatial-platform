@@ -108,21 +108,21 @@ function fixture(overrides = {}) {
 test("validates the Ahsan Manzil Y-up profile with south-front and overhead cameras", () => {
   const data = fixture();
   data.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
-  data.rawManifest.renderSettings.cameraCoordinateConvention = "y-up;+X=east-west-eastward;+Z=south-riverfront";
+  data.rawManifest.renderSettings.cameraCoordinateConvention = "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative";
   const elevation = 22 * Math.PI / 180;
   data.rawManifest.views = data.rawManifest.views.map((view) => {
     let direction;
-    if (view.id === "front") direction = [0, 0, -1];
-    else if (view.id === "back") direction = [0, 0, 1];
+    if (view.id === "front") direction = [0, 1, 0];
+    else if (view.id === "back") direction = [0, -1, 0];
     else if (view.id === "left") direction = [1, 0, 0];
     else if (view.id === "right") direction = [-1, 0, 0];
-    else if (view.id === "top") direction = [0, -1, 0];
+    else if (view.id === "top") direction = [0, 0, -1];
     else {
       const azimuth = Number(view.id.slice("turntable-".length)) * Math.PI / 180;
       direction = [
+        -Math.cos(azimuth) * Math.cos(elevation),
         -Math.sin(azimuth) * Math.cos(elevation),
         -Math.sin(elevation),
-        -Math.cos(azimuth) * Math.cos(elevation),
       ];
     }
     const position = [10, 20, 30];
@@ -139,7 +139,7 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
   assert.equal(report.renderProfile, "ahsan-manzil-y-up-cycles-cpu-v1");
-  assert.equal(report.renderSettings.cameraCoordinateConvention, "y-up;+X=east-west-eastward;+Z=south-riverfront");
+  assert.equal(report.renderSettings.cameraCoordinateConvention, "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative");
   assert.equal(report.errors.length, 0);
 
   const wrongConvention = fixture();

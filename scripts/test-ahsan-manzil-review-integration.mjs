@@ -140,19 +140,19 @@ async function main() {
   assert.equal(renderManifest.counts.generatedViews, REQUIRED_REVIEW_VIEWS.length);
   assert.match(renderManifest.modelSha256, /^[a-f0-9]{64}$/);
   assert.match(renderManifest.renderConfigSha256, /^[a-f0-9]{64}$/);
-  assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "y-up;+X=east-west-eastward;+Z=south-riverfront");
+  assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative");
   // Camera framing must use the named palace nodes, not the 440 m site-context bounds.
-  assert.ok(renderManifest.sceneBounds.dimensions[0] < 150, "palace width bounds must exclude large site-context objects");
-  assert.ok(renderManifest.sceneBounds.dimensions[1] < 40, "palace height bounds must exclude site/context height");
-  assert.ok(renderManifest.sceneBounds.dimensions[2] < 70, "palace depth bounds must exclude surrounding river/context extents");
+  assert.ok(renderManifest.sceneBounds.dimensions[0] < 150, "palace length bounds must exclude large site-context objects");
+  assert.ok(renderManifest.sceneBounds.dimensions[1] < 70, "palace depth bounds must exclude site/context extents");
+  assert.ok(renderManifest.sceneBounds.dimensions[2] < 40, "palace height bounds must exclude site/context height");
   assert.ok(
     renderManifest.views.every((view) => view.pixelStatistics.luminanceStandardDeviation > 0.004),
     "all 13 camera renders must contain image detail; a flat background-only image is a failure",
   );
-  const palaceCenterY = (renderManifest.sceneBounds.min[1] + renderManifest.sceneBounds.max[1]) / 2;
+  const palaceCenterZ = (renderManifest.sceneBounds.min[2] + renderManifest.sceneBounds.max[2]) / 2;
   assert.ok(
-    renderManifest.renderSettings.lights.every((light) => light.positionWorld[1] > palaceCenterY),
-    "Y-up heritage key/fill/rim lights must sit above the palace, not below it",
+    renderManifest.renderSettings.lights.every((light) => light.positionWorld[2] > palaceCenterZ),
+    "heritage key/fill/rim lights must sit above the palace in Blender Z-up world coordinates",
   );
   const directions = Object.fromEntries(renderManifest.views.map((view) => [view.id, view.cameraPose.viewDirectionWorld]));
   const assertDirection = (id, expected) => {
@@ -161,9 +161,9 @@ async function main() {
       id + " camera must use the expected Y-up viewing direction; actual=" + JSON.stringify(directions[id]),
     );
   };
-  assertDirection("front", [0, 0, -1]);
-  assertDirection("back", [0, 0, 1]);
-  assertDirection("top", [0, -1, 0]);
+  assertDirection("front", [0, 1, 0]);
+  assertDirection("back", [0, -1, 0]);
+  assertDirection("top", [0, 0, -1]);
   assertDirection("right", [-1, 0, 0]);
   assert.deepEqual(renderManifest.views.map((view) => view.id), [...REQUIRED_REVIEW_VIEWS]);
 

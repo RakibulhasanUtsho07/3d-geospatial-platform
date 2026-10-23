@@ -175,17 +175,11 @@ def main():
 
     light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
     light_size = max_dimension * 1.2
-    if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
-        # Translate the key/fill/rim layout to Y-up: height belongs on +Y,
-        # not +Z as in the generic Z-up recipe. Keep all three lights above
-        # the palace bounds so the side/front renders are not under-lit.
-        key_offset = Vector((1.4, 2.2, 1.8))
-        fill_offset = Vector((-1.8, 1.0, -0.3))
-        rim_offset = Vector((0.3, 1.5, -1.7))
-    else:
-        key_offset = Vector((1.4, -1.8, 2.2))
-        fill_offset = Vector((-1.8, -0.3, 1.0))
-        rim_offset = Vector((0.3, 1.7, 1.5))
+    # Blender's glTF importer converts the source Y-up model into Blender's
+    # Z-up world before this point, so lights must use Blender-world Z as up.
+    key_offset = Vector((1.4, -1.8, 2.2))
+    fill_offset = Vector((-1.8, -0.3, 1.0))
+    rim_offset = Vector((0.3, 1.7, 1.5))
     key_light = add_area_light("ReviewKeyLight", center + key_offset * max_dimension, center, light_power, light_size)
     fill_light = add_area_light("ReviewFillLight", center + fill_offset * max_dimension, center, light_power * 0.45, light_size * 1.2)
     rim_light = add_area_light("ReviewRimLight", center + rim_offset * max_dimension, center, light_power * 0.65, light_size)
@@ -211,7 +205,7 @@ def main():
         "worldBackgroundStrength": 0.7,
         "cameraProjection": "ORTHO",
         "cameraCoordinateConvention": (
-            "y-up;+X=east-west-eastward;+Z=south-riverfront"
+            "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative"
             if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
             else "z-up;front-view-direction=+Y"
         ),
@@ -223,21 +217,22 @@ def main():
 
     elevation = math.radians(22.0)
     if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
-        # This heritage GLB declares Y-up, +X east, +Z south.
-        # Its front camera stands south of the river-facing facade (+Z);
-        # the overhead camera is above the model (+Y).
+        # Source GLTF uses Y-up, +X east, +Z south. Blender's glTF importer
+        # converts it into Blender world: source +Y -> world +Z (up), and
+        # source +Z (south) -> world -Y. Therefore the river-front camera is
+        # at Blender -Y looking +Y; the top camera is at +Z looking -Z.
         views = [
-            ("front", Vector((0.0, 0.0, 1.0)), "ORTHO"),
-            ("back", Vector((0.0, 0.0, -1.0)), "ORTHO"),
+            ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+            ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
             ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
             ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
-            ("top", Vector((0.0, 1.0, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
         ]
         for angle in range(0, 360, 45):
             azimuth = math.radians(angle)
-            direction = Vector((math.sin(azimuth) * math.cos(elevation),
-                                math.sin(elevation),
-                                math.cos(azimuth) * math.cos(elevation)))
+            direction = Vector((math.cos(azimuth) * math.cos(elevation),
+                                math.sin(azimuth) * math.cos(elevation),
+                                math.sin(elevation)))
             views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
     else:
         views = [
