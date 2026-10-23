@@ -276,6 +276,9 @@ jobs:
       - name: Test feature pick routing priority
         run: npm run test:feature-pick-routing
 
+      - name: Test selection event dispatch and cleanup order
+        run: npm run test:selection-event-dispatch
+
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 
