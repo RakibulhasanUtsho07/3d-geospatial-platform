@@ -6,11 +6,15 @@ function finite(value, label) {
   }
 }
 
-export function createFacadeFrame(start, end) {
+export function createFacadeFrame(start, end, outwardSign = 1) {
   for (const [label, point] of [["start", start], ["end", end]]) {
     if (!point || typeof point !== "object") throw new TypeError(label + " point is required");
     finite(point.x, label + ".x");
     finite(point.z, label + ".z");
+  }
+
+  if (outwardSign !== 1 && outwardSign !== -1) {
+    throw new RangeError("outwardSign must be either 1 or -1");
   }
 
   const dx = end.x - start.x;
@@ -20,7 +24,8 @@ export function createFacadeFrame(start, end) {
 
   const tangent = { x: dx / len, z: dz / len };
   // Local +X follows the facade; local +Z points inward, so 'out' is the exterior normal.
-  const out = { x: tangent.z, z: -tangent.x };
+  // The polygon's winding determines which side of an edge is outside.
+  const out = { x: tangent.z * outwardSign, z: -tangent.x * outwardSign };
   const yaw = Math.atan2(-tangent.z, tangent.x);
 
   return { len, tangent, out, yaw };
