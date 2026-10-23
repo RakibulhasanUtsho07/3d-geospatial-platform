@@ -48,6 +48,8 @@ on:
   pull_request:
     branches:
       - main
+      - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
       - test/p1-building-selection-lifecycle
       - test/p1-selection-browser-lifecycle
       - dev
@@ -57,8 +59,6 @@ on:
       - refactor/p1-building-selection-materials
       - refactor/p1-picked-entity-resolution
       - refactor/p1-feature-pick-routing
-      - refactor/p1-feature-picking-controller
-      - refactor/p1-feature-pick-geometry
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
