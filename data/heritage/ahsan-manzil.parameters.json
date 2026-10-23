@@ -299,11 +299,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 16.5,
+        "value": 12,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single south-elevation reference image, ±20% estimate",
-        "note": "Working projection width for the central three-arch pavilion; recalibrate by counting its three arches from a straight-on photo."
+        "source": "Pinned Wikimedia Commons straight-on front photograph, scaled against the provisional 55.8 m Rangmahal frontage; photo-derived proportion, not surveyed.",
+        "note": "Working 12.0 m width (~21.5% of the provisional 55.8 m frontage) to keep the three-arch central pavilion visually distinct from the full stair. Source camera/lens are not calibrated; replace from a rectified elevation."
       },
       "porticoDepth": {
         "value": 4,
@@ -403,11 +403,11 @@
         "note": "Matched to the reference HTML: 28 steps × 0.34 m tread depth = 9.52 m horizontal run. Visual estimate; verify against measured site drawings."
       },
       "topWidth": {
-        "value": 13.5,
+        "value": 11.5,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single front reference photo estimate",
-        "note": "Approximate clear width at the upper portal; the stair tapers from 16.5 m at the base."
+        "source": "Pinned Wikimedia Commons straight-on front photograph; approximate stair-top/base proportion, not measured from a calibrated elevation.",
+        "note": "Working 11.5 m top width (~70% of the 16.5 m stair base) to match the visible taper toward the central portal. Perspective and camera calibration are unknown."
       }
     },
     "dome": {
@@ -436,10 +436,11 @@
         "source": "Supplied placeholder"
       },
       "drumWidth": {
-        "value": 14,
+        "value": 11,
         "unit": "m",
-        "confidence": "[?]",
-        "source": "Placeholder; calibrate from elevation photo"
+        "confidence": "[E]",
+        "source": "Pinned Wikimedia Commons straight-on front photograph, scaled against the provisional 55.8 m Rangmahal frontage; rough visual proportion, not surveyed.",
+        "note": "Working 11.0 m square/octagonal tower width (~20% of the provisional frontage). Replace from a rectified elevation or measured plan; source lens/camera are unknown."
       },
       "profile": {
         "value": "square base room → octagonal drum → lotus-bud dome → finial",

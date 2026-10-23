@@ -10,20 +10,38 @@
     {
       "id": "front-reference-framing",
       "status": "implemented-awaiting-render-verification",
-      "change": "Render the front source comparison with the named Rangmahal/portico/stair/dome meshes as framing bounds; retain full-palace bounds for other fixed views.",
-      "acceptance": "front camera targets the provisional dome/Rangmahal axis near X=34.8 m and its orthographic scale is below 85 m."
+      "change": "Render front and southeast comparison views from Rangmahal semantic bounds; preserve whole-palace framing in the other fixed views.",
+      "acceptance": "Front and oblique focal targets/orthographic scales match the profile contract."
     },
     {
       "id": "roof-deck-overlap",
       "status": "implemented-awaiting-build-verification",
-      "change": "Place an 8 cm roof finish above the upper-floor slab rather than overlapping the slab with coplanar top faces.",
-      "acceptance": "LOD3 GLB contains upward-facing roof-colored vertices at the roof finish top elevation."
+      "change": "Move an 8 cm roof finish above the upper-floor slab instead of overlapping it with coplanar faces.",
+      "acceptance": "LOD3 GLB contains upward-facing roof-colored vertices at the finish top elevation."
+    },
+    {
+      "id": "central-pavilion",
+      "status": "implemented-awaiting-render-verification",
+      "change": "Use a provisional 12 m central portico width, scaled from the pinned front image against the provisional 55.8 m facade; confidence remains [E].",
+      "acceptance": "Three-arch pavilion reads as a distinct central mass in the newly framed front render."
+    },
+    {
+      "id": "dome-drum",
+      "status": "implemented-awaiting-build-and-render-verification",
+      "change": "Use a provisional 11 m octagonal tower width from front-photo proportion; retain the separately shaped 8 m dome profile and verified 27.13 m peak.",
+      "acceptance": "Generated GLB drum extents match the parameter and the dome-to-tower silhouette is inspected."
+    },
+    {
+      "id": "stair-taper",
+      "status": "implemented-awaiting-build-and-render-verification",
+      "change": "Keep the 16.5 m estimated base width but taper the upper stair to 11.5 m to match the photo-estimated ~70% top/base ratio.",
+      "acceptance": "Generated GLB preserves broad bottom, narrows at the upper portal, and remains aligned to the dome axis."
     },
     {
       "id": "roof-and-facade-lighting",
       "status": "implemented-awaiting-render-verification",
-      "change": "Scale heritage review lighting size, power, and placement from model height rather than the full horizontal footprint length.",
-      "acceptance": "13 actual PNGs pass non-flat pixel-contrast checks and the latest front/southeast renders are visually inspected."
+      "change": "Scale heritage review lighting size, power, and placement from model height rather than the horizontal footprint length.",
+      "acceptance": "13 actual PNGs pass non-flat contrast checks and the latest front/southeast images are inspected."
     }
   ],
   "dimensionConflict": {

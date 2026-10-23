@@ -122,6 +122,31 @@ test("Ahsan Manzil roof finish is a visible top-facing vertex-coloured surface a
     "both palace wings need visible, upward-facing roof-finish vertices above the upper slabs");
 });
 
+test("central pavilion, dome drum and tapered stair implement the photo-estimated dimensions", async () => {
+  const { readMeshAttributes } = await readGlb("public/models/ahsan-manzil-lod3.glb");
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  const expectedDrumWidth = config.parameters.dome.drumWidth.value;
+  const drum = (await readMeshAttributes("Dome_Drum")).positions;
+  const xValues = drum.map((point) => point[0]);
+  const zValues = drum.map((point) => point[2]);
+  const actualDrumX = Math.max(...xValues) - Math.min(...xValues);
+  const actualDrumZ = Math.max(...zValues) - Math.min(...zValues);
+  assert.ok(Math.abs(actualDrumX - expectedDrumWidth) < 0.05,
+    "dome drum east-west extent follows its confidence-tagged parameter");
+  assert.ok(Math.abs(actualDrumZ - expectedDrumWidth) < 0.05,
+    "dome drum north-south extent follows its confidence-tagged parameter");
+  const stair = (await readMeshAttributes("Stair_S")).positions;
+  const stairX = stair.map((point) => point[0]);
+  const actualStairWidth = Math.max(...stairX) - Math.min(...stairX);
+  assert.ok(actualStairWidth >= config.parameters.stair.width.value,
+    "stair retains the broad reference-elevation base width");
+  assert.ok(actualStairWidth < config.parameters.stair.width.value + 3.0,
+    "stair rails/lamp details stay within a bounded margin around the stair footprint");
+  assert.equal(config.parameters.facade.porticoWidth.value, 12.0);
+  assert.equal(config.parameters.stair.topWidth.value, 11.5);
+  assert.equal(config.parameters.dome.drumWidth.confidence, "[E]");
+});
+
 test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
   assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
@@ -150,9 +175,9 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.footprint.andarmahalDepth.value, 14.375);
   assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
   assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
-  assert.equal(config.parameters.facade.porticoWidth.value, 16.5);
+  assert.equal(config.parameters.facade.porticoWidth.value, 12.0);
   assert.equal(config.parameters.stair.width.value, 16.5);
-  assert.equal(config.parameters.stair.topWidth.value, 13.5);
+  assert.equal(config.parameters.stair.topWidth.value, 11.5);
   assert.equal(config.parameters.stair.stepCount.value, 28);
   assert.equal(config.parameters.stair.riserHeight.value, 0.23);
   assert.equal(config.parameters.stair.treadDepth.value, 0.34);
@@ -162,6 +187,10 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
   assert.equal(config.parameters.materials.glass.value, "#392B27");
+  assert.equal(config.parameters.dome.drumWidth.value, 11.0);
+  assert.equal(config.parameters.dome.drumWidth.confidence, "[E]");
+  assert.equal(config.parameters.facade.porticoWidth.confidence, "[E]");
+  assert.equal(config.parameters.stair.topWidth.confidence, "[E]");
   assert.equal(config.parameters.dome.drumOpeningCount.value, 8);
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);
