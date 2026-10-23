@@ -5,7 +5,7 @@ import path from "node:path";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { convertTexturedPlyToGlb } from "../src/core/building-generation/textured-ply-to-glb.mjs";
+import { convertPlyToUntexturedGlb, convertTexturedPlyToGlb } from "../src/core/building-generation/textured-ply-to-glb.mjs";
 import { runColmapReconstruction } from "../src/core/building-generation/colmap-worker.mjs";
 import { generateBuildingAsset } from "../src/core/building-generation/generation-pipeline.mjs";
 import { ingestMediaFile, toBuildingSpecSource } from "../src/core/building-generation/media-intake.mjs";
@@ -91,6 +91,21 @@ test("converts ASCII textured PLY into a valid GLB with embedded PNG and UV coor
  const gltf=glbJson(result.glb);assert.equal(gltf.asset.version,"2.0");assert.equal(gltf.images[0].mimeType,"image/png");
  assert.ok(gltf.accessors.some(a=>a.type==="VEC2"));assert.equal(result.geometry.triangles,1);assert.equal(result.bounds.metresPerModelUnit,2);
  assert.equal(gltf.asset.extras.scaleCalibrated,true);
+});
+test("converts a sparse Poisson surface into a valid neutral-material review GLB without claiming a texture",async t=>{
+ const root=await workspace(t),plyPath=path.join(root,"sparse-mesh.ply");
+ await writeFile(plyPath,asciiPly(false));
+ const result=await convertPlyToUntexturedGlb({plyPath,metresPerModelUnit:2,upAxis:"Z",scaleCalibrated:true});
+ const gltf=glbJson(result.glb);
+ assert.equal(gltf.asset.version,"2.0");
+ assert.equal(gltf.asset.extras.textured,false);
+ assert.equal(gltf.asset.extras.metresPerModelUnit,2);
+ assert.equal(gltf.images,undefined);
+ assert.equal(gltf.textures,undefined);
+ assert.equal(gltf.meshes[0].primitives[0].attributes.TEXCOORD_0,undefined);
+ assert.equal(result.geometry.triangles,1);
+ assert.equal(result.geometry.textured,false);
+ assert.ok(result.glb.length>100);
 });
 test("converts binary little-endian PLY and rejects absent UVs or non-PNG textures",async t=>{
  const root=await workspace(t),plyPath=path.join(root,"mesh.ply"),texturePath=path.join(root,"texture.png");
