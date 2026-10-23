@@ -71,6 +71,7 @@ function fixture(overrides = {}) {
         viewTransform: "AgX",
         cameraProjection: "ORTHO",
         cameraCoordinateConvention: "z-up;front-view-direction=+Y",
+        excludedRenderObjects: [],
         cameraDistanceMultiplier: 3,
         cameraOrthoScaleMultiplier: 1.45,
         turntableElevationDegrees: 22,
@@ -109,6 +110,10 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   const data = fixture();
   data.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
   data.rawManifest.renderSettings.cameraCoordinateConvention = "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative";
+  data.rawManifest.renderSettings.excludedRenderObjects = [
+    "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
+    "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
+  ];
   const elevation = 22 * Math.PI / 180;
   data.rawManifest.views = data.rawManifest.views.map((view) => {
     let direction;
@@ -140,6 +145,10 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   assert.equal(report.valid, true);
   assert.equal(report.renderProfile, "ahsan-manzil-y-up-cycles-cpu-v1");
   assert.equal(report.renderSettings.cameraCoordinateConvention, "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative");
+  assert.deepEqual(report.renderSettings.excludedRenderObjects, [
+    "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
+    "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
+  ]);
   assert.equal(report.errors.length, 0);
 
   const wrongConvention = fixture();
@@ -147,6 +156,14 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   const rejected = finalizeRenderReviewManifest(wrongConvention);
   assert.equal(rejected.valid, false);
   assert.ok(rejected.errors.includes("render-settings-invalid-or-incomplete"));
+
+  const unexpectedExclusions = fixture();
+  unexpectedExclusions.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
+  unexpectedExclusions.rawManifest.renderSettings.cameraCoordinateConvention = "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative";
+  unexpectedExclusions.rawManifest.renderSettings.excludedRenderObjects = ["Site_Trees"];
+  const exclusionReport = finalizeRenderReviewManifest(unexpectedExclusions);
+  assert.equal(exclusionReport.valid, false);
+  assert.ok(exclusionReport.errors.includes("render-settings-invalid-or-incomplete"));
 });
 
 test("finalizes the full five-axis plus eight-angle render set", () => {

@@ -12,6 +12,13 @@ const RENDER_PROFILE_CONVENTIONS = Object.freeze({
   "building-review-cycles-cpu-v1": "z-up;front-view-direction=+Y",
   "ahsan-manzil-y-up-cycles-cpu-v1": "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative",
 });
+const EXCLUDED_RENDER_OBJECTS_BY_PROFILE = Object.freeze({
+  "building-review-cycles-cpu-v1": [],
+  "ahsan-manzil-y-up-cycles-cpu-v1": [
+    "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
+    "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
+  ],
+});
 
 function finiteVector3(value) {
   return Array.isArray(value) && value.length === 3 && value.every(finite);
@@ -66,6 +73,8 @@ function validRenderSettings(settings, resolution, renderProfile) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) return false;
   if (!Object.hasOwn(RENDER_PROFILE_CONVENTIONS, renderProfile) ||
     settings.cameraCoordinateConvention !== RENDER_PROFILE_CONVENTIONS[renderProfile] ||
+    !Array.isArray(settings.excludedRenderObjects) ||
+    JSON.stringify(settings.excludedRenderObjects) !== JSON.stringify(EXCLUDED_RENDER_OBJECTS_BY_PROFILE[renderProfile]) ||
     settings.renderEngine !== "CYCLES" || settings.cyclesDevice !== "CPU" ||
     !Number.isSafeInteger(settings.cyclesSamples) || settings.cyclesSamples < 1 || settings.cyclesSamples > 1024 ||
     typeof settings.cyclesUseDenoising !== "boolean" ||

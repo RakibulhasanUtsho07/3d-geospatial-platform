@@ -42,15 +42,16 @@
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
       "attribution": "Parvezahmed, “Ahsan Manzil Side View.jpg”, CC BY-SA 4.0, Wikimedia Commons. Source image retained unmodified.",
-      "facadeLabel": "east-side-facade-viewpoint-east-of-site",
-      "mappedRenderViewId": "right",
+      "facadeLabel": "southeast-oblique-viewpoint-from-published-camera-location",
+      "mappedRenderViewId": "turntable-315",
       "comparisonBasis": "pose-estimated",
       "captureHeadingBasis": "unknown",
       "cameraLocation": {
         "latitude": 23.708196,
         "longitude": 90.406732
       },
-      "note": "Commons describes this as a side view and records the camera point east of the heritage anchor. With +X east, this is mapped to the model's east-side 'right' view; azimuth/lens calibration is not published, so the pose remains estimated."
+      "note": "Commons records a camera point at 23.708196 N, 90.406732 E. The model anchor is 23.7086 N, 90.40606 E with [C] confidence, placing the camera provisionally southeast of the site. The nearest fixed turntable camera is 315 degrees in Blender world; this is a best-estimate viewpoint match, not a calibrated camera pose.",
+      "mappingConfidence": "[C] approximate camera point and source georeference anchor; nearest available fixed azimuth is 315 degrees; camera heading and lens calibration unknown"
     }
   ]
 }

@@ -27,8 +27,9 @@ test("maps the photographed south-front and east-side viewpoints to Y-up render 
   const east = sources.references.find((reference) => reference.id === "ahsan-manzil-east-side-parvezahmed-2019");
   assert.equal(front.mappedRenderViewId, "front");
   assert.equal(front.facadeLabel, "south-riverfront-front-facade");
-  assert.equal(east.mappedRenderViewId, "right");
-  assert.equal(east.facadeLabel, "east-side-facade-viewpoint-east-of-site");
+  assert.equal(east.mappedRenderViewId, "turntable-315");
+  assert.equal(east.facadeLabel, "southeast-oblique-viewpoint-from-published-camera-location");
+  assert.ok(east.mappingConfidence.includes("nearest available fixed azimuth is 315 degrees"));
   assert.equal(front.comparisonBasis, "pose-estimated");
   assert.equal(east.comparisonBasis, "pose-estimated");
   assert.equal(front.captureHeadingDegrees, undefined);

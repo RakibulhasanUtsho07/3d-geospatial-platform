@@ -125,7 +125,7 @@ async function main() {
     [
       path.join(modelDir, "ahsan-manzil-lod3.glb"),
       renderDir,
-      "--resolution=256",
+      "--resolution=512",
       "--blender=" + BLENDER_BIN,
       "--render-profile=" + PROFILE,
     ],
@@ -138,9 +138,14 @@ async function main() {
   assert.equal(renderManifest.renderProfile, PROFILE);
   assert.equal(renderManifest.publicationEligible, false);
   assert.equal(renderManifest.counts.generatedViews, REQUIRED_REVIEW_VIEWS.length);
+  assert.ok(renderManifest.views.every((view) => view.width === 512 && view.height === 512), "heritage review views must use readable 512x512 detail");
   assert.match(renderManifest.modelSha256, /^[a-f0-9]{64}$/);
   assert.match(renderManifest.renderConfigSha256, /^[a-f0-9]{64}$/);
   assert.equal(renderManifest.renderSettings.cameraCoordinateConvention, "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative");
+  assert.deepEqual(renderManifest.renderSettings.excludedRenderObjects, [
+    "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
+    "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
+  ]);
   // Camera framing must use the named palace nodes, not the 440 m site-context bounds.
   assert.ok(renderManifest.sceneBounds.dimensions[0] < 150, "palace length bounds must exclude large site-context objects");
   assert.ok(renderManifest.sceneBounds.dimensions[1] < 70, "palace depth bounds must exclude site/context extents");
@@ -164,7 +169,12 @@ async function main() {
   assertDirection("front", [0, 1, 0]);
   assertDirection("back", [0, -1, 0]);
   assertDirection("top", [0, 0, -1]);
-  assertDirection("right", [-1, 0, 0]);
+  const diagonal = [
+    -Math.cos(315 * Math.PI / 180) * Math.cos(22 * Math.PI / 180),
+    -Math.sin(315 * Math.PI / 180) * Math.cos(22 * Math.PI / 180),
+    -Math.sin(22 * Math.PI / 180),
+  ];
+  assertDirection("turntable-315", diagonal);
   assert.deepEqual(renderManifest.views.map((view) => view.id), [...REQUIRED_REVIEW_VIEWS]);
 
   const reviewInputPath = path.join(reviewDir, "ahsan-manzil.review-input.json");

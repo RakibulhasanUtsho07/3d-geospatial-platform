@@ -124,11 +124,29 @@ def main():
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
     all_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    excluded_render_object_names = []
     if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1":
-        # Site/context meshes (ground, river, trees, mosque and context blocks)
-        # must remain renderable, but must not dictate the camera framing.
-        # Frame from the named palace/plan nodes only, otherwise the 440 m
-        # context environment makes a ~126 m palace nearly disappear.
+        # Site/context meshes (notably trees that otherwise cover the stair and
+        # facade) are hidden from the architectural comparison render. The model
+        # remains unmodified; only this review scene's visibility changes.
+        # Keep Site_Ground for a stable ground/shadow reference.
+        context_nodes_to_hide = {
+            "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
+            "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
+        }
+        existing_bases = {obj.name.split(".")[0] for obj in all_meshes}
+        missing_context_nodes = context_nodes_to_hide - existing_bases
+        if missing_context_nodes:
+            raise RuntimeError("Ahsan Manzil GLB is missing expected context nodes: " + ", ".join(sorted(missing_context_nodes)))
+        for obj in all_meshes:
+            base_name = obj.name.split(".")[0]
+            if base_name in context_nodes_to_hide:
+                obj.hide_render = True
+                excluded_render_object_names.append(base_name)
+        excluded_render_object_names.sort()
+
+        # Camera bounds must use palace/plan nodes only; the 440 m site context
+        # previously reduced the palace to a tiny strip in the render.
         heritage_node_names = {
             "Plinth", "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
             "Stair_S", "Veranda_S", "Veranda_N", "Parapet", "Dome_Drum",
@@ -209,6 +227,7 @@ def main():
             if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
             else "z-up;front-view-direction=+Y"
         ),
+        "excludedRenderObjects": excluded_render_object_names,
         "cameraDistanceMultiplier": 3.0,
         "cameraOrthoScaleMultiplier": 1.45,
         "turntableElevationDegrees": 22.0,
