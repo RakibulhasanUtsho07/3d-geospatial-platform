@@ -1,6 +1,6 @@
 # Multi-view Blender render review
 
-This stage renders a reviewed GLB to a repeatable set of inspection images. Imported mesh names beginning with Site_ are hidden only during these renders, so large contextual ground/river planes and nearby illustrative buildings do not shrink the palace in the review frame. Those nodes remain in the source GLB and are not deleted or modified. The `front` view is specially framed to the Rangmahal river-facing facade (central dome, triple-arch portico and stair); the other 12 views frame the whole architectural model, including Andarmahal. These are review-camera targets, not a claim that a rendered axis label proves true north or geographic orientation.
+This stage renders a reviewed GLB to a repeatable set of inspection images. Imported mesh names beginning with Site_ are hidden only during these renders, so large contextual ground/river planes and nearby illustrative buildings do not shrink the palace in the review frame. Those nodes remain in the source GLB and are not deleted or modified. The `front` view is a slightly elevated, specially framed review of Rangmahal's river-facing facade (central dome, triple-arch portico, and visible stair tread surfaces); the other 12 views frame the whole architectural model, including Andarmahal. These are review-camera targets, not a claim that a rendered axis label proves true north or geographic orientation.
 
 ## Prerequisites
 
