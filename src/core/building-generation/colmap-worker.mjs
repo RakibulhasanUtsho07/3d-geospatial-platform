@@ -147,7 +147,17 @@ export async function runColmapReconstruction(options){
   }
   report.progress="reconstruction";await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
   const colmapPath=options.colmapPath||process.env.COLMAP_BIN||"colmap",spawnImpl=options.spawnImpl;
-  const reconstructionArgs=["automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality];
+  // Default to CPU extraction/matching so COLMAP works on headless servers without CUDA/GLX.
+  // GPU mode is explicit opt-in: the OpenGL-based fallback can fail before reconstruction starts
+  // on a Linux runner without a display/GL context.
+  const useGpu=options.useGpu===true;
+  const reconstructionArgs=[
+   "automatic_reconstructor","--workspace_path",outputJobDir,"--image_path",realImagesDir,"--quality",quality,
+   "--FeatureExtraction.use_gpu",useGpu?"1":"0",
+   "--FeatureMatching.use_gpu",useGpu?"1":"0",
+   "--FeatureExtraction.max_image_size",String(options.maxImageSize??1600),
+   "--FeatureExtraction.num_threads",String(options.featureThreads??4),
+  ];
   const reconstructStart=Date.now();await runProcess(colmapPath,reconstructionArgs,timeoutMs,spawnImpl);report.timingsMs={reconstruction:Date.now()-reconstructStart};
   // A zero exit code only means COLMAP completed; it does not mean enough input views
   // registered or that the sparse reconstruction is strong enough for stable geometry.
