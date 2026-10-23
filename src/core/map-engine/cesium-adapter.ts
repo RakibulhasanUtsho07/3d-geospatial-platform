@@ -48,6 +48,14 @@ import {
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
 import { BuildingLodRenderer } from "./building-lod-renderer";
 import type { BuildingHeightInfo, BuildingLodRecord } from "./building-lod-renderer";
+import {
+  areBuildingVisualStylesEqual,
+  indexBuildingStyleAssignments,
+  resolveBuildingStyleBaseline,
+  resolvePreviewGeometryStyle,
+  shouldReapplyBuildingStyle,
+  shouldRenderDetailedForBuildingStyle,
+} from "./building-style-assignment-policy.mjs";
 import { MAP_LAYER_IDS } from "./types";
 import { normalizeGeneratedModelDefinition } from "./generated-model-policy.mjs";
 import type {
@@ -2281,19 +2289,8 @@ export class CesiumAdapter implements MapEngine {
 
   setBuildingStyleAssignments(assignments: BuildingStyleAssignment[]): void {
     this.buildingStyleAssignments.clear();
-    for (const assignment of assignments) {
-      if (
-        !assignment ||
-        typeof assignment.featureId !== "string" ||
-        !assignment.featureId.trim() ||
-        !assignment.style ||
-        !/^#[0-9a-f]{6}$/i.test(assignment.style.facadeColor) ||
-        !/^#[0-9a-f]{6}$/i.test(assignment.style.roofColor) ||
-        !/^#[0-9a-f]{6}$/i.test(assignment.style.accentColor)
-      ) {
-        continue;
-      }
-      this.buildingStyleAssignments.set(assignment.featureId, assignment);
+    for (const [featureId, assignment] of indexBuildingStyleAssignments(assignments)) {
+      this.buildingStyleAssignments.set(featureId, assignment);
     }
 
     const viewer = this.viewer;
@@ -2309,11 +2306,9 @@ export class CesiumAdapter implements MapEngine {
     try {
       for (const record of this.buildingLodRecords) {
         const assignment = this.buildingStyleAssignments.get(record.entity.id);
-        const nextBaseline = assignment?.style ?? record.sourceVisualStyle;
-        const baselineChanged =
-          JSON.stringify(nextBaseline) !== JSON.stringify(record.baseVisualStyle);
-        const previewWasActive =
-          JSON.stringify(record.visualStyle) !== JSON.stringify(record.baseVisualStyle);
+        const nextBaseline = resolveBuildingStyleBaseline(assignment, record.sourceVisualStyle);
+        const baselineChanged = !areBuildingVisualStylesEqual(nextBaseline, record.baseVisualStyle);
+        const previewWasActive = !areBuildingVisualStylesEqual(record.visualStyle, record.baseVisualStyle);
         const nextHeightInfo = this.getResearchAdjustedBuildingHeight(
           record.sourceHeightInfo,
           nextBaseline,
@@ -2328,7 +2323,7 @@ export class CesiumAdapter implements MapEngine {
         record.baseHeight = nextHeightInfo.baseHeight;
         record.topHeight = nextHeightInfo.baseHeight + nextHeightInfo.meters;
         this.renderedBuildingMetadata.set(record.entity.id, nextHeightInfo);
-        if (!baselineChanged && !previewWasActive && !heightChanged) continue;
+        if (!shouldReapplyBuildingStyle({ baselineChanged, previewWasActive, heightChanged })) continue;
 
         // A saved assignment supersedes a temporary preview. Removing it
         // returns to the source Overture height/floor estimate.
@@ -2341,7 +2336,10 @@ export class CesiumAdapter implements MapEngine {
         record.entity.box = undefined;
         record.entity.position = undefined;
 
-        if (record.entity === selectedEntity || record.isDetailed) {
+        if (shouldRenderDetailedForBuildingStyle({
+          isSelected: record.entity === selectedEntity,
+          isDetailed: record.isDetailed,
+        })) {
           this.buildingLodRenderer.applyDetailedBuildingStyle(record, Cesium);
         } else {
           this.buildingLodRenderer.applyLightweightBuildingStyle(record, Cesium);
@@ -2370,12 +2368,7 @@ export class CesiumAdapter implements MapEngine {
     // Restore any highlighted material before invalidating the cached graphics.
     this.restoreSelectedBuilding();
     record.visualStyle = style ?? record.baseVisualStyle;
-    const geometryStyle = style && (
-      typeof style.reportedHeightMeters === "number" ||
-      typeof style.reportedFloorCount === "number"
-    )
-      ? style
-      : record.baseVisualStyle;
+    const geometryStyle = resolvePreviewGeometryStyle(style, record.baseVisualStyle);
     record.heightInfo = this.getResearchAdjustedBuildingHeight(
       record.sourceHeightInfo,
       geometryStyle,
