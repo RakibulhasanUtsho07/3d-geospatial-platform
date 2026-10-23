@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dimensions", required=True, type=Path)
     parser.add_argument("--worker-report", required=True, type=Path)
+    parser.add_argument("--calibration-report", type=Path, help="Optional report for calibration applied to the exact same GLB")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--minimum-registered-ratio", type=float, default=0.75)
     parser.add_argument("--minimum-registered-images", type=int, default=6)
@@ -22,6 +23,8 @@ def main():
 
     dim = load(args.dimensions)
     worker = load(args.worker_report)
+    calibration_report = load(args.calibration_report) if args.calibration_report else {}
+    calibration = calibration_report.get("scaleCalibration", {})
     comparison = dim.get("dimensionComparison", {})
     diagnostics = worker.get("reconstructionDiagnostics", {})
     coverage = worker.get("cameraCoverage", {})
@@ -72,6 +75,48 @@ def main():
         warnings.append("Camera viewing directions are too concentrated for a confident full-building reconstruction.")
     if texture_status != "textured":
         warnings.append("Image texture comparison was not possible; GLB is geometry-only.")
+    model_review = worker.get("modelReview")
+    # The worker report describes the uncalibrated reconstruction. If a separate scale
+    # calibration was applied to that exact same GLB, do not leave a stale finding saying
+    # "no baseline was applied"; replace it with a truthful reminder that only one axis
+    # was calibrated and depth/height still failed or remain independent.
+    if isinstance(model_review, dict) and calibration.get("sameReconstructionReused") is True:
+        review_findings = model_review.get("findings", [])
+        revised_findings = []
+        for finding in review_findings:
+            if finding.get("code") == "metric-scale-unverified":
+                length_status = comparison.get("lengthGate", "missing")
+                depth_status = comparison.get("depthGate", "missing")
+                height_status = comparison.get("heightGate", "missing")
+                revised_findings.append({
+                    "code": "metric-scale-baseline-calibrated-independent-checks-required",
+                    "category": "scale",
+                    "severity": "high" if depth_status != "pass" or height_status != "pass" else "medium",
+                    "title": "Long-axis calibrated; complete metric accuracy not established",
+                    "summary": (
+                        f"The same reconstruction was scaled to {calibration.get('referenceLengthM')} m along its longest horizontal axis. "
+                        f"Depth gate: {depth_status}; height gate: {height_status}. The calibrated length is not independent evidence."
+                    ),
+                    "recommendation": "Do not publish as accurate until independently measured depth and height pass and a human verifies the model against source views.",
+                    "evidence": {
+                        "method": calibration.get("method"),
+                        "referenceLengthM": calibration.get("referenceLengthM"),
+                        "scaleFactorApplied": calibration.get("scaleFactorApplied"),
+                        "lengthGate": length_status,
+                        "depthGate": depth_status,
+                        "heightGate": height_status,
+                        "lengthAgreementIsIndependent": False
+                    }
+                })
+            else:
+                revised_findings.append(finding)
+        model_review = {
+            **model_review,
+            "findings": revised_findings,
+            "findingCount": len(revised_findings),
+            "priority": "high" if not passed else model_review.get("priority", "medium"),
+        }
+
     report = {
         "schemaVersion": "1.0.0",
         "building": worker.get("buildingId", "ahsan-manzil-live-cv"),
@@ -79,7 +124,8 @@ def main():
         "accuracyValidated": passed,
         "gates": gates,
         "dimensionComparison": comparison,
-        "modelReview": worker.get("modelReview"),
+        "calibration": calibration if calibration else None,
+        "modelReview": model_review,
         "geometryStrategy": worker.get("geometryStrategy", "unknown"),
         "warnings": list(dict.fromkeys(warnings)),
         "limitations": [
