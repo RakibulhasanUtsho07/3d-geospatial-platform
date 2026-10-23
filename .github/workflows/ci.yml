@@ -163,23 +163,14 @@ jobs:
         run: npm run test:reconstruction-job-state
 
       - name: Install FFmpeg for deterministic texture atlas baking
-        run: |
-          set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            # Retry transient mirror failures and bound package-manager waits so
-            # this setup step cannot consume the entire CI job timeout silently.
-            sudo timeout 240s apt-get \
-              -o Acquire::Retries=3 \
-              -o Acquire::http::Timeout=30 \
-              -o Acquire::https::Timeout=30 \
-              update -qq
-            sudo DEBIAN_FRONTEND=noninteractive timeout 240s apt-get \
-              -o Acquire::Retries=3 \
-              -o Acquire::http::Timeout=30 \
-              -o Acquire::https::Timeout=30 \
-              install --yes --no-install-recommends ffmpeg
-          fi
-          ffmpeg -hide_banner -version
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
+        with:
+          ffmpeg-version: release
+          architecture: x64
+          linking-type: static
+
+      - name: Verify FFmpeg installation
+        run: ffmpeg -hide_banner -version
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -308,6 +299,9 @@ jobs:
 
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
+
+      - name: Test building viewport manager ownership and lifecycle
+        run: npm run test:building-viewport-manager
 
       - name: Test dynamic map performance telemetry and baseline aggregation
         run: npm run test:map-performance
