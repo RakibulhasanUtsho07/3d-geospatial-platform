@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ahsan-manzil-live-cv",
+  "name": "Ahsan Manzil — real-media validation candidate",
+  "location": {
+    "longitude": 90.40606,
+    "latitude": 23.70860,
+    "heightM": 0
+  },
+  "footprint": {
+    "type": "Polygon",
+    "coordinates": [[
+      [90.4054445, 23.7084709],
+      [90.4066755, 23.7084709],
+      [90.4066755, 23.7087291],
+      [90.4054445, 23.7087291],
+      [90.4054445, 23.7084709]
+    ]]
+  },
+  "dimensions": {
+    "floorCount": 2,
+    "floorHeightM": 5.4,
+    "parapetHeightM": 1.0,
+    "wallThicknessM": 0.78
+  },
+  "architecture": {
+    "style": "indo-saracenic-revival",
+    "roofType": "terrace",
+    "wallColor": "#E1917D",
+    "roofColor": "#ECAE9B",
+    "glassColor": "#392B27",
+    "frameColor": "#ECAE9B",
+    "concreteColor": "#6E625A",
+    "doorColor": "#6B4A32",
+    "balcony": {
+      "enabled": true,
+      "everyFloors": 1,
+      "widthM": 1.6,
+      "depthM": 0.85
+    },
+    "windows": {
+      "enabled": true,
+      "widthM": 1.3,
+      "heightM": 3.0
+    },
+    "includeDoor": true
+  },
+  "sources": [],
+  "evidence": [
+    {
+      "field": "overallLengthM",
+      "value": 125.4,
+      "confidence": "verified",
+      "sourceIds": [],
+      "notes": "Published Bangladesh Tourism Board/Parjatan dimension; model footprint is still an approximate axis-aligned rectangle, not a surveyed traced outline."
+    },
+    {
+      "field": "overallDepthM",
+      "value": 28.75,
+      "confidence": "verified",
+      "sourceIds": [],
+      "notes": "Published Bangladesh Tourism Board dimension; validate separately against the output reconstruction."
+    },
+    {
+      "field": "groundFloorClearHeightM",
+      "value": 5.0,
+      "confidence": "verified",
+      "sourceIds": [],
+      "notes": "Published Bangladesh Tourism Board/Parjatan dimension."
+    },
+    {
+      "field": "firstFloorClearHeightM",
+      "value": 5.8,
+      "confidence": "verified",
+      "sourceIds": [],
+      "notes": "Published Bangladesh Tourism Board/Parjatan dimension."
+    },
+    {
+      "field": "domePeakHeightM",
+      "value": 27.13,
+      "confidence": "verified",
+      "sourceIds": [],
+      "notes": "Published Bangladesh Tourism Board heritage information; measure model height independently after reconstruction."
+    },
+    {
+      "field": "footprintOutline",
+      "value": "rectangle approximation centred on provisional anchor",
+      "confidence": "estimated",
+      "sourceIds": [],
+      "notes": "Not a surveyed georeference and not used as proof of camera registration."
+    },
+    {
+      "field": "modelScaleAndWGS84Placement",
+      "value": null,
+      "confidence": "unknown",
+      "sourceIds": [],
+      "notes": "COLMAP will initially create a candidate-local coordinate frame; do not interpret it as map-ready."
+    }
+  ],
+  "tags": ["heritage", "ahsan-manzil", "real-media-validation", "photogrammetry-candidate"]
+}
