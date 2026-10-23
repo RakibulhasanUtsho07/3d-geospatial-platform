@@ -271,6 +271,9 @@ jobs:
       - name: Test picked entity resolution
         run: npm run test:picked-entity-resolution
 
+      - name: Test feature pick routing priority
+        run: npm run test:feature-pick-routing
+
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 
