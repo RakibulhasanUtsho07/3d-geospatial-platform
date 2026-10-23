@@ -72,11 +72,14 @@ test("invalid picks and ids outside the current data source resolve to null", ()
   }
 });
 
-test("direct Entity pick with no canonical source match does not resolve another candidate", () => {
-  const { isEntity } = fixture();
+test("an unresolved Entity candidate falls through to a valid primitive id", () => {
+  const { sourceA, isEntity } = fixture();
   const direct = entity("removed-building");
   const pickedWithFallback = { id: direct, primitive: { id: "building-a" } };
-  assert.strictEqual(resolvePickedEntity(pickedWithFallback, isEntity, () => undefined), null);
+  assert.strictEqual(
+    resolvePickedEntity(pickedWithFallback, isEntity, (id) => id === "building-a" ? sourceA : undefined),
+    sourceA,
+  );
 });
 
 test("CesiumAdapter delegates pick normalization and keeps data-source ownership", () => {
