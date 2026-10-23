@@ -7,6 +7,7 @@ on:
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
+      - refactor/p1-feature-picking-controller
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
@@ -55,6 +56,8 @@ on:
       - refactor/p1-building-selection-materials
       - refactor/p1-picked-entity-resolution
       - refactor/p1-feature-pick-routing
+      - refactor/p1-selection-event-dispatch
+      - refactor/p1-feature-picking-controller
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -92,6 +95,9 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Test feature picking controller lifecycle
+        run: npm run test:feature-picking-controller
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
@@ -279,6 +285,7 @@ jobs:
 
       - name: Test selection event dispatch and cleanup order
         run: npm run test:selection-event-dispatch
+
 
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection

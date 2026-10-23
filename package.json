@@ -140,7 +140,8 @@
     "test:building-selection-materials": "node --test tests/building-selection-material-controller.test.mjs",
     "test:picked-entity-resolution": "node --test tests/picked-entity-resolution.test.mjs",
     "test:feature-pick-routing": "node --test tests/feature-pick-routing.test.mjs",
-    "test:selection-event-dispatch": "node --test tests/selection-event-dispatch.test.mjs"
+    "test:selection-event-dispatch": "node --test tests/selection-event-dispatch.test.mjs",
+    "test:feature-picking-controller": "node --test tests/feature-picking-controller.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
