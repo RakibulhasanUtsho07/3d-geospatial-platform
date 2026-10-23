@@ -68,7 +68,7 @@ jobs:
           npm run render:building-review -- \
             public/models/ahsan-manzil-lod3.glb \
             artifacts/p1-4-render-set \
-            --resolution=512 --blender=blender
+            --resolution=1024 --blender=blender
           cp artifacts/p1-4-qa/geometry-qa-report.json artifacts/p1-4-render-set/
           cp artifacts/p1-4-qa/texture-qa-report.json artifacts/p1-4-render-set/
 
