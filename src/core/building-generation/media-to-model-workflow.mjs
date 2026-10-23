@@ -198,6 +198,7 @@ export async function runMediaToModelWorkflow(options){
   upAxis:options.upAxis??null,
   quality:options.quality??"MEDIUM",
   colmapPath:options.colmapPath??null,
+  colmapUseGpu:options.colmapUseGpu===true,
   reconstructionTimeoutMs:options.reconstructionTimeoutMs??3600000,
   headingDegrees:options.headingDegrees??0,
   modelDistanceUnits:options.modelDistanceUnits??null,
@@ -375,7 +376,7 @@ export async function runMediaToModelWorkflow(options){
    stageId:"model-generation",
    inputs:{specSyncArtifactSha256:specSync.artifact.contentSha256},
    parameters:{
-    strategy,viewIds,quality:config.quality,colmapPath:config.colmapPath,
+    strategy,viewIds,quality:config.quality,colmapPath:config.colmapPath,colmapUseGpu:config.colmapUseGpu,
     reconstructionTimeoutMs:config.reconstructionTimeoutMs,upAxis:config.upAxis,
     confirmSameBuilding:config.confirmSameBuilding,confirmOverlapReviewed:config.confirmOverlapReviewed,
     confirmUpAxisReviewed:config.confirmUpAxisReviewed,headingDegrees:config.headingDegrees,
@@ -406,7 +407,7 @@ export async function runMediaToModelWorkflow(options){
      reconstruction:{
       workspaceRoot:root,jobId:workerJobId,sourceIds:viewIds,upAxis:options.upAxis,upAxisReviewed:options.confirmUpAxisReviewed===true,
       matchConfirmed:options.confirmSameBuilding===true,overlapReviewed:options.confirmOverlapReviewed===true,
-      quality:config.quality,colmapPath:options.colmapPath,timeoutMs:config.reconstructionTimeoutMs,
+      quality:config.quality,colmapPath:options.colmapPath,useGpu:config.colmapUseGpu,timeoutMs:config.reconstructionTimeoutMs,
       headingDegrees:config.headingDegrees,
       scaleCalibration:{...(options.modelDistanceUnits!==undefined?{modelDistanceUnits:options.modelDistanceUnits}:{}),...(options.realDistanceM!==undefined?{realDistanceM:options.realDistanceM}:{})},
       ffmpegPath:options.ffmpegPath,
