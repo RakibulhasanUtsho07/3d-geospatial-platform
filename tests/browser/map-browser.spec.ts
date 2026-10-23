@@ -344,11 +344,9 @@ test("selecting a building then a road clears the previous details panel", async
   await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
 
   // Center the test fixture in the viewport so canvas clicks are deterministic.
-  const topDown = page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" });
-  // The generated-model launcher overlaps part of the tall control stack in
-  // the 720px CI viewport; keyboard activation avoids that unrelated overlay.
-  await topDown.focus();
-  await page.keyboard.press("Enter");
+  // Regression: the top-down control must remain directly clickable even
+  // when the generated-model launcher is visible near the bottom-right corner.
+  await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
   await page.waitForTimeout(1_000);
 
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
