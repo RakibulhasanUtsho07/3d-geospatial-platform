@@ -61,7 +61,7 @@ jobs:
 
       - name: Install Blender and contact-sheet library
         run: |
-          timeout 300s sudo apt-get update -qq
+          timeout 60s sudo apt-get update -qq || echo 'Proceeding with the runner package index if update times out.'
           DEBIAN_FRONTEND=noninteractive timeout 300s sudo apt-get install -y blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
 
       - name: Render all 13 review views
