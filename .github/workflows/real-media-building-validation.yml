@@ -28,8 +28,11 @@ jobs:
           python-version: "3.12"
 
       - name: Install project and measurement dependencies
+        shell: bash
         run: |
-          npm ci
+          set -euo pipefail
+          mkdir -p validation-output/logs
+          npm install --no-audit --no-fund 2>&1 | tee validation-output/logs/dependencies.log
           python -m pip install --upgrade pip
           python -m pip install numpy pillow
 
