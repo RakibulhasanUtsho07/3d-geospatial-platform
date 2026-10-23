@@ -109,6 +109,7 @@ export async function runSingleImage3D(options){
  const outputDir=path.join(realJobDir,"tripo-output");
  await mkdir(outputDir);
  const reportPath=path.join(realJobDir,"report.json"),startedAt=new Date().toISOString();
+ const pythonPath=options.pythonPath||process.env.TRIPOSR_PYTHON||"python";
  const report={
   schemaVersion:"1.0.0",engine:"single-image-ai-triposr-v1",modelImplementation:"VAST-AI-Research/TripoSR",
   modelLicense:"MIT (verify installed revision and notices)",buildingId,jobId,sourceId,status:"running",startedAt,
@@ -120,6 +121,12 @@ export async function runSingleImage3D(options){
   executionEvidence:{
    processAdapter:options.spawnImpl?"injected-adapter-unverified":"node-child-process.spawn",
    workerStarted:false,workerExitCode:null,workerVersion:"not-queried",
+   dependencyPreflight:{
+    status:options.spawnImpl?"skipped-injected-adapter":"pending",
+    executable:pythonPath,
+    checks:["python executable","torch module","tsr module"],
+    reason:options.spawnImpl?"Injected spawn adapter is reserved for orchestration tests; it cannot prove real dependency availability.":null
+   },
    runnerScriptSha256,
    actualInferenceVerified:false,
    outputVerification:"GLB-structure-and-geometry-only",
@@ -130,7 +137,34 @@ export async function runSingleImage3D(options){
  };
  try{
   await writeFile(reportPath,JSON.stringify(report,null,2)+"\n");
-  const pythonPath=options.pythonPath||process.env.TRIPOSR_PYTHON||"python";
+  if(!options.spawnImpl){
+   const preflightCode=[
+    "import importlib.util,json,sys",
+    "required=['torch','tsr']",
+    "modules={}",
+    "missing=[]",
+    "for name in required:",
+    "  try: modules[name]=importlib.util.find_spec(name) is not None",
+    "  except (ImportError,ValueError): modules[name]=False",
+    "  if not modules[name]: missing.append(name)",
+    "print(json.dumps({'pythonVersion':sys.version.split()[0],'pythonExecutable':sys.executable,'modules':modules}))",
+    "if missing:",
+    "  print('Missing TripoSR runtime module(s): '+', '.join(missing),file=sys.stderr)",
+    "  sys.exit(2)"
+   ].join("\\n");
+   report.executionEvidence.dependencyPreflight.status="running";
+   await writeFile(reportPath,JSON.stringify(report,null,2)+"\\n");
+   try{
+    const preflight=await processRun(pythonPath,["-c",preflightCode],path.dirname(runner.path),Math.min(timeoutMs,30000));
+    const details=JSON.parse(preflight.stdout.trim().split(/\\r?\\n/).at(-1));
+    report.executionEvidence.dependencyPreflight={status:"passed",executable:pythonPath,checks:["python executable","torch module","tsr module"],pythonVersion:details.pythonVersion,pythonExecutable:details.pythonExecutable,modules:details.modules,completedAt:new Date().toISOString()};
+    report.executionEvidence.workerVersion="Python "+details.pythonVersion+"; TripoSR code revision not pinned";
+    await writeFile(reportPath,JSON.stringify(report,null,2)+"\\n");
+   }catch(preflightError){
+    report.executionEvidence.dependencyPreflight={status:"failed",executable:pythonPath,checks:["python executable","torch module","tsr module"],failureMessage:preflightError instanceof Error?preflightError.message:String(preflightError),completedAt:new Date().toISOString()};
+    throw new Error("TripoSR runtime preflight failed: "+report.executionEvidence.dependencyPreflight.failureMessage);
+   }
+  }
   const args=[runner.path,sourceFile.path,"--output-dir",outputDir,"--model-save-format","glb","--mc-resolution",String(resolution),"--device",device,"--pretrained-model-name-or-path",modelId];
   const begin=Date.now();
   const processResult=await processRun(pythonPath,args,path.dirname(runner.path),timeoutMs,options.spawnImpl);
@@ -155,6 +189,10 @@ export async function runSingleImage3D(options){
   report.status="failed";report.failedAt=new Date().toISOString();report.failureMessage=error instanceof Error?error.message:String(error);
   if(error?.processStarted===true)report.executionEvidence.workerStarted=true;
   if(Number.isInteger(error?.exitCode))report.executionEvidence.workerExitCode=error.exitCode;
+  if(report.executionEvidence.dependencyPreflight.status==="running"){
+   report.executionEvidence.dependencyPreflight.status="failed";
+   report.executionEvidence.dependencyPreflight.failureMessage=report.failureMessage;
+  }
   if(report.executionEvidence.processStatus!=="exited-0"){
    report.executionEvidence.processStatus=error?.processStarted===false?"not-started":error?.processStarted===true?"failed":"not-confirmed";
   }
