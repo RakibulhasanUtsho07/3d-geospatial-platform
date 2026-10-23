@@ -986,10 +986,17 @@ function buildGlb(lod) {
   }
   for(let i=0;i<steps;i++){
     const t = steps <= 1 ? 1 : i / (steps - 1);
-    const top=(i+1)*rise;
+    const riserBottom=i*rise;
+    const riserTop=(i+1)*rise;
+    const riserCenter=(riserBottom+riserTop)/2;
     const z=stairTopZ+stepDepth*(steps-1-i);
     const width=stairBaseWidth+(stairTopWidth-stairBaseWidth)*t;
-    box(stair,domeX,top/2,z,width,top,stepDepth,"stair");
+    // One riser-height block per step. The old cumulative-height blocks
+    // overlapped all lower treads and made the staircase render as a single ramp.
+    box(stair,domeX,riserCenter,z,width,rise,stepDepth,"stair");
+    // A narrow contrasting nosing on each leading tread edge makes the 28
+    // horizontal steps readable in elevation without changing their dimensions.
+    box(stair,domeX,riserTop-.018,z+stepDepth*.32,width,.036,stepDepth*.16,"trim");
   }
   if(lod>=2){
     // Tapered cheek balustrades follow the stair and connect to the portal.
