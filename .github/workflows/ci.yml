@@ -48,6 +48,7 @@ on:
   pull_request:
     branches:
       - main
+      - refactor/p1-building-viewport-manager-sync
       - refactor/p1-feature-picking-controller
       - refactor/p1-feature-pick-geometry
       - test/p1-building-selection-lifecycle
@@ -347,6 +348,9 @@ jobs:
 
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
+
+      - name: Test road layer manager ownership and lifecycle
+        run: npm run test:road-layer-manager
 
       - name: Test source-derived building facade styles
         run: npm run test:building-style
