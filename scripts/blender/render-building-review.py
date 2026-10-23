@@ -171,7 +171,9 @@ def main():
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.75, light_size)
 
     views = [
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+        # Slightly elevated south-elevation camera exposes stair treads while
+        # keeping the Rangmahal facade/dome centered for reference comparison.
+        ("front", Vector((0.0, -0.94, 0.342)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
