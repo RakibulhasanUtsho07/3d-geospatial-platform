@@ -49,7 +49,7 @@ const SAMPLE_ROADS = [
     layer: 0,
     bridge: false,
     tunnel: false,
-    coordinates: [[90.4057, 23.70845], [90.4060, 23.70860], [90.4063, 23.70874]],
+    coordinates: [[90.4057, 23.70845], [90.40606, 23.70860], [90.4063, 23.70874]],
   },
   {
     id: "qa-local-road",
@@ -333,4 +333,86 @@ test("fixture building and roads pass through Cesium geometry staging with expec
     }),
     { timeout: 20_000 },
   ).toBe(true);
+});
+
+
+test("selecting a building then a road clears the previous details panel", async ({ page }) => {
+  test.setTimeout(60_000);
+  const observed = await stubMapNetwork(page);
+  const staged: {
+    buildings: Array<{ returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number }>;
+    roads: Array<{ returnedWays?: number; renderedWays?: number }>;
+  } = { buildings: [], roads: [] };
+
+  // A request reaching the fixture is not enough: wait until Cesium has staged
+  // the actual pickable building and road entities before driving the camera.
+  page.on("console", (message) => {
+    const args = message.args();
+    void Promise.all(args.map((arg) => arg.jsonValue().catch(() => null))).then((values) => {
+      if (values[0] === "[Overture] Building viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.buildings.push(values[1] as typeof staged.buildings[number]);
+      }
+      if (values[0] === "[Roads] Vector road viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.roads.push(values[1] as typeof staged.roads[number]);
+      }
+    });
+  });
+
+  await openReadyMap(page);
+  await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(
+    () => staged.buildings.some((summary) =>
+      summary.returnedFeatures === 1 &&
+      summary.renderedBuildings === 1 &&
+      summary.renderedExtrusions === 1
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+  await expect.poll(
+    () => staged.roads.some((summary) => summary.returnedWays === 4 && summary.renderedWays === 4),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  // Focus the fixture anchor in a repeatable north-up camera view.
+  // The test road passes through this point, so hide roads while selecting
+  // the building to make the intended first pick unambiguous.
+  await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
+  await page.waitForTimeout(1_250);
+
+  const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const center = { x: box!.width / 2, y: box!.height / 2 };
+  const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
+  const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
+
+  await roads.uncheck({ noWaitAfter: true });
+  await expect(roads).not.toBeChecked();
+
+  // Use absolute page coordinates so canvas-locator actionability checks do
+  // not mask an actual Cesium pointer/pick regression. The canvas centre is
+  // the shared fixture anchor for both selections.
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+  const buildingDetails = page.getByRole("complementary", { name: "Building details" });
+  await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
+  await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
+
+  // Hiding the selected building must clear its details panel immediately.
+  await buildings.uncheck({ noWaitAfter: true });
+  await expect(buildings).not.toBeChecked();
+  await expect(buildingDetails).toHaveCount(0);
+
+  // Restore the road layer at the same map point and pick its centreline.
+  await roads.check({ noWaitAfter: true });
+  await expect(roads).toBeChecked();
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+
+  const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
+  await expect(roadDetails).toBeVisible({ timeout: 10_000 });
+  await expect(roadDetails.getByRole("heading", { name: "QA Main Road" })).toBeVisible();
+  await expect(buildingDetails).toHaveCount(0);
+
+  await roadDetails.getByRole("button", { name: "Close road details" }).click();
+  await expect(roadDetails).toHaveCount(0);
 });
