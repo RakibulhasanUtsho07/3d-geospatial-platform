@@ -69,6 +69,11 @@ def main():
     }
     passed = all(item["passed"] for item in gates.values())
     warnings = list(worker.get("warnings", []))
+    if calibration.get("sameReconstructionReused") is True:
+        # This warning described the unscaled worker output. A scale baseline has since
+        # been applied to the exact same GLB; replace it with the more precise caveat.
+        warnings = [warning for warning in warnings if "No real-world scale was supplied" not in warning]
+        warnings.append("A published length baseline was applied to the emitted GLB; length agreement is by construction, not independent evidence. Depth and height remain independent accuracy checks.")
     if ratio < args.minimum_registered_ratio or registered < args.minimum_registered_images:
         warnings.append("Photograph registration coverage is below the live-validation threshold.")
     if spread < args.minimum_view_direction_spread_degrees:
