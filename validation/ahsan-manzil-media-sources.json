@@ -1,6 +1,6 @@
 {
   "building": "Ahsan Manzil (Pink Palace), Kumartuli, Dhaka, Bangladesh",
-  "purpose": "Exploratory real-image COLMAP reconstruction. This is not a surveyed/cadastral model and is not map-ready.",
+  "purpose": "Controlled same-photographer real-image COLMAP experiment. This remains exploratory, not a surveyed/cadastral model, and is not map-ready.",
   "independentReferenceDimensions": {
     "overallLengthM": 125.4,
     "overallDepthM": 28.75,
@@ -17,118 +17,94 @@
   },
   "inputImages": [
     {
-      "id": "ahsan003",
-      "file": "Ahsan_Manzil_003.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_003.jpg",
-      "creator": "Ranadipam Basu",
-      "capturedAt": "2010-12-31T03:05:08",
-      "license": "CC BY-SA 3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
-    },
-    {
-      "id": "ahsan004",
-      "file": "Ahsan_Manzil_004.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_004.jpg",
-      "creator": "Ranadipam Basu",
-      "capturedAt": "2010-12-31T03:05:42",
-      "license": "CC BY-SA 3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
-    },
-    {
-      "id": "ahsan005",
-      "file": "Ahsan_Manzil_005.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_005.jpg",
-      "creator": "Ranadipam Basu",
-      "capturedAt": "2010-12-31T03:07:09",
-      "license": "CC BY-SA 3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
-    },
-    {
-      "id": "ahsan006",
-      "file": "Ahsan_Manzil_006.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_006.jpg",
-      "creator": "Ranadipam Basu",
-      "capturedAt": "2010-12-31T03:08:03",
-      "license": "CC BY-SA 3.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
-    },
-    {
-      "id": "ahsan007",
-      "file": "Ahsan_Manzil_Side_View.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_Side_View.jpg",
-      "creator": "Parvezahmed",
-      "capturedAt": "2019-11-01T10:35:57",
+      "id": "saeed02",
+      "file": "Ahsan_Manzil_view_02.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_02.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_02.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
       "gps": {
-        "latitude": 23.7081961,
-        "longitude": 90.4067306
+        "latitude": 23.708578,
+        "longitude": 90.406031
       },
-      "note": "Wikimedia metadata reports a directly captured side-view photograph with GPS; retain actual image orientation and camera pose as unverified until matched."
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
     },
     {
-      "id": "ahsan008",
-      "file": "Ahsan_Manzil_(side).jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_(side).jpg",
-      "creator": "Mrpluto11",
-      "capturedAt": "2017-03-18T12:04:08",
-      "license": "CC BY-SA 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
-    },
-    {
-      "id": "ahsan009",
-      "file": "Ahasan_Manzil_east_side_building.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_building.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahasan_Manzil_east_side_building.jpg",
-      "creator": "Farhan alvee",
-      "capturedAt": "2015-10-09T16:57:08",
+      "id": "saeed03",
+      "file": "Ahsan_Manzil_view_03.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_03.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_03.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
       "gps": {
         "latitude": 23.708578,
         "longitude": 90.406031
-      }
+      },
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
     },
     {
-      "id": "ahsan010",
-      "file": "Ahasan_Manzil_east_side_corner_view.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahasan_Manzil_east_side_corner_view.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahasan_Manzil_east_side_corner_view.jpg",
-      "creator": "Farhan alvee",
-      "capturedAt": "2015-10-09T17:08:32",
+      "id": "saeed04",
+      "file": "Ahsan_Manzil_view_04.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_04.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_04.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
       "gps": {
         "latitude": 23.708578,
         "longitude": 90.406031
-      }
+      },
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
     },
     {
-      "id": "ahsan011",
-      "file": "Ahsan_Manjeel_2023.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manjeel_2023.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manjeel_2023.jpg",
-      "creator": "Md Joni Hossain",
-      "capturedAt": "2023-06-10T14:32:20",
-      "license": "CC BY-SA 4.0",
-      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
-    },
-    {
-      "id": "ahsan012",
-      "file": "Ahsan_Manjil_Angled_view.jpg",
-      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manjil_Angled_view.jpg",
-      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manjil_Angled_view.jpg",
-      "creator": "Samiha Ahmed Rafa",
-      "capturedAt": "2025-07-30",
+      "id": "saeed05",
+      "file": "Ahsan_Manzil_view_05.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_05.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_05.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-      "note": "Side of grand staircase; view angle is helpful but cross-photo overlap must be validated by COLMAP."
+      "gps": {
+        "latitude": 23.708578,
+        "longitude": 90.406031
+      },
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
+    },
+    {
+      "id": "saeed06",
+      "file": "Ahsan_Manzil_view_06.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_06.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_06.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "gps": {
+        "latitude": 23.708578,
+        "longitude": 90.406031
+      },
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
+    },
+    {
+      "id": "saeed07",
+      "file": "Ahsan_Manzil_view_07.jpg",
+      "pageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_view_07.jpg",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Ahsan_Manzil_view_07.jpg",
+      "creator": "Saeed Ahmad",
+      "capturedAt": "2016-09-30",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "gps": {
+        "latitude": 23.708578,
+        "longitude": 90.406031
+      },
+      "note": "Commons reports the same camera-location coordinate for this six-photo series. This is not a surveyed camera pose or a guaranteed camera-center measurement; use COLMAP registration and view-direction diagnostics to assess actual overlap and parallax."
     }
   ],
   "reviewMethod": {
@@ -140,21 +116,16 @@
     "axisAssumption": "The run declares Y as the candidate up axis to satisfy the worker contract. COLMAP's local reconstruction frame is not inherently WGS84-oriented, so this assumption must be checked in the orthographic previews.",
     "georeferencing": "Not claimed. Scale calibration alone does not solve horizontal WGS84 placement or vertical datum.",
     "visualReview": "The artifact includes the licensed reference photographs plus front, side and top orthographic previews of the output GLB for direct visual comparison.",
-    "selectedViewCount": 10,
-    "note": "Ten openly licensed photos are retained as visual references, but the geometry run uses only the six-view subset that previously produced a sparse model. A ten-view combined run was attempted and produced no sparse COLMAP model, demonstrating that adding still photographs without verified overlap can make reconstruction fail.",
+    "selectedViewCount": 6,
+    "note": "This controlled experiment replaces the previous mixed-author photo set with six same-photographer stills captured on 30 September 2016. Visual review shows dome-focused views (02/06), broad frontal/oblique views (03/05/07), and a long side-wing view (04). The set is not a continuous walk-around; the common Commons coordinate is not treated as surveyed camera-pose evidence. A pass still requires independent depth/height, registered-image coverage, sufficient viewing-direction spread, topology review, source-image comparison, and WGS84/GCP registration.",
     "activeReconstructionViews": [
-      "ahsan003",
-      "ahsan004",
-      "ahsan005",
-      "ahsan006",
-      "ahsan007",
-      "ahsan008"
+      "saeed02",
+      "saeed03",
+      "saeed04",
+      "saeed05",
+      "saeed06",
+      "saeed07"
     ],
-    "referenceOnlyImages": [
-      "ahsan009",
-      "ahsan010",
-      "ahsan011",
-      "ahsan012"
-    ]
+    "referenceOnlyImages": []
   }
 }
