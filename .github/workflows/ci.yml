@@ -143,18 +143,15 @@ jobs:
       - name: Test resumable reconstruction job state and immutable stage artifacts
         run: npm run test:reconstruction-job-state
 
-      - name: Ensure FFmpeg and Blender render dependencies are available
+      - name: Ensure FFmpeg is available for texture atlas tests
         run: |
-          if command -v ffmpeg >/dev/null 2>&1 && command -v blender >/dev/null 2>&1 && blender --background --python-expr "import numpy" >/dev/null 2>&1; then
-            echo "FFmpeg, Blender and Blender's NumPy import are already available."
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -version | head -n 1
           else
             sudo timeout 120s apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
-            sudo apt-get install --no-install-recommends -y ffmpeg blender python3-numpy libegl1 libgl1 libxkbcommon0 libsm6 libxext6 libxrender1
+            sudo timeout 180s apt-get install --no-install-recommends -y ffmpeg
+            ffmpeg -version | head -n 1
           fi
-          ffmpeg -version | head -n 1
-          blender --version
-          blender --background --python-expr "import numpy; print('Blender NumPy:', numpy.__version__)"
-          ldconfig -p | grep -E 'libEGL[.]so[.]1|libGL[.]so[.]1'
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -244,10 +241,13 @@ jobs:
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
 
-      - name: Verify Blender for headless render integration
+      - name: Install and verify Blender for headless render integration
         run: |
+          sudo timeout 120s apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20
+          sudo timeout 180s apt-get install --no-install-recommends -y blender python3-numpy libegl1 libgl1 libxkbcommon0 libsm6 libxext6 libxrender1
           blender --version
           blender --background --python-expr "import numpy; print('Blender NumPy:', numpy.__version__)"
+          ldconfig -p | grep -E 'libEGL[.]so[.]1|libGL[.]so[.]1'
 
       - name: Test end-to-end GLB render review and hash contract
         env:

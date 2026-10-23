@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -18,6 +18,23 @@ async function main() {
   const root = await mkdtemp(path.join(os.tmpdir(), "building-render-review-integration-"));
   let succeeded = false;
   try {
+    // Prove malformed GLB is rejected before Blender is launched and before output is created.
+    const malformedPath = path.join(root, "malformed-input.glb");
+    const malformedOutput = path.join(root, "malformed-render-output");
+    await writeFile(malformedPath, Buffer.alloc(20), { flag: "wx", mode: 0o600 });
+    const malformed = spawnSync(process.execPath, [
+      path.join(here, "render-building-review-views.mjs"),
+      malformedPath,
+      malformedOutput,
+      "--resolution=256",
+      "--blender=blender-that-must-not-run",
+    ], { encoding: "utf8", windowsHide: true, timeout: 30000, maxBuffer: 4 * 1024 * 1024 });
+    assert.equal(malformed.status, 1, "malformed GLB should be rejected");
+    assert.match(malformed.stderr, /invalid GLB magic/, "the GLB validator should explain the malformed input");
+    assert.doesNotMatch(malformed.stderr, /Blender executable was not found/, "Blender should not be launched for invalid GLB");
+    await assert.rejects(access(malformedOutput), (error) => error?.code === "ENOENT",
+      "geometry QA must reject malformed GLB before creating a render directory");
+
     const spec = JSON.parse(await readFile(new URL("../tests/fixtures/demo-building-spec.json", import.meta.url), "utf8"));
     const generated = generateProceduralGlb(spec);
     const modelPath = path.join(root, "render-review-fixture.glb");
