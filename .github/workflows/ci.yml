@@ -7,6 +7,8 @@ on:
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
+      - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
@@ -46,8 +48,18 @@ on:
   pull_request:
     branches:
       - main
+      - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
+      - test/p1-building-selection-lifecycle
+      - test/p1-selection-browser-lifecycle
       - dev
       - refactor/p1-building-lod-policy
+      - refactor/p1-building-lod-renderer
+      - refactor/p1-building-style-assignment-policy
+      - refactor/p1-building-selection-materials
+      - refactor/p1-picked-entity-resolution
+      - refactor/p1-feature-pick-routing
+      - refactor/p1-selection-event-dispatch
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -85,6 +97,12 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Test feature picking controller lifecycle
+        run: npm run test:feature-picking-controller
+
+      - name: Test feature pick geometry calculations
+        run: npm run test:feature-pick-geometry
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
@@ -146,11 +164,22 @@ jobs:
 
       - name: Install FFmpeg for deterministic texture atlas baking
         run: |
+          set -euo pipefail
           if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install --yes ffmpeg
+            # Retry transient mirror failures and bound package-manager waits so
+            # this setup step cannot consume the entire CI job timeout silently.
+            sudo timeout 240s apt-get \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=30 \
+              -o Acquire::https::Timeout=30 \
+              update -qq
+            sudo DEBIAN_FRONTEND=noninteractive timeout 240s apt-get \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=30 \
+              -o Acquire::https::Timeout=30 \
+              install --yes --no-install-recommends ffmpeg
           fi
-          ffmpeg -version
+          ffmpeg -hide_banner -version
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -257,6 +286,22 @@ jobs:
 
       - name: Test building LOD renderer ownership and delegation
         run: npm run test:building-lod-renderer
+
+      - name: Test building style assignment and preview policy
+        run: npm run test:building-style-assignment-policy
+
+      - name: Test building selection material controller
+        run: npm run test:building-selection-materials
+
+      - name: Test picked entity resolution
+        run: npm run test:picked-entity-resolution
+
+      - name: Test feature pick routing priority
+        run: npm run test:feature-pick-routing
+
+      - name: Test selection event dispatch and cleanup order
+        run: npm run test:selection-event-dispatch
+
 
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
