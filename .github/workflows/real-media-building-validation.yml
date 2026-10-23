@@ -1,0 +1,272 @@
+name: Ahsan Manzil real-media photogrammetry validation
+
+on:
+  push:
+    branches:
+      - validation/ahsan-manzil-real-media
+
+permissions:
+  contents: read
+
+jobs:
+  reconstruct-and-measure:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out validation branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project and measurement dependencies
+        run: |
+          npm ci
+          python -m pip install --upgrade pip
+          python -m pip install numpy pillow
+
+      - name: Prepare workspace and download licensed source photographs
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$RUNNER_TEMP/ahsan-manzil-validation"
+          mkdir -p "$WORKSPACE/uploads" validation-output/reference-images validation-output/logs
+          printf '%s\n' "$WORKSPACE" > validation-output/workspace-path.txt
+          cat > validation-output/reference-image-attribution.txt <<'ATTRIBUTION'
+          Building: Ahsan Manzil (Pink Palace), Dhaka, Bangladesh
+          Photograph creator: Ranadipam Basu
+          License: Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)
+          License URL: https://creativecommons.org/licenses/by-sa/3.0/
+          Source files:
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg
+          https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg
+          This artifact preserves the source originals and attribution for the validation run.
+          This attribution note is not a substitute for verifying each source's current metadata.
+          ATTRIBUTION
+          while IFS='|' read -r source_id filename; do
+            [ -n "$source_id" ] || continue
+            url="https://commons.wikimedia.org/wiki/Special:FilePath/$filename"
+            curl --fail --location --retry 3 --retry-delay 2 \
+              --user-agent '3D-Geospatial-Platform real-media validation/1.0' \
+              "$url" --output "$WORKSPACE/uploads/$filename"
+            test -s "$WORKSPACE/uploads/$filename"
+            cp "$WORKSPACE/uploads/$filename" "validation-output/reference-images/$filename"
+          done <<'FILES'
+          ahsan003|Ahsan_Manzil_003.jpg
+          ahsan004|Ahsan_Manzil_004.jpg
+          ahsan005|Ahsan_Manzil_005.jpg
+          ahsan006|Ahsan_Manzil_006.jpg
+          FILES
+          sha256sum "$WORKSPACE"/uploads/*.jpg > validation-output/reference-image-sha256.txt
+          python - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path("validation-output/reference-images")
+          rows = []
+          for path in sorted(root.glob("*.jpg")):
+              data = path.read_bytes()
+              rows.append({"file": path.name, "bytes": len(data),
+                           "sha256": hashlib.sha256(data).hexdigest()})
+          pathlib.Path("validation-output/reference-images-manifest.json").write_text(
+              json.dumps(rows, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(rows, indent=2))
+          PY
+
+      - name: Install COLMAP external reconstruction tool
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes colmap
+          command -v colmap
+          colmap -h > validation-output/logs/colmap-help.txt 2>&1 || true
+          colmap -h 2>&1 | head -40
+
+      - name: Validate analyzer syntax and run local quality-policy tests
+        run: |
+          python -m py_compile validation/analyze-real-glb.py
+          npm run test:colmap-worker
+          npm run test:glb-geometry-qa
+
+      - name: Run first-pass COLMAP reconstruction from real source photos
+        id: first
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          npm run build:building-from-media -- "$WORKSPACE" validation/ahsan-manzil-building-spec.json ahsan-unscaled \
+            --source "ahsan003=uploads/Ahsan_Manzil_003.jpg" \
+            --source "ahsan004=uploads/Ahsan_Manzil_004.jpg" \
+            --source "ahsan005=uploads/Ahsan_Manzil_005.jpg" \
+            --source "ahsan006=uploads/Ahsan_Manzil_006.jpg" \
+            --licence "ahsan003=CC BY-SA 3.0" \
+            --licence "ahsan004=CC BY-SA 3.0" \
+            --licence "ahsan005=CC BY-SA 3.0" \
+            --licence "ahsan006=CC BY-SA 3.0" \
+            --author "ahsan003=Ranadipam Basu" \
+            --author "ahsan004=Ranadipam Basu" \
+            --author "ahsan005=Ranadipam Basu" \
+            --author "ahsan006=Ranadipam Basu" \
+            --attribution "ahsan003=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan004=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan005=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan006=Ranadipam Basu, CC BY-SA 3.0" \
+            --source-url "ahsan003=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg" \
+            --source-url "ahsan004=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg" \
+            --source-url "ahsan005=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg" \
+            --source-url "ahsan006=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg" \
+            --kind "ahsan003=image" --kind "ahsan004=image" \
+            --kind "ahsan005=image" --kind "ahsan006=image" \
+            --confirm-rights --strategy photogrammetry \
+            --views "ahsan003,ahsan004,ahsan005,ahsan006" \
+            --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
+            --quality LOW --colmap-path colmap --reconstruction-timeout-ms 2400000 \
+            2>&1 | tee validation-output/logs/first-pass.log
+
+      - name: Inspect unscaled candidate and create orthographic previews
+        id: measure
+        if: steps.first.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          MODEL="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-unscaled-workflow/model.glb"
+          REPORT="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-unscaled-workflow/workflow-report.json"
+          test -s "$MODEL"
+          mkdir -p validation-output/unscaled
+          cp "$MODEL" validation-output/unscaled/model.glb
+          cp "$REPORT" validation-output/unscaled/workflow-report.json
+          python - <<'PY'
+          import json, pathlib, shutil
+          root = pathlib.Path(pathlib.Path("validation-output/workspace-path.txt").read_text().strip())
+          report_path = root / ".building-engine/jobs/ahsan-manzil-live-cv/ahsan-unscaled-workflow/workflow-report.json"
+          report = json.loads(report_path.read_text())
+          worker_path = report.get("output", {}).get("reportPath")
+          if worker_path:
+              source = root / worker_path
+              if source.is_file():
+                  shutil.copy2(source, "validation-output/unscaled/colmap-worker-report.json")
+          PY
+          python validation/analyze-real-glb.py --mode measure \
+            --glb validation-output/unscaled/model.glb \
+            --output validation-output/unscaled/measurements.json \
+            --render-dir validation-output/unscaled/previews
+
+      - name: Run second-pass reconstruction with length-based scale calibration
+        id: scaled
+        if: steps.measure.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          RAW_LONG="$(python -c 'import json; print(format(json.load(open("validation-output/unscaled/measurements.json"))["longAxisModelUnits"], ".12g"))')"
+          python - "$RAW_LONG" <<'PY'
+          import sys
+          value = float(sys.argv[1])
+          if not (value > 0 and value < 1e9):
+              raise SystemExit("unscaled long-axis extent is invalid: " + repr(value))
+          print("Unscaled longest horizontal principal extent:", value, "model units")
+          PY
+          npm run build:building-from-media -- "$WORKSPACE" validation/ahsan-manzil-building-spec.json ahsan-scaled \
+            --source "ahsan003=uploads/Ahsan_Manzil_003.jpg" \
+            --source "ahsan004=uploads/Ahsan_Manzil_004.jpg" \
+            --source "ahsan005=uploads/Ahsan_Manzil_005.jpg" \
+            --source "ahsan006=uploads/Ahsan_Manzil_006.jpg" \
+            --licence "ahsan003=CC BY-SA 3.0" \
+            --licence "ahsan004=CC BY-SA 3.0" \
+            --licence "ahsan005=CC BY-SA 3.0" \
+            --licence "ahsan006=CC BY-SA 3.0" \
+            --author "ahsan003=Ranadipam Basu" \
+            --author "ahsan004=Ranadipam Basu" \
+            --author "ahsan005=Ranadipam Basu" \
+            --author "ahsan006=Ranadipam Basu" \
+            --attribution "ahsan003=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan004=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan005=Ranadipam Basu, CC BY-SA 3.0" \
+            --attribution "ahsan006=Ranadipam Basu, CC BY-SA 3.0" \
+            --source-url "ahsan003=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_003.jpg" \
+            --source-url "ahsan004=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_004.jpg" \
+            --source-url "ahsan005=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_005.jpg" \
+            --source-url "ahsan006=https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_006.jpg" \
+            --kind "ahsan003=image" --kind "ahsan004=image" \
+            --kind "ahsan005=image" --kind "ahsan006=image" \
+            --confirm-rights --strategy photogrammetry \
+            --views "ahsan003,ahsan004,ahsan005,ahsan006" \
+            --up-axis Y --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed \
+            --quality LOW --colmap-path colmap --reconstruction-timeout-ms 2400000 \
+            --model-distance "$RAW_LONG" --real-distance-m 125.4 \
+            2>&1 | tee validation-output/logs/scaled-pass.log
+
+      - name: Compare dimensions and create calibrated orthographic previews
+        id: compare
+        if: steps.scaled.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          WORKSPACE="$(cat validation-output/workspace-path.txt)"
+          MODEL="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/model.glb"
+          REPORT="$WORKSPACE/.building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/workflow-report.json"
+          test -s "$MODEL"
+          mkdir -p validation-output/calibrated
+          cp "$MODEL" validation-output/calibrated/model.glb
+          cp "$REPORT" validation-output/calibrated/workflow-report.json
+          python - <<'PY'
+          import json, pathlib, shutil
+          root = pathlib.Path(pathlib.Path("validation-output/workspace-path.txt").read_text().strip())
+          report_path = root / ".building-engine/jobs/ahsan-manzil-live-cv/ahsan-scaled-workflow/workflow-report.json"
+          report = json.loads(report_path.read_text())
+          worker_path = report.get("output", {}).get("reportPath")
+          if worker_path:
+              source = root / worker_path
+              if source.is_file():
+                  shutil.copy2(source, "validation-output/calibrated/colmap-worker-report.json")
+          PY
+          python validation/analyze-real-glb.py --mode compare \
+            --glb validation-output/calibrated/model.glb \
+            --output validation-output/dimension-comparison.json \
+            --render-dir validation-output/calibrated/previews \
+            --reference-length-m 125.4 --reference-depth-m 28.75 --reference-height-m 27.13 \
+            --depth-tolerance-percent 20 --height-tolerance-percent 20
+
+      - name: Summarize real-media validation result
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f validation-output/dimension-comparison.json ]; then
+            python - <<'PY'
+          import json, pathlib
+          data = json.loads(pathlib.Path("validation-output/dimension-comparison.json").read_text())
+          result = data.get("dimensionComparison", {})
+          print("DIMENSION GATE:", result.get("dimensionGate", "unknown"))
+          print(json.dumps(result, indent=2))
+          if result.get("dimensionGate") != "pass":
+              print("::warning title=Real media validation::Depth/vertical dimensions are outside the exploratory tolerance or the comparison report is incomplete.")
+          else:
+              print("::notice title=Real media validation::Independent depth and vertical checks are within exploratory tolerance; visual review and WGS84 registration remain required.")
+          PY
+          elif [ -f validation-output/unscaled/measurements.json ]; then
+            echo "::warning title=Real media validation::First-pass real-media candidate exists, but calibrated run/comparison did not complete. Check logs/reports."
+          else
+            echo "::error title=Real media validation::No reconstruction GLB was produced. Check the first-pass log and workflow reports."
+          fi
+
+      - name: Upload source photos, models and validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-real-media-validation
+          path: validation-output/
+          if-no-files-found: warn
+          retention-days: 7
