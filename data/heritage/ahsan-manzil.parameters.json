@@ -260,28 +260,32 @@
         "source": "Supplied brief"
       },
       "gfOpeningWidth": {
-        "value": 1.2,
+        "value": 1.65,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Supplied brief"
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Widened from the early placeholder to improve the arched opening-to-pier proportion; confirm from a rectified facade."
       },
       "gfOpeningCrownHeight": {
-        "value": 3.2,
-        "unit": "m",
-        "confidence": "[E]",
-        "source": "Supplied brief"
-      },
-      "ffOpeningWidth": {
-        "value": 1.3,
-        "unit": "m",
-        "confidence": "[E]",
-        "source": "Supplied brief"
-      },
-      "ffOpeningCrownHeight": {
         "value": 3.8,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Supplied brief"
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Raised the ground-floor arch crown to reduce excessive blank spandrel wall; estimate pending rectified elevation."
+      },
+      "ffOpeningWidth": {
+        "value": 1.85,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Widened from the early placeholder to give the upper-storey arched openings a more monumental proportion; confirm from a rectified facade."
+      },
+      "ffOpeningCrownHeight": {
+        "value": 4.7,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Raised the first-floor arch crown to reduce the oversized blank band below the roofline; estimate pending rectified elevation."
       },
       "verandaArchSpan": {
         "value": 3.3,

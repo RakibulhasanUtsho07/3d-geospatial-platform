@@ -75,9 +75,15 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Upper veranda balustrades"));
   assert.ok(builder.includes("const andarRoofTop=andarFf.base+andarFf.height+DIM.slab;"));
   assert.ok(builder.includes("Align decorative rings with the actual lotus-bud profile samples"));
+  assert.ok(builder.includes("A restrained central keystone"), "LOD3 adds arch keystones and impost blocks");
+  assert.ok(builder.includes("Dome meridian ribs"), "LOD3 adds deterministic profile-following dome ribs");
   assert.ok(builder.includes("north/rear veranda is split"));
   const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
   assert.equal(config.parameters.facade.pedimentPeakHeightAboveGround.value, 15.2);
+  assert.equal(config.parameters.facade.gfOpeningWidth.value, 1.65);
+  assert.equal(config.parameters.facade.gfOpeningCrownHeight.value, 3.8);
+  assert.equal(config.parameters.facade.ffOpeningWidth.value, 1.85);
+  assert.equal(config.parameters.facade.ffOpeningCrownHeight.value, 4.7);
   assert.equal(config.parameters.footprint.rangmahalBlockLength.value, 55.8);
   assert.equal(config.parameters.footprint.andarmahalBlockLength.value, 69.6);
   assert.equal(config.parameters.footprint.exteriorBayCount.value, 15);

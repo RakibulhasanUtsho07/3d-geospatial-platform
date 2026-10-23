@@ -202,6 +202,12 @@ function buildGlb(lod) {
       box(node,cx-radius-.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       box(node,cx+radius+.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       archBand(node,cx,spring,trimZ,radius+.02,.085,"trim",detail===2?16:10);
+      if(detail===2){
+        // A restrained central keystone and impost blocks make the arch mouldings read as masonry rather than flat trim.
+        box(node,cx,spring+radius-.015,trimZ+side*.045,Math.max(.16,width*.11),.28,.16,"trim");
+        box(node,cx-radius,spring,trimZ+side*.045,.16,.18,.16,"trim");
+        box(node,cx+radius,spring,trimZ+side*.045,.16,.18,.16,"trim");
+      }
     }
     // Door glazing is modelled on the wooden leaf below, inside the reveal.
     if (isDoor && detail >= 1) {
@@ -1054,6 +1060,18 @@ function buildGlb(lod) {
       horizontalRing(n.Dome,domeX,0,drumTop+ringHeight,ringRadius,.13,"sceneTrim",48);
     }
     horizontalRing(n.Dome,domeX,0,drumTop+.08,domeRadius,.14,"sceneTrim",48);
+    // Dome meridian ribs follow each sampled profile segment; this adds a subtle, repeatable fluted rhythm without replacing the measured silhouette.
+    const meridianRibCount = 16;
+    for(let rib=0;rib<meridianRibCount;rib++){
+      const angle=2*Math.PI*rib/meridianRibCount;
+      for(let j=0;j<domeProfile.length-1;j++){
+        const [r0,h0]=domeProfile[j], [r1,h1]=domeProfile[j+1];
+        const offset=.045;
+        const p0=[domeX+(r0+offset)*Math.cos(angle),drumTop+h0,(r0+offset)*Math.sin(angle)];
+        const p1=[domeX+(r1+offset)*Math.cos(angle),drumTop+h1,(r1+offset)*Math.sin(angle)];
+        barBetween(n.Dome,p0,p1,.055,"sceneTrim");
+      }
+    }
   }
   const finialBase=DIM.peak-DIM.finialHeight;
   verticalCylinder(n.Finial,domeX,finialBase,finialBase+.9,0,.12,"trim",12);

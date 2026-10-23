@@ -133,7 +133,8 @@ jobs:
               "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
               "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
               "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
-              "profile-aligned dome mouldings, improved review contrast, and stylized column capitals"
+              "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
+              "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses"
             ],
             model: {
               filename: "ahsan-manzil-lod3.glb",
@@ -162,6 +163,9 @@ jobs:
                 "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
                 "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
                 "Review lighting was raised and moved closer because the first contact sheet under-lit facade and roof detail.",
+                "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
+                "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
+                "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
                 "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
               ],
               residualRisks: [
