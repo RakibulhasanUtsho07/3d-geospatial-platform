@@ -4,11 +4,16 @@ import test from "node:test";
 
 const sources = JSON.parse(await readFile(new URL("../data/heritage/ahsan-manzil-reference-sources.json", import.meta.url), "utf8"));
 
-const visualReview = JSON.parse(await readFile(new URL("../data/heritage/ahsan-manzil-visual-review.json", import.meta.url), "utf8"));
+const visualReview = JSON.parse(await readFile(new URL("../data/heritage/ahsan-manzil-visual-review-p1-3-baseline.json", import.meta.url), "utf8"));
 
 test("records the two inspected source/render disagreements and specific correction requests", () => {
   assert.equal(visualReview.schemaVersion, "1.0.0");
+  assert.equal(visualReview.reviewStage, "P1.3-baseline");
   assert.equal(visualReview.buildingId, sources.buildingId);
+  assert.match(visualReview.provenance.modelSha256, /^[a-f0-9]{64}$/);
+  assert.match(visualReview.provenance.renderManifestSha256, /^[a-f0-9]{64}$/);
+  assert.match(visualReview.provenance.renderConfigSha256, /^[a-f0-9]{64}$/);
+  assert.equal(visualReview.provenance.renderImageSha256s.front, "3a25ef2ad036d674b4d9ae2e76f54528add61b871c68cf101d0d292a6478b196");
   assert.equal(visualReview.overallStatus, "needs-model-or-reference-correction");
   assert.equal(visualReview.publicationEligible, false);
   assert.equal(visualReview.humanAcceptance.status, "pending");

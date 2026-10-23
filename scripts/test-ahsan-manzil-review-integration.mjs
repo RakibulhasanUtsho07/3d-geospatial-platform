@@ -12,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MODEL_PATH = path.join(ROOT, "public", "models", "ahsan-manzil-lod3.glb");
 const PARAMETERS_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil.parameters.json");
 const SOURCES_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil-reference-sources.json");
-const VISUAL_REVIEW_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil-visual-review.json");
+const VISUAL_REVIEW_PATH = path.join(ROOT, "data", "heritage", "ahsan-manzil-visual-review-p1-3-baseline.json");
 const OUT_ROOT = path.resolve(process.env.AHSAN_MANZIL_REVIEW_OUTPUT || path.join(ROOT, "artifacts", "ahsan-manzil-review"));
 const PROFILE = "ahsan-manzil-y-up-cycles-cpu-v1";
 const BLENDER_BIN = (process.env.BLENDER_BIN || "blender").trim();
@@ -82,8 +82,11 @@ async function main() {
   const visualReview = JSON.parse(await readFile(VISUAL_REVIEW_PATH, "utf8"));
   assert.equal(parameters.id, sourceManifest.buildingId);
   assert.equal(visualReview.schemaVersion, "1.0.0");
+  assert.equal(visualReview.reviewStage, "P1.3-baseline");
   assert.equal(visualReview.buildingId, sourceManifest.buildingId);
   assert.equal(visualReview.overallStatus, "needs-model-or-reference-correction");
+  assert.match(visualReview.provenance.modelSha256, /^[a-f0-9]{64}$/);
+  assert.match(visualReview.provenance.renderManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(visualReview.publicationEligible, false);
   assert.equal(visualReview.humanAcceptance.status, "pending");
   assert.match(visualReview.reviewer, /AI-assisted visual triage/);
@@ -111,6 +114,8 @@ async function main() {
   }
 
   const modelBytes = await readFile(MODEL_PATH);
+  assert.notEqual(sha256(modelBytes), visualReview.provenance.modelSha256,
+    "P1.4 must render a new candidate instead of reusing the P1.3 baseline model");
   assert.equal(modelBytes.readUInt32LE(0), 0x46546c67, "LOD3 must be a GLB");
   assert.equal(modelBytes.readUInt32LE(4), 2, "LOD3 must be GLB 2.0");
   assert.equal(modelBytes.readUInt32LE(8), modelBytes.length, "LOD3 declared GLB size must match");
@@ -132,7 +137,7 @@ async function main() {
   await copyFile(MODEL_PATH, path.join(modelDir, "ahsan-manzil-lod3.glb"));
   await copyFile(PARAMETERS_PATH, path.join(parametersDir, "ahsan-manzil.parameters.json"));
   await copyFile(SOURCES_PATH, path.join(OUT_ROOT, "reference-sources.json"));
-  await copyFile(VISUAL_REVIEW_PATH, path.join(OUT_ROOT, "visual-review.json"));
+  await copyFile(VISUAL_REVIEW_PATH, path.join(OUT_ROOT, "baseline-visual-review.json"));
 
   const downloaded = {};
   for (const reference of sourceManifest.references) {
@@ -166,6 +171,22 @@ async function main() {
     "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
     "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",
   ]);
+  assert.equal(renderManifest.renderSettings.frontViewFraming,
+    "rangmahal-semantic-bounds-for-front-and-turntable-315;whole-palace-for-other-views");
+  const renderedFront = renderManifest.views.find((view) => view.id === "front");
+  const renderedSoutheast = renderManifest.views.find((view) => view.id === "turntable-315");
+  const renderedTop = renderManifest.views.find((view) => view.id === "top");
+  assert.ok(Math.abs(renderedFront.cameraPose.targetWorld[0] - 34.8) < 1,
+    "front comparison must centre on the provisional Rangmahal/dome axis");
+  assert.ok(renderedFront.cameraPose.orthographicScale < 85,
+    "front comparison must frame the public wing rather than the full footprint");
+  assert.ok(Math.abs(renderedSoutheast.cameraPose.targetWorld[0] - 34.8) < 1,
+    "southeast reference comparison must focus the dome-bearing Rangmahal");
+  assert.ok(renderedSoutheast.cameraPose.orthographicScale < 100 &&
+    renderedSoutheast.cameraPose.orthographicScale > renderedFront.cameraPose.orthographicScale,
+    "southeast view must retain extra margin for diagonal projection");
+  assert.ok(renderedTop.cameraPose.orthographicScale > 150,
+    "whole-palace top-down view must retain the full footprint");
   // Camera framing must use the named palace nodes, not the 440 m site-context bounds.
   assert.ok(renderManifest.sceneBounds.dimensions[0] < 150, "palace length bounds must exclude large site-context objects");
   assert.ok(renderManifest.sceneBounds.dimensions[1] < 70, "palace depth bounds must exclude site/context extents");
@@ -215,16 +236,11 @@ async function main() {
       facadeLabel: reference.facadeLabel,
       captureHeadingBasis: reference.captureHeadingBasis,
     })),
-    reviewer: visualReview.reviewer,
-    comparisons: visualReview.comparisons.map((assessment) => ({
-      viewId: assessment.viewId,
-      referenceImageId: assessment.referenceImageId,
-      comparisonBasis: assessment.comparisonBasis,
-      outcome: assessment.outcome,
-      reviewer: visualReview.reviewer,
-      reviewedAt: visualReview.reviewedAt,
-      notes: assessment.notes,
-      correctionRequest: assessment.correctionRequest,
+    comparisons: sourceManifest.references.map((reference) => ({
+      viewId: reference.mappedRenderViewId,
+      referenceImageId: reference.id,
+      comparisonBasis: reference.comparisonBasis,
+      outcome: "pending",
     })),
   };
   await writeFile(reviewInputPath, JSON.stringify(reviewInput, null, 2) + "\n", { flag: "wx", mode: 0o600 });
@@ -241,16 +257,11 @@ async function main() {
   assert.equal(reviewReport.provenance.renderManifestSha256, sha256(renderManifestBytes));
   assert.equal(reviewReport.counts.referenceImageCount, 2);
   assert.equal(reviewReport.counts.comparisonCount, 2);
-  assert.equal(reviewReport.reviewStatus, "needs-model-or-reference-correction");
-  assert.equal(reviewReport.counts.mismatch, visualReview.comparisons.length);
-  assert.equal(reviewReport.counts.pending, 0);
+  assert.equal(reviewReport.reviewStatus, "pending-human-review");
+  assert.equal(reviewReport.counts.mismatch, 0);
+  assert.equal(reviewReport.counts.pending, 2, "new images require a fresh side-by-side review");
   assert.equal(reviewReport.counts.viewsWithoutComparisons, REQUIRED_REVIEW_VIEWS.length - 2);
-  assert.ok(reviewReport.comparisons.every((comparison) =>
-    comparison.outcome === "mismatch" &&
-    comparison.reviewer === visualReview.reviewer &&
-    comparison.notes.length > 0 &&
-    comparison.correctionRequest.length > 0
-  ));
+  assert.ok(reviewReport.comparisons.every((comparison) => comparison.outcome === "pending"));
   assert.equal(reviewReport.publicationEligible, false);
 
   const attributions = [
@@ -274,7 +285,9 @@ async function main() {
     ]),
     "## Review status",
     "",
-    "Outcome: NEEDS MODEL OR REFERENCE CORRECTION. Both source/render comparisons are recorded as mismatches in the separate visual-review file and in the generated hash-linked report. The reviewer is explicitly identified as AI-assisted visual triage; independent human sign-off remains pending. Camera poses are estimated, not calibrated, and publication eligibility remains false.",
+    "P1.3 baseline outcome: NEEDS MODEL OR REFERENCE CORRECTION. Those observations belong to the previous model hash recorded in baseline-visual-review.json; do not apply them automatically to this P1.4 candidate.",
+    "",
+    "Current P1.4 candidate: PENDING HUMAN REVIEW. The new hash-linked report starts with two pending comparison outcomes until the revised images are inspected. Camera poses remain estimated and publication eligibility remains false.",
     "",
     "## Recorded findings",
     "",
@@ -298,33 +311,37 @@ async function main() {
   await writeFile(path.join(OUT_ROOT, "VISUAL-REVIEW-FINDINGS.md"), [
     "# Ahsan Manzil visual review findings",
     "",
-    "- Reviewer: " + visualReview.reviewer,
-    "- Reviewed at: " + visualReview.reviewedAt,
-    "- Outcome: " + visualReview.overallStatus,
-    "- Human sign-off: pending",
+    "- Candidate: P1.4 geometry/render correction",
+    "- Current report status: " + reviewReport.reviewStatus,
+    "- Current pending comparisons: " + reviewReport.counts.pending,
+    "- Independent human sign-off: pending",
     "- Publication eligible: no",
+    "- Current model SHA-256: " + renderManifest.modelSha256,
+    "- Current render-manifest SHA-256: " + sha256(renderManifestBytes),
+    "",
+    "## P1.3 baseline findings",
     "",
     ...visualReview.comparisons.flatMap((assessment) => [
-      "## " + assessment.referenceImageId + " -> " + assessment.viewId + ": " + assessment.outcome.toUpperCase(),
+      "### " + assessment.referenceImageId + " -> " + assessment.viewId + ": " + assessment.outcome.toUpperCase(),
       "",
-      "**Observation:** " + assessment.notes,
+      "**Previous observation:** " + assessment.notes,
       "",
-      "**Requested correction:** " + assessment.correctionRequest,
+      "**Previous correction request:** " + assessment.correctionRequest,
       "",
     ]),
+    "## P1.4 current candidate",
+    "",
+    "The front and southeast-oblique views have been reframed to the dome-bearing Rangmahal. The roof finish is separated from the upper-floor slab to remove overlapping top surfaces. Current comparison outcomes intentionally remain pending until this candidate's newly hashed images are inspected.",
+    "",
     "## Unassessed views",
     "",
-    ...visualReview.unassessedViews.map((id) => "- " + id),
-    "",
-    "## Limitations",
-    "",
-    ...visualReview.limitations.map((item) => "- " + item),
+    ...REQUIRED_REVIEW_VIEWS.filter((id) => !reviewInput.comparisons.some((item) => item.viewId === id)).map((id) => "- " + id),
     "",
   ].join("\n"), { flag: "wx", mode: 0o600 });
   await writeFile(path.join(OUT_ROOT, "downloaded-reference-hashes.json"), JSON.stringify(downloaded, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 
   console.log(JSON.stringify({
-    status: "ahsan-manzil-visual-review-recorded-needs-correction",
+    status: "ahsan-manzil-p1-4-candidate-rendered-pending-human-review",
     renderProfile: PROFILE,
     modelSha256: renderManifest.modelSha256,
     renderConfigSha256: renderManifest.renderConfigSha256,
@@ -333,9 +350,10 @@ async function main() {
     referencesPinnedAndHashed: sourceManifest.references.length,
     referenceReviewReportSha256: sha256(await readFile(reviewReportPath)),
     comparisonStatus: reviewReport.reviewStatus,
-    mismatchesRecorded: reviewReport.counts.mismatch,
+    baselineMismatches: visualReview.comparisons.length,
+    currentCandidateMismatches: reviewReport.counts.mismatch,
     pendingHumanComparisons: reviewReport.counts.pending,
-    independentHumanSignoff: visualReview.humanAcceptance.status,
+    independentHumanSignoff: "pending",
     unmatchedRenderViews: reviewReport.counts.viewsWithoutComparisons,
     publicationEligible: false,
     output: OUT_ROOT,

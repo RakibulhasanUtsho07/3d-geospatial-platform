@@ -74,6 +74,9 @@ function fixture(overrides = {}) {
         excludedRenderObjects: [],
         cameraDistanceMultiplier: 3,
         cameraOrthoScaleMultiplier: 1.45,
+        frontViewFraming: "whole-model-bounds",
+        frontCameraOrthoScaleMultiplier: 1.45,
+        referenceObliqueOrthoScaleMultiplier: 1.45,
         turntableElevationDegrees: 22,
         worldBackgroundRgba: [0.38,0.4,0.43,1],
         worldBackgroundStrength: 0.7,
@@ -110,6 +113,8 @@ test("validates the Ahsan Manzil Y-up profile with south-front and overhead came
   const data = fixture();
   data.rawManifest.renderProfile = "ahsan-manzil-y-up-cycles-cpu-v1";
   data.rawManifest.renderSettings.cameraCoordinateConvention = "blender-z-up;source-glTF-y-up-imported;source+Z-south=>world-Y-negative;front-camera-from-world-Y-negative";
+  data.rawManifest.renderSettings.frontViewFraming = "rangmahal-semantic-bounds-for-front-and-turntable-315;whole-palace-for-other-views";
+  data.rawManifest.renderSettings.frontCameraOrthoScaleMultiplier = 1.12;
   data.rawManifest.renderSettings.excludedRenderObjects = [
     "Site_Approach", "Site_Context_Blocks", "Site_Family_Mosque",
     "Site_Pond", "Site_River", "Site_Stable", "Site_Trees",

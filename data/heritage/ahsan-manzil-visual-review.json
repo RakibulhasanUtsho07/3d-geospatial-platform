@@ -45,5 +45,20 @@
     "Source camera heading/lens metadata is incomplete; view pairing is estimated.",
     "No pixel similarity score, survey measurements, certified scale, or georeference residual is inferred.",
     "Review outcomes describe visible disagreement, not proof of every hidden facade detail."
-  ]
+  ],
+  "reviewStage": "P1.3-baseline",
+  "provenance": {
+    "modelSha256": "220612219c008a46e3a2da18c3fe4100be85cb8df64a2a897abda3b192368f1f",
+    "renderManifestSha256": "7a7a4bb4958d13299aa19538fddd112fe1c7132ee795bcfb88ac7708b3191a34",
+    "renderConfigSha256": "e22fe46083f7deab36ad3105c4a68cf6f2ea96818dda65aa46419a4721cf3242",
+    "referenceImageSha256s": {
+      "ahsan-manzil-front-mahosha-2012": "71215d112b4651862eb8816e06ebee1d1e451b4866b926c989dc4c91274da625",
+      "ahsan-manzil-east-side-parvezahmed-2019": "e8d2076274c078aa6bef7de9c1ff968135a55dd5df8c60dca1b1636764ccbe77"
+    },
+    "renderImageSha256s": {
+      "front": "3a25ef2ad036d674b4d9ae2e76f54528add61b871c68cf101d0d292a6478b196",
+      "turntable-315": "ffaf0bebdd2658d14e1ec062ade7867ea24b54516c910f33f0d5d7f07de68555"
+    },
+    "sourceRun": "CI #940; artifact rendered before the P1.4 geometry/framing fix"
+  }
 }

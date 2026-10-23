@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1.0.0",
+  "buildingId": "ahsan-manzil-kumartuli-dhaka",
+  "reviewer": "AI-assisted visual triage (ChatGPT); independent human sign-off pending",
+  "reviewedAt": "2026-10-23T07:55:00Z",
+  "reviewMethod": "Qualitative side-by-side visual inspection of the pinned source photographs and SHA-256-linked fixed-camera render PNGs. This is not a calibrated photogrammetry, measured-elevation, or pixel-similarity assessment.",
+  "overallStatus": "needs-model-or-reference-correction",
+  "publicationEligible": false,
+  "comparisons": [
+    {
+      "referenceImageId": "ahsan-manzil-front-mahosha-2012",
+      "viewId": "front",
+      "comparisonBasis": "pose-estimated",
+      "outcome": "mismatch",
+      "notes": "In the pinned straight-on front photograph, the two-storey facade has substantially more vertical presence; the central dome/pavilion and broad ceremonial stair are dominant, with a clear rhythm of arched openings and articulated end pavilions. In the generated front render, the facade reads as a long, low strip; the central dome/pavilion and stair read noticeably undersized relative to the facade, and the repeated facade detail is much less articulated. This is a qualitative shape/detail mismatch; the image headings and lens were not supplied and no dimensions were measured from pixels.",
+      "correctionRequest": "Reconcile the provisional 125.4 m overall extent with the 55.8 m working Rangmahal frontage before changing geometry; inspect whether Andarmahal is being presented as a continuous south-front wall instead of a set-back adjoining mass. Recalibrate the front-elevation width/height relationship, central pavilion and dome, main stair width/projection, opening rhythm and end pavilions against a rectified same-facade image. Every changed parameter must retain a confidence tag and source note; do not relabel estimates as verified."
+    },
+    {
+      "referenceImageId": "ahsan-manzil-east-side-parvezahmed-2019",
+      "viewId": "turntable-315",
+      "comparisonBasis": "pose-estimated",
+      "outcome": "mismatch",
+      "notes": "The southeast-oblique source photograph shows a recognizable long facade meeting a more strongly articulated end pavilion, substantial arches/columns, stair and projecting/arched lower-level elements. The turntable-315 render shows a much simpler block composition with broad, nearly black flat-looking roof surfaces and markedly less facade articulation; the side mass/corner silhouette does not convincingly reproduce the source. This comparison remains pose-estimated because the source lists a camera location but not a calibrated heading or lens, so the exact view angle is not proven.",
+      "correctionRequest": "First verify surface normals, material/light response and roof geometry so the roof is not rendered as a near-black unfeatured plane. Refine the east/end pavilion, visible arch/column rhythm, projecting lower-level arches/stairs and the mass intersection from sources that show those areas. Calibrate camera heading if additional metadata can be recovered; keep unobserved surfaces marked unknown rather than inventing them."
+    }
+  ],
+  "humanAcceptance": {
+    "status": "pending",
+    "note": "These findings are AI-assisted visual triage and are not independent architect/heritage-specialist sign-off. Model fidelity and publication remain blocked until a human reviewer confirms the findings, geometry corrections are rendered again, and the revised side-by-side review is recorded."
+  },
+  "unassessedViews": [
+    "back",
+    "left",
+    "right",
+    "top",
+    "turntable-000",
+    "turntable-045",
+    "turntable-090",
+    "turntable-135",
+    "turntable-180",
+    "turntable-225",
+    "turntable-270"
+  ],
+  "limitations": [
+    "Source camera heading/lens metadata is incomplete; view pairing is estimated.",
+    "No pixel similarity score, survey measurements, certified scale, or georeference residual is inferred.",
+    "Review outcomes describe visible disagreement, not proof of every hidden facade detail."
+  ],
+  "reviewStage": "P1.3-baseline",
+  "provenance": {
+    "modelSha256": "220612219c008a46e3a2da18c3fe4100be85cb8df64a2a897abda3b192368f1f",
+    "renderManifestSha256": "7a7a4bb4958d13299aa19538fddd112fe1c7132ee795bcfb88ac7708b3191a34",
+    "renderConfigSha256": "e22fe46083f7deab36ad3105c4a68cf6f2ea96818dda65aa46419a4721cf3242",
+    "referenceImageSha256s": {
+      "ahsan-manzil-front-mahosha-2012": "71215d112b4651862eb8816e06ebee1d1e451b4866b926c989dc4c91274da625",
+      "ahsan-manzil-east-side-parvezahmed-2019": "e8d2076274c078aa6bef7de9c1ff968135a55dd5df8c60dca1b1636764ccbe77"
+    },
+    "renderImageSha256s": {
+      "front": "3a25ef2ad036d674b4d9ae2e76f54528add61b871c68cf101d0d292a6478b196",
+      "turntable-315": "ffaf0bebdd2658d14e1ec062ade7867ea24b54516c910f33f0d5d7f07de68555"
+    },
+    "sourceRun": "CI #940; artifact rendered before the P1.4 geometry/framing fix"
+  }
+}

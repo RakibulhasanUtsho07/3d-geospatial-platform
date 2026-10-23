@@ -12,14 +12,57 @@ const requiredNodes = [
   "Finial", "Andarmahal",
 ];
 
-async function readGlbNodes(relativePath) {
+async function readGlb(relativePath) {
   const bytes = await readFile(path.join(root, relativePath));
   assert.equal(bytes.readUInt32LE(0), 0x46546c67, relativePath + " GLB magic");
   assert.equal(bytes.readUInt32LE(4), 2, relativePath + " GLB version");
   assert.equal(bytes.readUInt32LE(8), bytes.length, relativePath + " total length");
   const jsonLength = bytes.readUInt32LE(12);
   assert.equal(bytes.readUInt32LE(16), 0x4e4f534a, relativePath + " JSON chunk type");
-  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8"));
+  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const binHeader = 20 + jsonLength;
+  assert.equal(bytes.readUInt32LE(binHeader + 4), 0x004e4942, relativePath + " BIN chunk type");
+  const binLength = bytes.readUInt32LE(binHeader);
+  const binary = bytes.subarray(binHeader + 8, binHeader + 8 + binLength);
+  const readAccessor = (accessorIndex) => {
+    const accessor = gltf.accessors[accessorIndex];
+    const view = gltf.bufferViews[accessor.bufferView];
+    const componentCount = ({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 })[accessor.type];
+    assert.ok(componentCount, relativePath + " supported accessor type");
+    const componentType = accessor.componentType;
+    const componentSize = ({ 5121: 1, 5123: 2, 5125: 4, 5126: 4 })[componentType];
+    assert.ok(componentSize, relativePath + " supported component type");
+    const stride = view.byteStride || componentCount * componentSize;
+    const start = (view.byteOffset || 0) + (accessor.byteOffset || 0);
+    const values = [];
+    for (let row = 0; row < accessor.count; row++) {
+      const tuple = [];
+      for (let column = 0; column < componentCount; column++) {
+        const offset = start + row * stride + column * componentSize;
+        if (componentType === 5121) tuple.push(binary.readUInt8(offset));
+        else if (componentType === 5123) tuple.push(binary.readUInt16LE(offset));
+        else if (componentType === 5125) tuple.push(binary.readUInt32LE(offset));
+        else tuple.push(binary.readFloatLE(offset));
+      }
+      values.push(tuple);
+    }
+    return values;
+  };
+  const readMeshAttributes = (nodeName) => {
+    const node = gltf.nodes.find((item) => item.name === nodeName);
+    assert.ok(node && Number.isSafeInteger(node.mesh), relativePath + " must contain mesh node " + nodeName);
+    const primitive = gltf.meshes[node.mesh].primitives[0];
+    return {
+      positions: readAccessor(primitive.attributes.POSITION),
+      normals: readAccessor(primitive.attributes.NORMAL),
+      colors: readAccessor(primitive.attributes.COLOR_0),
+    };
+  };
+  return { gltf, readMeshAttributes };
+}
+
+async function readGlbNodes(relativePath) {
+  const { gltf } = await readGlb(relativePath);
   return gltf.nodes.map((node) => node.name);
 }
 
@@ -52,10 +95,39 @@ test("LOD1, LOD2 and LOD3 are valid GLBs with all required named nodes", async (
   }
 });
 
+test("Ahsan Manzil roof finish is a visible top-facing vertex-coloured surface above the upper slab", async () => {
+  const relativePath = "public/models/ahsan-manzil-lod3.glb";
+  const { readMeshAttributes } = await readGlb(relativePath);
+  const config = JSON.parse(await readFile(path.join(root, "data/heritage/ahsan-manzil.parameters.json"), "utf8"));
+  const roofTop = config.parameters.vertical.rooflineHeight.value -
+    config.parameters.vertical.parapetHeight.value;
+  const expectedTop = roofTop + 0.08;
+  const roofHex = config.parameters.materials.roof.value;
+  const expectedColor = [1, 3, 5].map((index) => Number.parseInt(roofHex.slice(index, index + 2), 16));
+  const { positions, normals, colors } = await readMeshAttributes("Parapet");
+  let visibleRoofTopVertices = 0;
+  for (let index = 0; index < positions.length; index++) {
+    const normal = normals[index];
+    const color = colors[index];
+    if (Math.abs(positions[index][1] - expectedTop) < 1e-4 &&
+      normal[1] > 0.99 &&
+      color[0] === expectedColor[0] &&
+      color[1] === expectedColor[1] &&
+      color[2] === expectedColor[2] &&
+      color[3] === 255) {
+      visibleRoofTopVertices++;
+    }
+  }
+  assert.ok(visibleRoofTopVertices >= 12,
+    "both palace wings need visible, upward-facing roof-finish vertices above the upper slabs");
+});
+
 test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry", async () => {
   const builder = await readFile(path.join(root, "scripts/build-ahsan-manzil-model.mjs"), "utf8");
   assert.ok(builder.includes("const rangLength = DIM.rangmahalLength;"));
   assert.ok(builder.includes("const split = xMin + andarLength;"));
+  assert.ok(builder.includes("const roofFinishThickness = 0.08;"));
+  assert.ok(builder.includes("const roofFinishCenterY = roofTop + roofFinishThickness / 2;"));
   assert.ok(builder.includes("const domeX = (split + xMax) / 2;"));
   assert.ok(builder.includes("const stairTopZ = half + 2.7;"));
   assert.ok(builder.includes("The projecting triple-arched portico is an open"));

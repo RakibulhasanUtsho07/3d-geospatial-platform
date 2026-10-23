@@ -89,6 +89,15 @@ function validRenderSettings(settings, resolution, renderProfile) {
     settings.cameraProjection !== "ORTHO" ||
     !finite(settings.cameraDistanceMultiplier) || settings.cameraDistanceMultiplier <= 0 ||
     !finite(settings.cameraOrthoScaleMultiplier) || settings.cameraOrthoScaleMultiplier <= 0 ||
+    settings.frontViewFraming !== (
+      renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1"
+        ? "rangmahal-semantic-bounds-for-front-and-turntable-315;whole-palace-for-other-views"
+        : "whole-model-bounds"
+    ) ||
+    settings.frontCameraOrthoScaleMultiplier !== (
+      renderProfile === "ahsan-manzil-y-up-cycles-cpu-v1" ? 1.12 : 1.45
+    ) ||
+    settings.referenceObliqueOrthoScaleMultiplier !== 1.45 ||
     !finite(settings.turntableElevationDegrees) ||
     !finiteVector4(settings.worldBackgroundRgba) ||
     !finite(settings.worldBackgroundStrength) ||

@@ -158,12 +158,36 @@ def main():
             raise RuntimeError("Ahsan Manzil GLB is missing camera-framing nodes: " + ", ".join(sorted(missing_nodes)))
         if len(meshes) != len(heritage_node_names):
             raise RuntimeError("Ahsan Manzil camera-framing nodes are duplicated or ambiguous")
+
+        # The pinned front and southeast-oblique references depict the
+        # dome-bearing Rangmahal, not a full 125.4 m footprint panorama.
+        # Match those two views to Rangmahal semantic bounds; keep whole-palace
+        # framing for the remaining inspection views.
+        reference_view_node_names = {
+            "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+            "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
+        }
+        reference_meshes = [
+            obj for obj in meshes if obj.name.split(".")[0] in reference_view_node_names
+        ]
+        missing_reference_nodes = reference_view_node_names - {
+            obj.name.split(".")[0] for obj in reference_meshes
+        }
+        if missing_reference_nodes:
+            raise RuntimeError(
+                "Ahsan Manzil GLB is missing reference-view nodes: " +
+                ", ".join(sorted(missing_reference_nodes))
+            )
+        if len(reference_meshes) != len(reference_view_node_names):
+            raise RuntimeError("Ahsan Manzil reference-view nodes are duplicated or ambiguous")
     else:
         meshes = all_meshes
+        reference_meshes = meshes
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
-    camera_distance = max_dimension * 3.0
     ortho_scale = max_dimension * 1.45
+    reference_minimum, reference_maximum, reference_dimensions, reference_center = scene_bounds(reference_meshes)
+    reference_max_dimension = max(reference_dimensions)
     scene = bpy.context.scene
     # Headless CI must not depend on a transient EGL/OpenGL context. CPU Cycles
     # gives every fixed camera a real pixel buffer with fixed sampling settings.
@@ -192,12 +216,14 @@ def main():
     ensure_world(scene)
 
     light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
-    light_size = max_dimension * 1.2
+    # More compact area lights create readable highlights on the roof finish
+    # and mouldings instead of washing fine facade detail with broad soft light.
+    light_size = max_dimension * 0.75
     # Blender's glTF importer converts the source Y-up model into Blender's
     # Z-up world before this point, so lights must use Blender-world Z as up.
-    key_offset = Vector((1.4, -1.8, 2.2))
-    fill_offset = Vector((-1.8, -0.3, 1.0))
-    rim_offset = Vector((0.3, 1.7, 1.5))
+    key_offset = Vector((1.0, -1.3, 1.7))
+    fill_offset = Vector((-1.2, -0.25, 1.25))
+    rim_offset = Vector((0.25, 1.1, 1.5))
     key_light = add_area_light("ReviewKeyLight", center + key_offset * max_dimension, center, light_power, light_size)
     fill_light = add_area_light("ReviewFillLight", center + fill_offset * max_dimension, center, light_power * 0.45, light_size * 1.2)
     rim_light = add_area_light("ReviewRimLight", center + rim_offset * max_dimension, center, light_power * 0.65, light_size)
@@ -230,6 +256,15 @@ def main():
         "excludedRenderObjects": excluded_render_object_names,
         "cameraDistanceMultiplier": 3.0,
         "cameraOrthoScaleMultiplier": 1.45,
+        "frontViewFraming": (
+            "rangmahal-semantic-bounds-for-front-and-turntable-315;whole-palace-for-other-views"
+            if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
+            else "whole-model-bounds"
+        ),
+        "frontCameraOrthoScaleMultiplier": (
+            1.12 if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1" else 1.45
+        ),
+        "referenceObliqueOrthoScaleMultiplier": 1.45,
         "turntableElevationDegrees": 22.0,
         "lights": lights,
     }
@@ -271,13 +306,25 @@ def main():
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
+        view_center = center
+        view_max_dimension = max_dimension
+        view_ortho_scale = ortho_scale
+        if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1" and view_id in ("front", "turntable-315"):
+            view_center = reference_center
+            view_max_dimension = reference_max_dimension
+            if view_id == "front":
+                view_ortho_scale = view_max_dimension * 1.12
+            else:
+                # Add margin for diagonal projection of facade depth.
+                view_ortho_scale = view_max_dimension * 1.45
+        view_camera_distance = view_max_dimension * 3.0
         camera_data = bpy.data.cameras.new("ReviewCamera_" + view_id)
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
         camera_data.type = camera_type
-        camera_data.ortho_scale = ortho_scale
-        camera.location = center + direction * camera_distance
-        camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        camera_data.ortho_scale = view_ortho_scale
+        camera.location = view_center + direction * view_camera_distance
+        camera.rotation_euler = (view_center - camera.location).to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
@@ -291,7 +338,7 @@ def main():
             stats = sample_pixel_statistics(result, resolution)
         finally:
             bpy.data.images.remove(result)
-        view_direction = (center - camera.location).normalized()
+        view_direction = (view_center - camera.location).normalized()
         raw_views.append({
             "id": view_id,
             "filename": filename,
@@ -301,7 +348,7 @@ def main():
             "cameraPose": {
                 "projection": camera_data.type,
                 "positionWorld": rounded_vector(camera.location),
-                "targetWorld": rounded_vector(center),
+                "targetWorld": rounded_vector(view_center),
                 "viewDirectionWorld": rounded_vector(view_direction),
                 "rotationEulerRadians": [round(float(value), 8) for value in camera.rotation_euler],
                 "orthographicScale": round(float(camera_data.ortho_scale), 8),
