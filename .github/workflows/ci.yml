@@ -255,7 +255,7 @@ jobs:
           # Ubuntu's Blender package pulls ~190 MB of archives on a cold runner.
           # Keep explicit network timeouts, but allow enough wall time for slower mirrors.
           sudo timeout 180s apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
-          sudo timeout 600s apt-get install --no-install-recommends -y blender python3-numpy libegl1 libgl1 libxkbcommon0 libsm6 libxext6 libxrender1
+          sudo timeout 1200s apt-get install --no-install-recommends -y blender python3-numpy libegl1 libgl1 libxkbcommon0 libsm6 libxext6 libxrender1
           blender --version
           blender --background --python-expr "import numpy; print('Blender NumPy:', numpy.__version__)"
           ldconfig -p | grep -E 'libEGL[.]so[.]1|libGL[.]so[.]1'
