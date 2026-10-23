@@ -69,6 +69,98 @@ def read_accessor(gltf, binary, accessor_index):
     return values
 
 
+
+def write_glb_chunks(raw, new_gltf, new_binary):
+    json_raw = json.dumps(new_gltf, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    json_pad = (4 - len(json_raw) % 4) % 4
+    json_chunk = json_raw + b" " * json_pad
+    chunks = []
+    offset = 12
+    seen_json = seen_bin = False
+    while offset < len(raw):
+        if offset + 8 > len(raw):
+            raise ValueError("truncated GLB chunk header during scale calibration")
+        length, chunk_type = struct.unpack_from("<II", raw, offset)
+        start = offset + 8
+        end = start + length
+        if end > len(raw):
+            raise ValueError("truncated GLB chunk during scale calibration")
+        chunk = raw[start:end]
+        if chunk_type == JSON_CHUNK:
+            if seen_json:
+                raise ValueError("multiple JSON chunks are not supported by the calibration utility")
+            chunk, seen_json = json_chunk, True
+        elif chunk_type == BIN_CHUNK:
+            if seen_bin:
+                raise ValueError("multiple BIN chunks are not supported by the calibration utility")
+            chunk, seen_bin = new_binary, True
+        chunks.append((chunk_type, chunk))
+        offset = end
+    if not seen_json or not seen_bin:
+        raise ValueError("scale calibration requires one JSON and one BIN chunk")
+    body = bytearray()
+    for chunk_type, chunk in chunks:
+        body.extend(struct.pack("<II", len(chunk), chunk_type))
+        body.extend(chunk)
+    total = 12 + len(body)
+    return struct.pack("<III", GLB_MAGIC, 2, total) + bytes(body)
+
+
+def calibrate_glb_to_length(raw, gltf, binary, reference_length_m, long_axis_model_units):
+    if not np.isfinite(reference_length_m) or reference_length_m <= 0:
+        raise ValueError("reference length must be a positive finite value")
+    if not np.isfinite(long_axis_model_units) or long_axis_model_units <= 0:
+        raise ValueError("model long-axis extent must be positive and finite")
+    factor = reference_length_m / long_axis_model_units
+    if not np.isfinite(factor) or factor <= 0 or factor > 1000:
+        raise ValueError("derived scale factor is outside the allowed positive range")
+
+    extras = gltf.setdefault("asset", {}).setdefault("extras", {})
+    previous_scale = extras.get("metresPerModelUnit", 1)
+    if not isinstance(previous_scale, (int, float)) or not np.isfinite(previous_scale) or previous_scale <= 0:
+        previous_scale = 1
+    position_accessors = set()
+    for mesh in gltf.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            attributes = primitive.get("attributes", {})
+            if "POSITION" in attributes:
+                position_accessors.add(attributes["POSITION"])
+    if not position_accessors:
+        raise ValueError("GLB has no POSITION accessors to calibrate")
+
+    new_binary = bytearray(binary)
+    for accessor_index in sorted(position_accessors):
+        accessor = gltf["accessors"][accessor_index]
+        if accessor.get("componentType") != 5126 or accessor.get("type") != "VEC3":
+            raise ValueError("POSITION accessors must be float32 VEC3")
+        view = gltf["bufferViews"][accessor["bufferView"]]
+        start = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        stride = view.get("byteStride", 12)
+        count = accessor["count"]
+        for row in range(count):
+            position = start + row * stride
+            x, y, z = struct.unpack_from("<3f", new_binary, position)
+            scaled = (x * factor, y * factor, z * factor)
+            if not all(np.isfinite(value) for value in scaled):
+                raise ValueError("scaling produced a non-finite vertex")
+            struct.pack_into("<3f", new_binary, position, *scaled)
+        for key in ("min", "max"):
+            if key in accessor:
+                accessor[key] = [float(v * factor) for v in accessor[key]]
+
+    extras["scaleCalibrated"] = True
+    extras["metresPerModelUnit"] = float(previous_scale * factor)
+    extras["scaleCalibration"] = {
+        "method": "operator-supplied-published-overall-length",
+        "referenceLengthM": float(reference_length_m),
+        "modelLongAxisBeforeScale": float(long_axis_model_units),
+        "scaleFactorApplied": float(factor),
+        "lengthAgreementIsIndependent": False,
+        "independentChecks": ["overall depth", "dome peak height"],
+        "warning": "Only the long-axis reference was used for scale calibration. Depth and height remain independent error checks.",
+    }
+    return write_glb_chunks(raw, gltf, bytes(new_binary)), float(factor)
+
 def extract_geometry(gltf, binary):
     positions, uv_values, triangles, texture_id, material_color = [], [], [], None, (190, 190, 190)
     vertex_offset = 0
@@ -217,8 +309,9 @@ def render_orthographic(points, uvs, triangles, texture, fallback_color, output_
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--glb", required=True)
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--mode", choices=["measure", "compare"], default="measure")
+    parser.add_argument("--output", required=True, help="Report output for measure/compare, GLB output for calibrate")
+    parser.add_argument("--report", help="Optional JSON calibration report path (calibrate mode)")
+    parser.add_argument("--mode", choices=["measure", "compare", "calibrate"], default="measure")
     parser.add_argument("--reference-length-m", type=float, default=125.4)
     parser.add_argument("--reference-depth-m", type=float, default=28.75)
     parser.add_argument("--reference-height-m", type=float, default=27.13)
@@ -284,6 +377,32 @@ def main():
                 "Human visual review against the input photographs is still required."
             ]
         }
+    if args.mode == "calibrate":
+        calibrated_glb, factor = calibrate_glb_to_length(
+            raw, gltf, binary, args.reference_length_m, metrics["longAxisModelUnits"]
+        )
+        output_glb = Path(args.output)
+        output_glb.parent.mkdir(parents=True, exist_ok=True)
+        output_glb.write_bytes(calibrated_glb)
+        report["scaleCalibration"] = {
+            "method": "operator-supplied-published-overall-length",
+            "referenceLengthM": args.reference_length_m,
+            "inputLongAxisModelUnits": metrics["longAxisModelUnits"],
+            "scaleFactorApplied": factor,
+            "sameReconstructionReused": True,
+            "lengthAgreementIsIndependent": False,
+            "independentChecks": ["overall depth", "dome peak height"],
+            "outputFile": output_glb.name,
+            "outputBytes": len(calibrated_glb),
+            "outputSha256": hashlib.sha256(calibrated_glb).hexdigest(),
+            "warning": "The calibrated long axis matches the supplied length by construction; this is not independent accuracy evidence."
+        }
+        report_path = Path(args.report) if args.report else Path(str(output_glb) + ".report.json")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps(report, indent=2))
+        return
+
     if args.render_dir:
         output_dir = Path(args.render_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
