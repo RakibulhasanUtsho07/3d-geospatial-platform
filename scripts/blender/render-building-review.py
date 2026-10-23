@@ -215,10 +215,15 @@ def main():
         pass
     ensure_world(scene)
 
-    light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
-    # More compact area lights create readable highlights on the roof finish
-    # and mouldings instead of washing fine facade detail with broad soft light.
-    light_size = max_dimension * 0.75
+    lighting_dimension = (
+        max(dimensions[2], 1.0)
+        if render_profile == "ahsan-manzil-y-up-cycles-cpu-v1"
+        else max_dimension
+    )
+    light_power = max(500.0, min(50000.0, lighting_dimension * lighting_dimension * 180.0))
+    # For this tall but long palace, size and placement follow building height,
+    # not the 125 m horizontal footprint length. This keeps roof/facade relief legible.
+    light_size = lighting_dimension * 0.55
     # Blender's glTF importer converts the source Y-up model into Blender's
     # Z-up world before this point, so lights must use Blender-world Z as up.
     key_offset = Vector((1.0, -1.3, 1.7))
