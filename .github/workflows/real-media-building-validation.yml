@@ -1,9 +1,7 @@
 name: Ahsan Manzil real-media photogrammetry validation
 
 on:
-  push:
-    branches:
-      - validation/ahsan-manzil-real-media
+  workflow_dispatch:
 
 permissions:
   contents: read
