@@ -2317,6 +2317,9 @@ export class CesiumAdapter implements MapEngine {
     } else {
       this.buildingLodRenderer.applyLightweightBuildingStyle(record, Cesium);
     }
+    // Geometry recreation replaces the roof material, so reapply the
+    // selection tint only after the new baseline/preview material is installed.
+    this.buildingSelectionMaterials.applySelectionHighlight(record.entity, Cesium);
     viewer.scene.requestRender();
     return true;
   }
