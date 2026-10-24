@@ -626,6 +626,32 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     "the default Dhaka startup view must return building features instead of staging an empty collection",
   ).not.toBeNull();
   expect(startupShallowObservation.returnedFeatureCount!).toBeGreaterThan(0);
+
+  const expectedStartupBoundsKey = boundsKeyFromUrl(
+    startupShallowObservation.request.url(),
+  );
+  if (!expectedStartupBoundsKey) {
+    throw new Error("The startup viewport request did not include valid geographic bounds.");
+  }
+  await expect.poll(async () => page.evaluate((expectedBoundsKey) => {
+    const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? [];
+    return events.some((event) => {
+      const viewport = event.summary.viewport as Record<string, unknown> | null | undefined;
+      const values = ["west", "south", "east", "north"].map((key) => Number(viewport?.[key]));
+      if (!values.every(Number.isFinite)) return false;
+      const stageBoundsKey = values.map((value) => value.toFixed(6)).join("|");
+      return stageBoundsKey === expectedBoundsKey
+        && typeof event.summary.returnedFeatures === "number"
+        && event.summary.returnedFeatures > 0
+        && typeof event.summary.renderedBuildings === "number"
+        && event.summary.renderedBuildings > 0;
+    });
+  }, expectedStartupBoundsKey), {
+    timeout: 20_000,
+    intervals: [100, 250, 500],
+    message: "the first populated startup viewport must actually commit and render buildings",
+  }).toBe(true);
+
   const shallowViewLocalWindowProbe = {
     viewportHash: startupShallowObservation.viewportHash,
     viewportSpanDegrees: {
