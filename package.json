@@ -158,7 +158,9 @@
     "benchmark:viewport-trend-report": "node scripts/build-viewport-performance-trend.mjs",
     "test:viewport-trend-report": "node --test tests/viewport-performance-trend.test.mjs",
     "benchmark:viewport-baseline-compare": "node scripts/compare-viewport-performance-baseline.mjs",
-    "test:viewport-baseline-compare": "node --test tests/viewport-performance-baseline-comparison.test.mjs"
+    "test:viewport-baseline-compare": "node --test tests/viewport-performance-baseline-comparison.test.mjs",
+    "benchmark:viewport-latency-repeatability": "node scripts/benchmark-viewport-latency-repeatability.mjs",
+    "test:viewport-latency-repeatability": "node --test tests/viewport-latency-repeatability.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
