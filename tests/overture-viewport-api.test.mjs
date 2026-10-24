@@ -158,6 +158,7 @@ test("viewport API returns features from generated spatial tiles", async (contex
   const candidateFeatureCount = Number(response.headers.get("X-Building-Candidate-Feature-Count"));
   const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
   assert.ok(Number.isFinite(candidateBytes) && candidateBytes > 0);
+  assert.notEqual(response.headers.get("X-Building-Index-Read-Bytes"), null, "expected index-read diagnostics even for a warm index cache");
   assert.ok(Number.isFinite(indexReadBytes) && indexReadBytes >= 0, "index-read diagnostics should be present even when the index cache is warm");
   assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes >= 0);
   assert.ok(
