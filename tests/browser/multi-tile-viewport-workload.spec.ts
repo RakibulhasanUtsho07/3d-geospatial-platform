@@ -743,24 +743,32 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     { timeout: 20_000 },
   );
 
-  // Start one fresh request through the normal camera handler, then immediately
-  // issue a second camera intent after that response is held. Avoid animated
-  // zoom/drag gestures in this narrow cancellation window: their delayed
-  // moveEnd events can otherwise supersede the request before it is observed.
-  const requestIntentProbe = await page.evaluate(
-    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null,
+  // Put the camera at a different bounded local focus using the opt-in probe,
+  // which synchronously invokes the real camera handler. This starts exactly one
+  // fresh request without an animated zoom producing competing moveEnd events.
+  const cancellationFocusApplied = await page.evaluate(
+    ({ longitude, latitude, heightMeters }) =>
+      window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+        longitude,
+        latitude,
+        heightMeters,
+      ) ?? false,
+    {
+      longitude: Math.min(180, pilotFocus.longitude + 0.012),
+      latitude: pilotFocus.latitude,
+      heightMeters: 220,
+    },
   );
-  expect(requestIntentProbe, "the opt-in production camera-intent probe must be installed")
-    .not.toBeNull();
-  expect(requestIntentProbe?.cameraBoundsChanged, "the first probe must produce a distinct viewport")
+  expect(cancellationFocusApplied, "the opt-in camera probe must start a deterministic fresh viewport")
     .toBe(true);
-  expect(
-    requestIntentProbe?.lifecycleAfter.loadInProgress &&
-      requestIntentProbe?.lifecycleAfter.hasAbortController,
-    "the first probe must create an active manager-owned viewport fetch",
-  ).toBe(true);
 
   const delayedBrowserRequest = await delayedRequestPromise;
+  const delayedStartObservation = requests.find(
+    (request) => request.request === delayedBrowserRequest,
+  );
+  expect(delayedStartObservation, "the fresh viewport request must be tracked").toBeDefined();
+  expect(delayedStartObservation?.viewportHash).not.toBeNull();
+  expect(delayedStartObservation?.delayedForCancellation).toBe(false);
   await expect.poll(
     () => requests.some((request) =>
       request.request === delayedBrowserRequest && request.delayedForCancellation,
