@@ -46,6 +46,7 @@ on:
       - feat/final-merge-cleanup
       - feat/texture-projection-validation
       - feat/p2-7-viewport-tile-selectivity
+      - feat/p2-8-startup-coverage-alignment
   pull_request:
     branches:
       - main
@@ -72,6 +73,7 @@ on:
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
       - feat/p2-6-multitile-viewport-workload
+      - feat/p2-7-viewport-tile-selectivity
 
 permissions:
   contents: read

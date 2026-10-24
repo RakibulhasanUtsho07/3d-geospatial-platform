@@ -17,6 +17,7 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  getRequestLifecycleDiagnostics?: () => WorkloadRequestLifecycleDiagnostics | null;
   focusViewportForBenchmark?: (
     longitudeDegrees: number,
     latitudeDegrees: number,
@@ -615,6 +616,42 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     "a shallow startup view must query a bounded local height, not the full horizon rectangle",
   ).not.toBeNull();
   expect(startupShallowObservation.viewportHeightDegrees!).toBeLessThan(0.05);
+  expect(
+    startupShallowObservation.selectedTileCount,
+    "the default Dhaka startup view must intersect a populated spatial tile",
+  ).not.toBeNull();
+  expect(startupShallowObservation.selectedTileCount!).toBeGreaterThan(0);
+  expect(
+    startupShallowObservation.returnedFeatureCount,
+    "the default Dhaka startup view must return building features instead of staging an empty collection",
+  ).not.toBeNull();
+  expect(startupShallowObservation.returnedFeatureCount!).toBeGreaterThan(0);
+
+  const expectedStartupBoundsKey = boundsKeyFromUrl(
+    startupShallowObservation.request.url(),
+  );
+  if (!expectedStartupBoundsKey) {
+    throw new Error("The startup viewport request did not include valid geographic bounds.");
+  }
+  await expect.poll(async () => page.evaluate((expectedBoundsKey) => {
+    const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? [];
+    return events.some((event) => {
+      const viewport = event.summary.viewport as Record<string, unknown> | null | undefined;
+      const values = ["west", "south", "east", "north"].map((key) => Number(viewport?.[key]));
+      if (!values.every(Number.isFinite)) return false;
+      const stageBoundsKey = values.map((value) => value.toFixed(6)).join("|");
+      return stageBoundsKey === expectedBoundsKey
+        && typeof event.summary.returnedFeatures === "number"
+        && event.summary.returnedFeatures > 0
+        && typeof event.summary.renderedBuildings === "number"
+        && event.summary.renderedBuildings > 0;
+    });
+  }, expectedStartupBoundsKey), {
+    timeout: 20_000,
+    intervals: [100, 250, 500],
+    message: "the first populated startup viewport must actually commit and render buildings",
+  }).toBe(true);
+
   const shallowViewLocalWindowProbe = {
     viewportHash: startupShallowObservation.viewportHash,
     viewportSpanDegrees: {
@@ -685,6 +722,37 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     focusAltitudeMeters: 200,
   };
 
+  const assertViewportManagerIdle = async () => {
+    await expect.poll(async () => {
+      const lifecycle = await page.evaluate(
+        () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.() ?? null,
+      );
+      const unsettledBrowserRequests = requests.filter(
+        (request) => request.outcome === "in-flight",
+      ).length;
+      return Boolean(
+        lifecycle &&
+        !lifecycle.loadInProgress &&
+        !lifecycle.hasActiveEndpoint &&
+        !lifecycle.hasAbortController &&
+        !lifecycle.hasPendingRequest &&
+        unsettledBrowserRequests === 0 &&
+        routeTasks.size === 0,
+      );
+    }, {
+      timeout: 15_000,
+      intervals: [100, 200, 300],
+      message: "viewport fetch and stage queue should be idle before the cancellation probe",
+    }).toBe(true);
+  };
+
+  // A camera preset can emit a late moveEnd after its first stage. Let that
+  // ordinary work drain before arming the deliberately delayed request, or the
+  // probe may observe an abort from the previous endpoint rather than its own.
+  await assertViewportManagerIdle();
+  await page.waitForTimeout(450);
+  await assertViewportManagerIdle();
+
   const initialStageCount = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
   );
@@ -700,8 +768,35 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     (request) => isViewportRequest(request.url()) && !existingRequestUrls.has(request.url()),
     { timeout: 20_000 },
   );
-  await page.getByRole("button", { name: "Zoom out" }).click();
+
+  // Put the camera at a different bounded local focus using the opt-in probe,
+  // which synchronously invokes the real camera handler. This starts exactly one
+  // fresh request without an animated zoom producing competing moveEnd events.
+  const cancellationFocusApplied = await page.evaluate(
+    ({ longitude, latitude, heightMeters }) =>
+      window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+        longitude,
+        latitude,
+        heightMeters,
+      ) ?? false,
+    {
+      longitude: Math.min(180, pilotFocus.longitude + 0.012),
+      latitude: pilotFocus.latitude,
+      heightMeters: 220,
+    },
+  );
+  expect(cancellationFocusApplied, "the opt-in camera probe must start a deterministic fresh viewport")
+    .toBe(true);
+
   const delayedBrowserRequest = await delayedRequestPromise;
+  await expect.poll(
+    () => requests.some((request) => request.request === delayedBrowserRequest),
+    { timeout: 10_000 },
+  ).toBe(true);
+  const delayedStartObservation = requests.find(
+    (request) => request.request === delayedBrowserRequest,
+  );
+  expect(delayedStartObservation?.viewportHash).not.toBeNull();
   await expect.poll(
     () => requests.some((request) =>
       request.request === delayedBrowserRequest && request.delayedForCancellation,
@@ -709,21 +804,16 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     { timeout: 10_000 },
   ).toBe(true);
 
-  await panCanvas(page, 280, 90);
-  await page.getByRole("button", { name: "Zoom out" }).click();
-
-  // Process the camera's current bounds through the same production handler
-  // attached to Cesium camera.moveEnd. The actual pointer and zoom operations
-  // above move the viewer; this opt-in hook only makes intent notification
-  // deterministic across headless browser timing.
+  // This second synchronous camera intent changes the endpoint while the
+  // browser response is held. The manager should abort precisely that request.
   const intentProbe = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null,
   );
-  expect(intentProbe, "the opt-in production camera-intent probe must be installed")
+  expect(intentProbe, "the opt-in production camera-intent probe must remain installed")
     .not.toBeNull();
   expect(intentProbe?.loadInProgress, "the deliberately delayed viewport must remain in-flight")
     .toBe(true);
-  expect(intentProbe?.cameraBoundsChanged, "the benchmark camera probe must change the viewport bounds")
+  expect(intentProbe?.cameraBoundsChanged, "the second probe must change the viewport bounds")
     .toBe(true);
   expect(
     intentProbe?.intentRevisionAfter,

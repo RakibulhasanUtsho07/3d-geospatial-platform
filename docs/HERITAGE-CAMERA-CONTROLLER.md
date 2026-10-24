@@ -4,7 +4,8 @@ The Ahsan Manzil camera preset and guided-orbit lifecycle now has a dedicated ow
 
 ## Responsibilities
 
-- Initial river-facing camera composition.
+- Initial Dhaka property-discovery camera composition positioned inside the committed Overture building-data bounds.
+- Explicit Ahsan Manzil front/rear/side/whole-footprint/top-down presets and guided orbit.
 - Front, rear, side, whole-footprint and top-down presets.
 - Manual heading orbit controls.
 - Guided 360-degree orbit.
@@ -13,7 +14,7 @@ The Ahsan Manzil camera preset and guided-orbit lifecycle now has a dedicated ow
 
 ## Compatibility and lifecycle
 
-\`CesiumAdapter\` preserves its existing public \`focusAhsanManzil*\`, \`orbitAhsanManzil\`, \`startAhsanManzilOrbitTour\` and \`stopAhsanManzilOrbitTour\` methods as delegates. The initial camera uses the same target, orientation and range constants.
+\`CesiumAdapter\` preserves its existing public \`focusAhsanManzil*\`, \`orbitAhsanManzil\`, \`startAhsanManzilOrbitTour\` and \`stopAhsanManzilOrbitTour\` methods as delegates. The initial camera uses `DEFAULT_DHAKA_MAP_CAMERA` from `src/core/geospatial/default-map-camera.mjs`. The target is checked against `data/overture/dhaka-buildings.geojson.state` so startup requests overlap known building-data coverage. Ahsan Manzil remains an explicit heritage preset; its provisional anchor is south of the current pilot coverage, so it is no longer the automatic first view.
 
 The controller accesses the current Viewer/Cesium module through getters. A stale animation tick cannot continue controlling a replacement viewer. \`destroy()\` clears the stopped callback before cleaning up so React teardown does not schedule a stale state update.
 

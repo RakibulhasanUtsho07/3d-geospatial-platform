@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { DEFAULT_DHAKA_MAP_CAMERA } from "../src/core/geospatial/default-map-camera.mjs";
 
 const root = process.cwd();
 const adapterPath = path.join(root, "src/core/map-engine/cesium-adapter.ts");
@@ -36,4 +37,31 @@ test("HeritageCameraController owns animation/input cleanup and guards stale vie
     "this.getCesium()",
   ]) assert.ok(source.includes(expected), "Missing camera lifecycle guard: " + expected);
   assert.match(source, /if \(wasActive\) callback\?\.\(\)/);
+});
+
+test("default map camera starts inside the committed Dhaka building-data bounds", async () => {
+  const statePath = path.join(root, "data/overture/dhaka-buildings.geojson.state");
+  const state = JSON.parse(await readFile(statePath, "utf8"));
+  const bbox = state.bbox;
+
+  assert.ok(bbox, "the tracked Overture state must declare the coverage bbox");
+  assert.ok(
+    DEFAULT_DHAKA_MAP_CAMERA.longitude >= bbox.xmin &&
+      DEFAULT_DHAKA_MAP_CAMERA.longitude <= bbox.xmax,
+    "default camera longitude must fall within the committed building-data bbox",
+  );
+  assert.ok(
+    DEFAULT_DHAKA_MAP_CAMERA.latitude >= bbox.ymin &&
+      DEFAULT_DHAKA_MAP_CAMERA.latitude <= bbox.ymax,
+    "default camera latitude must fall within the committed building-data bbox",
+  );
+  assert.ok(DEFAULT_DHAKA_MAP_CAMERA.rangeMeters >= 200);
+  assert.ok(DEFAULT_DHAKA_MAP_CAMERA.rangeMeters <= 600);
+  assert.ok(DEFAULT_DHAKA_MAP_CAMERA.pitchDegrees <= -35);
+  assert.ok(DEFAULT_DHAKA_MAP_CAMERA.pitchDegrees >= -70);
+
+  const controller = await readFile(controllerPath, "utf8");
+  assert.match(controller, /DEFAULT_DHAKA_MAP_CAMERA\.longitude/);
+  assert.match(controller, /DEFAULT_DHAKA_MAP_CAMERA\.latitude/);
+  assert.match(controller, /DEFAULT_DHAKA_MAP_CAMERA\.rangeMeters/);
 });
