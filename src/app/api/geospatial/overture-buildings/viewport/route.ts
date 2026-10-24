@@ -804,7 +804,14 @@ async function readSelectedTileFeatures(
         }
 
         const actualBounds = getFeatureBounds(feature);
-        if (!actualBounds || !intersects(actualBounds, record.bounds)) {
+        if (
+          !actualBounds ||
+          Math.abs(actualBounds.west - record.bounds.west) > 1e-9 ||
+          Math.abs(actualBounds.south - record.bounds.south) > 1e-9 ||
+          Math.abs(actualBounds.east - record.bounds.east) > 1e-9 ||
+          Math.abs(actualBounds.north - record.bounds.north) > 1e-9
+        ) {
+          // A stale/mismatched index must never silently narrow geometry bounds.
           return null;
         }
 
