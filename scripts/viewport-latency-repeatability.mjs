@@ -90,6 +90,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     "combinedReadBytes", "combinedReadReductionRatio", "fetchedFeatureCount",
     "geometryFeatureCacheHits", "geometryFeatureCacheMisses", "geometryFeatureCacheEntries",
     "geometryFeatureCacheBytes", "geometryFeatureCacheEvictions", "geometryFeatureCacheOversizedRejections",
+    "geometryFeatureCacheInvalidations",
     "featureLimit", "featureSha256",
   ];
 
@@ -147,6 +148,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         geometryFeatureCacheBytes: report.cold.geometryFeatureCacheBytes,
         geometryFeatureCacheEvictions: report.cold.geometryFeatureCacheEvictions,
         geometryFeatureCacheOversizedRejections: report.cold.geometryFeatureCacheOversizedRejections,
+        geometryFeatureCacheInvalidations: report.cold.geometryFeatureCacheInvalidations,
         candidatePayloadBytes: report.cold.candidatePayloadBytes,
         combinedReadReductionRatio: report.cold.combinedReadReductionRatio,
         selectedTileCount: report.cold.selectedTileCount,
@@ -167,6 +169,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         geometryFeatureCacheByteCounts: warmObservations.map((sample) => sample.geometryFeatureCacheBytes),
         geometryFeatureCacheEvictionCounts: warmObservations.map((sample) => sample.geometryFeatureCacheEvictions),
         geometryFeatureCacheOversizedRejectionCounts: warmObservations.map((sample) => sample.geometryFeatureCacheOversizedRejections),
+        geometryFeatureCacheInvalidationCounts: warmObservations.map((sample) => sample.geometryFeatureCacheInvalidations),
         meanGeometryPayloadReductionRatio: report.warm.meanGeometryPayloadReductionRatio,
         serverTimingMsByPhase: Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
           field,
