@@ -48,6 +48,7 @@ on:
       - feat/p2-7-viewport-tile-selectivity
       - feat/p2-8-startup-coverage-alignment
       - feat/p2-9-startup-tile-fetch-cost
+      - feat/p2-10-viewport-fetch-cost-evidence
   pull_request:
     branches:
       - main
@@ -76,6 +77,7 @@ on:
       - feat/p2-6-multitile-viewport-workload
       - feat/p2-7-viewport-tile-selectivity
       - feat/p2-8-startup-coverage-alignment
+      - feat/p2-9-startup-tile-fetch-cost
 
 permissions:
   contents: read
