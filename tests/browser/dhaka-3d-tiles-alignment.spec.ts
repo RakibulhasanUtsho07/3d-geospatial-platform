@@ -134,7 +134,7 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
         screenshot: failureScreenshot,
         screenshotSha256: sha256(failureScreenshotBytes),
       };
-      await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+      await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
     }
     assert.equal(pageStatus, "ready", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
     assert.equal(review.status, "pass", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
