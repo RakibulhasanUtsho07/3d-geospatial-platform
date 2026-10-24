@@ -552,6 +552,7 @@ jobs:
           npm run test:map-browser
           npm run test:dhaka-3d-tiles-performance
           npm run test:dhaka-3d-tiles-performance-repeatability
+          npm run test:map-dynamic-viewport-workload
 
       - name: Upload P2.3 fixed-camera comparison evidence
         if: always()
@@ -578,5 +579,14 @@ jobs:
         with:
           name: p2-5-dhaka-performance-repeatability
           path: artifacts/p2.5-dhaka-performance-repeatability/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload P2.6 dynamic map workload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-6-dynamic-map-workload
+          path: artifacts/p2.6-dynamic-map-workload/
           if-no-files-found: warn
           retention-days: 14
