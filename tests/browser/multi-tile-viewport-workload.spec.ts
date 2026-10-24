@@ -5,6 +5,14 @@ import { performance } from "node:perf_hooks";
 
 import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 
+type WorkloadRequestLifecycleDiagnostics = {
+  intentRevision: number;
+  loadInProgress: boolean;
+  hasActiveEndpoint: boolean;
+  hasAbortController: boolean;
+  hasPendingRequest: boolean;
+};
+
 type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
@@ -16,6 +24,8 @@ type WorkloadFrameDiagnostics = {
     cameraBoundsChanged: boolean;
     viewportWidthDegrees: number | null;
     viewportHeightDegrees: number | null;
+    lifecycleBefore: WorkloadRequestLifecycleDiagnostics;
+    lifecycleAfter: WorkloadRequestLifecycleDiagnostics;
   } | null;
 };
 
@@ -548,15 +558,44 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   )?.viewportHash;
   expect(delayedViewportHash, "the deliberately delayed request needs a stable viewport hash")
     .not.toBeNull();
-  await expect.poll(async () => {
-    const abortEvents = await page.evaluate(
+  try {
+    await expect.poll(async () => {
+      const abortEvents = await page.evaluate(
+        () => window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ?? [],
+      );
+      return abortEvents.some((event) =>
+        hashBounds(boundsKeyFromUrl(event.url)) === delayedViewportHash,
+      );
+    }, { timeout: CANCEL_RESPONSE_DELAY_MS - 500, intervals: [100, 200, 300] })
+      .toBe(true);
+  } catch (error) {
+    const observedAbortEvents = await page.evaluate(
       () => window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ?? [],
     );
-    return abortEvents.some((event) =>
-      hashBounds(boundsKeyFromUrl(event.url)) === delayedViewportHash,
+    const delayedObservation = requests.find(
+      (request) => request.request === delayedBrowserRequest,
     );
-  }, { timeout: CANCEL_RESPONSE_DELAY_MS - 500, intervals: [100, 200, 300] })
-    .toBe(true);
+    throw new Error(
+      "Delayed viewport AbortSignal was not observed. " +
+      JSON.stringify({
+        intentProbe,
+        delayedViewportHash,
+        abortEventCount: observedAbortEvents.length,
+        abortEventHashes: observedAbortEvents.map((event) => ({
+          atMs: Number(event.atMs.toFixed(2)),
+          viewportHash: hashBounds(boundsKeyFromUrl(event.url)),
+        })),
+        delayedRequest: delayedObservation ? {
+          outcome: delayedObservation.outcome,
+          delayedForCancellation: delayedObservation.delayedForCancellation,
+          routeResponseReady: delayedObservation.routeResponseReady,
+          statusCode: delayedObservation.statusCode,
+          routeError: delayedObservation.routeError,
+        } : null,
+        cause: errorText(error),
+      }),
+    );
+  }
 
   // Repeat camera movement on the live viewer. This exercises tile selection,
   // response-cache turnover and entity staging over distinct viewport bounds.
