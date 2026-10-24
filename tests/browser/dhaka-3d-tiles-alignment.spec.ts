@@ -24,7 +24,18 @@ type BrowserReview = {
   fixture: { fixtureId: string; tilesetSha256: string; glbSha256: string; syntheticFixtureGeometry: boolean };
   runtime: { cesiumVersion: string; browserUserAgent: string };
   baseline: { loaded: boolean; camera: Record<string, number> };
-  tiles: { loaded: boolean; initialTilesLoaded: boolean; loadEventName: string; camera: Record<string, number> };
+  tiles: {
+    loaded: boolean;
+    viewReady: boolean;
+    readinessStrategy: string;
+    runtimeDiagnostics: {
+      tileLoadCount: number;
+      tileVisibleCount: number;
+      tileFailedCount: number;
+      tileFailed: Array<{ url: string | null; message: string }>;
+    };
+    camera: Record<string, number>;
+  };
   cameraAlignment: { status: string; maximumAbsolutePoseDelta: number; deltaByField: Record<string, number>; tolerance: number };
   runtimePlacement: { status: string; reference: string; maximumDistanceMeters: number | null; toleranceMeters: number };
   projectedFootprintAlignment: { status: string; tolerancePixels: number; maximumResidualPixels: number | null; visibleProjectionCount: number; corners: ProjectedCorner[] };
@@ -38,6 +49,9 @@ type CaptureEntry = {
   browserReportSha256: string;
   requestedCamera: Record<string, number>;
   cameraPoseDelta: number;
+  tileLoadCount: number;
+  visibleTileCount: number;
+  tileFailedCount: number;
   runtimePlacementDistanceMeters: number;
   maximumProjectedFootprintResidualPixels: number;
   visibleProjectionCount: number;
@@ -106,8 +120,11 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
     assert.equal(review.view.id, viewId);
     assert.equal(review.baseline.loaded, true, "GeoJSON baseline was not rendered for " + viewId);
     assert.equal(review.tiles.loaded, true, "3D Tiles fixture was not ready for " + viewId);
-    assert.equal(review.tiles.initialTilesLoaded, true, "3D Tiles did not finish an initial visible load for " + viewId);
-    assert.ok(["initialTilesLoaded", "allTilesLoaded"].includes(review.tiles.loadEventName), "A supported Cesium tile-load event must settle before capture.");
+    assert.equal(review.tiles.viewReady, true, "The current camera view did not become render-ready for " + viewId);
+    assert.equal(review.tiles.readinessStrategy, "postRender-tilesLoaded-two-consecutive-frames");
+    assert.ok(review.tiles.runtimeDiagnostics.tileLoadCount > 0, "At least one tile content load must be observed for " + viewId);
+    assert.ok(review.tiles.runtimeDiagnostics.tileVisibleCount > 0, "At least one rendered visible tile must be observed for " + viewId);
+    assert.equal(review.tiles.runtimeDiagnostics.tileFailedCount, 0, "No tile requests may fail for " + viewId);
     assert.equal(review.cameraAlignment.status, "pass");
     assert.ok(review.cameraAlignment.maximumAbsolutePoseDelta <= 1e-8);
     assert.equal(review.runtimePlacement.status, "pass", "runtime tileset centre must match the fixed target for " + viewId);
@@ -145,6 +162,9 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
       browserReportSha256: sha256(Buffer.from(JSON.stringify(review))),
       requestedCamera: review.view.requestedCamera,
       cameraPoseDelta: review.cameraAlignment.maximumAbsolutePoseDelta,
+      tileLoadCount: review.tiles.runtimeDiagnostics.tileLoadCount,
+      visibleTileCount: review.tiles.runtimeDiagnostics.tileVisibleCount,
+      tileFailedCount: review.tiles.runtimeDiagnostics.tileFailedCount,
       runtimePlacementDistanceMeters: review.runtimePlacement.maximumDistanceMeters!,
       maximumProjectedFootprintResidualPixels: review.projectedFootprintAlignment.maximumResidualPixels!,
       visibleProjectionCount: review.projectedFootprintAlignment.visibleProjectionCount,
