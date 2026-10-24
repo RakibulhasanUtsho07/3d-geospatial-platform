@@ -113,7 +113,7 @@ function errorText(error: unknown): string {
   const message = error instanceof Error ? error.name + ": " + error.message : String(error);
   // Avoid leaking viewport query parameters into a report that otherwise stores
   // only salted-free hashes of the requested map bounds.
-  return message.replace(/https?:\\/\\/[^\\s)]+/g, (candidate) => {
+  return message.replace(/https?:\/\/[^\s)]+/g, (candidate) => {
     try {
       const url = new URL(candidate);
       return url.origin + url.pathname;
@@ -122,7 +122,6 @@ function errorText(error: unknown): string {
     }
   }).slice(0, 400);
 }
-
 function percentile(values: number[], fraction: number): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((left, right) => left - right);
