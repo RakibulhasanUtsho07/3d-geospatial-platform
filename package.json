@@ -14,6 +14,7 @@
     "test:viewport-budget": "node --test tests/viewport-feature-budget.test.mjs",
     "test:lod-budget": "node --test tests/lod-detail-budget.test.mjs",
     "test:viewport-selection": "node --test tests/viewport-feature-selection.test.mjs",
+    "test:3d-tiles-manifest": "node --test tests/tileset-manifest-validation.test.mjs",
     "predev": "npm run copy:cesium && npm run build:heritage-model",
     "prebuild": "npm run copy:cesium && npm run build:heritage-model",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
