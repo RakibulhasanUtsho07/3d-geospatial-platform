@@ -6,7 +6,7 @@ P2.17 measurements on the controlled 2,500-feature Dhaka viewport showed warm se
 
 ## Change
 
-Cache only individual tile-backed selected features that have already passed the existing JSON shape, geometry-bounds and render-role checks. The key includes the generated tile path, the current tile data-file signature (size and modification time), byte offset, byte length and feature identity. Changing the data signature changes the key and therefore makes previous entries ineligible for reuse.
+Cache only individual tile-backed selected features that have already passed the existing JSON shape, geometry-bounds and render-role checks. The key includes the generated tile path, the current tile data-file signature (size and modification time), byte offset, byte length, feature identity, render role and all indexed bounds. Changing the data signature changes the key and therefore makes previous entries ineligible for reuse.
 
 The cache is LRU and bounded to **4 MiB of source-record bytes and 6,000 entries**. A selected feature larger than the byte cap is read and validated normally but is not retained. The existing compact tile index still gets checked against the current data file signature before selected-geometry lookup. The API does not remove the geometry integrity checks from cache-miss reads.
 
