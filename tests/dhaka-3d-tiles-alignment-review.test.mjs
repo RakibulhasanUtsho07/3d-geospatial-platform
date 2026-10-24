@@ -79,6 +79,7 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
   const views = evidence.cameraReview.views;
   assert.deepEqual(views.map((view) => view.id), ["north", "east", "south", "west", "oblique"]);
   const target = evidence.cameraReview.target;
+  const expectedHeadings = { north: 180, east: 270, south: 0, west: 90, oblique: 225 };
   for (const view of views) {
     assert.deepEqual(view.target, {
       longitudeDegrees: target.longitudeDegrees,
@@ -86,6 +87,8 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
       ellipsoidHeightMeters: target.ellipsoidHeightMeters,
     });
     assert.ok(Number.isFinite(view.camera.headingDegrees));
+    const headingDelta = Math.abs(((view.camera.headingDegrees - expectedHeadings[view.id] + 540) % 360) - 180);
+    assert.ok(headingDelta < 0.25, view.id + " camera heading must point toward the shared target (delta " + headingDelta + " degrees)");
     assert.ok(view.camera.pitchDegrees < 0);
     assert.ok(view.rangeMeters > 0);
   }
