@@ -155,13 +155,6 @@ function summarize(values: number[]) {
   };
 }
 
-async function readBrowserEvents(page: Page): Promise<BrowserMetricEvent[]> {
-  return page.evaluate(() => {
-    const target = window as Window & { __P26_WORKLOAD__?: { events: BrowserMetricEvent[] } };
-    return target.__P26_WORKLOAD__?.events ?? [];
-  });
-}
-
 test("stresses repeated map viewport changes, cancellation, staging and memory", async ({ page, browser }) => {
   test.setTimeout(180_000);
   await mkdir(OUTPUT_DIRECTORY, { recursive: true });
@@ -192,60 +185,61 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   });
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.addInitScript(() => {
-    type EventKind = "fetch-start" | "fetch-end" | "fetch-cancelled" | "fetch-error";
-    type MetricEvent = {
-      kind: EventKind;
-      metric: "buildings" | "roads";
-      url: string;
-      atMs: number;
-      durationMs?: number;
-      status?: number;
-      errorName?: string;
-    };
-    const target = window as Window & { __P26_WORKLOAD__?: { events: MetricEvent[] } };
-    const harness = { events: [] as MetricEvent[] };
-    target.__P26_WORKLOAD__ = harness;
-    const nativeFetch = window.fetch.bind(window);
+  const browserEvents: BrowserMetricEvent[] = [];
+  const requestEvents = new WeakMap<object, BrowserMetricEvent>();
+  const requestStartedAt = new WeakMap<object, number>();
+  const apiRequestAudit: Array<{ url: string; method: string; resourceType: string }> = [];
+  const apiRequestFailures: Array<{ url: string; failure: string | null }> = [];
+  const pageErrors: string[] = [];
 
-    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const sourceUrl = input instanceof Request ? input.url : String(input);
-      const parsedUrl = new URL(sourceUrl, window.location.href);
-      const metric = parsedUrl.pathname.startsWith("/api/geospatial/overture-buildings")
-        ? "buildings"
-        : parsedUrl.pathname === "/api/geospatial/roads"
-          ? "roads"
-          : null;
-      if (!metric) return nativeFetch(input, init);
-
-      const atMs = performance.now();
-      const url = parsedUrl.toString();
-      harness.events.push({ kind: "fetch-start", metric, url, atMs });
+  page.on("request", (request) => {
+    const url = request.url();
+    let metric: MetricName | null = null;
+    if (url.includes("/api/geospatial/overture-buildings")) metric = "buildings";
+    else {
       try {
-        const response = await nativeFetch(input, init);
-        harness.events.push({
-          kind: "fetch-end",
-          metric,
-          url,
-          atMs: performance.now(),
-          durationMs: Number((performance.now() - atMs).toFixed(3)),
-          status: response.status,
-        });
-        return response;
-      } catch (error: unknown) {
-        const errorName = error instanceof Error ? error.name : "UnknownError";
-        harness.events.push({
-          kind: errorName === "AbortError" ? "fetch-cancelled" : "fetch-error",
-          metric,
-          url,
-          atMs: performance.now(),
-          durationMs: Number((performance.now() - atMs).toFixed(3)),
-          errorName,
-        });
-        throw error;
-      }
-    };
+        if (new URL(url).pathname === "/api/geospatial/roads") metric = "roads";
+      } catch { /* non-URL requests are ignored by this harness */ }
+    }
+    if (!metric) return;
+
+    const startedAtMs = performance.now();
+    const event: BrowserMetricEvent = { kind: "fetch-start", metric, url, atMs: startedAtMs };
+    browserEvents.push(event);
+    requestEvents.set(request, event);
+    requestStartedAt.set(request, startedAtMs);
+    apiRequestAudit.push({ url, method: request.method(), resourceType: request.resourceType() });
   });
+  page.on("response", (response) => {
+    const event = requestEvents.get(response.request());
+    if (event) event.status = response.status();
+  });
+  page.on("requestfinished", (request) => {
+    const event = requestEvents.get(request);
+    const startedAtMs = requestStartedAt.get(request);
+    if (!event || startedAtMs === undefined) return;
+    const endedAtMs = performance.now();
+    event.kind = "fetch-end";
+    event.atMs = endedAtMs;
+    event.durationMs = Number((endedAtMs - startedAtMs).toFixed(3));
+  });
+  page.on("requestfailed", (request) => {
+    const url = request.url();
+    const failure = request.failure()?.errorText ?? null;
+    const event = requestEvents.get(request);
+    const startedAtMs = requestStartedAt.get(request);
+    if (event && startedAtMs !== undefined) {
+      const endedAtMs = performance.now();
+      event.kind = failure && /abort|cancel/i.test(failure) ? "fetch-cancelled" : "fetch-error";
+      event.atMs = endedAtMs;
+      event.durationMs = Number((endedAtMs - startedAtMs).toFixed(3));
+      event.errorName = failure ?? "UnknownError";
+    }
+    if (url.includes("/api/geospatial/overture-buildings") || url.includes("/api/geospatial/roads")) {
+      apiRequestFailures.push({ url, failure });
+    }
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
 
   page.on("console", (message) => {
     if (message.type() !== "info") return;
@@ -397,7 +391,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await expect.poll(() => roadRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
 
   await expect.poll(async () => {
-    const fetchEvents = await readBrowserEvents(page);
+    const fetchEvents = browserEvents;
     const starts = fetchEvents.filter((event) => event.kind === "fetch-start" && event.metric === "buildings");
     const latest = starts.at(-1);
     return Boolean(latest && renderEvents.some((event) =>
@@ -476,7 +470,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     });
   });
 
-  const browserEvents = await readBrowserEvents(page);
   const successfulFetches = browserEvents.filter((event) => event.kind === "fetch-end" && event.status === 200);
   const cancelledFetches = browserEvents.filter((event) => event.kind === "fetch-cancelled");
   const failedFetches = browserEvents.filter((event) => event.kind === "fetch-error");
