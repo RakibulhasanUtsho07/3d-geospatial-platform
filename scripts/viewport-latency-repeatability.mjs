@@ -9,6 +9,12 @@ const SERVER_TIMING_FIELDS = [
   "oversizedSidecarReadMs",
   "featureSelectionMs",
   "selectedGeometryReadMs",
+  "geometryRangePlanningMs",
+  "geometryFileOpenMs",
+  "geometryRangeReadMs",
+  "geometryJsonParseMs",
+  "geometryIntegrityCheckMs",
+  "geometryFileCloseMs",
   "geometryReadMs",
   "featureAssemblyMs",
   "fallbackGeoJsonPreparationMs",
@@ -194,7 +200,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     serverPhaseTiming: {
       coldFirstRequestMsByPhase: coldServerPhaseSamples,
       pooledWarmRequestMsByPhase: pooledWarmServerPhaseSamples,
-      phaseScope: "Reported by the API using node:perf_hooks. Tile subphases measure manifest lookup, tile index access/parsing, candidate metadata scans, sidecar/selected-geometry reads, selection and assembly; route phases report fallback preparation, role classification and JSON serialization.",
+      phaseScope: "Reported by the API using node:perf_hooks. Selected-geometry subphases measure range planning, file open, range reads, per-feature JSON parse, integrity checks and file close; these are nested within selectedGeometryReadMs. Other tile subphases measure manifest lookup, tile index access/parsing, candidate metadata scans, sidecar reads, selection and assembly; route phases report fallback preparation, role classification and JSON serialization.",
       caveat: "Phase timings are component-level diagnostics. Framework/network overhead is not fully represented, and the geometryReadMs aggregate includes sidecar plus selected tile geometry read time.",
     },
     byteCost: {

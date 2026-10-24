@@ -55,6 +55,7 @@ on:
       - feat/p2-14-cross-commit-performance-compare
       - feat/p2-15-latency-repeatability-samples
       - feat/p2-16-server-phase-timings
+      - feat/p2-17-geometry-read-phase-breakdown
   pull_request:
     branches:
       - main
@@ -91,6 +92,7 @@ on:
       - feat/p2-14-cross-commit-performance-compare
       - feat/p2-15-latency-repeatability-samples
       - feat/p2-16-server-phase-timings
+      - feat/p2-17-geometry-read-phase-breakdown
 
 permissions:
   contents: read
