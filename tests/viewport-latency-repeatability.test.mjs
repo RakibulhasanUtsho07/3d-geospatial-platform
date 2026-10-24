@@ -37,7 +37,8 @@ function makeSample(index, coldMs = 140 + index * 5) {
     returnedFeatureCount: 2500, candidatePayloadBytes: 9007328, indexReadBytes: 4442393,
     featureReadBytes: 2532626, combinedReadBytes: 6975019, combinedReadReductionRatio: 0.2256,
     fetchedFeatureCount: 2500, geometryFeatureCacheHits: 0, geometryFeatureCacheMisses: 2500,
-    featureLimit: 2500, featureSha256,
+    geometryFeatureCacheEntries: 2500, geometryFeatureCacheBytes: 2500, geometryFeatureCacheEvictions: 0,
+    geometryFeatureCacheOversizedRejections: 0, featureLimit: 2500, featureSha256,
     serverTimingsMs: makeServerTimings(index),
   };
   observations.push(cold);
@@ -48,7 +49,8 @@ function makeSample(index, coldMs = 140 + index * 5) {
     returnedFeatureCount: 2500, candidatePayloadBytes: 9007328, indexReadBytes: 0,
     featureReadBytes: 0, combinedReadBytes: 0, combinedReadReductionRatio: 1,
     fetchedFeatureCount: 2500, geometryFeatureCacheHits: 2500, geometryFeatureCacheMisses: 0,
-    featureLimit: 2500, featureSha256,
+    geometryFeatureCacheEntries: 2500, geometryFeatureCacheBytes: 2500, geometryFeatureCacheEvictions: 0,
+    geometryFeatureCacheOversizedRejections: 0, featureLimit: 2500, featureSha256,
     serverTimingsMs: makeServerTimings(index + i / 10),
   });
   return {
@@ -101,7 +103,9 @@ test("aggregates repeated fresh-process cold/warm samples with deterministic dat
   assert.equal(result.byteCost.coldIndexReadsVerified, true);
   assert.equal(result.byteCost.zeroWarmIndexReadsVerified, true);
   assert.equal(result.samples[0].cold.geometryFeatureCacheMisses, 2500);
+  assert.equal(result.samples[0].cold.geometryFeatureCacheEntries, 2500);
   assert.deepEqual(result.samples[0].warm.geometryFeatureCacheMissCounts, [0, 0, 0, 0, 0]);
+  assert.deepEqual(result.samples[0].warm.geometryFeatureCacheEvictionCounts, [0, 0, 0, 0, 0]);
   assert.equal(result.dataset.sameOrderedFeatureHashAcrossProcesses, true);
 });
 
