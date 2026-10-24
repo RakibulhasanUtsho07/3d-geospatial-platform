@@ -12,7 +12,8 @@ The Playwright scenario:
 2. Uses the actual `/api/geospatial/overture-buildings/viewport` endpoint. Playwright observes the API response headers rather than replacing this endpoint with a one-building fixture.
 3. Records selected spatial-tile counts, tile-candidate/feature counts, endpoint response latency, and distinct viewport hashes (raw viewport coordinates are not saved in the report).
 4. Delays one browser response after the endpoint has returned, then changes the camera. The stale request should be cancelled by the engine's normal request lifecycle.
-5. Repeats eight pan/zoom cycles while sampling Chromium JavaScript heap, DOM nodes, event listeners, and Cesium frame counters.
+5. In request-render mode, uses an opt-in probe to request a render after each observed building-stage commit and records the actual subsequent Cesium `scene.postRender` callback. This measures stage-to-frame readiness without enabling continuous production rendering.
+6. Repeats eight pan/zoom cycles while sampling Chromium JavaScript heap, DOM nodes, event listeners, and Cesium frame counters.
 6. Saves a JSON report and attaches it to the Playwright test result.
 
 OSM imagery and the public road API are stubbed to keep the test repeatable and offline. The Overture viewport API and its spatial-tile reads are **not** stubbed. CI generates `data/overture/spatial-tiles/manifest.json` and its tile files before starting the map server.
@@ -43,7 +44,7 @@ The test prints and attaches `multi-tile-viewport-workload.json` and writes a lo
 - **Frame readiness:** actual Cesium post-render frame counts plus time from each building-stage log to the next subsequent render frame (p50/p95).
 - **Memory trend:** sampled `JSHeapUsedSize`, `JSHeapTotalSize`, DOM-node counts, event-listener counts, heap growth and a simple per-sample linear trend.
 
-The adapter's frame counter is explicitly opt-in through `window.__MAP_ENGINE_WORKLOAD_BENCHMARK__`; it is absent from normal runtime behavior. The diagnostic property is removed during adapter teardown.
+The adapter's frame counter and `requestRender` probe are explicitly opt-in through `window.__MAP_ENGINE_WORKLOAD_BENCHMARK__`; they are absent from normal runtime behavior. The diagnostic property is removed during adapter teardown. The benchmark explicitly requests a render after a stage because the map runs in Cesium request-render mode; the measured endpoint is still the real subsequent `postRender` callback.
 
 ## Initial acceptance gates
 
