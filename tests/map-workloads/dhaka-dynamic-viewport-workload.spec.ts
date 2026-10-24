@@ -167,24 +167,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const fixtureSha256 = sha256(Buffer.from(JSON.stringify({ buildings, roads })));
   let firstBuildingDelayUsed = false;
   let firstRoadDelayUsed = false;
-  const apiRequestAudit: Array<{ url: string; method: string; resourceType: string }> = [];
-  const apiRequestFailures: Array<{ url: string; failure: string | null }> = [];
-  const pageErrors: string[] = [];
-
-  page.on("request", (request) => {
-    const url = request.url();
-    if (url.includes("/api/geospatial/overture-buildings") || url.includes("/api/geospatial/roads")) {
-      apiRequestAudit.push({ url, method: request.method(), resourceType: request.resourceType() });
-    }
-  });
-  page.on("requestfailed", (request) => {
-    const url = request.url();
-    if (url.includes("/api/geospatial/overture-buildings") || url.includes("/api/geospatial/roads")) {
-      apiRequestFailures.push({ url, failure: request.failure()?.errorText ?? null });
-    }
-  });
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-
   const browserEvents: BrowserMetricEvent[] = [];
   const requestEvents = new WeakMap<object, BrowserMetricEvent>();
   const requestStartedAt = new WeakMap<object, number>();
