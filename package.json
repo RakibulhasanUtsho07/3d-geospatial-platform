@@ -13,6 +13,7 @@
     "review:dhaka-3d-tiles-alignment": "node scripts/review-dhaka-3d-tiles-alignment.mjs",
     "test:geospatial-tiles": "node --test tests/overture-spatial-tiles.test.mjs",
     "test:geospatial-api": "node --test tests/overture-viewport-api.test.mjs",
+    "benchmark:viewport-cold-warm": "node scripts/benchmark-viewport-cold-warm.mjs",
     "test:viewport-budget": "node --test tests/viewport-feature-budget.test.mjs",
     "test:lod-budget": "node --test tests/lod-detail-budget.test.mjs",
     "test:viewport-selection": "node --test tests/viewport-feature-selection.test.mjs",
