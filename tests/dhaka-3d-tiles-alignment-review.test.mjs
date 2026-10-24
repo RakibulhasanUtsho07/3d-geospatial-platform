@@ -61,7 +61,7 @@ test("checks transformed GLB ground corners against source WGS84 footprint envel
     assert.ok(corner.residualMeters <= 0.25, `${corner.id}: ${corner.residualMeters}m`);
   }
   assert.equal(evidence.model.syntheticFixtureGeometry, true);
-  assert.match(evidence.model.disclaimer, /not reconstructed/i);
+  assert.match(evidence.model.disclaimer, /not facade accuracy/i);
 });
 
 test("requires a proper right-handed glTF X-east, Y-up, Z-south transform", async () => {
@@ -129,12 +129,11 @@ test("rejects a left-handed matrix that would rotate the GLB footprint out of it
     const tileset = JSON.parse(originalTilesetBytes.toString("utf8"));
     const buildManifest = JSON.parse(originalBuildBytes.toString("utf8"));
     const matrix = tileset.root.transform;
-    // Swap the north/south vertical axis back to the historical Y=north/Z=up orientation.
-    // Translation remains correct, so this exercises axis validation rather than hash mismatch.
-    const oldUp = [matrix[8], matrix[9], matrix[10], matrix[11]];
-    const oldNorth = [matrix[4], matrix[5], matrix[6], matrix[7]];
-    matrix.splice(4, 4, ...oldNorth);
-    matrix.splice(8, 4, ...oldUp);
+    // Reflect one complete basis axis. Its length and orthogonality remain valid,
+    // but the handedness becomes -1; translation is unchanged.
+    matrix[4] *= -1;
+    matrix[5] *= -1;
+    matrix[6] *= -1;
     const mutatedTilesetBytes = Buffer.from(`${JSON.stringify(tileset, null, 2)}\n`);
     buildManifest.files["tileset.json"].sha256 = sha256(mutatedTilesetBytes);
     buildManifest.files["tileset.json"].bytes = mutatedTilesetBytes.length;
