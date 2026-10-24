@@ -324,6 +324,15 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   const source = readJson(sourceText, "source GeoJSON");
   const sourcePreview = readJson(sourcePreviewBytes.toString("utf8"), "source-feature.geojson");
   const asset = tileset.asset;
+  if (!Number.isFinite(tileset.geometricError) || tileset.geometricError <= 0) {
+    throw new Error("Tileset geometricError must be positive so Cesium traverses the single-leaf GLB fixture.");
+  }
+  if (!Number.isFinite(root.geometricError) || root.geometricError <= 0) {
+    throw new Error("Root tile geometricError must be positive so Cesium requests the single-leaf GLB content.");
+  }
+  if (root.geometricError !== tileset.geometricError) {
+    throw new Error("Root and tileset geometricError must match for the single-leaf placement fixture.");
+  }
   const root = tileset.root;
   const extras = asset?.extras;
   if (!isRecord(asset) || asset.version !== "1.1" || !isRecord(root) || !isRecord(extras)) {
