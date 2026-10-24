@@ -76,6 +76,10 @@ test("generates a valid OGC 3D Tiles 1.1 manifest with a resolvable relative GLB
   assert.equal(result.tileCount, 1);
   assert.equal(tileset.asset.tilesetVersion, "dhaka-pilot-placement-fixture-v1");
   assert.equal(tileset.root.content.uri, "tiles/dhaka-pilot.glb");
+  assert.ok(Number.isFinite(tileset.geometricError) && tileset.geometricError > 0, "tileset geometricError must be positive so Cesium does not short-circuit root traversal");
+  assert.equal(tileset.root.geometricError, tileset.geometricError);
+  assert.equal(tileset.asset.extras.fixtureGeometricErrorMeters, tileset.root.geometricError);
+  assert.equal(build.fixtureGeometry.geometricErrorMeters, tileset.root.geometricError);
   assert.ok(await stat(path.resolve(fixtureDir, tileset.root.content.uri)));
 });
 
