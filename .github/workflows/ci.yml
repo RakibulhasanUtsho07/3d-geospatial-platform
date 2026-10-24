@@ -58,6 +58,7 @@ on:
       - feat/p2-17-geometry-read-phase-breakdown
       - feat/p2-18-selected-geometry-lru-cache
       - feat/p2-19-geometry-cache-eviction-validation
+      - feat/p2-20-viewport-movement-cache-benchmark
   pull_request:
     branches:
       - main
@@ -97,6 +98,7 @@ on:
       - feat/p2-17-geometry-read-phase-breakdown
       - feat/p2-18-selected-geometry-lru-cache
       - feat/p2-19-geometry-cache-eviction-validation
+      - feat/p2-20-viewport-movement-cache-benchmark
 
 permissions:
   contents: read
@@ -624,6 +626,7 @@ jobs:
           P2_13_GUARD_REPORT=p2-13-evidence/p2-12-cold-warm-regression-guard.json npm run benchmark:viewport-trend-report
           npm run benchmark:viewport-baseline-compare
           P2_15_REPORT_PATH=p2-15-evidence/viewport-latency-repeatability.json npm run benchmark:viewport-latency-repeatability
+          P2_20_REPORT_PATH=test-results/p2-20-viewport-movement-cache.json npm run benchmark:viewport-movement-cache
 
       - name: Upload P2.6 workload report and Playwright diagnostics
         if: always()
