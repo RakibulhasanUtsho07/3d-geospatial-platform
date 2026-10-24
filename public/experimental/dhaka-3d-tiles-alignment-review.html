@@ -210,7 +210,7 @@
         strokeWidth: 3,
         fill: Cesium.Color.fromCssColorString("#0891b2").withAlpha(0.65)
       });
-      baselineViewer.dataSources.add(baselineDataSource);
+      await baselineViewer.dataSources.add(baselineDataSource);
       for (const entity of baselineDataSource.entities.values) {
         if (!entity.polygon) continue;
         entity.polygon.height = 0;
@@ -241,6 +241,15 @@
 
       const baselineCamera = snapshotCamera(baselineViewer);
       const tilesCamera = snapshotCamera(tilesViewer);
+      const target = Cesium.Cartesian3.fromDegrees(
+        cameraReview.target.longitudeDegrees,
+        cameraReview.target.latitudeDegrees,
+        cameraReview.target.ellipsoidHeightMeters
+      );
+      const runtimeTilesetCenter = tileset.boundingSphere?.center ?? tileset.root?.boundingSphere?.center ?? null;
+      const runtimePlacementDistanceMeters = runtimeTilesetCenter
+        ? Cesium.Cartesian3.distance(runtimeTilesetCenter, target)
+        : null;
       const cameraFields = [
         "longitudeDegrees",
         "latitudeDegrees",
@@ -320,6 +329,12 @@
           camera: tilesCamera
         },
         cameraAlignment: { status: maximumCameraPoseDelta <= 1e-8 ? "pass" : "fail", maximumAbsolutePoseDelta: maximumCameraPoseDelta, deltaByField: cameraPoseDelta, tolerance: 1e-8 },
+        runtimePlacement: {
+          status: runtimePlacementDistanceMeters !== null && runtimePlacementDistanceMeters <= 1 ? "pass" : "fail",
+          reference: "Cesium3DTileset world-space bounding-sphere centre vs the fixture camera-review target",
+          maximumDistanceMeters: runtimePlacementDistanceMeters,
+          toleranceMeters: 1
+        },
         projectedFootprintAlignment: {
           status: projectedCorners.length === 4 && residualValues.length === 8 && Math.max(...residualValues) <= 8 ? "pass" : "fail",
           tolerancePixels: 8,
@@ -329,11 +344,11 @@
         },
         disclaimer: "The tile content is a synthetic rectangular prism. This browser review verifies repeatable camera poses, transformed footprint-envelope projection, and render availability; it does not validate facade similarity or true building height."
       };
-      result.status = result.cameraAlignment.status === "pass" && result.projectedFootprintAlignment.status === "pass" && result.baseline.loaded && result.tiles.loaded ? "pass" : "fail";
+      result.status = result.cameraAlignment.status === "pass" && result.runtimePlacement.status === "pass" && result.projectedFootprintAlignment.status === "pass" && result.baseline.loaded && result.tiles.loaded ? "pass" : "fail";
 
       resultNode.textContent = JSON.stringify(result);
       if (result.status !== "pass") throw new Error("Camera/footprint alignment failed for " + view.id + "; inspect #review-result.");
-      setStatus("ready", "READY · " + view.id.toUpperCase() + " · camera delta " + maximumCameraPoseDelta.toExponential(1) + " · footprint residual " + result.projectedFootprintAlignment.maximumResidualPixels.toFixed(2) + " px");
+      setStatus("ready", "READY · " + view.id.toUpperCase() + " · pose " + maximumCameraPoseDelta.toExponential(1) + " · centre " + runtimePlacementDistanceMeters.toFixed(3) + " m · footprint " + result.projectedFootprintAlignment.maximumResidualPixels.toFixed(2) + " px");
     }
 
     main().catch((error) => {
