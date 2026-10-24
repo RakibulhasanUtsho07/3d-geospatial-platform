@@ -205,6 +205,32 @@ function pointTransformQuality(transform) {
   return { axes, orthogonality, handedness };
 }
 
+function cameraHeadingPitchToEcefTarget(cameraPosition, cameraEcef, targetEcef) {
+  // Cesium heading/pitch are expressed in the camera position's local ENU frame.
+  // Derive them from the ECEF target direction rather than reusing a nominal
+  // local-map bearing, which can leave a camera looking just outside the tile
+  // root's bounding volume after the ECEF transform.
+  const longitude = cameraPosition.longitudeDegrees * Math.PI / 180;
+  const latitude = cameraPosition.latitudeDegrees * Math.PI / 180;
+  const dx = targetEcef[0] - cameraEcef[0];
+  const dy = targetEcef[1] - cameraEcef[1];
+  const dz = targetEcef[2] - cameraEcef[2];
+
+  const east = -Math.sin(longitude) * dx + Math.cos(longitude) * dy;
+  const north =
+    -Math.sin(latitude) * Math.cos(longitude) * dx
+    - Math.sin(latitude) * Math.sin(longitude) * dy
+    + Math.cos(latitude) * dz;
+  const up =
+    Math.cos(latitude) * Math.cos(longitude) * dx
+    + Math.cos(latitude) * Math.sin(longitude) * dy
+    + Math.sin(latitude) * dz;
+
+  const headingDegrees = (Math.atan2(east, north) * RADIANS_TO_DEGREES + 360) % 360;
+  const pitchDegrees = Math.atan2(up, Math.hypot(east, north)) * RADIANS_TO_DEGREES;
+  return { headingDegrees, pitchDegrees };
+}
+
 function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) {
   const horizontalRangeMeters = Math.max(30, Math.min(120, Math.max(widthMeters, depthMeters, heightMeters) * 4));
   const targetLocal = [0, heightMeters / 2, 0];
@@ -229,18 +255,19 @@ function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) 
     horizontalRangeMeters,
     views: cameraSpecs.map((spec) => {
       const localGlb = [spec.eastMeters, spec.upMeters, -spec.northMeters];
-      const position = ecefToWgs84(multiplyPoint(transform, localGlb));
-      const downMeters = spec.upMeters - heightMeters / 2;
+      const cameraEcef = multiplyPoint(transform, localGlb);
+      const position = ecefToWgs84(cameraEcef);
+      const orientation = cameraHeadingPitchToEcefTarget(position, cameraEcef, targetEcef);
       const horizontalDistance = Math.hypot(spec.eastMeters, spec.northMeters);
-      const pitchDegrees = -Math.atan2(downMeters, horizontalDistance) * RADIANS_TO_DEGREES;
+      const verticalDistance = Math.abs(spec.upMeters - heightMeters / 2);
       return {
         id: spec.id,
         camera: {
           longitudeDegrees: position.longitudeDegrees,
           latitudeDegrees: position.latitudeDegrees,
           ellipsoidHeightMeters: position.heightMeters,
-          headingDegrees: spec.headingDegrees,
-          pitchDegrees,
+          headingDegrees: orientation.headingDegrees,
+          pitchDegrees: orientation.pitchDegrees,
           rollDegrees: 0,
         },
         target: {
@@ -248,7 +275,7 @@ function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) 
           latitudeDegrees: target.latitudeDegrees,
           ellipsoidHeightMeters: target.heightMeters,
         },
-        rangeMeters: Math.hypot(horizontalDistance, downMeters),
+        rangeMeters: Math.hypot(horizontalDistance, verticalDistance),
       };
     }),
   };
