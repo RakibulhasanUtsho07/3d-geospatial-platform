@@ -100,6 +100,20 @@ test("records Overture attribution, explicit synthetic-geometry limits and stabl
   assert.equal(build.source.featureSha256, extras.sourceFeatureSha256);
 });
 
+test("writes the exact selected source feature as a deterministic browser comparison baseline", async () => {
+  const previewBytes = await readFile(path.join(fixtureDir, "source-feature.geojson"));
+  const preview = JSON.parse(previewBytes.toString("utf8"));
+  assert.equal(preview.type, "FeatureCollection");
+  assert.equal(preview.features.length, 1);
+  assert.equal(sha256(previewBytes), build.files["source-feature.geojson"].sha256);
+  assert.equal(previewBytes.length, build.files["source-feature.geojson"].bytes);
+  assert.equal(
+    sha256(Buffer.from(JSON.stringify(preview.features[0]))),
+    build.source.featureSha256,
+  );
+  assert.equal(preview.features[0].id === undefined ? build.source.featureId : String(preview.features[0].id), build.source.featureId);
+});
+
 test("maps the manifest transform to independently calculated WGS84 ECEF", () => {
   const placement = build.placement;
   const transform = tileset.root.transform;
@@ -148,7 +162,7 @@ test("rebuilds identical tileset, GLB and build-manifest hashes from the same so
     stdio: "pipe",
     timeout: 30_000,
   });
-  for (const relativePath of ["tileset.json", "tiles/dhaka-pilot.glb", "build-manifest.json"]) {
+  for (const relativePath of ["tileset.json", "tiles/dhaka-pilot.glb", "source-feature.geojson", "build-manifest.json"]) {
     const [first, second] = await Promise.all([
       readFile(path.join(fixtureDir, relativePath)),
       readFile(path.join(secondFixtureDir, relativePath)),
