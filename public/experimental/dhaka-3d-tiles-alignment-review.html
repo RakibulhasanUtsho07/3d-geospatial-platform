@@ -184,18 +184,37 @@
       return viewer;
     }
 
-    function applyCamera(viewer, camera) {
+    function applyCamera(viewer, camera, target) {
+      const destination = Cesium.Cartesian3.fromDegrees(
+        camera.longitudeDegrees,
+        camera.latitudeDegrees,
+        camera.ellipsoidHeightMeters
+      );
+      const targetPosition = Cesium.Cartesian3.fromDegrees(
+        target.longitudeDegrees,
+        target.latitudeDegrees,
+        target.ellipsoidHeightMeters
+      );
+      const direction = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.subtract(targetPosition, destination, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      const cameraCartographic = Cesium.Cartographic.fromCartesian(destination, Cesium.Ellipsoid.WGS84);
+      const geodeticUp = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormalCartographic(
+        cameraCartographic,
+        new Cesium.Cartesian3()
+      );
+      const right = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.cross(direction, geodeticUp, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      const up = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.cross(right, direction, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
       viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(
-          camera.longitudeDegrees,
-          camera.latitudeDegrees,
-          camera.ellipsoidHeightMeters
-        ),
-        orientation: {
-          heading: Cesium.Math.toRadians(camera.headingDegrees),
-          pitch: Cesium.Math.toRadians(camera.pitchDegrees),
-          roll: Cesium.Math.toRadians(camera.rollDegrees)
-        }
+        destination,
+        orientation: { direction, up }
       });
       viewer.scene.requestRender();
     }
@@ -274,8 +293,8 @@
 
       const baselineViewer = createViewer("baseline-viewer");
       const tilesViewer = createViewer("tiles-viewer");
-      applyCamera(baselineViewer, view.camera);
-      applyCamera(tilesViewer, view.camera);
+      applyCamera(baselineViewer, view.camera, view.target);
+      applyCamera(tilesViewer, view.camera, view.target);
 
       const baselineDataSource = await Cesium.GeoJsonDataSource.load(SOURCE_URL, {
         clampToGround: false,
