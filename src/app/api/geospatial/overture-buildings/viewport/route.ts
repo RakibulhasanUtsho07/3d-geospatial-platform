@@ -990,7 +990,7 @@ async function queryGeneratedTiles(
     candidateFeatureCount += tileIndex.records.length;
     const priorGeometrySignature = selectedGeometrySignatureByTile.get(tile.file);
     if (priorGeometrySignature !== undefined && priorGeometrySignature !== tileIndex.dataSignature) {
-      const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key) => {
+      const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key: string) => {
         try {
           const parts: unknown = JSON.parse(key);
           return Array.isArray(parts) &&
