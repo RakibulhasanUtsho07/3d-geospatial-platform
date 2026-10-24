@@ -13,6 +13,7 @@ type WorkloadFrameDiagnostics = {
     loadInProgress: boolean;
     intentRevisionBefore: number;
     intentRevisionAfter: number;
+    cameraBoundsChanged: boolean;
     viewportWidthDegrees: number | null;
     viewportHeightDegrees: number | null;
   } | null;
@@ -532,6 +533,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   expect(intentProbe, "the opt-in production camera-intent probe must be installed")
     .not.toBeNull();
   expect(intentProbe?.loadInProgress, "the deliberately delayed viewport must remain in-flight")
+    .toBe(true);
+  expect(intentProbe?.cameraBoundsChanged, "the benchmark camera probe must change the viewport bounds")
     .toBe(true);
   expect(
     intentProbe?.intentRevisionAfter,
