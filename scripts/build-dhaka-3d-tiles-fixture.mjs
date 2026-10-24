@@ -268,11 +268,11 @@ function parseArgs(argv) {
 
 function isWithin(directory, target) {
   const relative = path.relative(directory, target);
-  return relative === "" || (
+  // Only allow a child directory; never permit recursive deletion of the root itself.
+  return relative !== "" &&
     relative !== ".." &&
     !relative.startsWith(`..${path.sep}`) &&
-    !path.isAbsolute(relative)
-  );
+    !path.isAbsolute(relative);
 }
 
 export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, outputPath = defaultOutput } = {}) {
