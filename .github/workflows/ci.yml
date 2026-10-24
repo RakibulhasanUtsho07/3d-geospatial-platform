@@ -308,6 +308,9 @@ jobs:
       - name: Test Dhaka 3D Tiles placement and content integrity fixture
         run: npm run test:dhaka-3d-tiles-fixture
 
+      - name: Test opt-in Dhaka 3D Tiles controller cancellation and teardown
+        run: npm run test:dhaka-3d-tiles-pilot-controller
+
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
@@ -390,6 +393,8 @@ jobs:
         run: npm run test:geospatial-tiles
 
       - name: Build production app
+        env:
+          NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
         run: npm run build
 
       - name: Install Chromium for map browser integration tests
@@ -398,6 +403,7 @@ jobs:
       - name: Verify viewport API against the production server
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
+          NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
         run: |
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
           server_pid=$!
