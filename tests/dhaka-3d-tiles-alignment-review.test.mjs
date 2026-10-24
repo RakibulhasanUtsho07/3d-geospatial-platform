@@ -94,12 +94,15 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
 
 test("alignment evidence binds the exact source, feature, tileset and GLB hashes", async () => {
   const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
-  const [sourceBytes, tilesetBytes, glbBytes] = await Promise.all([
+  const [sourceBytes, previewBytes, tilesetBytes, glbBytes] = await Promise.all([
     readFile(sourcePath),
+    readFile(path.join(fixtureDirectory, "source-feature.geojson")),
     readFile(path.join(fixtureDirectory, "tileset.json")),
     readFile(path.join(fixtureDirectory, "tiles", "dhaka-pilot.glb")),
   ]);
   assert.equal(evidence.source.sha256, sha256(sourceBytes));
+  assert.equal(evidence.source.previewSha256, sha256(previewBytes));
+  assert.equal(evidence.source.previewPath, "source-feature.geojson");
   assert.equal(evidence.model.tilesetSha256, sha256(tilesetBytes));
   assert.equal(evidence.model.glbSha256, sha256(glbBytes));
   assert.match(evidence.source.featureSha256, /^[a-f0-9]{64}$/);
