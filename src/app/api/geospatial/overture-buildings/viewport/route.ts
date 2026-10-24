@@ -112,6 +112,12 @@ type TileQueryResult = {
   indexReadBytes: number;
   featureReadBytes: number;
   tileCacheHits: number;
+  geometryFeatureCacheHits: number;
+  geometryFeatureCacheMisses: number;
+};
+type CachedSelectedGeometryFeature = {
+  feature: unknown;
+  byteLength: number;
 };
 
 type TileQueryTimings = {
@@ -152,6 +158,51 @@ function formatTimingMs(value: number): string {
   return Math.max(0, value).toFixed(3);
 }
 
+function getSelectedGeometryCacheKey(
+  relativeFile: string,
+  dataSignature: string,
+  record: TileFeatureIndexRecord,
+): string {
+  return JSON.stringify([relativeFile, dataSignature, record.offset, record.length, record.identity]);
+}
+
+function getCachedSelectedGeometryFeature(key: string): unknown | undefined {
+  const cached = selectedTileGeometryCache.get(key);
+  if (!cached) return undefined;
+  selectedTileGeometryCache.delete(key);
+  selectedTileGeometryCache.set(key, cached);
+  return cached.feature;
+}
+
+function cacheSelectedGeometryFeature(
+  key: string,
+  feature: unknown,
+  record: TileFeatureIndexRecord,
+): void {
+  const byteLength = record.length;
+  if (!Number.isInteger(byteLength) || byteLength < 1 || byteLength > MAX_SELECTED_GEOMETRY_CACHE_BYTES) {
+    return;
+  }
+  const prior = selectedTileGeometryCache.get(key);
+  if (prior) {
+    selectedGeometryCacheBytes -= prior.byteLength;
+    selectedTileGeometryCache.delete(key);
+  }
+  selectedTileGeometryCache.set(key, { feature, byteLength });
+  selectedGeometryCacheBytes += byteLength;
+  while (
+    selectedGeometryCacheBytes > MAX_SELECTED_GEOMETRY_CACHE_BYTES ||
+    selectedTileGeometryCache.size > MAX_SELECTED_GEOMETRY_CACHE_ENTRIES
+  ) {
+    const oldestKey = selectedTileGeometryCache.keys().next().value;
+    if (typeof oldestKey !== "string") break;
+    const oldest = selectedTileGeometryCache.get(oldestKey);
+    if (oldest) selectedGeometryCacheBytes -= oldest.byteLength;
+    selectedTileGeometryCache.delete(oldestKey);
+  }
+}
+
+
 const DATA_FILE = resolve(
   process.cwd(),
   "data",
@@ -172,6 +223,8 @@ const MAX_VIEWPORT_SPAN_DEGREES = 2;
 const DEFAULT_VIEWPORT_FEATURE_LIMIT = 2500;
 const MAX_VIEWPORT_FEATURE_LIMIT = 5000;
 const MAX_CACHED_TILE_FILES = 64;
+const MAX_SELECTED_GEOMETRY_CACHE_BYTES = 4 * 1024 * 1024;
+const MAX_SELECTED_GEOMETRY_CACHE_ENTRIES = 6000;
 
 let indexedDatasetPromise: Promise<IndexedDataset> | null = null;
 let cachedTileManifest: CachedManifestEntry | null = null;
@@ -181,6 +234,11 @@ const tileFeatureCache = new Map<string, CachedTileEntry>();
 // Keep compact byte-offset indexes in memory; geometry payloads are read only
 // for features whose indexed bounds intersect the requested viewport.
 const tileFeatureIndexCache = new Map<string, CachedTileIndexEntry>();
+// Only retain selected features after their JSON, bounds and render role have
+// passed the existing index-integrity checks. Signatures in each key prevent
+// stale geometry from being reused when a tile file changes.
+const selectedTileGeometryCache = new Map<string, CachedSelectedGeometryFeature>();
+let selectedGeometryCacheBytes = 0;
 const MAX_TILE_READ_GAP_BYTES = 2 * 1024;
 const MAX_TILE_READ_WINDOW_BYTES = 64 * 1024;
 
@@ -784,11 +842,39 @@ async function readSelectedTileFeatures(
   relativeFile: string,
   records: TileFeatureIndexRecord[],
   timings: TileQueryTimings,
+  dataSignature: string,
+  cacheStats: { hits: number; misses: number },
 ): Promise<IndexedTileFeatureRead | null> {
-  if (!/^tiles\/x\d+_y\d+\.geojson$/.test(relativeFile)) {
+  if (!/^tiles\\/x\\d+_y\\d+\\.geojson$/.test(relativeFile)) {
     return null;
   }
   if (records.length === 0) return { features: [], bytesRead: 0 };
+
+  const featuresByIdentity = new Map<string, IndexedTileFeature>();
+  const recordsToRead: TileFeatureIndexRecord[] = [];
+  for (const record of records) {
+    const cachedFeature = getCachedSelectedGeometryFeature(
+      getSelectedGeometryCacheKey(relativeFile, dataSignature, record),
+    );
+    if (cachedFeature === undefined) {
+      cacheStats.misses += 1;
+      recordsToRead.push(record);
+    } else {
+      cacheStats.hits += 1;
+      featuresByIdentity.set(record.identity, {
+        feature: cachedFeature,
+        bounds: record.bounds,
+        identity: record.identity,
+      });
+    }
+  }
+
+  if (recordsToRead.length === 0) {
+    return {
+      features: records.map((record) => featuresByIdentity.get(record.identity)!),
+      bytesRead: 0,
+    };
+  }
 
   let handle: Awaited<ReturnType<typeof open>>;
   const fileOpenStartedAt = performance.now();
@@ -801,9 +887,10 @@ async function readSelectedTileFeatures(
   }
   timings.geometryFileOpenMs += performance.now() - fileOpenStartedAt;
 
+  let bytesRead = 0;
   try {
     const rangePlanningStartedAt = performance.now();
-    const orderedRecords = [...records].sort((left, right) => left.offset - right.offset);
+    const orderedRecords = [...recordsToRead].sort((left, right) => left.offset - right.offset);
     const ranges: Array<{ start: number; end: number; records: TileFeatureIndexRecord[] }> = [];
 
     for (const record of orderedRecords) {
@@ -824,9 +911,6 @@ async function readSelectedTileFeatures(
       }
     }
     timings.geometryRangePlanningMs += performance.now() - rangePlanningStartedAt;
-
-    const features: IndexedTileFeature[] = [];
-    let bytesRead = 0;
 
     for (const range of ranges) {
       const rangeReadStartedAt = performance.now();
@@ -850,10 +934,7 @@ async function readSelectedTileFeatures(
 
       for (const record of range.records) {
         const localStart = record.offset - range.start;
-        const featureBytes = rangeBuffer.subarray(
-          localStart,
-          localStart + record.length,
-        );
+        const featureBytes = rangeBuffer.subarray(localStart, localStart + record.length);
         let feature: unknown;
         const jsonParseStartedAt = performance.now();
         try {
@@ -865,11 +946,7 @@ async function readSelectedTileFeatures(
         timings.geometryJsonParseMs += performance.now() - jsonParseStartedAt;
 
         const integrityCheckStartedAt = performance.now();
-        if (
-          !isRecord(feature) ||
-          feature.type !== "Feature" ||
-          !isRecord(feature.geometry)
-        ) {
+        if (!isRecord(feature) || feature.type !== "Feature" || !isRecord(feature.geometry)) {
           timings.geometryIntegrityCheckMs += performance.now() - integrityCheckStartedAt;
           return null;
         }
@@ -894,15 +971,23 @@ async function readSelectedTileFeatures(
         }
         timings.geometryIntegrityCheckMs += performance.now() - integrityCheckStartedAt;
 
-        features.push({
+        featuresByIdentity.set(record.identity, {
           feature,
           bounds: record.bounds,
           identity: record.identity,
         });
+        cacheSelectedGeometryFeature(
+          getSelectedGeometryCacheKey(relativeFile, dataSignature, record),
+          feature,
+          record,
+        );
       }
     }
 
-    return { features, bytesRead };
+    return {
+      features: records.map((record) => featuresByIdentity.get(record.identity)!),
+      bytesRead,
+    };
   } finally {
     const fileCloseStartedAt = performance.now();
     try {
@@ -934,6 +1019,7 @@ async function queryGeneratedTiles(
   let featureReadBytes = 0;
   let tileCacheHits = 0;
 
+  const tileDataSignatures = new Map<string, string>();
   for (const tile of selectedTiles) {
     const tileIndexStartedAt = performance.now();
     const tileIndex = await readCachedTileIndex(tile);
@@ -943,6 +1029,7 @@ async function queryGeneratedTiles(
       return null;
     }
     candidateFeatureCount += tileIndex.records.length;
+    tileDataSignatures.set(tile.file, tileIndex.dataSignature);
     candidateBytes += getSignatureSize(tileIndex.dataSignature);
     indexReadBytes += tileIndex.indexReadBytes;
     if (tileIndex.cacheHit) tileCacheHits += 1;
@@ -1014,6 +1101,7 @@ async function queryGeneratedTiles(
   // also bounds normal tile-backed geometry deserialization.
   const recordsByTile = new Map<string, TileFeatureIndexRecord[]>();
   const selectedFeaturesByIdentity = new Map<string, unknown>();
+  const selectedGeometryCacheStats = { hits: 0, misses: 0 };
   for (const candidate of limitedCandidates) {
     if (candidate.preloadedFeature !== undefined) {
       selectedFeaturesByIdentity.set(candidate.identity, candidate.preloadedFeature);
@@ -1029,8 +1117,19 @@ async function queryGeneratedTiles(
   }
 
   for (const [tileFile, records] of recordsByTile) {
+    const dataSignature = tileDataSignatures.get(tileFile);
+    if (typeof dataSignature !== "string") {
+      console.warn("[Overture Viewport API] Selected geometry has no current tile signature; falling back to GeoJSON index.", { tile: tileFile });
+      return null;
+    }
     const selectedGeometryStartedAt = performance.now();
-    const selectedRead = await readSelectedTileFeatures(tileFile, records, timings);
+    const selectedRead = await readSelectedTileFeatures(
+      tileFile,
+      records,
+      timings,
+      dataSignature,
+      selectedGeometryCacheStats,
+    );
     timings.selectedGeometryReadMs += performance.now() - selectedGeometryStartedAt;
     if (!selectedRead) {
       console.warn("[Overture Viewport API] Indexed feature bytes are invalid or unavailable; falling back to GeoJSON index.", { tile: tileFile });
@@ -1069,6 +1168,8 @@ async function queryGeneratedTiles(
     indexReadBytes,
     featureReadBytes,
     tileCacheHits,
+    geometryFeatureCacheHits: selectedGeometryCacheStats.hits,
+    geometryFeatureCacheMisses: selectedGeometryCacheStats.misses,
   };
 }
 
@@ -1192,6 +1293,8 @@ export async function GET(request: Request): Promise<Response> {
       indexReadBytes: tileResult?.indexReadBytes ?? 0,
       featureReadBytes: tileResult?.featureReadBytes ?? 0,
       tileCacheHits: tileResult?.tileCacheHits ?? 0,
+      geometryFeatureCacheHits: tileResult?.geometryFeatureCacheHits ?? 0,
+      geometryFeatureCacheMisses: tileResult?.geometryFeatureCacheMisses ?? 0,
       oversizedFeatures: tileResult?.oversizedFeatureCount ?? 0,
       buildings: buildingCount,
       buildingParts: partCount,
@@ -1212,7 +1315,7 @@ export async function GET(request: Request): Promise<Response> {
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
-        "X-Building-Timing-Version": "p2.17",
+        "X-Building-Timing-Version": "p2.18",
         "X-Building-Timing-Total-Server-Ms": formatTimingMs(totalServerMs),
         "X-Building-Timing-Tile-Query-Ms": formatTimingMs(tileQueryMs),
         "X-Building-Timing-Manifest-Lookup-Ms": formatTimingMs(tileTimings.manifestLookupMs),
@@ -1255,6 +1358,8 @@ export async function GET(request: Request): Promise<Response> {
         "X-Building-Index-Read-Bytes": String(tileResult?.indexReadBytes ?? 0),
         "X-Building-Feature-Read-Bytes": String(tileResult?.featureReadBytes ?? 0),
         "X-Building-Tile-Cache-Hits": String(tileResult?.tileCacheHits ?? 0),
+        "X-Building-Geometry-Feature-Cache-Hits": String(tileResult?.geometryFeatureCacheHits ?? 0),
+        "X-Building-Geometry-Feature-Cache-Misses": String(tileResult?.geometryFeatureCacheMisses ?? 0),
         "X-Building-Count": String(buildingCount),
         "X-Building-Parent-Count": String(parentCount),
         "X-Building-Part-Count": String(partCount),
