@@ -615,6 +615,16 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     "a shallow startup view must query a bounded local height, not the full horizon rectangle",
   ).not.toBeNull();
   expect(startupShallowObservation.viewportHeightDegrees!).toBeLessThan(0.05);
+  expect(
+    startupShallowObservation.selectedTileCount,
+    "the default Dhaka startup view must intersect a populated spatial tile",
+  ).not.toBeNull();
+  expect(startupShallowObservation.selectedTileCount!).toBeGreaterThan(0);
+  expect(
+    startupShallowObservation.returnedFeatureCount,
+    "the default Dhaka startup view must return building features instead of staging an empty collection",
+  ).not.toBeNull();
+  expect(startupShallowObservation.returnedFeatureCount!).toBeGreaterThan(0);
   const shallowViewLocalWindowProbe = {
     viewportHash: startupShallowObservation.viewportHash,
     viewportSpanDegrees: {
