@@ -90,6 +90,11 @@ type ViewportRequestObservation = {
   candidateFeatureCount: number | null;
   matchedFeatureCount: number | null;
   returnedFeatureCount: number | null;
+  candidatePayloadBytes: number | null;
+  indexReadBytes: number | null;
+  featureReadBytes: number | null;
+  fetchedFeatureCount: number | null;
+  featureLimit: number | null;
   endpointResponseMs: number | null;
   completedAtMs: number | null;
   failure: string | null;
@@ -431,6 +436,11 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         candidateFeatureCount: null,
         matchedFeatureCount: null,
         returnedFeatureCount: null,
+        candidatePayloadBytes: null,
+        indexReadBytes: null,
+        featureReadBytes: null,
+        fetchedFeatureCount: null,
+        featureLimit: null,
         endpointResponseMs: null,
         completedAtMs: null,
         failure: null,
@@ -459,6 +469,17 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         observation.returnedFeatureCount = Number.isFinite(Number(headers["x-building-feature-count"]))
           ? Number(headers["x-building-feature-count"])
           : null;
+        const readMetric = (header: string): number | null => {
+          const rawValue = headers[header];
+          if (typeof rawValue !== "string" || rawValue.trim() === "") return null;
+          const parsed = Number(rawValue);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+        observation.candidatePayloadBytes = readMetric("x-building-candidate-bytes");
+        observation.indexReadBytes = readMetric("x-building-index-read-bytes");
+        observation.featureReadBytes = readMetric("x-building-feature-read-bytes");
+        observation.fetchedFeatureCount = readMetric("x-building-fetched-feature-count");
+        observation.featureLimit = readMetric("x-building-feature-limit");
         observation.endpointResponseMs = Number((performance.now() - observation.startedAtMs).toFixed(2));
 
         if (delayNextViewportResponse && !delayedResponseClaimed) {
@@ -984,6 +1005,35 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     .filter((count) => Number.isFinite(count));
   const maxTilesInViewport = allTileCounts.length ? Math.max(...allTileCounts) : 0;
   const totalSelectedTileLoads = allTileCounts.reduce((sum, count) => sum + count, 0);
+  const costMeasuredRequests = successfulGeneratedTileRequests.filter((request) =>
+    request.candidatePayloadBytes !== null &&
+    request.indexReadBytes !== null &&
+    request.featureReadBytes !== null &&
+    request.fetchedFeatureCount !== null &&
+    request.featureLimit !== null,
+  );
+  const totalCandidatePayloadBytes = costMeasuredRequests.reduce(
+    (sum, request) => sum + request.candidatePayloadBytes!,
+    0,
+  );
+  const totalIndexReadBytes = costMeasuredRequests.reduce(
+    (sum, request) => sum + request.indexReadBytes!,
+    0,
+  );
+  const totalFeatureReadBytes = costMeasuredRequests.reduce(
+    (sum, request) => sum + request.featureReadBytes!,
+    0,
+  );
+  const totalSelectiveReadBytes = totalIndexReadBytes + totalFeatureReadBytes;
+  const geometryPayloadReductionRatio = totalCandidatePayloadBytes > 0
+    ? Number((1 - totalFeatureReadBytes / totalCandidatePayloadBytes).toFixed(4))
+    : null;
+  const combinedReadReductionRatio = totalCandidatePayloadBytes > 0
+    ? Number((1 - totalSelectiveReadBytes / totalCandidatePayloadBytes).toFixed(4))
+    : null;
+  const geometryFetchBudgetViolations = costMeasuredRequests.filter(
+    (request) => request.fetchedFeatureCount! > request.featureLimit!,
+  ).length;
   const viewportWidthSummary = summarizeSpan(
     requests.map((request) => request.viewportWidthDegrees)
       .filter((value): value is number => value !== null),
@@ -1065,6 +1115,13 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         candidateFeatureCount: request.candidateFeatureCount,
         matchedFeatureCount: request.matchedFeatureCount,
         returnedFeatureCount: request.returnedFeatureCount,
+        fetchCost: {
+          candidatePayloadBytes: request.candidatePayloadBytes,
+          indexReadBytes: request.indexReadBytes,
+          featureReadBytes: request.featureReadBytes,
+          fetchedFeatureCount: request.fetchedFeatureCount,
+          featureLimit: request.featureLimit,
+        },
         endpointResponseMs: request.endpointResponseMs,
         delayedForCancellation: request.delayedForCancellation,
         routeResponseReady: request.routeResponseReady,
@@ -1087,6 +1144,17 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         ).length,
         viewportWidthDegrees: viewportWidthSummary,
         viewportHeightDegrees: viewportHeightSummary,
+        fetchCostEvidence: {
+          measuredRequestCount: costMeasuredRequests.length,
+          fullSelectedTilePayloadBaselineBytes: totalCandidatePayloadBytes,
+          coldIndexReadBytes: totalIndexReadBytes,
+          selectedFeatureGeometryReadBytes: totalFeatureReadBytes,
+          combinedIndexAndGeometryReadBytes: totalSelectiveReadBytes,
+          geometryPayloadReductionRatio,
+          combinedReadReductionRatio,
+          geometryFetchBudgetViolations,
+          limitation: "Selected-tile bytes are a per-request whole-payload baseline; index bytes are reported separately and this is not a physical-disk-I/O or wall-clock speedup estimate.",
+        },
       },
     },
     readiness: {
@@ -1144,6 +1212,12 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   console.log("[P2.6 multi-tile viewport workload]", JSON.stringify(report));
 
   expect(successfulGeneratedTileRequests.length, "the real Overture viewport endpoint must use the generated spatial-tile manifest").toBeGreaterThan(0);
+  expect(costMeasuredRequests.length, "real viewport responses must expose P2.9 byte and geometry-fetch diagnostics").toBeGreaterThan(0);
+  expect(totalCandidatePayloadBytes, "the selected-tile whole-payload baseline must be measurable").toBeGreaterThan(0);
+  expect(totalFeatureReadBytes, "the sampled feature payload cost must be measurable").toBeGreaterThan(0);
+  expect(geometryPayloadReductionRatio, "feature-only reads should be below the whole selected-tile payload baseline").not.toBeNull();
+  expect(geometryPayloadReductionRatio!).toBeGreaterThan(0);
+  expect(geometryFetchBudgetViolations, "tile-backed geometry reads must remain within each request's response feature limit").toBe(0);
   expect(maxTilesInViewport, "at least one viewport must select multiple generated spatial tiles").toBeGreaterThan(1);
   expect(uniqueViewports.size, "repeated pan/zoom must produce distinct viewport requests").toBeGreaterThanOrEqual(4);
   expect(fetchAbortEvents.length, "a newer camera intent must abort at least one viewport fetch signal").toBeGreaterThan(0);
