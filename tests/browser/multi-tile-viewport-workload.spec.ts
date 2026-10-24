@@ -205,21 +205,23 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ = [];
     window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ = [];
 
-    const originalInfo = console.info.bind(console);
-    console.info = (...args: unknown[]) => {
-      if (args[0] === "[Overture] Building viewport rendered.") {
-        const summary = args[1] && typeof args[1] === "object"
-          ? args[1] as Record<string, unknown>
-          : {};
-        const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ??= [];
-        events.push({ atMs: performance.now(), summary });
-        if (events.length > 500) events.splice(0, events.length - 500);
-        // The map is in requestRenderMode; request a post-commit frame so the
-        // benchmark can measure stage-to-frame readiness deterministically.
-        window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.requestRender?.();
-      }
-      originalInfo(...args);
-    };
+    window.addEventListener("map:building-viewport-staged", (event: Event) => {
+      const detail = (event as CustomEvent<{
+        atMs?: number;
+        summary?: Record<string, unknown>;
+      }>).detail;
+      if (!detail || typeof detail.summary !== "object" || detail.summary === null) return;
+
+      const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ??= [];
+      events.push({
+        atMs: Number.isFinite(detail.atMs) ? detail.atMs as number : performance.now(),
+        summary: detail.summary,
+      });
+      if (events.length > 500) events.splice(0, events.length - 500);
+      // The map is in requestRenderMode; request a post-commit frame so the
+      // benchmark measures render readiness after an actual datasource commit.
+      window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.requestRender?.();
+    });
 
     window.addEventListener("map:frame-ready", (event: Event) => {
       const detail = (event as CustomEvent<WorkloadFrameDiagnostics>).detail;
@@ -393,11 +395,59 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     page.getByTestId("cesium-map-container").locator("canvas").first(),
   ).toBeVisible({ timeout: 45_000 });
 
+  const browserDiagnostics: string[] = [];
+  page.on("console", (message) => {
+    const text = message.text();
+    if (
+      message.type() === "error" &&
+      (/^\\[Overture\\]/.test(text) || /Cesium|WebGL/i.test(text))
+    ) {
+      browserDiagnostics.push(text.slice(0, 500));
+      if (browserDiagnostics.length > 30) browserDiagnostics.shift();
+    }
+  });
+  page.on("pageerror", (error) => {
+    browserDiagnostics.push(("pageerror: " + error.message).slice(0, 500));
+    if (browserDiagnostics.length > 30) browserDiagnostics.shift();
+  });
+
   await expect.poll(
     () => requests.some((request) => request.statusCode === 200),
     { timeout: 45_000 },
   ).toBe(true);
-  await waitForStageThenCesiumFrame(page, 0, 45_000);
+  try {
+    await waitForStageThenCesiumFrame(page, 0, 45_000);
+  } catch (error) {
+    const browserState = await page.evaluate(() => ({
+      stageCount: window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
+      frameCount: window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.frameCount ?? 0,
+      diagnosticsInstalled: Boolean(window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__),
+      buildingLayerVisible: Array.from(document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
+        .some((input) => input.checked && /Overture 3D buildings/i.test(input.closest("li")?.textContent ?? "")),
+    }));
+    const requestState = requests.map((request) => ({
+      sequence: request.sequence,
+      outcome: request.outcome,
+      statusCode: request.statusCode,
+      dataSource: request.dataSource,
+      selectedTileCount: request.selectedTileCount,
+      candidateFeatureCount: request.candidateFeatureCount,
+      matchedFeatureCount: request.matchedFeatureCount,
+      returnedFeatureCount: request.returnedFeatureCount,
+      endpointResponseMs: request.endpointResponseMs,
+      failure: request.failure,
+      routeError: request.routeError,
+    }));
+    throw new Error(
+      "Initial building viewport did not commit before the readiness timeout. " +
+      JSON.stringify({
+        browserState,
+        requests: requestState,
+        browserDiagnostics: browserDiagnostics.slice(-20),
+        cause: errorText(error),
+      }),
+    );
+  }
 
   const initialStageCount = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
