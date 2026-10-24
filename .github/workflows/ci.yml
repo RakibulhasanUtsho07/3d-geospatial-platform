@@ -597,10 +597,10 @@ jobs:
 
           P2_11_REPORT_PATH=test-results/p2-11-cold-warm-viewport-benchmark.json npm run benchmark:viewport-cold-warm
           GEOSPATIAL_API_BASE_URL=http://127.0.0.1:3001 P2_11_REPORT_PATH=test-results/p2-12-run-b.json npm run benchmark:viewport-cold-warm
-          P2_12_RUN_A_REPORT=test-results/p2-11-cold-warm-viewport-benchmark.json P2_12_RUN_B_REPORT=test-results/p2-12-run-b.json npm run benchmark:viewport-regression-guard
+          P2_12_GUARD_REPORT_PATH=p2-13-evidence/p2-12-cold-warm-regression-guard.json P2_12_RUN_A_REPORT=test-results/p2-11-cold-warm-viewport-benchmark.json P2_12_RUN_B_REPORT=test-results/p2-12-run-b.json npm run benchmark:viewport-regression-guard
           npm run test:geospatial-api
           npm run test:map-browser
-          npm run benchmark:viewport-trend-report
+          P2_13_GUARD_REPORT=p2-13-evidence/p2-12-cold-warm-regression-guard.json npm run benchmark:viewport-trend-report
 
       - name: Upload P2.6 workload report and Playwright diagnostics
         if: always()
