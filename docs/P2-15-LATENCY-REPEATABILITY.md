@@ -12,7 +12,7 @@ Raw reports are saved as `p2-15-evidence/fresh-process-samples/sample-01.json` t
 
 ## Statistical summaries and gates
 
-The aggregate reports min, p25, median, p75, IQR, p95, max, range, median absolute deviation, mean, standard deviation, and coefficient of variation for cold samples, per-process warm medians, and pooled warm request observations. It includes raw per-process latency observations.
+The aggregate reports min, p25, median, p75, IQR, p95, max, range, median absolute deviation, mean, standard deviation, and coefficient of variation for cold samples, per-process warm medians, and pooled warm request observations. With P2.16, it also summarizes each API server phase timing (cold across fresh processes and pooled warm observations) and retains raw per-request phase values.
 
 Hard checks require identical manifest/viewport/feature budget and ordered response hashes, positive cold index reads in every fresh process, zero warm index reads, and matching deterministic cold metrics. Millisecond results are descriptive only: the CI job does not fail simply because a latency sample is slower.
 

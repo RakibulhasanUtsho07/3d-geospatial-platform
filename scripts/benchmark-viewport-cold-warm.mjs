@@ -9,6 +9,25 @@ const endpoint = baseUrl + "/api/geospatial/overture-buildings/viewport";
 const bounds = { west: 90.405, south: 23.775, east: 90.415, north: 23.785 };
 const featureLimit = 2500;
 const warmRunCount = Number(process.env.P2_11_WARM_RUNS ?? 5);
+const SERVER_TIMING_FIELDS = [
+  "totalServerMs",
+  "tileQueryMs",
+  "manifestLookupMs",
+  "tileIndexReadAndParseMs",
+  "candidateMetadataScanMs",
+  "oversizedSidecarReadMs",
+  "featureSelectionMs",
+  "selectedGeometryReadMs",
+  "geometryReadMs",
+  "featureAssemblyMs",
+  "fallbackGeoJsonPreparationMs",
+  "roleClassificationMs",
+  "responseSerializationMs",
+];
+
+function toTimingHeader(field) {
+  return "x-building-timing-" + field.replace(/[A-Z]/g, (letter) => "-" + letter.toLowerCase());
+}
 
 assert.ok(Number.isInteger(warmRunCount) && warmRunCount >= 3 && warmRunCount <= 10,
   "P2_11_WARM_RUNS must be an integer between 3 and 10");
@@ -52,7 +71,18 @@ async function observeRequest(sequence, phase) {
   const elapsedMs = Number((performance.now() - startedAt).toFixed(2));
   assert.equal(response.status, 200, phase + " request " + sequence + " should return HTTP 200");
   assert.equal(response.headers.get("x-building-data-source"), "generated-tiles");
+  assert.equal(response.headers.get("x-building-timing-version"), "p2.16",
+    "server must advertise the P2.16 timing contract");
   assert.ok(Array.isArray(body.features) && body.features.length > 0, "expected real Dhaka building features");
+
+  const serverTimingsMs = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
+    field,
+    readMetric(response.headers, toTimingHeader(field)),
+  ]));
+  assert.ok(serverTimingsMs.totalServerMs >= serverTimingsMs.responseSerializationMs,
+    "server total timing must include response serialization");
+  assert.ok(serverTimingsMs.totalServerMs >= serverTimingsMs.tileQueryMs,
+    "server total timing must include tile query work");
 
   const candidatePayloadBytes = readMetric(response.headers, "x-building-candidate-bytes");
   const indexReadBytes = readMetric(response.headers, "x-building-index-read-bytes");
@@ -73,6 +103,7 @@ async function observeRequest(sequence, phase) {
     sequence,
     phase,
     elapsedMs,
+    serverTimingsMs,
     statusCode: response.status,
     selectedTileCount,
     candidateFeatureCount: readMetric(response.headers, "x-building-candidate-feature-count"),
@@ -154,6 +185,7 @@ const report = {
     coldDefinition: "First valid bounded viewport request after a fresh Next.js production server starts; readiness probes use invalid bounds and do not query tile/index files.",
     warmDefinition: "Consecutive identical viewport requests on the same server process after the cold sample.",
     latency: "Client-observed request through response-body download; does not isolate server CPU time or claim a general speedup.",
+    serverTimings: "X-Building-Timing-* headers use node:perf_hooks phase durations for tile query, manifest lookup, tile-index read/parse, candidate metadata scan, selected geometry read, feature selection/assembly, fallback GeoJSON preparation, role classification and JSON serialization. These phases are diagnostic measurements, not a complete accounting of framework/network/GPU time.",
     bytes: "Candidate payload is a whole-selected-tile baseline. Index and selected geometry bytes are application-reported reads, not physical disk I/O.",
     correctness: "Ordered response feature hashes and feature counts must match across cold and warm requests.",
   },

@@ -1,4 +1,5 @@
 import { open, readFile, stat } from "node:fs/promises";
+import { performance } from "node:perf_hooks";
 import { resolve } from "node:path";
 import { NextResponse } from "next/server";
 import { selectViewportFeatures } from "../../../../../core/geospatial/select-viewport-features.mjs";
@@ -112,6 +113,32 @@ type TileQueryResult = {
   featureReadBytes: number;
   tileCacheHits: number;
 };
+
+type TileQueryTimings = {
+  manifestLookupMs: number;
+  tileIndexReadAndParseMs: number;
+  candidateMetadataScanMs: number;
+  oversizedSidecarReadMs: number;
+  featureSelectionMs: number;
+  selectedGeometryReadMs: number;
+  featureAssemblyMs: number;
+};
+
+function createTileQueryTimings(): TileQueryTimings {
+  return {
+    manifestLookupMs: 0,
+    tileIndexReadAndParseMs: 0,
+    candidateMetadataScanMs: 0,
+    oversizedSidecarReadMs: 0,
+    featureSelectionMs: 0,
+    selectedGeometryReadMs: 0,
+    featureAssemblyMs: 0,
+  };
+}
+
+function formatTimingMs(value: number): string {
+  return Math.max(0, value).toFixed(3);
+}
 
 const DATA_FILE = resolve(
   process.cwd(),
@@ -854,10 +881,15 @@ async function readSelectedTileFeatures(
 async function queryGeneratedTiles(
   viewport: ViewportBounds,
   featureLimit: number,
+  timings: TileQueryTimings,
 ): Promise<TileQueryResult | null> {
+  const manifestStartedAt = performance.now();
   const manifest = await readCachedTileManifest();
+  timings.manifestLookupMs += performance.now() - manifestStartedAt;
   if (!manifest) return null;
+  const tileFilterStartedAt = performance.now();
   const selectedTiles = manifest.tiles.filter((tile) => intersects(tile.bounds, viewport));
+  timings.candidateMetadataScanMs += performance.now() - tileFilterStartedAt;
   const candidateMap = new Map<string, ViewportFeatureCandidate>();
   let oversizedFeatureCount = 0;
   let candidateFeatureCount = 0;
@@ -868,7 +900,9 @@ async function queryGeneratedTiles(
   let tileCacheHits = 0;
 
   for (const tile of selectedTiles) {
+    const tileIndexStartedAt = performance.now();
     const tileIndex = await readCachedTileIndex(tile);
+    timings.tileIndexReadAndParseMs += performance.now() - tileIndexStartedAt;
     if (!tileIndex) {
       console.warn("[Overture Viewport API] Generated tile or feature index is missing or invalid; falling back to GeoJSON index.", { tile: tile.id });
       return null;
@@ -879,6 +913,7 @@ async function queryGeneratedTiles(
     if (tileIndex.cacheHit) tileCacheHits += 1;
 
     // Preserve tile and index order, but sample on metadata before deserializing payloads.
+    const candidateScanStartedAt = performance.now();
     for (const record of tileIndex.records) {
       if (!intersects(record.bounds, viewport) || candidateMap.has(record.identity)) continue;
       candidateMap.set(record.identity, {
@@ -889,15 +924,19 @@ async function queryGeneratedTiles(
         record,
       });
     }
+    timings.candidateMetadataScanMs += performance.now() - candidateScanStartedAt;
   }
 
   if (manifest.oversizedFile) {
+    const oversizedReadStartedAt = performance.now();
     const oversizedCollection = await readCachedTileCollection(manifest.oversizedFile);
     if (!oversizedCollection) {
+      timings.oversizedSidecarReadMs += performance.now() - oversizedReadStartedAt;
       console.warn("[Overture Viewport API] Oversized feature sidecar is missing or invalid; falling back to GeoJSON index.");
       return null;
     }
     const oversizedSignature = await getFileSignature(resolve(TILE_DIRECTORY, manifest.oversizedFile));
+    timings.oversizedSidecarReadMs += performance.now() - oversizedReadStartedAt;
     const oversizedBytes = oversizedSignature ? getSignatureSize(oversizedSignature) : 0;
     candidateFeatureCount += oversizedCollection.features.length;
     fetchedFeatureCount += oversizedCollection.features.length;
@@ -905,6 +944,7 @@ async function queryGeneratedTiles(
     featureReadBytes += oversizedBytes;
     if (oversizedCollection.cacheHit) tileCacheHits += 1;
 
+    const oversizedScanStartedAt = performance.now();
     for (const indexedFeature of oversizedCollection.features) {
       if (
         !indexedFeature.bounds ||
@@ -921,9 +961,11 @@ async function queryGeneratedTiles(
       });
       oversizedFeatureCount += 1;
     }
+    timings.candidateMetadataScanMs += performance.now() - oversizedScanStartedAt;
   }
 
   const matchedFeatureCount = candidateMap.size;
+  const selectionStartedAt = performance.now();
   const limitedCandidates = selectViewportFeatures(
     [...candidateMap.values()],
     viewport,
@@ -931,6 +973,7 @@ async function queryGeneratedTiles(
     (candidate: ViewportFeatureCandidate) => candidate.bounds,
     (candidate: ViewportFeatureCandidate) => candidate.role,
   ) as ViewportFeatureCandidate[];
+  timings.featureSelectionMs += performance.now() - selectionStartedAt;
 
   // Only fetch geometry for selected candidates; the response feature budget now
   // also bounds normal tile-backed geometry deserialization.
@@ -951,19 +994,24 @@ async function queryGeneratedTiles(
   }
 
   for (const [tileFile, records] of recordsByTile) {
+    const selectedGeometryStartedAt = performance.now();
     const selectedRead = await readSelectedTileFeatures(tileFile, records);
+    timings.selectedGeometryReadMs += performance.now() - selectedGeometryStartedAt;
     if (!selectedRead) {
       console.warn("[Overture Viewport API] Indexed feature bytes are invalid or unavailable; falling back to GeoJSON index.", { tile: tileFile });
       return null;
     }
     fetchedFeatureCount += selectedRead.features.length;
     featureReadBytes += selectedRead.bytesRead;
+    const featureMapStartedAt = performance.now();
     for (const indexedFeature of selectedRead.features) {
       selectedFeaturesByIdentity.set(indexedFeature.identity, indexedFeature.feature);
     }
+    timings.featureAssemblyMs += performance.now() - featureMapStartedAt;
   }
 
   const features: unknown[] = [];
+  const finalAssemblyStartedAt = performance.now();
   for (const candidate of limitedCandidates) {
     const feature = selectedFeaturesByIdentity.get(candidate.identity);
     if (feature === undefined) {
@@ -972,6 +1020,7 @@ async function queryGeneratedTiles(
     }
     features.push(feature);
   }
+  timings.featureAssemblyMs += performance.now() - finalAssemblyStartedAt;
 
   return {
     features,
@@ -1019,9 +1068,14 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const featureLimit = parsedLimit.limit;
+  const requestStartedAt = performance.now();
 
   try {
-    const tileResult = await queryGeneratedTiles(viewport, featureLimit);
+    const tileTimings = createTileQueryTimings();
+    const tileQueryStartedAt = performance.now();
+    const tileResult = await queryGeneratedTiles(viewport, featureLimit, tileTimings);
+    const tileQueryMs = performance.now() - tileQueryStartedAt;
+    const fallbackPreparationStartedAt = performance.now();
     const dataset = tileResult ? null : await getIndexedDataset();
     const matchingFeatures = tileResult
       ? []
@@ -1037,6 +1091,10 @@ export async function GET(request: Request): Promise<Response> {
     const matchedFeatureCount = tileResult
       ? tileResult.matchedFeatureCount
       : matchingFeatures.length;
+    const fallbackGeoJsonPreparationMs = tileResult
+      ? 0
+      : performance.now() - fallbackPreparationStartedAt;
+    const fallbackSelectionStartedAt = performance.now();
     const limitedFeatures = tileResult
       ? tileResult.features
       : selectViewportFeatures(
@@ -1046,6 +1104,9 @@ export async function GET(request: Request): Promise<Response> {
           getFeatureBounds,
           getRenderRole,
         );
+    const fallbackFeatureSelectionMs = tileResult
+      ? 0
+      : performance.now() - fallbackSelectionStartedAt;
     const samplingStrategy =
       matchedFeatureCount > limitedFeatures.length
         ? "spatial-grid-round-robin"
@@ -1055,6 +1116,7 @@ export async function GET(request: Request): Promise<Response> {
     let parentCount = 0;
     let partCount = 0;
     let unknownRoleCount = 0;
+    const roleClassificationStartedAt = performance.now();
 
     for (const feature of limitedFeatures) {
       switch (getRenderRole(feature)) {
@@ -1073,6 +1135,7 @@ export async function GET(request: Request): Promise<Response> {
       }
     }
 
+    const roleClassificationMs = performance.now() - roleClassificationStartedAt;
     const viewportCollection = {
       type: "FeatureCollection",
       ...(dataset?.collection ?? {}),
@@ -1100,9 +1163,34 @@ export async function GET(request: Request): Promise<Response> {
       parents: parentCount,
     });
 
-    return NextResponse.json(viewportCollection, {
+    const responseSerializationStartedAt = performance.now();
+    const serializedBody = JSON.stringify(viewportCollection);
+    const responseSerializationMs = performance.now() - responseSerializationStartedAt;
+    if (typeof serializedBody !== "string") {
+      throw new Error("Viewport FeatureCollection could not be serialized as JSON.");
+    }
+    const totalServerMs = performance.now() - requestStartedAt;
+    const geometryReadMs = tileTimings.oversizedSidecarReadMs + tileTimings.selectedGeometryReadMs;
+    const featureSelectionMs = tileTimings.featureSelectionMs + fallbackFeatureSelectionMs;
+
+    return new NextResponse(serializedBody, {
       headers: {
+        "Content-Type": "application/json",
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+        "X-Building-Timing-Version": "p2.16",
+        "X-Building-Timing-Total-Server-Ms": formatTimingMs(totalServerMs),
+        "X-Building-Timing-Tile-Query-Ms": formatTimingMs(tileQueryMs),
+        "X-Building-Timing-Manifest-Lookup-Ms": formatTimingMs(tileTimings.manifestLookupMs),
+        "X-Building-Timing-Tile-Index-Read-And-Parse-Ms": formatTimingMs(tileTimings.tileIndexReadAndParseMs),
+        "X-Building-Timing-Candidate-Metadata-Scan-Ms": formatTimingMs(tileTimings.candidateMetadataScanMs),
+        "X-Building-Timing-Oversized-Sidecar-Read-Ms": formatTimingMs(tileTimings.oversizedSidecarReadMs),
+        "X-Building-Timing-Feature-Selection-Ms": formatTimingMs(featureSelectionMs),
+        "X-Building-Timing-Selected-Geometry-Read-Ms": formatTimingMs(tileTimings.selectedGeometryReadMs),
+        "X-Building-Timing-Geometry-Read-Ms": formatTimingMs(geometryReadMs),
+        "X-Building-Timing-Feature-Assembly-Ms": formatTimingMs(tileTimings.featureAssemblyMs),
+        "X-Building-Timing-Fallback-Geo-Json-Preparation-Ms": formatTimingMs(fallbackGeoJsonPreparationMs),
+        "X-Building-Timing-Role-Classification-Ms": formatTimingMs(roleClassificationMs),
+        "X-Building-Timing-Response-Serialization-Ms": formatTimingMs(responseSerializationMs),
         "X-Building-Dataset": "overture-3d-pilot",
         "X-Building-Feature-Count": String(limitedFeatures.length),
         "X-Building-Matched-Feature-Count": String(matchedFeatureCount),
