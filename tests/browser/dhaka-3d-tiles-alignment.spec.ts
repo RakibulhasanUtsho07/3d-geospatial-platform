@@ -93,10 +93,15 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
       waitUntil: "load",
       timeout: 60_000,
     });
-    await expect(page.locator("html")).toHaveAttribute("data-review-status", "ready", { timeout: 60_000 });
+    await expect.poll(
+      () => page.locator("html").getAttribute("data-review-status"),
+      { timeout: 60_000 },
+    ).toMatch(/^(ready|error)$/);
 
+    const pageStatus = await page.locator("html").getAttribute("data-review-status");
     const review = await readBrowserReview(page);
-    assert.equal(review.status, "pass", "Browser review failed for camera preset " + viewId);
+    assert.equal(pageStatus, "ready", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
+    assert.equal(review.status, "pass", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
     assert.equal(review.evidenceType, "p2.3-fixed-camera-geojson-vs-3d-tiles-render-review");
     assert.equal(review.view.id, viewId);
     assert.equal(review.baseline.loaded, true, "GeoJSON baseline was not rendered for " + viewId);
