@@ -91,6 +91,7 @@ type WorkloadFrameDiagnostics = {
     loadInProgress: boolean;
     intentRevisionBefore: number;
     intentRevisionAfter: number;
+    cameraBoundsChanged: boolean;
     viewportWidthDegrees: number | null;
     viewportHeightDegrees: number | null;
   } | null;
