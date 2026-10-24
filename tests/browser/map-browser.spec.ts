@@ -462,7 +462,7 @@ test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replaci
   expect(manifest.root.transform).toHaveLength(16);
   expect(manifest.root.transform?.every(Number.isFinite)).toBe(true);
   expect(manifest.root.boundingVolume?.region).toHaveLength(6);
-  expect(manifest.root.transform?.[1]).toBeCloseTo(Math.cos((manifest.asset.extras?.placementAnchor?.latitudeDegrees ?? 0) * Math.PI / 180), 5);
+  expect(manifest.root.transform?.[6]).toBeCloseTo(Math.sin((manifest.asset.extras?.placementAnchor?.latitudeDegrees ?? 0) * Math.PI / 180), 5);
   expect(manifest.asset.extras?.sourceFeatureId).toBeTruthy();
   expect(manifest.asset.extras?.contentSha256).toMatch(/^[a-f0-9]{64}$/);
   expect(manifest.asset.extras?.gltfCoordinateConvention).toBe("right-handed; X=east, Y=up, Z=south");
