@@ -331,12 +331,18 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
     fixtureHeightMeters,
     disclaimer: "The GLB is a synthetic box matched to source footprint bounds; it is not a real building reconstruction or survey-accurate geometry.",
   };
+  // Cesium's base traversal skips the entire root when its screen-space
+  // error is <= maximumScreenSpaceError. A one-tile fixture with geometricError
+  // 0 can therefore report tilesLoaded=true without ever requesting its GLB.
+  // Use a positive footprint-scale error so the root enters traversal; as the
+  // only leaf, this same GLB remains the selected/rendered content.
+  const fixtureGeometricErrorMeters = Math.max(widthMeters, depthMeters, fixtureHeightMeters);
   const tileset = {
-    asset: { version: "1.1", tilesetVersion: "dhaka-pilot-placement-fixture-v1", extras: { ...assetExtras, contentSha256 } },
-    geometricError: 0,
+    asset: { version: "1.1", tilesetVersion: "dhaka-pilot-placement-fixture-v1", extras: { ...assetExtras, contentSha256, fixtureGeometricErrorMeters } },
+    geometricError: fixtureGeometricErrorMeters,
     root: {
       boundingVolume: { region },
-      geometricError: 0,
+      geometricError: fixtureGeometricErrorMeters,
       refine: "REPLACE",
       transform,
       content: { uri: "tiles/dhaka-pilot.glb" },
@@ -380,6 +386,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
       widthMeters,
       depthMeters,
       heightMeters: fixtureHeightMeters,
+      geometricErrorMeters: fixtureGeometricErrorMeters,
       heightIsSynthetic: true,
       axisConvention: "right-handed glTF frame; X=east, Y=up, Z=south",
       sourceFootprintBoundsDegrees: selected.bounds,
