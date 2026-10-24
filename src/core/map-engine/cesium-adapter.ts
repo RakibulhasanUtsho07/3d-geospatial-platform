@@ -86,6 +86,8 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  /** Benchmark-only hook to process the live camera state through the normal intent handler. */
+  notifyCameraIntent?: () => void;
 };
 
 type WorkloadBenchmarkWindow = Window & {
@@ -251,6 +253,21 @@ export class CesiumAdapter implements MapEngine {
         !viewer.isDestroyed()
       ) {
         viewer.scene.requestRender();
+      }
+    };
+    diagnostics.notifyCameraIntent = () => {
+      // Some synthetic browser drags can update the camera without reliably
+      // emitting moveEnd on every runner. Process the current live camera state
+      // through the same production handler used by the registered moveEnd
+      // listener, allowing deterministic observation of stale-request aborts.
+      const currentCesium = this.cesium;
+      if (
+        this.workloadFrameDiagnostics === diagnostics &&
+        this.viewer === viewer &&
+        currentCesium &&
+        !viewer.isDestroyed()
+      ) {
+        this.handleCameraMoveEnd(viewer, currentCesium);
       }
     };
     this.workloadFrameDiagnostics = diagnostics;
