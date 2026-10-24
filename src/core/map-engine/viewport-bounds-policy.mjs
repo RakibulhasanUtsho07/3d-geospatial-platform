@@ -1,34 +1,31 @@
-export type GeographicViewportBounds = {
-  west: number;
-  south: number;
-  east: number;
-  north: number;
-};
-
-export type GeographicViewportCenter = {
-  longitude: number;
-  latitude: number;
-};
-
 const METERS_PER_LATITUDE_DEGREE = 111_320;
 
 /**
- * Intersect an existing viewport rectangle with a local square centred on the
- * camera's ground-focus point. The radius is a per-axis half-extent, not a
- * circular-distance test; actual selection still uses the viewport rectangle.
+ * Intersect a viewport rectangle with a local square centred on the camera's
+ * ground-focus point. The half-extent applies to each axis; tile selection
+ * still uses a geographic rectangle, not a circular-distance test.
  *
+ * @param {{west:number,south:number,east:number,north:number}} bounds
+ * @param {{longitude:number,latitude:number}} center
+ * @param {number} halfExtentMeters
+ * @returns {{west:number,south:number,east:number,north:number}|null}
  * A null result means the arguments are invalid or the rectangles do not
- * intersect. Callers can then retain their unmodified viewport rather than
- * silently requesting the wrong area.
+ * intersect. Callers can retain their unmodified viewport rather than
+ * silently requesting an unrelated area.
  */
-export function clampViewportBoundsToLocalWindow(
-  bounds: GeographicViewportBounds,
-  center: GeographicViewportCenter,
-  halfExtentMeters: number,
-): GeographicViewportBounds | null {
+export function clampViewportBoundsToLocalWindow(bounds, center, halfExtentMeters) {
   if (
-    ![bounds.west, bounds.south, bounds.east, bounds.north,
-      center.longitude, center.latitude, halfExtentMeters].every(Number.isFinite) ||
+    !bounds ||
+    !center ||
+    ![
+      bounds.west,
+      bounds.south,
+      bounds.east,
+      bounds.north,
+      center.longitude,
+      center.latitude,
+      halfExtentMeters,
+    ].every(Number.isFinite) ||
     bounds.west >= bounds.east ||
     bounds.south >= bounds.north ||
     center.longitude < -180 ||
