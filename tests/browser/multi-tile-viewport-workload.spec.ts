@@ -67,7 +67,7 @@ type MemorySample = {
 };
 
 const VIEWPORT_API_FRAGMENT = "/api/geospatial/overture-buildings/viewport";
-const CANCEL_RESPONSE_DELAY_MS = 1_500;
+const CANCEL_RESPONSE_DELAY_MS = 5_000;
 const MOVEMENT_CYCLES = 8;
 const MAX_HEAP_GROWTH_BYTES = 128 * 1024 * 1024;
 const MAX_DOM_NODE_GROWTH = 10_000;
@@ -514,7 +514,25 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
   await panCanvas(page, 280, 90);
   await page.getByRole("button", { name: "Zoom out" }).click();
-  await pause(CANCEL_RESPONSE_DELAY_MS + 300);
+
+  // Canvas drags and UI clicks take longer than a short API response delay on
+  // hosted Chromium. Keep the intercepted response pending until the app's
+  // AbortController sees the newer camera intent; do not pass based only on
+  // the browser route eventually failing or on the stale model not being drawn.
+  const delayedViewportHash = requests.find(
+    (request) => request.request === delayedBrowserRequest,
+  )?.viewportHash;
+  expect(delayedViewportHash, "the deliberately delayed request needs a stable viewport hash")
+    .not.toBeNull();
+  await expect.poll(async () => {
+    const abortEvents = await page.evaluate(
+      () => window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ?? [],
+    );
+    return abortEvents.some((event) =>
+      hashBounds(boundsKeyFromUrl(event.url)) === delayedViewportHash,
+    );
+  }, { timeout: CANCEL_RESPONSE_DELAY_MS - 500, intervals: [100, 200, 300] })
+    .toBe(true);
 
   // Repeat camera movement on the live viewer. This exercises tile selection,
   // response-cache turnover and entity staging over distinct viewport bounds.
