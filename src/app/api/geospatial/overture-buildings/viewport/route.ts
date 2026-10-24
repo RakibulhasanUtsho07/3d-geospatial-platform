@@ -122,6 +122,7 @@ type TileQueryResult = {
   geometryFeatureCacheBytes: number;
   geometryFeatureCacheEvictions: number;
   geometryFeatureCacheOversizedRejections: number;
+  geometryFeatureCacheInvalidations: number;
 };
 
 type TileQueryTimings = {
@@ -984,6 +985,23 @@ async function queryGeneratedTiles(
       return null;
     }
     candidateFeatureCount += tileIndex.records.length;
+    const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key) => {
+      try {
+        const parts: unknown = JSON.parse(key);
+        return Array.isArray(parts) &&
+          parts[0] === tile.file &&
+          typeof parts[1] === "string" &&
+          parts[1] !== tileIndex.dataSignature;
+      } catch {
+        return false;
+      }
+    });
+    if (invalidatedGeometryEntries > 0) {
+      console.info("[Overture Viewport API] Purged selected geometry cached for an older tile signature.", {
+        tile: tile.id,
+        invalidatedEntries: invalidatedGeometryEntries,
+      });
+    }
     tileDataSignatures.set(tile.file, tileIndex.dataSignature);
     candidateBytes += getSignatureSize(tileIndex.dataSignature);
     indexReadBytes += tileIndex.indexReadBytes;
@@ -1129,6 +1147,7 @@ async function queryGeneratedTiles(
     geometryFeatureCacheBytes: selectedTileGeometryCache.getStats().bytes,
     geometryFeatureCacheEvictions: selectedTileGeometryCache.getStats().evictions,
     geometryFeatureCacheOversizedRejections: selectedTileGeometryCache.getStats().oversizedRejections,
+    geometryFeatureCacheInvalidations: selectedTileGeometryCache.getStats().invalidations,
   };
 }
 
@@ -1255,6 +1274,7 @@ export async function GET(request: Request): Promise<Response> {
       geometryFeatureCacheHits: tileResult?.geometryFeatureCacheHits ?? 0,
       geometryFeatureCacheMisses: tileResult?.geometryFeatureCacheMisses ?? 0,
       geometryFeatureCacheStats: selectedTileGeometryCache.getStats(),
+      geometryFeatureCacheInvalidations: selectedTileGeometryCache.getStats().invalidations,
       oversizedFeatures: tileResult?.oversizedFeatureCount ?? 0,
       buildings: buildingCount,
       buildingParts: partCount,
@@ -1275,7 +1295,7 @@ export async function GET(request: Request): Promise<Response> {
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
-        "X-Building-Timing-Version": "p2.18",
+        "X-Building-Timing-Version": "p2.19",
         "X-Building-Timing-Total-Server-Ms": formatTimingMs(totalServerMs),
         "X-Building-Timing-Tile-Query-Ms": formatTimingMs(tileQueryMs),
         "X-Building-Timing-Manifest-Lookup-Ms": formatTimingMs(tileTimings.manifestLookupMs),
@@ -1324,6 +1344,7 @@ export async function GET(request: Request): Promise<Response> {
         "X-Building-Geometry-Feature-Cache-Bytes": String(selectedTileGeometryCache.getStats().bytes),
         "X-Building-Geometry-Feature-Cache-Evictions": String(selectedTileGeometryCache.getStats().evictions),
         "X-Building-Geometry-Feature-Cache-Oversized-Rejections": String(selectedTileGeometryCache.getStats().oversizedRejections),
+        "X-Building-Geometry-Feature-Cache-Invalidations": String(selectedTileGeometryCache.getStats().invalidations),
         "X-Building-Count": String(buildingCount),
         "X-Building-Parent-Count": String(parentCount),
         "X-Building-Part-Count": String(partCount),
