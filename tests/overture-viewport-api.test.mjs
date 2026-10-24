@@ -193,7 +193,7 @@ test("viewport API exposes server phase timings without changing its feature pay
   const firstBody = await firstResponse.json();
 
   assert.equal(firstResponse.status, 200);
-  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.16");
+  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.17");
   assert.equal(firstResponse.headers.get("Content-Type"), "application/json");
 
   const timingHeaders = {
@@ -205,6 +205,12 @@ test("viewport API exposes server phase timings without changing its feature pay
     oversizedSidecarReadMs: "X-Building-Timing-Oversized-Sidecar-Read-Ms",
     featureSelectionMs: "X-Building-Timing-Feature-Selection-Ms",
     selectedGeometryReadMs: "X-Building-Timing-Selected-Geometry-Read-Ms",
+    geometryRangePlanningMs: "X-Building-Timing-Geometry-Range-Planning-Ms",
+    geometryFileOpenMs: "X-Building-Timing-Geometry-File-Open-Ms",
+    geometryRangeReadMs: "X-Building-Timing-Geometry-Range-Read-Ms",
+    geometryJsonParseMs: "X-Building-Timing-Geometry-Json-Parse-Ms",
+    geometryIntegrityCheckMs: "X-Building-Timing-Geometry-Integrity-Check-Ms",
+    geometryFileCloseMs: "X-Building-Timing-Geometry-File-Close-Ms",
     geometryReadMs: "X-Building-Timing-Geometry-Read-Ms",
     featureAssemblyMs: "X-Building-Timing-Feature-Assembly-Ms",
     fallbackGeoJsonPreparationMs: "X-Building-Timing-Fallback-Geo-Json-Preparation-Ms",
@@ -233,6 +239,15 @@ test("viewport API exposes server phase timings without changing its feature pay
     timings.featureAssemblyMs;
   assert.ok(timings.tileQueryMs + 0.1 >= tilePhaseTotal,
     "measured tile sub-phases should fit within total tile-query duration");
+  const selectedGeometrySubphaseTotal =
+    timings.geometryRangePlanningMs +
+    timings.geometryFileOpenMs +
+    timings.geometryRangeReadMs +
+    timings.geometryJsonParseMs +
+    timings.geometryIntegrityCheckMs +
+    timings.geometryFileCloseMs;
+  assert.ok(timings.selectedGeometryReadMs + 0.1 >= selectedGeometrySubphaseTotal,
+    "selected geometry subphases should fit within their enclosing geometry-read duration");
   assert.ok(Array.isArray(firstBody.features) && firstBody.features.length > 0);
 
   const secondResponse = await fetch(url, { cache: "no-store" });
