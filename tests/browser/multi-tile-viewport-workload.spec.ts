@@ -50,6 +50,13 @@ type FetchAbortEvent = {
   url: string;
 };
 
+type BrowserFetchLifecycleEvent = {
+  startedAtMs: number;
+  completedAtMs: number | null;
+  viewportKey: string | null;
+  outcome: "in-flight" | "delivered" | "http-error" | "failed";
+};
+
 declare global {
   interface Window {
     __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
@@ -57,6 +64,7 @@ declare global {
     __MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?: StageEvent[];
     __MAP_ENGINE_WORKLOAD_FRAME_EVENTS__?: FrameEvent[];
     __MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?: FetchAbortEvent[];
+    __MAP_ENGINE_WORKLOAD_FETCH_EVENTS__?: BrowserFetchLifecycleEvent[];
   }
 }
 
@@ -341,6 +349,56 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ = [];
     window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ = [];
     window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ = [];
+    window.__MAP_ENGINE_WORKLOAD_FETCH_EVENTS__ = [];
+
+    // Measure fetch lifecycle using the browser's performance clock so request
+    // start, response completion, building-stage and postRender timestamps share
+    // the same clock. Raw coordinates remain transient and are hashed in report.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const rawUrl = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (!rawUrl.includes("/api/geospatial/overture-buildings/viewport")) {
+        return nativeFetch(input, init);
+      }
+
+      const startedAtMs = performance.now();
+      let viewportKey: string | null = null;
+      try {
+        const url = new URL(rawUrl, window.location.origin);
+        const bounds = ["west", "south", "east", "north"].map((key) =>
+          Number(url.searchParams.get(key)),
+        );
+        if (bounds.every(Number.isFinite) && bounds[0] < bounds[2] && bounds[1] < bounds[3]) {
+          viewportKey = bounds.map((value) => value.toFixed(6)).join("|");
+        }
+      } catch {
+        viewportKey = null;
+      }
+      const lifecycle: BrowserFetchLifecycleEvent = {
+        startedAtMs,
+        completedAtMs: null,
+        viewportKey,
+        outcome: "in-flight",
+      };
+      const lifecycleEvents = window.__MAP_ENGINE_WORKLOAD_FETCH_EVENTS__ ??= [];
+      lifecycleEvents.push(lifecycle);
+      if (lifecycleEvents.length > 500) lifecycleEvents.splice(0, lifecycleEvents.length - 500);
+
+      try {
+        const response = await nativeFetch(input, init);
+        lifecycle.completedAtMs = performance.now();
+        lifecycle.outcome = response.ok ? "delivered" : "http-error";
+        return response;
+      } catch (error) {
+        lifecycle.completedAtMs = performance.now();
+        lifecycle.outcome = "failed";
+        throw error;
+      }
+    };
 
     // Observe the actual AbortController signal from BuildingViewportManager.
     // Raw endpoints stay in-memory only; persisted reports store viewport hashes.
@@ -974,6 +1032,40 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     })
     .filter((value): value is number => value !== null);
 
+  const browserFetchLifecycleEvents = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_FETCH_EVENTS__ ?? [],
+  );
+  const startupFetchLifecycle = browserFetchLifecycleEvents.find((event) =>
+    hashBounds(event.viewportKey) === startupShallowObservation.viewportHash &&
+    event.outcome === "delivered" &&
+    event.completedAtMs !== null,
+  );
+  const startupBuildingStage = stages.find((stage) =>
+    stage.viewportHash === startupShallowObservation.viewportHash &&
+    (stage.renderedBuildings ?? 0) > 0 &&
+    (stage.returnedFeatures ?? 0) > 0,
+  );
+  const startupBuildingFrame = startupBuildingStage
+    ? frameEvents.find((frame) => frame.atMs >= startupBuildingStage.atMs)
+    : undefined;
+  const startupBuildingReadiness = startupFetchLifecycle && startupBuildingStage && startupBuildingFrame
+    ? {
+      viewportHash: startupShallowObservation.viewportHash,
+      requestStartToRenderedBuildingStageMs: Number(
+        (startupBuildingStage.atMs - startupFetchLifecycle.startedAtMs).toFixed(2),
+      ),
+      responseCompleteToRenderedBuildingStageMs: Number(
+        (startupBuildingStage.atMs - startupFetchLifecycle.completedAtMs!).toFixed(2),
+      ),
+      buildingStageToPostRenderFrameMs: Number(
+        (startupBuildingFrame.atMs - startupBuildingStage.atMs).toFixed(2),
+      ),
+      returnedFeatures: startupBuildingStage.returnedFeatures,
+      renderedBuildings: startupBuildingStage.renderedBuildings,
+      postRenderFrameSequence: startupBuildingFrame.frameSequence,
+    }
+    : null;
+
   const successfulGeneratedTileRequests = requests.filter((request) =>
     request.statusCode === 200 &&
     request.dataSource === "generated-tiles" &&
@@ -1093,6 +1185,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     workload: {
       movementCycles: MOVEMENT_CYCLES,
       viewportRequestCount: requests.length,
+      browserFetchLifecycleObservationCount: browserFetchLifecycleEvents.length,
       deliveredRequestCount: completedRequests.length,
       browserCancelledRequestCount: cancelledRequests.length,
       failedRequestCount: requests.filter((request) => request.outcome === "failed" || request.outcome === "route-error").length,
@@ -1162,6 +1255,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       },
     },
     readiness: {
+      firstBuilding: startupBuildingReadiness,
       buildingStageCount: stages.length,
       initialStageCount,
       cesiumPostRenderFrameCount: frameEvents.length,
@@ -1230,6 +1324,10 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   expect(finalViewportStaged, "the latest stable viewport intent must eventually commit after pan/zoom churn").toBe(true);
   expect(stages.length, "the initial and final committed viewport stages must be observed").toBeGreaterThanOrEqual(2);
   expect(stageFrameDelaysMs.length, "each staged viewport must be followed by an actual Cesium postRender frame").toBe(stages.length);
+  expect(startupBuildingReadiness, "the first startup viewport must be tied to a rendered-building stage and a later Cesium postRender frame").not.toBeNull();
+  expect(startupBuildingReadiness!.requestStartToRenderedBuildingStageMs, "first building readiness should be measured from browser fetch start").toBeGreaterThanOrEqual(0);
+  expect(startupBuildingReadiness!.responseCompleteToRenderedBuildingStageMs, "building staging should follow the browser-visible response").toBeGreaterThanOrEqual(0);
+  expect(startupBuildingReadiness!.buildingStageToPostRenderFrameMs, "first rendered building stage should be followed by a real Cesium frame").toBeGreaterThanOrEqual(0);
   expect(validHeapValues.length, "Chromium JS heap metrics must be available for the memory trend").toBeGreaterThanOrEqual(5);
   expect(memoryGuardPass, "repeated camera movement must not exceed the broad JS heap/DOM growth guard").toBe(true);
 });
