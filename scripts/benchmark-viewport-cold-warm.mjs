@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -110,10 +110,15 @@ assert.ok(warm.every((sample) => sample.returnedFeatureCount === cold.returnedFe
 const warmLatencies = warm.map((sample) => sample.elapsedMs);
 const warmGeometryBytes = warm.reduce((total, sample) => total + sample.featureReadBytes, 0);
 const warmCandidateBytes = warm.reduce((total, sample) => total + sample.candidatePayloadBytes, 0);
+const manifestPath = resolve(process.cwd(), "data", "overture", "spatial-tiles", "manifest.json");
+const manifestBytes = await readFile(manifestPath);
+const spatialTileManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
+
 const report = {
   benchmark: "p2.11-controlled-cold-warm-viewport",
   generatedAt: new Date().toISOString(),
   candidateSha: process.env.GITHUB_SHA ?? null,
+  spatialTileManifestSha256,
   environment: {
     node: process.version,
     platform: process.platform,
@@ -154,7 +159,10 @@ const report = {
   },
 };
 
-const artifactPath = resolve(process.cwd(), "test-results", "p2-11-cold-warm-viewport-benchmark.json");
+const artifactPath = resolve(
+  process.cwd(),
+  process.env.P2_11_REPORT_PATH ?? "test-results/p2-11-cold-warm-viewport-benchmark.json",
+);
 await mkdir(dirname(artifactPath), { recursive: true });
 await writeFile(artifactPath, JSON.stringify(report, null, 2) + "\n", "utf8");
 console.log("[P2.11 cold/warm viewport benchmark]", JSON.stringify(report));

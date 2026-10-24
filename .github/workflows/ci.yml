@@ -50,6 +50,7 @@ on:
       - feat/p2-9-startup-tile-fetch-cost
       - feat/p2-10-viewport-fetch-cost-evidence
       - feat/p2-11-cold-warm-render-readiness
+      - feat/p2-12-cross-process-regression-guard
   pull_request:
     branches:
       - main
@@ -80,6 +81,7 @@ on:
       - feat/p2-8-startup-coverage-alignment
       - feat/p2-9-startup-tile-fetch-cost
       - feat/p2-10-viewport-fetch-cost-evidence
+      - feat/p2-11-cold-warm-render-readiness
 
 permissions:
   contents: read
@@ -421,7 +423,11 @@ jobs:
         run: |
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          # The second production process has an independent module/index cache
+          # but uses the exact same built app and generated tile manifest.
+          ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3001 > /tmp/geospatial-next-repeat.log 2>&1 &
+          repeat_server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true' EXIT
 
           node --input-type=module <<'NODE'
           const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
@@ -559,7 +565,33 @@ jobs:
           }
           NODE
 
-          npm run benchmark:viewport-cold-warm
+          # Readiness probes use invalid bounds, so both servers' tile indexes are still cold.
+          node --input-type=module <<'NODE'
+          const endpoint = "http://127.0.0.1:3001/api/geospatial/overture-buildings/viewport";
+          const deadline = Date.now() + 60000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(endpoint);
+              await response.arrayBuffer();
+              if (response.status === 400) {
+                ready = true;
+                break;
+              }
+            } catch {
+              // The repeat server is still starting.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          if (!ready) {
+            console.error("Second Next.js production server did not become ready.");
+            process.exit(1);
+          }
+          NODE
+
+          P2_11_REPORT_PATH=test-results/p2-11-cold-warm-viewport-benchmark.json npm run benchmark:viewport-cold-warm
+          GEOSPATIAL_API_BASE_URL=http://127.0.0.1:3001 P2_11_REPORT_PATH=test-results/p2-12-run-b.json npm run benchmark:viewport-cold-warm
+          P2_12_RUN_A_REPORT=test-results/p2-11-cold-warm-viewport-benchmark.json P2_12_RUN_B_REPORT=test-results/p2-12-run-b.json npm run benchmark:viewport-regression-guard
           npm run test:geospatial-api
           npm run test:map-browser
 
