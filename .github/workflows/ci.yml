@@ -52,6 +52,7 @@ on:
       - feat/p2-11-cold-warm-render-readiness
       - feat/p2-12-cross-process-regression-guard
       - feat/p2-13-viewport-performance-trend
+      - feat/p2-14-cross-commit-performance-compare
   pull_request:
     branches:
       - main
@@ -85,6 +86,7 @@ on:
       - feat/p2-11-cold-warm-render-readiness
       - feat/p2-12-cross-process-regression-guard
       - feat/p2-13-viewport-performance-trend
+      - feat/p2-14-cross-commit-performance-compare
 
 permissions:
   contents: read
@@ -341,6 +343,9 @@ jobs:
 
       - name: Test P2.13 viewport performance trend evidence contract
         run: npm run test:viewport-trend-report
+
+      - name: Test P2.14 cross-commit viewport performance comparison
+        run: npm run test:viewport-baseline-compare
 
       - name: Test dynamic map optimization parity and visual style policies
         run: npm run test:map-optimization
@@ -601,6 +606,7 @@ jobs:
           npm run test:geospatial-api
           npm run test:map-browser
           P2_13_GUARD_REPORT=p2-13-evidence/p2-12-cold-warm-regression-guard.json npm run benchmark:viewport-trend-report
+          npm run benchmark:viewport-baseline-compare
 
       - name: Upload P2.6 workload report and Playwright diagnostics
         if: always()
