@@ -99,7 +99,10 @@ export class Dhaka3DTilesPilotController {
       });
 
       if (!this.#isCurrent(revision, viewer)) {
-        if (revision === this.#revision) this.#loading = false;
+        if (revision === this.#revision) {
+          this.#loading = false;
+          this.#emit("cancelled");
+        }
         destroyUnattachedTileset(tileset);
         return { status: "cancelled" };
       }
