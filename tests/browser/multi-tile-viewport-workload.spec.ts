@@ -601,6 +601,30 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     );
   }
 
+  const startupShallowObservation = requests.find((request) => request.sequence === 1);
+  if (!startupShallowObservation) {
+    throw new Error("The startup building viewport request was not observed.");
+  }
+  expect(
+    startupShallowObservation.viewportWidthDegrees,
+    "a shallow startup view must query a bounded local width, not the full horizon rectangle",
+  ).not.toBeNull();
+  expect(startupShallowObservation.viewportWidthDegrees!).toBeLessThan(0.05);
+  expect(
+    startupShallowObservation.viewportHeightDegrees,
+    "a shallow startup view must query a bounded local height, not the full horizon rectangle",
+  ).not.toBeNull();
+  expect(startupShallowObservation.viewportHeightDegrees!).toBeLessThan(0.05);
+  const shallowViewLocalWindowProbe = {
+    viewportHash: startupShallowObservation.viewportHash,
+    viewportSpanDegrees: {
+      width: startupShallowObservation.viewportWidthDegrees,
+      height: startupShallowObservation.viewportHeightDegrees,
+    },
+    selectedTileCount: startupShallowObservation.selectedTileCount,
+    availableTileCount: availableSpatialTileCount,
+  };
+
   const stageCountBeforeLocalFocus = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
   );
@@ -931,6 +955,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       failedRequestCount: requests.filter((request) => request.outcome === "failed" || request.outcome === "route-error").length,
       fetchAbortSignalCount: fetchAbortEvents.length,
       uniqueViewportCount: uniqueViewports.size,
+      shallowViewLocalWindowProbe,
       localFocusSelectivityProbe,
       delayedCancellationRequestObserved: delayedResponseClaimed,
       delayedCancellationOutcome: delayedCancellationRequest?.outcome ?? null,
