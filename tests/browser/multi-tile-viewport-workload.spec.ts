@@ -742,7 +742,24 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     (request) => isViewportRequest(request.url()) && !existingRequestUrls.has(request.url()),
     { timeout: 20_000 },
   );
-  await page.getByRole("button", { name: "Zoom out" }).click();
+
+  // Start one fresh request through the normal camera handler, then immediately
+  // issue a second camera intent after that response is held. Avoid animated
+  // zoom/drag gestures in this narrow cancellation window: their delayed
+  // moveEnd events can otherwise supersede the request before it is observed.
+  const requestIntentProbe = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null,
+  );
+  expect(requestIntentProbe, "the opt-in production camera-intent probe must be installed")
+    .not.toBeNull();
+  expect(requestIntentProbe?.cameraBoundsChanged, "the first probe must produce a distinct viewport")
+    .toBe(true);
+  expect(
+    requestIntentProbe?.lifecycleAfter.loadInProgress &&
+      requestIntentProbe?.lifecycleAfter.hasAbortController,
+    "the first probe must create an active manager-owned viewport fetch",
+  ).toBe(true);
+
   const delayedBrowserRequest = await delayedRequestPromise;
   await expect.poll(
     () => requests.some((request) =>
@@ -751,21 +768,16 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     { timeout: 10_000 },
   ).toBe(true);
 
-  await panCanvas(page, 280, 90);
-  await page.getByRole("button", { name: "Zoom out" }).click();
-
-  // Process the camera's current bounds through the same production handler
-  // attached to Cesium camera.moveEnd. The actual pointer and zoom operations
-  // above move the viewer; this opt-in hook only makes intent notification
-  // deterministic across headless browser timing.
+  // This second synchronous camera intent changes the endpoint while the
+  // browser response is held. The manager should abort precisely that request.
   const intentProbe = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null,
   );
-  expect(intentProbe, "the opt-in production camera-intent probe must be installed")
+  expect(intentProbe, "the opt-in production camera-intent probe must remain installed")
     .not.toBeNull();
   expect(intentProbe?.loadInProgress, "the deliberately delayed viewport must remain in-flight")
     .toBe(true);
-  expect(intentProbe?.cameraBoundsChanged, "the benchmark camera probe must change the viewport bounds")
+  expect(intentProbe?.cameraBoundsChanged, "the second probe must change the viewport bounds")
     .toBe(true);
   expect(
     intentProbe?.intentRevisionAfter,
