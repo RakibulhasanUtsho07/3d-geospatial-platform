@@ -159,7 +159,7 @@ async function loadDataset() {
   assert.equal(source.type, "FeatureCollection");
   assert.ok(Array.isArray(source.features));
 
-  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.schemaVersion, 2);
   assert.ok(Array.isArray(manifest.tiles));
 
   return { source, manifest };
@@ -193,7 +193,7 @@ test("manifest matches the source dataset and generated grid", async () => {
     manifest.tiles.length,
   );
 
-  assert.equal(manifest.gridStepDegrees, 0.005);
+  assert.equal(manifest.gridStepDegrees, 0.01);
 
   assert.ok(
     manifest.tileCount > 0,
@@ -276,9 +276,23 @@ test(
         `tile file does not exist: ${tile.file}`,
       );
 
-      const tileCollection = JSON.parse(
-        await readFile(filePath, "utf8"),
+      const tileContents = await readFile(filePath);
+      const tileCollection = JSON.parse(tileContents.toString("utf8"));
+      assert.equal(
+        tile.indexFile,
+        "tiles/" + tile.id + ".geojson.index.json",
+        `tile ${tile.id} has an invalid feature-index path`,
       );
+      const indexPath = path.resolve(generatedPath, tile.indexFile);
+      assert.ok(
+        indexPath.startsWith(outputRoot + path.sep),
+        `feature index path escaped output directory: ${tile.indexFile}`,
+      );
+      const featureIndex = JSON.parse(await readFile(indexPath, "utf8"));
+      assert.equal(featureIndex.schemaVersion, 1);
+      assert.equal(featureIndex.tileId, tile.id);
+      assert.equal(featureIndex.featureCount, tile.featureCount);
+      assert.equal(featureIndex.records.length, tile.featureCount);
 
       assert.equal(
         tileCollection.type,
@@ -301,8 +315,22 @@ test(
       totalTileFeatureCopies +=
         tileCollection.features.length;
 
-      for (const feature of tileCollection.features) {
+      for (const [featurePosition, feature] of tileCollection.features.entries()) {
+        const record = featureIndex.records[featurePosition];
+        assert.ok(Number.isInteger(record.offset) && record.offset >= 0);
+        assert.ok(Number.isInteger(record.length) && record.length > 0);
+        assert.ok(record.offset + record.length <= tileContents.length);
+        const indexedFeature = JSON.parse(
+          tileContents.subarray(record.offset, record.offset + record.length).toString("utf8"),
+        );
+        assert.deepEqual(
+          indexedFeature,
+          feature,
+          `byte-offset index differs from tile record in ${tile.id}`,
+        );
+
         const identity = getFeatureIdentity(feature);
+        assert.equal(record.identity, identity);
 
         assert.ok(
           !localIdentities.has(identity),
