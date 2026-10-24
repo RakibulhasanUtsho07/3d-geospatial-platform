@@ -82,6 +82,18 @@ type PerformanceDiagnosticsWindow = Window & {
   __MAP_ENGINE_PERFORMANCE__?: MapPerformanceDiagnosticsHandle;
 };
 
+type WorkloadFrameDiagnostics = {
+  frameCount: number;
+  lastFrameNumber: number;
+  lastFrameAtMs: number;
+};
+
+type WorkloadBenchmarkWindow = Window & {
+  /** Explicit opt-in used only by the real multi-tile browser workload benchmark. */
+  __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
+  __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: WorkloadFrameDiagnostics;
+};
+
 type BuildingProperties = Record<string, unknown>;
 
 type BuildingHeight = BuildingHeightInfo;
@@ -212,6 +224,41 @@ export class CesiumAdapter implements MapEngine {
   private readonly buildingViewportManager = new BuildingViewportManager();
   private readonly performanceTelemetry = createMapPerformanceTelemetry();
   private performanceDiagnosticsHandle: MapPerformanceDiagnosticsHandle | null = null;
+  private workloadFrameDiagnostics: WorkloadFrameDiagnostics | null = null;
+  private workloadFrameDiagnosticsUnsubscribe: (() => void) | null = null;
+
+  /**
+   * Expose actual Cesium postRender frames only when an integration benchmark
+   * explicitly opts in before viewer initialization. Normal production users
+   * do not pay for a per-frame global counter or event dispatch.
+   */
+  private installWorkloadFrameDiagnostics(viewer: CesiumViewer): void {
+    if (typeof window === "undefined") return;
+
+    const target = window as WorkloadBenchmarkWindow;
+    if (target.__MAP_ENGINE_WORKLOAD_BENCHMARK__ !== true) return;
+
+    const diagnostics: WorkloadFrameDiagnostics = {
+      frameCount: 0,
+      lastFrameNumber: 0,
+      lastFrameAtMs: 0,
+    };
+    this.workloadFrameDiagnostics = diagnostics;
+    target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__ = diagnostics;
+
+    this.workloadFrameDiagnosticsUnsubscribe = viewer.scene.postRender.addEventListener(() => {
+      const current = this.workloadFrameDiagnostics;
+      if (!current || typeof window === "undefined") return;
+
+      current.frameCount += 1;
+      current.lastFrameNumber = viewer.scene.frameState.frameNumber;
+      current.lastFrameAtMs = performance.now();
+      window.dispatchEvent(new CustomEvent("map:frame-ready", {
+        detail: { ...current },
+      }));
+    });
+  }
+
   private installMapPerformanceDiagnostics(): void {
     if (typeof window === "undefined" || process.env.NODE_ENV === "production") {
       return;
@@ -292,6 +339,7 @@ export class CesiumAdapter implements MapEngine {
     });
 
     this.viewer = viewer;
+    this.installWorkloadFrameDiagnostics(viewer);
     this.addHeritageLandmarkMarkers(viewer, Cesium);
     this.heritageCameraController.configureInitialCamera();
 
@@ -1991,6 +2039,16 @@ export class CesiumAdapter implements MapEngine {
   }
 
   destroy(): void {
+    this.workloadFrameDiagnosticsUnsubscribe?.();
+    this.workloadFrameDiagnosticsUnsubscribe = null;
+    if (this.workloadFrameDiagnostics && typeof window !== "undefined") {
+      const target = window as WorkloadBenchmarkWindow;
+      if (target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__ === this.workloadFrameDiagnostics) {
+        delete target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__;
+      }
+    }
+    this.workloadFrameDiagnostics = null;
+
     if (this.performanceDiagnosticsHandle && typeof window !== "undefined") {
       const target = window as PerformanceDiagnosticsWindow;
       if (target.__MAP_ENGINE_PERFORMANCE__ === this.performanceDiagnosticsHandle) {
