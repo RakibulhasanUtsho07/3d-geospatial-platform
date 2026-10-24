@@ -235,29 +235,20 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ = [];
     window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ = [];
 
-    // Observe the real signal supplied by BuildingViewportManager.fetch().
-    // Store URLs only in this in-memory test page; exported reports contain
-    // only the SHA-256 viewport hash, never raw coordinates.
-    const nativeFetch = window.fetch.bind(window);
-    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-      const requestUrl = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : typeof input === "object" && input !== null && "url" in input
-            ? String((input as { url?: unknown }).url ?? "")
-            : String(input);
-      const signal = init?.signal;
-      if (requestUrl.includes("/api/geospatial/overture-buildings/viewport") && signal) {
-        const recordAbort = () => {
-          const events = window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ??= [];
-          events.push({ atMs: performance.now(), url: requestUrl });
-        };
-        if (signal.aborted) recordAbort();
-        else signal.addEventListener("abort", recordAbort, { once: true });
-      }
-      return nativeFetch(input, init);
-    }) as typeof window.fetch;
+    // Observe the actual AbortController signal from BuildingViewportManager.
+    // Raw endpoints stay in-memory only; persisted reports store viewport hashes.
+    window.addEventListener("map:viewport-request-aborted", (event: Event) => {
+      const detail = (event as CustomEvent<{
+        atMs?: number;
+        endpoint?: string | null;
+      }>).detail;
+      if (!detail || typeof detail.endpoint !== "string") return;
+      const events = window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ??= [];
+      events.push({
+        atMs: Number.isFinite(detail.atMs) ? detail.atMs as number : performance.now(),
+        url: detail.endpoint,
+      });
+    });
 
     window.addEventListener("map:building-viewport-staged", (event: Event) => {
       const detail = (event as CustomEvent<{
