@@ -112,7 +112,7 @@ function hashBounds(key: string | null): string | null {
 function errorText(error: unknown): string {
   const message = error instanceof Error ? error.name + ": " + error.message : String(error);
   // Avoid leaking viewport query parameters into a report that otherwise stores
-  // only salted-free hashes of the requested map bounds.
+  // only short hashes of the requested map bounds.
   return message.replace(/https?:\/\/[^\s)]+/g, (candidate) => {
     try {
       const url = new URL(candidate);
