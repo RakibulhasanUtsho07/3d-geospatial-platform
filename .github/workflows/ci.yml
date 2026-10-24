@@ -551,6 +551,7 @@ jobs:
           npm run test:geospatial-api
           npm run test:map-browser
           npm run test:dhaka-3d-tiles-performance
+          npm run test:dhaka-3d-tiles-performance-repeatability
 
       - name: Upload P2.3 fixed-camera comparison evidence
         if: always()
@@ -568,5 +569,14 @@ jobs:
         with:
           name: p2-4-dhaka-render-performance
           path: artifacts/p2.4-dhaka-render-performance/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload P2.5 repeated performance baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-5-dhaka-performance-repeatability
+          path: artifacts/p2.5-dhaka-performance-repeatability/
           if-no-files-found: warn
           retention-days: 14
