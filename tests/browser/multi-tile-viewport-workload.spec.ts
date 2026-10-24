@@ -491,6 +491,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   );
   const completedRequests = requests.filter((request) => request.outcome === "delivered");
   const cancelledRequests = requests.filter((request) => request.outcome === "cancelled");
+  const delayedCancellationRequest = requests.find((request) => request.delayedForCancellation);
+  const staleDelayedResponseCancelled = delayedCancellationRequest?.outcome === "cancelled";
   const uniqueViewports = new Set(requests.map((request) => request.viewportHash).filter(Boolean));
   const allTileCounts = successfulGeneratedTileRequests
     .map((request) => request.selectedTileCount!)
@@ -546,6 +548,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       failedRequestCount: requests.filter((request) => request.outcome === "failed" || request.outcome === "route-error").length,
       uniqueViewportCount: uniqueViewports.size,
       delayedCancellationRequestObserved: delayedResponseClaimed,
+      delayedCancellationOutcome: delayedCancellationRequest?.outcome ?? null,
+      staleDelayedResponseCancelled,
       viewportResponses: requests.map((request) => ({
         sequence: request.sequence,
         viewportHash: request.viewportHash,
@@ -621,9 +625,11 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
   expect(successfulGeneratedTileRequests.length, "the real Overture viewport endpoint must use the generated spatial-tile manifest").toBeGreaterThan(0);
   expect(maxTilesInViewport, "at least one viewport must select multiple generated spatial tiles").toBeGreaterThan(1);
+  expect(uniqueViewports.size, "repeated pan/zoom must produce distinct viewport requests").toBeGreaterThanOrEqual(4);
   expect(cancelledRequests.length, "a stale in-flight viewport request must be cancelled after a newer camera intent").toBeGreaterThan(0);
+  expect(staleDelayedResponseCancelled, "the deliberately delayed stale viewport request itself must be cancelled").toBe(true);
   expect(stages.length, "several viewport payloads must be staged into Cesium").toBeGreaterThanOrEqual(4);
-  expect(stageFrameDelaysMs.length, "each staged viewport must be followed by an actual Cesium postRender frame").toBeGreaterThan(0);
+  expect(stageFrameDelaysMs.length, "each staged viewport must be followed by an actual Cesium postRender frame").toBe(stages.length);
   expect(validHeapValues.length, "Chromium JS heap metrics must be available for the memory trend").toBeGreaterThanOrEqual(5);
   expect(memoryGuardPass, "repeated camera movement must not exceed the broad JS heap/DOM growth guard").toBe(true);
 });
