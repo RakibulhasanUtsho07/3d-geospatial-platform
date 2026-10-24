@@ -327,15 +327,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     }
   });
 
-  const initial = await page.evaluate(() => {
-    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
-    return {
-      sampledAt: new Date().toISOString(),
-      jsHeapUsedBytes: typeof memory?.usedJSHeapSize === "number" ? memory.usedJSHeapSize : null,
-      jsHeapTotalBytes: typeof memory?.totalJSHeapSize === "number" ? memory.totalJSHeapSize : null,
-    };
-  }).catch(() => null);
-
   await page.setViewportSize({ width: 1600, height: 950 });
   await page.goto("/map", { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
@@ -343,6 +334,18 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await expect(canvas).toBeVisible({ timeout: 45_000 });
   await expect.poll(() => buildingRoutes.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(() => roadRoutes.length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  const initial = await page.evaluate(() => {
+    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
+    const canvas = document.querySelector("#cesium-map-container canvas") as HTMLCanvasElement | null;
+    const rect = canvas?.getBoundingClientRect();
+    return {
+      sampledAt: new Date().toISOString(),
+      jsHeapUsedBytes: typeof memory?.usedJSHeapSize === "number" ? memory.usedJSHeapSize : null,
+      jsHeapTotalBytes: typeof memory?.totalJSHeapSize === "number" ? memory.totalJSHeapSize : null,
+      canvas: { width: canvas?.width ?? 0, height: canvas?.height ?? 0, cssWidth: rect?.width ?? 0, cssHeight: rect?.height ?? 0 },
+    };
+  });
 
   const movementStartedAtMs = performance.now();
   const movementActions: string[] = [];
