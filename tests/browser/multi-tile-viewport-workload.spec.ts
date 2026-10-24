@@ -17,6 +17,7 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  getRequestLifecycleDiagnostics?: () => WorkloadRequestLifecycleDiagnostics | null;
   focusViewportForBenchmark?: (
     longitudeDegrees: number,
     latitudeDegrees: number,
@@ -694,6 +695,37 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     returnedFeatureCount: localFocusObservation.returnedFeatureCount,
     focusAltitudeMeters: 200,
   };
+
+  const assertViewportManagerIdle = async () => {
+    await expect.poll(async () => {
+      const lifecycle = await page.evaluate(
+        () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.() ?? null,
+      );
+      const unsettledBrowserRequests = requests.filter(
+        (request) => request.outcome === "in-flight",
+      ).length;
+      return Boolean(
+        lifecycle &&
+        !lifecycle.loadInProgress &&
+        !lifecycle.hasActiveEndpoint &&
+        !lifecycle.hasAbortController &&
+        !lifecycle.hasPendingRequest &&
+        unsettledBrowserRequests === 0 &&
+        routeTasks.size === 0,
+      );
+    }, {
+      timeout: 15_000,
+      intervals: [100, 200, 300],
+      message: "viewport fetch and stage queue should be idle before the cancellation probe",
+    }).toBe(true);
+  };
+
+  // A camera preset can emit a late moveEnd after its first stage. Let that
+  // ordinary work drain before arming the deliberately delayed request, or the
+  // probe may observe an abort from the previous endpoint rather than its own.
+  await assertViewportManagerIdle();
+  await page.waitForTimeout(450);
+  await assertViewportManagerIdle();
 
   const initialStageCount = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
