@@ -9,6 +9,12 @@ const OUTPUT_DIRECTORY = path.resolve(
 );
 const REVIEW_URL = "/experimental/dhaka-3d-tiles-alignment-review.html?view=north";
 
+type MiniReport = {
+  tiles?: { runtimeDiagnostics?: { tileLoadCount?: number; tileVisibleCount?: number; tileFailedCount?: number } };
+  source?: { sha256?: string };
+  fixture?: { tilesetSha256?: string; glbSha256?: string };
+};
+
 type RuntimeSample = {
   sampledAt: string;
   jsHeapUsedBytes: number | null;
@@ -40,8 +46,8 @@ async function sampleRuntime(page: Page): Promise<RuntimeSample> {
     }).memory;
     const resources = performance.getEntriesByType("resource") as PerformanceResourceTiming[];
     const reportText = document.querySelector("#review-result")?.textContent ?? "";
-    let report: Record<string, any> = {};
-    try { report = JSON.parse(reportText); } catch { /* captured as null in the evidence */ }
+    let report: MiniReport = {};
+    try { report = JSON.parse(reportText) as MiniReport; } catch { /* captured as null in the evidence */ }
     const baselineCanvas = document.querySelector("#baseline-viewer canvas") as HTMLCanvasElement | null;
     const tilesCanvas = document.querySelector("#tiles-viewer canvas") as HTMLCanvasElement | null;
     const canvas = tilesCanvas ?? baselineCanvas;
@@ -62,13 +68,14 @@ async function sampleRuntime(page: Page): Promise<RuntimeSample> {
         cssHeight: rect?.height ?? 0,
       },
       reviewStatus: document.documentElement.getAttribute("data-review-status"),
-      cesiumVersion: typeof (window as any).Cesium?.VERSION === "string" ? (window as any).Cesium.VERSION : null,
-      tileLoadCount: Number.isFinite(report?.tiles?.runtimeDiagnostics?.tileLoadCount) ? report.tiles.runtimeDiagnostics.tileLoadCount : null,
-      tileVisibleCount: Number.isFinite(report?.tiles?.runtimeDiagnostics?.tileVisibleCount) ? report.tiles.runtimeDiagnostics.tileVisibleCount : null,
-      tileFailedCount: Number.isFinite(report?.tiles?.runtimeDiagnostics?.tileFailedCount) ? report.tiles.runtimeDiagnostics.tileFailedCount : null,
-      sourceSha256: typeof report?.source?.sha256 === "string" ? report.source.sha256 : null,
-      tilesetSha256: typeof report?.fixture?.tilesetSha256 === "string" ? report.fixture.tilesetSha256 : null,
-      glbSha256: typeof report?.fixture?.glbSha256 === "string" ? report.fixture.glbSha256 : null,
+      cesiumVersion: typeof (window as Window & { Cesium?: { VERSION?: string } }).Cesium?.VERSION === "string"
+        ? (window as Window & { Cesium?: { VERSION?: string } }).Cesium?.VERSION ?? null : null,
+      tileLoadCount: typeof report.tiles?.runtimeDiagnostics?.tileLoadCount === "number" ? report.tiles.runtimeDiagnostics.tileLoadCount : null,
+      tileVisibleCount: typeof report.tiles?.runtimeDiagnostics?.tileVisibleCount === "number" ? report.tiles.runtimeDiagnostics.tileVisibleCount : null,
+      tileFailedCount: typeof report.tiles?.runtimeDiagnostics?.tileFailedCount === "number" ? report.tiles.runtimeDiagnostics.tileFailedCount : null,
+      sourceSha256: typeof report.source?.sha256 === "string" ? report.source.sha256 : null,
+      tilesetSha256: typeof report.fixture?.tilesetSha256 === "string" ? report.fixture.tilesetSha256 : null,
+      glbSha256: typeof report.fixture?.glbSha256 === "string" ? report.fixture.glbSha256 : null,
     };
   });
 }
