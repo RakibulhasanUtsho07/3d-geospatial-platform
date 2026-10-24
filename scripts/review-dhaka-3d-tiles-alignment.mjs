@@ -310,6 +310,7 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
     sourcePreview.type !== "FeatureCollection" ||
     !Array.isArray(sourcePreview.features) ||
     sourcePreview.features.length !== 1 ||
+    !isRecord(sourcePreview.features[0]) ||
     getFeatureIdentity(sourcePreview.features[0]) !== buildManifest.source?.featureId
   ) {
     throw new Error("The browser GeoJSON preview must contain exactly the selected source feature.");
