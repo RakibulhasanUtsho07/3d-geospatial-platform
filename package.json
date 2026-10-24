@@ -154,7 +154,8 @@
     "test:feature-picking-controller": "node --test tests/feature-picking-controller.test.mjs",
     "test:feature-pick-geometry": "node --test tests/feature-pick-geometry.test.mjs",
     "test:dhaka-3d-tiles-performance": "playwright test tests/browser/dhaka-3d-tiles-performance.spec.ts --config=playwright.config.ts",
-    "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts"
+    "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts",
+    "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts"
   },
   "dependencies": {
     "cesium": "^1.146.0",
