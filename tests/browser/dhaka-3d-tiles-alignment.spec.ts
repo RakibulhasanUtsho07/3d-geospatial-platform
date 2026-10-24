@@ -35,11 +35,20 @@ type BrowserReview = {
     loaded: boolean;
     viewReady: boolean;
     readinessStrategy: string;
+    resourceProbe: { url: string; status: number; ok: boolean; contentType: string | null; contentLength: string | null };
     runtimeDiagnostics: {
       tileLoadCount: number;
       tileVisibleCount: number;
       tileFailedCount: number;
       tileFailed: Array<{ url: string | null; message: string }>;
+      rootContentAvailable: boolean | null;
+      rootHasRenderableContent: boolean | null;
+      rootContentState: number | string | null;
+      rootContentUri: string | null;
+      rootContentResourceUrl: string | null;
+      selectedTileCount: number | null;
+      requestedTileCount: number | null;
+      processingQueueLength: number | null;
     };
     camera: Record<string, number>;
   };
@@ -155,6 +164,8 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
     }
     assert.equal(review.baseline.loaded, true, "GeoJSON baseline was not rendered for " + viewId);
     assert.equal(review.tiles.loaded, true, "3D Tiles fixture was not ready for " + viewId);
+    assert.equal(review.tiles.resourceProbe.ok, true);
+    assert.equal(review.tiles.resourceProbe.status, 200, "The fixture GLB route must be reachable before visual validation.");
     assert.equal(review.tiles.viewReady, true, "The current camera view did not become render-ready for " + viewId);
     assert.equal(review.tiles.readinessStrategy, "postRender-tilesLoaded-two-consecutive-frames");
     assert.ok(review.tiles.runtimeDiagnostics.tileLoadCount > 0, "At least one tile content load must be observed for " + viewId);
