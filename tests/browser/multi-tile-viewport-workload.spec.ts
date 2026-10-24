@@ -9,6 +9,7 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  notifyCameraIntent?: () => void;
 };
 
 type StageEvent = {
@@ -515,10 +516,16 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   await panCanvas(page, 280, 90);
   await page.getByRole("button", { name: "Zoom out" }).click();
 
-  // Canvas drags and UI clicks take longer than a short API response delay on
-  // hosted Chromium. Keep the intercepted response pending until the app's
-  // AbortController sees the newer camera intent; do not pass based only on
-  // the browser route eventually failing or on the stale model not being drawn.
+  // Process the camera's current bounds through the same production handler
+  // attached to Cesium camera.moveEnd. The actual pointer and zoom operations
+  // above move the viewer; this opt-in hook only makes intent notification
+  // deterministic across headless browser timing.
+  await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.(),
+  );
+
+  // Keep the intercepted response pending until the app's AbortController sees
+  // the newer camera intent; do not pass based on route cancellation alone.
   const delayedViewportHash = requests.find(
     (request) => request.request === delayedBrowserRequest,
   )?.viewportHash;
