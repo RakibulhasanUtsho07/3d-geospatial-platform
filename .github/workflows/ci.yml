@@ -551,11 +551,11 @@ jobs:
           npm run test:geospatial-api
           npm run test:map-browser
 
-      - name: Upload P2.6 multi-tile viewport workload report
+      - name: Upload P2.6 workload report and Playwright diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: multi-tile-viewport-workload
-          path: test-results/multi-tile-viewport-workload.json
+          path: test-results/
           if-no-files-found: warn
           retention-days: 7
