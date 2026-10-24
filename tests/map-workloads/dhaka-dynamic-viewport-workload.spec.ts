@@ -10,8 +10,8 @@ const OUTPUT_DIRECTORY = path.resolve(
 );
 const BUILDING_FEATURE_COUNT = 36;
 const ROAD_FEATURE_COUNT = 24;
-const FIRST_BUILDING_RESPONSE_DELAY_MS = 1_600;
-const FIRST_ROAD_RESPONSE_DELAY_MS = 1_100;
+const FIRST_BUILDING_RESPONSE_DELAY_MS = 4_000;
+const FIRST_ROAD_RESPONSE_DELAY_MS = 3_500;
 
 type MetricName = "buildings" | "roads";
 type BrowserMetricEvent = {
