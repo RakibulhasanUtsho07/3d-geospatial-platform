@@ -35,6 +35,7 @@ export class Dhaka3DTilesPilotController {
   #onStatus;
   #url;
   #revision = 0;
+  #loading = false;
   #tileset = null;
   #attachedViewer = null;
   #disposed = false;
@@ -88,6 +89,7 @@ export class Dhaka3DTilesPilotController {
     }
 
     const revision = ++this.#revision;
+    this.#loading = true;
     this.#emit("loading");
     let tileset;
 
@@ -97,6 +99,7 @@ export class Dhaka3DTilesPilotController {
       });
 
       if (!this.#isCurrent(revision, viewer)) {
+        if (revision === this.#revision) this.#loading = false;
         destroyUnattachedTileset(tileset);
         return { status: "cancelled" };
       }
@@ -107,6 +110,7 @@ export class Dhaka3DTilesPilotController {
         throw new Error("Cesium scene primitive collection is unavailable for the Dhaka 3D Tiles pilot.");
       }
 
+      this.#loading = false;
       primitives.add(tileset);
       this.#tileset = tileset;
       this.#attachedViewer = viewer;
@@ -114,6 +118,7 @@ export class Dhaka3DTilesPilotController {
       this.#emit("loaded");
       return { status: "loaded", tileset };
     } catch (error) {
+      if (revision === this.#revision) this.#loading = false;
       if (tileset && !this.#tileset) destroyUnattachedTileset(tileset);
       if (this.#isCurrent(revision, viewer)) this.#emit("error", {
         message: error instanceof Error ? error.message : String(error),
@@ -124,6 +129,8 @@ export class Dhaka3DTilesPilotController {
 
   disable() {
     this.#revision += 1;
+    const wasActive = this.#loading || Boolean(this.#tileset);
+    this.#loading = false;
     const tileset = this.#tileset;
     const viewer = this.#attachedViewer;
     this.#tileset = null;
@@ -145,7 +152,7 @@ export class Dhaka3DTilesPilotController {
       if (!removed) destroyUnattachedTileset(tileset);
     }
 
-    if (!this.#disposed) this.#emit("disabled");
+    if (!this.#disposed && wasActive) this.#emit("disabled");
   }
 
   destroy() {
@@ -158,7 +165,7 @@ export class Dhaka3DTilesPilotController {
   getState() {
     return {
       enabled: !this.#disposed && this.#isEnabled(),
-      loadingOrAttached: this.#revision > 0 && Boolean(this.#tileset),
+      loadingOrAttached: this.#loading || Boolean(this.#tileset),
       attached: Boolean(this.#tileset) && !isDestroyed(this.#tileset),
       disposed: this.#disposed,
     };
