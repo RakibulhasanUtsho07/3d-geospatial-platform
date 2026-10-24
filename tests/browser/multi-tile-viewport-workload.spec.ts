@@ -395,6 +395,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Performance.enable");
+  await cdp.send("HeapProfiler.enable");
 
   const sampleMemory = async (label: string): Promise<MemorySample> => {
     const { metrics } = await cdp.send("Performance.getMetrics");
@@ -487,7 +488,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
   );
   const memorySamples: MemorySample[] = [];
-  memorySamples.push(await sampleMemory("initial-stable"));
+  await cdp.send("HeapProfiler.collectGarbage");
+  memorySamples.push(await sampleMemory("initial-retained-after-gc"));
 
   // Force one known stale viewport response to remain pending. A pan + zoom
   // creates a newer camera intent while its AbortController signal is active.
@@ -527,11 +529,40 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     memorySamples.push(await sampleMemory("movement-" + String(index + 1)));
   }
 
-  // Allow the last fetch/stage to settle, then guarantee a report even when a
-  // regression causes one of the workload gates below to fail.
-  await pause(2_000);
+  // Let route handlers settle, then require the latest requested viewport to
+  // become the committed datasource. Camera intents are coalesced by design,
+  // so not every intermediate request is expected to stage.
+  await pause(500);
   await Promise.allSettled([...routeTasks]);
-  memorySamples.push(await sampleMemory("final-stable"));
+  let finalViewportStaged = false;
+  try {
+    await expect.poll(async () => {
+      const latestRequest = requests.filter((request) => request.viewportHash).at(-1);
+      if (!latestRequest) return false;
+      const expectedBoundsKey = boundsKeyFromUrl(latestRequest.request.url());
+      if (!expectedBoundsKey) return false;
+      const stageBoundsKeys = await page.evaluate(() =>
+        (window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? []).map((event) => {
+          const viewport = event.summary.viewport as Record<string, unknown> | null | undefined;
+          const values = ["west", "south", "east", "north"].map((key) => Number(viewport?.[key]));
+          return values.every(Number.isFinite)
+            ? values.map((value) => value.toFixed(6)).join("|")
+            : null;
+        }),
+      );
+      return routeTasks.size === 0
+        && stageBoundsKeys.slice(initialStageCount).includes(expectedBoundsKey);
+    }, { timeout: 25_000, intervals: [250, 500, 1_000] }).toBe(true);
+    finalViewportStaged = true;
+  } catch {
+    // Preserve the report even if the latest camera intent never reaches commit.
+    finalViewportStaged = false;
+  }
+
+  await Promise.allSettled([...routeTasks]);
+  memorySamples.push(await sampleMemory("final-before-gc"));
+  await cdp.send("HeapProfiler.collectGarbage");
+  memorySamples.push(await sampleMemory("final-retained-after-gc"));
 
   const rawStages = await page.evaluate(() => {
     const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? [];
@@ -576,7 +607,23 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   const completedRequests = requests.filter((request) => request.outcome === "delivered");
   const cancelledRequests = requests.filter((request) => request.outcome === "cancelled");
   const delayedCancellationRequest = requests.find((request) => request.delayedForCancellation);
-  const staleDelayedResponseCancelled = delayedCancellationRequest?.outcome === "cancelled";
+  const rawFetchAbortEvents = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ?? [],
+  );
+  const fetchAbortEvents = rawFetchAbortEvents.map((event) => ({
+    atMs: Number(event.atMs),
+    viewportHash: hashBounds(boundsKeyFromUrl(event.url)),
+  })).filter((event) => event.viewportHash !== null);
+  const abortedViewportHashes = new Set(fetchAbortEvents.map((event) => event.viewportHash));
+  const staleDelayedFetchSignalAborted = Boolean(
+    delayedCancellationRequest?.viewportHash &&
+    abortedViewportHashes.has(delayedCancellationRequest.viewportHash),
+  );
+  const staleDelayedResponseNotStaged = Boolean(
+    delayedCancellationRequest?.viewportHash &&
+    !stages.some((stage) => stage.viewportHash === delayedCancellationRequest.viewportHash),
+  );
+  const latestRequestedViewportHash = requests.filter((request) => request.viewportHash).at(-1)?.viewportHash ?? null;
   const uniqueViewports = new Set(requests.map((request) => request.viewportHash).filter(Boolean));
   const allTileCounts = successfulGeneratedTileRequests
     .map((request) => request.selectedTileCount!)
@@ -586,17 +633,25 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
   const heapValues = memorySamples.map((sample) => sample.jsHeapUsedBytes);
   const validHeapValues = heapValues.filter((value): value is number => value !== null);
-  const firstHeap = validHeapValues[0] ?? null;
-  const lastHeap = validHeapValues.at(-1) ?? null;
-  const heapDelta = firstHeap !== null && lastHeap !== null ? lastHeap - firstHeap : null;
+  const initialRetainedHeap = memorySamples[0]?.jsHeapUsedBytes ?? null;
+  const finalRetainedHeap = memorySamples.at(-1)?.jsHeapUsedBytes ?? null;
+  const retainedHeapGrowthBytes = initialRetainedHeap !== null && finalRetainedHeap !== null
+    ? finalRetainedHeap - initialRetainedHeap
+    : null;
   const maxHeap = validHeapValues.length ? Math.max(...validHeapValues) : null;
+  const transientPeakGrowthBytes = initialRetainedHeap !== null && maxHeap !== null
+    ? maxHeap - initialRetainedHeap
+    : null;
+  const movementHeapValues = memorySamples
+    .filter((sample) => sample.label.startsWith("movement-"))
+    .map((sample) => sample.jsHeapUsedBytes);
   const firstNodeCount = memorySamples.find((sample) => sample.domNodeCount !== null)?.domNodeCount ?? null;
   const lastNodeCount = [...memorySamples].reverse().find((sample) => sample.domNodeCount !== null)?.domNodeCount ?? null;
   const nodeDelta = firstNodeCount !== null && lastNodeCount !== null
     ? lastNodeCount - firstNodeCount
     : null;
-  const memoryGuardPass = heapDelta !== null &&
-    heapDelta <= MAX_HEAP_GROWTH_BYTES &&
+  const memoryGuardPass = retainedHeapGrowthBytes !== null &&
+    retainedHeapGrowthBytes <= MAX_HEAP_GROWTH_BYTES &&
     nodeDelta !== null &&
     nodeDelta <= MAX_DOM_NODE_GROWTH;
 
@@ -628,12 +683,14 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       movementCycles: MOVEMENT_CYCLES,
       viewportRequestCount: requests.length,
       deliveredRequestCount: completedRequests.length,
-      cancelledRequestCount: cancelledRequests.length,
+      browserCancelledRequestCount: cancelledRequests.length,
       failedRequestCount: requests.filter((request) => request.outcome === "failed" || request.outcome === "route-error").length,
+      fetchAbortSignalCount: fetchAbortEvents.length,
       uniqueViewportCount: uniqueViewports.size,
       delayedCancellationRequestObserved: delayedResponseClaimed,
       delayedCancellationOutcome: delayedCancellationRequest?.outcome ?? null,
-      staleDelayedResponseCancelled,
+      staleDelayedFetchSignalAborted,
+      staleDelayedResponseNotStaged,
       viewportResponses: requests.map((request) => ({
         sequence: request.sequence,
         viewportHash: request.viewportHash,
@@ -646,6 +703,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         returnedFeatureCount: request.returnedFeatureCount,
         endpointResponseMs: request.endpointResponseMs,
         delayedForCancellation: request.delayedForCancellation,
+        routeResponseReady: request.routeResponseReady,
         failure: request.failure,
         routeError: request.routeError,
       })),
@@ -668,6 +726,9 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         p95Ms: percentile(stageFrameDelaysMs, 0.95),
         allStagesHaveFollowingFrame: stageFrameDelaysMs.length === stages.length && stages.length > 0,
       },
+      finalViewportStaged,
+      latestRequestedViewportHash,
+      staleDelayedResponseNotStaged,
       stages: stages.map((stage) => ({
         viewportHash: stage.viewportHash,
         returnedFeatures: stage.returnedFeatures,
@@ -680,9 +741,10 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     memory: {
       measurement: "Chromium CDP JS heap and DOM counters; excludes GPU/native tile memory",
       samples: memorySamples,
-      heapGrowthBytes: heapDelta,
-      heapMaxBytes: maxHeap,
-      heapTrendBytesPerSample: linearTrendSlope(heapValues),
+      retainedHeapGrowthBytes,
+      observedHeapPeakBytes: maxHeap,
+      transientPeakGrowthBytes,
+      heapTrendBytesPerMovementSample: linearTrendSlope(movementHeapValues),
       domNodeGrowth: nodeDelta,
       limits: {
         maxHeapGrowthBytes: MAX_HEAP_GROWTH_BYTES,
@@ -692,7 +754,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     },
     limitations: [
       "This is an end-to-end browser workload against the real generated Overture spatial-tile API, with road and basemap network responses stubbed for repeatability.",
-      "The intentional response delay tests browser-side stale-request cancellation; the API request may already have completed on the server before the browser cancels it.",
+      "The delayed request's application AbortSignal is observed directly; browser-network cancellation events are recorded separately because route interception can outlive the upstream API response.",
       "Heap and DOM metrics do not include GPU allocations, Cesium native resources, or operating-system process memory.",
       "Tile counts describe selected generated spatial tiles for each viewport; they do not represent downloaded OGC 3D Tiles payload bytes.",
     ],
@@ -710,9 +772,11 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   expect(successfulGeneratedTileRequests.length, "the real Overture viewport endpoint must use the generated spatial-tile manifest").toBeGreaterThan(0);
   expect(maxTilesInViewport, "at least one viewport must select multiple generated spatial tiles").toBeGreaterThan(1);
   expect(uniqueViewports.size, "repeated pan/zoom must produce distinct viewport requests").toBeGreaterThanOrEqual(4);
-  expect(cancelledRequests.length, "a stale in-flight viewport request must be cancelled after a newer camera intent").toBeGreaterThan(0);
-  expect(staleDelayedResponseCancelled, "the deliberately delayed stale viewport request itself must be cancelled").toBe(true);
-  expect(stages.length, "several viewport payloads must be staged into Cesium").toBeGreaterThanOrEqual(4);
+  expect(fetchAbortEvents.length, "a newer camera intent must abort at least one viewport fetch signal").toBeGreaterThan(0);
+  expect(staleDelayedFetchSignalAborted, "the deliberately delayed stale viewport fetch signal must be aborted").toBe(true);
+  expect(staleDelayedResponseNotStaged, "the deliberately delayed stale viewport must never be committed to Cesium").toBe(true);
+  expect(finalViewportStaged, "the latest stable viewport intent must eventually commit after pan/zoom churn").toBe(true);
+  expect(stages.length, "the initial and final committed viewport stages must be observed").toBeGreaterThanOrEqual(2);
   expect(stageFrameDelaysMs.length, "each staged viewport must be followed by an actual Cesium postRender frame").toBe(stages.length);
   expect(validHeapValues.length, "Chromium JS heap metrics must be available for the memory trend").toBeGreaterThanOrEqual(5);
   expect(memoryGuardPass, "repeated camera movement must not exceed the broad JS heap/DOM growth guard").toBe(true);
