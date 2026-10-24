@@ -44,7 +44,7 @@ export class Dhaka3DTilesPilotController {
     getViewer,
     getCesium,
     isEnabled,
-    onStatus = () => {},
+    onStatus = (event) => { void event; },
     url = DHAKA_3D_TILES_PILOT_URL,
   }) {
     if (typeof getViewer !== "function" || typeof getCesium !== "function" || typeof isEnabled !== "function") {
