@@ -49,6 +49,7 @@ on:
       - feat/p2-8-startup-coverage-alignment
       - feat/p2-9-startup-tile-fetch-cost
       - feat/p2-10-viewport-fetch-cost-evidence
+      - feat/p2-11-cold-warm-render-readiness
   pull_request:
     branches:
       - main
@@ -78,6 +79,7 @@ on:
       - feat/p2-7-viewport-tile-selectivity
       - feat/p2-8-startup-coverage-alignment
       - feat/p2-9-startup-tile-fetch-cost
+      - feat/p2-10-viewport-fetch-cost-evidence
 
 permissions:
   contents: read
@@ -557,6 +559,7 @@ jobs:
           }
           NODE
 
+          npm run benchmark:viewport-cold-warm
           npm run test:geospatial-api
           npm run test:map-browser
 

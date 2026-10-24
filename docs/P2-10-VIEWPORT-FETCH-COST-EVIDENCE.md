@@ -12,7 +12,7 @@ Each real viewport request in the Playwright workload records:
 - actual selected feature-geometry bytes read;
 - number of geometry features fetched and the request's feature limit.
 
-The first valid viewport API integration request separately logs a cold-request record, including index bytes, geometry bytes, combined bytes, and the reduction ratio. The browser workload runs later against the same production server process and may therefore see a warm index cache; its index-byte aggregate is named as workload-observed index bytes, and its cache-miss request count makes that state visible.
+The controlled `scripts/benchmark-viewport-cold-warm.mjs` run records the first valid viewport request after a fresh production-server start, followed by five identical requests on the same process. It requires index bytes to be read in the first request, zero index bytes in the repeated requests, and identical ordered feature hashes. The P2.10 API correctness test reports its observed cache state without assuming it owns the server's first valid request; the browser workload also records observed index bytes and cache-miss count because the cache may already be warm.
 
 The workload report aggregates the whole-tile baseline, geometry payload bytes, index overhead, the geometry-payload reduction ratio, and fetch-budget violations. It asserts that feature-only payload reads are lower than the whole-tile baseline and that every measured tile-backed geometry fetch stays within its response feature limit. The geometry ratio compares bytes read from selected feature payloads with the complete selected-tile payload baseline; index bytes are reported separately so the report does not hide index overhead.
 
