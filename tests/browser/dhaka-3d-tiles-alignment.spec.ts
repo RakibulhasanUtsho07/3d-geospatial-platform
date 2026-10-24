@@ -26,6 +26,7 @@ type BrowserReview = {
   baseline: { loaded: boolean; camera: Record<string, number> };
   tiles: { loaded: boolean; initialTilesLoaded: boolean; camera: Record<string, number> };
   cameraAlignment: { status: string; maximumAbsolutePoseDelta: number; deltaByField: Record<string, number>; tolerance: number };
+  runtimePlacement: { status: string; reference: string; maximumDistanceMeters: number | null; toleranceMeters: number };
   projectedFootprintAlignment: { status: string; tolerancePixels: number; maximumResidualPixels: number | null; visibleProjectionCount: number; corners: ProjectedCorner[] };
   disclaimer: string;
 };
@@ -37,6 +38,7 @@ type CaptureEntry = {
   browserReportSha256: string;
   requestedCamera: Record<string, number>;
   cameraPoseDelta: number;
+  runtimePlacementDistanceMeters: number;
   maximumProjectedFootprintResidualPixels: number;
   visibleProjectionCount: number;
   sourceSha256: string;
@@ -102,6 +104,9 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
     assert.equal(review.tiles.initialTilesLoaded, true, "3D Tiles did not finish an initial visible load for " + viewId);
     assert.equal(review.cameraAlignment.status, "pass");
     assert.ok(review.cameraAlignment.maximumAbsolutePoseDelta <= 1e-8);
+    assert.equal(review.runtimePlacement.status, "pass", "runtime tileset centre must match the fixed target for " + viewId);
+    assert.ok(review.runtimePlacement.maximumDistanceMeters !== null);
+    assert.ok(review.runtimePlacement.maximumDistanceMeters <= 1);
     assert.equal(review.projectedFootprintAlignment.status, "pass");
     assert.ok(review.projectedFootprintAlignment.maximumResidualPixels !== null);
     assert.ok(review.projectedFootprintAlignment.maximumResidualPixels <= 8);
@@ -134,6 +139,7 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
       browserReportSha256: sha256(Buffer.from(JSON.stringify(review))),
       requestedCamera: review.view.requestedCamera,
       cameraPoseDelta: review.cameraAlignment.maximumAbsolutePoseDelta,
+      runtimePlacementDistanceMeters: review.runtimePlacement.maximumDistanceMeters!,
       maximumProjectedFootprintResidualPixels: review.projectedFootprintAlignment.maximumResidualPixels!,
       visibleProjectionCount: review.projectedFootprintAlignment.visibleProjectionCount,
       sourceSha256: review.source.sha256,
