@@ -496,6 +496,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   const report = {
     benchmark: "p2.6-real-multi-tile-viewport-workload",
     generatedAt: new Date().toISOString(),
+    candidateSha: process.env.GITHUB_SHA ?? null,
     environment: {
       node: process.version,
       platform: process.platform,
