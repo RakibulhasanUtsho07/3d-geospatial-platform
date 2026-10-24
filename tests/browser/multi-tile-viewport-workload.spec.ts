@@ -21,12 +21,18 @@ type FrameEvent = {
   frameSequence: number;
 };
 
+type FetchAbortEvent = {
+  atMs: number;
+  url: string;
+};
+
 declare global {
   interface Window {
     __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
     __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: WorkloadFrameDiagnostics;
     __MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?: StageEvent[];
     __MAP_ENGINE_WORKLOAD_FRAME_EVENTS__?: FrameEvent[];
+    __MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?: FetchAbortEvent[];
   }
 }
 
@@ -37,6 +43,7 @@ type ViewportRequestObservation = {
   viewportHash: string | null;
   outcome: "in-flight" | "delivered" | "cancelled" | "failed" | "route-error";
   delayedForCancellation: boolean;
+  routeResponseReady: boolean;
   statusCode: number | null;
   dataSource: string | null;
   selectedTileCount: number | null;
@@ -204,6 +211,31 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     window.__MAP_ENGINE_WORKLOAD_BENCHMARK__ = true;
     window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ = [];
     window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ = [];
+    window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ = [];
+
+    // Observe the real signal supplied by BuildingViewportManager.fetch().
+    // Store URLs only in this in-memory test page; exported reports contain
+    // only the SHA-256 viewport hash, never raw coordinates.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : typeof input === "object" && input !== null && "url" in input
+            ? String((input as { url?: unknown }).url ?? "")
+            : String(input);
+      const signal = init?.signal;
+      if (requestUrl.includes("/api/geospatial/overture-buildings/viewport") && signal) {
+        const recordAbort = () => {
+          const events = window.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ ??= [];
+          events.push({ atMs: performance.now(), url: requestUrl });
+        };
+        if (signal.aborted) recordAbort();
+        else signal.addEventListener("abort", recordAbort, { once: true });
+      }
+      return nativeFetch(input, init);
+    }) as typeof window.fetch;
 
     window.addEventListener("map:building-viewport-staged", (event: Event) => {
       const detail = (event as CustomEvent<{
@@ -274,6 +306,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         viewportHash: hashBounds(boundsKeyFromUrl(request.url())),
         outcome: "in-flight",
         delayedForCancellation: false,
+        routeResponseReady: false,
         statusCode: null,
         dataSource: null,
         selectedTileCount: null,
@@ -318,8 +351,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         }
 
         await route.fulfill({ response: upstream });
+        observation.routeResponseReady = true;
         observation.completedAtMs ??= performance.now();
-        if (observation.outcome === "in-flight") observation.outcome = "delivered";
       } catch (error) {
         observation.routeError = errorText(error);
         if (observation.outcome === "in-flight") observation.outcome = "route-error";
@@ -355,6 +388,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     if (!observation) return;
 
     observation.statusCode = response.status();
+    observation.routeResponseReady = true;
     observation.completedAtMs = performance.now();
     if (observation.outcome === "in-flight") observation.outcome = "delivered";
   });
