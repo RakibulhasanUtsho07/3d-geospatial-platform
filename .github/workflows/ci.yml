@@ -45,6 +45,21 @@ on:
       - feat/release-readiness-accuracy-evidence
       - feat/final-merge-cleanup
       - feat/texture-projection-validation
+      - feat/p2-7-viewport-tile-selectivity
+      - feat/p2-8-startup-coverage-alignment
+      - feat/p2-9-startup-tile-fetch-cost
+      - feat/p2-10-viewport-fetch-cost-evidence
+      - feat/p2-11-cold-warm-render-readiness
+      - feat/p2-12-cross-process-regression-guard
+      - feat/p2-13-viewport-performance-trend
+      - feat/p2-14-cross-commit-performance-compare
+      - feat/p2-15-latency-repeatability-samples
+      - feat/p2-16-server-phase-timings
+      - feat/p2-17-geometry-read-phase-breakdown
+      - feat/p2-18-selected-geometry-lru-cache
+      - feat/p2-19-geometry-cache-eviction-validation
+      - feat/p2-20-viewport-movement-cache-benchmark
+      - development
   pull_request:
     branches:
       - main
@@ -70,6 +85,22 @@ on:
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
+      - feat/p2-6-multitile-viewport-workload
+      - feat/p2-7-viewport-tile-selectivity
+      - feat/p2-8-startup-coverage-alignment
+      - feat/p2-9-startup-tile-fetch-cost
+      - feat/p2-10-viewport-fetch-cost-evidence
+      - feat/p2-11-cold-warm-render-readiness
+      - feat/p2-12-cross-process-regression-guard
+      - feat/p2-13-viewport-performance-trend
+      - feat/p2-14-cross-commit-performance-compare
+      - feat/p2-15-latency-repeatability-samples
+      - feat/p2-16-server-phase-timings
+      - feat/p2-17-geometry-read-phase-breakdown
+      - feat/p2-18-selected-geometry-lru-cache
+      - feat/p2-19-geometry-cache-eviction-validation
+      - feat/p2-20-viewport-movement-cache-benchmark
+      - development
 
 permissions:
   contents: read
@@ -323,6 +354,18 @@ jobs:
       - name: Test dynamic map performance telemetry and baseline aggregation
         run: npm run test:map-performance
 
+      - name: Test P2.13 viewport performance trend evidence contract
+        run: npm run test:viewport-trend-report
+
+      - name: Test P2.14 cross-commit viewport performance comparison
+        run: npm run test:viewport-baseline-compare
+
+      - name: Test P2.15 fresh-process latency repeatability analysis
+        run: npm run test:viewport-latency-repeatability
+
+      - name: Test bounded selected geometry cache eviction and signature invalidation
+        run: npm run test:selected-geometry-cache
+
       - name: Test dynamic map optimization parity and visual style policies
         run: npm run test:map-optimization
 
@@ -410,7 +453,11 @@ jobs:
         run: |
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          # The second production process has an independent module/index cache
+          # but uses the exact same built app and generated tile manifest.
+          ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3001 > /tmp/geospatial-next-repeat.log 2>&1 &
+          repeat_server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true' EXIT
 
           node --input-type=module <<'NODE'
           const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
@@ -548,11 +595,59 @@ jobs:
           }
           NODE
 
-          npm run test:geospatial-api
-          npm run test:map-browser
+          # Readiness probes use invalid bounds, so both servers' tile indexes are still cold.
+          node --input-type=module <<'NODE'
+          const endpoint = "http://127.0.0.1:3001/api/geospatial/overture-buildings/viewport";
+          const deadline = Date.now() + 60000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(endpoint);
+              await response.arrayBuffer();
+              if (response.status === 400) {
+                ready = true;
+                break;
+              }
+            } catch {
+              // The repeat server is still starting.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          if (!ready) {
+            console.error("Second Next.js production server did not become ready.");
+            process.exit(1);
+          }
+          NODE
+
+          npm run test:dhaka-3d-tiles-camera-alignment
           npm run test:dhaka-3d-tiles-performance
           npm run test:dhaka-3d-tiles-performance-repeatability
           npm run test:map-dynamic-viewport-workload
+          P2_11_REPORT_PATH=test-results/p2-11-cold-warm-viewport-benchmark.json npm run benchmark:viewport-cold-warm
+          GEOSPATIAL_API_BASE_URL=http://127.0.0.1:3001 P2_11_REPORT_PATH=test-results/p2-12-run-b.json npm run benchmark:viewport-cold-warm
+          P2_12_GUARD_REPORT_PATH=p2-13-evidence/p2-12-cold-warm-regression-guard.json P2_12_RUN_A_REPORT=test-results/p2-11-cold-warm-viewport-benchmark.json P2_12_RUN_B_REPORT=test-results/p2-12-run-b.json npm run benchmark:viewport-regression-guard
+          npm run test:geospatial-api
+          npm run test:map-browser
+          # Playwright reuses/cleans test-results for subsequent runs; preserve the P2.6
+          # evidence before later browser suites can remove it.
+          mkdir -p p2-13-evidence
+          cp test-results/multi-tile-viewport-workload.json p2-13-evidence/multi-tile-viewport-workload.json
+          P2_13_GUARD_REPORT=p2-13-evidence/p2-12-cold-warm-regression-guard.json P2_13_BROWSER_REPORT=p2-13-evidence/multi-tile-viewport-workload.json npm run benchmark:viewport-trend-report
+          npm run benchmark:viewport-baseline-compare
+          P2_15_REPORT_PATH=p2-15-evidence/viewport-latency-repeatability.json npm run benchmark:viewport-latency-repeatability
+          P2_20_REPORT_PATH=test-results/p2-20-viewport-movement-cache.json npm run benchmark:viewport-movement-cache
+
+      - name: Upload P2.6 workload report and Playwright diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-tile-viewport-workload
+          path: |
+            test-results/
+            p2-13-evidence/
+            p2-15-evidence/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload P2.3 fixed-camera comparison evidence
         if: always()
@@ -562,7 +657,6 @@ jobs:
           path: artifacts/p2.3-camera-alignment/
           if-no-files-found: warn
           retention-days: 14
-
 
       - name: Upload P2.4 cold/warm render performance evidence
         if: always()

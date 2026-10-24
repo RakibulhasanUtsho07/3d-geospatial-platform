@@ -41,6 +41,10 @@ type CesiumViewer = import("cesium").Viewer;
 type CesiumModule = typeof import("cesium");
 type CesiumDataSource = import("cesium").GeoJsonDataSource;
 
+type ViewportWorkloadBenchmarkWindow = Window & {
+  __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
+};
+
 export type BuildingViewportManagerDependencies = {
   getViewportEndpoint: (
     bounds: BuildingViewportBounds,
@@ -104,6 +108,26 @@ export class BuildingViewportManager {
 
   getIntentRevision(): number {
     return this.intentRevision;
+  }
+
+  /**
+   * Minimal, coordinate-free lifecycle state for the opt-in browser workload.
+   * This does not expose active URLs or feature payloads.
+   */
+  getRequestLifecycleDiagnostics(): {
+    intentRevision: number;
+    loadInProgress: boolean;
+    hasActiveEndpoint: boolean;
+    hasAbortController: boolean;
+    hasPendingRequest: boolean;
+  } {
+    return {
+      intentRevision: this.intentRevision,
+      loadInProgress: this.loadInProgress,
+      hasActiveEndpoint: this.activeEndpoint !== null,
+      hasAbortController: this.requestAbortController !== null,
+      hasPendingRequest: this.pendingRequest !== null,
+    };
   }
 
   isViewportCoveredByLoadedData(
@@ -236,6 +260,24 @@ export class BuildingViewportManager {
       this.activeEndpoint = endpoint;
       requestController = new AbortController();
       this.requestAbortController = requestController;
+
+      // Observe the actual controller owned by this manager only when the
+      // browser workload benchmark opts in. The event is coordinate-free at
+      // the report boundary: tests hash the endpoint before persisting evidence.
+      if (
+        typeof window !== "undefined" &&
+        (window as ViewportWorkloadBenchmarkWindow).__MAP_ENGINE_WORKLOAD_BENCHMARK__ === true
+      ) {
+        const diagnosticEndpoint = activeEndpoint;
+        requestController.signal.addEventListener("abort", () => {
+          window.dispatchEvent(new CustomEvent("map:viewport-request-aborted", {
+            detail: {
+              atMs: performance.now(),
+              endpoint: diagnosticEndpoint,
+            },
+          }));
+        }, { once: true });
+      }
 
       console.info("[Overture] Fetching building viewport...", {
         endpoint,
