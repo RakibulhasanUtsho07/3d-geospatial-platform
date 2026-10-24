@@ -284,16 +284,18 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   if (!within(projectRoot, normalizedFixture) && !within(os.tmpdir(), normalizedFixture)) throw new Error("Refusing to read fixture data outside the repository or OS temporary directory.");
   if (!within(projectRoot, normalizedSource)) throw new Error("Refusing to read source data outside the repository.");
 
-  const [sourceBytes, tilesetBytes, glbBytes, buildManifestBytes] = await Promise.all([
+  const [sourceBytes, tilesetBytes, glbBytes, buildManifestBytes, sourcePreviewBytes] = await Promise.all([
     readFile(normalizedSource),
     readFile(path.join(normalizedFixture, "tileset.json")),
     readFile(path.join(normalizedFixture, "tiles", "dhaka-pilot.glb")),
     readFile(path.join(normalizedFixture, "build-manifest.json")),
+    readFile(path.join(normalizedFixture, "source-feature.geojson")),
   ]);
   const sourceText = sourceBytes.toString("utf8");
   const tileset = readJson(tilesetBytes.toString("utf8"), "tileset.json");
   const buildManifest = readJson(buildManifestBytes.toString("utf8"), "build-manifest.json");
   const source = readJson(sourceText, "source GeoJSON");
+  const sourcePreview = readJson(sourcePreviewBytes.toString("utf8"), "source-feature.geojson");
   const asset = tileset.asset;
   const root = tileset.root;
   const extras = asset?.extras;
@@ -302,6 +304,19 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   }
   if (root.content?.uri !== "tiles/dhaka-pilot.glb") throw new Error("Unexpected fixture content URI.");
   if (sha256(sourceBytes) !== buildManifest.source?.sha256) throw new Error("Source dataset SHA-256 does not match build-manifest.json.");
+  if (sha256(sourcePreviewBytes) !== buildManifest.files?.["source-feature.geojson"]?.sha256) throw new Error("Source GeoJSON browser preview SHA-256 does not match build-manifest.json.");
+  if (
+    !isRecord(sourcePreview) ||
+    sourcePreview.type !== "FeatureCollection" ||
+    !Array.isArray(sourcePreview.features) ||
+    sourcePreview.features.length !== 1 ||
+    getFeatureIdentity(sourcePreview.features[0]) !== buildManifest.source?.featureId
+  ) {
+    throw new Error("The browser GeoJSON preview must contain exactly the selected source feature.");
+  }
+  if (sha256(Buffer.from(JSON.stringify(sourcePreview.features[0]))) !== buildManifest.source?.featureSha256) {
+    throw new Error("Browser GeoJSON preview feature hash does not match the selected source feature.");
+  }
   if (sha256(glbBytes) !== buildManifest.files?.["tiles/dhaka-pilot.glb"]?.sha256) throw new Error("GLB SHA-256 does not match build-manifest.json.");
   if (sha256(tilesetBytes) !== buildManifest.files?.["tileset.json"]?.sha256) throw new Error("tileset.json SHA-256 does not match build-manifest.json.");
   if (sha256(glbBytes) !== extras.contentSha256) throw new Error("GLB SHA-256 does not match tileset asset extras.");
@@ -408,6 +423,8 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
       sha256: sourceHash,
       featureId: buildManifest.source.featureId,
       featureSha256: buildManifest.source.featureSha256,
+      previewPath: "source-feature.geojson",
+      previewSha256: sha256(sourcePreviewBytes),
       boundsDegrees: sourceBounds,
     },
     model: {
