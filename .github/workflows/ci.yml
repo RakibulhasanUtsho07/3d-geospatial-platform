@@ -54,6 +54,7 @@ on:
       - feat/p2-13-viewport-performance-trend
       - feat/p2-14-cross-commit-performance-compare
       - feat/p2-15-latency-repeatability-samples
+      - feat/p2-16-server-phase-timings
   pull_request:
     branches:
       - main
@@ -89,6 +90,7 @@ on:
       - feat/p2-13-viewport-performance-trend
       - feat/p2-14-cross-commit-performance-compare
       - feat/p2-15-latency-repeatability-samples
+      - feat/p2-16-server-phase-timings
 
 permissions:
   contents: read
