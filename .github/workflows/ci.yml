@@ -7,6 +7,8 @@ on:
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
+      - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
       - rakibul-hasan
       - feat/generated-building-model-layer
       - feat/building-generation-core
@@ -46,7 +48,20 @@ on:
   pull_request:
     branches:
       - main
+      - refactor/p1-road-layer-manager-sync
+      - refactor/p1-building-viewport-manager-sync
+      - refactor/p1-feature-picking-controller
+      - refactor/p1-feature-pick-geometry
+      - test/p1-building-selection-lifecycle
+      - test/p1-selection-browser-lifecycle
       - dev
+      - refactor/p1-building-lod-policy
+      - refactor/p1-building-lod-renderer
+      - refactor/p1-building-style-assignment-policy
+      - refactor/p1-building-selection-materials
+      - refactor/p1-picked-entity-resolution
+      - refactor/p1-feature-pick-routing
+      - refactor/p1-selection-event-dispatch
       - rakibul-hasan
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
@@ -85,8 +100,17 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Test feature picking controller lifecycle
+        run: npm run test:feature-picking-controller
+
+      - name: Test feature pick geometry calculations
+        run: npm run test:feature-pick-geometry
+
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
+
+      - name: Test heritage camera controller boundary
+        run: npm run test:heritage-camera-controller-boundary
 
       - name: Test reviewed generated-model catalog publishing and rollback
         run: npm run test:published-model-catalog
@@ -144,9 +168,14 @@ jobs:
         run: npm run test:reconstruction-job-state
 
       - name: Install FFmpeg for deterministic texture atlas baking
-        uses: FedericoCarboni/setup-ffmpeg@v3
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
         with:
           ffmpeg-version: release
+          architecture: x64
+          linking-type: static
+
+      - name: Verify FFmpeg installation
+        run: ffmpeg -hide_banner -version
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -248,11 +277,48 @@ jobs:
       - name: Test camera-aware facade LOD budget
         run: npm run test:lod-budget
 
+      - name: Test building LOD decision and selection policy
+        run: npm run test:building-lod-policy
+
+      - name: Test building LOD renderer ownership and delegation
+        run: npm run test:building-lod-renderer
+
+      - name: Test building style assignment and preview policy
+        run: npm run test:building-style-assignment-policy
+
+      - name: Test building selection material controller
+        run: npm run test:building-selection-materials
+
+      - name: Test picked entity resolution
+        run: npm run test:picked-entity-resolution
+
+      - name: Test feature pick routing priority
+        run: npm run test:feature-pick-routing
+
+      - name: Test selection event dispatch and cleanup order
+        run: npm run test:selection-event-dispatch
+
+
       - name: Test viewport spatial sampling
         run: npm run test:viewport-selection
 
+      - name: Test OGC 3D Tiles 1.1 manifest contract
+        run: npm run test:3d-tiles-manifest
+
+      - name: Test Dhaka 3D Tiles placement and content integrity fixture
+        run: npm run test:dhaka-3d-tiles-fixture
+
+      - name: Test opt-in Dhaka 3D Tiles controller cancellation and teardown
+        run: npm run test:dhaka-3d-tiles-pilot-controller
+
+      - name: Test Dhaka 3D Tiles footprint alignment and deterministic camera evidence
+        run: npm run test:dhaka-3d-tiles-alignment-review
+
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
+
+      - name: Test building viewport manager ownership and lifecycle
+        run: npm run test:building-viewport-manager
 
       - name: Test dynamic map performance telemetry and baseline aggregation
         run: npm run test:map-performance
@@ -299,6 +365,9 @@ jobs:
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
 
+      - name: Test road layer manager ownership and lifecycle
+        run: npm run test:road-layer-manager
+
       - name: Test source-derived building facade styles
         run: npm run test:building-style
 
@@ -327,6 +396,8 @@ jobs:
         run: npm run test:geospatial-tiles
 
       - name: Build production app
+        env:
+          NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
         run: npm run build
 
       - name: Install Chromium for map browser integration tests
@@ -335,6 +406,7 @@ jobs:
       - name: Verify viewport API against the production server
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
+          NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
         run: |
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
           server_pid=$!
@@ -478,3 +550,43 @@ jobs:
 
           npm run test:geospatial-api
           npm run test:map-browser
+          npm run test:dhaka-3d-tiles-performance
+          npm run test:dhaka-3d-tiles-performance-repeatability
+          npm run test:map-dynamic-viewport-workload
+
+      - name: Upload P2.3 fixed-camera comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-3-dhaka-camera-alignment-evidence
+          path: artifacts/p2.3-camera-alignment/
+          if-no-files-found: warn
+          retention-days: 14
+
+
+      - name: Upload P2.4 cold/warm render performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-4-dhaka-render-performance
+          path: artifacts/p2.4-dhaka-render-performance/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload P2.5 repeated performance baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-5-dhaka-performance-repeatability
+          path: artifacts/p2.5-dhaka-performance-repeatability/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload P2.6 dynamic map workload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p2-6-dynamic-map-workload
+          path: artifacts/p2.6-dynamic-map-workload/
+          if-no-files-found: warn
+          retention-days: 14

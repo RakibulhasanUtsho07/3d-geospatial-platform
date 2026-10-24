@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Local source media, hashes, extracted video frames and job workspace
 /.building-engine/
+
+# Generated opt-in OGC 3D Tiles fixture (rebuild with npm run build:dhaka-3d-tiles-fixture)
+/public/experimental/dhaka-3d-tiles-fixture/
