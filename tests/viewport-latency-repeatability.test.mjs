@@ -5,6 +5,24 @@ import { buildRepeatabilityReport, quantile, summarizeLatency } from "../scripts
 const manifestSha256 = "9a5c59a08b37c3661a2c31a250c168e7f9d87d200bb0d9b316a4aa1939cd6e63";
 const featureSha256 = "72c389f2e19388327f217acdb7d9063035db7819de518382e68ef57e439bb64";
 
+function makeServerTimings(offset = 0) {
+  return {
+    totalServerMs: 12 + offset,
+    tileQueryMs: 8 + offset,
+    manifestLookupMs: 0.2 + offset / 10,
+    tileIndexReadAndParseMs: 2 + offset / 5,
+    candidateMetadataScanMs: 1 + offset / 5,
+    oversizedSidecarReadMs: 0,
+    featureSelectionMs: 0.5 + offset / 10,
+    selectedGeometryReadMs: 1 + offset / 5,
+    geometryReadMs: 1 + offset / 5,
+    featureAssemblyMs: 0.3 + offset / 10,
+    fallbackGeoJsonPreparationMs: 0,
+    roleClassificationMs: 0.1 + offset / 10,
+    responseSerializationMs: 0.4 + offset / 10,
+  };
+}
+
 function makeSample(index, coldMs = 140 + index * 5) {
   const observations = [];
   const cold = {
@@ -13,6 +31,7 @@ function makeSample(index, coldMs = 140 + index * 5) {
     returnedFeatureCount: 2500, candidatePayloadBytes: 9007328, indexReadBytes: 4442393,
     featureReadBytes: 2532626, combinedReadBytes: 6975019, combinedReadReductionRatio: 0.2256,
     fetchedFeatureCount: 2500, featureLimit: 2500, featureSha256,
+    serverTimingsMs: makeServerTimings(index),
   };
   observations.push(cold);
   const warmLatencies = [50 + index, 58 + index, 62 + index, 67 + index, 84 + index];
@@ -22,6 +41,7 @@ function makeSample(index, coldMs = 140 + index * 5) {
     returnedFeatureCount: 2500, candidatePayloadBytes: 9007328, indexReadBytes: 0,
     featureReadBytes: 2532626, combinedReadBytes: 2532626, combinedReadReductionRatio: 0.7188,
     fetchedFeatureCount: 2500, featureLimit: 2500, featureSha256,
+    serverTimingsMs: makeServerTimings(index + i / 10),
   });
   return {
     benchmark: "p2.11-controlled-cold-warm-viewport",
@@ -64,6 +84,10 @@ test("aggregates repeated fresh-process cold/warm samples with deterministic dat
   assert.equal(result.latency.coldFirstValidRequestMs.sampleCount, 4);
   assert.equal(result.latency.perProcessWarmMedianMs.sampleCount, 4);
   assert.equal(result.latency.pooledWarmRequestMs.sampleCount, 20);
+  assert.equal(result.serverPhaseTiming.coldFirstRequestMsByPhase.tileQueryMs.sampleCount, 4);
+  assert.equal(result.serverPhaseTiming.pooledWarmRequestMsByPhase.totalServerMs.sampleCount, 20);
+  assert.equal(result.samples[0].cold.serverTimingsMs.tileQueryMs, 8);
+  assert.equal(result.samples[0].warm.serverTimingMsByPhase.totalServerMs.sampleCount, 5);
   assert.equal(result.byteCost.coldIndexReadsVerified, true);
   assert.equal(result.byteCost.zeroWarmIndexReadsVerified, true);
   assert.equal(result.dataset.sameOrderedFeatureHashAcrossProcesses, true);
