@@ -17,6 +17,11 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  focusViewportForBenchmark?: (
+    longitudeDegrees: number,
+    latitudeDegrees: number,
+    heightMeters: number,
+  ) => boolean;
   notifyCameraIntent?: () => {
     loadInProgress: boolean;
     intentRevisionBefore: number;
@@ -53,6 +58,20 @@ declare global {
     __MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?: FetchAbortEvent[];
   }
 }
+
+type NumericTileBounds = {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+};
+
+type SpatialTileManifest = {
+  tileCount?: unknown;
+  tiles?: Array<{
+    bounds?: Partial<Record<"west" | "south" | "east" | "north", unknown>>;
+  }>;
+};
 
 type ViewportRequestObservation = {
   sequence: number;
@@ -263,6 +282,46 @@ async function waitForStageThenCesiumFrame(
 
 test("P2.6 measures real multi-tile viewport churn, cancellation, frame readiness and memory trend", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
+
+  const tileManifestPath = resolve(
+    process.cwd(),
+    "data",
+    "overture",
+    "spatial-tiles",
+    "manifest.json",
+  );
+  const tileManifestBytes = await readFile(tileManifestPath);
+  const tileManifest = JSON.parse(tileManifestBytes.toString("utf8")) as SpatialTileManifest;
+  const manifestBounds = (tileManifest.tiles ?? [])
+    .map((tile) => tile.bounds)
+    .filter((bounds): bounds is NumericTileBounds => {
+      if (!bounds) return false;
+      const values = [bounds.west, bounds.south, bounds.east, bounds.north];
+      return values.every((value) => typeof value === "number" && Number.isFinite(value))
+        && Number(bounds.west) < Number(bounds.east)
+        && Number(bounds.south) < Number(bounds.north);
+    });
+  const availableSpatialTileCount = typeof tileManifest.tileCount === "number"
+    && Number.isInteger(tileManifest.tileCount)
+    && tileManifest.tileCount >= 0
+    ? tileManifest.tileCount
+    : manifestBounds.length;
+  if (availableSpatialTileCount < 2 || manifestBounds.length !== availableSpatialTileCount) {
+    throw new Error(
+      "The generated spatial-tile manifest must expose consistent tile bounds before the workload can run.",
+    );
+  }
+  const spatialTileManifestSha256 = createHash("sha256").update(tileManifestBytes).digest("hex");
+  const pilotExtent = {
+    west: Math.min(...manifestBounds.map((bounds) => bounds.west)),
+    south: Math.min(...manifestBounds.map((bounds) => bounds.south)),
+    east: Math.max(...manifestBounds.map((bounds) => bounds.east)),
+    north: Math.max(...manifestBounds.map((bounds) => bounds.north)),
+  };
+  const pilotFocus = {
+    longitude: (pilotExtent.west + pilotExtent.east) / 2,
+    latitude: (pilotExtent.south + pilotExtent.north) / 2,
+  };
 
   const workloadStartedAt = performance.now();
   const requests: ViewportRequestObservation[] = [];
@@ -542,12 +601,72 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     );
   }
 
+  const stageCountBeforeLocalFocus = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
+  );
+  const urlsBeforeLocalFocus = new Set(requests.map((request) => request.request.url()));
+  const localFocusRequestPromise = page.waitForRequest(
+    (request) => isViewportRequest(request.url()) && !urlsBeforeLocalFocus.has(request.url()),
+    { timeout: 20_000 },
+  );
+  const focusApplied = await page.evaluate(
+    ({ longitude, latitude, heightMeters }) =>
+      window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+        longitude,
+        latitude,
+        heightMeters,
+      ) ?? false,
+    { longitude: pilotFocus.longitude, latitude: pilotFocus.latitude, heightMeters: 200 },
+  );
+  expect(focusApplied, "the opt-in camera probe must focus the generated-tile extent").toBe(true);
+  const localFocusBrowserRequest = await localFocusRequestPromise;
+  await expect.poll(() => {
+    const observation = requests.find((request) => request.request === localFocusBrowserRequest);
+    return Boolean(
+      observation &&
+      observation.outcome === "delivered" &&
+      observation.statusCode === 200 &&
+      observation.selectedTileCount !== null,
+    );
+  }, { timeout: 20_000 }).toBe(true);
+  await waitForStageThenCesiumFrame(page, stageCountBeforeLocalFocus, 45_000);
+
+  const localFocusObservation = requests.find(
+    (request) => request.request === localFocusBrowserRequest,
+  );
+  if (!localFocusObservation || localFocusObservation.selectedTileCount === null) {
+    throw new Error("The local-focus viewport response did not expose generated-tile selection diagnostics.");
+  }
+  expect(localFocusObservation.dataSource, "local focus must use the real generated-tile API")
+    .toBe("generated-tiles");
+  expect(localFocusObservation.selectedTileCount, "local focus must select at least one tile")
+    .toBeGreaterThan(0);
+  expect(
+    localFocusObservation.selectedTileCount,
+    "a close top-down viewport must select fewer than the full tile inventory",
+  ).toBeLessThan(availableSpatialTileCount);
+  const localFocusSelectivityProbe = {
+    viewportHash: localFocusObservation.viewportHash,
+    selectedTileCount: localFocusObservation.selectedTileCount,
+    availableTileCount: availableSpatialTileCount,
+    selectedTileRatio: Number((
+      localFocusObservation.selectedTileCount / availableSpatialTileCount
+    ).toFixed(4)),
+    viewportSpanDegrees: {
+      width: localFocusObservation.viewportWidthDegrees,
+      height: localFocusObservation.viewportHeightDegrees,
+    },
+    matchedFeatureCount: localFocusObservation.matchedFeatureCount,
+    returnedFeatureCount: localFocusObservation.returnedFeatureCount,
+    focusAltitudeMeters: 200,
+  };
+
   const initialStageCount = await page.evaluate(
     () => window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__?.length ?? 0,
   );
   const memorySamples: MemorySample[] = [];
   await cdp.send("HeapProfiler.collectGarbage");
-  memorySamples.push(await sampleMemory("initial-retained-after-gc"));
+  memorySamples.push(await sampleMemory("local-focus-retained-after-gc"));
 
   // Force one known stale viewport response to remain pending. A pan + zoom
   // creates a newer camera intent while its AbortController signal is active.
@@ -784,28 +903,18 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     nodeDelta !== null &&
     nodeDelta <= MAX_DOM_NODE_GROWTH;
 
-  const tileManifestPath = resolve(process.cwd(), "data", "overture", "spatial-tiles", "manifest.json");
-  let spatialTileManifestSha256: string | null = null;
-  let availableSpatialTileCount: number | null = null;
-  try {
-    const manifestBytes = await readFile(tileManifestPath);
-    spatialTileManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
-    const manifest = JSON.parse(manifestBytes.toString("utf8")) as { tileCount?: unknown };
-    availableSpatialTileCount = typeof manifest.tileCount === "number"
-      && Number.isInteger(manifest.tileCount)
-      && manifest.tileCount >= 0
-      ? manifest.tileCount
-      : null;
-  } catch {
-    // The endpoint-backed tile assertions below will fail if the generated
-    // manifest is absent; still preserve diagnostic output first.
-  }
-
   const report = {
     benchmark: "p2.6-real-multi-tile-viewport-workload",
     generatedAt: new Date().toISOString(),
     candidateSha: process.env.GITHUB_SHA ?? null,
-    dataset: { spatialTileManifestSha256, availableSpatialTileCount },
+    dataset: {
+      spatialTileManifestSha256,
+      availableSpatialTileCount,
+      extentSpanDegrees: {
+        width: Number((pilotExtent.east - pilotExtent.west).toFixed(6)),
+        height: Number((pilotExtent.north - pilotExtent.south).toFixed(6)),
+      },
+    },
     environment: {
       node: process.version,
       platform: process.platform,
@@ -822,6 +931,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       failedRequestCount: requests.filter((request) => request.outcome === "failed" || request.outcome === "route-error").length,
       fetchAbortSignalCount: fetchAbortEvents.length,
       uniqueViewportCount: uniqueViewports.size,
+      localFocusSelectivityProbe,
       delayedCancellationRequestObserved: delayedResponseClaimed,
       delayedCancellationOutcome: delayedCancellationRequest?.outcome ?? null,
       staleDelayedFetchSignalAborted,
@@ -905,6 +1015,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       "The delayed request's application AbortSignal is observed directly; browser-network cancellation events are recorded separately because route interception can outlive the upstream API response.",
       "Heap and DOM metrics do not include GPU allocations, Cesium native resources, or operating-system process memory.",
       "Tile counts describe selected generated spatial tiles for each viewport; they do not represent downloaded OGC 3D Tiles payload bytes.",
+      "For shallow camera angles, detailed building queries are clipped to a camera-height-aware local window around the centre-ray ground point; distant horizon buildings are loaded when the camera moves or zooms to that area.",
     ],
   };
 
