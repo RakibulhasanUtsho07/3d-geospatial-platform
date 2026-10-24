@@ -87,7 +87,13 @@ type WorkloadFrameDiagnostics = {
   lastFrameAtMs: number;
   requestRender?: () => void;
   /** Benchmark-only hook to process the live camera state through the normal intent handler. */
-  notifyCameraIntent?: () => void;
+  notifyCameraIntent?: () => {
+    loadInProgress: boolean;
+    intentRevisionBefore: number;
+    intentRevisionAfter: number;
+    viewportWidthDegrees: number | null;
+    viewportHeightDegrees: number | null;
+  } | null;
 };
 
 type WorkloadBenchmarkWindow = Window & {
@@ -259,16 +265,33 @@ export class CesiumAdapter implements MapEngine {
       // Some synthetic browser drags can update the camera without reliably
       // emitting moveEnd on every runner. Process the current live camera state
       // through the same production handler used by the registered moveEnd
-      // listener, allowing deterministic observation of stale-request aborts.
+      // listener, and return non-coordinate state for failure diagnosis.
       const currentCesium = this.cesium;
       if (
-        this.workloadFrameDiagnostics === diagnostics &&
-        this.viewer === viewer &&
-        currentCesium &&
-        !viewer.isDestroyed()
+        this.workloadFrameDiagnostics !== diagnostics ||
+        this.viewer !== viewer ||
+        !currentCesium ||
+        viewer.isDestroyed()
       ) {
-        this.handleCameraMoveEnd(viewer, currentCesium);
+        return null;
       }
+
+      const bounds = this.getPaddedViewportBounds(viewer, currentCesium);
+      const intentRevisionBefore = this.buildingViewportManager.getIntentRevision();
+      const loadInProgress = this.buildingViewportManager.isLoadInProgress();
+      this.handleCameraMoveEnd(viewer, currentCesium);
+
+      return {
+        loadInProgress,
+        intentRevisionBefore,
+        intentRevisionAfter: this.buildingViewportManager.getIntentRevision(),
+        viewportWidthDegrees: bounds
+          ? Number((bounds.east - bounds.west).toFixed(6))
+          : null,
+        viewportHeightDegrees: bounds
+          ? Number((bounds.north - bounds.south).toFixed(6))
+          : null,
+      };
     };
     this.workloadFrameDiagnostics = diagnostics;
     target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__ = diagnostics;
