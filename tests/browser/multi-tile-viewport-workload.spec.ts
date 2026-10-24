@@ -8,6 +8,7 @@ import { expect, test, type Page, type Request, type Route } from "@playwright/t
 type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
+  requestRender?: () => void;
 };
 
 type StageEvent = {
@@ -166,16 +167,25 @@ async function waitForStageThenCesiumFrame(
   minimumStageCount: number,
   timeout = 25_000,
 ): Promise<void> {
+  // First prove the actual building layer reached its stage/commit log.
   await page.waitForFunction(
-    (previousStageCount) => {
-      const stages = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? [];
-      const frames = window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ ?? [];
-
-      return stages.slice(previousStageCount).some((stage) =>
-        frames.some((frame) => frame.atMs >= stage.atMs),
-      );
-    },
+    (previousStageCount) =>
+      (window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ?? []).length > previousStageCount,
     minimumStageCount,
+    { timeout },
+  );
+
+  // requestRenderMode intentionally avoids continuous idle frames. Ask Cesium
+  // for a frame after the stage commit, then wait for its actual postRender
+  // callback rather than treating canvas visibility as render readiness.
+  const previousFrameCount = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.frameCount ?? 0,
+  );
+  await page.evaluate(() => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.requestRender?.());
+  await page.waitForFunction(
+    (frameCount) =>
+      (window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.frameCount ?? 0) > frameCount,
+    previousFrameCount,
     { timeout },
   );
 }
@@ -204,6 +214,9 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         const events = window.__MAP_ENGINE_WORKLOAD_STAGE_EVENTS__ ??= [];
         events.push({ atMs: performance.now(), summary });
         if (events.length > 500) events.splice(0, events.length - 500);
+        // The map is in requestRenderMode; request a post-commit frame so the
+        // benchmark can measure stage-to-frame readiness deterministically.
+        window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.requestRender?.();
       }
       originalInfo(...args);
     };
