@@ -147,6 +147,48 @@ function intersects(left, right) {
   );
 }
 
+
+function countPopulatedTilesAtGridStep(features, viewport, step) {
+  const columns = Math.ceil(360 / step);
+  const rows = Math.ceil(180 / step);
+  const tileIds = new Set();
+
+  for (const feature of features) {
+    if (!isRecord(feature) || feature.type !== "Feature" || !isRecord(feature.geometry)) {
+      continue;
+    }
+    const bounds = getGeometryBounds(feature.geometry);
+    if (!bounds) continue;
+
+    const clamp = (value, minimum, maximum) =>
+      Math.max(minimum, Math.min(maximum, value));
+    const minX = clamp(Math.floor((bounds.west + 180) / step), 0, columns - 1);
+    const maxX = clamp(Math.floor((bounds.east + 180) / step), 0, columns - 1);
+    const minY = clamp(Math.floor((bounds.south + 90) / step), 0, rows - 1);
+    const maxY = clamp(Math.floor((bounds.north + 90) / step), 0, rows - 1);
+
+    if ((maxX - minX + 1) * (maxY - minY + 1) > 64) continue;
+
+    for (let x = minX; x <= maxX; x += 1) {
+      for (let y = minY; y <= maxY; y += 1) {
+        const west = -180 + x * step;
+        const south = -90 + y * step;
+        const tileBounds = {
+          west,
+          south,
+          east: Math.min(180, west + step),
+          north: Math.min(90, south + step),
+        };
+        if (intersects(tileBounds, viewport)) {
+          tileIds.add(`x${x}_y${y}`);
+        }
+      }
+    }
+  }
+
+  return tileIds.size;
+}
+
 async function loadDataset() {
   const [sourceText, manifestText] = await Promise.all([
     readFile(sourcePath, "utf8"),
@@ -204,6 +246,32 @@ test("manifest matches the source dataset and generated grid", async () => {
     manifest.invalidFeatureCount,
     0,
     "source contains invalid features",
+  );
+});
+
+
+test("startup viewport selects fewer populated tiles than the previous 0.005-degree grid", async () => {
+  const { source, manifest } = await loadDataset();
+  const startupViewport = {
+    west: 90.405,
+    south: 23.775,
+    east: 90.415,
+    north: 23.785,
+  };
+
+  const previousTileCount = countPopulatedTilesAtGridStep(
+    source.features,
+    startupViewport,
+    0.005,
+  );
+  const currentTileCount = manifest.tiles.filter((tile) =>
+    intersects(tile.bounds, startupViewport),
+  ).length;
+
+  assert.ok(previousTileCount > 0, "expected the legacy startup viewport to intersect populated tiles");
+  assert.ok(
+    currentTileCount < previousTileCount,
+    `expected coarser indexed tiles to reduce startup tile reads (${currentTileCount} current vs ${previousTileCount} previous)`,
   );
 });
 
