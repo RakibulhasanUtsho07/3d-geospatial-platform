@@ -270,6 +270,7 @@ test("viewport API exposes server phase timings without changing its feature pay
   assert.ok(Number.isInteger(cacheBytes) && cacheBytes > 0 && cacheBytes <= 4 * 1024 * 1024);
   assert.ok(Number.isInteger(cacheEvictions) && cacheEvictions >= 0);
   assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Oversized-Rejections")) >= 0);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Invalidations")) >= 0);
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
