@@ -16,6 +16,7 @@ export function createSelectedGeometryCache(options = {}) {
   const entries = new Map();
   let accountedBytes = 0;
   let evictionCount = 0;
+  let invalidationCount = 0;
   let oversizedRejectionCount = 0;
 
   function get(key) {
@@ -64,6 +65,21 @@ export function createSelectedGeometryCache(options = {}) {
     return entries.has(key);
   }
 
+  function invalidateWhere(predicate) {
+    if (typeof predicate !== "function") {
+      throw new TypeError("predicate must be a function");
+    }
+    let invalidated = 0;
+    for (const [key, entry] of entries) {
+      if (!predicate(key, entry.value)) continue;
+      entries.delete(key);
+      accountedBytes -= entry.byteLength;
+      invalidationCount += 1;
+      invalidated += 1;
+    }
+    return invalidated;
+  }
+
   function getStats() {
     return {
       entries: entries.size,
@@ -71,6 +87,7 @@ export function createSelectedGeometryCache(options = {}) {
       maxBytes,
       maxEntries,
       evictions: evictionCount,
+      invalidations: invalidationCount,
       oversizedRejections: oversizedRejectionCount,
     };
   }
@@ -79,10 +96,11 @@ export function createSelectedGeometryCache(options = {}) {
     entries.clear();
     accountedBytes = 0;
     evictionCount = 0;
+    invalidationCount = 0;
     oversizedRejectionCount = 0;
   }
 
-  return Object.freeze({ get, set, getStats, clear });
+  return Object.freeze({ get, set, invalidateWhere, getStats, clear });
 }
 
 export function createSelectedGeometryCacheKey({
