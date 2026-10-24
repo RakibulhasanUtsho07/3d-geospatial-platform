@@ -195,6 +195,9 @@ const tileFeatureIndexCache = new Map<string, CachedTileIndexEntry>();
 // Only retain selected features after their JSON, bounds and render role have
 // passed index-integrity checks. The shared cache policy bounds memory and LRU eviction.
 const selectedTileGeometryCache = createSelectedGeometryCache();
+// Track the signature used by the selected-geometry cache so we only scan and
+// purge that tile's old keys when its observed file signature actually changes.
+const selectedGeometrySignatureByTile = new Map<string, string>();
 const MAX_TILE_READ_GAP_BYTES = 2 * 1024;
 const MAX_TILE_READ_WINDOW_BYTES = 64 * 1024;
 
@@ -985,23 +988,27 @@ async function queryGeneratedTiles(
       return null;
     }
     candidateFeatureCount += tileIndex.records.length;
-    const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key) => {
-      try {
-        const parts: unknown = JSON.parse(key);
-        return Array.isArray(parts) &&
-          parts[0] === tile.file &&
-          typeof parts[1] === "string" &&
-          parts[1] !== tileIndex.dataSignature;
-      } catch {
-        return false;
-      }
-    });
-    if (invalidatedGeometryEntries > 0) {
-      console.info("[Overture Viewport API] Purged selected geometry cached for an older tile signature.", {
-        tile: tile.id,
-        invalidatedEntries: invalidatedGeometryEntries,
+    const priorGeometrySignature = selectedGeometrySignatureByTile.get(tile.file);
+    if (priorGeometrySignature !== undefined && priorGeometrySignature !== tileIndex.dataSignature) {
+      const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key) => {
+        try {
+          const parts: unknown = JSON.parse(key);
+          return Array.isArray(parts) &&
+            parts[0] === tile.file &&
+            typeof parts[1] === "string" &&
+            parts[1] !== tileIndex.dataSignature;
+        } catch {
+          return false;
+        }
       });
+      if (invalidatedGeometryEntries > 0) {
+        console.info("[Overture Viewport API] Purged selected geometry cached for an older tile signature.", {
+          tile: tile.id,
+          invalidatedEntries: invalidatedGeometryEntries,
+        });
+      }
     }
+    selectedGeometrySignatureByTile.set(tile.file, tileIndex.dataSignature);
     tileDataSignatures.set(tile.file, tileIndex.dataSignature);
     candidateBytes += getSignatureSize(tileIndex.dataSignature);
     indexReadBytes += tileIndex.indexReadBytes;
