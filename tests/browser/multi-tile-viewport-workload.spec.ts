@@ -985,7 +985,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     .filter((value): value is number => value !== null);
 
   const browserFetchLifecycleEvents = await page.evaluate(() => {
-    return performance.getEntriesByType("resource")
+    return window.performance.getEntriesByType("resource")
       .filter((entry) => entry.name.includes("/api/geospatial/overture-buildings/viewport"))
       .map((entry) => {
         const resource = entry as PerformanceResourceTiming;
