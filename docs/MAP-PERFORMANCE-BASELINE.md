@@ -53,6 +53,18 @@ npm run benchmark:map-optimization
 
 The benchmark prints reference/optimized median and p95 timings for 5,000 building candidates with a 48-record facade budget, and for 600 road ways with 36 vertices each. It verifies output parity before timing. These are same-process CPU microbenchmarks; they do not represent total GPU render time or production Dhaka dataset performance. Keep the printed environment and output with any optimization report, and use the browser telemetry above for end-to-end measurements.
 
+## Real multi-tile viewport workload (P2.6)
+
+The browser workload benchmark complements these CPU microbenchmarks with repeated pan/zoom against the live Overture viewport API and generated spatial-tile manifest. It measures selected tile counts, request cancellation, building-stage-to-Cesium-frame readiness, and Chromium heap/DOM trends. The dedicated runbook, metric definitions, commands, acceptance gates, and limitations are in [MULTI-TILE-VIEWPORT-WORKLOAD-BENCHMARK.md](./MULTI-TILE-VIEWPORT-WORKLOAD-BENCHMARK.md).
+
+Run it against a running map server with generated Overture spatial tiles:
+
+```bash
+npm run benchmark:map-workload
+```
+
+The report is saved and attached by Playwright as `multi-tile-viewport-workload.json`. This is a defined browser workload, not a universal FPS SLA or a substitute for device-specific GPU/native-memory profiling.
+
 ## Initial benchmark results recorded in CI
 
 GitHub Actions run [#39831935488](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/39831935488), on Node v24.21.0 / Linux x64 / 4 CPUs (5 warm-ups and 21 samples), reported:
