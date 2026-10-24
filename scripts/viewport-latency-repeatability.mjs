@@ -1,5 +1,30 @@
 import assert from "node:assert/strict";
 
+const SERVER_TIMING_FIELDS = [
+  "totalServerMs",
+  "tileQueryMs",
+  "manifestLookupMs",
+  "tileIndexReadAndParseMs",
+  "candidateMetadataScanMs",
+  "oversizedSidecarReadMs",
+  "featureSelectionMs",
+  "selectedGeometryReadMs",
+  "geometryReadMs",
+  "featureAssemblyMs",
+  "fallbackGeoJsonPreparationMs",
+  "roleClassificationMs",
+  "responseSerializationMs",
+];
+
+function validateServerTimings(value, label) {
+  assert.ok(value && typeof value === "object", label + " requires server phase timing metrics");
+  for (const field of SERVER_TIMING_FIELDS) {
+    assert.equal(typeof value[field], "number", label + "." + field + " must be numeric");
+    assert.ok(Number.isFinite(value[field]) && value[field] >= 0,
+      label + "." + field + " must be finite and nonnegative");
+  }
+}
+
 export function quantile(values, fraction) {
   assert.ok(Array.isArray(values) && values.length > 0, "quantile requires at least one sample");
   assert.ok(Number.isFinite(fraction) && fraction >= 0 && fraction <= 1, "quantile fraction must be in [0, 1]");
@@ -68,6 +93,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     if (first.candidateSha && report.candidateSha) assertSame(report.candidateSha, first.candidateSha, label + " candidate SHA");
 
     assert.ok(report.cold && report.warm && Array.isArray(report.runObservations), label + " is missing observations");
+    validateServerTimings(report.cold.serverTimingsMs, label + " cold server timings");
     assert.ok(Number.isFinite(report.cold.elapsedMs) && report.cold.elapsedMs >= 0, label + " cold latency is invalid");
     assert.ok(report.cold.indexReadBytes > 0, label + " must read the tile index on its first valid request");
     assert.ok(report.cold.candidatePayloadBytes > 0, label + " candidate baseline must be nonzero");
@@ -80,6 +106,9 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     for (const field of exactColdFields) assertSame(report.cold[field], first.cold[field], label + " cold." + field);
     const warmObservations = report.runObservations.filter((sample) => sample.phase === "warm-repeat");
     assert.ok(warmObservations.length >= 3, label + " must include repeated warm samples");
+    for (const [warmIndex, observation] of warmObservations.entries()) {
+      validateServerTimings(observation.serverTimingsMs, label + " warm observation " + (warmIndex + 1));
+    }
     assert.ok(warmObservations.every((sample) => sample.indexReadBytes === 0), label + " warm observations must have zero index reads");
     assert.ok(warmObservations.every((sample) => sample.featureSha256 === report.cold.featureSha256),
       label + " every warm hash must match its cold response");
@@ -91,6 +120,7 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
       viewportBoundsSha256: report.viewport.boundsSha256,
       cold: {
         elapsedMs: report.cold.elapsedMs,
+        serverTimingsMs: report.cold.serverTimingsMs,
         indexReadBytes: report.cold.indexReadBytes,
         featureReadBytes: report.cold.featureReadBytes,
         candidatePayloadBytes: report.cold.candidatePayloadBytes,
@@ -108,6 +138,11 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         totalIndexReadBytes: report.warm.totalIndexReadBytes,
         totalGeometryReadBytes: report.warm.totalGeometryReadBytes,
         meanGeometryPayloadReductionRatio: report.warm.meanGeometryPayloadReductionRatio,
+        serverTimingMsByPhase: Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
+          field,
+          summarizeLatency(warmObservations.map((sample) => sample.serverTimingsMs[field])),
+        ])),
+        serverTimingObservationsMs: warmObservations.map((sample) => sample.serverTimingsMs),
         responseLatenciesMs: warmObservations.map((sample) => sample.elapsedMs),
       },
     };
@@ -118,6 +153,16 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
   const pooledWarmLatencies = samples.flatMap((sample) => sample.warm.responseLatenciesMs);
   const coldGeometryBytes = samples.map((sample) => sample.cold.featureReadBytes);
   const warmGeometryBytes = samples.map((sample) => sample.warm.totalGeometryReadBytes);
+  const coldServerPhaseSamples = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
+    field,
+    summarizeLatency(sampleReports.map((report) => report.cold.serverTimingsMs[field])),
+  ]));
+  const pooledWarmServerPhaseSamples = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
+    field,
+    summarizeLatency(sampleReports.flatMap((report) => report.runObservations
+      .filter((observation) => observation.phase === "warm-repeat")
+      .map((observation) => observation.serverTimingsMs[field]))),
+  ]));
   const candidateShaValues = [...new Set(samples.map((sample) => sample.candidateSha).filter(Boolean))];
   assert.ok(candidateShaValues.length <= 1, "fresh-process samples must belong to the same candidate SHA");
 
@@ -145,6 +190,12 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
       perProcessWarmMedianMs: summarizeLatency(warmPerProcessMedians),
       pooledWarmRequestMs: summarizeLatency(pooledWarmLatencies),
       note: "Pooled warm observations are clustered within fresh processes; the per-process warm-median distribution is the more conservative unit for process-to-process variability. Millisecond values are not hard-gated.",
+    },
+    serverPhaseTiming: {
+      coldFirstRequestMsByPhase: coldServerPhaseSamples,
+      pooledWarmRequestMsByPhase: pooledWarmServerPhaseSamples,
+      phaseScope: "Reported by the API using node:perf_hooks. Tile subphases measure manifest lookup, tile index access/parsing, candidate metadata scans, sidecar/selected-geometry reads, selection and assembly; route phases report fallback preparation, role classification and JSON serialization.",
+      caveat: "Phase timings are component-level diagnostics. Framework/network overhead is not fully represented, and the geometryReadMs aggregate includes sidecar plus selected tile geometry read time.",
     },
     byteCost: {
       coldGeometryReadBytes: {
