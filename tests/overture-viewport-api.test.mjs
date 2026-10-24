@@ -172,6 +172,16 @@ test("viewport API returns features from generated spatial tiles", async (contex
       fetchedFeatureCount <= featureLimit,
     "geometry fetches should obey the response feature budget before deserialization",
   );
+
+  console.info("[P2.10 cold viewport fetch-cost]", JSON.stringify({
+    candidatePayloadBytes: candidateBytes,
+    indexReadBytes,
+    featureReadBytes,
+    combinedIndexAndGeometryReadBytes: indexReadBytes + featureReadBytes,
+    combinedReadReductionRatio: Number((1 - (indexReadBytes + featureReadBytes) / candidateBytes).toFixed(4)),
+    fetchedFeatureCount,
+    featureLimit,
+  }));
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
