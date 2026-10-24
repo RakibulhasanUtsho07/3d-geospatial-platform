@@ -64,8 +64,8 @@ function makeSample(index, coldMs = 140 + index * 5) {
     warm: {
       requestCount: 5, medianResponseMs: warmLatencies[2], p95ResponseMs: warmLatencies[4],
       minResponseMs: warmLatencies[0], maxResponseMs: warmLatencies[4], totalIndexReadBytes: 0,
-      totalGeometryReadBytes: 12663130, totalCandidatePayloadBaselineBytes: 45036640,
-      meanGeometryPayloadReductionRatio: 0.7188, allIndexReadsServedFromMemory: true,
+      totalGeometryReadBytes: 0, totalCandidatePayloadBaselineBytes: 45036640,
+      meanGeometryPayloadReductionRatio: 1, allIndexReadsServedFromMemory: true,
       allFeatureHashesMatchCold: true,
     },
     runObservations: observations,
