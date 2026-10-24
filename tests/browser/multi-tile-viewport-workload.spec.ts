@@ -98,7 +98,11 @@ function canonicalBoundsKey(values: unknown): string | null {
 
 function boundsKeyFromUrl(rawUrl: string): string | null {
   try {
-    const url = new URL(rawUrl);
+    // CesiumAdapter intentionally calls fetch with a same-origin relative URL.
+    // Playwright Request.url() is absolute, while the wrapped application fetch
+    // reports that relative string; accept both so abort events retain the
+    // same coordinate hash without exporting the raw bounds.
+    const url = new URL(rawUrl, "http://viewport-benchmark.invalid");
     return canonicalBoundsKey({
       west: url.searchParams.get("west"),
       south: url.searchParams.get("south"),
