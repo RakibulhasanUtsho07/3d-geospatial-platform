@@ -20,7 +20,7 @@ The test deliberately does not enforce a millisecond speedup threshold: hosted C
 
 The real multi-tile Playwright workload now records viewport-fetch start and response completion inside the browser. Those timestamps share the same `performance.now()` timebase as the building-stage and `map:frame-ready` events. The report adds `readiness.firstBuilding`:
 - request start to the first populated building stage for the startup viewport;
-- browser-visible response completion to that stage;
+- browser-visible response availability to that stage (not full body-download completion);
 - building stage to its next actual Cesium postRender frame;
 - returned feature and rendered building counts, plus the matching hashed viewport and frame sequence.
 
