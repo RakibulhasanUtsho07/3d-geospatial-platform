@@ -73,7 +73,51 @@
       for (let index = 0; index < count; index += 1) await nextFrame();
     }
 
-    function waitForTilesetView(viewer, tileset, diagnostics, timeoutMs = 45000) {
+    function inspectTilesetView(viewer, tileset, diagnostics, targetPosition) {
+      const scene = viewer.scene;
+      const camera = viewer.camera;
+      const targetDirection = Cesium.Cartesian3.normalize(
+        Cesium.Cartesian3.subtract(targetPosition, camera.positionWC, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      const directionDot = Cesium.Cartesian3.dot(camera.directionWC, targetDirection);
+      const targetScreen = Cesium.SceneTransforms.worldToWindowCoordinates(scene, targetPosition);
+      const cullingVolume = camera.frustum.computeCullingVolume(
+        camera.positionWC,
+        camera.directionWC,
+        camera.upWC
+      );
+      const describeSphere = (sphere) => sphere ? {
+        radiusMeters: sphere.radius,
+        centerDistanceToTargetMeters: Cesium.Cartesian3.distance(sphere.center, targetPosition),
+        frustumVisibility: cullingVolume.computeVisibility(sphere),
+        centerCartesian: {
+          x: sphere.center.x,
+          y: sphere.center.y,
+          z: sphere.center.z
+        }
+      } : null;
+      return {
+        sceneMode: scene.mode,
+        canvas: { width: scene.canvas.width, height: scene.canvas.height },
+        cameraTargetDirectionDot: directionDot,
+        cameraTargetAngularErrorDegrees: Cesium.Math.toDegrees(Math.acos(Math.max(-1, Math.min(1, directionDot)))),
+        targetScreen: targetScreen ? { x: targetScreen.x, y: targetScreen.y } : null,
+        targetInsideCanvas: Boolean(targetScreen && targetScreen.x >= 0 && targetScreen.x <= scene.canvas.clientWidth && targetScreen.y >= 0 && targetScreen.y <= scene.canvas.clientHeight),
+        tilesetShow: tileset.show,
+        rootBoundingVolume: describeSphere(tileset.root?.boundingSphere),
+        tilesetBoundingSphere: describeSphere(tileset.boundingSphere),
+        tilesLoaded: tileset.tilesLoaded === true,
+        tileLoadCount: diagnostics.tileLoadCount,
+        tileVisibleCount: diagnostics.tileVisibleCount,
+        tileFailedCount: diagnostics.tileFailed.length,
+        tileFailed: diagnostics.tileFailed.slice(0, 3),
+        rootContentReady: tileset.root?.contentReady ?? null,
+        rootHasContent: Boolean(tileset.root?.content)
+      };
+    }
+
+    function waitForTilesetView(viewer, tileset, diagnostics, targetPosition, timeoutMs = 45000) {
       return new Promise((resolve, reject) => {
         const scene = viewer.scene;
         let readyFrames = 0;
@@ -107,19 +151,9 @@
           scene.requestRender();
         });
         timer = setTimeout(() => {
-          const root = tileset.root;
-          const failedSummary = diagnostics.tileFailed.slice(0, 3);
           finish(new Error(
             "3D Tiles view readiness timed out after " + timeoutMs + " ms: " +
-            JSON.stringify({
-              tilesLoaded: tileset.tilesLoaded === true,
-              tileLoadCount: diagnostics.tileLoadCount,
-              tileVisibleCount: diagnostics.tileVisibleCount,
-              tileFailedCount: diagnostics.tileFailed.length,
-              tileFailed: failedSummary,
-              rootContentReady: root?.contentReady ?? null,
-              rootHasContent: Boolean(root?.content)
-            })
+            JSON.stringify(inspectTilesetView(viewer, tileset, diagnostics, targetPosition))
           ));
         }, timeoutMs);
         scene.requestRender();
@@ -320,7 +354,18 @@
         preloadWhenHidden: false
       });
       const tileObserver = observeTilesetRuntime(tileset);
-      const tileViewReady = waitForTilesetView(tilesViewer, tileset, tileObserver.diagnostics, 45000);
+      const tilesetTarget = Cesium.Cartesian3.fromDegrees(
+        cameraReview.target.longitudeDegrees,
+        cameraReview.target.latitudeDegrees,
+        cameraReview.target.ellipsoidHeightMeters
+      );
+      const tileViewReady = waitForTilesetView(
+        tilesViewer,
+        tileset,
+        tileObserver.diagnostics,
+        tilesetTarget,
+        45000
+      );
       tilesViewer.scene.primitives.add(tileset);
       tilesViewer.scene.requestRender();
       const readinessStrategy = await tileViewReady;
