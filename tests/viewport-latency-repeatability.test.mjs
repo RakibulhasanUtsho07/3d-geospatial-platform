@@ -15,6 +15,12 @@ function makeServerTimings(offset = 0) {
     oversizedSidecarReadMs: 0,
     featureSelectionMs: 0.5 + offset / 10,
     selectedGeometryReadMs: 1 + offset / 5,
+    geometryRangePlanningMs: 0.05 + offset / 100,
+    geometryFileOpenMs: 0.1 + offset / 100,
+    geometryRangeReadMs: 0.2 + offset / 10,
+    geometryJsonParseMs: 0.3 + offset / 10,
+    geometryIntegrityCheckMs: 0.2 + offset / 10,
+    geometryFileCloseMs: 0.05 + offset / 100,
     geometryReadMs: 1 + offset / 5,
     featureAssemblyMs: 0.3 + offset / 10,
     fallbackGeoJsonPreparationMs: 0,
@@ -86,7 +92,9 @@ test("aggregates repeated fresh-process cold/warm samples with deterministic dat
   assert.equal(result.latency.pooledWarmRequestMs.sampleCount, 20);
   assert.equal(result.serverPhaseTiming.coldFirstRequestMsByPhase.tileQueryMs.sampleCount, 4);
   assert.equal(result.serverPhaseTiming.pooledWarmRequestMsByPhase.totalServerMs.sampleCount, 20);
+  assert.equal(result.serverPhaseTiming.pooledWarmRequestMsByPhase.geometryJsonParseMs.sampleCount, 20);
   assert.equal(result.samples[0].cold.serverTimingsMs.tileQueryMs, 8);
+  assert.equal(result.samples[0].cold.serverTimingsMs.geometryIntegrityCheckMs, 0.2);
   assert.equal(result.samples[0].warm.serverTimingMsByPhase.totalServerMs.sampleCount, 5);
   assert.equal(result.byteCost.coldIndexReadsVerified, true);
   assert.equal(result.byteCost.zeroWarmIndexReadsVerified, true);
