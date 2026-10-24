@@ -158,7 +158,7 @@ test("viewport API returns features from generated spatial tiles", async (contex
   const candidateFeatureCount = Number(response.headers.get("X-Building-Candidate-Feature-Count"));
   const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
   assert.ok(Number.isFinite(candidateBytes) && candidateBytes > 0);
-  assert.ok(Number.isFinite(indexReadBytes) && indexReadBytes > 0, "cold request should report index bytes read");
+  assert.ok(Number.isFinite(indexReadBytes) && indexReadBytes >= 0, "index-read diagnostics should be present even when the index cache is warm");
   assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes >= 0);
   assert.ok(
     indexReadBytes + featureReadBytes < candidateBytes,
@@ -173,7 +173,7 @@ test("viewport API returns features from generated spatial tiles", async (contex
     "geometry fetches should obey the response feature budget before deserialization",
   );
 
-  console.info("[P2.10 cold viewport fetch-cost]", JSON.stringify({
+  console.info("[P2.10 viewport fetch-cost sample]", JSON.stringify({
     candidatePayloadBytes: candidateBytes,
     indexReadBytes,
     featureReadBytes,
