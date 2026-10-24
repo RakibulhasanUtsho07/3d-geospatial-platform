@@ -161,7 +161,8 @@
     "benchmark:viewport-baseline-compare": "node scripts/compare-viewport-performance-baseline.mjs",
     "test:viewport-baseline-compare": "node --test tests/viewport-performance-baseline-comparison.test.mjs",
     "benchmark:viewport-latency-repeatability": "node scripts/benchmark-viewport-latency-repeatability.mjs",
-    "test:viewport-latency-repeatability": "node --test tests/viewport-latency-repeatability.test.mjs"
+    "test:viewport-latency-repeatability": "node --test tests/viewport-latency-repeatability.test.mjs",
+    "benchmark:viewport-movement-cache": "node scripts/benchmark-viewport-movement-cache.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
