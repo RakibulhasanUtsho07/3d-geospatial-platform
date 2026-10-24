@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { performance } from "node:perf_hooks";
 import { expect, test, type Page } from "@playwright/test";
 
 const OUTPUT_DIRECTORY = path.resolve(
@@ -335,7 +334,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
   const initial = await page.evaluate(() => {
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
+    const memory = (window.performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
     const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
@@ -396,7 +395,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   }));
   const finalMemory = await page.evaluate(() => {
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
+    const memory = (window.performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
     const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
@@ -416,7 +415,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   const frameMetrics = await page.evaluate(async () => {
     const intervals: number[] = [];
-    const startedAt = performance.now();
+    const startedAt = window.performance.now();
     return new Promise<{
       sampleDurationMs: number;
       frameCount: number;
