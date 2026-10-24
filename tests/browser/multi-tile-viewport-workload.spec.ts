@@ -59,6 +59,8 @@ type ViewportRequestObservation = {
   request: Request;
   startedAtMs: number;
   viewportHash: string | null;
+  viewportWidthDegrees: number | null;
+  viewportHeightDegrees: number | null;
   outcome: "in-flight" | "delivered" | "cancelled" | "failed" | "route-error";
   delayedForCancellation: boolean;
   routeResponseReady: boolean;
@@ -136,6 +138,46 @@ function hashBounds(key: string | null): string | null {
   return key
     ? createHash("sha256").update(key).digest("hex").slice(0, 12)
     : null;
+}
+
+/** Persist only viewport dimensions, never the source coordinates themselves. */
+function viewportSpanFromUrl(rawUrl: string): { widthDegrees: number; heightDegrees: number } | null {
+  try {
+    const url = new URL(rawUrl, "http://viewport-benchmark.invalid");
+    const west = Number(url.searchParams.get("west"));
+    const south = Number(url.searchParams.get("south"));
+    const east = Number(url.searchParams.get("east"));
+    const north = Number(url.searchParams.get("north"));
+    if (![west, south, east, north].every(Number.isFinite) || west >= east || south >= north) {
+      return null;
+    }
+    return {
+      widthDegrees: Number((east - west).toFixed(6)),
+      heightDegrees: Number((north - south).toFixed(6)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function summarizeSpan(values: number[]): {
+  minDegrees: number | null;
+  p50Degrees: number | null;
+  p95Degrees: number | null;
+  maxDegrees: number | null;
+} {
+  if (values.length === 0) {
+    return { minDegrees: null, p50Degrees: null, p95Degrees: null, maxDegrees: null };
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const at = (fraction: number) => sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)];
+  const round = (value: number) => Number(value.toFixed(6));
+  return {
+    minDegrees: round(sorted[0]),
+    p50Degrees: round(at(0.5)),
+    p95Degrees: round(at(0.95)),
+    maxDegrees: round(sorted[sorted.length - 1]),
+  };
 }
 
 function errorText(error: unknown): string {
@@ -312,11 +354,14 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   await page.route("**/api/geospatial/overture-buildings/viewport**", async (route: Route) => {
     const task = (async () => {
       const request = route.request();
+      const viewportSpan = viewportSpanFromUrl(request.url());
       const observation: ViewportRequestObservation = {
         sequence: requests.length + 1,
         request,
         startedAtMs: performance.now(),
         viewportHash: hashBounds(boundsKeyFromUrl(request.url())),
+        viewportWidthDegrees: viewportSpan?.widthDegrees ?? null,
+        viewportHeightDegrees: viewportSpan?.heightDegrees ?? null,
         outcome: "in-flight",
         delayedForCancellation: false,
         routeResponseReady: false,
@@ -706,6 +751,14 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     .filter((count) => Number.isFinite(count));
   const maxTilesInViewport = allTileCounts.length ? Math.max(...allTileCounts) : 0;
   const totalSelectedTileLoads = allTileCounts.reduce((sum, count) => sum + count, 0);
+  const viewportWidthSummary = summarizeSpan(
+    requests.map((request) => request.viewportWidthDegrees)
+      .filter((value): value is number => value !== null),
+  );
+  const viewportHeightSummary = summarizeSpan(
+    requests.map((request) => request.viewportHeightDegrees)
+      .filter((value): value is number => value !== null),
+  );
 
   const heapValues = memorySamples.map((sample) => sample.jsHeapUsedBytes);
   const validHeapValues = heapValues.filter((value): value is number => value !== null);
@@ -733,10 +786,16 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
   const tileManifestPath = resolve(process.cwd(), "data", "overture", "spatial-tiles", "manifest.json");
   let spatialTileManifestSha256: string | null = null;
+  let availableSpatialTileCount: number | null = null;
   try {
-    spatialTileManifestSha256 = createHash("sha256")
-      .update(await readFile(tileManifestPath))
-      .digest("hex");
+    const manifestBytes = await readFile(tileManifestPath);
+    spatialTileManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
+    const manifest = JSON.parse(manifestBytes.toString("utf8")) as { tileCount?: unknown };
+    availableSpatialTileCount = typeof manifest.tileCount === "number"
+      && Number.isInteger(manifest.tileCount)
+      && manifest.tileCount >= 0
+      ? manifest.tileCount
+      : null;
   } catch {
     // The endpoint-backed tile assertions below will fail if the generated
     // manifest is absent; still preserve diagnostic output first.
@@ -746,7 +805,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     benchmark: "p2.6-real-multi-tile-viewport-workload",
     generatedAt: new Date().toISOString(),
     candidateSha: process.env.GITHUB_SHA ?? null,
-    dataset: { spatialTileManifestSha256 },
+    dataset: { spatialTileManifestSha256, availableSpatialTileCount },
     environment: {
       node: process.version,
       platform: process.platform,
@@ -770,6 +829,10 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       viewportResponses: requests.map((request) => ({
         sequence: request.sequence,
         viewportHash: request.viewportHash,
+        viewportSpanDegrees: {
+          width: request.viewportWidthDegrees,
+          height: request.viewportHeightDegrees,
+        },
         outcome: request.outcome,
         statusCode: request.statusCode,
         dataSource: request.dataSource,
@@ -785,11 +848,20 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       })),
       generatedSpatialTiles: {
         successfulResponseCount: successfulGeneratedTileRequests.length,
+        availableTileCount: availableSpatialTileCount,
         totalSelectedTileLoads,
         maxTilesInOneViewport: maxTilesInViewport,
+        meanSelectedTilesPerViewport: allTileCounts.length
+          ? Number((totalSelectedTileLoads / allTileCounts.length).toFixed(2))
+          : null,
+        meanSelectedTileRatio: availableSpatialTileCount && allTileCounts.length
+          ? Number((totalSelectedTileLoads / (availableSpatialTileCount * allTileCounts.length)).toFixed(4))
+          : null,
         viewportsSelectingMultipleTiles: successfulGeneratedTileRequests.filter(
           (request) => (request.selectedTileCount ?? 0) > 1,
         ).length,
+        viewportWidthDegrees: viewportWidthSummary,
+        viewportHeightDegrees: viewportHeightSummary,
       },
     },
     readiness: {
