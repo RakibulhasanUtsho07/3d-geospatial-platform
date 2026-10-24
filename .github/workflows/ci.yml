@@ -45,6 +45,7 @@ on:
       - feat/release-readiness-accuracy-evidence
       - feat/final-merge-cleanup
       - feat/texture-projection-validation
+      - feat/p2-7-viewport-tile-selectivity
   pull_request:
     branches:
       - main
@@ -70,6 +71,7 @@ on:
       - feat/similarity-evidence-correction-tasks
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
+      - feat/p2-6-multitile-viewport-workload
 
 permissions:
   contents: read

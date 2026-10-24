@@ -7,6 +7,7 @@ import {
   shouldContinueViewportStage,
   shouldLoadFullDatasetForWideViewport,
 } from "./viewport-load-policy.mjs";
+import { clampViewportBoundsToLocalWindow } from "./viewport-bounds-policy.mjs";
 import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
 import { createMapPerformanceTelemetry } from "./performance-telemetry.mjs";
 import type {
@@ -94,6 +95,12 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  /** Test-only deterministic camera placement for a representative spatial-tile viewport. */
+  focusViewportForBenchmark?: (
+    longitudeDegrees: number,
+    latitudeDegrees: number,
+    heightMeters: number,
+  ) => boolean;
   /** Benchmark-only hook to process the live camera state through the normal intent handler. */
   notifyCameraIntent?: () => {
     loadInProgress: boolean;
@@ -140,9 +147,13 @@ type GeneratedModelRecord = {
 // Detail budgets adapt to camera altitude to keep distant city views lightweight.
 const BATCH_SIZE = 200;
 const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
-const VIEWPORT_PADDING_FACTOR = 0.4;
+const VIEWPORT_PADDING_FACTOR = 0.15;
 const VIEWPORT_MIN_PADDING_DEGREES = 0.004;
 const MAX_VIEWPORT_SPAN_DEGREES = 1.8;
+const SHALLOW_BUILDING_VIEW_PITCH_LIMIT_DEGREES = 35;
+const MIN_SHALLOW_BUILDING_QUERY_HALF_EXTENT_METERS = 750;
+const MAX_SHALLOW_BUILDING_QUERY_HALF_EXTENT_METERS = 20_000;
+const CAMERA_HEIGHT_TO_BUILDING_QUERY_HALF_EXTENT = 4;
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -272,6 +283,52 @@ export class CesiumAdapter implements MapEngine {
         viewer.scene.requestRender();
       }
     };
+    diagnostics.focusViewportForBenchmark = (
+      longitudeDegrees,
+      latitudeDegrees,
+      heightMeters,
+    ) => {
+      const currentCesium = this.cesium;
+      if (
+        this.workloadFrameDiagnostics !== diagnostics ||
+        this.viewer !== viewer ||
+        !currentCesium ||
+        viewer.isDestroyed() ||
+        !Number.isFinite(longitudeDegrees) ||
+        !Number.isFinite(latitudeDegrees) ||
+        !Number.isFinite(heightMeters) ||
+        longitudeDegrees < -180 ||
+        longitudeDegrees > 180 ||
+        latitudeDegrees < -85 ||
+        latitudeDegrees > 85 ||
+        heightMeters < 50 ||
+        heightMeters > 50_000
+      ) {
+        return false;
+      }
+
+      // The hook exists only when the opt-in browser workload flag is set.
+      // Place the real Cesium camera above the generated-tile extent so the
+      // benchmark can measure a local viewport independently of the app's
+      // heritage-landmark startup preset.
+      viewer.camera.cancelFlight();
+      viewer.camera.lookAtTransform(currentCesium.Matrix4.IDENTITY);
+      viewer.camera.setView({
+        destination: currentCesium.Cartesian3.fromDegrees(
+          longitudeDegrees,
+          latitudeDegrees,
+          heightMeters,
+        ),
+        orientation: {
+          heading: currentCesium.Math.toRadians(0),
+          pitch: currentCesium.Math.toRadians(-88.5),
+          roll: 0,
+        },
+      });
+      viewer.scene.requestRender();
+      this.handleCameraMoveEnd(viewer, currentCesium);
+      return true;
+    };
     diagnostics.notifyCameraIntent = () => {
       // Some synthetic browser drags can update the camera without reliably
       // emitting moveEnd on every runner. Process the current live camera state
@@ -290,7 +347,7 @@ export class CesiumAdapter implements MapEngine {
       const lifecycleBefore = this.buildingViewportManager.getRequestLifecycleDiagnostics();
       const intentRevisionBefore = lifecycleBefore.intentRevision;
       const loadInProgress = lifecycleBefore.loadInProgress;
-      const boundsBeforeMove = this.getPaddedViewportBounds(viewer, currentCesium);
+      const boundsBeforeMove = this.getBuildingViewportBounds(viewer, currentCesium);
 
       // The test intentionally holds the active viewport response. Move the
       // actual Cesium camera by a bounded distance so computeViewRectangle
@@ -299,7 +356,7 @@ export class CesiumAdapter implements MapEngine {
       viewer.camera.moveRight(5_000);
       viewer.scene.requestRender();
 
-      const boundsAfterMove = this.getPaddedViewportBounds(viewer, currentCesium);
+      const boundsAfterMove = this.getBuildingViewportBounds(viewer, currentCesium);
       this.handleCameraMoveEnd(viewer, currentCesium);
       const lifecycleAfter = this.buildingViewportManager.getRequestLifecycleDiagnostics();
 
@@ -750,7 +807,7 @@ export class CesiumAdapter implements MapEngine {
     viewer: CesiumViewer,
     Cesium: CesiumModule,
     requestedBounds: ViewportBounds | null =
-      this.getPaddedViewportBounds(viewer, Cesium),
+      this.getBuildingViewportBounds(viewer, Cesium),
   ): Promise<void> {
     const requestedFeatureLimit = requestedBounds
       ? getViewportFeatureLimit(viewer.camera.positionCartographic.height)
@@ -1147,6 +1204,49 @@ export class CesiumAdapter implements MapEngine {
     return padded;
   }
 
+  /**
+   * Cesium's view rectangle includes the far horizon for shallow camera angles.
+   * Bound detailed building queries around the centre ray in that case: the
+   * maximum window expands with camera altitude but avoids downloading the
+   * entire city merely because the horizon intersects it.
+   *
+   * Roads keep their existing viewport policy because they have a separate
+   * centreline budget and do not stage thousands of building entities.
+   */
+  private getBuildingViewportBounds(
+    viewer: CesiumViewer,
+    Cesium: CesiumModule,
+  ): ViewportBounds | null {
+    const paddedBounds = this.getPaddedViewportBounds(viewer, Cesium);
+    if (!paddedBounds) return null;
+
+    const pitchDegrees = Math.abs(Cesium.Math.toDegrees(viewer.camera.pitch));
+    if (
+      !Number.isFinite(pitchDegrees) ||
+      pitchDegrees >= SHALLOW_BUILDING_VIEW_PITCH_LIMIT_DEGREES
+    ) {
+      return paddedBounds;
+    }
+
+    const groundCenter = this.getGroundCenter();
+    if (!groundCenter) return paddedBounds;
+
+    const cameraHeightMeters = Math.max(0, viewer.camera.positionCartographic.height);
+    const halfExtentMeters = Math.min(
+      MAX_SHALLOW_BUILDING_QUERY_HALF_EXTENT_METERS,
+      Math.max(
+        MIN_SHALLOW_BUILDING_QUERY_HALF_EXTENT_METERS,
+        cameraHeightMeters * CAMERA_HEIGHT_TO_BUILDING_QUERY_HALF_EXTENT,
+      ),
+    );
+
+    return clampViewportBoundsToLocalWindow(
+      paddedBounds,
+      groundCenter,
+      halfExtentMeters,
+    ) ?? paddedBounds;
+  }
+
   private getViewportEndpoint(
     bounds: ViewportBounds,
     featureLimit: number,
@@ -1176,7 +1276,7 @@ export class CesiumAdapter implements MapEngine {
 
     if (!this.isLayerVisible(MAP_LAYER_IDS.overtureBuildings)) return;
 
-    const requestedBounds = this.getPaddedViewportBounds(viewer, Cesium);
+    const requestedBounds = this.getBuildingViewportBounds(viewer, Cesium);
 
     if (!requestedBounds) {
       // A wide view needs all pilot buildings unless the full dataset is active.
