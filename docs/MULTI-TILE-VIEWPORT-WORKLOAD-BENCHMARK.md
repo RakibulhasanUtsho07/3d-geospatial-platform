@@ -51,9 +51,9 @@ The adapter's frame counter and `requestRender` probe are explicitly opt-in thro
 The test fails when any of the following cannot be demonstrated:
 
 - The real API uses the generated spatial-tile source and at least one viewport selects multiple tiles.
-- A stale in-flight viewport request is cancelled after a newer camera intent.
-- Multiple viewport payloads reach the Cesium building staging path.
-- A real `scene.postRender` frame follows staged building work.
+- Repeated pan/zoom produces at least four distinct viewport requests.
+- The deliberately delayed stale viewport request itself is cancelled after a newer camera intent.
+- Multiple viewport payloads reach the Cesium building staging path, and every recorded stage is followed by a real `scene.postRender` frame.
 - Chromium exposes enough heap samples to compute the post-movement trend.
 - The broad post-run growth guard is exceeded (128 MiB heap increase or 10,000 additional DOM nodes compared with the initial sample).
 
