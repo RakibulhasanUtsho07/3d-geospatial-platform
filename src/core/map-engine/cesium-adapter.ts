@@ -84,7 +84,6 @@ type PerformanceDiagnosticsWindow = Window & {
 
 type WorkloadFrameDiagnostics = {
   frameCount: number;
-  lastFrameNumber: number;
   lastFrameAtMs: number;
 };
 
@@ -240,7 +239,6 @@ export class CesiumAdapter implements MapEngine {
 
     const diagnostics: WorkloadFrameDiagnostics = {
       frameCount: 0,
-      lastFrameNumber: 0,
       lastFrameAtMs: 0,
     };
     this.workloadFrameDiagnostics = diagnostics;
@@ -251,7 +249,6 @@ export class CesiumAdapter implements MapEngine {
       if (!current || typeof window === "undefined") return;
 
       current.frameCount += 1;
-      current.lastFrameNumber = viewer.scene.frameState.frameNumber;
       current.lastFrameAtMs = performance.now();
       window.dispatchEvent(new CustomEvent("map:frame-ready", {
         detail: { ...current },
