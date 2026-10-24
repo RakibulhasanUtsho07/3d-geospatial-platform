@@ -77,8 +77,8 @@ async function observeRequest(sequence, phase) {
   const elapsedMs = Number((performance.now() - startedAt).toFixed(2));
   assert.equal(response.status, 200, phase + " request " + sequence + " should return HTTP 200");
   assert.equal(response.headers.get("x-building-data-source"), "generated-tiles");
-  assert.equal(response.headers.get("x-building-timing-version"), "p2.18",
-    "server must advertise the P2.18 timing contract");
+  assert.equal(response.headers.get("x-building-timing-version"), "p2.19",
+    "server must advertise the P2.19 timing contract");
   assert.ok(Array.isArray(body.features) && body.features.length > 0, "expected real Dhaka building features");
 
   const serverTimingsMs = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
@@ -96,6 +96,12 @@ async function observeRequest(sequence, phase) {
   const fetchedFeatureCount = readMetric(response.headers, "x-building-fetched-feature-count");
   const geometryFeatureCacheHits = readMetric(response.headers, "x-building-geometry-feature-cache-hits");
   const geometryFeatureCacheMisses = readMetric(response.headers, "x-building-geometry-feature-cache-misses");
+  const geometryFeatureCacheEntries = readMetric(response.headers, "x-building-geometry-feature-cache-entries");
+  const geometryFeatureCacheBytes = readMetric(response.headers, "x-building-geometry-feature-cache-bytes");
+  const geometryFeatureCacheEvictions = readMetric(response.headers, "x-building-geometry-feature-cache-evictions");
+  const geometryFeatureCacheOversizedRejections = readMetric(response.headers, "x-building-geometry-feature-cache-oversized-rejections");
+  assert.ok(geometryFeatureCacheEntries <= 6000, "selected-geometry cache must respect its entry cap");
+  assert.ok(geometryFeatureCacheBytes <= 4 * 1024 * 1024, "selected-geometry cache must respect its byte budget");
   const responseFeatureLimit = readMetric(response.headers, "x-building-feature-limit");
   const selectedTileCount = readMetric(response.headers, "x-building-tile-count");
 
@@ -125,6 +131,10 @@ async function observeRequest(sequence, phase) {
     fetchedFeatureCount,
     geometryFeatureCacheHits,
     geometryFeatureCacheMisses,
+    geometryFeatureCacheEntries,
+    geometryFeatureCacheBytes,
+    geometryFeatureCacheEvictions,
+    geometryFeatureCacheOversizedRejections,
     featureLimit: responseFeatureLimit,
     featureSha256: createHash("sha256").update(JSON.stringify(body.features)).digest("hex"),
   };
@@ -206,7 +216,7 @@ const report = {
     warmDefinition: "Consecutive identical viewport requests on the same server process after the cold sample.",
     latency: "Client-observed request through response-body download; does not isolate server CPU time or claim a general speedup.",
     serverTimings: "X-Building-Timing-* headers use node:perf_hooks phase durations for tile query, manifest lookup, tile-index read/parse, candidate metadata scan, selected geometry read subphases (range planning, open, range read, JSON parse, integrity check, close), feature selection/assembly, fallback GeoJSON preparation, role classification and JSON serialization. Geometry subphases are nested within selectedGeometryReadMs and must not be added to it; timings are diagnostic, not a complete accounting of framework/network/GPU time.",
-    geometryFeatureCache: "Cache hits and misses count selected tile-backed feature records. Entries are keyed by tile path, current data-file size/mtime signature, byte offset/length and feature identity, bounded to 4 MiB of source-record bytes and 6000 entries. Hits avoid geometry-file reads and JSON parsing; misses still pass the original bounds and render-role integrity checks.",
+    geometryFeatureCache: "Cache hits and misses count selected tile-backed feature records. Entries are keyed by tile path, current data-file size/mtime signature, byte offset/length, feature identity, render role and indexed bounds. The tested LRU policy is bounded to 4 MiB of source-record bytes and 6000 entries; benchmark observations record entries, accounted bytes, evictions and oversized-entry rejections. Hits avoid geometry-file reads and JSON parsing; misses still pass the original bounds and render-role integrity checks.",
     bytes: "Candidate payload is a whole-selected-tile baseline. Index and selected geometry bytes are application-reported reads, not physical disk I/O.",
     correctness: "Ordered response feature hashes and feature counts must match across cold and warm requests.",
   },
