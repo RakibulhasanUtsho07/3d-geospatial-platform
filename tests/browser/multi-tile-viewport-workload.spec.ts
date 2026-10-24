@@ -43,7 +43,7 @@ type ViewportRequestObservation = {
   candidateFeatureCount: number | null;
   matchedFeatureCount: number | null;
   returnedFeatureCount: number | null;
-  serverResponseMs: number | null;
+  endpointResponseMs: number | null;
   completedAtMs: number | null;
   failure: string | null;
   routeError: string | null;
@@ -257,7 +257,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         candidateFeatureCount: null,
         matchedFeatureCount: null,
         returnedFeatureCount: null,
-        serverResponseMs: null,
+        endpointResponseMs: null,
         completedAtMs: null,
         failure: null,
         routeError: null,
@@ -285,7 +285,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         observation.returnedFeatureCount = Number.isFinite(Number(headers["x-building-feature-count"]))
           ? Number(headers["x-building-feature-count"])
           : null;
-        observation.serverResponseMs = Number((performance.now() - observation.startedAtMs).toFixed(2));
+        observation.endpointResponseMs = Number((performance.now() - observation.startedAtMs).toFixed(2));
 
         if (delayNextViewportResponse && !delayedResponseClaimed) {
           delayNextViewportResponse = false;
@@ -522,7 +522,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         candidateFeatureCount: request.candidateFeatureCount,
         matchedFeatureCount: request.matchedFeatureCount,
         returnedFeatureCount: request.returnedFeatureCount,
-        serverResponseMs: request.serverResponseMs,
+        endpointResponseMs: request.endpointResponseMs,
         delayedForCancellation: request.delayedForCancellation,
         failure: request.failure,
         routeError: request.routeError,
