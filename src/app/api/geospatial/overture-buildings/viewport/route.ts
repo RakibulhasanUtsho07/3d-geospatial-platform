@@ -930,12 +930,13 @@ async function queryGeneratedTiles(
   if (manifest.oversizedFile) {
     const oversizedReadStartedAt = performance.now();
     const oversizedCollection = await readCachedTileCollection(manifest.oversizedFile);
-    const oversizedSignature = await getFileSignature(resolve(TILE_DIRECTORY, manifest.oversizedFile));
-    timings.oversizedSidecarReadMs += performance.now() - oversizedReadStartedAt;
     if (!oversizedCollection) {
+      timings.oversizedSidecarReadMs += performance.now() - oversizedReadStartedAt;
       console.warn("[Overture Viewport API] Oversized feature sidecar is missing or invalid; falling back to GeoJSON index.");
       return null;
     }
+    const oversizedSignature = await getFileSignature(resolve(TILE_DIRECTORY, manifest.oversizedFile));
+    timings.oversizedSidecarReadMs += performance.now() - oversizedReadStartedAt;
     const oversizedBytes = oversizedSignature ? getSignatureSize(oversizedSignature) : 0;
     candidateFeatureCount += oversizedCollection.features.length;
     fetchedFeatureCount += oversizedCollection.features.length;
@@ -1184,7 +1185,7 @@ export async function GET(request: Request): Promise<Response> {
         "X-Building-Timing-Selected-Geometry-Read-Ms": formatTimingMs(tileTimings.selectedGeometryReadMs),
         "X-Building-Timing-Geometry-Read-Ms": formatTimingMs(geometryReadMs),
         "X-Building-Timing-Feature-Assembly-Ms": formatTimingMs(tileTimings.featureAssemblyMs),
-        "X-Building-Timing-Fallback-Geojson-Preparation-Ms": formatTimingMs(fallbackGeoJsonPreparationMs),
+        "X-Building-Timing-Fallback-Geo-Json-Preparation-Ms": formatTimingMs(fallbackGeoJsonPreparationMs),
         "X-Building-Timing-Role-Classification-Ms": formatTimingMs(roleClassificationMs),
         "X-Building-Timing-Response-Serialization-Ms": formatTimingMs(responseSerializationMs),
         "X-Building-Dataset": "overture-3d-pilot",
