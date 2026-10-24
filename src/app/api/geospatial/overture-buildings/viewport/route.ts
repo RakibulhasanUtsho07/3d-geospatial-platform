@@ -163,7 +163,18 @@ function getSelectedGeometryCacheKey(
   dataSignature: string,
   record: TileFeatureIndexRecord,
 ): string {
-  return JSON.stringify([relativeFile, dataSignature, record.offset, record.length, record.identity]);
+  return JSON.stringify([
+    relativeFile,
+    dataSignature,
+    record.offset,
+    record.length,
+    record.identity,
+    record.role,
+    record.bounds.west,
+    record.bounds.south,
+    record.bounds.east,
+    record.bounds.north,
+  ]);
 }
 
 function getCachedSelectedGeometryFeature(key: string): unknown | undefined {
