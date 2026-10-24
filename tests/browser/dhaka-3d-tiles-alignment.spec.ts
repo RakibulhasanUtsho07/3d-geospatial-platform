@@ -22,7 +22,14 @@ type BrowserReview = {
   view: { id: string; requestedCamera: Record<string, number>; target: Record<string, number>; rangeMeters: number };
   source: { sha256: string; featureSha256: string; previewSha256: string | null; featureId: string };
   fixture: { fixtureId: string; tilesetSha256: string; glbSha256: string; syntheticFixtureGeometry: boolean };
-  runtime: { cesiumVersion: string; browserUserAgent: string };
+  runtime: {
+    cesiumVersion: string;
+    browserUserAgent: string;
+    viewport: {
+      baseline: { buffer: { width: number; height: number }; css: { width: number; height: number }; container: { width: number; height: number } };
+      tiles: { buffer: { width: number; height: number }; css: { width: number; height: number }; container: { width: number; height: number } };
+    };
+  };
   baseline: { loaded: boolean; camera: Record<string, number> };
   tiles: {
     loaded: boolean;
@@ -140,6 +147,12 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
     assert.equal(review.status, "pass", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
     assert.equal(review.evidenceType, "p2.3-fixed-camera-geojson-vs-3d-tiles-render-review");
     assert.equal(review.view.id, viewId);
+    for (const [label, viewport] of Object.entries(review.runtime.viewport)) {
+      assert.ok(viewport.buffer.width >= 640, label + " Cesium drawing buffer width must match the fixed capture viewport");
+      assert.ok(viewport.buffer.height >= 400, label + " Cesium drawing buffer height must match the fixed capture viewport");
+      assert.ok(viewport.css.width >= 640, label + " Cesium canvas CSS width must fill its panel");
+      assert.ok(viewport.css.height >= 400, label + " Cesium canvas CSS height must fill its panel");
+    }
     assert.equal(review.baseline.loaded, true, "GeoJSON baseline was not rendered for " + viewId);
     assert.equal(review.tiles.loaded, true, "3D Tiles fixture was not ready for " + viewId);
     assert.equal(review.tiles.viewReady, true, "The current camera view did not become render-ready for " + viewId);
