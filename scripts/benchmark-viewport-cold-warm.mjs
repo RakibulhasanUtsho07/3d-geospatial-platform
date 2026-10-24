@@ -77,8 +77,8 @@ async function observeRequest(sequence, phase) {
   const elapsedMs = Number((performance.now() - startedAt).toFixed(2));
   assert.equal(response.status, 200, phase + " request " + sequence + " should return HTTP 200");
   assert.equal(response.headers.get("x-building-data-source"), "generated-tiles");
-  assert.equal(response.headers.get("x-building-timing-version"), "p2.17",
-    "server must advertise the P2.17 timing contract");
+  assert.equal(response.headers.get("x-building-timing-version"), "p2.18",
+    "server must advertise the P2.18 timing contract");
   assert.ok(Array.isArray(body.features) && body.features.length > 0, "expected real Dhaka building features");
 
   const serverTimingsMs = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
@@ -94,6 +94,8 @@ async function observeRequest(sequence, phase) {
   const indexReadBytes = readMetric(response.headers, "x-building-index-read-bytes");
   const featureReadBytes = readMetric(response.headers, "x-building-feature-read-bytes");
   const fetchedFeatureCount = readMetric(response.headers, "x-building-fetched-feature-count");
+  const geometryFeatureCacheHits = readMetric(response.headers, "x-building-geometry-feature-cache-hits");
+  const geometryFeatureCacheMisses = readMetric(response.headers, "x-building-geometry-feature-cache-misses");
   const responseFeatureLimit = readMetric(response.headers, "x-building-feature-limit");
   const selectedTileCount = readMetric(response.headers, "x-building-tile-count");
 
@@ -121,6 +123,8 @@ async function observeRequest(sequence, phase) {
     combinedReadBytes: indexReadBytes + featureReadBytes,
     combinedReadReductionRatio: Number((1 - (indexReadBytes + featureReadBytes) / candidatePayloadBytes).toFixed(4)),
     fetchedFeatureCount,
+    geometryFeatureCacheHits,
+    geometryFeatureCacheMisses,
     featureLimit: responseFeatureLimit,
     featureSha256: createHash("sha256").update(JSON.stringify(body.features)).digest("hex"),
   };
@@ -131,6 +135,10 @@ async function observeRequest(sequence, phase) {
 const cold = await observeRequest(1, "cold-first-valid-request");
 assert.ok(cold.indexReadBytes > 0,
   "the cold sample must read compact tile indexes from disk before the warm series begins");
+assert.equal(cold.geometryFeatureCacheHits, 0,
+  "a fresh process must not have selected geometry in memory before its first valid request");
+assert.ok(cold.geometryFeatureCacheMisses > 0,
+  "the first valid request should populate the selected-geometry cache");
 
 const warm = [];
 for (let index = 0; index < warmRunCount; index += 1) {
@@ -139,6 +147,12 @@ for (let index = 0; index < warmRunCount; index += 1) {
 
 assert.ok(warm.every((sample) => sample.indexReadBytes === 0),
   "all repeated requests should reuse the parsed in-memory tile indexes");
+assert.ok(warm.every((sample) => sample.geometryFeatureCacheHits > 0),
+  "repeated viewport requests should reuse cached selected geometry");
+assert.ok(warm.every((sample) => sample.geometryFeatureCacheMisses === 0),
+  "the bounded selected-geometry cache should retain the tested viewport workload");
+assert.ok(warm.every((sample) => sample.featureReadBytes === 0),
+  "warm repeated requests should perform no selected geometry byte reads");
 assert.ok(warm.every((sample) => sample.featureSha256 === cold.featureSha256),
   "cold and warm requests must preserve identical ordered building features");
 assert.ok(warm.every((sample) => sample.returnedFeatureCount === cold.returnedFeatureCount),
@@ -192,6 +206,7 @@ const report = {
     warmDefinition: "Consecutive identical viewport requests on the same server process after the cold sample.",
     latency: "Client-observed request through response-body download; does not isolate server CPU time or claim a general speedup.",
     serverTimings: "X-Building-Timing-* headers use node:perf_hooks phase durations for tile query, manifest lookup, tile-index read/parse, candidate metadata scan, selected geometry read subphases (range planning, open, range read, JSON parse, integrity check, close), feature selection/assembly, fallback GeoJSON preparation, role classification and JSON serialization. Geometry subphases are nested within selectedGeometryReadMs and must not be added to it; timings are diagnostic, not a complete accounting of framework/network/GPU time.",
+    geometryFeatureCache: "Cache hits and misses count selected tile-backed feature records. Entries are keyed by tile path, current data-file size/mtime signature, byte offset/length and feature identity, bounded to 4 MiB of source-record bytes and 6000 entries. Hits avoid geometry-file reads and JSON parsing; misses still pass the original bounds and render-role integrity checks.",
     bytes: "Candidate payload is a whole-selected-tile baseline. Index and selected geometry bytes are application-reported reads, not physical disk I/O.",
     correctness: "Ordered response feature hashes and feature counts must match across cold and warm requests.",
   },
