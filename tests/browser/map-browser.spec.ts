@@ -416,3 +416,56 @@ test("selecting a building then a road clears the previous details panel", async
   await roadDetails.getByRole("button", { name: "Close road details" }).click();
   await expect(roadDetails).toHaveCount(0);
 });
+
+
+test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replacing the GeoJSON layer", async ({ page }) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_DHAKA_3D_TILES_PILOT !== "true",
+    "The 3D Tiles pilot is opt-in; CI sets the flag for this integration check.",
+  );
+
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{ status: string; url?: string; message?: string }>;
+    };
+    target.__dhaka3DTilesPilotEvents = [];
+    window.addEventListener("map:dhaka-3d-tiles-pilot", (event: Event) => {
+      const detail = (event as CustomEvent<{ status: string; url?: string; message?: string }>).detail;
+      target.__dhaka3DTilesPilotEvents?.push(detail);
+    });
+  });
+
+  const manifestResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/experimental/dhaka-3d-tiles-fixture/tileset.json"),
+  );
+  await stubMapNetwork(page);
+  await openReadyMap(page);
+
+  const manifestResponse = await manifestResponsePromise;
+  expect(manifestResponse.status()).toBe(200);
+  const manifest = await manifestResponse.json() as {
+    asset: { version: string; tilesetVersion?: string; extras?: { contentSha256?: string; sourceFeatureId?: string } };
+    root: { content?: { uri?: string }; boundingVolume?: { region?: number[] }; transform?: number[] };
+  };
+  expect(manifest.asset.version).toBe("1.1");
+  expect(manifest.asset.tilesetVersion).toBe("dhaka-pilot-placement-fixture-v1");
+  expect(manifest.root.content?.uri).toBe("tiles/dhaka-pilot.glb");
+  expect(manifest.root.transform).toHaveLength(16);
+  expect(manifest.root.transform?.every(Number.isFinite)).toBe(true);
+  expect(manifest.root.boundingVolume?.region).toHaveLength(6);
+  expect(manifest.asset.extras?.sourceFeatureId).toBeTruthy();
+  expect(manifest.asset.extras?.contentSha256).toMatch(/^[a-f0-9]{64}$/);
+
+  const contentUrl = new URL(manifest.root.content!.uri!, manifestResponse.url()).toString();
+  const glbResponse = await page.request.get(contentUrl);
+  expect(glbResponse.status()).toBe(200);
+  const glbBytes = await glbResponse.body();
+  expect(glbBytes.subarray(0, 4).toString("ascii")).toBe("glTF");
+
+  await expect.poll(async () => page.evaluate(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{ status: string }>;
+    };
+    return target.__dhaka3DTilesPilotEvents?.some((event) => event.status === "loaded") ?? false;
+  })).toBe(true);
+});

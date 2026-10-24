@@ -278,7 +278,9 @@ function isWithin(directory, target) {
 export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, outputPath = defaultOutput } = {}) {
   const normalizedSource = path.resolve(sourcePath);
   const normalizedOutput = path.resolve(outputPath);
-  const safeOutput = isWithin(path.join(projectRoot, "data", "overture"), normalizedOutput) ||
+  const safeOutput =
+    isWithin(path.join(projectRoot, "data", "overture"), normalizedOutput) ||
+    isWithin(path.join(projectRoot, "public", "experimental"), normalizedOutput) ||
     isWithin(os.tmpdir(), normalizedOutput);
   if (!safeOutput) {
     throw new Error("Refusing to write the fixture outside data/overture or the OS temporary directory.");

@@ -33,6 +33,10 @@ import { BuildingViewportManager } from "./building-viewport-manager";
 import type { BuildingViewportStageContext } from "./building-viewport-manager";
 import { RoadLayerManager } from "./road-layer-manager";
 import { HeritageCameraController } from "./heritage-camera-controller";
+import {
+  Dhaka3DTilesPilotController,
+  isDhaka3DTilesPilotEnabled,
+} from "./dhaka-3d-tiles-pilot-controller.mjs";
 import { BuildingSelectionMaterialController } from "./building-selection-material-controller.mjs";
 import { resolvePickedEntity } from "./picked-entity-resolution.mjs";
 import { resolveFeaturePickRoute } from "./feature-pick-routing.mjs";
@@ -130,6 +134,19 @@ export class CesiumAdapter implements MapEngine {
     () => this.viewer,
     () => this.cesium,
   );
+  private readonly dhaka3DTilesPilotController = new Dhaka3DTilesPilotController({
+    getViewer: () => this.viewer,
+    getCesium: () => this.cesium,
+    isEnabled: () => isDhaka3DTilesPilotEnabled(
+      process.env.NEXT_PUBLIC_DHAKA_3D_TILES_PILOT,
+    ),
+    onStatus: (event: { status: string; url?: string; message?: string }) => {
+      if (typeof window === "undefined") return;
+      window.dispatchEvent(new CustomEvent("map:dhaka-3d-tiles-pilot", {
+        detail: event,
+      }));
+    },
+  });
   private heritageManifestAssets: Record<string, string> | null = null;
   private heritageManifestPromise: Promise<Record<string, string>> | null = null;
   private readonly generatedModels = new Map<string, GeneratedModelRecord>();
@@ -341,6 +358,18 @@ export class CesiumAdapter implements MapEngine {
         }
       },
     );
+
+    // This experimental tile path is strictly opt-in. The GeoJSON baseline remains
+    // the default and an unavailable pilot tileset never blocks map readiness.
+    if (isDhaka3DTilesPilotEnabled(process.env.NEXT_PUBLIC_DHAKA_3D_TILES_PILOT)) {
+      void this.dhaka3DTilesPilotController.enable().catch((error: unknown) => {
+        if (this.viewer !== viewer || viewer.isDestroyed()) return;
+        console.warn(
+          "[3D Tiles pilot] Dhaka fixture failed to load; keeping the GeoJSON baseline:",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+    }
   }
 
 
@@ -1972,6 +2001,10 @@ export class CesiumAdapter implements MapEngine {
 
     // Invalidate a pending dynamic import before it can create a new viewer.
     this.initializationRevision += 1;
+
+    // Remove the opt-in 3D Tiles primitive and invalidate any late fromUrl result
+    // before the viewer and its primitive collection are destroyed.
+    this.dhaka3DTilesPilotController.destroy();
 
     // Stop animation and clear the caller callback before component teardown.
     this.heritageCameraController.destroy();
