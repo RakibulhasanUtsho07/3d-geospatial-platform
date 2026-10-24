@@ -52,7 +52,7 @@ type FetchAbortEvent = {
 
 type BrowserFetchLifecycleEvent = {
   startedAtMs: number;
-  completedAtMs: number | null;
+  responseAvailableAtMs: number | null;
   viewportKey: string | null;
   outcome: "in-flight" | "delivered" | "http-error" | "failed";
 };
@@ -104,7 +104,7 @@ type ViewportRequestObservation = {
   fetchedFeatureCount: number | null;
   featureLimit: number | null;
   endpointResponseMs: number | null;
-  completedAtMs: number | null;
+  responseAvailableAtMs: number | null;
   failure: string | null;
   routeError: string | null;
 };
@@ -380,7 +380,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       }
       const lifecycle: BrowserFetchLifecycleEvent = {
         startedAtMs,
-        completedAtMs: null,
+        responseAvailableAtMs: null,
         viewportKey,
         outcome: "in-flight",
       };
@@ -390,11 +390,11 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
       try {
         const response = await nativeFetch(input, init);
-        lifecycle.completedAtMs = performance.now();
+        lifecycle.responseAvailableAtMs = performance.now();
         lifecycle.outcome = response.ok ? "delivered" : "http-error";
         return response;
       } catch (error) {
-        lifecycle.completedAtMs = performance.now();
+        lifecycle.responseAvailableAtMs = performance.now();
         lifecycle.outcome = "failed";
         throw error;
       }
@@ -500,7 +500,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         fetchedFeatureCount: null,
         featureLimit: null,
         endpointResponseMs: null,
-        completedAtMs: null,
+        responseAvailableAtMs: null,
         failure: null,
         routeError: null,
       };
@@ -549,7 +549,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
         await route.fulfill({ response: upstream });
         observation.routeResponseReady = true;
-        observation.completedAtMs ??= performance.now();
+        observation.responseAvailableAtMs ??= performance.now();
       } catch (error) {
         observation.routeError = errorText(error);
         if (observation.outcome === "in-flight") observation.outcome = "route-error";
@@ -576,7 +576,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
     const failure = request.failure()?.errorText ?? "Unknown network failure";
     observation.failure = failure;
-    observation.completedAtMs = performance.now();
+    observation.responseAvailableAtMs = performance.now();
     observation.outcome = /abort|cancel/i.test(failure) ? "cancelled" : "failed";
   });
 
@@ -586,7 +586,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
 
     observation.statusCode = response.status();
     observation.routeResponseReady = true;
-    observation.completedAtMs = performance.now();
+    observation.responseAvailableAtMs = performance.now();
     if (observation.outcome === "in-flight") observation.outcome = "delivered";
   });
 
@@ -1038,7 +1038,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   const startupFetchLifecycle = browserFetchLifecycleEvents.find((event) =>
     hashBounds(event.viewportKey) === startupShallowObservation.viewportHash &&
     event.outcome === "delivered" &&
-    event.completedAtMs !== null,
+    event.responseAvailableAtMs !== null,
   );
   const startupBuildingStage = stages.find((stage) =>
     stage.viewportHash === startupShallowObservation.viewportHash &&
@@ -1054,8 +1054,8 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       requestStartToRenderedBuildingStageMs: Number(
         (startupBuildingStage.atMs - startupFetchLifecycle.startedAtMs).toFixed(2),
       ),
-      responseCompleteToRenderedBuildingStageMs: Number(
-        (startupBuildingStage.atMs - startupFetchLifecycle.completedAtMs!).toFixed(2),
+      responseAvailableToRenderedBuildingStageMs: Number(
+        (startupBuildingStage.atMs - startupFetchLifecycle.responseAvailableAtMs!).toFixed(2),
       ),
       buildingStageToPostRenderFrameMs: Number(
         (startupBuildingFrame.atMs - startupBuildingStage.atMs).toFixed(2),
@@ -1326,7 +1326,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   expect(stageFrameDelaysMs.length, "each staged viewport must be followed by an actual Cesium postRender frame").toBe(stages.length);
   expect(startupBuildingReadiness, "the first startup viewport must be tied to a rendered-building stage and a later Cesium postRender frame").not.toBeNull();
   expect(startupBuildingReadiness!.requestStartToRenderedBuildingStageMs, "first building readiness should be measured from browser fetch start").toBeGreaterThanOrEqual(0);
-  expect(startupBuildingReadiness!.responseCompleteToRenderedBuildingStageMs, "building staging should follow the browser-visible response").toBeGreaterThanOrEqual(0);
+  expect(startupBuildingReadiness!.responseAvailableToRenderedBuildingStageMs, "building staging should follow the browser-visible response availability").toBeGreaterThanOrEqual(0);
   expect(startupBuildingReadiness!.buildingStageToPostRenderFrameMs, "first rendered building stage should be followed by a real Cesium frame").toBeGreaterThanOrEqual(0);
   expect(validHeapValues.length, "Chromium JS heap metrics must be available for the memory trend").toBeGreaterThanOrEqual(5);
   expect(memoryGuardPass, "repeated camera movement must not exceed the broad JS heap/DOM growth guard").toBe(true);
