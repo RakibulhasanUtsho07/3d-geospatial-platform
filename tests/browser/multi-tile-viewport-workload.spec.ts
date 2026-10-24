@@ -763,10 +763,13 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     .toBe(true);
 
   const delayedBrowserRequest = await delayedRequestPromise;
+  await expect.poll(
+    () => requests.some((request) => request.request === delayedBrowserRequest),
+    { timeout: 10_000 },
+  ).toBe(true);
   const delayedStartObservation = requests.find(
     (request) => request.request === delayedBrowserRequest,
   );
-  expect(delayedStartObservation, "the fresh viewport request must be tracked").toBeDefined();
   expect(delayedStartObservation?.viewportHash).not.toBeNull();
   await expect.poll(
     () => requests.some((request) =>
