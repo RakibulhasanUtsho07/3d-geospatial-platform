@@ -1,3 +1,4 @@
+import { DEFAULT_DHAKA_MAP_CAMERA } from "../geospatial/default-map-camera.mjs";
 import {
   AHSAN_MANZIL_CAMERA_TARGET,
   AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET,
@@ -33,23 +34,23 @@ export class HeritageCameraController {
     private readonly getCesium: () => CesiumModule | null,
   ) {}
 
-  /** Reproduce the initial river-facing facade view previously set by the adapter. */
+  /** Start within the committed Dhaka building-data coverage; heritage views remain explicit presets. */
   configureInitialCamera(): void {
     const viewer = this.getViewer();
     const Cesium = this.getCesium();
     if (!viewer || !Cesium || viewer.isDestroyed()) return;
 
     const center = Cesium.Cartesian3.fromDegrees(
-      AHSAN_MANZIL_CAMERA_TARGET.longitude,
-      AHSAN_MANZIL_CAMERA_TARGET.latitude,
-      AHSAN_MANZIL_CAMERA_TARGET.height,
+      DEFAULT_DHAKA_MAP_CAMERA.longitude,
+      DEFAULT_DHAKA_MAP_CAMERA.latitude,
+      DEFAULT_DHAKA_MAP_CAMERA.targetHeight,
     );
     viewer.camera.lookAt(
       center,
       new Cesium.HeadingPitchRange(
-        Cesium.Math.toRadians(this.headingDegrees),
-        Cesium.Math.toRadians(this.pitchDegrees),
-        this.rangeMeters,
+        Cesium.Math.toRadians(DEFAULT_DHAKA_MAP_CAMERA.headingDegrees),
+        Cesium.Math.toRadians(DEFAULT_DHAKA_MAP_CAMERA.pitchDegrees),
+        DEFAULT_DHAKA_MAP_CAMERA.rangeMeters,
       ),
     );
     // Release lookAt's local transform so regular Cesium navigation remains free.
