@@ -90,6 +90,16 @@ test("viewport API returns features from generated spatial tiles", async (contex
     null,
     "expected tile-cache diagnostics",
   );
+  const candidateBytes = Number(response.headers.get("X-Building-Candidate-Bytes"));
+  const featureReadBytes = Number(response.headers.get("X-Building-Feature-Read-Bytes"));
+  const candidateFeatureCount = Number(response.headers.get("X-Building-Candidate-Feature-Count"));
+  const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
+  assert.ok(Number.isFinite(candidateBytes) && candidateBytes > 0);
+  assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes >= 0);
+  assert.ok(featureReadBytes <= candidateBytes, "selective feature reads must not exceed full selected-tile bytes");
+  assert.ok(Number.isInteger(candidateFeatureCount) && candidateFeatureCount >= body.features.length);
+  assert.ok(Number.isInteger(fetchedFeatureCount) && fetchedFeatureCount >= body.features.length);
+  assert.ok(fetchedFeatureCount <= candidateFeatureCount, "full feature payloads should be read only for viewport-intersecting index records");
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
