@@ -7,7 +7,6 @@ import { expect, test, type Page, type Request, type Route } from "@playwright/t
 
 type WorkloadFrameDiagnostics = {
   frameCount: number;
-  lastFrameNumber: number;
   lastFrameAtMs: number;
 };
 
@@ -18,7 +17,7 @@ type StageEvent = {
 
 type FrameEvent = {
   atMs: number;
-  frameNumber: number;
+  frameSequence: number;
 };
 
 declare global {
@@ -216,7 +215,7 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
       const frames = window.__MAP_ENGINE_WORKLOAD_FRAME_EVENTS__ ??= [];
       frames.push({
         atMs: detail.lastFrameAtMs,
-        frameNumber: detail.lastFrameNumber,
+        frameSequence: detail.frameCount,
       });
       if (frames.length > 1_000) frames.splice(0, frames.length - 1_000);
     });
