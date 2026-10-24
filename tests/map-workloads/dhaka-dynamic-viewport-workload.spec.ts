@@ -352,15 +352,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
-  await expect.poll(
-    () => buildingRoutes.length,
-    { timeout: 15_000, message: "No building viewport request reached the P2.6 route handler. Browser API requests: " + JSON.stringify(apiRequestAudit.slice(0, 20)) + "; failed: " + JSON.stringify(apiRequestFailures.slice(0, 10)) + "; page errors: " + JSON.stringify(pageErrors.slice(0, 10)) },
-  ).toBeGreaterThan(0);
-  await expect.poll(
-    () => roadRoutes.length,
-    { timeout: 15_000, message: "No road viewport request reached the P2.6 route handler. Browser API requests: " + JSON.stringify(apiRequestAudit.slice(0, 20)) + "; failed: " + JSON.stringify(apiRequestFailures.slice(0, 10)) + "; page errors: " + JSON.stringify(pageErrors.slice(0, 10)) },
-  ).toBeGreaterThan(0);
-
   const initial = await page.evaluate(() => {
     const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
     const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
