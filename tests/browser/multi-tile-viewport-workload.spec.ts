@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -110,7 +110,17 @@ function hashBounds(key: string | null): string | null {
 }
 
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.name + ": " + error.message : String(error);
+  const message = error instanceof Error ? error.name + ": " + error.message : String(error);
+  // Avoid leaking viewport query parameters into a report that otherwise stores
+  // only salted-free hashes of the requested map bounds.
+  return message.replace(/https?:\\/\\/[^\\s)]+/g, (candidate) => {
+    try {
+      const url = new URL(candidate);
+      return url.origin + url.pathname;
+    } catch {
+      return "[redacted URL]";
+    }
+  }).slice(0, 400);
 }
 
 function percentile(values: number[], fraction: number): number | null {
@@ -493,10 +503,22 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
     nodeDelta !== null &&
     nodeDelta <= MAX_DOM_NODE_GROWTH;
 
+  const tileManifestPath = resolve(process.cwd(), "data", "overture", "spatial-tiles", "manifest.json");
+  let spatialTileManifestSha256: string | null = null;
+  try {
+    spatialTileManifestSha256 = createHash("sha256")
+      .update(await readFile(tileManifestPath))
+      .digest("hex");
+  } catch {
+    // The endpoint-backed tile assertions below will fail if the generated
+    // manifest is absent; still preserve diagnostic output first.
+  }
+
   const report = {
     benchmark: "p2.6-real-multi-tile-viewport-workload",
     generatedAt: new Date().toISOString(),
     candidateSha: process.env.GITHUB_SHA ?? null,
+    dataset: { spatialTileManifestSha256 },
     environment: {
       node: process.version,
       platform: process.platform,
