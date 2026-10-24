@@ -550,3 +550,12 @@ jobs:
 
           npm run test:geospatial-api
           npm run test:map-browser
+
+      - name: Upload P2.6 multi-tile viewport workload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-tile-viewport-workload
+          path: test-results/multi-tile-viewport-workload.json
+          if-no-files-found: warn
+          retention-days: 7
