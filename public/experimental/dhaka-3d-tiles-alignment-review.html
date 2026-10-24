@@ -73,37 +73,77 @@
       for (let index = 0; index < count; index += 1) await nextFrame();
     }
 
-    function waitForInitialTilesLoaded(tileset, timeoutMs = 45000) {
+    function waitForTilesetView(viewer, tileset, diagnostics, timeoutMs = 45000) {
       return new Promise((resolve, reject) => {
-        const eventName = typeof tileset.initialTilesLoaded?.addEventListener === "function"
-          ? "initialTilesLoaded"
-          : "allTilesLoaded";
-        const event = tileset[eventName];
-        if (!event || typeof event.addEventListener !== "function") {
-          reject(new Error("This Cesium build exposes neither an initialTilesLoaded nor an allTilesLoaded event."));
-          return;
-        }
-
+        const scene = viewer.scene;
+        let readyFrames = 0;
         let timer;
-        let removeListener;
+        let removePostRender;
         let settled = false;
         const cleanup = () => {
           if (timer !== undefined) clearTimeout(timer);
-          if (typeof removeListener === "function") removeListener();
+          if (typeof removePostRender === "function") removePostRender();
         };
         const finish = (error) => {
           if (settled) return;
           settled = true;
           cleanup();
           if (error) reject(error);
-          else resolve(eventName);
+          else resolve("postRender-tilesLoaded-two-consecutive-frames");
         };
-        removeListener = event.addEventListener(() => finish());
-        timer = setTimeout(
-          () => finish(new Error("3D Tiles did not finish its initial visible load within " + timeoutMs + " ms.")),
-          timeoutMs,
-        );
+
+        // Cesium's readiness is view-dependent. Poll after rendered frames so a
+        // listener cannot miss an initialTilesLoaded event emitted before capture.
+        removePostRender = scene.postRender.addEventListener(() => {
+          const visibleAndLoaded =
+            tileset.tilesLoaded === true &&
+            diagnostics.tileLoadCount > 0 &&
+            diagnostics.tileVisibleCount > 0;
+          readyFrames = visibleAndLoaded ? readyFrames + 1 : 0;
+          if (readyFrames >= 2) {
+            finish();
+            return;
+          }
+          scene.requestRender();
+        });
+        timer = setTimeout(() => {
+          const root = tileset.root;
+          const failedSummary = diagnostics.tileFailed.slice(0, 3);
+          finish(new Error(
+            "3D Tiles view readiness timed out after " + timeoutMs + " ms: " +
+            JSON.stringify({
+              tilesLoaded: tileset.tilesLoaded === true,
+              tileLoadCount: diagnostics.tileLoadCount,
+              tileVisibleCount: diagnostics.tileVisibleCount,
+              tileFailedCount: diagnostics.tileFailed.length,
+              tileFailed: failedSummary,
+              rootContentReady: root?.contentReady ?? null,
+              rootHasContent: Boolean(root?.content)
+            })
+          ));
+        }, timeoutMs);
+        scene.requestRender();
       });
+    }
+
+    function observeTilesetRuntime(tileset) {
+      const diagnostics = { tileLoadCount: 0, tileVisibleCount: 0, tileFailed: [] };
+      const removers = [];
+      if (tileset.tileLoad?.addEventListener) {
+        removers.push(tileset.tileLoad.addEventListener(() => { diagnostics.tileLoadCount += 1; }));
+      }
+      if (tileset.tileVisible?.addEventListener) {
+        removers.push(tileset.tileVisible.addEventListener(() => { diagnostics.tileVisibleCount += 1; }));
+      }
+      if (tileset.tileFailed?.addEventListener) {
+        removers.push(tileset.tileFailed.addEventListener((error) => {
+          diagnostics.tileFailed.push({
+            url: typeof error?.url === "string" ? error.url : null,
+            message: typeof error?.message === "string" ? error.message : String(error)
+          });
+        }));
+      }
+      return { diagnostics, dispose: () => removers.forEach((remove) => { if (typeof remove === "function") remove(); }) };
     }
 
     async function readJson(url) {
@@ -260,10 +300,11 @@
         maximumMemoryUsage: 32,
         preloadWhenHidden: false
       });
-      const initialTilesLoaded = waitForInitialTilesLoaded(tileset, 45000);
+      const tileObserver = observeTilesetRuntime(tileset);
+      const tileViewReady = waitForTilesetView(tilesViewer, tileset, tileObserver.diagnostics, 45000);
       tilesViewer.scene.primitives.add(tileset);
       tilesViewer.scene.requestRender();
-      const tileLoadEventName = await initialTilesLoaded;
+      const readinessStrategy = await tileViewReady;
 
       addFootprintMarkers(baselineViewer, evidence.footprintAlignment);
       addFootprintMarkers(tilesViewer, evidence.footprintAlignment);
@@ -357,8 +398,14 @@
         },
         tiles: {
           loaded: tileset.tilesLoaded === true,
-          initialTilesLoaded: true,
-          loadEventName: tileLoadEventName,
+          viewReady: true,
+          readinessStrategy,
+          runtimeDiagnostics: {
+            tileLoadCount: tileObserver.diagnostics.tileLoadCount,
+            tileVisibleCount: tileObserver.diagnostics.tileVisibleCount,
+            tileFailedCount: tileObserver.diagnostics.tileFailed.length,
+            tileFailed: tileObserver.diagnostics.tileFailed.slice(0, 3)
+          },
           camera: tilesCamera
         },
         cameraAlignment: { status: maximumCameraPoseDelta <= 1e-8 ? "pass" : "fail", maximumAbsolutePoseDelta: maximumCameraPoseDelta, deltaByField: cameraPoseDelta, tolerance: 1e-8 },
@@ -382,6 +429,7 @@
       resultNode.textContent = JSON.stringify(result);
       if (result.status !== "pass") throw new Error("Camera/footprint alignment failed for " + view.id + "; inspect #review-result.");
       setStatus("ready", "READY · " + view.id.toUpperCase() + " · pose " + maximumCameraPoseDelta.toExponential(1) + " · centre " + runtimePlacementDistanceMeters.toFixed(3) + " m · footprint " + result.projectedFootprintAlignment.maximumResidualPixels.toFixed(2) + " px");
+      tileObserver.dispose();
     }
 
     main().catch((error) => {
