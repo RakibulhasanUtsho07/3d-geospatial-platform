@@ -15,6 +15,7 @@
     "test:lod-budget": "node --test tests/lod-detail-budget.test.mjs",
     "test:viewport-selection": "node --test tests/viewport-feature-selection.test.mjs",
     "test:3d-tiles-manifest": "node --test tests/tileset-manifest-validation.test.mjs",
+    "test:dhaka-3d-tiles-fixture": "node --test tests/dhaka-3d-tiles-fixture.test.mjs",
     "predev": "npm run copy:cesium && npm run build:heritage-model",
     "prebuild": "npm run copy:cesium && npm run build:heritage-model",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
