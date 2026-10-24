@@ -305,6 +305,9 @@ jobs:
       - name: Test OGC 3D Tiles 1.1 manifest contract
         run: npm run test:3d-tiles-manifest
 
+      - name: Test Dhaka 3D Tiles placement and content integrity fixture
+        run: npm run test:dhaka-3d-tiles-fixture
+
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
