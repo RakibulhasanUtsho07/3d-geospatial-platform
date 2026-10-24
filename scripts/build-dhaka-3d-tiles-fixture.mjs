@@ -151,11 +151,12 @@ function localEnuToEcefTransform(longitude, latitude) {
   const sinLat = Math.sin(lat);
   const cosLat = Math.cos(lat);
   const [x, y, z] = wgs84ToEcef(longitude, latitude);
-  // Column-major matrix: local X=east, Y=north, Z=up; translation is WGS84 ECEF.
+  // glTF is Y-up. Build a right-handed local frame: X=east, Y=up, Z=south.
+  // The matrix is column-major and its translation is the WGS84 ECEF anchor.
   return [
     -sinLon, cosLon, 0, 0,
-    -sinLat * cosLon, -sinLat * sinLon, cosLat, 0,
     cosLat * cosLon, cosLat * sinLon, sinLat, 0,
+    sinLat * cosLon, sinLat * sinLon, -cosLat, 0,
     x, y, z, 1,
   ];
 }
@@ -321,6 +322,8 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
     sourceFeatureSha256,
     sourceSha256,
     sourceBoundsDegrees: { west, south, east, north },
+    placementAnchor: { longitudeDegrees: longitude, latitudeDegrees: latitude, ellipsoidHeightMeters: 0 },
+    gltfCoordinateConvention: "right-handed; X=east, Y=up, Z=south",
     attribution,
     coordinateSystems: { geographic: "EPSG:4979", globalCartesian: "EPSG:4978" },
     heightStatus: "synthetic-test-height",
@@ -366,7 +369,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
       longitudeDegrees: longitude,
       latitudeDegrees: latitude,
       ellipsoidHeightMeters: 0,
-      transformConvention: "column-major; local X=east, Y=north, Z=up; global WGS84 ECEF",
+      transformConvention: "column-major; glTF local X=east, Y=up, Z=south; global WGS84 ECEF",
       transform,
       boundingRegionRadians: region,
     },
@@ -376,6 +379,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
       depthMeters,
       heightMeters: fixtureHeightMeters,
       heightIsSynthetic: true,
+      axisConvention: "right-handed glTF frame; X=east, Y=up, Z=south",
       sourceFootprintBoundsDegrees: selected.bounds,
     },
     files: {
