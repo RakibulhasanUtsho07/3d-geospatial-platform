@@ -26,7 +26,6 @@
     #review-result { display: none; }
     @media (max-width: 900px) { main { grid-template-columns: 1fr; } .viewer { height: 580px; min-height: 420px; } }
   </style>
-  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
   <script>window.CESIUM_BASE_URL = "/cesium/";</script>
   <script src="/cesium/Cesium.js"></script>
 </head>
@@ -125,6 +124,7 @@
         rootBoundingVolume: describeSphere(tileset.root?.boundingSphere),
         tilesetBoundingSphere: describeSphere(tileset.boundingSphere),
         tilesLoaded: tileset.tilesLoaded === true,
+        resourceProbe: diagnostics.resourceProbe ?? null,
         tileLoadCount: diagnostics.tileLoadCount,
         tileVisibleCount: diagnostics.tileVisibleCount,
         tileFailedCount: diagnostics.tileFailed.length,
@@ -419,6 +419,7 @@
         preloadWhenHidden: false
       });
       const tileObserver = observeTilesetRuntime(tileset);
+      tileObserver.diagnostics.resourceProbe = glbResourceProbe;
       const tilesetTarget = Cesium.Cartesian3.fromDegrees(
         cameraReview.target.longitudeDegrees,
         cameraReview.target.latitudeDegrees,
