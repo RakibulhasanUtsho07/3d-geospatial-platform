@@ -80,6 +80,11 @@
 
     function inspectTilesetView(viewer, tileset, diagnostics, targetPosition) {
       const scene = viewer.scene;
+      const root = tileset.root;
+      const processingQueueLength = tileset._processingQueue?._length
+        ?? tileset._processingQueue?._queue?.length
+        ?? null;
+      const requestQueueLength = tileset._requestedTiles?.length ?? null;
       const camera = viewer.camera;
       const targetDirection = Cesium.Cartesian3.normalize(
         Cesium.Cartesian3.subtract(targetPosition, camera.positionWC, new Cesium.Cartesian3()),
@@ -124,8 +129,17 @@
         tileVisibleCount: diagnostics.tileVisibleCount,
         tileFailedCount: diagnostics.tileFailed.length,
         tileFailed: diagnostics.tileFailed.slice(0, 3),
-        rootContentReady: tileset.root?.contentReady ?? null,
-        rootHasContent: Boolean(tileset.root?.content)
+        rootContentReady: root?.contentReady ?? null,
+        rootHasContent: Boolean(root?.content),
+        rootContentAvailable: root?.contentAvailable ?? null,
+        rootHasRenderableContent: root?.hasRenderableContent ?? null,
+        rootContentState: root?._contentState ?? root?._header?.content?._state ?? null,
+        rootContentUri: root?._header?.content?.uri ?? root?._header?.content?.url ?? null,
+        rootContentResourceUrl: root?._contentResource?.url ?? root?.contentResource?.url ?? null,
+        rootChildrenCount: root?.children?.length ?? null,
+        selectedTileCount: tileset._selectedTiles?.length ?? null,
+        requestedTileCount: requestQueueLength,
+        processingQueueLength
       };
     }
 
@@ -388,6 +402,17 @@
         entity.polygon.material = Cesium.Color.fromCssColorString("#0891b2").withAlpha(0.65);
       }
 
+      const glbProbeUrl = new URL("tiles/dhaka-pilot.glb", new URL(TILESET_URL, window.location.origin));
+      const glbProbeResponse = await fetch(glbProbeUrl, { method: "HEAD", cache: "no-store" });
+      const glbResourceProbe = {
+        url: glbProbeUrl.pathname,
+        status: glbProbeResponse.status,
+        ok: glbProbeResponse.ok,
+        contentType: glbProbeResponse.headers.get("content-type"),
+        contentLength: glbProbeResponse.headers.get("content-length")
+      };
+      if (!glbProbeResponse.ok) throw new Error("The fixture GLB URL is not reachable: " + JSON.stringify(glbResourceProbe));
+
       const tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
         maximumScreenSpaceError: 1,
         maximumMemoryUsage: 32,
@@ -511,11 +536,20 @@
           loaded: tileset.tilesLoaded === true,
           viewReady: true,
           readinessStrategy,
+          resourceProbe: glbResourceProbe,
           runtimeDiagnostics: {
             tileLoadCount: tileObserver.diagnostics.tileLoadCount,
             tileVisibleCount: tileObserver.diagnostics.tileVisibleCount,
             tileFailedCount: tileObserver.diagnostics.tileFailed.length,
-            tileFailed: tileObserver.diagnostics.tileFailed.slice(0, 3)
+            tileFailed: tileObserver.diagnostics.tileFailed.slice(0, 3),
+            rootContentAvailable: tileset.root?.contentAvailable ?? null,
+            rootHasRenderableContent: tileset.root?.hasRenderableContent ?? null,
+            rootContentState: tileset.root?._contentState ?? null,
+            rootContentUri: tileset.root?._header?.content?.uri ?? null,
+            rootContentResourceUrl: tileset.root?._contentResource?.url ?? null,
+            selectedTileCount: tileset._selectedTiles?.length ?? null,
+            requestedTileCount: tileset._requestedTiles?.length ?? null,
+            processingQueueLength: tileset._processingQueue?._length ?? tileset._processingQueue?._queue?.length ?? null
           },
           camera: tilesCamera
         },
