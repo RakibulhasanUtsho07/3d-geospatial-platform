@@ -87,7 +87,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
   const exactColdFields = [
     "statusCode", "selectedTileCount", "candidateFeatureCount", "matchedFeatureCount",
     "returnedFeatureCount", "candidatePayloadBytes", "indexReadBytes", "featureReadBytes",
-    "combinedReadBytes", "combinedReadReductionRatio", "fetchedFeatureCount", "featureLimit", "featureSha256",
+    "combinedReadBytes", "combinedReadReductionRatio", "fetchedFeatureCount",
+    "geometryFeatureCacheHits", "geometryFeatureCacheMisses", "featureLimit", "featureSha256",
   ];
 
   const samples = sampleReports.map((report, index) => {
@@ -102,6 +103,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     validateServerTimings(report.cold.serverTimingsMs, label + " cold server timings");
     assert.ok(Number.isFinite(report.cold.elapsedMs) && report.cold.elapsedMs >= 0, label + " cold latency is invalid");
     assert.ok(report.cold.indexReadBytes > 0, label + " must read the tile index on its first valid request");
+    assert.equal(report.cold.geometryFeatureCacheHits, 0, label + " cold request must miss the selected-geometry cache");
+    assert.ok(report.cold.geometryFeatureCacheMisses > 0, label + " cold request must populate the selected-geometry cache");
     assert.ok(report.cold.candidatePayloadBytes > 0, label + " candidate baseline must be nonzero");
     assert.ok(report.cold.returnedFeatureCount > 0, label + " must return actual building features");
     assert.equal(report.warm.totalIndexReadBytes, 0, label + " warm requests must not reread the compact index");
@@ -116,6 +119,9 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
       validateServerTimings(observation.serverTimingsMs, label + " warm observation " + (warmIndex + 1));
     }
     assert.ok(warmObservations.every((sample) => sample.indexReadBytes === 0), label + " warm observations must have zero index reads");
+    assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheHits > 0), label + " warm samples must reuse selected geometry");
+    assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheMisses === 0), label + " warm samples must have zero selected-geometry cache misses");
+    assert.ok(warmObservations.every((sample) => sample.featureReadBytes === 0), label + " warm samples must not reread selected geometry bytes");
     assert.ok(warmObservations.every((sample) => sample.featureSha256 === report.cold.featureSha256),
       label + " every warm hash must match its cold response");
 
@@ -129,6 +135,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         serverTimingsMs: report.cold.serverTimingsMs,
         indexReadBytes: report.cold.indexReadBytes,
         featureReadBytes: report.cold.featureReadBytes,
+        geometryFeatureCacheHits: report.cold.geometryFeatureCacheHits,
+        geometryFeatureCacheMisses: report.cold.geometryFeatureCacheMisses,
         candidatePayloadBytes: report.cold.candidatePayloadBytes,
         combinedReadReductionRatio: report.cold.combinedReadReductionRatio,
         selectedTileCount: report.cold.selectedTileCount,
@@ -143,6 +151,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         maxResponseMs: report.warm.maxResponseMs,
         totalIndexReadBytes: report.warm.totalIndexReadBytes,
         totalGeometryReadBytes: report.warm.totalGeometryReadBytes,
+        geometryFeatureCacheHitCounts: warmObservations.map((sample) => sample.geometryFeatureCacheHits),
+        geometryFeatureCacheMissCounts: warmObservations.map((sample) => sample.geometryFeatureCacheMisses),
         meanGeometryPayloadReductionRatio: report.warm.meanGeometryPayloadReductionRatio,
         serverTimingMsByPhase: Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
           field,
