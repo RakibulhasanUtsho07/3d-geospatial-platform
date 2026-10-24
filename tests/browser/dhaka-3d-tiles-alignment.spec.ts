@@ -98,6 +98,13 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
       "This verifies runtime load, camera reproducibility, and projected footprint-envelope placement, not facade accuracy, source polygon-shape reconstruction, survey-grade height, or photogrammetric fidelity.",
       "PNG hashes bind the captured evidence to this run; renderer/version differences can legitimately change image hashes across platforms.",
     ],
+    failure: null as null | {
+      viewId: string;
+      pageStatus: string | null;
+      browserReview: unknown;
+      screenshot: string;
+      screenshotSha256: string;
+    },
   };
 
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
@@ -114,6 +121,21 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
 
     const pageStatus = await page.locator("html").getAttribute("data-review-status");
     const review = await readBrowserReview(page);
+    if (pageStatus !== "ready") {
+      const failureScreenshot = "failure-view-" + viewId + ".png";
+      const failureScreenshotPath = path.join(OUTPUT_DIRECTORY, failureScreenshot);
+      await page.screenshot({ path: failureScreenshotPath, fullPage: false, animations: "disabled" });
+      const failureScreenshotBytes = await readFile(failureScreenshotPath);
+      manifest.status = "fail";
+      manifest.failure = {
+        viewId,
+        pageStatus,
+        browserReview: review,
+        screenshot: failureScreenshot,
+        screenshotSha256: sha256(failureScreenshotBytes),
+      };
+      await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+    }
     assert.equal(pageStatus, "ready", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
     assert.equal(review.status, "pass", "Browser review failed for camera preset " + viewId + ": " + JSON.stringify(review));
     assert.equal(review.evidenceType, "p2.3-fixed-camera-geojson-vs-3d-tiles-render-review");
