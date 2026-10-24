@@ -444,7 +444,16 @@ test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replaci
   const manifestResponse = await manifestResponsePromise;
   expect(manifestResponse.status()).toBe(200);
   const manifest = await manifestResponse.json() as {
-    asset: { version: string; tilesetVersion?: string; extras?: { contentSha256?: string; sourceFeatureId?: string } };
+    asset: {
+      version: string;
+      tilesetVersion?: string;
+      extras?: {
+        contentSha256?: string;
+        sourceFeatureId?: string;
+        placementAnchor?: { longitudeDegrees: number; latitudeDegrees: number; ellipsoidHeightMeters: number };
+        gltfCoordinateConvention?: string;
+      };
+    };
     root: { content?: { uri?: string }; boundingVolume?: { region?: number[] }; transform?: number[] };
   };
   expect(manifest.asset.version).toBe("1.1");
@@ -453,8 +462,12 @@ test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replaci
   expect(manifest.root.transform).toHaveLength(16);
   expect(manifest.root.transform?.every(Number.isFinite)).toBe(true);
   expect(manifest.root.boundingVolume?.region).toHaveLength(6);
+  expect(manifest.root.transform?.[1]).toBeCloseTo(Math.cos((manifest.asset.extras?.placementAnchor?.latitudeDegrees ?? 0) * Math.PI / 180), 5);
   expect(manifest.asset.extras?.sourceFeatureId).toBeTruthy();
   expect(manifest.asset.extras?.contentSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(manifest.asset.extras?.gltfCoordinateConvention).toBe("right-handed; X=east, Y=up, Z=south");
+  expect(manifest.asset.extras?.placementAnchor?.longitudeDegrees).toBeGreaterThan(90.39);
+  expect(manifest.asset.extras?.placementAnchor?.longitudeDegrees).toBeLessThan(90.43);
 
   const contentUrl = new URL(manifest.root.content!.uri!, manifestResponse.url()).toString();
   const glbResponse = await page.request.get(contentUrl);
@@ -468,4 +481,49 @@ test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replaci
     };
     return target.__dhaka3DTilesPilotEvents?.some((event) => event.status === "loaded") ?? false;
   })).toBe(true);
+
+  const runtimeCenter = await page.evaluate(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{
+        status: string;
+        worldCenter?: { longitudeDegrees: number; latitudeDegrees: number; ellipsoidHeightMeters: number } | null;
+      }>;
+    };
+    return target.__dhaka3DTilesPilotEvents?.find((event) => event.status === "loaded")?.worldCenter ?? null;
+  });
+  expect(runtimeCenter).not.toBeNull();
+  const anchor = manifest.asset.extras!.placementAnchor!;
+  const latitudeErrorMeters = (runtimeCenter!.latitudeDegrees - anchor.latitudeDegrees) * 111_132;
+  const longitudeErrorMeters = (runtimeCenter!.longitudeDegrees - anchor.longitudeDegrees) *
+    111_319.49 * Math.cos(anchor.latitudeDegrees * Math.PI / 180);
+  const horizontalErrorMeters = Math.hypot(latitudeErrorMeters, longitudeErrorMeters);
+  expect(horizontalErrorMeters).toBeLessThan(3);
+  expect(runtimeCenter!.ellipsoidHeightMeters).toBeGreaterThan(-1);
+  expect(runtimeCenter!.ellipsoidHeightMeters).toBeLessThan(10);
+
+  const alignmentEvidenceResponse = await page.request.get(
+    "/experimental/dhaka-3d-tiles-fixture/alignment-review.json",
+  );
+  expect(alignmentEvidenceResponse.status()).toBe(200);
+  const alignmentEvidence = await alignmentEvidenceResponse.json() as {
+    footprintAlignment: { status: string; maximumResidualMeters: number; toleranceMeters: number };
+    cameraReview: { captureStatus: string; views: Array<{ id: string; camera: { longitudeDegrees: number; latitudeDegrees: number; headingDegrees: number; pitchDegrees: number } }> };
+    model: { glbSha256: string; tilesetSha256: string };
+  };
+  expect(alignmentEvidence.footprintAlignment.status).toBe("pass");
+  expect(alignmentEvidence.footprintAlignment.maximumResidualMeters).toBeLessThanOrEqual(
+    alignmentEvidence.footprintAlignment.toleranceMeters,
+  );
+  expect(alignmentEvidence.cameraReview.views.map((view) => view.id)).toEqual([
+    "north", "east", "south", "west", "oblique",
+  ]);
+  expect(alignmentEvidence.cameraReview.views.every((view) =>
+    Number.isFinite(view.camera.longitudeDegrees) &&
+    Number.isFinite(view.camera.latitudeDegrees) &&
+    Number.isFinite(view.camera.headingDegrees) &&
+    view.camera.pitchDegrees < 0
+  )).toBe(true);
+  expect(alignmentEvidence.cameraReview.captureStatus).toBe("not-captured-by-this-command");
+  expect(alignmentEvidence.model.glbSha256).toBe(manifest.asset.extras?.contentSha256);
+  expect(alignmentEvidence.model.tilesetSha256).toMatch(/^[a-f0-9]{64}$/);
 });
