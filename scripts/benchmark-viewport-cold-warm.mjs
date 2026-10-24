@@ -18,6 +18,12 @@ const SERVER_TIMING_FIELDS = [
   "oversizedSidecarReadMs",
   "featureSelectionMs",
   "selectedGeometryReadMs",
+  "geometryRangePlanningMs",
+  "geometryFileOpenMs",
+  "geometryRangeReadMs",
+  "geometryJsonParseMs",
+  "geometryIntegrityCheckMs",
+  "geometryFileCloseMs",
   "geometryReadMs",
   "featureAssemblyMs",
   "fallbackGeoJsonPreparationMs",
@@ -71,8 +77,8 @@ async function observeRequest(sequence, phase) {
   const elapsedMs = Number((performance.now() - startedAt).toFixed(2));
   assert.equal(response.status, 200, phase + " request " + sequence + " should return HTTP 200");
   assert.equal(response.headers.get("x-building-data-source"), "generated-tiles");
-  assert.equal(response.headers.get("x-building-timing-version"), "p2.16",
-    "server must advertise the P2.16 timing contract");
+  assert.equal(response.headers.get("x-building-timing-version"), "p2.17",
+    "server must advertise the P2.17 timing contract");
   assert.ok(Array.isArray(body.features) && body.features.length > 0, "expected real Dhaka building features");
 
   const serverTimingsMs = Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
@@ -185,7 +191,7 @@ const report = {
     coldDefinition: "First valid bounded viewport request after a fresh Next.js production server starts; readiness probes use invalid bounds and do not query tile/index files.",
     warmDefinition: "Consecutive identical viewport requests on the same server process after the cold sample.",
     latency: "Client-observed request through response-body download; does not isolate server CPU time or claim a general speedup.",
-    serverTimings: "X-Building-Timing-* headers use node:perf_hooks phase durations for tile query, manifest lookup, tile-index read/parse, candidate metadata scan, selected geometry read, feature selection/assembly, fallback GeoJSON preparation, role classification and JSON serialization. These phases are diagnostic measurements, not a complete accounting of framework/network/GPU time.",
+    serverTimings: "X-Building-Timing-* headers use node:perf_hooks phase durations for tile query, manifest lookup, tile-index read/parse, candidate metadata scan, selected geometry read subphases (range planning, open, range read, JSON parse, integrity check, close), feature selection/assembly, fallback GeoJSON preparation, role classification and JSON serialization. Geometry subphases are nested within selectedGeometryReadMs and must not be added to it; timings are diagnostic, not a complete accounting of framework/network/GPU time.",
     bytes: "Candidate payload is a whole-selected-tile baseline. Index and selected geometry bytes are application-reported reads, not physical disk I/O.",
     correctness: "Ordered response feature hashes and feature counts must match across cold and warm requests.",
   },
