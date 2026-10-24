@@ -140,7 +140,7 @@ type GeneratedModelRecord = {
 // Detail budgets adapt to camera altitude to keep distant city views lightweight.
 const BATCH_SIZE = 200;
 const LOD_ORIGIN_MOVE_THRESHOLD_METERS = 180;
-const VIEWPORT_PADDING_FACTOR = 0.4;
+const VIEWPORT_PADDING_FACTOR = 0.15;
 const VIEWPORT_MIN_PADDING_DEGREES = 0.004;
 const MAX_VIEWPORT_SPAN_DEGREES = 1.8;
 
