@@ -283,6 +283,16 @@
       viewer.scene.requestRender();
     }
 
+    function snapshotViewport(viewer) {
+      const canvas = viewer.scene.canvas;
+      const rect = canvas.getBoundingClientRect();
+      return {
+        buffer: { width: canvas.width, height: canvas.height },
+        css: { width: rect.width, height: rect.height },
+        container: { width: viewer.container.clientWidth, height: viewer.container.clientHeight }
+      };
+    }
+
     function snapshotCamera(viewer) {
       const cameraPosition = viewer.camera.positionCartographic;
       return {
@@ -485,7 +495,14 @@
           glbSha256: evidence.model.glbSha256,
           syntheticFixtureGeometry: evidence.model.syntheticFixtureGeometry
         },
-        runtime: { cesiumVersion: Cesium.VERSION, browserUserAgent: navigator.userAgent },
+        runtime: {
+          cesiumVersion: Cesium.VERSION,
+          browserUserAgent: navigator.userAgent,
+          viewport: {
+            baseline: snapshotViewport(baselineViewer),
+            tiles: snapshotViewport(tilesViewer)
+          }
+        },
         baseline: {
           loaded: baselineDataSource.entities.values.some((entity) => Boolean(entity.polygon)),
           camera: baselineCamera
