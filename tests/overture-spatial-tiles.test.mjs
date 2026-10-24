@@ -147,6 +147,48 @@ function intersects(left, right) {
   );
 }
 
+
+function countPopulatedTilesAtGridStep(features, viewport, step) {
+  const columns = Math.ceil(360 / step);
+  const rows = Math.ceil(180 / step);
+  const tileIds = new Set();
+
+  for (const feature of features) {
+    if (!isRecord(feature) || feature.type !== "Feature" || !isRecord(feature.geometry)) {
+      continue;
+    }
+    const bounds = getGeometryBounds(feature.geometry);
+    if (!bounds) continue;
+
+    const clamp = (value, minimum, maximum) =>
+      Math.max(minimum, Math.min(maximum, value));
+    const minX = clamp(Math.floor((bounds.west + 180) / step), 0, columns - 1);
+    const maxX = clamp(Math.floor((bounds.east + 180) / step), 0, columns - 1);
+    const minY = clamp(Math.floor((bounds.south + 90) / step), 0, rows - 1);
+    const maxY = clamp(Math.floor((bounds.north + 90) / step), 0, rows - 1);
+
+    if ((maxX - minX + 1) * (maxY - minY + 1) > 64) continue;
+
+    for (let x = minX; x <= maxX; x += 1) {
+      for (let y = minY; y <= maxY; y += 1) {
+        const west = -180 + x * step;
+        const south = -90 + y * step;
+        const tileBounds = {
+          west,
+          south,
+          east: Math.min(180, west + step),
+          north: Math.min(90, south + step),
+        };
+        if (intersects(tileBounds, viewport)) {
+          tileIds.add(`x${x}_y${y}`);
+        }
+      }
+    }
+  }
+
+  return tileIds.size;
+}
+
 async function loadDataset() {
   const [sourceText, manifestText] = await Promise.all([
     readFile(sourcePath, "utf8"),
@@ -159,7 +201,7 @@ async function loadDataset() {
   assert.equal(source.type, "FeatureCollection");
   assert.ok(Array.isArray(source.features));
 
-  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.schemaVersion, 2);
   assert.ok(Array.isArray(manifest.tiles));
 
   return { source, manifest };
@@ -193,7 +235,7 @@ test("manifest matches the source dataset and generated grid", async () => {
     manifest.tiles.length,
   );
 
-  assert.equal(manifest.gridStepDegrees, 0.005);
+  assert.equal(manifest.gridStepDegrees, 0.01);
 
   assert.ok(
     manifest.tileCount > 0,
@@ -204,6 +246,32 @@ test("manifest matches the source dataset and generated grid", async () => {
     manifest.invalidFeatureCount,
     0,
     "source contains invalid features",
+  );
+});
+
+
+test("startup viewport selects fewer populated tiles than the previous 0.005-degree grid", async () => {
+  const { source, manifest } = await loadDataset();
+  const startupViewport = {
+    west: 90.405,
+    south: 23.775,
+    east: 90.415,
+    north: 23.785,
+  };
+
+  const previousTileCount = countPopulatedTilesAtGridStep(
+    source.features,
+    startupViewport,
+    0.005,
+  );
+  const currentTileCount = manifest.tiles.filter((tile) =>
+    intersects(tile.bounds, startupViewport),
+  ).length;
+
+  assert.ok(previousTileCount > 0, "expected the legacy startup viewport to intersect populated tiles");
+  assert.ok(
+    currentTileCount < previousTileCount,
+    `expected coarser indexed tiles to reduce startup tile reads (${currentTileCount} current vs ${previousTileCount} previous)`,
   );
 });
 
@@ -276,9 +344,23 @@ test(
         `tile file does not exist: ${tile.file}`,
       );
 
-      const tileCollection = JSON.parse(
-        await readFile(filePath, "utf8"),
+      const tileContents = await readFile(filePath);
+      const tileCollection = JSON.parse(tileContents.toString("utf8"));
+      assert.equal(
+        tile.indexFile,
+        "tiles/" + tile.id + ".geojson.index.json",
+        `tile ${tile.id} has an invalid feature-index path`,
       );
+      const indexPath = path.resolve(generatedPath, tile.indexFile);
+      assert.ok(
+        indexPath.startsWith(outputRoot + path.sep),
+        `feature index path escaped output directory: ${tile.indexFile}`,
+      );
+      const featureIndex = JSON.parse(await readFile(indexPath, "utf8"));
+      assert.equal(featureIndex.schemaVersion, 2);
+      assert.equal(featureIndex.tileId, tile.id);
+      assert.equal(featureIndex.featureCount, tile.featureCount);
+      assert.equal(featureIndex.records.length, tile.featureCount);
 
       assert.equal(
         tileCollection.type,
@@ -301,8 +383,27 @@ test(
       totalTileFeatureCopies +=
         tileCollection.features.length;
 
-      for (const feature of tileCollection.features) {
+      for (const [featurePosition, feature] of tileCollection.features.entries()) {
+        const record = featureIndex.records[featurePosition];
+        assert.ok(Number.isInteger(record.offset) && record.offset >= 0);
+        assert.ok(Number.isInteger(record.length) && record.length > 0);
+        assert.ok(record.offset + record.length <= tileContents.length);
+        const indexedFeature = JSON.parse(
+          tileContents.subarray(record.offset, record.offset + record.length).toString("utf8"),
+        );
+        assert.deepEqual(
+          indexedFeature,
+          feature,
+          `byte-offset index differs from tile record in ${tile.id}`,
+        );
+
         const identity = getFeatureIdentity(feature);
+        assert.equal(record.identity, identity);
+        const expectedRole =
+          isRecord(feature.properties) && typeof feature.properties._renderRole === "string"
+            ? feature.properties._renderRole
+            : "unknown";
+        assert.equal(record.role, expectedRole);
 
         assert.ok(
           !localIdentities.has(identity),

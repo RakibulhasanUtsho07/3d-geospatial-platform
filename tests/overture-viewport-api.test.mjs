@@ -90,6 +90,27 @@ test("viewport API returns features from generated spatial tiles", async (contex
     null,
     "expected tile-cache diagnostics",
   );
+  const candidateBytes = Number(response.headers.get("X-Building-Candidate-Bytes"));
+  const indexReadBytes = Number(response.headers.get("X-Building-Index-Read-Bytes"));
+  const featureReadBytes = Number(response.headers.get("X-Building-Feature-Read-Bytes"));
+  const featureLimit = Number(response.headers.get("X-Building-Feature-Limit"));
+  const candidateFeatureCount = Number(response.headers.get("X-Building-Candidate-Feature-Count"));
+  const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
+  assert.ok(Number.isFinite(candidateBytes) && candidateBytes > 0);
+  assert.ok(Number.isFinite(indexReadBytes) && indexReadBytes > 0, "cold request should report index bytes read");
+  assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes >= 0);
+  assert.ok(
+    indexReadBytes + featureReadBytes < candidateBytes,
+    "index plus selected geometry reads should be below reading every selected tile payload",
+  );
+  assert.ok(Number.isInteger(candidateFeatureCount) && candidateFeatureCount >= body.features.length);
+  assert.ok(Number.isInteger(featureLimit) && featureLimit > 0);
+  assert.ok(
+    Number.isInteger(fetchedFeatureCount) &&
+      fetchedFeatureCount >= body.features.length &&
+      fetchedFeatureCount <= featureLimit,
+    "geometry fetches should obey the response feature budget before deserialization",
+  );
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {

@@ -47,6 +47,7 @@ on:
       - feat/texture-projection-validation
       - feat/p2-7-viewport-tile-selectivity
       - feat/p2-8-startup-coverage-alignment
+      - feat/p2-9-startup-tile-fetch-cost
   pull_request:
     branches:
       - main
@@ -74,6 +75,7 @@ on:
       - feat/release-readiness-accuracy-evidence
       - feat/p2-6-multitile-viewport-workload
       - feat/p2-7-viewport-tile-selectivity
+      - feat/p2-8-startup-coverage-alignment
 
 permissions:
   contents: read
