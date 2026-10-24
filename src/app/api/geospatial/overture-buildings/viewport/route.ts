@@ -385,7 +385,7 @@ function isValidTileManifest(value: unknown): value is TileManifest {
   if (
     !isRecord(value) ||
     value.schemaVersion !== 2 ||
-    typeof value.sourceFeatureCount !== "number"
+    typeof value.sourceFeatureCount !== "number" ||
     !Number.isInteger(value.sourceFeatureCount) ||
     value.sourceFeatureCount < 0 ||
     typeof value.tileCount !== "number" ||
@@ -644,7 +644,7 @@ async function readCachedTileIndex(
 ): Promise<TileIndexRead | null> {
   // Paths are derived from validated manifest ids, never trusted as arbitrary paths.
   if (
-    !/^tiles\\/x\\d+_y\\d+\\.geojson$/.test(tile.file) ||
+    !/^tiles\/x\d+_y\d+\.geojson$/.test(tile.file) ||
     tile.indexFile !== "tiles/" + tile.id + ".geojson.index.json"
   ) {
     return null;
@@ -729,12 +729,12 @@ async function readSelectedTileFeatures(
   relativeFile: string,
   records: TileFeatureIndexRecord[],
 ): Promise<IndexedTileFeatureRead | null> {
-  if (!/^tiles\\/x\\d+_y\\d+\\.geojson$/.test(relativeFile)) {
+  if (!/^tiles\/x\d+_y\d+\.geojson$/.test(relativeFile)) {
     return null;
   }
   if (records.length === 0) return { features: [], bytesRead: 0 };
 
-  let handle;
+  let handle: Awaited<ReturnType<typeof open>>;
   try {
     handle = await open(resolve(TILE_DIRECTORY, relativeFile), "r");
   } catch (error: unknown) {
