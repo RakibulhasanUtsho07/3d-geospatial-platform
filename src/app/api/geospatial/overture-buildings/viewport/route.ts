@@ -1166,6 +1166,9 @@ export async function GET(request: Request): Promise<Response> {
     const responseSerializationStartedAt = performance.now();
     const serializedBody = JSON.stringify(viewportCollection);
     const responseSerializationMs = performance.now() - responseSerializationStartedAt;
+    if (typeof serializedBody !== "string") {
+      throw new Error("Viewport FeatureCollection could not be serialized as JSON.");
+    }
     const totalServerMs = performance.now() - requestStartedAt;
     const geometryReadMs = tileTimings.oversizedSidecarReadMs + tileTimings.selectedGeometryReadMs;
     const featureSelectionMs = tileTimings.featureSelectionMs + fallbackFeatureSelectionMs;
