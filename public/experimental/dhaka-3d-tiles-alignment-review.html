@@ -26,6 +26,7 @@
     #review-result { display: none; }
     @media (max-width: 900px) { main { grid-template-columns: 1fr; } .viewer { height: 580px; min-height: 420px; } }
   </style>
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
   <script>window.CESIUM_BASE_URL = "/cesium/";</script>
   <script src="/cesium/Cesium.js"></script>
 </head>
@@ -103,7 +104,14 @@
       } : null;
       return {
         sceneMode: scene.mode,
-        canvas: { width: scene.canvas.width, height: scene.canvas.height },
+        canvas: {
+          width: scene.canvas.width,
+          height: scene.canvas.height,
+          clientWidth: scene.canvas.clientWidth,
+          clientHeight: scene.canvas.clientHeight,
+          containerWidth: viewer.container.clientWidth,
+          containerHeight: viewer.container.clientHeight
+        },
         cameraTargetDirectionDot: directionDot,
         cameraTargetAngularErrorDegrees: Cesium.Math.toDegrees(Math.acos(Math.max(-1, Math.min(1, directionDot)))),
         targetScreen: targetScreen ? { x: targetScreen.x, y: targetScreen.y } : null,
@@ -209,7 +217,25 @@
         maximumRenderTimeChange: Infinity,
         shouldAnimate: false
       });
+      // Cesium's global bundle does not inject its widget CSS. The stylesheet
+      // establishes the viewer/canvas 100% sizing contract; explicitly resize
+      // as a guard against the default intrinsic 300×150 canvas.
+      viewer.resize();
       const scene = viewer.scene;
+      const canvasRect = scene.canvas.getBoundingClientRect();
+      if (scene.canvas.width < 640 || scene.canvas.height < 400 || canvasRect.width < 640 || canvasRect.height < 400) {
+        throw new Error(
+          "Cesium viewport did not reach the fixed capture size: " +
+          JSON.stringify({
+            buffer: { width: scene.canvas.width, height: scene.canvas.height },
+            css: { width: canvasRect.width, height: canvasRect.height },
+            container: {
+              width: document.getElementById(containerId).clientWidth,
+              height: document.getElementById(containerId).clientHeight
+            }
+          })
+        );
+      }
       scene.globe.show = false;
       scene.backgroundColor = Cesium.Color.fromCssColorString("#09111f");
       scene.fog.enabled = false;
