@@ -20,6 +20,7 @@
     "test:dhaka-3d-tiles-fixture": "node --test tests/dhaka-3d-tiles-fixture.test.mjs",
     "test:dhaka-3d-tiles-pilot-controller": "node --test tests/dhaka-3d-tiles-pilot-controller.test.mjs",
     "test:dhaka-3d-tiles-alignment-review": "node --test tests/dhaka-3d-tiles-alignment-review.test.mjs",
+    "test:dhaka-3d-tiles-camera-alignment": "playwright test tests/browser/dhaka-3d-tiles-alignment.spec.ts --config=playwright.config.ts",
     "predev": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment",
     "prebuild": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
