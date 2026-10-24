@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { before, test } from "node:test";
+
+import { selectViewportFeatures } from "../src/core/geospatial/select-viewport-features.mjs";
 
 const baseUrl = (
   process.env.GEOSPATIAL_API_BASE_URL ?? "http://localhost:3000"
@@ -11,6 +15,63 @@ const smallViewport = new URLSearchParams({
   east: "90.415",
   north: "23.785",
 });
+
+
+
+function intersects(left, right) {
+  return left.west <= right.east &&
+    left.east >= right.west &&
+    left.south <= right.north &&
+    left.north >= right.south;
+}
+
+async function buildGeometryFirstBaseline(featureLimit) {
+  const tileRoot = resolve(process.cwd(), "data", "overture", "spatial-tiles");
+  const manifest = JSON.parse(await readFile(resolve(tileRoot, "manifest.json"), "utf8"));
+  const viewport = {
+    west: Math.min(...manifest.tiles.map((tile) => tile.bounds.west)),
+    south: Math.min(...manifest.tiles.map((tile) => tile.bounds.south)),
+    east: Math.max(...manifest.tiles.map((tile) => tile.bounds.east)),
+    north: Math.max(...manifest.tiles.map((tile) => tile.bounds.north)),
+  };
+  const candidateByIdentity = new Map();
+
+  for (const tile of manifest.tiles.filter((entry) => intersects(entry.bounds, viewport))) {
+    const [tileText, indexText] = await Promise.all([
+      readFile(resolve(tileRoot, tile.file), "utf8"),
+      readFile(resolve(tileRoot, tile.indexFile), "utf8"),
+    ]);
+    const tileCollection = JSON.parse(tileText);
+    const tileIndex = JSON.parse(indexText);
+
+    for (let index = 0; index < tileIndex.records.length; index += 1) {
+      const record = tileIndex.records[index];
+      if (!intersects(record.bounds, viewport) || candidateByIdentity.has(record.identity)) {
+        continue;
+      }
+      candidateByIdentity.set(record.identity, {
+        identity: record.identity,
+        bounds: record.bounds,
+        role: record.role,
+        feature: tileCollection.features[index],
+      });
+    }
+  }
+
+  const candidates = [...candidateByIdentity.values()];
+  const selected = selectViewportFeatures(
+    candidates,
+    viewport,
+    featureLimit,
+    (candidate) => candidate.bounds,
+    (candidate) => candidate.role,
+  );
+  return {
+    viewport,
+    matchedFeatureCount: candidates.length,
+    expectedFeatures: selected.map((candidate) => candidate.feature),
+  };
+}
 
 let serverAvailable = false;
 
@@ -174,6 +235,52 @@ test("viewport API caps response features and reports truncation diagnostics", a
   assert.equal(
     response.headers.get("X-Building-Sampling-Strategy"),
     matched > returned ? "spatial-grid-round-robin" : "none",
+  );
+});
+
+
+test("dense viewport preserves the geometry-first spatial sample while fetching only the response budget", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const featureLimit = 3000;
+  const baseline = await buildGeometryFirstBaseline(featureLimit);
+  assert.equal(
+    baseline.expectedFeatures.length,
+    featureLimit,
+    "the generated pilot extent must exercise a dense, truncated viewport",
+  );
+
+  const query = new URLSearchParams({
+    west: baseline.viewport.west.toFixed(6),
+    south: baseline.viewport.south.toFixed(6),
+    east: baseline.viewport.east.toFixed(6),
+    north: baseline.viewport.north.toFixed(6),
+    limit: String(featureLimit),
+  });
+  const response = await fetch(baseUrl + viewportPath + "?" + query);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("X-Building-Data-Source"), "generated-tiles");
+  assert.equal(Number(response.headers.get("X-Building-Matched-Feature-Count")), baseline.matchedFeatureCount);
+  assert.equal(Number(response.headers.get("X-Building-Feature-Limit")), featureLimit);
+  assert.equal(body.features.length, featureLimit);
+  assert.deepEqual(
+    body.features,
+    baseline.expectedFeatures,
+    "metadata-first sampling must return the same ordered JSON features as geometry-first sampling over generated tiles",
+  );
+
+  const candidatePayloadBytes = Number(response.headers.get("X-Building-Candidate-Bytes"));
+  const featureReadBytes = Number(response.headers.get("X-Building-Feature-Read-Bytes"));
+  const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
+  assert.ok(Number.isFinite(candidatePayloadBytes) && candidatePayloadBytes > 0);
+  assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes > 0);
+  assert.ok(featureReadBytes < candidatePayloadBytes, "sampled geometry payload should be below whole selected-tile payload size");
+  assert.equal(
+    fetchedFeatureCount,
+    featureLimit,
+    "the generated-tile path should deserialize only the selected response feature budget",
   );
 });
 
