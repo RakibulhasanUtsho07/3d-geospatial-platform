@@ -357,7 +357,7 @@ test(
         `feature index path escaped output directory: ${tile.indexFile}`,
       );
       const featureIndex = JSON.parse(await readFile(indexPath, "utf8"));
-      assert.equal(featureIndex.schemaVersion, 1);
+      assert.equal(featureIndex.schemaVersion, 2);
       assert.equal(featureIndex.tileId, tile.id);
       assert.equal(featureIndex.featureCount, tile.featureCount);
       assert.equal(featureIndex.records.length, tile.featureCount);
@@ -399,6 +399,11 @@ test(
 
         const identity = getFeatureIdentity(feature);
         assert.equal(record.identity, identity);
+        const expectedRole =
+          isRecord(feature.properties) && typeof feature.properties._renderRole === "string"
+            ? feature.properties._renderRole
+            : "unknown";
+        assert.equal(record.role, expectedRole);
 
         assert.ok(
           !localIdentities.has(identity),

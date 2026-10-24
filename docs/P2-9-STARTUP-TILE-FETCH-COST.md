@@ -3,8 +3,9 @@
 ## Change
 
 - Increase the Overture pilot spatial grid from **0.005° to 0.01°** so a startup viewport intersects fewer populated tile files.
-- Emit a compact per-tile feature index containing each feature's stable identity, exact geometry bounds, and UTF-8 byte offset/length in the existing GeoJSON tile.
-- Read only byte ranges for features whose indexed bounds intersect the request. Small gaps between adjacent records are coalesced into bounded reads (2 KiB gap, 64 KiB window) to avoid a read syscall per feature.
+- Emit a compact per-tile feature index containing each feature's stable identity, render role, exact geometry bounds, and UTF-8 byte offset/length in the existing GeoJSON tile.
+- Run the existing spatial-grid round-robin selector against indexed bounds and roles **before reading feature geometry**. Only selected records (up to the response feature limit) are deserialized from tile payloads.
+- Read selected feature byte ranges, coalescing small gaps between adjacent records into bounded reads (2 KiB gap, 64 KiB window) to avoid a read syscall per feature.
 - Keep the GeoJSON collection format, response feature cap, role-aware spatial sampling, exact viewport intersection, oversized-feature sidecar, and indexed-GeoJSON fallback.
 
 ## Safety and coverage
@@ -16,8 +17,9 @@ The coarser tile grid is only a storage grouping. The query still tests each fea
 The viewport API adds:
 
 - `X-Building-Candidate-Bytes`: complete size of all selected tile files (the prior whole-tile read cost estimate).
-- `X-Building-Feature-Read-Bytes`: bytes actually read from indexed tile payloads, including coalesced gaps.
-- `X-Building-Fetched-Feature-Count`: feature records read before cross-tile deduplication.
+- `X-Building-Index-Read-Bytes`: bytes read to load compact indexes on a cold request (zero for an in-memory index cache hit).
+- `X-Building-Feature-Read-Bytes`: bytes actually read from selected tile payloads, including coalesced gaps.
+- `X-Building-Fetched-Feature-Count`: full geometry records read; normal tile-backed requests now read no more than the response feature limit.
 
 Existing tile-count and candidate-feature headers remain available. The spatial-tile test compares the new selected tile count with a reconstructed 0.005° baseline for the representative Dhaka startup viewport; the API integration test checks that selective bytes/feature reads do not exceed the full-selected-tile baseline.
 

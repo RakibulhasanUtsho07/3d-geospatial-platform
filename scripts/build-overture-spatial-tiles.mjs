@@ -22,6 +22,11 @@ function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function getRenderRole(feature) {
+  const properties = isRecord(feature.properties) ? feature.properties : {};
+  return typeof properties._renderRole === "string" ? properties._renderRole : "unknown";
+}
+
 function getFeatureIdentity(feature) {
   if (feature.id !== undefined && feature.id !== null) {
     return `feature-id:${String(feature.id)}`;
@@ -262,6 +267,7 @@ async function main() {
       const indexRecord = {
         identity: record.identity,
         bounds: record.bounds,
+        role: getRenderRole(record.feature),
         offset: byteOffset,
         length,
       };
@@ -272,7 +278,7 @@ async function main() {
     await writeFile(
       path.join(tilesPath, indexFilename),
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         tileId,
         featureCount: featureRecords.length,
         records: indexRecords,
