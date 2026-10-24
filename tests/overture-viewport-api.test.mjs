@@ -185,6 +185,65 @@ test("viewport API returns features from generated spatial tiles", async (contex
   }));
 });
 
+test("viewport API exposes server phase timings without changing its feature payload", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const url = baseUrl + viewportPath + "?" + smallViewport;
+  const firstResponse = await fetch(url, { cache: "no-store" });
+  const firstBody = await firstResponse.json();
+
+  assert.equal(firstResponse.status, 200);
+  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.16");
+  assert.equal(firstResponse.headers.get("Content-Type"), "application/json");
+
+  const timingHeaders = {
+    totalServerMs: "X-Building-Timing-Total-Server-Ms",
+    tileQueryMs: "X-Building-Timing-Tile-Query-Ms",
+    manifestLookupMs: "X-Building-Timing-Manifest-Lookup-Ms",
+    tileIndexReadAndParseMs: "X-Building-Timing-Tile-Index-Read-And-Parse-Ms",
+    candidateMetadataScanMs: "X-Building-Timing-Candidate-Metadata-Scan-Ms",
+    oversizedSidecarReadMs: "X-Building-Timing-Oversized-Sidecar-Read-Ms",
+    featureSelectionMs: "X-Building-Timing-Feature-Selection-Ms",
+    selectedGeometryReadMs: "X-Building-Timing-Selected-Geometry-Read-Ms",
+    geometryReadMs: "X-Building-Timing-Geometry-Read-Ms",
+    featureAssemblyMs: "X-Building-Timing-Feature-Assembly-Ms",
+    fallbackGeoJsonPreparationMs: "X-Building-Timing-Fallback-Geo-Json-Preparation-Ms",
+    roleClassificationMs: "X-Building-Timing-Role-Classification-Ms",
+    responseSerializationMs: "X-Building-Timing-Response-Serialization-Ms",
+  };
+  const timings = Object.fromEntries(Object.entries(timingHeaders).map(([name, header]) => {
+    const value = firstResponse.headers.get(header);
+    assert.notEqual(value, null, "expected timing header " + header);
+    const parsed = Number(value);
+    assert.ok(Number.isFinite(parsed) && parsed >= 0, header + " must be a finite nonnegative duration");
+    return [name, parsed];
+  }));
+
+  assert.ok(timings.totalServerMs >= timings.responseSerializationMs,
+    "total route time must include response serialization");
+  assert.ok(timings.totalServerMs >= timings.tileQueryMs,
+    "total route time must include generated-tile query work");
+  const tilePhaseTotal =
+    timings.manifestLookupMs +
+    timings.tileIndexReadAndParseMs +
+    timings.candidateMetadataScanMs +
+    timings.oversizedSidecarReadMs +
+    timings.featureSelectionMs +
+    timings.selectedGeometryReadMs +
+    timings.featureAssemblyMs;
+  assert.ok(timings.tileQueryMs + 0.1 >= tilePhaseTotal,
+    "measured tile sub-phases should fit within total tile-query duration");
+  assert.ok(Array.isArray(firstBody.features) && firstBody.features.length > 0);
+
+  const secondResponse = await fetch(url, { cache: "no-store" });
+  assert.equal(secondResponse.status, 200);
+  assert.deepEqual(
+    await secondResponse.json(),
+    firstBody,
+    "timing instrumentation must not change the JSON feature collection between identical requests",
+  );
+});
+
 test("repeated viewport requests reuse parsed tile data", async (context) => {
   if (skipWithoutServer(context)) return;
 
