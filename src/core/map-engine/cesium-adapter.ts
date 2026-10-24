@@ -932,7 +932,7 @@ export class CesiumAdapter implements MapEngine {
       uniqueRoofColors: roofColors.length,
     };
 
-    console.info("[Overture] Building viewport rendered.", {
+    const stageSummary = {
       returnedFeatures: entities.length,
       viewport: context.requestedBounds,
       renderedBuildings,
@@ -945,7 +945,20 @@ export class CesiumAdapter implements MapEngine {
       invalidPolygons,
       cameraAwareLod: true,
       visualStyleSummary,
-    });
+    };
+    console.info("[Overture] Building viewport rendered.", stageSummary);
+
+    // Give browser integration tests a first-party signal only after the real
+    // datasource has been committed. This avoids relying on console monkey-
+    // patching, which can be bypassed by bundled loggers or browser tooling.
+    if (
+      typeof window !== "undefined" &&
+      (window as WorkloadBenchmarkWindow).__MAP_ENGINE_WORKLOAD_BENCHMARK__ === true
+    ) {
+      window.dispatchEvent(new CustomEvent("map:building-viewport-staged", {
+        detail: { atMs: performance.now(), summary: stageSummary },
+      }));
+    }
 
     return true;
   }
