@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -204,7 +205,7 @@ function pointTransformQuality(transform) {
   return { axes, orthogonality, handedness };
 }
 
-function makeCameraViews({ longitudeDegrees, latitudeDegrees, widthMeters, depthMeters, heightMeters, transform }) {
+function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) {
   const horizontalRangeMeters = Math.max(30, Math.min(120, Math.max(widthMeters, depthMeters, heightMeters) * 4));
   const targetLocal = [0, heightMeters / 2, 0];
   const targetEcef = multiplyPoint(transform, targetLocal);
@@ -279,8 +280,8 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   const normalizedSource = path.resolve(sourcePath);
   const normalizedFixture = path.resolve(fixtureDirectory);
   const normalizedOutput = path.resolve(outputPath ?? path.join(normalizedFixture, "alignment-review.json"));
-  if (!within(projectRoot, normalizedOutput)) throw new Error("Refusing to write alignment evidence outside the repository.");
-  if (!within(projectRoot, normalizedFixture)) throw new Error("Refusing to read fixture data outside the repository.");
+  if (!within(projectRoot, normalizedOutput) && !within(os.tmpdir(), normalizedOutput)) throw new Error("Refusing to write alignment evidence outside the repository or OS temporary directory.");
+  if (!within(projectRoot, normalizedFixture) && !within(os.tmpdir(), normalizedFixture)) throw new Error("Refusing to read fixture data outside the repository or OS temporary directory.");
   if (!within(projectRoot, normalizedSource)) throw new Error("Refusing to read source data outside the repository.");
 
   const [sourceBytes, tilesetBytes, glbBytes, buildManifestBytes] = await Promise.all([
@@ -390,8 +391,6 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   }
 
   const cameraViews = makeCameraViews({
-    longitudeDegrees: anchor.longitudeDegrees,
-    latitudeDegrees: anchor.latitudeDegrees,
     widthMeters: dimensions.widthMeters,
     depthMeters: dimensions.depthMeters,
     heightMeters: dimensions.heightMeters,
