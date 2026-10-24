@@ -76,6 +76,10 @@ test("generates a valid OGC 3D Tiles 1.1 manifest with a resolvable relative GLB
   assert.equal(result.tileCount, 1);
   assert.equal(tileset.asset.tilesetVersion, "dhaka-pilot-placement-fixture-v1");
   assert.equal(tileset.root.content.uri, "tiles/dhaka-pilot.glb");
+  assert.ok(Number.isFinite(tileset.geometricError) && tileset.geometricError > 0, "tileset geometricError must be positive so Cesium does not short-circuit root traversal");
+  assert.equal(tileset.root.geometricError, tileset.geometricError);
+  assert.equal(tileset.asset.extras.fixtureGeometricErrorMeters, tileset.root.geometricError);
+  assert.equal(build.fixtureGeometry.geometricErrorMeters, tileset.root.geometricError);
   assert.ok(await stat(path.resolve(fixtureDir, tileset.root.content.uri)));
 });
 
@@ -98,6 +102,20 @@ test("records Overture attribution, explicit synthetic-geometry limits and stabl
   assert.equal(sha256(source), build.source.sha256);
   assert.equal(build.source.featureId, extras.sourceFeatureId);
   assert.equal(build.source.featureSha256, extras.sourceFeatureSha256);
+});
+
+test("writes the exact selected source feature as a deterministic browser comparison baseline", async () => {
+  const previewBytes = await readFile(path.join(fixtureDir, "source-feature.geojson"));
+  const preview = JSON.parse(previewBytes.toString("utf8"));
+  assert.equal(preview.type, "FeatureCollection");
+  assert.equal(preview.features.length, 1);
+  assert.equal(sha256(previewBytes), build.files["source-feature.geojson"].sha256);
+  assert.equal(previewBytes.length, build.files["source-feature.geojson"].bytes);
+  assert.equal(
+    sha256(Buffer.from(JSON.stringify(preview.features[0]))),
+    build.source.featureSha256,
+  );
+  assert.equal(preview.features[0].id === undefined ? build.source.featureId : String(preview.features[0].id), build.source.featureId);
 });
 
 test("maps the manifest transform to independently calculated WGS84 ECEF", () => {
@@ -148,7 +166,7 @@ test("rebuilds identical tileset, GLB and build-manifest hashes from the same so
     stdio: "pipe",
     timeout: 30_000,
   });
-  for (const relativePath of ["tileset.json", "tiles/dhaka-pilot.glb", "build-manifest.json"]) {
+  for (const relativePath of ["tileset.json", "tiles/dhaka-pilot.glb", "source-feature.geojson", "build-manifest.json"]) {
     const [first, second] = await Promise.all([
       readFile(path.join(fixtureDir, relativePath)),
       readFile(path.join(secondFixtureDir, relativePath)),

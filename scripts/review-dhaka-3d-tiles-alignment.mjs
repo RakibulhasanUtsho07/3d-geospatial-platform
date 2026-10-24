@@ -205,6 +205,32 @@ function pointTransformQuality(transform) {
   return { axes, orthogonality, handedness };
 }
 
+function cameraHeadingPitchToEcefTarget(cameraPosition, cameraEcef, targetEcef) {
+  // Cesium heading/pitch are expressed in the camera position's local ENU frame.
+  // Derive them from the ECEF target direction rather than reusing a nominal
+  // local-map bearing, which can leave a camera looking just outside the tile
+  // root's bounding volume after the ECEF transform.
+  const longitude = cameraPosition.longitudeDegrees * Math.PI / 180;
+  const latitude = cameraPosition.latitudeDegrees * Math.PI / 180;
+  const dx = targetEcef[0] - cameraEcef[0];
+  const dy = targetEcef[1] - cameraEcef[1];
+  const dz = targetEcef[2] - cameraEcef[2];
+
+  const east = -Math.sin(longitude) * dx + Math.cos(longitude) * dy;
+  const north =
+    -Math.sin(latitude) * Math.cos(longitude) * dx
+    - Math.sin(latitude) * Math.sin(longitude) * dy
+    + Math.cos(latitude) * dz;
+  const up =
+    Math.cos(latitude) * Math.cos(longitude) * dx
+    + Math.cos(latitude) * Math.sin(longitude) * dy
+    + Math.sin(latitude) * dz;
+
+  const headingDegrees = (Math.atan2(east, north) * RADIANS_TO_DEGREES + 360) % 360;
+  const pitchDegrees = Math.atan2(up, Math.hypot(east, north)) * RADIANS_TO_DEGREES;
+  return { headingDegrees, pitchDegrees };
+}
+
 function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) {
   const horizontalRangeMeters = Math.max(30, Math.min(120, Math.max(widthMeters, depthMeters, heightMeters) * 4));
   const targetLocal = [0, heightMeters / 2, 0];
@@ -229,18 +255,19 @@ function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) 
     horizontalRangeMeters,
     views: cameraSpecs.map((spec) => {
       const localGlb = [spec.eastMeters, spec.upMeters, -spec.northMeters];
-      const position = ecefToWgs84(multiplyPoint(transform, localGlb));
-      const downMeters = spec.upMeters - heightMeters / 2;
+      const cameraEcef = multiplyPoint(transform, localGlb);
+      const position = ecefToWgs84(cameraEcef);
+      const orientation = cameraHeadingPitchToEcefTarget(position, cameraEcef, targetEcef);
       const horizontalDistance = Math.hypot(spec.eastMeters, spec.northMeters);
-      const pitchDegrees = -Math.atan2(downMeters, horizontalDistance) * RADIANS_TO_DEGREES;
+      const verticalDistance = Math.abs(spec.upMeters - heightMeters / 2);
       return {
         id: spec.id,
         camera: {
           longitudeDegrees: position.longitudeDegrees,
           latitudeDegrees: position.latitudeDegrees,
           ellipsoidHeightMeters: position.heightMeters,
-          headingDegrees: spec.headingDegrees,
-          pitchDegrees,
+          headingDegrees: orientation.headingDegrees,
+          pitchDegrees: orientation.pitchDegrees,
           rollDegrees: 0,
         },
         target: {
@@ -248,7 +275,7 @@ function makeCameraViews({ widthMeters, depthMeters, heightMeters, transform }) 
           latitudeDegrees: target.latitudeDegrees,
           ellipsoidHeightMeters: target.heightMeters,
         },
-        rangeMeters: Math.hypot(horizontalDistance, downMeters),
+        rangeMeters: Math.hypot(horizontalDistance, verticalDistance),
       };
     }),
   };
@@ -284,24 +311,49 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
   if (!within(projectRoot, normalizedFixture) && !within(os.tmpdir(), normalizedFixture)) throw new Error("Refusing to read fixture data outside the repository or OS temporary directory.");
   if (!within(projectRoot, normalizedSource)) throw new Error("Refusing to read source data outside the repository.");
 
-  const [sourceBytes, tilesetBytes, glbBytes, buildManifestBytes] = await Promise.all([
+  const [sourceBytes, tilesetBytes, glbBytes, buildManifestBytes, sourcePreviewBytes] = await Promise.all([
     readFile(normalizedSource),
     readFile(path.join(normalizedFixture, "tileset.json")),
     readFile(path.join(normalizedFixture, "tiles", "dhaka-pilot.glb")),
     readFile(path.join(normalizedFixture, "build-manifest.json")),
+    readFile(path.join(normalizedFixture, "source-feature.geojson")),
   ]);
   const sourceText = sourceBytes.toString("utf8");
   const tileset = readJson(tilesetBytes.toString("utf8"), "tileset.json");
   const buildManifest = readJson(buildManifestBytes.toString("utf8"), "build-manifest.json");
   const source = readJson(sourceText, "source GeoJSON");
+  const sourcePreview = readJson(sourcePreviewBytes.toString("utf8"), "source-feature.geojson");
   const asset = tileset.asset;
   const root = tileset.root;
+  if (!Number.isFinite(tileset.geometricError) || tileset.geometricError <= 0) {
+    throw new Error("Tileset geometricError must be positive so Cesium traverses the single-leaf GLB fixture.");
+  }
+  if (!Number.isFinite(root?.geometricError) || root.geometricError <= 0) {
+    throw new Error("Root tile geometricError must be positive so Cesium requests the single-leaf GLB content.");
+  }
+  if (root.geometricError !== tileset.geometricError) {
+    throw new Error("Root and tileset geometricError must match for the single-leaf placement fixture.");
+  }
   const extras = asset?.extras;
   if (!isRecord(asset) || asset.version !== "1.1" || !isRecord(root) || !isRecord(extras)) {
     throw new Error("The fixture is missing the OGC 3D Tiles 1.1 asset/root metadata.");
   }
   if (root.content?.uri !== "tiles/dhaka-pilot.glb") throw new Error("Unexpected fixture content URI.");
   if (sha256(sourceBytes) !== buildManifest.source?.sha256) throw new Error("Source dataset SHA-256 does not match build-manifest.json.");
+  if (sha256(sourcePreviewBytes) !== buildManifest.files?.["source-feature.geojson"]?.sha256) throw new Error("Source GeoJSON browser preview SHA-256 does not match build-manifest.json.");
+  if (
+    !isRecord(sourcePreview) ||
+    sourcePreview.type !== "FeatureCollection" ||
+    !Array.isArray(sourcePreview.features) ||
+    sourcePreview.features.length !== 1 ||
+    !isRecord(sourcePreview.features[0]) ||
+    getFeatureIdentity(sourcePreview.features[0]) !== buildManifest.source?.featureId
+  ) {
+    throw new Error("The browser GeoJSON preview must contain exactly the selected source feature.");
+  }
+  if (sha256(Buffer.from(JSON.stringify(sourcePreview.features[0]))) !== buildManifest.source?.featureSha256) {
+    throw new Error("Browser GeoJSON preview feature hash does not match the selected source feature.");
+  }
   if (sha256(glbBytes) !== buildManifest.files?.["tiles/dhaka-pilot.glb"]?.sha256) throw new Error("GLB SHA-256 does not match build-manifest.json.");
   if (sha256(tilesetBytes) !== buildManifest.files?.["tileset.json"]?.sha256) throw new Error("tileset.json SHA-256 does not match build-manifest.json.");
   if (sha256(glbBytes) !== extras.contentSha256) throw new Error("GLB SHA-256 does not match tileset asset extras.");
@@ -408,6 +460,8 @@ export async function reviewDhaka3DTilesAlignment({ sourcePath = DEFAULT_SOURCE,
       sha256: sourceHash,
       featureId: buildManifest.source.featureId,
       featureSha256: buildManifest.source.featureSha256,
+      previewPath: "source-feature.geojson",
+      previewSha256: sha256(sourcePreviewBytes),
       boundsDegrees: sourceBounds,
     },
     model: {

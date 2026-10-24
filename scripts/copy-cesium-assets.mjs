@@ -48,6 +48,15 @@ console.log("Preparing Cesium static assets...");
 
 fs.mkdirSync(publicCesium, { recursive: true });
 
+// The React app imports Cesium through the bundler, but the standalone
+// deterministic browser-review page uses the documented global build.
+const cesiumBrowserEntry = path.join(cesiumRoot, "Cesium.js");
+if (!fs.existsSync(cesiumBrowserEntry)) {
+  throw new Error(`Cesium browser entry not found: ${cesiumBrowserEntry}`);
+}
+fs.copyFileSync(cesiumBrowserEntry, path.join(publicCesium, "Cesium.js"));
+console.log("✓ Copied Cesium.js browser entry");
+
 for (const directory of directories) {
   copyDirectory(directory);
 }

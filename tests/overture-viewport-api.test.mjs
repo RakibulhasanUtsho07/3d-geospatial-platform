@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { before, test } from "node:test";
+
+import { selectViewportFeatures } from "../src/core/geospatial/select-viewport-features.mjs";
 
 const baseUrl = (
   process.env.GEOSPATIAL_API_BASE_URL ?? "http://localhost:3000"
@@ -11,6 +15,63 @@ const smallViewport = new URLSearchParams({
   east: "90.415",
   north: "23.785",
 });
+
+
+
+function intersects(left, right) {
+  return left.west <= right.east &&
+    left.east >= right.west &&
+    left.south <= right.north &&
+    left.north >= right.south;
+}
+
+async function buildGeometryFirstBaseline(featureLimit) {
+  const tileRoot = resolve(process.cwd(), "data", "overture", "spatial-tiles");
+  const manifest = JSON.parse(await readFile(resolve(tileRoot, "manifest.json"), "utf8"));
+  const viewport = {
+    west: Math.min(...manifest.tiles.map((tile) => tile.bounds.west)),
+    south: Math.min(...manifest.tiles.map((tile) => tile.bounds.south)),
+    east: Math.max(...manifest.tiles.map((tile) => tile.bounds.east)),
+    north: Math.max(...manifest.tiles.map((tile) => tile.bounds.north)),
+  };
+  const candidateByIdentity = new Map();
+
+  for (const tile of manifest.tiles.filter((entry) => intersects(entry.bounds, viewport))) {
+    const [tileText, indexText] = await Promise.all([
+      readFile(resolve(tileRoot, tile.file), "utf8"),
+      readFile(resolve(tileRoot, tile.indexFile), "utf8"),
+    ]);
+    const tileCollection = JSON.parse(tileText);
+    const tileIndex = JSON.parse(indexText);
+
+    for (let index = 0; index < tileIndex.records.length; index += 1) {
+      const record = tileIndex.records[index];
+      if (!intersects(record.bounds, viewport) || candidateByIdentity.has(record.identity)) {
+        continue;
+      }
+      candidateByIdentity.set(record.identity, {
+        identity: record.identity,
+        bounds: record.bounds,
+        role: record.role,
+        feature: tileCollection.features[index],
+      });
+    }
+  }
+
+  const candidates = [...candidateByIdentity.values()];
+  const selected = selectViewportFeatures(
+    candidates,
+    viewport,
+    featureLimit,
+    (candidate) => candidate.bounds,
+    (candidate) => candidate.role,
+  );
+  return {
+    viewport,
+    matchedFeatureCount: candidates.length,
+    expectedFeatures: selected.map((candidate) => candidate.feature),
+  };
+}
 
 let serverAvailable = false;
 
@@ -90,6 +151,126 @@ test("viewport API returns features from generated spatial tiles", async (contex
     null,
     "expected tile-cache diagnostics",
   );
+  const candidateBytes = Number(response.headers.get("X-Building-Candidate-Bytes"));
+  const indexReadBytes = Number(response.headers.get("X-Building-Index-Read-Bytes"));
+  const featureReadBytes = Number(response.headers.get("X-Building-Feature-Read-Bytes"));
+  const featureLimit = Number(response.headers.get("X-Building-Feature-Limit"));
+  const candidateFeatureCount = Number(response.headers.get("X-Building-Candidate-Feature-Count"));
+  const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
+  assert.ok(Number.isFinite(candidateBytes) && candidateBytes > 0);
+  assert.notEqual(response.headers.get("X-Building-Index-Read-Bytes"), null, "expected index-read diagnostics even for a warm index cache");
+  assert.ok(Number.isFinite(indexReadBytes) && indexReadBytes >= 0, "index-read diagnostics should be present even when the index cache is warm");
+  assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes >= 0);
+  assert.ok(
+    indexReadBytes + featureReadBytes < candidateBytes,
+    "index plus selected geometry reads should be below reading every selected tile payload",
+  );
+  assert.ok(Number.isInteger(candidateFeatureCount) && candidateFeatureCount >= body.features.length);
+  assert.ok(Number.isInteger(featureLimit) && featureLimit > 0);
+  assert.ok(
+    Number.isInteger(fetchedFeatureCount) &&
+      fetchedFeatureCount >= body.features.length &&
+      fetchedFeatureCount <= featureLimit,
+    "geometry fetches should obey the response feature budget before deserialization",
+  );
+
+  console.info("[P2.10 viewport fetch-cost sample]", JSON.stringify({
+    candidatePayloadBytes: candidateBytes,
+    indexReadBytes,
+    featureReadBytes,
+    combinedIndexAndGeometryReadBytes: indexReadBytes + featureReadBytes,
+    combinedReadReductionRatio: Number((1 - (indexReadBytes + featureReadBytes) / candidateBytes).toFixed(4)),
+    fetchedFeatureCount,
+    featureLimit,
+  }));
+});
+
+test("viewport API exposes server phase timings without changing its feature payload", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const url = baseUrl + viewportPath + "?" + smallViewport;
+  const firstResponse = await fetch(url, { cache: "no-store" });
+  const firstBody = await firstResponse.json();
+
+  assert.equal(firstResponse.status, 200);
+  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.19");
+  assert.equal(firstResponse.headers.get("Content-Type"), "application/json");
+
+  const timingHeaders = {
+    totalServerMs: "X-Building-Timing-Total-Server-Ms",
+    tileQueryMs: "X-Building-Timing-Tile-Query-Ms",
+    manifestLookupMs: "X-Building-Timing-Manifest-Lookup-Ms",
+    tileIndexReadAndParseMs: "X-Building-Timing-Tile-Index-Read-And-Parse-Ms",
+    candidateMetadataScanMs: "X-Building-Timing-Candidate-Metadata-Scan-Ms",
+    oversizedSidecarReadMs: "X-Building-Timing-Oversized-Sidecar-Read-Ms",
+    featureSelectionMs: "X-Building-Timing-Feature-Selection-Ms",
+    selectedGeometryReadMs: "X-Building-Timing-Selected-Geometry-Read-Ms",
+    geometryRangePlanningMs: "X-Building-Timing-Geometry-Range-Planning-Ms",
+    geometryFileOpenMs: "X-Building-Timing-Geometry-File-Open-Ms",
+    geometryRangeReadMs: "X-Building-Timing-Geometry-Range-Read-Ms",
+    geometryJsonParseMs: "X-Building-Timing-Geometry-Json-Parse-Ms",
+    geometryIntegrityCheckMs: "X-Building-Timing-Geometry-Integrity-Check-Ms",
+    geometryFileCloseMs: "X-Building-Timing-Geometry-File-Close-Ms",
+    geometryReadMs: "X-Building-Timing-Geometry-Read-Ms",
+    featureAssemblyMs: "X-Building-Timing-Feature-Assembly-Ms",
+    fallbackGeoJsonPreparationMs: "X-Building-Timing-Fallback-Geo-Json-Preparation-Ms",
+    roleClassificationMs: "X-Building-Timing-Role-Classification-Ms",
+    responseSerializationMs: "X-Building-Timing-Response-Serialization-Ms",
+  };
+  const timings = Object.fromEntries(Object.entries(timingHeaders).map(([name, header]) => {
+    const value = firstResponse.headers.get(header);
+    assert.notEqual(value, null, "expected timing header " + header);
+    const parsed = Number(value);
+    assert.ok(Number.isFinite(parsed) && parsed >= 0, header + " must be a finite nonnegative duration");
+    return [name, parsed];
+  }));
+
+  assert.ok(timings.totalServerMs >= timings.responseSerializationMs,
+    "total route time must include response serialization");
+  assert.ok(timings.totalServerMs >= timings.tileQueryMs,
+    "total route time must include generated-tile query work");
+  const tilePhaseTotal =
+    timings.manifestLookupMs +
+    timings.tileIndexReadAndParseMs +
+    timings.candidateMetadataScanMs +
+    timings.oversizedSidecarReadMs +
+    timings.featureSelectionMs +
+    timings.selectedGeometryReadMs +
+    timings.featureAssemblyMs;
+  assert.ok(timings.tileQueryMs + 0.1 >= tilePhaseTotal,
+    "measured tile sub-phases should fit within total tile-query duration");
+  const selectedGeometrySubphaseTotal =
+    timings.geometryRangePlanningMs +
+    timings.geometryFileOpenMs +
+    timings.geometryRangeReadMs +
+    timings.geometryJsonParseMs +
+    timings.geometryIntegrityCheckMs +
+    timings.geometryFileCloseMs;
+  assert.ok(timings.selectedGeometryReadMs + 0.1 >= selectedGeometrySubphaseTotal,
+    "selected geometry subphases should fit within their enclosing geometry-read duration");
+  assert.ok(Array.isArray(firstBody.features) && firstBody.features.length > 0);
+
+  const secondResponse = await fetch(url, { cache: "no-store" });
+  assert.equal(secondResponse.status, 200);
+  assert.deepEqual(
+    await secondResponse.json(),
+    firstBody,
+    "selected-geometry caching must not change the JSON feature collection between identical requests",
+  );
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Hits")) > 0,
+    "repeated viewport request should reuse validated selected geometry");
+  assert.equal(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Misses"), "0",
+    "repeated viewport request should have no selected-geometry cache misses");
+  assert.equal(secondResponse.headers.get("X-Building-Feature-Read-Bytes"), "0",
+    "repeated viewport request should not reread selected geometry bytes");
+  const cacheEntries = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Entries"));
+  const cacheBytes = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Bytes"));
+  const cacheEvictions = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Evictions"));
+  assert.ok(Number.isInteger(cacheEntries) && cacheEntries > 0 && cacheEntries <= 6000);
+  assert.ok(Number.isInteger(cacheBytes) && cacheBytes > 0 && cacheBytes <= 4 * 1024 * 1024);
+  assert.ok(Number.isInteger(cacheEvictions) && cacheEvictions >= 0);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Oversized-Rejections")) >= 0);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Invalidations")) >= 0);
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
@@ -109,6 +290,12 @@ test("repeated viewport requests reuse parsed tile data", async (context) => {
     Number(secondResponse.headers.get("X-Building-Tile-Cache-Hits")) > 0,
     "expected a repeated request to hit the in-memory tile cache",
   );
+  assert.ok(
+    Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Hits")) > 0,
+    "expected a repeated request to hit the validated selected-geometry cache",
+  );
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Entries")) <= 6000);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Bytes")) <= 4 * 1024 * 1024);
 });
 
 
@@ -153,6 +340,52 @@ test("viewport API caps response features and reports truncation diagnostics", a
   assert.equal(
     response.headers.get("X-Building-Sampling-Strategy"),
     matched > returned ? "spatial-grid-round-robin" : "none",
+  );
+});
+
+
+test("dense viewport preserves the geometry-first spatial sample while fetching only the response budget", async (context) => {
+  if (skipWithoutServer(context)) return;
+
+  const featureLimit = 3000;
+  const baseline = await buildGeometryFirstBaseline(featureLimit);
+  assert.equal(
+    baseline.expectedFeatures.length,
+    featureLimit,
+    "the generated pilot extent must exercise a dense, truncated viewport",
+  );
+
+  const query = new URLSearchParams({
+    west: baseline.viewport.west.toFixed(6),
+    south: baseline.viewport.south.toFixed(6),
+    east: baseline.viewport.east.toFixed(6),
+    north: baseline.viewport.north.toFixed(6),
+    limit: String(featureLimit),
+  });
+  const response = await fetch(baseUrl + viewportPath + "?" + query);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("X-Building-Data-Source"), "generated-tiles");
+  assert.equal(Number(response.headers.get("X-Building-Matched-Feature-Count")), baseline.matchedFeatureCount);
+  assert.equal(Number(response.headers.get("X-Building-Feature-Limit")), featureLimit);
+  assert.equal(body.features.length, featureLimit);
+  assert.deepEqual(
+    body.features,
+    baseline.expectedFeatures,
+    "metadata-first sampling must return the same ordered JSON features as geometry-first sampling over generated tiles",
+  );
+
+  const candidatePayloadBytes = Number(response.headers.get("X-Building-Candidate-Bytes"));
+  const featureReadBytes = Number(response.headers.get("X-Building-Feature-Read-Bytes"));
+  const fetchedFeatureCount = Number(response.headers.get("X-Building-Fetched-Feature-Count"));
+  assert.ok(Number.isFinite(candidatePayloadBytes) && candidatePayloadBytes > 0);
+  assert.ok(Number.isFinite(featureReadBytes) && featureReadBytes > 0);
+  assert.ok(featureReadBytes < candidatePayloadBytes, "sampled geometry payload should be below whole selected-tile payload size");
+  assert.equal(
+    fetchedFeatureCount,
+    featureLimit,
+    "the generated-tile path should deserialize only the selected response feature budget",
   );
 });
 

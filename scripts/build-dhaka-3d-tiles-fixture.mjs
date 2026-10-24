@@ -294,6 +294,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
   }
   const selected = chooseDhakaBuilding(source);
   const sourceFeatureText = JSON.stringify(selected.feature);
+  const sourceFeatureCollectionText = `${JSON.stringify({ type: "FeatureCollection", features: [selected.feature] }, null, 2)}\n`;
   const sourceFeatureSha256 = sha256(sourceFeatureText);
   const sourceSha256 = sha256(sourceText);
   const { west, south, east, north } = selected.bounds;
@@ -330,12 +331,18 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
     fixtureHeightMeters,
     disclaimer: "The GLB is a synthetic box matched to source footprint bounds; it is not a real building reconstruction or survey-accurate geometry.",
   };
+  // Cesium's base traversal skips the entire root when its screen-space
+  // error is <= maximumScreenSpaceError. A one-tile fixture with geometricError
+  // 0 can therefore report tilesLoaded=true without ever requesting its GLB.
+  // Use a positive footprint-scale error so the root enters traversal; as the
+  // only leaf, this same GLB remains the selected/rendered content.
+  const fixtureGeometricErrorMeters = Math.max(widthMeters, depthMeters, fixtureHeightMeters);
   const tileset = {
-    asset: { version: "1.1", tilesetVersion: "dhaka-pilot-placement-fixture-v1", extras: { ...assetExtras, contentSha256 } },
-    geometricError: 0,
+    asset: { version: "1.1", tilesetVersion: "dhaka-pilot-placement-fixture-v1", extras: { ...assetExtras, contentSha256, fixtureGeometricErrorMeters } },
+    geometricError: fixtureGeometricErrorMeters,
     root: {
       boundingVolume: { region },
-      geometricError: 0,
+      geometricError: fixtureGeometricErrorMeters,
       refine: "REPLACE",
       transform,
       content: { uri: "tiles/dhaka-pilot.glb" },
@@ -348,6 +355,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
   const tileDirectory = path.join(normalizedOutput, "tiles");
   await mkdir(tileDirectory, { recursive: true });
   await writeFile(path.join(tileDirectory, "dhaka-pilot.glb"), contentBuffer);
+  await writeFile(path.join(normalizedOutput, "source-feature.geojson"), sourceFeatureCollectionText, "utf8");
   const tilesetText = `${JSON.stringify(tileset, null, 2)}\n`;
   await writeFile(path.join(normalizedOutput, "tileset.json"), tilesetText, "utf8");
   const tilesetSha256 = sha256(tilesetText);
@@ -378,6 +386,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
       widthMeters,
       depthMeters,
       heightMeters: fixtureHeightMeters,
+      geometricErrorMeters: fixtureGeometricErrorMeters,
       heightIsSynthetic: true,
       axisConvention: "right-handed glTF frame; X=east, Y=up, Z=south",
       sourceFootprintBoundsDegrees: selected.bounds,
@@ -385,6 +394,7 @@ export async function buildDhaka3DTilesFixture({ sourcePath = defaultSource, out
     files: {
       "tileset.json": { sha256: tilesetSha256, bytes: Buffer.byteLength(tilesetText) },
       "tiles/dhaka-pilot.glb": { sha256: contentSha256, bytes: contentBuffer.length },
+      "source-feature.geojson": { sha256: sha256(sourceFeatureCollectionText), bytes: Buffer.byteLength(sourceFeatureCollectionText) },
     },
     validation: { manifestValid: true, tileCount: validation.tileCount, version: validation.version },
   };
@@ -402,6 +412,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
       sourceFeatureId: result.source.featureId,
       tilesetSha256: result.files["tileset.json"].sha256,
       contentSha256: result.files["tiles/dhaka-pilot.glb"].sha256,
+      sourceFeaturePreviewSha256: result.files["source-feature.geojson"].sha256,
       sourceSha256: result.source.sha256,
       validation: result.validation,
     }, null, 2)}\n`);

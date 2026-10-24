@@ -79,6 +79,7 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
   const views = evidence.cameraReview.views;
   assert.deepEqual(views.map((view) => view.id), ["north", "east", "south", "west", "oblique"]);
   const target = evidence.cameraReview.target;
+  const expectedHeadings = { north: 180, east: 270, south: 0, west: 90, oblique: 225 };
   for (const view of views) {
     assert.deepEqual(view.target, {
       longitudeDegrees: target.longitudeDegrees,
@@ -86,6 +87,8 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
       ellipsoidHeightMeters: target.ellipsoidHeightMeters,
     });
     assert.ok(Number.isFinite(view.camera.headingDegrees));
+    const headingDelta = Math.abs(((view.camera.headingDegrees - expectedHeadings[view.id] + 540) % 360) - 180);
+    assert.ok(headingDelta < 0.25, view.id + " camera heading must point toward the shared target (delta " + headingDelta + " degrees)");
     assert.ok(view.camera.pitchDegrees < 0);
     assert.ok(view.rangeMeters > 0);
   }
@@ -94,12 +97,15 @@ test("creates five fixed camera presets that share the exact same WGS84 target",
 
 test("alignment evidence binds the exact source, feature, tileset and GLB hashes", async () => {
   const evidence = JSON.parse(await readFile(evidencePath, "utf8"));
-  const [sourceBytes, tilesetBytes, glbBytes] = await Promise.all([
+  const [sourceBytes, previewBytes, tilesetBytes, glbBytes] = await Promise.all([
     readFile(sourcePath),
+    readFile(path.join(fixtureDirectory, "source-feature.geojson")),
     readFile(path.join(fixtureDirectory, "tileset.json")),
     readFile(path.join(fixtureDirectory, "tiles", "dhaka-pilot.glb")),
   ]);
   assert.equal(evidence.source.sha256, sha256(sourceBytes));
+  assert.equal(evidence.source.previewSha256, sha256(previewBytes));
+  assert.equal(evidence.source.previewPath, "source-feature.geojson");
   assert.equal(evidence.model.tilesetSha256, sha256(tilesetBytes));
   assert.equal(evidence.model.glbSha256, sha256(glbBytes));
   assert.match(evidence.source.featureSha256, /^[a-f0-9]{64}$/);
