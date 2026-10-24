@@ -129,7 +129,10 @@ const result = {
   ],
 };
 
-const outputPath = resolve(process.cwd(), "test-results", "p2-12-cold-warm-regression-guard.json");
+const outputPath = resolve(
+  process.cwd(),
+  process.env.P2_12_GUARD_REPORT_PATH ?? "test-results/p2-12-cold-warm-regression-guard.json",
+);
 await mkdir(dirname(outputPath), { recursive: true });
 await writeFile(outputPath, JSON.stringify(result, null, 2) + "\n", "utf8");
 console.log("[P2.12 cross-process viewport regression guard]", JSON.stringify(result));
