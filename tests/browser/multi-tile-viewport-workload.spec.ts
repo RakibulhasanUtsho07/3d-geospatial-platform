@@ -9,7 +9,13 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
-  notifyCameraIntent?: () => void;
+  notifyCameraIntent?: () => {
+    loadInProgress: boolean;
+    intentRevisionBefore: number;
+    intentRevisionAfter: number;
+    viewportWidthDegrees: number | null;
+    viewportHeightDegrees: number | null;
+  } | null;
 };
 
 type StageEvent = {
@@ -520,9 +526,17 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   // attached to Cesium camera.moveEnd. The actual pointer and zoom operations
   // above move the viewer; this opt-in hook only makes intent notification
   // deterministic across headless browser timing.
-  await page.evaluate(
-    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.(),
+  const intentProbe = await page.evaluate(
+    () => window.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null,
   );
+  expect(intentProbe, "the opt-in production camera-intent probe must be installed")
+    .not.toBeNull();
+  expect(intentProbe?.loadInProgress, "the deliberately delayed viewport must remain in-flight")
+    .toBe(true);
+  expect(
+    intentProbe?.intentRevisionAfter,
+    "the camera-intent handler must enqueue a newer viewport revision",
+  ).toBeGreaterThan(intentProbe?.intentRevisionBefore ?? Number.MAX_SAFE_INTEGER);
 
   // Keep the intercepted response pending until the app's AbortController sees
   // the newer camera intent; do not pass based on route cancellation alone.
