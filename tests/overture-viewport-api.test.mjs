@@ -193,7 +193,7 @@ test("viewport API exposes server phase timings without changing its feature pay
   const firstBody = await firstResponse.json();
 
   assert.equal(firstResponse.status, 200);
-  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.18");
+  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.19");
   assert.equal(firstResponse.headers.get("Content-Type"), "application/json");
 
   const timingHeaders = {
@@ -263,6 +263,13 @@ test("viewport API exposes server phase timings without changing its feature pay
     "repeated viewport request should have no selected-geometry cache misses");
   assert.equal(secondResponse.headers.get("X-Building-Feature-Read-Bytes"), "0",
     "repeated viewport request should not reread selected geometry bytes");
+  const cacheEntries = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Entries"));
+  const cacheBytes = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Bytes"));
+  const cacheEvictions = Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Evictions"));
+  assert.ok(Number.isInteger(cacheEntries) && cacheEntries > 0 && cacheEntries <= 6000);
+  assert.ok(Number.isInteger(cacheBytes) && cacheBytes > 0 && cacheBytes <= 4 * 1024 * 1024);
+  assert.ok(Number.isInteger(cacheEvictions) && cacheEvictions >= 0);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Oversized-Rejections")) >= 0);
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
@@ -286,6 +293,8 @@ test("repeated viewport requests reuse parsed tile data", async (context) => {
     Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Hits")) > 0,
     "expected a repeated request to hit the validated selected-geometry cache",
   );
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Entries")) <= 6000);
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Bytes")) <= 4 * 1024 * 1024);
 });
 
 
