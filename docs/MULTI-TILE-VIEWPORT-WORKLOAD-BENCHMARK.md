@@ -39,7 +39,8 @@ The command uses `MAP_E2E_BASE_URL` from the existing Playwright configuration i
 
 The test prints and attaches `multi-tile-viewport-workload.json` and writes a local copy under `test-results/`. The report includes:
 
-- **Tile workload:** endpoint response count, selected tile counts per viewport, candidate/matched/returned feature counts, unique viewport hashes, and repeated-movement request volume.
+- **Tile workload:** endpoint response count, selected tile counts per viewport, candidate/matched/returned feature counts, total generated-tile inventory, mean selected-tile ratio, unique viewport hashes, and repeated-movement request volume.
+- **Viewport selectivity:** width/height span distributions (min/p50/p95/max, in degrees) are recorded without persisting the original coordinates. This reveals whether all tiles are being selected because the camera's geographic bounds are too broad or because tile indexing is too coarse.
 - **Request lifecycle:** actual application fetch-abort signal count, whether the deliberately delayed stale fetch was aborted, whether it was prevented from staging, browser request-failure outcomes, and route-handler status.
 - **Frame readiness:** actual Cesium post-render frame counts plus time from each committed building viewport to the next subsequent render frame (p50/p95), and whether the final stable camera viewport was committed.
 - **Memory trend:** sampled `JSHeapUsedSize`, `JSHeapTotalSize`, DOM-node counts, event-listener counts, retained heap growth after a forced-GC baseline/final comparison, transient heap peak and movement-only trend.
@@ -65,6 +66,7 @@ These are regression guardrails, not a universal latency or memory SLA. Keep the
 - `endpointResponseMs` is elapsed time observed by the Playwright route handler around the live endpoint request. It is not a server-only CPU profile.
 - The API response may have already been computed server-side before the browser-side fetch is aborted. The report distinguishes application `AbortSignal` observations from Playwright browser request outcomes because intercepted route fulfillment is a separate measurement boundary.
 - Chromium JS heap and DOM counters do not account for GPU allocations, Cesium native resources, browser-process memory, or operating-system memory. They are trend indicators rather than proof of zero leaks.
-- The tile count reports generated Overture spatial tiles selected by a viewport; it is not a count of downloaded OGC 3D Tiles payloads.
+- The tile count reports generated Overture spatial tiles selected by a viewport; it is not a count of downloaded OGC 3D Tiles payloads. Compare selected tiles against the manifest's total tile inventory and the recorded bounds spans before changing spatial-index granularity.
+- Viewport query padding is 15% of the raw camera rectangle (with a minimum-degree floor), reduced from 40% to limit unnecessary edge overfetch. The browser workload must confirm whether this changes actual tile selection for the current camera and pilot dataset; do not infer a speedup from the constant change alone.
 - The transparent imagery and empty road response deliberately isolate building viewport churn. Real provider latency, road refreshes, mobile GPUs, real frame rate, and visual alignment require separate measurements.
 - A passing run is evidence for this defined workload only. Review its JSON metrics and any failure details before claiming that the complete dynamic map engine has a verified production performance profile.
