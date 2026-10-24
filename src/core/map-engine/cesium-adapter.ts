@@ -276,20 +276,39 @@ export class CesiumAdapter implements MapEngine {
         return null;
       }
 
-      const bounds = this.getPaddedViewportBounds(viewer, currentCesium);
       const intentRevisionBefore = this.buildingViewportManager.getIntentRevision();
       const loadInProgress = this.buildingViewportManager.isLoadInProgress();
+      const boundsBeforeMove = this.getPaddedViewportBounds(viewer, currentCesium);
+
+      // The test intentionally holds the active viewport response. Move the
+      // actual Cesium camera by a bounded distance so computeViewRectangle
+      // produces a distinct endpoint regardless of headless gesture timing.
+      // This is strictly available under the opt-in workload benchmark flag.
+      viewer.camera.moveRight(5_000);
+      viewer.scene.requestRender();
+
+      const boundsAfterMove = this.getPaddedViewportBounds(viewer, currentCesium);
       this.handleCameraMoveEnd(viewer, currentCesium);
 
       return {
         loadInProgress,
         intentRevisionBefore,
         intentRevisionAfter: this.buildingViewportManager.getIntentRevision(),
-        viewportWidthDegrees: bounds
-          ? Number((bounds.east - bounds.west).toFixed(6))
+        cameraBoundsChanged: Boolean(
+          boundsBeforeMove &&
+          boundsAfterMove &&
+          (
+            boundsBeforeMove.west !== boundsAfterMove.west ||
+            boundsBeforeMove.south !== boundsAfterMove.south ||
+            boundsBeforeMove.east !== boundsAfterMove.east ||
+            boundsBeforeMove.north !== boundsAfterMove.north
+          )
+        ),
+        viewportWidthDegrees: boundsAfterMove
+          ? Number((boundsAfterMove.east - boundsAfterMove.west).toFixed(6))
           : null,
-        viewportHeightDegrees: bounds
-          ? Number((bounds.north - bounds.south).toFixed(6))
+        viewportHeightDegrees: boundsAfterMove
+          ? Number((boundsAfterMove.north - boundsAfterMove.south).toFixed(6))
           : null,
       };
     };
