@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en" data-review-status="loading">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P2.3 — Fixed-camera GeoJSON / 3D Tiles alignment review</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #08111f; color: #e5edf8; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 24px 14px; border-bottom: 1px solid #263348; }
+    h1 { font-size: 19px; margin: 0; font-weight: 650; letter-spacing: .01em; }
+    p { margin: 5px 0 0; color: #9fb0c7; font-size: 12px; }
+    #review-status { color: #a7f3d0; font-size: 12px; text-align: right; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px; }
+    section { min-width: 0; border: 1px solid #263348; border-radius: 12px; overflow: hidden; background: #0b1627; }
+    .pane-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #263348; }
+    h2 { margin: 0; font-size: 13px; font-weight: 650; }
+    .tag { color: #9fb0c7; font-size: 11px; }
+    .viewer { height: calc(100vh - 135px); min-height: 620px; width: 100%; background: #09111f; }
+    footer { padding: 0 20px 14px; color: #8395ad; font-size: 11px; }
+    #review-result { display: none; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } .viewer { height: 580px; min-height: 420px; } }
+  </style>
+  <script src="/cesium/Cesium.js"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>P2.3 · Fixed-camera alignment validation</h1>
+      <p id="active-view">Loading source and tile fixture…</p>
+    </div>
+    <div id="review-status" role="status">Preparing deterministic render pair…</div>
+  </header>
+  <main>
+    <section aria-label="GeoJSON baseline">
+      <div class="pane-title"><h2>GeoJSON footprint baseline</h2><span class="tag">SOURCE / cyan outline</span></div>
+      <div id="baseline-viewer" class="viewer" data-testid="baseline-viewer"></div>
+    </section>
+    <section aria-label="3D Tiles fixture">
+      <div class="pane-title"><h2>3D Tiles placement fixture</h2><span class="tag">GLB / synthetic box</span></div>
+      <div id="tiles-viewer" class="viewer" data-testid="tiles-viewer"></div>
+    </section>
+  </main>
+  <footer>Both scenes use the same fixed WGS84 camera pose. Cyan markers indicate source footprint corners; orange markers indicate transformed GLB corners. Synthetic fixture geometry validates placement, not facade realism.</footer>
+  <pre id="review-result" aria-hidden="true"></pre>
+  <script>
+  (() => {
+    "use strict";
+
+    const FIXTURE_ROOT = "/experimental/dhaka-3d-tiles-fixture/";
+    const REVIEW_URL = FIXTURE_ROOT + "alignment-review.json";
+    const SOURCE_URL = FIXTURE_ROOT + "source-feature.geojson";
+    const TILESET_URL = FIXTURE_ROOT + "tileset.json";
+    const VIEW_IDS = ["north", "east", "south", "west", "oblique"];
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = VIEW_IDS.includes(params.get("view")) ? params.get("view") : "north";
+    const statusNode = document.getElementById("review-status");
+    const resultNode = document.getElementById("review-result");
+    document.getElementById("active-view").textContent = "Camera preset: " + requestedView + " · view IDs are versioned in alignment-review.json";
+
+    function setStatus(status, message) {
+      document.documentElement.dataset.reviewStatus = status;
+      statusNode.textContent = message;
+    }
+
+    function nextFrame() {
+      return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    }
+
+    async function settleFrames(count) {
+      for (let index = 0; index < count; index += 1) await nextFrame();
+    }
+
+    async function readJson(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(url + " returned HTTP " + response.status);
+      return response.json();
+    }
+
+    function createViewer(containerId) {
+      const viewer = new Cesium.Viewer(containerId, {
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+        baseLayer: false,
+        baseLayerPicker: false,
+        animation: false,
+        timeline: false,
+        geocoder: false,
+        homeButton: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        fullscreenButton: false,
+        infoBox: false,
+        selectionIndicator: false,
+        scene3DOnly: true,
+        requestRenderMode: false,
+        maximumRenderTimeChange: Infinity,
+        shouldAnimate: false
+      });
+      const scene = viewer.scene;
+      scene.globe.show = false;
+      scene.backgroundColor = Cesium.Color.fromCssColorString("#09111f");
+      scene.fog.enabled = false;
+      scene.globe.enableLighting = false;
+      if (scene.skyBox) scene.skyBox.show = false;
+      if (scene.skyAtmosphere) scene.skyAtmosphere.show = false;
+      if (scene.sun) scene.sun.show = false;
+      if (scene.moon) scene.moon.show = false;
+      scene.screenSpaceCameraController.enableInputs = false;
+      return viewer;
+    }
+
+    function applyCamera(viewer, camera) {
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(
+          camera.longitudeDegrees,
+          camera.latitudeDegrees,
+          camera.ellipsoidHeightMeters
+        ),
+        orientation: {
+          heading: Cesium.Math.toRadians(camera.headingDegrees),
+          pitch: Cesium.Math.toRadians(camera.pitchDegrees),
+          roll: Cesium.Math.toRadians(camera.rollDegrees)
+        }
+      });
+      viewer.scene.requestRender();
+    }
+
+    function snapshotCamera(viewer) {
+      const cameraPosition = viewer.camera.positionCartographic;
+      return {
+        longitudeDegrees: Cesium.Math.toDegrees(cameraPosition.longitude),
+        latitudeDegrees: Cesium.Math.toDegrees(cameraPosition.latitude),
+        ellipsoidHeightMeters: cameraPosition.height,
+        headingDegrees: Cesium.Math.toDegrees(viewer.camera.heading),
+        pitchDegrees: Cesium.Math.toDegrees(viewer.camera.pitch),
+        rollDegrees: Cesium.Math.toDegrees(viewer.camera.roll)
+      };
+    }
+
+    function projectedPosition(viewer, point) {
+      const cartesian = Cesium.Cartesian3.fromDegrees(
+        point.longitudeDegrees,
+        point.latitudeDegrees,
+        Number.isFinite(point.heightMeters) ? point.heightMeters : 0
+      );
+      const screen = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, cartesian);
+      return screen && Number.isFinite(screen.x) && Number.isFinite(screen.y)
+        ? { x: Number(screen.x.toFixed(4)), y: Number(screen.y.toFixed(4)) }
+        : null;
+    }
+
+    function addFootprintMarkers(viewer, alignment) {
+      for (const corner of alignment.corners) {
+        viewer.entities.add({
+          id: "source-corner-" + corner.id,
+          position: Cesium.Cartesian3.fromDegrees(
+            corner.expected.longitudeDegrees,
+            corner.expected.latitudeDegrees,
+            0.15
+          ),
+          point: {
+            pixelSize: 12,
+            color: Cesium.Color.fromCssColorString("#22d3ee"),
+            outlineColor: Cesium.Color.fromCssColorString("#082f49"),
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+        viewer.entities.add({
+          id: "transformed-glb-corner-" + corner.id,
+          position: Cesium.Cartesian3.fromDegrees(
+            corner.actual.longitudeDegrees,
+            corner.actual.latitudeDegrees,
+            (Number.isFinite(corner.actual.heightMeters) ? corner.actual.heightMeters : 0) + 0.18
+          ),
+          point: {
+            pixelSize: 6,
+            color: Cesium.Color.fromCssColorString("#fb923c"),
+            outlineColor: Cesium.Color.fromCssColorString("#7c2d12"),
+            outlineWidth: 1,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+      }
+    }
+
+    async function main() {
+      if (typeof Cesium === "undefined") throw new Error("Cesium global did not load from /cesium/Cesium.js.");
+      const evidence = await readJson(REVIEW_URL);
+      const sourceFeatureCollection = await readJson(SOURCE_URL);
+      const cameraReview = evidence.cameraReview;
+      const view = cameraReview.views.find((item) => item.id === requestedView);
+      if (!view) throw new Error("No deterministic camera preset exists for view " + requestedView + ".");
+      if (
+        sourceFeatureCollection.type !== "FeatureCollection" ||
+        !Array.isArray(sourceFeatureCollection.features) ||
+        sourceFeatureCollection.features.length !== 1
+      ) throw new Error("The source preview must contain exactly the selected GeoJSON feature.");
+
+      const baselineViewer = createViewer("baseline-viewer");
+      const tilesViewer = createViewer("tiles-viewer");
+      applyCamera(baselineViewer, view.camera);
+      applyCamera(tilesViewer, view.camera);
+
+      const baselineDataSource = await Cesium.GeoJsonDataSource.load(SOURCE_URL, {
+        clampToGround: false,
+        stroke: Cesium.Color.fromCssColorString("#67e8f9"),
+        strokeWidth: 3,
+        fill: Cesium.Color.fromCssColorString("#0891b2").withAlpha(0.65)
+      });
+      baselineViewer.dataSources.add(baselineDataSource);
+      for (const entity of baselineDataSource.entities.values) {
+        if (!entity.polygon) continue;
+        entity.polygon.height = 0;
+        entity.polygon.extrudedHeight = 8;
+        entity.polygon.perPositionHeight = false;
+        entity.polygon.fill = true;
+        entity.polygon.outline = true;
+        entity.polygon.outlineColor = Cesium.Color.fromCssColorString("#67e8f9");
+        entity.polygon.material = Cesium.Color.fromCssColorString("#0891b2").withAlpha(0.65);
+      }
+
+      const tileset = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
+        maximumScreenSpaceError: 1,
+        maximumMemoryUsage: 32,
+        preloadWhenHidden: false
+      });
+      tilesViewer.scene.primitives.add(tileset);
+      await Promise.race([
+        tileset.initialTilesLoaded,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("3D Tiles did not finish its initial visible load within 45 seconds.")), 45000))
+      ]);
+
+      addFootprintMarkers(baselineViewer, evidence.footprintAlignment);
+      addFootprintMarkers(tilesViewer, evidence.footprintAlignment);
+      baselineViewer.scene.requestRender();
+      tilesViewer.scene.requestRender();
+      await settleFrames(6);
+
+      const baselineCamera = snapshotCamera(baselineViewer);
+      const tilesCamera = snapshotCamera(tilesViewer);
+      const cameraFields = [
+        "longitudeDegrees",
+        "latitudeDegrees",
+        "ellipsoidHeightMeters",
+        "headingDegrees",
+        "pitchDegrees",
+        "rollDegrees"
+      ];
+      const cameraPoseDelta = Object.fromEntries(cameraFields.map((field) => [
+        field,
+        Math.abs(baselineCamera[field] - tilesCamera[field])
+      ]));
+      const maximumCameraPoseDelta = Math.max(...Object.values(cameraPoseDelta));
+
+      const projectedCorners = evidence.footprintAlignment.corners.map((corner) => {
+        const expected = {
+          longitudeDegrees: corner.expected.longitudeDegrees,
+          latitudeDegrees: corner.expected.latitudeDegrees,
+          heightMeters: 0.15
+        };
+        const actual = {
+          longitudeDegrees: corner.actual.longitudeDegrees,
+          latitudeDegrees: corner.actual.latitudeDegrees,
+          heightMeters: (Number.isFinite(corner.actual.heightMeters) ? corner.actual.heightMeters : 0) + 0.18
+        };
+        const baselineExpected = projectedPosition(baselineViewer, expected);
+        const baselineActual = projectedPosition(baselineViewer, actual);
+        const tilesExpected = projectedPosition(tilesViewer, expected);
+        const tilesActual = projectedPosition(tilesViewer, actual);
+        const pixelResidual = (left, right) => left && right
+          ? Math.hypot(left.x - right.x, left.y - right.y)
+          : null;
+        return {
+          id: corner.id,
+          baseline: {
+            expected: baselineExpected,
+            transformed: baselineActual,
+            residualPixels: pixelResidual(baselineExpected, baselineActual)
+          },
+          tiles: {
+            expected: tilesExpected,
+            transformed: tilesActual,
+            residualPixels: pixelResidual(tilesExpected, tilesActual)
+          }
+        };
+      });
+      const residualValues = projectedCorners.flatMap((corner) => [
+        corner.baseline.residualPixels,
+        corner.tiles.residualPixels
+      ]).filter((value) => Number.isFinite(value));
+
+      const result = {
+        schemaVersion: 1,
+        evidenceType: "p2.3-fixed-camera-geojson-vs-3d-tiles-render-review",
+        status: "pass",
+        view: { id: view.id, requestedCamera: view.camera, target: view.target, rangeMeters: view.rangeMeters },
+        source: {
+          sha256: evidence.source.sha256,
+          featureSha256: evidence.source.featureSha256,
+          previewSha256: evidence.source.previewSha256 ?? null,
+          featureId: evidence.source.featureId
+        },
+        fixture: {
+          fixtureId: evidence.fixtureId,
+          tilesetSha256: evidence.model.tilesetSha256,
+          glbSha256: evidence.model.glbSha256,
+          syntheticFixtureGeometry: evidence.model.syntheticFixtureGeometry
+        },
+        runtime: { cesiumVersion: Cesium.VERSION, browserUserAgent: navigator.userAgent },
+        baseline: {
+          loaded: baselineDataSource.entities.values.some((entity) => Boolean(entity.polygon)),
+          camera: baselineCamera
+        },
+        tiles: {
+          loaded: tileset.ready === true,
+          initialTilesLoaded: true,
+          camera: tilesCamera
+        },
+        cameraAlignment: { status: maximumCameraPoseDelta <= 1e-8 ? "pass" : "fail", maximumAbsolutePoseDelta: maximumCameraPoseDelta, deltaByField: cameraPoseDelta, tolerance: 1e-8 },
+        projectedFootprintAlignment: {
+          status: projectedCorners.length === 4 && residualValues.length === 8 && Math.max(...residualValues) <= 8 ? "pass" : "fail",
+          tolerancePixels: 8,
+          maximumResidualPixels: residualValues.length ? Math.max(...residualValues) : null,
+          visibleProjectionCount: residualValues.length,
+          corners: projectedCorners
+        },
+        disclaimer: "The tile content is a synthetic rectangular prism. This browser review verifies repeatable camera poses, transformed footprint-envelope projection, and render availability; it does not validate facade similarity or true building height."
+      };
+      result.status = result.cameraAlignment.status === "pass" && result.projectedFootprintAlignment.status === "pass" && result.baseline.loaded && result.tiles.loaded ? "pass" : "fail";
+
+      resultNode.textContent = JSON.stringify(result);
+      if (result.status !== "pass") throw new Error("Camera/footprint alignment failed for " + view.id + "; inspect #review-result.");
+      setStatus("ready", "READY · " + view.id.toUpperCase() + " · camera delta " + maximumCameraPoseDelta.toExponential(1) + " · footprint residual " + result.projectedFootprintAlignment.maximumResidualPixels.toFixed(2) + " px");
+    }
+
+    main().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      resultNode.textContent = JSON.stringify({ schemaVersion: 1, status: "error", viewId: requestedView, error: message });
+      setStatus("error", "FAILED · " + message);
+      console.error("[P2.3 camera alignment]", error);
+    });
+  })();
+  </script>
+</body>
+</html>
