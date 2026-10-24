@@ -311,6 +311,9 @@ jobs:
       - name: Test opt-in Dhaka 3D Tiles controller cancellation and teardown
         run: npm run test:dhaka-3d-tiles-pilot-controller
 
+      - name: Test Dhaka 3D Tiles footprint alignment and deterministic camera evidence
+        run: npm run test:dhaka-3d-tiles-alignment-review
+
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 

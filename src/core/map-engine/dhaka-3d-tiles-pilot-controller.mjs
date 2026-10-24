@@ -21,6 +21,23 @@ function destroyUnattachedTileset(tileset) {
   }
 }
 
+function resolveWorldCenter(Cesium, tileset) {
+  const center = tileset?.boundingSphere?.center ?? tileset?.root?.boundingSphere?.center;
+  if (!center || typeof Cesium?.Cartographic?.fromCartesian !== "function") return null;
+  try {
+    const cartographic = Cesium.Cartographic.fromCartesian(center);
+    if (!cartographic) return null;
+    const toDegrees = Cesium.Math?.toDegrees ?? ((radians) => radians * 180 / Math.PI);
+    return {
+      longitudeDegrees: toDegrees(cartographic.longitude),
+      latitudeDegrees: toDegrees(cartographic.latitude),
+      ellipsoidHeightMeters: cartographic.height,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Owns the opt-in experimental 3D Tiles primitive lifecycle.
  *
@@ -118,7 +135,12 @@ export class Dhaka3DTilesPilotController {
       this.#tileset = tileset;
       this.#attachedViewer = viewer;
       viewer.scene.requestRender?.();
-      this.#emit("loaded");
+      // Cesium exposes the tileset's world-space bound; convert it back to WGS84
+      // so the browser integration check can compare actual runtime placement
+      // with the source anchor recorded in the manifest.
+      this.#emit("loaded", {
+        worldCenter: resolveWorldCenter(Cesium, tileset),
+      });
       return { status: "loaded", tileset };
     } catch (error) {
       if (revision === this.#revision) this.#loading = false;
