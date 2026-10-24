@@ -1034,6 +1034,9 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   const geometryFetchBudgetViolations = costMeasuredRequests.filter(
     (request) => request.fetchedFeatureCount! > request.featureLimit!,
   ).length;
+  const indexCacheMissRequestCount = costMeasuredRequests.filter(
+    (request) => request.indexReadBytes! > 0,
+  ).length;
   const viewportWidthSummary = summarizeSpan(
     requests.map((request) => request.viewportWidthDegrees)
       .filter((value): value is number => value !== null),
@@ -1147,13 +1150,14 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
         fetchCostEvidence: {
           measuredRequestCount: costMeasuredRequests.length,
           fullSelectedTilePayloadBaselineBytes: totalCandidatePayloadBytes,
-          coldIndexReadBytes: totalIndexReadBytes,
+          indexBytesReadDuringWorkload: totalIndexReadBytes,
+          indexCacheMissRequestCount,
           selectedFeatureGeometryReadBytes: totalFeatureReadBytes,
           combinedIndexAndGeometryReadBytes: totalSelectiveReadBytes,
           geometryPayloadReductionRatio,
           combinedReadReductionRatio,
           geometryFetchBudgetViolations,
-          limitation: "Selected-tile bytes are a per-request whole-payload baseline; index bytes are reported separately and this is not a physical-disk-I/O or wall-clock speedup estimate.",
+          limitation: "Selected-tile bytes are a per-request whole-payload baseline, not a physical-disk-I/O or wall-clock speedup estimate. The browser workload runs after API integration tests in the same server process, so its index cache can already be warm; cold-request index bytes are logged separately by the API integration suite.",
         },
       },
     },
