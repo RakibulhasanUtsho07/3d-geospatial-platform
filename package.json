@@ -143,6 +143,7 @@
     "test:map-optimization": "node --test tests/lod-record-selection.test.mjs tests/flatten-road-coordinates.test.mjs tests/road-visual-style.test.mjs tests/map-optimization-benchmark.test.mjs",
     "benchmark:map-optimization": "node scripts/benchmark-map-optimization.mjs",
     "test:map-browser": "playwright test --config=playwright.config.ts",
+    "benchmark:map-workload": "playwright test --config=playwright.config.ts tests/browser/multi-tile-viewport-workload.spec.ts",
     "test:building-lod-policy": "node --test tests/building-lod-policy.test.mjs",
     "test:building-lod-renderer": "node --test tests/building-lod-renderer-boundary.test.mjs",
     "test:building-style-assignment-policy": "node --test tests/building-style-assignment-policy.test.mjs",
