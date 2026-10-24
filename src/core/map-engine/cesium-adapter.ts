@@ -95,6 +95,8 @@ type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
   requestRender?: () => void;
+  /** Benchmark-only read of manager-owned lifecycle state, without exposing viewport coordinates. */
+  getRequestLifecycleDiagnostics?: () => WorkloadRequestLifecycleDiagnostics | null;
   /** Test-only deterministic camera placement for a representative spatial-tile viewport. */
   focusViewportForBenchmark?: (
     longitudeDegrees: number,
@@ -282,6 +284,16 @@ export class CesiumAdapter implements MapEngine {
       ) {
         viewer.scene.requestRender();
       }
+    };
+    diagnostics.getRequestLifecycleDiagnostics = () => {
+      if (
+        this.workloadFrameDiagnostics !== diagnostics ||
+        this.viewer !== viewer ||
+        viewer.isDestroyed()
+      ) {
+        return null;
+      }
+      return this.buildingViewportManager.getRequestLifecycleDiagnostics();
     };
     diagnostics.focusViewportForBenchmark = (
       longitudeDegrees,
