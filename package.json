@@ -24,6 +24,7 @@
     "test:dhaka-3d-tiles-alignment-review": "node --test tests/dhaka-3d-tiles-alignment-review.test.mjs",
     "predev": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment",
     "prebuild": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment",
+    "test:selected-geometry-cache": "node --test tests/selected-geometry-cache.test.mjs",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
     "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs",
     "test:building-viewport-manager": "node --test tests/building-viewport-manager-boundary.test.mjs tests/building-viewport-manager-lifecycle.test.mjs",

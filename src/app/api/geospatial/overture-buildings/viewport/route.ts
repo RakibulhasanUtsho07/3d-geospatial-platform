@@ -3,6 +3,10 @@ import { performance } from "node:perf_hooks";
 import { resolve } from "node:path";
 import { NextResponse } from "next/server";
 import { selectViewportFeatures } from "../../../../../core/geospatial/select-viewport-features.mjs";
+import {
+  createSelectedGeometryCache,
+  createSelectedGeometryCacheKey,
+} from "../../../../../core/geospatial/selected-geometry-cache.mjs";
 
 type JsonObject = Record<string, unknown>;
 
@@ -114,10 +118,11 @@ type TileQueryResult = {
   tileCacheHits: number;
   geometryFeatureCacheHits: number;
   geometryFeatureCacheMisses: number;
-};
-type CachedSelectedGeometryFeature = {
-  feature: unknown;
-  byteLength: number;
+  geometryFeatureCacheEntries: number;
+  geometryFeatureCacheBytes: number;
+  geometryFeatureCacheEvictions: number;
+  geometryFeatureCacheOversizedRejections: number;
+  geometryFeatureCacheInvalidations: number;
 };
 
 type TileQueryTimings = {
@@ -158,62 +163,6 @@ function formatTimingMs(value: number): string {
   return Math.max(0, value).toFixed(3);
 }
 
-function getSelectedGeometryCacheKey(
-  relativeFile: string,
-  dataSignature: string,
-  record: TileFeatureIndexRecord,
-): string {
-  return JSON.stringify([
-    relativeFile,
-    dataSignature,
-    record.offset,
-    record.length,
-    record.identity,
-    record.role,
-    record.bounds.west,
-    record.bounds.south,
-    record.bounds.east,
-    record.bounds.north,
-  ]);
-}
-
-function getCachedSelectedGeometryFeature(key: string): unknown | undefined {
-  const cached = selectedTileGeometryCache.get(key);
-  if (!cached) return undefined;
-  selectedTileGeometryCache.delete(key);
-  selectedTileGeometryCache.set(key, cached);
-  return cached.feature;
-}
-
-function cacheSelectedGeometryFeature(
-  key: string,
-  feature: unknown,
-  record: TileFeatureIndexRecord,
-): void {
-  const byteLength = record.length;
-  if (!Number.isInteger(byteLength) || byteLength < 1 || byteLength > MAX_SELECTED_GEOMETRY_CACHE_BYTES) {
-    return;
-  }
-  const prior = selectedTileGeometryCache.get(key);
-  if (prior) {
-    selectedGeometryCacheBytes -= prior.byteLength;
-    selectedTileGeometryCache.delete(key);
-  }
-  selectedTileGeometryCache.set(key, { feature, byteLength });
-  selectedGeometryCacheBytes += byteLength;
-  while (
-    selectedGeometryCacheBytes > MAX_SELECTED_GEOMETRY_CACHE_BYTES ||
-    selectedTileGeometryCache.size > MAX_SELECTED_GEOMETRY_CACHE_ENTRIES
-  ) {
-    const oldestKey = selectedTileGeometryCache.keys().next().value;
-    if (typeof oldestKey !== "string") break;
-    const oldest = selectedTileGeometryCache.get(oldestKey);
-    if (oldest) selectedGeometryCacheBytes -= oldest.byteLength;
-    selectedTileGeometryCache.delete(oldestKey);
-  }
-}
-
-
 const DATA_FILE = resolve(
   process.cwd(),
   "data",
@@ -234,8 +183,6 @@ const MAX_VIEWPORT_SPAN_DEGREES = 2;
 const DEFAULT_VIEWPORT_FEATURE_LIMIT = 2500;
 const MAX_VIEWPORT_FEATURE_LIMIT = 5000;
 const MAX_CACHED_TILE_FILES = 64;
-const MAX_SELECTED_GEOMETRY_CACHE_BYTES = 4 * 1024 * 1024;
-const MAX_SELECTED_GEOMETRY_CACHE_ENTRIES = 6000;
 
 let indexedDatasetPromise: Promise<IndexedDataset> | null = null;
 let cachedTileManifest: CachedManifestEntry | null = null;
@@ -246,10 +193,11 @@ const tileFeatureCache = new Map<string, CachedTileEntry>();
 // for features whose indexed bounds intersect the requested viewport.
 const tileFeatureIndexCache = new Map<string, CachedTileIndexEntry>();
 // Only retain selected features after their JSON, bounds and render role have
-// passed the existing index-integrity checks. Signatures in each key prevent
-// stale geometry from being reused when a tile file changes.
-const selectedTileGeometryCache = new Map<string, CachedSelectedGeometryFeature>();
-let selectedGeometryCacheBytes = 0;
+// passed index-integrity checks. The shared cache policy bounds memory and LRU eviction.
+const selectedTileGeometryCache = createSelectedGeometryCache();
+// Track the signature used by the selected-geometry cache so we only scan and
+// purge that tile's old keys when its observed file signature actually changes.
+const selectedGeometrySignatureByTile = new Map<string, string>();
 const MAX_TILE_READ_GAP_BYTES = 2 * 1024;
 const MAX_TILE_READ_WINDOW_BYTES = 64 * 1024;
 
@@ -864,8 +812,8 @@ async function readSelectedTileFeatures(
   const featuresByIdentity = new Map<string, IndexedTileFeature>();
   const recordsToRead: TileFeatureIndexRecord[] = [];
   for (const record of records) {
-    const cachedFeature = getCachedSelectedGeometryFeature(
-      getSelectedGeometryCacheKey(relativeFile, dataSignature, record),
+    const cachedFeature = selectedTileGeometryCache.get(
+      createSelectedGeometryCacheKey({ relativeFile, dataSignature, record }),
     );
     if (cachedFeature === undefined) {
       cacheStats.misses += 1;
@@ -987,10 +935,10 @@ async function readSelectedTileFeatures(
           bounds: record.bounds,
           identity: record.identity,
         });
-        cacheSelectedGeometryFeature(
-          getSelectedGeometryCacheKey(relativeFile, dataSignature, record),
+        selectedTileGeometryCache.set(
+          createSelectedGeometryCacheKey({ relativeFile, dataSignature, record }),
           feature,
-          record,
+          record.length,
         );
       }
     }
@@ -1040,6 +988,27 @@ async function queryGeneratedTiles(
       return null;
     }
     candidateFeatureCount += tileIndex.records.length;
+    const priorGeometrySignature = selectedGeometrySignatureByTile.get(tile.file);
+    if (priorGeometrySignature !== undefined && priorGeometrySignature !== tileIndex.dataSignature) {
+      const invalidatedGeometryEntries = selectedTileGeometryCache.invalidateWhere((key: string) => {
+        try {
+          const parts: unknown = JSON.parse(key);
+          return Array.isArray(parts) &&
+            parts[0] === tile.file &&
+            typeof parts[1] === "string" &&
+            parts[1] !== tileIndex.dataSignature;
+        } catch {
+          return false;
+        }
+      });
+      if (invalidatedGeometryEntries > 0) {
+        console.info("[Overture Viewport API] Purged selected geometry cached for an older tile signature.", {
+          tile: tile.id,
+          invalidatedEntries: invalidatedGeometryEntries,
+        });
+      }
+    }
+    selectedGeometrySignatureByTile.set(tile.file, tileIndex.dataSignature);
     tileDataSignatures.set(tile.file, tileIndex.dataSignature);
     candidateBytes += getSignatureSize(tileIndex.dataSignature);
     indexReadBytes += tileIndex.indexReadBytes;
@@ -1181,6 +1150,11 @@ async function queryGeneratedTiles(
     tileCacheHits,
     geometryFeatureCacheHits: selectedGeometryCacheStats.hits,
     geometryFeatureCacheMisses: selectedGeometryCacheStats.misses,
+    geometryFeatureCacheEntries: selectedTileGeometryCache.getStats().entries,
+    geometryFeatureCacheBytes: selectedTileGeometryCache.getStats().bytes,
+    geometryFeatureCacheEvictions: selectedTileGeometryCache.getStats().evictions,
+    geometryFeatureCacheOversizedRejections: selectedTileGeometryCache.getStats().oversizedRejections,
+    geometryFeatureCacheInvalidations: selectedTileGeometryCache.getStats().invalidations,
   };
 }
 
@@ -1306,6 +1280,8 @@ export async function GET(request: Request): Promise<Response> {
       tileCacheHits: tileResult?.tileCacheHits ?? 0,
       geometryFeatureCacheHits: tileResult?.geometryFeatureCacheHits ?? 0,
       geometryFeatureCacheMisses: tileResult?.geometryFeatureCacheMisses ?? 0,
+      geometryFeatureCacheStats: selectedTileGeometryCache.getStats(),
+      geometryFeatureCacheInvalidations: selectedTileGeometryCache.getStats().invalidations,
       oversizedFeatures: tileResult?.oversizedFeatureCount ?? 0,
       buildings: buildingCount,
       buildingParts: partCount,
@@ -1326,7 +1302,7 @@ export async function GET(request: Request): Promise<Response> {
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
-        "X-Building-Timing-Version": "p2.18",
+        "X-Building-Timing-Version": "p2.19",
         "X-Building-Timing-Total-Server-Ms": formatTimingMs(totalServerMs),
         "X-Building-Timing-Tile-Query-Ms": formatTimingMs(tileQueryMs),
         "X-Building-Timing-Manifest-Lookup-Ms": formatTimingMs(tileTimings.manifestLookupMs),
@@ -1371,6 +1347,11 @@ export async function GET(request: Request): Promise<Response> {
         "X-Building-Tile-Cache-Hits": String(tileResult?.tileCacheHits ?? 0),
         "X-Building-Geometry-Feature-Cache-Hits": String(tileResult?.geometryFeatureCacheHits ?? 0),
         "X-Building-Geometry-Feature-Cache-Misses": String(tileResult?.geometryFeatureCacheMisses ?? 0),
+        "X-Building-Geometry-Feature-Cache-Entries": String(selectedTileGeometryCache.getStats().entries),
+        "X-Building-Geometry-Feature-Cache-Bytes": String(selectedTileGeometryCache.getStats().bytes),
+        "X-Building-Geometry-Feature-Cache-Evictions": String(selectedTileGeometryCache.getStats().evictions),
+        "X-Building-Geometry-Feature-Cache-Oversized-Rejections": String(selectedTileGeometryCache.getStats().oversizedRejections),
+        "X-Building-Geometry-Feature-Cache-Invalidations": String(selectedTileGeometryCache.getStats().invalidations),
         "X-Building-Count": String(buildingCount),
         "X-Building-Parent-Count": String(parentCount),
         "X-Building-Part-Count": String(partCount),

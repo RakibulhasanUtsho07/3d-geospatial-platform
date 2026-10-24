@@ -88,7 +88,10 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     "statusCode", "selectedTileCount", "candidateFeatureCount", "matchedFeatureCount",
     "returnedFeatureCount", "candidatePayloadBytes", "indexReadBytes", "featureReadBytes",
     "combinedReadBytes", "combinedReadReductionRatio", "fetchedFeatureCount",
-    "geometryFeatureCacheHits", "geometryFeatureCacheMisses", "featureLimit", "featureSha256",
+    "geometryFeatureCacheHits", "geometryFeatureCacheMisses", "geometryFeatureCacheEntries",
+    "geometryFeatureCacheBytes", "geometryFeatureCacheEvictions", "geometryFeatureCacheOversizedRejections",
+    "geometryFeatureCacheInvalidations",
+    "featureLimit", "featureSha256",
   ];
 
   const samples = sampleReports.map((report, index) => {
@@ -105,6 +108,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     assert.ok(report.cold.indexReadBytes > 0, label + " must read the tile index on its first valid request");
     assert.equal(report.cold.geometryFeatureCacheHits, 0, label + " cold request must miss the selected-geometry cache");
     assert.ok(report.cold.geometryFeatureCacheMisses > 0, label + " cold request must populate the selected-geometry cache");
+    assert.ok(report.cold.geometryFeatureCacheEntries <= 6000, label + " cold cache must respect the entry cap");
+    assert.ok(report.cold.geometryFeatureCacheBytes <= 4 * 1024 * 1024, label + " cold cache must respect the byte cap");
     assert.ok(report.cold.candidatePayloadBytes > 0, label + " candidate baseline must be nonzero");
     assert.ok(report.cold.returnedFeatureCount > 0, label + " must return actual building features");
     assert.equal(report.warm.totalIndexReadBytes, 0, label + " warm requests must not reread the compact index");
@@ -122,6 +127,8 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
     assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheHits > 0), label + " warm samples must reuse selected geometry");
     assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheMisses === 0), label + " warm samples must have zero selected-geometry cache misses");
     assert.ok(warmObservations.every((sample) => sample.featureReadBytes === 0), label + " warm samples must not reread selected geometry bytes");
+    assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheEntries <= 6000), label + " warm cache must respect the entry cap");
+    assert.ok(warmObservations.every((sample) => sample.geometryFeatureCacheBytes <= 4 * 1024 * 1024), label + " warm cache must respect the byte cap");
     assert.ok(warmObservations.every((sample) => sample.featureSha256 === report.cold.featureSha256),
       label + " every warm hash must match its cold response");
 
@@ -137,6 +144,11 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         featureReadBytes: report.cold.featureReadBytes,
         geometryFeatureCacheHits: report.cold.geometryFeatureCacheHits,
         geometryFeatureCacheMisses: report.cold.geometryFeatureCacheMisses,
+        geometryFeatureCacheEntries: report.cold.geometryFeatureCacheEntries,
+        geometryFeatureCacheBytes: report.cold.geometryFeatureCacheBytes,
+        geometryFeatureCacheEvictions: report.cold.geometryFeatureCacheEvictions,
+        geometryFeatureCacheOversizedRejections: report.cold.geometryFeatureCacheOversizedRejections,
+        geometryFeatureCacheInvalidations: report.cold.geometryFeatureCacheInvalidations,
         candidatePayloadBytes: report.cold.candidatePayloadBytes,
         combinedReadReductionRatio: report.cold.combinedReadReductionRatio,
         selectedTileCount: report.cold.selectedTileCount,
@@ -153,6 +165,11 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
         totalGeometryReadBytes: report.warm.totalGeometryReadBytes,
         geometryFeatureCacheHitCounts: warmObservations.map((sample) => sample.geometryFeatureCacheHits),
         geometryFeatureCacheMissCounts: warmObservations.map((sample) => sample.geometryFeatureCacheMisses),
+        geometryFeatureCacheEntryCounts: warmObservations.map((sample) => sample.geometryFeatureCacheEntries),
+        geometryFeatureCacheByteCounts: warmObservations.map((sample) => sample.geometryFeatureCacheBytes),
+        geometryFeatureCacheEvictionCounts: warmObservations.map((sample) => sample.geometryFeatureCacheEvictions),
+        geometryFeatureCacheOversizedRejectionCounts: warmObservations.map((sample) => sample.geometryFeatureCacheOversizedRejections),
+        geometryFeatureCacheInvalidationCounts: warmObservations.map((sample) => sample.geometryFeatureCacheInvalidations),
         meanGeometryPayloadReductionRatio: report.warm.meanGeometryPayloadReductionRatio,
         serverTimingMsByPhase: Object.fromEntries(SERVER_TIMING_FIELDS.map((field) => [
           field,
