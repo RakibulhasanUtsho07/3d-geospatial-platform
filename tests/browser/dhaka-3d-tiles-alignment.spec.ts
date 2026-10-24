@@ -130,7 +130,7 @@ test("captures five repeatable GeoJSON-vs-3D-Tiles camera views with hash-bound 
 
     const screenshotName = "view-" + viewId + ".png";
     const screenshotPath = path.join(OUTPUT_DIRECTORY, screenshotName);
-    await page.screenshot({ path: screenshotPath, fullPage: true, animations: "disabled" });
+    await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled" });
     const screenshotBytes = await readFile(screenshotPath);
     const entry: CaptureEntry = {
       viewId,
