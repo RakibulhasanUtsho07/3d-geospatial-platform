@@ -193,7 +193,7 @@ test("viewport API exposes server phase timings without changing its feature pay
   const firstBody = await firstResponse.json();
 
   assert.equal(firstResponse.status, 200);
-  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.17");
+  assert.equal(firstResponse.headers.get("X-Building-Timing-Version"), "p2.18");
   assert.equal(firstResponse.headers.get("Content-Type"), "application/json");
 
   const timingHeaders = {
@@ -255,8 +255,14 @@ test("viewport API exposes server phase timings without changing its feature pay
   assert.deepEqual(
     await secondResponse.json(),
     firstBody,
-    "timing instrumentation must not change the JSON feature collection between identical requests",
+    "selected-geometry caching must not change the JSON feature collection between identical requests",
   );
+  assert.ok(Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Hits")) > 0,
+    "repeated viewport request should reuse validated selected geometry");
+  assert.equal(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Misses"), "0",
+    "repeated viewport request should have no selected-geometry cache misses");
+  assert.equal(secondResponse.headers.get("X-Building-Feature-Read-Bytes"), "0",
+    "repeated viewport request should not reread selected geometry bytes");
 });
 
 test("repeated viewport requests reuse parsed tile data", async (context) => {
@@ -275,6 +281,10 @@ test("repeated viewport requests reuse parsed tile data", async (context) => {
   assert.ok(
     Number(secondResponse.headers.get("X-Building-Tile-Cache-Hits")) > 0,
     "expected a repeated request to hit the in-memory tile cache",
+  );
+  assert.ok(
+    Number(secondResponse.headers.get("X-Building-Geometry-Feature-Cache-Hits")) > 0,
+    "expected a repeated request to hit the validated selected-geometry cache",
   );
 });
 
