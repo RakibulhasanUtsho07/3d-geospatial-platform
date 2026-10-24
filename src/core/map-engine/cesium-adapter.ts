@@ -85,6 +85,7 @@ type PerformanceDiagnosticsWindow = Window & {
 type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
+  requestRender?: () => void;
 };
 
 type WorkloadBenchmarkWindow = Window & {
@@ -240,6 +241,17 @@ export class CesiumAdapter implements MapEngine {
     const diagnostics: WorkloadFrameDiagnostics = {
       frameCount: 0,
       lastFrameAtMs: 0,
+    };
+    diagnostics.requestRender = () => {
+      // The test probe uses Cesium's public render request API. Guard the
+      // callback so a stale page hook cannot revive a destroyed viewer.
+      if (
+        this.workloadFrameDiagnostics === diagnostics &&
+        this.viewer === viewer &&
+        !viewer.isDestroyed()
+      ) {
+        viewer.scene.requestRender();
+      }
     };
     this.workloadFrameDiagnostics = diagnostics;
     target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__ = diagnostics;
