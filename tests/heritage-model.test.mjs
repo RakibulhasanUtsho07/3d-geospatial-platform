@@ -102,7 +102,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.runtimeCamera.footprintBoundingSphereRadiusMeters.value, AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS);
 });
 
-test("the map opens on the river-facing facade and provides whole-footprint and guided-orbit views", async () => {
+test("the map opens in Dhaka building coverage and retains explicit heritage camera controls", async () => {
   const landmarks = await readFile(path.join(root, "src/core/geospatial/heritage-landmarks.mjs"), "utf8");
   assert.ok(landmarks.includes("AHSAN_MANZIL_FRONT_FOCUS_OFFSET_EAST_METERS"));
   assert.match(landmarks, /AHSAN_MANZIL_ANCHOR_LONGITUDE = 90\.40606/);
@@ -116,22 +116,26 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
   assert.equal(Number(((AHSAN_MANZIL_CAMERA_TARGET.longitude - AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude) * 111319.49 * Math.cos((23.7086 * Math.PI) / 180)).toFixed(1)), 34.8);
 
   const adapter = await readFile(path.join(root, "src/core/map-engine/cesium-adapter.ts"), "utf8");
+  const cameraController = await readFile(path.join(root, "src/core/map-engine/heritage-camera-controller.ts"), "utf8");
   assert.ok(adapter.includes("focusAhsanManzil(durationMs = 1200)"));
   assert.ok(adapter.includes("focusAhsanManzilWhole(durationMs = 900)"));
   assert.ok(adapter.includes("focusAhsanManzilTopDown(durationMs = 850)"));
   assert.ok(adapter.includes("focusAhsanManzilRear(durationMs = 850)"));
   assert.ok(adapter.includes("focusAhsanManzilSide(durationMs = 850)"));
   assert.ok(adapter.includes("startAhsanManzilOrbitTour(onStopped?: () => void): void"));
-  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude"));
-  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS"));
+  assert.ok(cameraController.includes("DEFAULT_DHAKA_MAP_CAMERA.longitude"));
+  assert.ok(cameraController.includes("DEFAULT_DHAKA_MAP_CAMERA.latitude"));
+  assert.ok(cameraController.includes("DEFAULT_DHAKA_MAP_CAMERA.rangeMeters"));
+  assert.ok(cameraController.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_TARGET.longitude"));
+  assert.ok(cameraController.includes("AHSAN_MANZIL_FOOTPRINT_CAMERA_RANGE_METERS"));
   assert.ok(adapter.includes("stopAhsanManzilOrbitTour(): void"));
-  assert.ok(adapter.includes("if (wasActive) onStopped?.();"));
+  assert.ok(cameraController.includes("if (wasActive) callback?.();"));
   assert.ok(adapter.includes("orbitAhsanManzil(stepDegrees: number)"));
-  assert.ok(adapter.includes('this.flyToAhsanManzilOrbit(650, "footprint")'));
-  assert.ok(adapter.includes("flyToBoundingSphere"));
-  assert.ok(adapter.includes("AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS"));
-  assert.ok(adapter.includes("AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS"));
-  assert.ok(adapter.includes("AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND"));
+  assert.ok(cameraController.includes('this.flyToLandmark(650, "footprint")'));
+  assert.ok(cameraController.includes("flyToBoundingSphere"));
+  assert.ok(cameraController.includes("AHSAN_MANZIL_FRONT_BOUNDING_RADIUS_METERS"));
+  assert.ok(cameraController.includes("AHSAN_MANZIL_FOOTPRINT_BOUNDING_RADIUS_METERS"));
+  assert.ok(cameraController.includes("AHSAN_MANZIL_ORBIT_DEGREES_PER_SECOND"));
   assert.match(adapter, /ahsan-manzil-lod3\.glb/);
   assert.match(adapter, /Shat Gombuj Mosque/);
   assert.ok(adapter.includes("ahsan-manzil.manifest.json"));
@@ -143,7 +147,11 @@ test("the map opens on the river-facing facade and provides whole-footprint and 
 
   const mapCanvas = await readFile(path.join(root, "src/features/map/components/MapCanvas.tsx"), "utf8");
   const controls = await readFile(path.join(root, "src/features/map/components/MapControls.tsx"), "utf8");
-  assert.ok(mapCanvas.includes("engine.focusAhsanManzil(650)"));
+  assert.ok(
+    !mapCanvas.includes("engine.focusAhsanManzil(650)"),
+    "initialization must preserve the Dhaka property-discovery camera instead of auto-flying to the out-of-coverage heritage anchor",
+  );
+  assert.ok(mapCanvas.includes("engine.focusAhsanManzil(1100)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilWhole(900)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilTopDown(850)"));
   assert.ok(mapCanvas.includes("engine.focusAhsanManzilRear(850)"));

@@ -49,7 +49,7 @@ const SAMPLE_ROADS = [
     layer: 0,
     bridge: false,
     tunnel: false,
-    coordinates: [[90.4057, 23.70845], [90.4060, 23.70860], [90.4063, 23.70874]],
+    coordinates: [[90.4057, 23.70845], [90.40606, 23.70860], [90.4063, 23.70874]],
   },
   {
     id: "qa-local-road",
@@ -333,4 +333,197 @@ test("fixture building and roads pass through Cesium geometry staging with expec
     }),
     { timeout: 20_000 },
   ).toBe(true);
+});
+
+
+test("selecting a building then a road clears the previous details panel", async ({ page }) => {
+  test.setTimeout(60_000);
+  const observed = await stubMapNetwork(page);
+  const staged: {
+    buildings: Array<{ returnedFeatures?: number; renderedBuildings?: number; renderedExtrusions?: number }>;
+    roads: Array<{ returnedWays?: number; renderedWays?: number }>;
+  } = { buildings: [], roads: [] };
+
+  // A request reaching the fixture is not enough: wait until Cesium has staged
+  // the actual pickable building and road entities before driving the camera.
+  page.on("console", (message) => {
+    const args = message.args();
+    void Promise.all(args.map((arg) => arg.jsonValue().catch(() => null))).then((values) => {
+      if (values[0] === "[Overture] Building viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.buildings.push(values[1] as typeof staged.buildings[number]);
+      }
+      if (values[0] === "[Roads] Vector road viewport rendered." && values[1] && typeof values[1] === "object") {
+        staged.roads.push(values[1] as typeof staged.roads[number]);
+      }
+    });
+  });
+
+  await openReadyMap(page);
+  await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(
+    () => staged.buildings.some((summary) =>
+      summary.returnedFeatures === 1 &&
+      summary.renderedBuildings === 1 &&
+      summary.renderedExtrusions === 1
+    ),
+    { timeout: 20_000 },
+  ).toBe(true);
+  await expect.poll(
+    () => staged.roads.some((summary) => summary.returnedWays === 4 && summary.renderedWays === 4),
+    { timeout: 20_000 },
+  ).toBe(true);
+
+  // Focus the fixture anchor in a repeatable north-up camera view.
+  // The test road passes through this point, so hide roads while selecting
+  // the building to make the intended first pick unambiguous.
+  await page.getByRole("button", { name: "North-up top-down view of Ahsan Manzil" }).click();
+  await page.waitForTimeout(1_250);
+
+  const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const center = { x: box!.width / 2, y: box!.height / 2 };
+  const buildings = page.getByRole("checkbox", { name: "Overture 3D buildings" });
+  const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
+
+  await roads.uncheck({ noWaitAfter: true });
+  await expect(roads).not.toBeChecked();
+
+  // Use absolute page coordinates so canvas-locator actionability checks do
+  // not mask an actual Cesium pointer/pick regression. The canvas centre is
+  // the shared fixture anchor for both selections.
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+  const buildingDetails = page.getByRole("complementary", { name: "Building details" });
+  await expect(buildingDetails).toBeVisible({ timeout: 10_000 });
+  await expect(buildingDetails.getByRole("heading", { name: "Selected 3D Building" })).toBeVisible();
+
+  // Hiding the selected building must clear its details panel immediately.
+  await buildings.uncheck({ noWaitAfter: true });
+  await expect(buildings).not.toBeChecked();
+  await expect(buildingDetails).toHaveCount(0);
+
+  // Restore the road layer at the same map point and pick its centreline.
+  await roads.check({ noWaitAfter: true });
+  await expect(roads).toBeChecked();
+  await page.mouse.click(box!.x + center.x, box!.y + center.y);
+
+  const roadDetails = page.getByRole("complementary", { name: "Selected road details" });
+  await expect(roadDetails).toBeVisible({ timeout: 10_000 });
+  await expect(roadDetails.getByRole("heading", { name: "QA Main Road" })).toBeVisible();
+  await expect(buildingDetails).toHaveCount(0);
+
+  await roadDetails.getByRole("button", { name: "Close road details" }).click();
+  await expect(roadDetails).toHaveCount(0);
+});
+
+
+test("opt-in Dhaka 3D Tiles pilot loads the manifest and its GLB without replacing the GeoJSON layer", async ({ page }) => {
+  test.skip(
+    process.env.NEXT_PUBLIC_DHAKA_3D_TILES_PILOT !== "true",
+    "The 3D Tiles pilot is opt-in; CI sets the flag for this integration check.",
+  );
+
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{ status: string; url?: string; message?: string }>;
+    };
+    target.__dhaka3DTilesPilotEvents = [];
+    window.addEventListener("map:dhaka-3d-tiles-pilot", (event: Event) => {
+      const detail = (event as CustomEvent<{ status: string; url?: string; message?: string }>).detail;
+      target.__dhaka3DTilesPilotEvents?.push(detail);
+    });
+  });
+
+  const manifestResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/experimental/dhaka-3d-tiles-fixture/tileset.json"),
+  );
+  await stubMapNetwork(page);
+  await openReadyMap(page);
+
+  const manifestResponse = await manifestResponsePromise;
+  expect(manifestResponse.status()).toBe(200);
+  const manifest = await manifestResponse.json() as {
+    asset: {
+      version: string;
+      tilesetVersion?: string;
+      extras?: {
+        contentSha256?: string;
+        sourceFeatureId?: string;
+        placementAnchor?: { longitudeDegrees: number; latitudeDegrees: number; ellipsoidHeightMeters: number };
+        gltfCoordinateConvention?: string;
+      };
+    };
+    root: { content?: { uri?: string }; boundingVolume?: { region?: number[] }; transform?: number[] };
+  };
+  expect(manifest.asset.version).toBe("1.1");
+  expect(manifest.asset.tilesetVersion).toBe("dhaka-pilot-placement-fixture-v1");
+  expect(manifest.root.content?.uri).toBe("tiles/dhaka-pilot.glb");
+  expect(manifest.root.transform).toHaveLength(16);
+  expect(manifest.root.transform?.every(Number.isFinite)).toBe(true);
+  expect(manifest.root.boundingVolume?.region).toHaveLength(6);
+  expect(manifest.root.transform?.[6]).toBeCloseTo(Math.sin((manifest.asset.extras?.placementAnchor?.latitudeDegrees ?? 0) * Math.PI / 180), 5);
+  expect(manifest.asset.extras?.sourceFeatureId).toBeTruthy();
+  expect(manifest.asset.extras?.contentSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(manifest.asset.extras?.gltfCoordinateConvention).toBe("right-handed; X=east, Y=up, Z=south");
+  expect(manifest.asset.extras?.placementAnchor?.longitudeDegrees).toBeGreaterThan(90.39);
+  expect(manifest.asset.extras?.placementAnchor?.longitudeDegrees).toBeLessThan(90.43);
+
+  const contentUrl = new URL(manifest.root.content!.uri!, manifestResponse.url()).toString();
+  const glbResponse = await page.request.get(contentUrl);
+  expect(glbResponse.status()).toBe(200);
+  const glbBytes = await glbResponse.body();
+  expect(glbBytes.subarray(0, 4).toString("ascii")).toBe("glTF");
+
+  await expect.poll(async () => page.evaluate(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{ status: string }>;
+    };
+    return target.__dhaka3DTilesPilotEvents?.some((event) => event.status === "loaded") ?? false;
+  })).toBe(true);
+
+  const runtimeCenter = await page.evaluate(() => {
+    const target = window as Window & {
+      __dhaka3DTilesPilotEvents?: Array<{
+        status: string;
+        worldCenter?: { longitudeDegrees: number; latitudeDegrees: number; ellipsoidHeightMeters: number } | null;
+      }>;
+    };
+    return target.__dhaka3DTilesPilotEvents?.find((event) => event.status === "loaded")?.worldCenter ?? null;
+  });
+  expect(runtimeCenter).not.toBeNull();
+  const anchor = manifest.asset.extras!.placementAnchor!;
+  const latitudeErrorMeters = (runtimeCenter!.latitudeDegrees - anchor.latitudeDegrees) * 111_132;
+  const longitudeErrorMeters = (runtimeCenter!.longitudeDegrees - anchor.longitudeDegrees) *
+    111_319.49 * Math.cos(anchor.latitudeDegrees * Math.PI / 180);
+  const horizontalErrorMeters = Math.hypot(latitudeErrorMeters, longitudeErrorMeters);
+  expect(horizontalErrorMeters).toBeLessThan(3);
+  expect(runtimeCenter!.ellipsoidHeightMeters).toBeGreaterThan(-1);
+  expect(runtimeCenter!.ellipsoidHeightMeters).toBeLessThan(10);
+
+  const alignmentEvidenceResponse = await page.request.get(
+    "/experimental/dhaka-3d-tiles-fixture/alignment-review.json",
+  );
+  expect(alignmentEvidenceResponse.status()).toBe(200);
+  const alignmentEvidence = await alignmentEvidenceResponse.json() as {
+    footprintAlignment: { status: string; maximumResidualMeters: number; toleranceMeters: number };
+    cameraReview: { captureStatus: string; views: Array<{ id: string; camera: { longitudeDegrees: number; latitudeDegrees: number; headingDegrees: number; pitchDegrees: number } }> };
+    model: { glbSha256: string; tilesetSha256: string };
+  };
+  expect(alignmentEvidence.footprintAlignment.status).toBe("pass");
+  expect(alignmentEvidence.footprintAlignment.maximumResidualMeters).toBeLessThanOrEqual(
+    alignmentEvidence.footprintAlignment.toleranceMeters,
+  );
+  expect(alignmentEvidence.cameraReview.views.map((view) => view.id)).toEqual([
+    "north", "east", "south", "west", "oblique",
+  ]);
+  expect(alignmentEvidence.cameraReview.views.every((view) =>
+    Number.isFinite(view.camera.longitudeDegrees) &&
+    Number.isFinite(view.camera.latitudeDegrees) &&
+    Number.isFinite(view.camera.headingDegrees) &&
+    view.camera.pitchDegrees < 0
+  )).toBe(true);
+  expect(alignmentEvidence.cameraReview.captureStatus).toBe("not-captured-by-this-command");
+  expect(alignmentEvidence.model.glbSha256).toBe(manifest.asset.extras?.contentSha256);
+  expect(alignmentEvidence.model.tilesetSha256).toMatch(/^[a-f0-9]{64}$/);
 });

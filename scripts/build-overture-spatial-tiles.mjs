@@ -13,13 +13,18 @@ const sourcePath = path.resolve(projectRoot, sourceRelative);
 const outputPath = path.resolve(projectRoot, outputRelative);
 const tilesPath = path.join(outputPath, "tiles");
 
-const GRID_STEP_DEGREES = 0.005;
+const GRID_STEP_DEGREES = 0.01;
 const MAX_TILES_PER_FEATURE = 64;
 const TILE_COLUMNS = Math.ceil(360 / GRID_STEP_DEGREES);
 const TILE_ROWS = Math.ceil(180 / GRID_STEP_DEGREES);
 
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getRenderRole(feature) {
+  const properties = isRecord(feature.properties) ? feature.properties : {};
+  return typeof properties._renderRole === "string" ? properties._renderRole : "unknown";
 }
 
 function getFeatureIdentity(feature) {
@@ -213,7 +218,7 @@ async function main() {
           bucket = { x, y, features: [] };
           tileBuckets.set(id, bucket);
         }
-        bucket.features.push(feature);
+        bucket.features.push({ feature, identity, bounds });
       }
     }
   }
@@ -227,27 +232,69 @@ async function main() {
   for (const bucket of [...tileBuckets.values()].sort((left, right) =>
     left.x === right.x ? left.y - right.y : left.x - right.x
   )) {
+    const tileId = getTileId(bucket.x, bucket.y);
     const filename = tileFileName(bucket.x, bucket.y);
-    const tileCollection = {
-      type: "FeatureCollection",
-      name: getTileId(bucket.x, bucket.y),
-      features: bucket.features,
-    };
+    const indexFilename = filename + ".index.json";
 
+    // Ordering records spatially keeps reads for a small viewport clustered
+    // into a few byte ranges rather than forcing whole-tile JSON parsing.
+    const featureRecords = bucket.features.sort((left, right) => {
+      const leftLongitude = (left.bounds.west + left.bounds.east) / 2;
+      const rightLongitude = (right.bounds.west + right.bounds.east) / 2;
+      const leftLatitude = (left.bounds.south + left.bounds.north) / 2;
+      const rightLatitude = (right.bounds.south + right.bounds.north) / 2;
+      return leftLongitude - rightLongitude
+        || leftLatitude - rightLatitude
+        || left.identity.localeCompare(right.identity);
+    });
+    const serializedFeatures = featureRecords.map((record) =>
+      JSON.stringify(record.feature)
+    );
+    const prefix = '{"type":"FeatureCollection","name":'
+      + JSON.stringify(tileId)
+      + ',"features":[';
+    const tileContents = prefix + serializedFeatures.join(",") + "]}";
     await writeFile(
       path.join(tilesPath, filename),
-      JSON.stringify(tileCollection),
+      tileContents,
+      "utf8",
+    );
+
+    let byteOffset = Buffer.byteLength(prefix, "utf8");
+    const indexRecords = featureRecords.map((record, index) => {
+      const serialized = serializedFeatures[index];
+      const length = Buffer.byteLength(serialized, "utf8");
+      const indexRecord = {
+        identity: record.identity,
+        bounds: record.bounds,
+        role: getRenderRole(record.feature),
+        offset: byteOffset,
+        length,
+      };
+      byteOffset += length + (index < serializedFeatures.length - 1 ? 1 : 0);
+      return indexRecord;
+    });
+
+    await writeFile(
+      path.join(tilesPath, indexFilename),
+      JSON.stringify({
+        schemaVersion: 2,
+        tileId,
+        featureCount: featureRecords.length,
+        records: indexRecords,
+      }, null, 2) + "\n",
       "utf8",
     );
 
     const west = -180 + bucket.x * GRID_STEP_DEGREES;
     const south = -90 + bucket.y * GRID_STEP_DEGREES;
     tileManifest.push({
-      id: getTileId(bucket.x, bucket.y),
+      id: tileId,
       x: bucket.x,
       y: bucket.y,
       file: `tiles/${filename}`,
-      featureCount: bucket.features.length,
+      indexFile: `tiles/${indexFilename}`,
+      featureCount: featureRecords.length,
       bounds: {
         west,
         south,
@@ -255,7 +302,7 @@ async function main() {
         north: Math.min(90, south + GRID_STEP_DEGREES),
       },
     });
-    tileFeatureCopies += bucket.features.length;
+    tileFeatureCopies += featureRecords.length;
   }
 
   if (oversizedFeatures.length > 0) {
@@ -271,7 +318,7 @@ async function main() {
   }
 
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     sourceFile: sourceRelative,
     gridStepDegrees: GRID_STEP_DEGREES,
     maxTilesPerFeature: MAX_TILES_PER_FEATURE,

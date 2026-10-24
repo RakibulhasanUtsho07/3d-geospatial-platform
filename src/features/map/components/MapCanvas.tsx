@@ -11,6 +11,7 @@ import type { BuildingSearchResult } from "@/core/geospatial/building-search.mjs
 import type { NearbyPlace } from "@/core/geospatial/nearby-places.mjs";
 import type { PropertyListing } from "@/core/geospatial/property-listings.mjs";
 import type { RoadFeature } from "@/core/geospatial/road-network.mjs";
+import { MAP_LAYER_IDS } from "@/core/map-engine/types";
 import type {
   BuildingStyleAssignment,
   GeneratedModelDefinition,
@@ -168,12 +169,14 @@ export default function MapCanvas({
 
         setLayers(engine.getLayers());
 
-        /* Start with a centred, target-framed view that shows the entire palace. */
-        engine.focusAhsanManzil(650);
-
+        // CesiumAdapter has already configured the Dhaka property-discovery
+        // camera inside the committed Overture building-data coverage. Do not
+        // immediately override it with the separate Ahsan Manzil heritage preset:
+        // that anchor is outside the current pilot coverage and produces an
+        // empty initial building viewport.
         setStatus("ready");
 
-        console.info("[MapCanvas] Ahsan Manzil 3D map is ready.");
+        console.info("[MapCanvas] 3D map is ready.");
       } catch (error: unknown) {
         console.error(
           "[MapCanvas] Map initialization failed:",
@@ -501,6 +504,26 @@ export default function MapCanvas({
 
     engine.setLayerVisibility(layerId, visible);
     setLayers(engine.getLayers());
+
+    if (visible) return;
+
+    // A hidden layer must not leave a stale details panel or building preview
+    // active for a feature the user can no longer see or select.
+    const hidesCurrentSelection =
+      (layerId === MAP_LAYER_IDS.overtureBuildings && selectedFeature !== null) ||
+      (layerId === MAP_LAYER_IDS.roads && selectedRoad !== null) ||
+      (layerId === MAP_LAYER_IDS.nearbyPlaces && selectedPlace !== null) ||
+      (layerId === MAP_LAYER_IDS.propertyListings && selectedProperty !== null);
+
+    if (!hidesCurrentSelection) return;
+
+    if (layerId === MAP_LAYER_IDS.propertyListings) {
+      cancelNearbyServiceRequest();
+    }
+    engine.clearFeatureSelection();
+    if (layerId === MAP_LAYER_IDS.overtureBuildings) {
+      onSelectedFeatureChangeRef.current?.(null);
+    }
   }
 
   function cancelNearbyServiceRequest() {

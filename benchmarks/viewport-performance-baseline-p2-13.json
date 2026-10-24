@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "benchmark": "p2.13-viewport-performance-baseline",
+  "capturedAt": "2026-10-24T14:55:37.302Z",
+  "source": {
+    "workflowRunId": 40104416317,
+    "workflowRunUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40104416317",
+    "sourcePullRequest": 142,
+    "pullRequestHeadSha": "827e8ae7625358ccb9db076258bf12988d15c034",
+    "ciCandidateSha": "8e12edcdd20d7b6b1750549e676896d710fda709",
+    "note": "Captured from the successful P2.13 trend-report log for the same CI run; this versioned snapshot becomes the explicit comparison baseline."
+  },
+  "spatialTileManifestSha256": "9a5c59a08b37c3661a2c31a250c168e7f9d87d200bb0d9b316a4aa1939cd6e63",
+  "crossProcess": {
+    "deterministicMetricsMatch": true,
+    "sameOrderedFeatureHash": true,
+    "coldIndexReadsVerifiedOnBothProcesses": true,
+    "zeroWarmIndexReadsVerifiedOnBothProcesses": true,
+    "processA": {
+      "coldMs": 168.94,
+      "warmMedianMs": 66.28,
+      "warmP95Ms": 88.49,
+      "coldIndexReadBytes": 4442393,
+      "coldGeometryReadBytes": 2532626,
+      "coldCombinedReadReductionRatio": 0.2256,
+      "warmIndexReadBytes": 0,
+      "warmGeometryReadBytes": 12663130,
+      "warmGeometryPayloadReductionRatio": 0.7188
+    },
+    "processB": {
+      "coldMs": 171.49,
+      "warmMedianMs": 57.96,
+      "warmP95Ms": 72.59,
+      "coldIndexReadBytes": 4442393,
+      "coldGeometryReadBytes": 2532626,
+      "coldCombinedReadReductionRatio": 0.2256,
+      "warmIndexReadBytes": 0,
+      "warmGeometryReadBytes": 12663130,
+      "warmGeometryPayloadReductionRatio": 0.7188
+    },
+    "latencyDifferencesMs": {
+      "cold": 2.55,
+      "warmMedian": -8.32
+    }
+  },
+  "browserWorkload": {
+    "viewportRequestCount": 11,
+    "deliveredRequestCount": 10,
+    "cancelledRequestCount": 1,
+    "failedRequestCount": 0,
+    "fetchAbortSignalCount": 1,
+    "staleDelayedFetchSignalAborted": true,
+    "staleDelayedResponseNotStaged": true,
+    "latestViewportStaged": true,
+    "selectedTileLoads": 8,
+    "availableSpatialTileCount": 21,
+    "fetchCost": {
+      "measuredRequestCount": 11,
+      "fullSelectedTilePayloadBaselineBytes": 9111152,
+      "indexBytesReadDuringWorkload": 0,
+      "selectedFeatureGeometryReadBytes": 2971816,
+      "combinedIndexAndGeometryReadBytes": 2971816,
+      "geometryPayloadReductionRatio": 0.6738,
+      "combinedReadReductionRatio": 0.6738,
+      "geometryFetchBudgetViolations": 0
+    }
+  },
+  "firstBuildingReadiness": {
+    "requestStartToRenderedBuildingStageMs": 3299,
+    "responseBodyEndToRenderedBuildingStageMs": 3070.5,
+    "buildingStageToPostRenderFrameMs": 535.7,
+    "returnedFeatures": 3000,
+    "renderedBuildings": 3000,
+    "postRenderFrameSequence": 20,
+    "allStagesHaveFollowingFrame": true
+  },
+  "memory": {
+    "retainedHeapGrowthBytes": -551996,
+    "transientPeakGrowthBytes": 4364576,
+    "heapTrendBytesPerMovementSample": -618853.57,
+    "domNodeGrowth": 8,
+    "sampleCount": 11,
+    "guardPassed": true
+  }
+}
