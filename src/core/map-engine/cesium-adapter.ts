@@ -82,6 +82,14 @@ type PerformanceDiagnosticsWindow = Window & {
   __MAP_ENGINE_PERFORMANCE__?: MapPerformanceDiagnosticsHandle;
 };
 
+type WorkloadRequestLifecycleDiagnostics = {
+  intentRevision: number;
+  loadInProgress: boolean;
+  hasActiveEndpoint: boolean;
+  hasAbortController: boolean;
+  hasPendingRequest: boolean;
+};
+
 type WorkloadFrameDiagnostics = {
   frameCount: number;
   lastFrameAtMs: number;
@@ -94,6 +102,8 @@ type WorkloadFrameDiagnostics = {
     cameraBoundsChanged: boolean;
     viewportWidthDegrees: number | null;
     viewportHeightDegrees: number | null;
+    lifecycleBefore: WorkloadRequestLifecycleDiagnostics;
+    lifecycleAfter: WorkloadRequestLifecycleDiagnostics;
   } | null;
 };
 
@@ -277,8 +287,9 @@ export class CesiumAdapter implements MapEngine {
         return null;
       }
 
-      const intentRevisionBefore = this.buildingViewportManager.getIntentRevision();
-      const loadInProgress = this.buildingViewportManager.isLoadInProgress();
+      const lifecycleBefore = this.buildingViewportManager.getRequestLifecycleDiagnostics();
+      const intentRevisionBefore = lifecycleBefore.intentRevision;
+      const loadInProgress = lifecycleBefore.loadInProgress;
       const boundsBeforeMove = this.getPaddedViewportBounds(viewer, currentCesium);
 
       // The test intentionally holds the active viewport response. Move the
@@ -290,11 +301,14 @@ export class CesiumAdapter implements MapEngine {
 
       const boundsAfterMove = this.getPaddedViewportBounds(viewer, currentCesium);
       this.handleCameraMoveEnd(viewer, currentCesium);
+      const lifecycleAfter = this.buildingViewportManager.getRequestLifecycleDiagnostics();
 
       return {
         loadInProgress,
         intentRevisionBefore,
-        intentRevisionAfter: this.buildingViewportManager.getIntentRevision(),
+        intentRevisionAfter: lifecycleAfter.intentRevision,
+        lifecycleBefore,
+        lifecycleAfter,
         cameraBoundsChanged: Boolean(
           boundsBeforeMove &&
           boundsAfterMove &&
