@@ -336,7 +336,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await expect.poll(() => roadRoutes.length, { timeout: 15_000 }).toBeGreaterThan(0);
 
   const initial = await page.evaluate(() => {
-    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
     const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
@@ -397,7 +397,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   }));
   const finalMemory = await page.evaluate(() => {
-    const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
     const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
@@ -556,7 +556,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     ],
   };
 
-  assert.equal(report.renderStages.latestBuildingRequestWasStaged, true, "Latest viewport request must be the viewport ultimately staged to Cesium.");
+  assert.equal(report.renderStages.latestViewportRequestWasStaged, true, "Latest viewport request must be the viewport ultimately staged to Cesium.");
 
   const reportPath = path.join(OUTPUT_DIRECTORY, "dynamic-viewport-workload.json");
   const reportBytes = Buffer.from(JSON.stringify(report, null, 2) + "\n");
