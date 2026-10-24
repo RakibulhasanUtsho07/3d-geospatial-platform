@@ -156,7 +156,9 @@
     "test:feature-picking-controller": "node --test tests/feature-picking-controller.test.mjs",
     "test:feature-pick-geometry": "node --test tests/feature-pick-geometry.test.mjs",
     "benchmark:viewport-trend-report": "node scripts/build-viewport-performance-trend.mjs",
-    "test:viewport-trend-report": "node --test tests/viewport-performance-trend.test.mjs"
+    "test:viewport-trend-report": "node --test tests/viewport-performance-trend.test.mjs",
+    "benchmark:viewport-baseline-compare": "node scripts/compare-viewport-performance-baseline.mjs",
+    "test:viewport-baseline-compare": "node --test tests/viewport-performance-baseline-comparison.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
