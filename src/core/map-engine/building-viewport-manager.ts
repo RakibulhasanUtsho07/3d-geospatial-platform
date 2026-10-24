@@ -106,6 +106,26 @@ export class BuildingViewportManager {
     return this.intentRevision;
   }
 
+  /**
+   * Minimal, coordinate-free lifecycle state for the opt-in browser workload.
+   * This does not expose active URLs or feature payloads.
+   */
+  getRequestLifecycleDiagnostics(): {
+    intentRevision: number;
+    loadInProgress: boolean;
+    hasActiveEndpoint: boolean;
+    hasAbortController: boolean;
+    hasPendingRequest: boolean;
+  } {
+    return {
+      intentRevision: this.intentRevision,
+      loadInProgress: this.loadInProgress,
+      hasActiveEndpoint: this.activeEndpoint !== null,
+      hasAbortController: this.requestAbortController !== null,
+      hasPendingRequest: this.pendingRequest !== null,
+    };
+  }
+
   isViewportCoveredByLoadedData(
     bounds: BuildingViewportBounds,
     requiredFeatureLimit: number,
