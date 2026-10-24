@@ -147,8 +147,16 @@ export function buildRepeatabilityReport(sampleReports, metadata = {}) {
       note: "Pooled warm observations are clustered within fresh processes; the per-process warm-median distribution is the more conservative unit for process-to-process variability. Millisecond values are not hard-gated.",
     },
     byteCost: {
-      coldGeometryReadBytes: summarizeLatency(coldGeometryBytes),
-      warmGeometryReadBytesAcrossEachProcess: summarizeLatency(warmGeometryBytes),
+      coldGeometryReadBytes: {
+        sampleCount: coldGeometryBytes.length,
+        samples: coldGeometryBytes,
+        allEqual: new Set(coldGeometryBytes).size === 1,
+      },
+      warmGeometryReadBytesAcrossEachProcess: {
+        sampleCount: warmGeometryBytes.length,
+        samples: warmGeometryBytes,
+        allEqual: new Set(warmGeometryBytes).size === 1,
+      },
       coldIndexReadBytes: samples.map((sample) => sample.cold.indexReadBytes),
       warmIndexReadBytes: samples.map((sample) => sample.warm.totalIndexReadBytes),
       sameColdGeometryBytesAcrossProcesses: new Set(coldGeometryBytes).size === 1,
