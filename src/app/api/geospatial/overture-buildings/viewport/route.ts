@@ -845,7 +845,7 @@ async function readSelectedTileFeatures(
   dataSignature: string,
   cacheStats: { hits: number; misses: number },
 ): Promise<IndexedTileFeatureRead | null> {
-  if (!/^tiles\\/x\\d+_y\\d+\\.geojson$/.test(relativeFile)) {
+  if (!/^tiles\/x\d+_y\d+\.geojson$/.test(relativeFile)) {
     return null;
   }
   if (records.length === 0) return { features: [], bytesRead: 0 };
