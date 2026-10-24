@@ -337,7 +337,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   const initial = await page.evaluate(() => {
     const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number } }).memory;
-    const canvas = document.querySelector("#cesium-map-container canvas") as HTMLCanvasElement | null;
+    const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
       sampledAt: new Date().toISOString(),
@@ -398,7 +398,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   }));
   const finalMemory = await page.evaluate(() => {
     const memory = (performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
-    const canvas = document.querySelector("#cesium-map-container canvas") as HTMLCanvasElement | null;
+    const canvas = document.querySelector('[data-testid="cesium-map-container"] canvas') as HTMLCanvasElement | null;
     const rect = canvas?.getBoundingClientRect();
     return {
       sampledAt: new Date().toISOString(),
