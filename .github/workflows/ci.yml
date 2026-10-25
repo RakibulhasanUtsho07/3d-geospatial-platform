@@ -493,6 +493,7 @@ jobs:
 
           node --input-type=module <<'NODE'
           const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+          const fetchWithTimeout = (url, options = {}) => fetchWithTimeout(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
@@ -631,6 +632,7 @@ jobs:
           # Readiness probes use invalid bounds, so both servers' tile indexes are still cold.
           node --input-type=module <<'NODE'
           const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+          const fetchWithTimeout = (url, options = {}) => fetchWithTimeout(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3001/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
