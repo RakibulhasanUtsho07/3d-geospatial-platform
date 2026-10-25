@@ -57,6 +57,23 @@ def scene_bounds(mesh_objects):
     center = Vector([(minimum[axis] + maximum[axis]) / 2.0 for axis in range(3)])
     return minimum, maximum, dimensions, center
 
+def projected_bounds_size(minimum, maximum, center, camera):
+    """Project the eight world-AABB corners into camera space for crop-safe framing."""
+    rotation = camera.rotation_euler.to_matrix()
+    camera_right = rotation @ Vector((1.0, 0.0, 0.0))
+    camera_up = rotation @ Vector((0.0, 1.0, 0.0))
+    projected = []
+    for x in (minimum[0], maximum[0]):
+        for y in (minimum[1], maximum[1]):
+            for z in (minimum[2], maximum[2]):
+                relative = Vector((x, y, z)) - center
+                projected.append((relative.dot(camera_right), relative.dot(camera_up)))
+    width = max(point[0] for point in projected) - min(point[0] for point in projected)
+    height = max(point[1] for point in projected) - min(point[1] for point in projected)
+    if not math.isfinite(width) or not math.isfinite(height) or min(width, height) <= 1e-6:
+        raise RuntimeError("Projected camera bounds are invalid; refusing to generate a misleading render")
+    return width, height
+
 def sample_pixel_statistics(image, resolution):
     total = int(image.size[0] * image.size[1])
     if total < 1:
@@ -111,7 +128,6 @@ def main():
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
-    ortho_scale = max_dimension * 1.45
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -165,9 +181,20 @@ def main():
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
         camera_data.type = camera_type
-        camera_data.ortho_scale = ortho_scale
         camera.location = center + direction * camera_distance
         camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        projected_width, projected_height = projected_bounds_size(minimum, maximum, center, camera)
+        # Fit each view to its own projected bounds instead of using the global
+        # longest dimension for every axis. This preserves a safety margin while
+        # making side/end and oblique review views large enough to inspect.
+        ortho_scale = max(projected_width, projected_height) * 1.12
+        if not math.isfinite(ortho_scale) or ortho_scale <= 0.0:
+            raise RuntimeError("Calculated orthographic scale is invalid")
+        camera_data.ortho_scale = ortho_scale
+        width_fill = projected_width / ortho_scale
+        height_fill = projected_height / ortho_scale
+        if max(width_fill, height_fill) < 0.70 or max(width_fill, height_fill) > 0.91:
+            raise RuntimeError("Projected bounds do not fit the expected camera frame: " + view_id)
         scene.camera = camera
         filename = view_id + ".png"
         rendered_path = os.path.join(output_dir, filename)
@@ -186,6 +213,13 @@ def main():
             "width": resolution,
             "height": resolution,
             "renderComplete": True,
+            "framing": {
+                "orthographicScale": round(float(ortho_scale), 8),
+                "projectedBoundsWidth": round(float(projected_width), 8),
+                "projectedBoundsHeight": round(float(projected_height), 8),
+                "widthFillRatio": round(float(width_fill), 6),
+                "heightFillRatio": round(float(height_fill), 6),
+            },
             "pixelStatistics": stats,
         })
         bpy.data.objects.remove(camera, do_unlink=True)
