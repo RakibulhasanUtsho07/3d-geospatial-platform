@@ -190,7 +190,7 @@
   ],
   "visualReview": {
     "contactSheet": "contact-sheet.png",
-    "status": "13-view render and hash validation passed; visual-fidelity acceptance remains pending; a current contact-sheet review found unresolved roof-detail, material/texture, and side/back framing issues.",
+    "status": "13/13 deterministic renders completed and screenshot SHA-256 values verified. Manual review confirms the framing correction, but architectural visual-fidelity and release acceptance remain pending.",
     "findings": [
       "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
       "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -202,15 +202,66 @@
       "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
       "Human review of the exact generated 13-view contact sheet found the top view dominated by a broad, nearly blank roof deck with insufficient roof-level architectural detail; visual completeness is not accepted.",
-      "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
-      "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
+      "Manual review of the regenerated front.png confirms the Rangmahal facade and stair are fully visible and centred; the previous rear/left-wing crop is removed. This passes camera framing only, not facade proportions or architectural fidelity.",
+      "Manual review confirms per-view projected-bounds fitting made left/right and oblique views large enough for useful inspection; back elevation is fully visible. Architectural acceptance of these views remains pending because their wall detail and proportions are not independently verified.",
       "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
-      "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
+      "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance.",
+      "Manual review of front.png and the contact sheet found a broad plain upper spandrel/roofline band, simplified facade surfaces, and visibly faceted dome; these remain unaccepted visual-quality issues.",
+      "Geometry QA reports 83,716 triangles with 1,964 degenerate triangles (2.346%) plus long-edge, non-manifold, open-boundary, disconnected-component and small-component warnings. Status remains review-recommended, with publication eligibility false.",
+      "Texture QA reports zero images, zero textures, zero UV accessors and all 21 primitives untextured. The flat material appearance is not a photorealistic texture pass.",
+      "Do not invent rooftop or facade detail to fill gaps; use permission-cleared references and measured elevations to guide the next correction."
     ],
     "residualRisks": [
       "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
       "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
     ],
-    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
+    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility.",
+    "reviewedOn": "2026-10-25",
+    "manualReview": {
+      "reviewedViews": [
+        {
+          "id": "front",
+          "sha256": "7ba1f44b777cc03f8661392299c67e135da6c30d8365b78ee34c1a9b27ed3a9b",
+          "assessment": "FRAMING_PASS_ONLY",
+          "finding": "Rangmahal facade and staircase are fully within frame and centred; the earlier rear/left-wing crop is gone. Plain upper spandrel/roofline band and flat surface appearance remain visual defects."
+        },
+        {
+          "id": "back",
+          "sha256": "db6b8372c7ae637be33c28e76812906e64a5b75890744ffd6203ee3b838a3d68",
+          "assessment": "FRAME_VISIBLE_FIDELITY_PENDING",
+          "finding": "Full long rear elevation visible. It occupies a narrow height in the square image due to the building's long, low proportions; detailed acceptance still needs elevation references."
+        },
+        {
+          "id": "left",
+          "sha256": "0a76ea1b24674ce9ab0a8af79988b4fa2f44b9146f4500935fc6a52f94bb0487",
+          "assessment": "FRAMING_PASS_FIDELITY_PENDING",
+          "finding": "Side elevation and full stair outline are visible at useful scale, but wall surfaces remain simplified and the stair side profile needs reference comparison."
+        },
+        {
+          "id": "right",
+          "sha256": "2fae5986e78fbb2bf331a00bbf77b1a879a14f9b95670812031ab5e66a45db82",
+          "assessment": "FRAMING_PASS_FIDELITY_PENDING",
+          "finding": "Side elevation and stair outline are visible at useful scale; no independent reference dimensions were available to accept proportions."
+        },
+        {
+          "id": "top",
+          "sha256": "42ca88c7f021feb7db89fd27731192241bdaee3b625f3da355db2713225faf43",
+          "assessment": "FOOTPRINT_VISIBLE_ROOF_DETAIL_PENDING",
+          "finding": "Complete footprint is visible. Roof deck remains broad and mostly undecorated; no roof details were invented without reference evidence."
+        },
+        {
+          "id": "contact-sheet",
+          "sha256": "f642312f4d27907f54c4b08981487659fd554c35ae040dd5567aed903ccae370",
+          "assessment": "13_VIEWS_INSPECTED_VISUAL_FIDELITY_PENDING",
+          "finding": "Side/back camera fitting is visibly improved. Dome and facade remain stylized; several oblique silhouettes and blank upper roofline band still need source-backed review."
+        }
+      ],
+      "overallDecision": "ACCEPT_CAMERA_FRAMING_CORRECTION_ONLY; DO_NOT_PASS_ARCHITECTURAL_FIDELITY_OR_RELEASE",
+      "evidenceLimitations": [
+        "This review checks the generated renders and hashes, not historical accuracy.",
+        "GLB model-space units remain unverified against an independent survey.",
+        "No permission-cleared multi-view reference package and independent dimensions were available for this model during this correction pass."
+      ]
+    }
   }
 }
