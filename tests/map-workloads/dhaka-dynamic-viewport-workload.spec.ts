@@ -330,6 +330,15 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   await page.setViewportSize({ width: 1600, height: 950 });
   await page.goto("/map", { waitUntil: "domcontentloaded", timeout: 60_000 });
+
+  // The map UX intentionally keeps the layer list collapsed at startup.
+  // Open it before asserting the road-layer control is ready; otherwise the
+  // accessibility query cannot discover a checkbox in the collapsed panel.
+  const layersToggle = page.getByRole("button", { name: /Map layers/i });
+  await expect(layersToggle).toBeVisible({ timeout: 45_000 });
+  await expect(layersToggle).toHaveAttribute("aria-expanded", "false");
+  await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
