@@ -62,6 +62,9 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Recessed timber door with an arched glazed head"));
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[andarGf,andarFf],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [andarGf, andarFf], 6, lod,andarCenterZ,andarDepth);'));
+  assert.ok(builder.includes("const areaVector = cross(sub(b, a), sub(c, a));"));
+  assert.ok(builder.includes("if (Math.hypot(...areaVector) <= 1e-9) return;"),
+    "degenerate triangles are filtered before they enter the generated GLB");
   assert.ok(builder.includes("function fillRectLouverWindow("));
   assert.ok(builder.includes('"#45674D"'), "LOD3 facade includes green shutter details from the reference scene");
   assert.ok(builder.includes("Upper-storey triple-arched loggia."));
