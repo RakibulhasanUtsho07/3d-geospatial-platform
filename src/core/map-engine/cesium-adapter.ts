@@ -10,6 +10,7 @@ import {
 import { clampViewportBoundsToLocalWindow } from "./viewport-bounds-policy.mjs";
 import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
 import { createMapPerformanceTelemetry } from "./performance-telemetry.mjs";
+import { appendImageryTileErrorDiagnostic } from "./imagery-tile-error-diagnostics.mjs";
 import type {
   MapPerformanceMetric,
   MapPerformanceOutcome,
@@ -204,6 +205,7 @@ export class CesiumAdapter implements MapEngine {
   private baseImageryLayer:
     | import("cesium").ImageryLayer
     | null = null;
+  private imageryErrorUnsubscribe: (() => boolean) | null = null;
 
   private readonly roadLayerManager = new RoadLayerManager();
   private readonly roadSelectionListeners = new Set<(road: RoadFeature | null) => void>();
@@ -522,6 +524,22 @@ export class CesiumAdapter implements MapEngine {
           url: "https://tile.openstreetmap.org/",
           credit: "© OpenStreetMap contributors",
         });
+
+      // A red/partial raster patch appeared in one earlier real-Dhaka capture
+      // despite successful HTTP statuses. Record provider-level tile errors so
+      // future screenshots can distinguish imagery decode/load faults from
+      // building geometry and overlay behavior. Never persist source tile URLs.
+      this.imageryErrorUnsubscribe?.();
+      this.imageryErrorUnsubscribe = imageryProvider.errorEvent.addEventListener((error) => {
+        const diagnostic = appendImageryTileErrorDiagnostic(
+          window as unknown as Record<string, unknown>,
+          error,
+        );
+        window.dispatchEvent(new CustomEvent("map:imagery-tile-error", {
+          detail: diagnostic,
+        }));
+        console.warn("[Map] OSM imagery tile error.", diagnostic);
+      });
 
       this.baseImageryLayer =
         viewer.imageryLayers.addImageryProvider(
@@ -2329,6 +2347,8 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 
+    this.imageryErrorUnsubscribe?.();
+    this.imageryErrorUnsubscribe = null;
     this.baseImageryLayer = null;
     this.overtureBuildings = null;
     this.nearbyPlacesRevision += 1;
