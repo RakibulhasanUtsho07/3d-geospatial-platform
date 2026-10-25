@@ -73,6 +73,7 @@ test("un-pinned media hashes and unsolved vertical datum remain incomplete", () 
   const result = assessBuildingAccuracyEvidencePack(pack([item, building("house", "ordinary-low-rise")]));
   assert.equal(result.status, "benchmark-incomplete");
   assert.ok(result.checks.some((entry) => entry.id === "source-media-rights-and-side-coverage" && entry.status === "passed"));
+  assert.ok(result.buildings[0].checks.some((entry) => entry.id === "source-media-hash-pins" && entry.status === "warning"));
   assert.ok(result.buildings[0].checks.some((entry) => entry.id === "vertical-datum-evidence" && entry.status === "warning"));
 });
 test("candidate geometry failure or an explicitly mismatched view fails closed", () => {

@@ -68,6 +68,9 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       nonEmpty(item.sourceId) && nonEmpty(item.rightsEvidenceId) && nonEmpty(item.verifiedBy) && dateOk(item.verifiedAt));
     add("source-media-rights-and-side-coverage", mediaRights,
       "At least four hash-verified source photos/videos must cover front, back, left and right with documented rights evidence.");
+    add("source-media-hash-pins", sourceMedia.length > 0 &&
+      sourceMedia.every((item) => sameHash(item.expectedSha256, item.sha256)),
+      "Pin the expected SHA-256 for every source asset after reviewing the bootstrap report.");
 
     const referenceImages = Array.isArray(building.referenceImages) ? building.referenceImages : [];
     const referenceIds = new Set();
@@ -85,6 +88,9 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
     referencesValid = referencesValid && REQUIRED_SOURCE_SIDES.every((side) => referenceSides.has(side));
     add("reference-image-rights-and-side-coverage", referencesValid,
       "Need at least four unique, hash-verified independent references with rights provenance and all four side views.");
+    add("reference-image-hash-pins", referenceImages.length > 0 &&
+      referenceImages.every((item) => sameHash(item.expectedSha256, item.sha256)),
+      "Pin the expected SHA-256 for every independent reference image after reviewing the bootstrap report.");
 
     const render = building.renderEvidence ?? {};
     const views = Array.isArray(render.views) ? render.views : [];
