@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "bangabhaban-dhaka-reference-pack",
+  "building": {
+    "name": "Bangabhaban",
+    "aliases": [
+      "Bongobhobon",
+      "Bangabhavan"
+    ],
+    "type": "official presidential residence and office",
+    "city": "Dhaka",
+    "area": "Dilkusha",
+    "approximateCoordinates": {
+      "latitude": 23.723302,
+      "longitude": 90.41782,
+      "confidence": "[C]",
+      "basis": "Coordinates listed for the 2006 aerial reference image viewpoint, NOT a surveyed building centroid."
+    }
+  },
+  "purpose": "Reference intake and evidence-gated reconstruction pilot for the platform's multi-building reconstruction engine.",
+  "reconstructionStatus": "reference-intake-only",
+  "geometryPolicy": {
+    "dimensions": {
+      "status": "unknown",
+      "basis": "No independent measured building dimensions verified in this pack.",
+      "mustNotInferFrom": "aerial image pixels, video frames, news descriptions, or compound area"
+    },
+    "footprint": {
+      "status": "not-traced",
+      "requirement": "Trace the main building footprint from suitable overhead imagery and validate against independent geospatial data."
+    },
+    "model": {
+      "status": "not-generated",
+      "publicationEligible": false,
+      "reason": "No independently measured dimensions, traced footprint, calibrated multi-view set, or candidate GLB QA evidence yet."
+    }
+  },
+  "sources": [
+    {
+      "id": "official-location",
+      "kind": "official-text",
+      "title": "বঙ্গভবনের অবস্থান — রাষ্ট্রপতির কার্যালয়",
+      "url": "https://bangabhaban.gov.bd/pages/static-pages/694032d935ce18e1c0563692",
+      "supports": [
+        "Bangabhaban is the President's office and residence",
+        "Dilkusha area, central Dhaka"
+      ],
+      "license": "Government information page; factual citation only; do not treat page text as a geometry measurement."
+    },
+    {
+      "id": "licensed-aerial-2006",
+      "kind": "image",
+      "title": "Bangabhaban.jpg — aerial view",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
+      "date": "2006-11-25",
+      "creator": "Naira Al Husain",
+      "license": "CC BY-SA 4.0",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "sha256": null,
+      "downloaded": false,
+      "usableFor": [
+        "compound-level context and approximate site orientation"
+      ],
+      "notUsableAs": [
+        "independent dimension survey",
+        "facade texture without confirming resolution and suitability"
+      ],
+      "notes": "Commons page records a free-use permission and CC BY-SA 4.0; download and hash the exact file before using it in reproducible tests."
+    },
+    {
+      "id": "commons-category",
+      "kind": "image-index",
+      "title": "Bangabhaban media category — Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/Category:Bangabhaban",
+      "license": "Per-file; verify each file page individually",
+      "usableFor": [
+        "finding additional facade/context references"
+      ],
+      "notes": "Category includes aerial, gate/wall, and event images; interior event photos are not necessarily exterior geometry references."
+    },
+    {
+      "id": "official-video-2016",
+      "kind": "video-reference",
+      "title": "BANGABHABAN || Office of the President of Bangladesh",
+      "url": "https://www.youtube.com/watch?v=RqnsvatJGCw",
+      "publisher": "BATAYON",
+      "date": "2016-02-25",
+      "license": "Copyright status not established for reuse",
+      "downloaded": false,
+      "usableFor": [
+        "visual orientation and contextual research only"
+      ],
+      "notUsableFor": [
+        "texture baking or redistribution without permission"
+      ],
+      "notes": "Video description states the main complex is three storeys and describes a roughly 23.5-hectare compound; compound area is not building footprint area."
+    },
+    {
+      "id": "published-history-2026",
+      "kind": "published-article",
+      "title": "New president to move into Bangabhaban today, let’s look for century-old building’s history",
+      "url": "https://en.prothomalo.com/bangladesh/government/eyc4gdsa5h",
+      "date": "2026",
+      "supports": [
+        "published historical account of 1905–1911 original timber palace",
+        "reported later palace reconstruction and 1964 two-storey building"
+      ],
+      "notes": "Article reports 84,000 square feet for the later building; treat as published secondary-source figure, not an independent survey. Resolve the area definition and current additions before using it as a dimensional constraint."
+    },
+    {
+      "id": "official-photo-gallery",
+      "kind": "official-image-index",
+      "title": "ফটোগ্যালারি — রাষ্ট্রপতির কার্যালয়",
+      "url": "https://bangabhaban.gov.bd/pages/photo-galleries/",
+      "license": "Per-image rights must be checked before reuse",
+      "usableFor": [
+        "finding official event and interior context"
+      ],
+      "notUsableFor": [
+        "automatically assumed reusable texture assets"
+      ]
+    }
+  ],
+  "acceptanceGates": [
+    "Every downloaded reference file has source URL, license/rights decision, byte length and SHA-256.",
+    "Exterior references are classified by facade, approximate camera pose, date, and visible occlusion; unknown pose remains unknown.",
+    "Building dimensions are sourced to independent survey or clearly tagged published measurement with a tolerance and axis mapping.",
+    "Compound area is never substituted for building footprint or floor area.",
+    "Candidate GLB is tested by geometry QA, UV/texture QA, deterministic multi-view renders, and independent reference review.",
+    "No visual fidelity or release pass is inferred from a successful build or a valid GLB alone."
+  ]
+}
