@@ -9,9 +9,12 @@ on:
       - "src/core/map-engine/**"
       - "src/core/geospatial/**"
       - "data/overture/**"
+      - "public/data/roads/**"
       - "scripts/benchmark-map-browser.mjs"
+      - "scripts/validate-real-dhaka-baseline.mjs"
       - "scripts/prepare-dhaka-road-extract.mjs"
       - "tests/map-browser-baseline.test.mjs"
+      - "tests/real-dhaka-baseline-validation.test.mjs"
       - "tests/offline-road-extract.test.mjs"
       - "tests/prepare-dhaka-road-extract.test.mjs"
       - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
@@ -88,6 +91,13 @@ jobs:
           fi
 
           npm run benchmark:map-browser
+
+      - name: Verify six real-Dhaka cold/warm samples, input hashes, and road rendering
+        if: success()
+        run: >-
+          npm run verify:real-dhaka-baseline --
+          "artifacts/real-dhaka-baseline/${GITHUB_SHA}/report.json"
+          "--expected-commit-sha=${GITHUB_SHA}"
 
       - name: Upload real-Dhaka report, screenshots, and server logs
         if: always()
