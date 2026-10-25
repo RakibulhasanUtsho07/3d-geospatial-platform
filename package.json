@@ -40,7 +40,7 @@
     "test:road-layer-manager": "node --test tests/road-layer-manager-boundary.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
     "pretest:heritage-model": "npm run build:heritage-model",
-    "test:heritage-model": "node --test tests/heritage-model.test.mjs",
+    "test:heritage-model": "node --test tests/heritage-model.test.mjs tests/ahsan-manzil-generated-glb-qa.test.mjs",
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
     "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
