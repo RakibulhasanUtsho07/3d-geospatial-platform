@@ -65,7 +65,7 @@ export function validateHeritageReferenceRegistry(registry) {
     if (!ALLOWED_ROLES.has(source.viewRole)) errors.push(label + "-view-role-invalid");
     else roles.add(source.viewRole);
     if (!isHttpsHost(source.sourcePageUrl, "commons.wikimedia.org")) errors.push(label + "-source-page-host-invalid");
-    if (!isHttpsHost(source.downloadUrl, "commons.wikimedia.org")) errors.push(label + "-download-host-invalid");
+    if (!isHttpsHost(source.downloadUrl, "commons.wikimedia.org") && !isHttpsHost(source.downloadUrl, "upload.wikimedia.org")) errors.push(label + "-download-host-invalid");
     if (typeof source.attribution !== "string" || !source.attribution.trim()) errors.push(label + "-attribution-missing");
     if (source.license !== "CC BY-SA 4.0" ||
         source.licenseUrl !== "https://creativecommons.org/licenses/by-sa/4.0/") {
