@@ -56,3 +56,8 @@ test("road lifecycle APIs abort stale work and clear per-viewport state", () => 
   assert.match(manager, /cancelPendingRequest\(\): void[\s\S]*?this\.roadRequestAbortController\?\.abort\(\)/);
   assert.match(manager, /destroy\(\): void[\s\S]*?this\.roadByEntityId\.clear\(\)[\s\S]*?this\.loadedRoadBounds = null/);
 });
+
+test("successful road render telemetry distinguishes actual rendered entities from upstream ways", () => {
+  assert.match(manager, /dependencies\.recordMapPerformance\("roads\.render", "success"[\s\S]*?featureCount:\s*renderedRoads/);
+  assert.match(manager, /featureCount:\s*renderedRoads,[\s\S]*?returnedWays:\s*payload\.results\.length/);
+});

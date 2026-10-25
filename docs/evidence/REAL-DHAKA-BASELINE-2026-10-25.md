@@ -38,3 +38,20 @@ The development server log shows successful road requests taking roughly 13.2–
 The first run validates 3/3 cold and 3/3 warm building-stage checks. It does not close P3.1 because it captured images before roads reached a terminal state and did not persist the explicit readiness object. The revised harness waits for the road fetch/render outcome and saves, per sample, the staged feature count, road status, road terminal timing and screenshot digest. It records HTTP failure/timeouts instead of treating a ready canvas as a fully ready map.
 
 The CI runner is Linux/SwiftShader and is not a proxy for every end-user GPU. No FPS, survey-grade building accuracy or production SLA is claimed.
+
+
+## Follow-up finding: retry timing
+
+- Refined baseline run: [GitHub Actions run #40159047454](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40159047454), artifact ID 12585775596.
+- Building-stage readiness passed in all 6 samples (3 cold + 3 warm; 3,000 features staged per sample). The first road fetch in every sample ended in an error after about 18.0–18.5 seconds, with no road-render event in the captured telemetry.
+- The server log also showed additional same-bounds road route responses with HTTP 200 roughly 2.1–2.6 seconds after some 504 responses. Those responses were not represented by the telemetry snapshot used to capture the corresponding PNG, so the previous run does **not** prove those later responses rendered roads.
+- All six screenshots had the same SHA-256. The missing evidence was whether a follow-up road request was still in flight or subsequently rendered after the first failure.
+
+**Corrective action:** the benchmark now tracks road API request lifecycle, records road-specific HTTP status counts and pending requests, waits for a configurable retry quiet period after failure, and requires a later `roads.render` success before reporting road-ready.
+
+
+## Final capture-order and render-integrity correction
+
+The run's report exposed that some samples had a road API request still pending at screenshot time: the script waited for road status and then delayed for 5 seconds before the screenshot. A new camera-move-triggered request could start in that gap. The benchmark now applies the visual settle delay first, then waits for road-request quiescence/retry grace immediately before capturing.
+
+The road manager's successful render telemetry now includes `featureCount` (actual road entities rendered) separately from `returnedWays` (API ways returned). A fetch success or render event without a positive feature count is not accepted as road-ready.

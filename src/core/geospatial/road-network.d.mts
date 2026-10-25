@@ -30,7 +30,10 @@ export interface RoadFeature {
 export function parseRoadNetworkParams(params: URLSearchParams):
   | { ok: true; value: RoadNetworkRequest }
   | { ok: false; error: string };
-export function buildOverpassRoadQuery(request: RoadNetworkRequest): string;
+export function buildOverpassRoadQuery(
+  request: RoadNetworkRequest,
+  options?: { detailLevel?: "full" | "reduced" },
+): string;
 export function normalizeOverpassRoadElements(elements: unknown[], request: RoadNetworkRequest): RoadFeature[];
 export const ROAD_NETWORK_LIMITS: Readonly<{
   minSpanDegrees: number;

@@ -153,3 +153,14 @@ test("road cache key uses the map's four-decimal request identity", () => {
     ].join("|"),
   );
 });
+
+test("uses an eight-second server-side budget and reduced highway set for fallback queries", () => {
+  const full = buildOverpassRoadQuery(defaultBounds);
+  const reduced = buildOverpassRoadQuery(defaultBounds, { detailLevel: "reduced" });
+  assert.match(full, /\[timeout:8\]/);
+  assert.match(reduced, /\[timeout:8\]/);
+  assert.match(reduced, /qt 350;/);
+  assert.match(reduced, /residential/);
+  assert.match(reduced, /tertiary/);
+  assert.doesNotMatch(reduced, /footway/);
+});

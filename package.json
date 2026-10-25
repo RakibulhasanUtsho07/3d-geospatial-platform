@@ -168,7 +168,8 @@
     "test:dhaka-3d-tiles-camera-alignment": "playwright test tests/browser/dhaka-3d-tiles-alignment.spec.ts --config=playwright.config.ts",
     "test:dhaka-3d-tiles-performance": "playwright test tests/browser/dhaka-3d-tiles-performance.spec.ts --config=playwright.config.ts",
     "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts",
-    "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts"
+    "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts",
+    "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

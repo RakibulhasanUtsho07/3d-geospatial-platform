@@ -408,6 +408,9 @@ jobs:
       - name: Test OSM road network query and width normalization
         run: npm run test:road-network
 
+      - name: Test bounded Overpass failover, reduced-query fallback and cancellation
+        run: npm run test:overpass-road-provider
+
       - name: Test road layer manager ownership and lifecycle
         run: npm run test:road-layer-manager
 
