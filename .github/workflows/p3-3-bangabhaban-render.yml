@@ -78,6 +78,11 @@ jobs:
         with:
           version: 4.0.2
 
+      - name: Install lightweight software-rendering libraries
+        run: |
+          timeout 60s sudo apt-get update -qq || echo 'Using runner package index if update times out.'
+          DEBIAN_FRONTEND=noninteractive timeout 180s sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
       - name: Verify Blender runtime
         run: |
           blender --version
