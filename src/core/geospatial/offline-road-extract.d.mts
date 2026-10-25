@@ -5,7 +5,7 @@ export interface OfflineRoadExtract {
   source: {
     provider: string; url: string; extractDate: string;
     license: "ODbL 1.0"; attribution: "© OpenStreetMap contributors";
-    sourceSha256: string | null;
+    sourceSha256: string | null; normalizationInputSha256?: string | null;
   };
   coverage: { west: number; south: number; east: number; north: number };
   featureCount: number;

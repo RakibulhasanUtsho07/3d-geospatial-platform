@@ -83,7 +83,11 @@ export function validateOfflineRoadExtract(value) {
       || !validDate(value.source.extractDate)
       || value.source.license !== "ODbL 1.0"
       || typeof value.source.attribution !== "string"
-      || !value.source.attribution.includes("OpenStreetMap contributors")) {
+      || !value.source.attribution.includes("OpenStreetMap contributors")
+      || (value.source.sourceSha256 !== null && value.source.sourceSha256 !== undefined
+        && (typeof value.source.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.source.sourceSha256)))
+      || (value.source.normalizationInputSha256 !== null && value.source.normalizationInputSha256 !== undefined
+        && (typeof value.source.normalizationInputSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.source.normalizationInputSha256))) {
     throw new TypeError("Offline road extract source metadata must include HTTPS source, extract date, ODbL 1.0 and OpenStreetMap attribution.");
   }
   let sourceUrl;
@@ -110,8 +114,9 @@ export function validateOfflineRoadExtract(value) {
       extractDate: value.source.extractDate,
       license: "ODbL 1.0",
       attribution: "© OpenStreetMap contributors",
-      sourceSha256: typeof value.source.sourceSha256 === "string" && /^[a-f0-9]{64}$/i.test(value.source.sourceSha256)
-        ? value.source.sourceSha256.toLowerCase() : null,
+      sourceSha256: typeof value.source.sourceSha256 === "string" ? value.source.sourceSha256.toLowerCase() : null,
+      normalizationInputSha256: typeof value.source.normalizationInputSha256 === "string"
+        ? value.source.normalizationInputSha256.toLowerCase() : null,
     },
     coverage: { west: value.coverage.west, south: value.coverage.south, east: value.coverage.east, north: value.coverage.north },
     featureCount: roads.length,

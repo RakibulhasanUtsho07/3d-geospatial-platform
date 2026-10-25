@@ -405,8 +405,8 @@ jobs:
       - name: Test stale road viewport request cancellation
         run: npm run test:road-request-policy
 
-      - name: Test OSM road network query and width normalization
-        run: npm run test:road-network
+      - name: Test OSM road network query and offline extract validation
+        run: npm run test:road-network && npm run test:prepare-dhaka-road-extract
 
       - name: Test bounded Overpass failover, reduced-query fallback and cancellation
         run: npm run test:overpass-road-provider
