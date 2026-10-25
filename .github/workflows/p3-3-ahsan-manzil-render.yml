@@ -158,7 +158,7 @@ jobs:
             views,
             visualReview: {
               contactSheet: "contact-sheet.png",
-              status: "13-view render and hash validation passed; visual comparison was performed against a published front exterior photo; survey-grade validation remains open",
+              status: "13-view render and hash validation passed; visual-fidelity acceptance remains pending; a current contact-sheet review found unresolved roof-detail, material/texture, and side/back framing issues.",
               findings: [
                 "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
                 "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -168,7 +168,11 @@ jobs:
                 "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
                 "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
                 "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
-                "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
+                "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
+                "Human review of the exact generated 13-view contact sheet found the top view dominated by a broad, nearly blank roof deck with insufficient roof-level architectural detail; visual completeness is not accepted.",
+                "Back and left/right orthographic views render the building at a small projected size or near end-on angle, limiting useful inspection of facade and side geometry; framing needs another correction pass.",
+                "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
+                "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
               ],
               residualRisks: [
                 "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
