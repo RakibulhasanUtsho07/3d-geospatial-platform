@@ -61,7 +61,12 @@ jobs:
           curl --fail --location --silent --show-error --retry 3 --retry-all-errors --retry-delay 2 \
             "$source_url" --output "$source_pbf"
           source_sha256="$(sha256sum "$source_pbf" | awk '{print $1}')"
-          source_timestamp="$(osmium fileinfo -g data.timestamp "$source_pbf")"
+          source_timestamp="$(osmium fileinfo -g header.option.osmosis_replication_timestamp "$source_pbf" 2>/dev/null || true)"
+          if ! [[ "$source_timestamp" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+            # Some third-party PBF exports lack the replication header; in that case
+            # use Osmium's extended last-object timestamp as an explicitly documented fallback.
+            source_timestamp="$(osmium fileinfo --extended -g data.timestamp.last "$source_pbf")"
+          fi
           source_date="${source_timestamp%%T*}"
           if ! [[ "$source_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
             echo "Could not read the OSM source timestamp from the downloaded PBF: $source_timestamp"

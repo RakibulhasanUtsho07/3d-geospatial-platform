@@ -24,3 +24,8 @@ Set `source-date` to the actual date of the downloaded extract. The importer rec
 The validator/importer, CLI regression tests, and data-backed GitHub Actions workflow are part of the code. The workflow downloads the official Geofabrik Bangladesh PBF, reads the extract's actual timestamp and SHA-256, clips the Dhaka bbox, normalizes the road GeoJSON, starts the app with `DHAKA_ROADS_EXTRACT_PATH`, and checks both the API response and all six browser samples. It uploads the normalized extract and screenshot/report bundle as a 14-day artifact; the raw PBF is not committed or uploaded.
 
 **Acceptance:** the workflow must pass with six `roadReadiness.status === "rendered"` records, each with positive rendered-feature count, zero pending road requests, `detailLevel: offline`, and zero Overpass attempts for the covered viewport. The generated artifact is still not automatically deployed to production; deployment must set `DHAKA_ROADS_EXTRACT_PATH` to the reviewed extract and retain ODbL attribution.
+
+
+## Workflow source timestamp note
+
+The automated workflow reads the PBF's `header.option.osmosis_replication_timestamp`, which is a supported Osmium fileinfo variable for replication extracts. For a PBF without that header it falls back to the extended `data.timestamp.last` value. The downloaded file SHA-256 is captured independently, so the exact input remains pinned even if the upstream `latest` URL later changes.
