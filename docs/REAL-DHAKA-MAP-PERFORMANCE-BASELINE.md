@@ -5,7 +5,7 @@ This is the repeatable first-stage baseline for measuring the live browser map b
 ## What the runner records
 
 - Candidate Git commit, working-tree state, Node/platform/CPU details, browser version and fixed viewport size.
-- SHA-256 and byte size for the local Overture tile manifest and source GeoJSON, when those files exist on the benchmark machine.
+- SHA-256 and byte size for the local Overture tile manifest, source GeoJSON, and bundled Dhaka road extract, with explicit missing-input markers for optional files that are unavailable.
 - Navigation-to-building-stage readiness and separate road-layer settlement timing. A failed road response is not settled until no road API request is in flight and the retry grace period expires; a successful fetch also needs its following `roads.render` event.
 - Browser navigation/paint timings and in-flight road API request/status counts.
 - Existing map-engine telemetry for viewport fetch/staging and road fetch/render/coverage, including p50/p95, errors and cache-hit counts.
@@ -44,6 +44,12 @@ The default measures the initial camera configured by the current source. For an
 
 For a quicker smoke run, set both sample counts to 1 and the settle interval to 1000 ms. Do not treat a smoke run as release baseline evidence.
 
+## Automated CI acceptance gate
+
+The dedicated `.github/workflows/real-dhaka-baseline.yml` workflow runs six samples (three cold and three warm) against the built Overture tile fixture and the bundled Dhaka road extract. After the capture it runs `npm run verify:real-dhaka-baseline` against the report and the exact workflow commit SHA. The gate checks that all six runs staged actual building features, all six road layers rendered a positive feature count using the local offline source with zero Overpass attempts and no pending requests, the road-extract and Overture input manifests are either SHA-256-pinned or explicitly marked missing, and every screenshot exists and matches its recorded digest. A failed road request or missing screenshot is an acceptance failure even when the building canvas loaded.
+
+The CI browser uses the runner's Chromium/SwiftShader environment. It is reproducible evidence for that candidate and dataset, not a substitute for visual review on the target workstation or for a live-production check. The artifact includes `report.json`, six PNGs, and the server log and is retained for 14 days.
+
 ## How to compare candidates
 
 Compare cold with cold and warm with warm. Preserve browser version, device/GPU, viewport, data hashes and scenario. Use the median and p95 of load-to-map-ready and the separate telemetry p50/p95s; do not add fetch and staging durations together because browser work may overlap. Review screenshots side by side at matching dimensions, and record visual defects separately from timing changes.
@@ -60,4 +66,4 @@ Interpretation limits:
 
 P0 is measured—not merely implemented—only after a real-data run has at least three successful cold and three successful warm samples; records the candidate SHA and relevant local data hashes or explicitly notes missing inputs; contains viewport/road telemetry where those layers are triggered; and includes six screenshots reviewed for blank canvases, gaps, alignment/occlusion and loading regressions. Record browser/OS/GPU details and known visual defects with that review.
 
-The script and deterministic helper tests create the evidence bundle. A real-Dhaka report and human visual sign-off must still be produced from the developer's local runtime; CI alone cannot establish either.
+The script and deterministic helper tests create the evidence bundle, and the CI acceptance script verifies six samples, road readiness, pinned data inputs and actual screenshot digests. Human visual sign-off must still record blank canvases, footprint alignment, building height, road occlusion, viewport refresh, console findings, and the screenshot SHA-256 values; a green CI run alone cannot establish those visual judgments.
