@@ -57,11 +57,11 @@ The codebase still needs real-data validation and product-level completion. The 
 
 **Acceptance gates:** accepted visual review with recorded reference mappings; geometry/texture QA; any unsurveyed parameter remains estimated; no model is declared accurate from a generated render alone.
 
-### Phase 4 — P3.4: Dynamic map real-data quality and performance
+### Phase 4 — P3.4: Dynamic map real-data quality and performance (**active**)
 
-**Scope:** extend the baseline beyond the initial landmark to dense-city, sparse/low-rise, and street-level views. Validate road/building alignment, source-height provenance, parent/part duplicate suppression, stale-response cancellation, fallback behavior, cache eviction, and layer hide/show/resize/rapid pan/zoom behavior. Capture comparable cold/warm p50/p95 and memory/DOM trends on a documented device.
+**Scope:** extend the baseline beyond the initial landmark to dense-city, sparse/low-rise, and street-level views. Validate road/building alignment, source-height provenance, parent/part duplicate suppression, stale-response cancellation, fallback behavior, cache eviction, and layer hide/show/resize/rapid pan/zoom behavior. Capture comparable cold/warm p50/p95 and memory/DOM trends on a documented device. The first reliability slice adds bounded Overpass endpoint fallback and a reduced road query after a transient failure.
 
-**Acceptance gates:** same-device and same-data comparison; no functional regression; visual defects documented; synthetic CPU microbenchmarks kept separate from browser/GPU performance claims.
+**Acceptance gates:** same-device and same-data comparison; no functional regression; visual defects documented; synthetic CPU microbenchmarks kept separate from browser/GPU performance claims. The road slice must prove cancellation halts retries, transient failures can fall back, reduced results are explicitly marked, and all-endpoint failure remains visible.
 
 ### Phase 5 — P3.5: Map-engine ownership and lifecycle modularity
 
@@ -109,4 +109,5 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Improved benchmark to retain the actual staged-feature count, wait for road fetch/render terminal state and record per-sample road success/error/timeout; a refined run is now required because the first screenshots were taken before all map layers settled.
 - [ ] Refined baseline: capture six samples with explicit building readiness and road outcome per sample, and review the new screenshot hashes.
 - [ ] Human visual review of the refined screenshots and workstation-specific baseline.
+- [ ] P3.4 road reliability slice: current branch implementation is awaiting focused/full CI and refined real-data verification.
 - [ ] Phase 2 onward: remaining implementation phases above.

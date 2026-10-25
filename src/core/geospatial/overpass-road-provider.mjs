@@ -24,7 +24,7 @@ export function resolveOverpassEndpoints(env = process.env) {
     candidates = configuredList.split(",").map((item) => item.trim()).filter(Boolean);
   } else if (configuredPrimary) {
     const primary = validateEndpoint(configuredPrimary);
-    candidates = [primary, ...DEFAULT_OVERPASS_ENDPOINTS.filter((endpoint) => endpoint !== primary)];
+    candidates = [primary, ...DEFAULT_OVERPASS_ENDPOINTS.filter((endpoint) => endpoint !== primary).slice(0, MAX_OVERPASS_ENDPOINTS - 1)];
   } else candidates = [...DEFAULT_OVERPASS_ENDPOINTS];
 
   const endpoints = [...new Set(candidates.map(validateEndpoint))];
