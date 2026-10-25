@@ -36,7 +36,7 @@
     "test:property-listings": "node --test tests/property-listings.test.mjs",
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
     "test:architecture-research": "node --test tests/architecture-research.test.mjs",
-    "test:road-network": "node --test tests/road-network.test.mjs",
+    "test:road-network": "node --test tests/road-network.test.mjs tests/offline-road-extract.test.mjs",
     "test:road-layer-manager": "node --test tests/road-layer-manager-boundary.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
     "pretest:heritage-model": "npm run build:heritage-model",
@@ -169,7 +169,8 @@
     "test:dhaka-3d-tiles-performance": "playwright test tests/browser/dhaka-3d-tiles-performance.spec.ts --config=playwright.config.ts",
     "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts",
     "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts",
-    "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs"
+    "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs",
+    "test:offline-road-extract": "node --test tests/offline-road-extract.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
