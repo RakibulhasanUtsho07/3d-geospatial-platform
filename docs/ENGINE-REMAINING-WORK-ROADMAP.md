@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-10-25  
 **Target branch flow:** `rakibul-hasan` → `development` → `main`  
-**Current status:** roadmap created; Phase 1 implementation is being integrated.
+**Current status:** roadmap and first browser-baseline harness are merged to `main`; automated real-data capture is now being added; human visual sign-off remains pending.
 
 ## Ground rules
 
@@ -37,13 +37,13 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ### Phase 1 — P3.1: Reproducible real-Dhaka browser baseline (**in progress**)
 
-**Scope:** port the older P0 baseline harness onto the current branch; add deterministic helper tests and CI coverage; document exact real-data capture commands. The runner should collect candidate SHA, local data file hashes, browser/OS context, map-ready/navigation timings, map telemetry, resource status groups, and screenshot hashes without storing viewport query values.
+**Scope:** port the older P0 baseline harness onto the current branch; add deterministic helper tests and CI coverage; automate a separate Playwright/Chromium real-data run; document capture and human review. The runner collects candidate SHA, local data file hashes, browser context, navigation timings, bounded map telemetry, resource status groups, and screenshot hashes without storing viewport query values. Map readiness must require a successful viewport stage with at least one actual building feature—not merely a visible canvas.
 
 **Acceptance gates:**
-- Helper tests pass for percentiles, empty/invalid samples, resource classification, and lookalike-host/privacy boundaries.
-- Lint and production build pass; CI/browser workload checks pass on the same candidate SHA.
-- A local run yields at least 3 successful cold and 3 warm samples, six PNGs, report.json, commit SHA, and source/tile hashes or explicit missing-input markers.
-- A reviewer records blank-canvas, footprint alignment, building-height, road occlusion, viewport refresh, and console findings. CI alone does not close the real-data evidence gate.
+- [x] Helper tests cover percentiles, empty/invalid samples, resource classification, and lookalike-host/privacy boundaries; helper checks and full CI pass on the first promoted candidate.
+- [x] A dedicated workflow runs the app in development mode, validates the generated spatial tiles, requires a successful viewport stage with real building features, and saves report/screenshots as an artifact.
+- [ ] The workflow produces 3 successful cold and 3 warm samples, six PNGs, report.json, candidate SHA, and source/tile hashes or explicit missing-input markers.
+- [ ] A reviewer records blank-canvas, footprint alignment, building-height, road occlusion, viewport refresh, and console findings. CI alone does not close the human visual evidence gate.
 
 ### Phase 2 — P3.2: Independent building accuracy evidence pack
 
@@ -101,8 +101,12 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ## Current execution record
 
-- [x] Confirmed the current `main` SHA and the latest post-merge CI is green.
-- [x] Audited README, performance/release/accuracy/generation documentation, package scripts, CI workflow, and open PR inventory.
-- [ ] Phase 1 helper and CI integration.
-- [ ] Phase 1 real-Dhaka capture and human screenshot review.
+- [x] Confirmed that the initial P3.1 commit and its development promotion passed full CI; promotion PR #156 merged.
+- [x] Audited README, performance/release/accuracy/generation documentation, package scripts, CI workflow, branch state and open PR inventory.
+- [x] Added a current-branch P3.1 browser harness and helper tests; canvas-only false readiness is now rejected.
+- [x] Dedicated real-data capture workflow produced artifact [run #40157388201](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40157388201), with 3/3 cold and 3/3 warm building-stage samples plus six PNG screenshots on SHA `76032ec65ab9d57069d2ce69c7e6c39fa20a0faa`.
+- [x] Initial visual review: 3D buildings are visible and no blank canvas occurs; facade/roof detail is still boxy, UI side panels obscure the map, and raster imagery differs between samples. One warm sample reported an OSM roads API HTTP 502; successful road requests took roughly 13–18 seconds in the server log.
+- [x] Improved benchmark to retain the actual staged-feature count, wait for road fetch/render terminal state and record per-sample road success/error/timeout; a refined run is now required because the first screenshots were taken before all map layers settled.
+- [ ] Refined baseline: capture six samples with explicit building readiness and road outcome per sample, and review the new screenshot hashes.
+- [ ] Human visual review of the refined screenshots and workstation-specific baseline.
 - [ ] Phase 2 onward: remaining implementation phases above.
