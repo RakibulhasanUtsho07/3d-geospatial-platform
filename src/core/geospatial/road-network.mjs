@@ -196,8 +196,11 @@ function roadClass(highway) {
   return "path";
 }
 
-export function normalizeOverpassRoadElements(elements, request) {
+export function normalizeOverpassRoadElements(elements, request, options = {}) {
   if (!Array.isArray(elements)) return [];
+  const sourceLabel = typeof options.source === "string" && options.source.trim()
+    ? options.source.trim().slice(0, 120)
+    : "OpenStreetMap via Overpass";
   const seen = new Set();
   const roads = [];
 
@@ -229,7 +232,7 @@ export function normalizeOverpassRoadElements(elements, request) {
     const layerValue = finiteNumber(item.tags.layer);
     roads.push({
       id: "osm-road-" + String(id),
-      osmWayId: String(id),
+      osmWayId: safeText(item.tags.offline_osm_way_id) ?? String(id),
       name,
       highway,
       roadClass: roadClass(highway),
@@ -243,7 +246,7 @@ export function normalizeOverpassRoadElements(elements, request) {
       tunnel: item.tags.tunnel === "yes",
       oneway: item.tags.oneway === "yes" || item.tags.oneway === "1",
       coordinates,
-      source: "OpenStreetMap via Overpass",
+      source: sourceLabel,
       license: "ODbL 1.0",
       attribution: "© OpenStreetMap contributors",
     });
@@ -263,3 +266,47 @@ export const ROAD_NETWORK_LIMITS = Object.freeze({
   defaultLimit: DEFAULT_ROAD_FEATURES,
   maxLimit: MAX_ROAD_FEATURES,
 });
+
+export function normalizeGeoJsonRoadFeatures(features, request, options = {}) {
+  if (!Array.isArray(features)) return [];
+  const source = typeof options.source === "string" && options.source.trim()
+    ? options.source.trim().slice(0, 120)
+    : "OpenStreetMap regional extract";
+  const elements = [];
+  let syntheticId = 1;
+
+  for (const feature of features) {
+    if (!isRecord(feature) || !isRecord(feature.properties) || !isRecord(feature.geometry)) continue;
+    const properties = feature.properties;
+    const highwayValue = Array.isArray(properties.highway)
+      ? properties.highway.find((value) => typeof value === "string")
+      : properties.highway;
+    if (typeof highwayValue !== "string" || !SAFE_HIGHWAY.has(highwayValue)) continue;
+
+    const geometry = feature.geometry;
+    const lines = geometry.type === "LineString"
+      ? [geometry.coordinates]
+      : geometry.type === "MultiLineString" ? geometry.coordinates : [];
+    if (!Array.isArray(lines)) continue;
+
+    const originalId = safeText(String(properties.osm_way_id ?? properties.osm_id ?? properties["@id"] ?? feature.id ?? ""), 180);
+    const tags = { highway: highwayValue, offline_osm_way_id: originalId ?? String(syntheticId) };
+    for (const key of ["name", "name:en", "ref", "surface", "width", "lanes", "maxspeed", "layer", "bridge", "tunnel", "oneway"]) {
+      const value = properties[key];
+      if (value === null || value === undefined) continue;
+      if (typeof value === "string" || typeof value === "number") tags[key] = String(value);
+      else if (typeof value === "boolean") tags[key] = value ? "yes" : "no";
+    }
+    for (const line of lines) {
+      if (!Array.isArray(line) || line.length < 2) continue;
+      const points = line.map((coordinate) => Array.isArray(coordinate) && coordinate.length >= 2
+        ? { lon: coordinate[0], lat: coordinate[1] }
+        : null).filter(Boolean);
+      if (points.length < 2) continue;
+      elements.push({ type: "way", id: syntheticId++, tags, geometry: points });
+      if (elements.length >= Math.max(1, request.limit)) break;
+    }
+    if (elements.length >= Math.max(1, request.limit)) break;
+  }
+  return normalizeOverpassRoadElements(elements, request, { source });
+}

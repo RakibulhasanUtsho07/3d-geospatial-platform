@@ -34,7 +34,16 @@ export function buildOverpassRoadQuery(
   request: RoadNetworkRequest,
   options?: { detailLevel?: "full" | "reduced" },
 ): string;
-export function normalizeOverpassRoadElements(elements: unknown[], request: RoadNetworkRequest): RoadFeature[];
+export function normalizeOverpassRoadElements(
+  elements: unknown[],
+  request: RoadNetworkRequest,
+  options?: { source?: string },
+): RoadFeature[];
+export function normalizeGeoJsonRoadFeatures(
+  features: unknown[],
+  request: RoadNetworkRequest,
+  options?: { source?: string },
+): RoadFeature[];
 export const ROAD_NETWORK_LIMITS: Readonly<{
   minSpanDegrees: number;
   maxSpanDegrees: number;
