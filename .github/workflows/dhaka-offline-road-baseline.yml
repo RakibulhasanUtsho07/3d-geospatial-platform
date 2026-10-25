@@ -17,10 +17,11 @@ on:
       - ".github/workflows/dhaka-offline-road-baseline.yml"
       - "package.json"
       - "package-lock.json"
+      - "public/data/roads/**"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: dhaka-offline-road-baseline-${{ github.ref }}
@@ -116,12 +117,20 @@ jobs:
             --max-features 200000 \
             > artifacts/offline-road/baseline/import-report.json
 
+      - name: Stage extract at the bundled runtime path
+        run: |
+          set -euo pipefail
+          target="public/data/roads/dhaka-road-network-v1.json"
+          mkdir -p "$(dirname "$target")"
+          cp artifacts/offline-road/data/dhaka-road-network-v1.json "$target"
+          cmp -s artifacts/offline-road/data/dhaka-road-network-v1.json "$target"
+          sha256sum "$target" | tee -a artifacts/offline-road/baseline/source-manifest.txt
+
       - name: Build and validate the Overture map fixture
         run: npm run build:geospatial-tiles && npm run test:geospatial-tiles
 
-      - name: Start the map with the generated offline road extract
+      - name: Start the map using the bundled offline extract without an environment override
         env:
-          DHAKA_ROADS_EXTRACT_PATH: artifacts/offline-road/data/dhaka-road-network-v1.json
           MAP_BENCHMARK_OUT_DIR: artifacts/offline-road/baseline
         shell: bash
         run: |
@@ -154,7 +163,7 @@ jobs:
           import { readFile } from "node:fs/promises";
           const payload = JSON.parse(await readFile("artifacts/offline-road/baseline/road-api-smoke.json", "utf8"));
           assert.equal(payload.dataStatus, "openstreetmap-road-network");
-          assert.equal(payload.detailLevel, "offline", "API did not use the configured local extract");
+          assert.equal(payload.detailLevel, "offline", "API did not use the bundled local extract by default");
           assert.ok(Number.isSafeInteger(payload.count) && payload.count > 0, "offline API returned no roads");
           assert.equal(payload.license, "ODbL 1.0");
           assert.match(payload.attribution, /OpenStreetMap contributors/);
@@ -171,13 +180,17 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
           import { readFile } from "node:fs/promises";
           const report = JSON.parse(await readFile("artifacts/offline-road/baseline/report.json", "utf8"));
           assert.equal(report.runs.length, 6, "expected three cold and three warm runs");
           assert.equal(report.summary.cold.successfulRuns, 3);
           assert.equal(report.summary.warm.successfulRuns, 3);
-          const extract = report.candidate.dataInputs.find((entry) => entry.path === "artifacts/offline-road/data/dhaka-road-network-v1.json");
-          assert.ok(extract?.exists && /^[a-f0-9]{64}$/.test(extract.sha256), "offline extract hash is missing");
+          const runtimeExtract = await readFile("public/data/roads/dhaka-road-network-v1.json");
+          const artifactExtract = await readFile("artifacts/offline-road/data/dhaka-road-network-v1.json");
+          const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          assert.ok(runtimeExtract.length > 0, "bundled runtime road extract is empty");
+          assert.equal(sha256(runtimeExtract), sha256(artifactExtract), "bundled runtime extract differs from the validated generated extract");
           for (const run of report.runs) {
             assert.equal(run.status, "ok", run.mode + "-" + run.index + " browser sample failed");
             assert.equal(run.roadReadiness.status, "rendered", run.mode + "-" + run.index + " road layer not rendered");
@@ -190,6 +203,21 @@ jobs:
           }
           console.log("Validated all six cold/warm samples with a positive offline road render and a pinned extract hash.");
           NODE
+
+      - name: Persist the validated runtime snapshot on the source branch
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/rakibul-hasan'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/roads/dhaka-road-network-v1.json
+          if git diff --cached --quiet; then
+            echo "Bundled Dhaka road extract is unchanged; no data commit required."
+            exit 0
+          fi
+          git commit -m "chore(data): refresh bundled Dhaka road extract"
+          git push origin HEAD:refs/heads/rakibul-hasan
 
       - name: Upload the offline extract and browser evidence
         if: always()
