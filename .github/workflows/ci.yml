@@ -402,6 +402,9 @@ jobs:
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
 
+      - name: Test Bangabhaban reference provenance and reconstruction gates
+        run: npm run test:bangabhaban-reference-pack
+
       - name: Test shared request cancellation lifecycle
         run: npm run test:shared-request-lifecycle
 
