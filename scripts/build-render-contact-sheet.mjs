@@ -1,4 +1,5 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { mkdir } from "node:fs/promises";
 import sharp from "sharp";
 
@@ -78,7 +79,7 @@ export async function buildRenderContactSheet(inputDir, outputPath, options = {}
   return { outputPath, width, height, viewCount: REVIEW_VIEW_IDS.length };
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${path.resolve(process.argv[1])}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [inputDir, outputPath, resolutionArg] = process.argv.slice(2);
   if (!inputDir || !outputPath) {
     console.error("Usage: node scripts/build-render-contact-sheet.mjs <render-dir> <output.png> [resolution]");
