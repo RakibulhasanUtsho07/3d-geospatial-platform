@@ -168,10 +168,14 @@ def main():
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
         bpy.ops.render.render(write_still=True)
-        result = bpy.data.images.get("Render Result")
-        if result is None:
-            raise RuntimeError("Blender did not provide a render result for " + view_id)
-        stats = sample_pixel_statistics(result, resolution)
+        rendered_path = scene.render.filepath
+        if not os.path.isfile(rendered_path):
+            raise RuntimeError("Blender reported success but the render file is missing: " + rendered_path)
+        result = bpy.data.images.load(rendered_path, check_existing=False)
+        try:
+            stats = sample_pixel_statistics(result, resolution)
+        finally:
+            bpy.data.images.remove(result)
         raw_views.append({
             "id": view_id,
             "filename": filename,
