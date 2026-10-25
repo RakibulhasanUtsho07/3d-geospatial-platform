@@ -394,8 +394,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   movementActions.push("drag-pan");
 
   await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
-  await expect.poll(() => roadRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
-
   // Wait until a real request is in flight, then ask the engine's opt-in
   // workload hook to produce one additional distinct camera intent. This makes
   // cancellation deterministic instead of relying on runner-dependent timing
@@ -448,6 +446,11 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     "A distinct camera intent must invalidate the obsolete viewport revision.");
   assert.equal(cancellationProbe.lifecycleAfter.hasPendingRequest, true,
     "The newest viewport intent must remain queued after cancellation.");
+
+  // Only wait for road coverage after triggering cancellation; waiting for both
+  // layers first can allow the held building request to finish and erase the
+  // live AbortController before the cancellation probe runs.
+  await expect.poll(() => roadRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
 
   await expect.poll(async () => {
     const fetchEvents = browserEvents;
