@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyResourceUrl, summarizeValues } from "../scripts/benchmark-map-browser.mjs";
+import { classifyResourceUrl, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
 
 test("summarizes browser samples using nearest-rank p50 and p95", () => {
   assert.deepEqual(summarizeValues([10, 20, 30, 40, 50]), {
@@ -57,4 +57,44 @@ test("summarizes unsorted duplicate timing samples deterministically", () => {
     max: 40,
     mean: 22,
   });
+});
+
+test("does not call a canvas-only map ready without a successful viewport stage", () => {
+  assert.equal(validateMapReadyState({
+    hasError: false,
+    telemetryAvailable: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 0,
+    stagedFeatureCount: 120,
+  }), false);
+  assert.equal(validateMapReadyState({
+    hasError: false,
+    telemetryAvailable: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 0,
+  }), false);
+});
+
+test("accepts a map readiness record only when a viewport staged real building features", () => {
+  assert.equal(validateMapReadyState({
+    hasError: false,
+    telemetryAvailable: true,
+    canvasCount: 2,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 157,
+  }), true);
+});
+
+test("rejects map readiness when initialization fails or telemetry is unavailable", () => {
+  const valid = {
+    hasError: false,
+    telemetryAvailable: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 12,
+  };
+  assert.equal(validateMapReadyState({ ...valid, hasError: true }), false);
+  assert.equal(validateMapReadyState({ ...valid, telemetryAvailable: false }), false);
+  assert.equal(validateMapReadyState({ ...valid, canvasCount: 0 }), false);
 });

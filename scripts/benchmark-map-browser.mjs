@@ -170,15 +170,28 @@ async function waitForMapReady(page, timeoutMs) {
     const text = document.body?.innerText || "";
     const hasError = text.includes("3D map initialization failed");
     const loading = text.includes("Loading Ahsan Manzil 3D map");
-    return hasError || (Boolean(container?.querySelector("canvas")) && !loading);
+    const telemetry = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.();
+    const stage = telemetry?.metrics?.["viewport.stage"];
+    return hasError || (
+      Boolean(container?.querySelector("canvas")) &&
+      !loading &&
+      Number(stage?.successCount) > 0
+    );
   }, null, { timeout: timeoutMs });
 
   const state = await page.evaluate(() => {
     const text = document.body?.innerText || "";
+    const telemetry = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null;
+    const stage = telemetry?.metrics?.["viewport.stage"];
+    const stageEvent = telemetry?.recentEvents?.slice().reverse().find(
+      (event) => event.metric === "viewport.stage" && event.outcome === "success"
+    );
     return {
       hasError: text.includes("3D map initialization failed"),
       telemetryAvailable: typeof window.__MAP_ENGINE_PERFORMANCE__?.snapshot === "function",
       canvasCount: document.querySelectorAll('[data-testid="cesium-map-container"] canvas').length,
+      viewportStageSuccessCount: Number(stage?.successCount) || 0,
+      stagedFeatureCount: Number.isSafeInteger(stageEvent?.featureCount) ? stageEvent.featureCount : null,
     };
   });
   if (state.hasError) throw new Error("The map showed its initialization error state.");
@@ -186,7 +199,25 @@ async function waitForMapReady(page, timeoutMs) {
     throw new Error("Map telemetry is missing. Start the app with npm run dev, not production mode.");
   }
   if (state.canvasCount < 1) throw new Error("Cesium did not create a map canvas.");
+  if (!validateMapReadyState(state)) {
+    throw new Error("Map readiness requires a successful viewport stage containing at least one building feature; observed " +
+      state.viewportStageSuccessCount + " successful stage(s), feature count " + String(state.stagedFeatureCount) + ".");
+  }
   return state;
+}
+
+export function validateMapReadyState(state) {
+  return Boolean(
+    state &&
+    state.hasError === false &&
+    state.telemetryAvailable === true &&
+    Number.isSafeInteger(state.canvasCount) &&
+    state.canvasCount >= 1 &&
+    Number.isSafeInteger(state.viewportStageSuccessCount) &&
+    state.viewportStageSuccessCount > 0 &&
+    Number.isSafeInteger(state.stagedFeatureCount) &&
+    state.stagedFeatureCount > 0
+  );
 }
 
 async function capturePageMetrics(page, counters, origin, screenshotPath, loadToMapReadyMs, mode, index, scenario) {
