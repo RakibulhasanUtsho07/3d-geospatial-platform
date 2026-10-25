@@ -94,7 +94,31 @@
         "independent dimension survey",
         "calibrated multi-view reconstruction by itself"
       ],
-      "notes": "Commons page identifies the source as a 2017 photo by ASaber91 under CC BY 2.0. The published SHA-1 is source metadata, not a locally recomputed checksum; download and compute SHA-256 before using it in reproducible reconstruction."
+      "notes": "Commons page identifies the source as a 2017 photo by ASaber91 under CC BY 2.0. The published SHA-1 is source metadata, not a locally recomputed checksum; download and compute SHA-256 before using it in reproducible reconstruction.",
+      "viewAssessment": {
+        "viewpoint": "elevated oblique cityscape view",
+        "visibleFeatures": [
+          "main palace massing",
+          "central dome",
+          "front colonnade",
+          "roof volumes",
+          "landscaping context"
+        ],
+        "occlusions": [
+          "trees obscure lower perimeter",
+          "distance reduces fine facade detail"
+        ],
+        "cameraCalibration": "unknown",
+        "captureCoordinates": "unknown",
+        "geometryUse": "single-view visual comparison and broad massing cues only",
+        "notSufficientFor": [
+          "multi-view photogrammetry",
+          "survey-grade dimensions",
+          "texture baking without projection review"
+        ],
+        "assessedFrom": "Commons preview and file metadata; original bytes not downloaded locally",
+        "assessedAt": "2026-10-25"
+      }
     },
     {
       "id": "commons-category",
