@@ -286,7 +286,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
       routeOrdinal,
       // Hold the first two network requests so the workload can deterministically
       // invalidate an in-flight viewport after the camera has moved.
-      routeDelayMs: routeOrdinal <= 2 ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
+      routeDelayMs: routeOrdinal <= 4 ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
     };
     buildingRoutes.push(routeRecord);
     await wait(routeRecord.routeDelayMs);
@@ -372,6 +372,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   const movementStartedAtMs = performance.now();
   const movementActions: string[] = [];
+  const buildingRoutesBeforeCancellationFocus = buildingRoutes.length;
 
   // Use the opt-in workload hook to move to a known local viewport and trigger
   // the normal production camera-intent handler before running rapid gestures.
@@ -397,7 +398,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     "The opt-in Cesium hook must focus the real camera before the cancellation workload.");
   movementActions.push("focus-local-viewport-for-cancellation");
 
-  await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
+  await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(buildingRoutesBeforeCancellationFocus);
 
   const getBuildingRequestLifecycle = async () => page.evaluate(() => {
     const target = window as Window & {
