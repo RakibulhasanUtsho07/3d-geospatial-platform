@@ -98,21 +98,48 @@ async function hashFile(relativePath) {
 function createNetworkCounters() {
   const groups = Object.create(null);
   const failures = Object.create(null);
+  const activeRoadRequests = new Set();
+  const roadApi = {
+    requestCount: 0, responseCount: 0, status2xx: 0, status3xx: 0,
+    status4xx: 0, status5xx: 0, otherStatus: 0, failedRequests: 0,
+  };
+
+  function isRoadApiUrl(resourceUrl, origin) {
+    try {
+      const parsed = new URL(resourceUrl);
+      return parsed.origin === origin && parsed.pathname === "/api/geospatial/roads";
+    } catch {
+      return false;
+    }
+  }
+
   return {
     reset() {
       for (const key of Object.keys(groups)) delete groups[key];
       for (const key of Object.keys(failures)) delete failures[key];
+      Object.assign(roadApi, {
+        requestCount: 0, responseCount: 0, status2xx: 0, status3xx: 0,
+        status4xx: 0, status5xx: 0, otherStatus: 0, failedRequests: 0,
+      });
+      activeRoadRequests.clear();
+    },
+    recordRequest(resourceUrl, origin, request) {
+      if (!isRoadApiUrl(resourceUrl, origin)) return;
+      roadApi.requestCount += 1;
+      activeRoadRequests.add(request);
+    },
+    finishRequest(request) {
+      activeRoadRequests.delete(request);
+    },
+    getPendingRoadRequestCount() {
+      return activeRoadRequests.size;
     },
     recordResponse(resourceUrl, origin, status) {
       const group = classifyResourceUrl(resourceUrl, origin);
       if (!groups[group]) {
         groups[group] = {
-          responseCount: 0,
-          status2xx: 0,
-          status3xx: 0,
-          status4xx: 0,
-          status5xx: 0,
-          otherStatus: 0,
+          responseCount: 0, status2xx: 0, status3xx: 0,
+          status4xx: 0, status5xx: 0, otherStatus: 0,
         };
       }
       const item = groups[group];
@@ -122,10 +149,20 @@ function createNetworkCounters() {
       else if (status >= 400 && status < 500) item.status4xx += 1;
       else if (status >= 500 && status < 600) item.status5xx += 1;
       else item.otherStatus += 1;
+
+      if (isRoadApiUrl(resourceUrl, origin)) {
+        roadApi.responseCount += 1;
+        if (status >= 200 && status < 300) roadApi.status2xx += 1;
+        else if (status >= 300 && status < 400) roadApi.status3xx += 1;
+        else if (status >= 400 && status < 500) roadApi.status4xx += 1;
+        else if (status >= 500 && status < 600) roadApi.status5xx += 1;
+        else roadApi.otherStatus += 1;
+      }
     },
     recordFailure(resourceUrl, origin) {
       const group = classifyResourceUrl(resourceUrl, origin);
       failures[group] = (failures[group] || 0) + 1;
+      if (isRoadApiUrl(resourceUrl, origin)) roadApi.failedRequests += 1;
     },
     snapshot() {
       return {
@@ -135,6 +172,7 @@ function createNetworkCounters() {
         failedRequestsByResourceGroup: Object.fromEntries(
           Object.entries(failures).sort(([a], [b]) => a.localeCompare(b)),
         ),
+        roadApi: { ...roadApi, pendingRequestsAtCapture: activeRoadRequests.size },
       };
     },
   };
@@ -212,6 +250,7 @@ export function resolveRoadReadiness(snapshot) {
   if (!fetchEvent || !["success", "cache-hit", "error", "cancelled"].includes(fetchEvent.outcome)) return null;
 
   const base = {
+    fetchSequence: Number.isSafeInteger(fetchEvent.sequence) ? fetchEvent.sequence : null,
     fetchOutcome: fetchEvent.outcome,
     fetchDurationMs: Number.isFinite(fetchEvent.durationMs) ? fetchEvent.durationMs : null,
   };
@@ -227,6 +266,7 @@ export function resolveRoadReadiness(snapshot) {
   if (!renderEvent || !["success", "error", "cancelled"].includes(renderEvent.outcome)) return null;
   return {
     ...base,
+    renderSequence: renderEvent.sequence,
     renderOutcome: renderEvent.outcome,
     renderDurationMs: Number.isFinite(renderEvent.durationMs) ? renderEvent.durationMs : null,
     status: renderEvent.outcome === "success"
@@ -235,39 +275,62 @@ export function resolveRoadReadiness(snapshot) {
   };
 }
 
-async function waitForRoadsSettled(page, timeoutMs) {
+async function waitForRoadsSettled(page, timeoutMs, getPendingRoadRequestCount, retryGraceMs) {
   const startedAt = performance.now();
-  try {
-    await page.waitForFunction(() => {
-      const events = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.()?.recentEvents;
-      if (!Array.isArray(events)) return false;
-      const fetchEvent = events.slice().reverse().find((event) => event.metric === "roads.fetch");
-      if (!fetchEvent) return false;
-      if (fetchEvent.outcome === "error" || fetchEvent.outcome === "cancelled") return true;
-      if (fetchEvent.outcome !== "success" && fetchEvent.outcome !== "cache-hit") return false;
-      return events.some((event) =>
-        event.metric === "roads.render" &&
-        Number.isSafeInteger(event.sequence) &&
-        Number.isSafeInteger(fetchEvent.sequence) &&
-        event.sequence > fetchEvent.sequence &&
-        ["success", "error", "cancelled"].includes(event.outcome)
-      );
-    }, null, { timeout: timeoutMs });
-  } catch (error) {
-    if (!(error instanceof Error) || !/timeout/i.test(error.name + " " + error.message)) throw error;
+  let failureQuietSince = null;
+  let failureSignature = null;
+  const isFailureTerminal = (status) => [
+    "fetch-error", "fetch-cancelled", "render-error", "render-cancelled",
+  ].includes(status);
+
+  while (performance.now() - startedAt < timeoutMs) {
     const telemetry = await page.evaluate(() => window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null);
-    return {
-      status: "timeout",
-      waitStatus: "timeout",
-      elapsedMs: roundMs(performance.now() - startedAt),
-      observedState: resolveRoadReadiness(telemetry) ?? "no-terminal-road-event",
-    };
+    const readiness = resolveRoadReadiness(telemetry);
+    const pendingRequests = getPendingRoadRequestCount();
+
+    if (readiness?.status === "rendered" && pendingRequests === 0) {
+      return {
+        ...readiness,
+        waitStatus: "rendered",
+        retryGraceMs,
+        elapsedMs: roundMs(performance.now() - startedAt),
+      };
+    }
+
+    if (pendingRequests > 0) {
+      // A later road request is still active. Do not let an earlier timeout
+      // hide a recovery attempt that may return/render successfully.
+      failureQuietSince = null;
+      failureSignature = null;
+    } else if (readiness && isFailureTerminal(readiness.status)) {
+      const signature = readiness.status + ":" + String(readiness.fetchSequence) + ":" + String(readiness.renderSequence ?? "");
+      if (signature !== failureSignature) {
+        failureSignature = signature;
+        failureQuietSince = performance.now();
+      } else if (failureQuietSince !== null && performance.now() - failureQuietSince >= retryGraceMs) {
+        return {
+          ...readiness,
+          waitStatus: "settled-after-retry-grace",
+          retryGraceMs,
+          elapsedMs: roundMs(performance.now() - startedAt),
+        };
+      }
+    } else {
+      failureQuietSince = null;
+      failureSignature = null;
+    }
+
+    await page.waitForTimeout(200);
   }
+
   const telemetry = await page.evaluate(() => window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null);
   return {
-    ...(resolveRoadReadiness(telemetry) ?? { status: "unclassified" }),
-    waitStatus: "settled",
+    status: "timeout",
+    waitStatus: "timeout",
+    retryGraceMs,
     elapsedMs: roundMs(performance.now() - startedAt),
+    observedState: resolveRoadReadiness(telemetry) ?? "no-terminal-road-event",
+    pendingRoadRequests: getPendingRoadRequestCount(),
   };
 }
 
@@ -411,7 +474,7 @@ function sanitizeError(error) {
   return raw.replace(/https?:\/\/[^\s)]+/g, "[URL]").slice(0, 500);
 }
 
-async function newInstrumentedPage(browser, viewport) {
+async function newInstrumentedPage(browser, viewport, origin) {
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 1,
@@ -420,19 +483,22 @@ async function newInstrumentedPage(browser, viewport) {
   await attachLongTaskObserver(context);
   const page = await context.newPage();
   const counters = createNetworkCounters();
+  page.on("request", (request) => {
+    counters.recordRequest(request.url(), origin, request);
+  });
   page.on("response", (response) => {
-    try {
-      counters.recordResponse(response.url(), new URL(page.url()).origin, response.status());
-    } catch {
-      // Ignore malformed resource URLs in instrumentation.
-    }
+    counters.recordResponse(response.url(), origin, response.status());
+  });
+  page.on("requestfinished", (request) => {
+    counters.finishRequest(request);
   });
   page.on("requestfailed", (request) => {
     try {
-      counters.recordFailure(request.url(), new URL(page.url()).origin);
+      counters.recordFailure(request.url(), origin);
     } catch {
-      counters.recordFailure("", "");
+      counters.recordFailure("", origin);
     }
+    counters.finishRequest(request);
   });
   return { context, page, counters };
 }
@@ -496,7 +562,8 @@ async function runBenchmark() {
   const warmCount = readInteger("MAP_BENCHMARK_WARM_RUNS", 3, 1, 10);
   const settleMs = readInteger("MAP_BENCHMARK_SETTLE_MS", 5000, 0, 120000);
   const readyTimeoutMs = readInteger("MAP_BENCHMARK_READY_TIMEOUT_MS", 90000, 1, 120000);
-  const roadReadyTimeoutMs = readInteger("MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS", 30000, 1000, 120000);
+  const roadReadyTimeoutMs = readInteger("MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS", 45000, 1000, 120000);
+  const roadRetryGraceMs = readInteger("MAP_BENCHMARK_ROAD_RETRY_GRACE_MS", 6000, 0, 30000);
   const runStamp = new Date().toISOString().replace(/[:.]/g, "-");
   const defaultOutput = path.join("artifacts", "map-performance-baseline", runStamp);
   const outputDirectory = path.resolve(projectRoot, process.env.MAP_BENCHMARK_OUT_DIR || defaultOutput);
@@ -533,7 +600,7 @@ async function runBenchmark() {
       let session = null;
       let startedAt = null;
       try {
-        session = await newInstrumentedPage(browser, viewport);
+        session = await newInstrumentedPage(browser, viewport, origin);
         const cdp = await session.context.newCDPSession(session.page);
         await cdp.send("Network.enable");
         await cdp.send("Network.clearBrowserCache");
@@ -541,7 +608,7 @@ async function runBenchmark() {
         await session.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
         const readiness = await waitForMapReady(session.page, readyTimeoutMs);
         const loadToMapReadyMs = roundMs(performance.now() - startedAt);
-        const roadReadiness = await waitForRoadsSettled(session.page, roadReadyTimeoutMs);
+        const roadReadiness = await waitForRoadsSettled(session.page, roadReadyTimeoutMs, session.counters.getPendingRoadRequestCount, roadRetryGraceMs);
         const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
         if (settleMs > 0) await session.page.waitForTimeout(settleMs);
         results.push(await capturePageMetrics(
@@ -569,10 +636,10 @@ async function runBenchmark() {
 
     let warmSession = null;
     try {
-      warmSession = await newInstrumentedPage(browser, viewport);
+      warmSession = await newInstrumentedPage(browser, viewport, origin);
       await warmSession.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
       await waitForMapReady(warmSession.page, readyTimeoutMs);
-      await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs);
+      await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs, warmSession.counters.getPendingRoadRequestCount, roadRetryGraceMs);
       if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
       // The primer warms this isolated context's browser HTTP cache and is excluded from measurements.
       for (let index = 1; index <= warmCount; index += 1) {
@@ -583,7 +650,7 @@ async function runBenchmark() {
           await warmSession.page.reload({ waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
           const readiness = await waitForMapReady(warmSession.page, readyTimeoutMs);
           const loadToMapReadyMs = roundMs(performance.now() - startedAt);
-          const roadReadiness = await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs);
+          const roadReadiness = await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs, warmSession.counters.getPendingRoadRequestCount, roadRetryGraceMs);
           const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
           if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
           results.push(await capturePageMetrics(
@@ -651,6 +718,7 @@ async function runBenchmark() {
       settleMs,
       readyTimeoutMs,
       roadReadyTimeoutMs,
+      roadRetryGraceMs,
       readyCondition: "A successful viewport.stage event with at least one building feature.",
       roadSettlement: "Wait for roads.fetch and, after a successful fetch, the following roads.render event; record errors, cancellation and timeout instead of silently treating the canvas as fully ready.",
       screenshotDigestsProveCapturedFileIntegrityNotCrossMachineBitIdentity: true,

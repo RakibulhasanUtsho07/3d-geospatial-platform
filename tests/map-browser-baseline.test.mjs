@@ -104,8 +104,10 @@ test("records road rendering only when a render event follows a successful fetch
     { sequence: 10, metric: "roads.fetch", outcome: "success", durationMs: 14000 },
     { sequence: 11, metric: "roads.render", outcome: "success", durationMs: 850 },
   ] }), {
+    fetchSequence: 10,
     fetchOutcome: "success",
     fetchDurationMs: 14000,
+    renderSequence: 11,
     renderOutcome: "success",
     renderDurationMs: 850,
     status: "rendered",
@@ -118,12 +120,35 @@ test("records road rendering only when a render event follows a successful fetch
 test("separates road service errors and cancellation from successful building-stage readiness", () => {
   assert.deepEqual(resolveRoadReadiness({ recentEvents: [
     { sequence: 12, metric: "roads.fetch", outcome: "error", durationMs: 2390 },
-  ] }), { fetchOutcome: "error", fetchDurationMs: 2390, status: "fetch-error" });
+  ] }), { fetchSequence: 12, fetchOutcome: "error", fetchDurationMs: 2390, status: "fetch-error" });
   assert.deepEqual(resolveRoadReadiness({ recentEvents: [
     { sequence: 12, metric: "roads.fetch", outcome: "cancelled", durationMs: 1200 },
-  ] }), { fetchOutcome: "cancelled", fetchDurationMs: 1200, status: "fetch-cancelled" });
+  ] }), { fetchSequence: 12, fetchOutcome: "cancelled", fetchDurationMs: 1200, status: "fetch-cancelled" });
   assert.equal(resolveRoadReadiness({ recentEvents: [
     { sequence: 12, metric: "roads.fetch", outcome: "success", durationMs: 100 },
     { sequence: 11, metric: "roads.render", outcome: "success", durationMs: 10 },
+  ] }), null);
+});
+
+test("a later successful retry supersedes an earlier roads fetch error", () => {
+  assert.deepEqual(resolveRoadReadiness({ recentEvents: [
+    { sequence: 3, metric: "roads.fetch", outcome: "error", durationMs: 18000 },
+    { sequence: 4, metric: "roads.fetch", outcome: "success", durationMs: 2600 },
+    { sequence: 5, metric: "roads.render", outcome: "success", durationMs: 320 },
+  ] }), {
+    fetchSequence: 4,
+    fetchOutcome: "success",
+    fetchDurationMs: 2600,
+    renderSequence: 5,
+    renderOutcome: "success",
+    renderDurationMs: 320,
+    status: "rendered",
+  });
+});
+
+test("a successful road fetch is not ready until a following render event completes", () => {
+  assert.equal(resolveRoadReadiness({ recentEvents: [
+    { sequence: 4, metric: "roads.fetch", outcome: "success", durationMs: 2600 },
+    { sequence: 3, metric: "roads.render", outcome: "success", durationMs: 320 },
   ] }), null);
 });

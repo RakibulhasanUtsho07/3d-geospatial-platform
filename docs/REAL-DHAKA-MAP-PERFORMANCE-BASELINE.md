@@ -6,7 +6,8 @@ This is the repeatable first-stage baseline for measuring the live browser map b
 
 - Candidate Git commit, working-tree state, Node/platform/CPU details, browser version and fixed viewport size.
 - SHA-256 and byte size for the local Overture tile manifest and source GeoJSON, when those files exist on the benchmark machine.
-- Navigation-to-usable-map timing and browser navigation/paint timings.
+- Navigation-to-building-stage readiness and separate road-layer settlement timing. A failed road response is not settled until no road API request is in flight and the retry grace period expires; a successful fetch also needs its following `roads.render` event.
+- Browser navigation/paint timings and in-flight road API request/status counts.
 - Existing map-engine telemetry for viewport fetch/staging and road fetch/render/coverage, including p50/p95, errors and cache-hit counts.
 - Resource timings grouped into API, Cesium assets, static assets, same-origin other and third-party resources. Query strings and individual feature coordinates are not written to the report.
 - Long-task count/duration where Chromium exposes the Long Tasks API, JavaScript heap usage where supported, grouped response status codes, and a screenshot SHA-256 digest for every measured run.
@@ -34,7 +35,9 @@ The default measures the initial camera configured by the current source. For an
 | MAP_BENCHMARK_COLD_RUNS | 3 | Fresh-context cold samples, 1–10 |
 | MAP_BENCHMARK_WARM_RUNS | 3 | Reloads after an unmeasured warm-up, 1–10 |
 | MAP_BENCHMARK_SETTLE_MS | 5000 | Wait after map readiness |
-| MAP_BENCHMARK_READY_TIMEOUT_MS | 90000 | Maximum wait for map readiness |
+| MAP_BENCHMARK_READY_TIMEOUT_MS | 90000 | Maximum wait for building-stage readiness |
+| MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS | 45000 | Maximum wait for road fetch/render settlement |
+| MAP_BENCHMARK_ROAD_RETRY_GRACE_MS | 6000 | Quiet period after failure to detect a follow-up retry/render |
 | MAP_BENCHMARK_HEADLESS | 1 | Set to 0 to open Chromium visibly |
 | MAP_BENCHMARK_OUT_DIR | Timestamped artifacts folder | Optional output folder |
 | MAP_BENCHMARK_COMMIT_SHA | Current Git HEAD | Optional explicit candidate SHA |
