@@ -695,6 +695,30 @@ function buildGlb(lod) {
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
   addFacadeSection("Andarmahal",xMin,split,andarBays,[andarGf,andarFf],lod,andarCenterZ,andarDepth);
 
+  // Source-backed Rangmahal roofline ventilation/oculus band.
+  // The licensed front reference shows small circular openings along the
+  // upper cornice on both wings; the central portico is intentionally skipped.
+  // Their spacing/diameter remain estimates until a rectified elevation exists.
+  if (lod === 3) {
+    const pitch = rangLength / rangBays;
+    const ventY = Math.min(ff.base + ff.height - 0.30, roofTop - 0.20);
+    for (const side of [-1, 1]) {
+      const faceZ = side * (half + 0.115);
+      for (let bay = 0; bay < rangBays; bay++) {
+        if (bay >= Math.floor(rangBays / 2) - 1 && bay <= Math.floor(rangBays / 2) + 1) continue;
+        const ventX = split + (bay + 0.5) * pitch;
+        addFacadeDisk(n.Rangmahal_FF, ventX, ventY, faceZ, 0.105, "sceneDark", side, 20);
+        addFacadeRing(n.Rangmahal_FF, ventX, ventY, faceZ + side * 0.012, 0.155, 0.108, "trim", side, 20);
+      }
+    }
+    // A continuous, shallow cornice separates the facade from the roof deck.
+    // This follows the visible reference band and avoids inventing roof objects.
+    for (const side of [-1, 1]) {
+      box(n.Parapet, rangCenterX, roofTop - 0.06, side * (half + 0.10),
+        rangLength, 0.14, 0.20, "trim");
+    }
+  }
+
   // Model the short elevations of both blocks, including the exposed Rangmahal
   // west end beside the rear-set Andarmahal junction.
   addEndFacade("Andarmahal", xMin, -1, [andarGf, andarFf], 6, lod,andarCenterZ,andarDepth);
