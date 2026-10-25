@@ -205,7 +205,7 @@ export class CesiumAdapter implements MapEngine {
   private baseImageryLayer:
     | import("cesium").ImageryLayer
     | null = null;
-  private imageryErrorUnsubscribe: (() => boolean) | null = null;
+  private imageryErrorUnsubscribe: (() => void) | null = null;
 
   private readonly roadLayerManager = new RoadLayerManager();
   private readonly roadSelectionListeners = new Set<(road: RoadFeature | null) => void>();
