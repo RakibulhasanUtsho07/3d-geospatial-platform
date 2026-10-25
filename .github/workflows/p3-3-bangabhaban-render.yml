@@ -117,11 +117,13 @@ jobs:
           const render = JSON.parse(manifestBytes.toString("utf8"));
           const geometryBytes = await readFile(path.join(root, "geometry-qa-report.json"));
           const textureBytes = await readFile(path.join(root, "texture-qa-report.json"));
+          const visibilityBytes = await readFile(path.join(root, "foreground-visibility-report.json"));
           const topologyBytes = await readFile(path.join(root, "topology-audit.json"));
           const referenceBytes = await readFile(path.join(root, "reference-pack", "reference-pack.manifest.json"));
           const reference = JSON.parse(referenceBytes.toString("utf8"));
           const geometry = JSON.parse(geometryBytes.toString("utf8"));
           const texture = JSON.parse(textureBytes.toString("utf8"));
+          const visibility = JSON.parse(visibilityBytes.toString("utf8"));
           const topology = JSON.parse(topologyBytes.toString("utf8"));
           if (reference.verified !== true || reference.sources?.length !== 3 || reference.sources.some((s) => s.verified !== true || !/^[a-f0-9]{64}$/.test(s.sha256 || ""))) {
             throw new Error("Bangabhaban needs three individually licensed and hash-verified reference files");
@@ -131,6 +133,9 @@ jobs:
             throw new Error("Expected 13 unique, hash-pinned render views; got " + views.length);
           }
           const modelBytes = await readFile("public/models/bangabhaban-lod3.glb");
+          if (visibility.summary?.status !== "passed" || visibility.summary?.viewCount !== 13 || visibility.summary?.failedViews !== 0 || visibility.candidateModelSha256 !== hash(modelBytes)) {
+            throw new Error("Foreground visibility gate failed or is not bound to the exact candidate GLB");
+          }
           const summary = {
             task:"P3.3-Bangabhaban",building:"Bangabhaban, Dhaka",sourceCommit:process.env.SOURCE_COMMIT,
             reviewGeneratedAt:new Date().toISOString(),
@@ -139,7 +144,8 @@ jobs:
             qa:{
               geometry:{sha256:hash(geometryBytes),status:geometry.status,valid:geometry.valid,counts:geometry.counts,warnings:geometry.warnings||[]},
               texture:{sha256:hash(textureBytes),status:texture.status,valid:texture.valid,counts:texture.counts,warnings:texture.warnings||[]},
-              topology:{sha256:hash(topologyBytes),releaseGate:topology.summary.releaseGate,summary:topology.summary}
+              topology:{sha256:hash(topologyBytes),releaseGate:topology.summary.releaseGate,summary:topology.summary},
+              foregroundVisibility:{sha256:hash(visibilityBytes),summary:visibility.summary,limits:visibility.limits}
             },
             referencePack:{sha256:hash(referenceBytes),verified:reference.verified,licensePolicy:reference.licensePolicy,sources:reference.sources.map(s=>({id:s.id,filename:s.imagePath,sha256:s.sha256,byteLength:s.byteLength,license:s.license,author:s.author,url:s.sourcePage,viewRole:s.viewRole,cameraCalibration:s.cameraCalibration}))},
             views,
@@ -168,9 +174,10 @@ jobs:
       - name: Commit candidate assets and evidence
         run: |
           cp artifacts/bangabhaban-render-set/contact-sheet.png docs/heritage/bangabhaban-render-contact-sheet.png
+          cp artifacts/bangabhaban-render-set/foreground-visibility-report.json docs/heritage/bangabhaban-render-foreground-visibility.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/heritage/bangabhaban-render-review-summary.json docs/heritage/bangabhaban-render-contact-sheet.png docs/heritage/bangabhaban-topology-audit.md public/models/bangabhaban*.glb public/models/bangabhaban.manifest.json
+          git add docs/heritage/bangabhaban-render-review-summary.json docs/heritage/bangabhaban-render-contact-sheet.png docs/heritage/bangabhaban-render-foreground-visibility.json docs/heritage/bangabhaban-topology-audit.md public/models/bangabhaban*.glb public/models/bangabhaban.manifest.json
           if ! git diff --cached --quiet; then git commit -m "docs(heritage): record Bangabhaban render evidence"; fi
           if [[ -n "$(git status --porcelain)" ]]; then git stash push --include-untracked -m "Bangabhaban transient QA reports before rebase"; fi
           git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
