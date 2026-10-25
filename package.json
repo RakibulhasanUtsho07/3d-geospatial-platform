@@ -176,7 +176,12 @@
     "prepare:dhaka-road-extract": "node scripts/prepare-dhaka-road-extract.mjs",
     "test:prepare-dhaka-road-extract": "node --test tests/prepare-dhaka-road-extract.test.mjs",
     "test:real-dhaka-baseline": "node --test tests/real-dhaka-baseline-validation.test.mjs",
-    "verify:real-dhaka-baseline": "node scripts/validate-real-dhaka-baseline.mjs"
+    "verify:real-dhaka-baseline": "node scripts/validate-real-dhaka-baseline.mjs",
+    "build:bangabhaban-model": "node scripts/build-bangabhaban-model.mjs",
+    "fetch:bangabhaban-reference-pack": "node scripts/fetch-bangabhaban-reference-pack.mjs",
+    "audit:bangabhaban-topology": "node scripts/build-bangabhaban-topology-audit.mjs",
+    "test:bangabhaban-reference-pack": "node --test tests/bangabhaban-reference-pack.test.mjs",
+    "test:bangabhaban-model": "node --test tests/bangabhaban-model.test.mjs tests/bangabhaban-generated-glb-qa.test.mjs tests/bangabhaban-topology-audit.test.mjs tests/bangabhaban-reference-pack.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

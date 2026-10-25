@@ -1,0 +1,232 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "bangabhaban-dhaka-reference-pack",
+  "building": {
+    "name": "Bangabhaban",
+    "aliases": [
+      "Bongobhobon",
+      "Bangabhavan"
+    ],
+    "type": "official presidential residence and office",
+    "city": "Dhaka",
+    "area": "Dilkusha",
+    "approximateCoordinates": {
+      "latitude": 23.723302,
+      "longitude": 90.41782,
+      "confidence": "[C]",
+      "basis": "Coordinates listed for the 2006 aerial reference image viewpoint, NOT a surveyed building centroid."
+    }
+  },
+  "purpose": "Licensed-reference-backed Bangabhaban exterior visual-proxy pilot with deterministic GLB geometry QA, topology review and fixed-camera renders. This is not survey-grade or a photogrammetric reconstruction.",
+  "reconstructionStatus": "provisional-procedural-candidate-pending-qa",
+  "geometryPolicy": {
+    "dimensions": {
+      "status": "unknown",
+      "basis": "No independent measured building dimensions verified in this pack.",
+      "mustNotInferFrom": "aerial image pixels, video frames, news descriptions, or compound area"
+    },
+    "footprint": {
+      "status": "not-traced",
+      "requirement": "Trace the main building footprint from suitable overhead imagery and validate against independent geospatial data."
+    },
+    "model": {
+      "status": "provisional-procedural-candidate",
+      "publicationEligible": false,
+      "reason": "No independently measured dimensions, traced footprint, calibrated multi-view reconstruction or survey-control comparison is available."
+    }
+  },
+  "sources": [
+    {
+      "id": "official-location",
+      "kind": "official-text",
+      "title": "বঙ্গভবনের অবস্থান — রাষ্ট্রপতির কার্যালয়",
+      "url": "https://bangabhaban.gov.bd/pages/static-pages/694032d935ce18e1c0563692",
+      "supports": [
+        "Bangabhaban is the President's office and residence",
+        "Dilkusha area, central Dhaka"
+      ],
+      "license": "Government information page; factual citation only; do not treat page text as a geometry measurement."
+    },
+    {
+      "id": "licensed-aerial-2006",
+      "kind": "image",
+      "title": "Bangabhaban.jpg — aerial view",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
+      "date": "2006-11-25",
+      "creator": "Naira Al Husain",
+      "license": "CC BY-SA 4.0",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "sha256": null,
+      "downloaded": false,
+      "usableFor": [
+        "compound-level context and approximate site orientation"
+      ],
+      "notUsableAs": [
+        "independent dimension survey",
+        "facade texture without confirming resolution and suitability"
+      ],
+      "notes": "Commons page records a free-use permission and CC BY-SA 4.0; download and hash the exact file before using it in reproducible tests."
+    },
+    {
+      "id": "licensed-exterior-2017",
+      "kind": "image",
+      "title": "Bangabhaban (33310655331).jpg — exterior/context photograph",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Bangabhaban_%2833310655331%29.jpg",
+      "date": "2017-03-14",
+      "creator": "ASaber91",
+      "license": "CC BY 2.0",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 1800,
+        "height": 1153
+      },
+      "byteLength": 2420452,
+      "publishedSha1": "08c42b61fb435cf2bd9ac8e90f8261e8edc03b4a",
+      "sha256": null,
+      "downloaded": false,
+      "usableFor": [
+        "visual exterior/context comparison after confirming visible facade and viewpoint suitability"
+      ],
+      "notUsableAs": [
+        "independent dimension survey",
+        "calibrated multi-view reconstruction by itself"
+      ],
+      "notes": "Commons page identifies the source as a 2017 photo by ASaber91 under CC BY 2.0. The published SHA-1 is source metadata, not a locally recomputed checksum; download and compute SHA-256 before using it in reproducible reconstruction.",
+      "viewAssessment": {
+        "viewpoint": "elevated oblique cityscape view",
+        "visibleFeatures": [
+          "main palace massing",
+          "central dome",
+          "front colonnade",
+          "roof volumes",
+          "landscaping context"
+        ],
+        "occlusions": [
+          "trees obscure lower perimeter",
+          "distance reduces fine facade detail"
+        ],
+        "cameraCalibration": "unknown",
+        "captureCoordinates": "unknown",
+        "geometryUse": "single-view visual comparison and broad massing cues only",
+        "notSufficientFor": [
+          "multi-view photogrammetry",
+          "survey-grade dimensions",
+          "texture baking without projection review"
+        ],
+        "assessedFrom": "Commons preview and file metadata; original bytes not downloaded locally",
+        "assessedAt": "2026-10-25"
+      }
+    },
+    {
+      "id": "commons-category",
+      "kind": "image-index",
+      "title": "Bangabhaban media category — Wikimedia Commons",
+      "url": "https://commons.wikimedia.org/wiki/Category:Bangabhaban",
+      "license": "Per-file; verify each file page individually",
+      "usableFor": [
+        "finding additional facade/context references"
+      ],
+      "notes": "Category includes aerial, gate/wall, and event images; interior event photos are not necessarily exterior geometry references."
+    },
+    {
+      "id": "official-video-2016",
+      "kind": "video-reference",
+      "title": "BANGABHABAN || Office of the President of Bangladesh",
+      "url": "https://www.youtube.com/watch?v=RqnsvatJGCw",
+      "publisher": "BATAYON",
+      "date": "2016-02-25",
+      "license": "Copyright status not established for reuse",
+      "downloaded": false,
+      "usableFor": [
+        "visual orientation and contextual research only"
+      ],
+      "notUsableFor": [
+        "texture baking or redistribution without permission"
+      ],
+      "notes": "Video description states the main complex is three storeys and describes a roughly 23.5-hectare compound; compound area is not building footprint area."
+    },
+    {
+      "id": "published-history-2026",
+      "kind": "published-article",
+      "title": "New president to move into Bangabhaban today, let’s look for century-old building’s history",
+      "url": "https://en.prothomalo.com/bangladesh/government/eyc4gdsa5h",
+      "date": "2026",
+      "supports": [
+        "published historical account of 1905–1911 original timber palace",
+        "reported later palace reconstruction and 1964 two-storey building"
+      ],
+      "notes": "Article reports 84,000 square feet for the later building; treat as published secondary-source figure, not an independent survey. Resolve the area definition and current additions before using it as a dimensional constraint."
+    },
+    {
+      "id": "official-photo-gallery",
+      "kind": "official-image-index",
+      "title": "ফটোগ্যালারি — রাষ্ট্রপতির কার্যালয়",
+      "url": "https://bangabhaban.gov.bd/pages/photo-galleries/",
+      "license": "Per-image rights must be checked before reuse",
+      "usableFor": [
+        "finding official event and interior context"
+      ],
+      "notUsableFor": [
+        "automatically assumed reusable texture assets"
+      ]
+    },
+    {
+      "id": "licensed-aerial-2017",
+      "kind": "image",
+      "title": "Bangabhaban, Dhaka April (33244270994).jpg — elevated aerial/context photograph",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban,_Dhaka_April_(33244270994).jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/8/81/Bangabhaban%2C_Dhaka_April_%2833244270994%29.jpg",
+      "date": "2017-04-16",
+      "creator": "ASaber91",
+      "license": "CC BY 2.0",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "sha256": null,
+      "downloaded": false,
+      "usableFor": [
+        "qualitative roof blocks, building massing and compound context"
+      ],
+      "notUsableAs": [
+        "independent dimension survey",
+        "calibrated texture projection",
+        "photogrammetry by itself"
+      ],
+      "notes": "Wikimedia Commons identifies CC BY 2.0 and the author ASaber91. Camera pose is not calibrated; qualitative comparison only.",
+      "viewAssessment": {
+        "viewpoint": "elevated oblique aerial/cityscape",
+        "visibleFeatures": [
+          "white palace volumes",
+          "dome",
+          "front colonnade",
+          "roof decks",
+          "landscaping"
+        ],
+        "occlusions": [
+          "trees and foreground buildings obscure lower edges",
+          "perspective and distance hide facade detail"
+        ],
+        "cameraCalibration": "unknown",
+        "captureCoordinates": "unknown",
+        "geometryUse": "qualitative roof and wing massing only",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "calibrated texture baking",
+          "complete hidden geometry"
+        ],
+        "assessedAt": "2026-10-25"
+      }
+    }
+  ],
+  "acceptanceGates": [
+    "Every downloaded reference file has source URL, license/rights decision, byte length and SHA-256.",
+    "Exterior references are classified by facade, approximate camera pose, date, and visible occlusion; unknown pose remains unknown.",
+    "Building dimensions are sourced to independent survey or clearly tagged published measurement with a tolerance and axis mapping.",
+    "Compound area is never substituted for building footprint or floor area.",
+    "Candidate GLB is tested by geometry QA, UV/texture QA, deterministic multi-view renders, and independent reference review.",
+    "No visual fidelity or release pass is inferred from a successful build or a valid GLB alone.",
+    "The procedural candidate must not be described as photogrammetric or survey-verified without independent evidence."
+  ]
+}
