@@ -1,8 +1,8 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "0b6b3323931391f69438a5c9a5a1c61970e423a4",
-  "reviewGeneratedAt": "2026-10-25T09:03:36.092Z",
+  "sourceCommit": "73d44a51be9b1cf8342500e99c7350c556c68b70",
+  "reviewGeneratedAt": "2026-10-25T10:58:19.131Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
     "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
@@ -19,7 +19,7 @@
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "6c84696a478ab4c37c72abeb9894217a4470366a1760efb67c0345ed4bf4157c",
+    "sha256": "e1f2bd1b80e3b6dc1333199be86206ee451eda0369342311c988b22ce6b8033a",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -93,97 +93,135 @@
       ]
     }
   },
+  "referencePack": {
+    "filename": "reference-pack/reference-pack.manifest.json",
+    "sha256": "d63e13d5862178a7ae36e7d7ab71630d6dd50ff457cd6778e5714eddc5195582",
+    "verified": true,
+    "licensePolicy": "These reference images are licensed CC BY-SA 4.0. Preserve creator attribution, link the license, disclose any changes, and comply with share-alike terms for redistributed/adapted material. This metadata file does not grant any rights beyond the individual source licenses.",
+    "sources": [
+      {
+        "id": "licensed-front-2018",
+        "imagePath": "reference-pack/ahsan-manzil-front-2018.jpg",
+        "sha256": "90c5ca2c27020d5d49294675c8cb662a40ec50874c298bff227a95aa90de7a99",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Front_view_of_Ahsan_Manzil.jpg",
+        "viewRole": "south-front-elevation",
+        "verified": true,
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-side-2017",
+        "imagePath": "reference-pack/ahsan-manzil-side-2017.jpg",
+        "sha256": "6330269884ed2a34927e41e3cc14223795cc6d6f3e92a96cf279a28e34a4a0b0",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
+        "viewRole": "side-facade",
+        "verified": true,
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-oblique-2019",
+        "imagePath": "reference-pack/ahsan-manzil-oblique-2019.jpg",
+        "sha256": "e8d2076274c078aa6bef7de9c1ff968135a55dd5df8c60dca1b1636764ccbe77",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+        "viewRole": "oblique-front-side",
+        "verified": true,
+        "cameraCalibration": "unknown"
+      }
+    ]
+  },
   "views": [
     {
       "id": "front",
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c7ba985b285594f0573ff15e35148f9c3efa7bb59fdf90008860a1dbcdf64cce"
+      "sha256": "9010a6d045abd3501f67f768436a69405bc79a439aa32a064c51fdea4cf479e6"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9c034f01319e0132e62245f85b6865447777be7c77654391ff8c64f8e4b7bf52"
+      "sha256": "d3668f492a47699cf5d4cadeaeb276b9b4b1fc1c666594a471a0a72c011a849f"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "99fd3e5d9ffe07d9b6a2f9d9fa55f65ab74f7241f9cffaf37a99421d7f32b8cb"
+      "sha256": "f8216dcfc09b106d26fbcb8711a3384585f6cedbafc1f8c2d0ea388c2a46a80a"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d19249ad22c96cd478067697638890fcb5cee0e4120b9f2c0807d9bc9dc9d7ab"
+      "sha256": "3590ee0736631395efd88910d05d8eb24f116143a6a9639f34eace9a0ed3528f"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9c7c5ddbe273b94c50ae99c14ebfd6037d5a38706c684c5e85718ecb8be837b8"
+      "sha256": "b7f78bb02e76eba814b732bc668d4c0e923c98caa11bbdb1439203ec4c81ece8"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "5263ccbdb396ef06cf4aa01ef20c2b07702d80e5f3b0c02aa23ac3b5f129120f"
+      "sha256": "8ed49d3af6e8c5ec7b9585e35d5430234c06f51f512543192675b31b7928be4c"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d395be6f98605676699d4e38ce7ed3a8a150f4cecbd903930b72a1ff2ffd240f"
+      "sha256": "03a9d5141e57674090d2e0ec47eef1cc6496cd8287b35bc8581c4d1fcc89efe4"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a6a9338b49981f13496c193db6d46ee346d021e61c33b3ce2657abd8a83a2d00"
+      "sha256": "cb08cfd6f474a7a92840f34bfac618ae823552ecaf9185bb6e91be8fb4b09dc1"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "0ae9499408525f4b9cd15f667086b5732fbd1921a586292e8cee6404c1617642"
+      "sha256": "309625a13b633371784a9051060a5431633c1a4464de6a7d55c2cd3664b7c981"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9c7d0cb10194a7b114dbd5fec1fef865da865d6ec0c813a3ef2b1c681a9638c5"
+      "sha256": "f288cc5f086d93ae5f701311fc30c63c1aca13aa0e7f8676e22d96b156a44017"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "06f3e722d34d1bdf2181c0e95d8a0b9c73497a9910fc90cf994b93bbf895015d"
+      "sha256": "03b0159b6a497336f5685a1a114e9b418fc4ad2806394016bf53aa0173e52be1"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c3c308a432c3f5357635a8e0593e225f33dde66b56b3ce61e3a6aab4a1cdc69e"
+      "sha256": "f1f90b1f63b5cfd34da6d0c69837855e6eb276a193d3573b2ba141f16dfbfc75"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d6f58c9f9a15519a37d4457c65e7779b8fca72f43082e36144f5f3ed6c140378"
+      "sha256": "acab66d0d0bfb84bd9d2d77f4ffdd10fb7c3d4212175703ca1f7138f0bbbb140"
     }
   ],
   "visualReview": {
