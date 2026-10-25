@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 
 import { attachSharedRequestConsumer } from "@/core/geospatial/shared-request-lifecycle.mjs";
@@ -64,28 +66,37 @@ function remember(key: string, payload: RoadQueryResult): void {
 }
 
 async function queryRoads(request: RoadNetworkRequest, upstreamSignal: AbortSignal): Promise<RoadQueryResult> {
-  const offlinePath = process.env.DHAKA_ROADS_EXTRACT_PATH?.trim();
+  const configuredOfflinePath = process.env.DHAKA_ROADS_EXTRACT_PATH?.trim();
+  const bundledOfflinePath = path.join(process.cwd(), "public", "data", "roads", "dhaka-road-network-v1.json");
+  const offlinePath = configuredOfflinePath || (existsSync(bundledOfflinePath) ? bundledOfflinePath : null);
   if (offlinePath) {
     let extract;
     try {
       extract = await loadOfflineRoadExtract(offlinePath);
     } catch (error: unknown) {
-      console.error("[Roads] Configured local OSM extract failed validation.", error instanceof Error ? error.message : String(error));
-      throw Object.assign(new Error("The configured local Dhaka road extract is unavailable or invalid."), {
-        statusCode: 503,
-        retryAfter: "60",
-      }) as UpstreamFailure;
+      const message = error instanceof Error ? error.message : String(error);
+      if (configuredOfflinePath) {
+        console.error("[Roads] Configured local OSM extract failed validation.", message);
+        throw Object.assign(new Error("The configured local Dhaka road extract is unavailable or invalid."), {
+          statusCode: 503,
+          retryAfter: "60",
+        }) as UpstreamFailure;
+      }
+      console.error("[Roads] Bundled local OSM extract is unusable; falling back to Overpass.", message);
+      extract = undefined;
     }
-    const offline = queryOfflineRoadExtract(extract, request);
-    if (offline.covered) {
-      return {
-        roads: offline.roads,
-        detailLevel: "offline",
-        upstreamAttempts: 0,
-        upstreamEndpoint: "local-road-extract",
-        sourceDate: offline.sourceDate,
-        sourceUrl: offline.sourceUrl,
-      };
+    if (extract) {
+      const offline = queryOfflineRoadExtract(extract, request);
+      if (offline.covered) {
+        return {
+          roads: offline.roads,
+          detailLevel: "offline",
+          upstreamAttempts: 0,
+          upstreamEndpoint: "local-road-extract",
+          sourceDate: offline.sourceDate,
+          sourceUrl: offline.sourceUrl,
+        };
+      }
     }
   }
   const upstream = await fetchOverpassElements({
@@ -138,7 +149,7 @@ function respond(
       license: "ODbL 1.0",
       attribution: "© OpenStreetMap contributors",
       note: payload.detailLevel === "offline"
-        ? "Road geometry comes from the configured local OSM regional extract, dated " + String(payload.sourceDate) + ". It is available without an Overpass request but may be stale relative to live OSM changes."
+        ? "Road geometry comes from the local OSM regional extract, dated " + String(payload.sourceDate) + ". It is available without an Overpass request but may be stale relative to live OSM changes."
         : payload.detailLevel === "reduced"
           ? "Road geometry is a reduced fallback after the primary query failed; some local, service and pedestrian roads may be omitted. Unmapped/private roads and stale tags remain possible."
           : "Road geometry reflects mapped OpenStreetMap centerlines and tags. Unmapped/private roads, incomplete widths and stale tags remain possible. Rendered road widths are sourced where tagged, otherwise estimated from highway class/lanes.",
