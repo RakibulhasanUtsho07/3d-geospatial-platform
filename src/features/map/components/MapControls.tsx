@@ -234,6 +234,7 @@ export default function MapControls({
           {orbitTourActive ? "Stop tour" : "360° tour"}
         </button>
         </div>
+        </div>
       )}
     </div>
   );
