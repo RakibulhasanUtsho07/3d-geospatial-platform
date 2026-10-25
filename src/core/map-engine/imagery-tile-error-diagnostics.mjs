@@ -15,7 +15,7 @@ export function summarizeImageryTileError(error) {
     : "Unspecified imagery tile error";
   const message = rawMessage
     .replace(/https?:\/\/[^\s)\]}>]+/gi, "[imagery-url]")
-    .replace(/\b(?:west|south|east|north|x|y|z|s|access_token|token)=([^&\s)\]}]+)/gi, "$1=[redacted]")
+    .replace(/\b(west|south|east|north|x|y|z|s|access_token|token)=([^&\s)\]}]+)/gi, "$1=[redacted]")
     .slice(0, MAX_ERROR_MESSAGE_LENGTH);
 
   return {
