@@ -74,7 +74,7 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | facade.pilasterOrder | [V] | simplified Corinthian-type | Supplied brief | Fine capital and fluting geometry simplified. |
 | facade.capitalFluting | [?] | smooth simplified capital | Placeholder; needs close-up |  |
 | facade.coloredGlazing | [?] | dark rose/amber panels with simple mullions | Placeholder; exact pattern unknown |  |
-| facade.porticoWidth | [E] | 18.6 m | 15-bay Rangmahal frontage estimate: 55.8 m / 15 = 3.72 m bay pitch | Five estimated bay pitches align the central triple-arch pavilion with the openings it replaces; verify from a rectified south elevation. |
+| facade.porticoWidth | [E] | 13.0 m | About 3.5 estimated bay pitches at 3.72 m, compared with the provisional 55.8 m frontage | Reduced from five bay pitches after the licensed front image showed the modelled central pavilion too wide; perspective is not rectified and this remains an estimate. |
 | facade.porticoDepth | [E] | 4 m | Procedural placeholder until footprint/photo calibration | Projection depth of the central portico. | 
 | facade.balustradeHeight | [E] | 0.9 m | Visible upper-veranda guardrail proportion in exterior photographs | Approximate guardrail height above veranda floor. |
 | facade.balusterSpacing | [E] | 0.85 m | Procedural rendering parameter | Approximate post interval; replace after elevation/photo calibration. |
@@ -86,20 +86,20 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | stair.riserHeight | [E] | 0.2286 m | 6.4 m upper portal datum / 28 estimated risers | Twenty-eight estimated risers align with the 6.4 m upper portal datum; verify the actual step count from a straight-on photograph. |
 | stair.treadDepth | [E] | 0.5714 m | 16.0 m horizontal run / 28 estimated steps | Restores the broad ceremonial run; the previous 0.34 m tread / 9.52 m run compressed the stair. Verify against measured plan imagery. |
 | stair.stepCount | [E] | 28 steps | Single front reference photo estimate (25–30 steps) | Count from a straight-on photograph to replace this estimate. |
-| stair.width | [E] | 39.0 m | Visual ratio from published south/front exterior photograph against the 55.8 m provisional Rangmahal frontage | The broad ceremonial stair base is estimated at about 70% of the frontage; the previous 26 m/46% version looked too narrow in the rendered comparison. Confirm from a rectified elevation or measured plan. |
+| stair.width | [E] | 27.0 m | Visual ratio against licensed south/front exterior photograph, referenced to the provisional 55.8 m frontage | Reduced from 39 m (~70%) because the stair base visually dominated the facade; 27 m is about 48% of the provisional frontage. Confirm using a rectified elevation or measured plan. |
 | stair.sideRail | [?] | simple low side rails | Stylized placeholder |  |
 | stair.runLength | [E] | 16 m | Single front reference photo estimate | Horizontal garden run toward the river; not site-surveyed. |
-| stair.topWidth | [E] | 18.6 m | Aligned to the provisional triple-arched portico width | The top landing aligns to the central portico and tapers from the broad base; verify from rectified elevation. |
+| stair.topWidth | [E] | 13.0 m | Aligned to the revised 13.0 m provisional triple-arched portico width | The landing was narrowed with the central pavilion to better match the licensed front image; verify from a rectified elevation. |
 | dome.peakHeight | [V] | 27.13 m above ground | Bangladesh Tourism Board heritage newsletter |  |
 | dome.drumHeight | [E] | 5 m | Supplied placeholder |  |
 | dome.bodyHeight | [E] | 6.53 m | Derived to meet 27.13 m peak with 13.6 m roofline and 2 m finial |  |
 | dome.finialHeight | [E] | 2 m | Supplied placeholder |  |
-| dome.drumWidth | [?] | 14 m | Placeholder; calibrate from elevation photo |  |
+| dome.drumWidth | [E] | 10.5 m | Relative silhouette proportion against licensed front/oblique images; camera calibration and independent dimensions are unavailable | Reduced from the 14 m placeholder because the generated dome/drum diameter looked too broad relative to the facade; estimate pending rectification or survey. |
 | dome.profile | [V] | square base room → octagonal drum → lotus-bud dome → finial | Supplied brief | Curvature and ribs remain stylized. |
 | dome.drumOpeningCount | [E] | 8 open bays around octagonal drum | Reference-image interpretation of an open/fenestrated drum | One open arch per octagonal face is a procedural reconstruction; verify from oblique and elevation photographs. |
 | dome.drumOpeningWidth | [E] | 2.7 m | Single reference photo estimate for open colonnade bays | Wider openings deliberately read as a colonnade rather than small glazed windows. |
 | dome.drumOpeningCrownHeight | [E] | 2.8 m | Single reference photo estimate | Opening crown within the 5 m drum; measure from a rectified elevation. |
-| dome.profileRings | [E] | [[6.9,0],[6.89,0.35],[6.8,1.1],[6.57,2],[6.18,2.9],[5.61,3.8],[4.89,4.65],[3.8,5.45],[0.28,6.53]] [radius_m, height_above_dome_base_m] pairs | Fuller oval/lotus-bud profile constrained by 14 m drum and the 27.13 m peak | Mid-body radii were enlarged because the first render review showed a visibly conical taper; the rounded curvature remains an estimate pending a rectified elevation. |
+| dome.profileRings | [E] | [[5.25,0],[5.24,0.35],[5.17,1.1],[5.0,2],[4.70,2.9],[4.27,3.8],[3.72,4.65],[2.89,5.45],[0.21,6.53]] [radius_m, height_above_dome_base_m] pairs | Rounded lotus-bud profile scaled to a 10.5 m estimated drum while preserving the 6.53 m profile height and 27.13 m published peak | Maximum radius reduced from 6.9 m after front/oblique comparison showed the dome/drum too broad; curvature remains an estimate pending rectified elevation. |
 | materials.facadePink | [E] | #E1917D | User-supplied daylight photo estimate | Warm salmon pink; final colour still needs a calibrated daylight sample. |
 | materials.trimOffWhite | [E] | #E99C8A | User-supplied daylight photo estimate | Trim intentionally stays in the same pink family; the old off-white trim was incorrect. |
 | materials.glass | [?] | #583943 | Generic dark glazing proxy |  |

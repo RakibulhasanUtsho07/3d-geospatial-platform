@@ -195,10 +195,9 @@ def main():
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
-        # Near-level (~2.5 degree) south-elevation view keeps the facade dominant.
-        # The 8-degree render still projected the full roof depth into a broad blank band above the arcade.
-        # At 2.5 degrees, roof-depth projection is smaller; the other 12 views retain roof context.
-        ("front", Vector((0.0, -0.999048, 0.043619)), "ORTHO"),
+        # Straight-on (0 degree) south-elevation view minimizes blank roof-depth projection over the facade.
+        # The other 12 views retain roof context and oblique visibility for the dome and roofline.
+        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),

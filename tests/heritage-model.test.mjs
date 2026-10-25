@@ -98,9 +98,15 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.footprint.andarmahalDepth.value, 14.375);
   assert.equal(config.parameters.footprint.andarmahalNorthOffset.value, -7.1875);
   assert.equal(config.parameters.footprint.andarmahalBayCount.value, 8);
-  assert.equal(config.parameters.facade.porticoWidth.value, 18.6);
-  assert.equal(config.parameters.stair.width.value, 39);
-  assert.equal(config.parameters.stair.topWidth.value, 18.6);
+  assert.equal(config.parameters.facade.porticoWidth.value, 13.0);
+  assert.equal(config.parameters.stair.width.value, 27);
+  assert.equal(config.parameters.stair.topWidth.value, 13.0);
+  assert.ok(config.parameters.facade.porticoWidth.value / config.parameters.footprint.rangmahalBlockLength.value > 0.22);
+  assert.ok(config.parameters.facade.porticoWidth.value / config.parameters.footprint.rangmahalBlockLength.value < 0.25);
+  assert.ok(config.parameters.stair.width.value / config.parameters.footprint.rangmahalBlockLength.value > 0.45);
+  assert.ok(config.parameters.stair.width.value / config.parameters.footprint.rangmahalBlockLength.value < 0.50);
+  assert.ok(Math.abs(config.parameters.stair.topWidth.value - config.parameters.facade.porticoWidth.value) < 0.001);
+  assert.equal(config.parameters.dome.drumWidth.value, 10.5);
   assert.equal(config.parameters.stair.stepCount.value, 28);
   assert.equal(config.parameters.stair.riserHeight.value, 0.2285714286);
   assert.equal(config.parameters.stair.treadDepth.value, 0.5714285714);
@@ -109,9 +115,9 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(Math.abs(config.parameters.stair.stepCount.value * config.parameters.stair.riserHeight.value - 6.4) < 0.00001);
   assert.ok(Math.abs(config.parameters.stair.stepCount.value * config.parameters.stair.treadDepth.value - 16) < 0.00001);
   const domeRings = config.parameters.dome.profileRings.value;
-  assert.equal(domeRings[0][0], 6.9, "dome base radius nearly matches the 7 m drum radius");
-  assert.equal(domeRings[2][0], 6.8, "dome keeps a full rounded lower shoulder instead of pinching into a cone");
-  assert.ok(domeRings[6][0] > 4.8, "upper-mid dome remains full before narrowing toward the finial");
+  assert.equal(domeRings[0][0], 5.25, "dome base radius matches the revised 10.5 m drum width");
+  assert.ok(domeRings[2][0] > 5.1, "scaled dome keeps a full rounded lower shoulder instead of pinching into a cone");
+  assert.ok(domeRings[6][0] > 3.6, "scaled upper-mid dome remains full before narrowing toward the finial");
   assert.equal(domeRings[domeRings.length - 1][1], 6.53, "dome body profile height fits its peak-height budget");
   assert.ok(Math.abs(domeRings[0][0] * 2 - config.parameters.dome.drumWidth.value) <= 0.2);
   assert.equal(config.parameters.materials.facadePink.value, "#E1917D");
@@ -219,8 +225,8 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
-  assert.ok(renderer.includes('("front", Vector((0.0, -0.999048, 0.043619)), "ORTHO")'));
-  assert.ok(renderer.includes("Near-level (~2.5 degree) south-elevation view limits blank roof-depth projection over the facade."));
+  assert.ok(renderer.includes('("front", Vector((0.0, -1.0, 0.0)), "ORTHO")'));
+  assert.ok(renderer.includes("Straight-on (0 degree) south-elevation view minimizes blank roof-depth projection over the facade."));
   assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.45'));
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
   assert.ok(renderer.includes("light_power * 0.33, light_size * 1.05"));

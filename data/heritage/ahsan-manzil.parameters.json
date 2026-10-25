@@ -310,11 +310,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 18.6,
+        "value": 13,
         "unit": "m",
         "confidence": "[E]",
-        "source": "15-bay Rangmahal frontage estimate: 55.8 m / 15 bays = 3.72 m bay pitch",
-        "note": "Five estimated bay pitches align the central facade openings, triple-arched portico, and upper stair landing; verify from rectified elevation imagery."
+        "source": "Licensed front-elevation image proportion: about 3.5 estimated bays at the provisional 3.72 m bay pitch; camera perspective is not rectified.",
+        "note": "Reduced from five bay pitches (18.6 m) because side-by-side comparison showed the modelled central pavilion/portico too wide against the facade. Use as a visual proportion estimate only; verify from a rectified elevation."
       },
       "porticoDepth": {
         "value": 4,
@@ -395,11 +395,11 @@
         "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 39,
+        "value": 27,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Approximate base-to-frontage ratio from the south-elevation reference image",
-        "note": "The published front exterior image shows a broad flared stair base occupying roughly two-thirds to three-quarters of the 55.8 m Rangmahal frontage. Working width is 39 m (~70%); estimate only until photo rectification or survey."
+        "source": "Visual ratio against the licensed south/front exterior photograph, referenced to the provisional 55.8 m Rangmahal frontage.",
+        "note": "Reduced from 39 m (~70% of frontage) after comparison showed the stair base dominating the facade. 27 m is about 48% of the provisional frontage; perspective and foreground make this an estimate, not a surveyed width."
       },
       "sideRail": {
         "value": "simple low side rails",
@@ -414,11 +414,11 @@
         "note": "28 shallow treads at 0.5714285714 m give a 16 m horizontal run; verify against a measured plan."
       },
       "topWidth": {
-        "value": 18.6,
+        "value": 13,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Aligned to the 18.6 m provisional triple-arched portico width",
-        "note": "Upper stair landing aligns with the central portico and tapers from the broad lower flight; visual estimate only."
+        "source": "Aligned to the revised 13.0 m provisional triple-arch portico width, estimated at about 3.5 bay pitches.",
+        "note": "Reduced from 18.6 m so the stair landing aligns with the narrower central pavilion in the licensed front image. Confirm using a rectified elevation or measured plan."
       }
     },
     "dome": {
@@ -447,10 +447,11 @@
         "source": "Supplied placeholder"
       },
       "drumWidth": {
-        "value": 14,
+        "value": 10.5,
         "unit": "m",
-        "confidence": "[?]",
-        "source": "Placeholder; calibrate from elevation photo"
+        "confidence": "[E]",
+        "source": "Relative silhouette proportion against the licensed front and oblique reference images; no camera calibration or independent measurement.",
+        "note": "Reduced from the 14 m placeholder because the generated drum/dome diameter was too broad relative to the front elevation. 10.5 m is an image-based proportion estimate pending rectification or survey."
       },
       "profile": {
         "value": "square base room → octagonal drum → lotus-bud dome → finial",
@@ -482,46 +483,46 @@
       "profileRings": {
         "value": [
           [
-            6.9,
+            5.25,
             0
           ],
           [
-            6.89,
+            5.24,
             0.35
           ],
           [
-            6.8,
+            5.17,
             1.1
           ],
           [
-            6.57,
+            5,
             2
           ],
           [
-            6.18,
+            4.7,
             2.9
           ],
           [
-            5.61,
+            4.27,
             3.8
           ],
           [
-            4.89,
+            3.72,
             4.65
           ],
           [
-            3.8,
+            2.89,
             5.45
           ],
           [
-            0.28,
+            0.21,
             6.53
           ]
         ],
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
-        "source": "Lotus-bud dome silhouette interpreted from published exterior photographs and constrained by 14 m drum width and 27.13 m peak",
-        "note": "Nine radial profile samples approximate a fuller, rounded lotus-bud/ellipsoidal dome rather than the earlier visibly conical taper. The 6.9 m base radius nearly matches the 7 m drum radius and the 6.53 m body height remains constrained by the 27.13 m overall peak; the curvature is still an estimate pending rectified elevation imagery."
+        "source": "Lotus-bud dome silhouette interpreted from the licensed exterior reference set; radii scaled to the 10.5 m estimated drum width while preserving the 6.53 m profile height and 27.13 m published peak.",
+        "note": "The previous 6.9 m maximum radius produced a dome/drum that was too broad against the facade. The revised 5.25 m maximum radius keeps the rounded lower shoulder while reducing diameter; shape and radii remain estimates pending rectified elevation imagery."
       }
     },
     "materials": {
