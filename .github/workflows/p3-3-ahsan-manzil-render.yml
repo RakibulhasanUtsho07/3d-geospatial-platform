@@ -11,6 +11,7 @@ on:
       - 'scripts/fetch-ahsan-manzil-reference-pack.mjs'
       - 'tests/ahsan-manzil-reference-pack.test.mjs'
       - 'scripts/build-ahsan-manzil-model.mjs'
+      - 'scripts/build-ahsan-manzil-topology-audit.mjs'
       - 'scripts/blender/render-building-review.py'
       - 'docs/BLENDER-RENDER-REVIEW.md'
       - 'tests/heritage-model.test.mjs'
