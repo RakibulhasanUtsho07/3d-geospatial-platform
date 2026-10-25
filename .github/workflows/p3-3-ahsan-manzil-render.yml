@@ -183,8 +183,12 @@ jobs:
                 sha256: source.sha256,
                 license: source.license,
                 sourceUrl: source.url,
+                downloadedUrl: source.downloadedUrl,
+                downloadMode: source.downloadMode || "original",
+                originalPublishedSha1: source.publishedSha1,
                 viewRole: source.viewRole,
                 verified: source.verified,
+                verificationMethod: source.verificationMethod,
                 cameraCalibration: source.viewAssessment?.cameraCalibration ?? "unknown"
               }))
             },

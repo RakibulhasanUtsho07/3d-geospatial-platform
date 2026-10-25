@@ -21,6 +21,9 @@ test("Ahsan Manzil reference pack uses fixed, permission-documented Wikimedia so
   assert.match(downloader, /status === 429/);
   assert.match(downloader, /retry-after/);
   assert.match(downloader, /upload\.wikimedia\.org/);
+  assert.match(downloader, /thumb\\.wikimedia\\.org/);
+  assert.match(downloader, /jpegDimensions/);
+  assert.match(downloader, /expectedDownloadDimensions/);
   assert.match(downloader, /Existing reference file differs from its verified source/);
   assert.match(downloader, /Existing reference manifest differs from the newly verified manifest/);
   assert.match(downloader, /verified: true/);
@@ -57,6 +60,11 @@ test("four licensed view types include an unrectified aerial reference without t
   assert.ok(pack.acceptanceGates.some((gate) => gate.includes("independent surveyed dimensions")));
   const aerial = pack.sources.find((source) => source.id === "licensed-aerial-2019");
   assert.equal(aerial.expectedByteLength, 7908613);
+  assert.equal(aerial.downloadMode, "thumbnail");
+  assert.equal(new URL(aerial.downloadUrl).hostname, "thumb.wikimedia.org");
+  assert.deepEqual(aerial.expectedDownloadDimensions, {width: 1280, height: 853});
+  assert.equal(aerial.localFileName, "ahsan-manzil-aerial-2019-1280.jpg");
+  assert.equal(aerial.publishedSha1, "6f2913594f7db0b04fc8b480442d0694c41dfb9f", "published SHA-1 refers to the original file, not thumbnail bytes");
   assert.equal(aerial.publishedSha1, "6f2913594f7db0b04fc8b480442d0694c41dfb9f");
   assert.equal(aerial.viewRole, "aerial-oblique-roof-plan");
   assert.ok(aerial.notUsableFor.some((value) => value.includes("orthographic footprint")));

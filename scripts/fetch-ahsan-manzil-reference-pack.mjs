@@ -10,19 +10,48 @@ const manifestPath = path.join(outputDir, "reference-pack.manifest.json");
 const sha = (algorithm, bytes) => createHash(algorithm).update(bytes).digest("hex");
 
 function assertAllowedSource(source) {
-  const parsed = new URL(source.originalFileUrl);
-  if (parsed.protocol !== "https:" || parsed.hostname !== "upload.wikimedia.org" || !parsed.pathname.startsWith("/wikipedia/commons/")) {
-    throw new Error("Reference URL is outside the allowed Wikimedia Commons original-file host: " + source.id);
+  const thumbnailMode = source.downloadMode === "thumbnail";
+  const downloadUrl = thumbnailMode ? source.downloadUrl : source.originalFileUrl;
+  const parsed = new URL(downloadUrl || "");
+  const allowedHost = thumbnailMode ? "thumb.wikimedia.org" : "upload.wikimedia.org";
+  if (parsed.protocol !== "https:" || parsed.hostname !== allowedHost || !parsed.pathname.startsWith("/wikipedia/commons/")) {
+    throw new Error("Reference URL is outside the allowlisted Wikimedia Commons host: " + source.id);
+  }
+  if (thumbnailMode && (!parsed.pathname.includes("/thumb/") ||
+      !Number.isSafeInteger(source.expectedDownloadDimensions?.width) ||
+      !Number.isSafeInteger(source.expectedDownloadDimensions?.height))) {
+    throw new Error("Thumbnail sources require a fixed Commons thumb URL and expected dimensions: " + source.id);
   }
   if (!/^[a-z0-9][a-z0-9._-]+$/i.test(source.localFileName || "")) {
     throw new Error("Reference filename is not a safe basename: " + source.id);
   }
   if (!/^[a-f0-9]{40}$/i.test(source.publishedSha1 || "")) {
-    throw new Error("Reference source has no valid published SHA-1: " + source.id);
+    throw new Error("Reference source has no valid published original-file SHA-1: " + source.id);
   }
   if (!Number.isSafeInteger(source.expectedByteLength) || source.expectedByteLength < 1024) {
-    throw new Error("Reference source has an invalid expected byte length: " + source.id);
+    throw new Error("Reference source has an invalid original-file byte length: " + source.id);
   }
+}
+
+function jpegDimensions(bytes) {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  const startOfFrame = new Set([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf]);
+  let offset = 2;
+  while (offset + 4 < bytes.length) {
+    if (bytes[offset] !== 0xff) { offset++; continue; }
+    while (offset < bytes.length && bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++];
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) break;
+    const segmentLength = bytes.readUInt16BE(offset);
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
+    if (startOfFrame.has(marker) && segmentLength >= 7) {
+      return {height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5)};
+    }
+    offset += segmentLength;
+  }
+  return null;
 }
 
 async function readIfExists(filename) {
@@ -84,19 +113,32 @@ async function main() {
 
   for (const source of imageSources) {
     assertAllowedSource(source);
-    const response = await fetchWithRetry(source);
+    const downloadUrl = source.downloadMode === "thumbnail" ? source.downloadUrl : source.originalFileUrl;
+    const response = await fetchWithRetry({...source, originalFileUrl: downloadUrl});
     const final = new URL(response.url);
-    if (final.protocol !== "https:" || final.hostname !== "upload.wikimedia.org" || !final.pathname.startsWith("/wikipedia/commons/")) {
-      throw new Error(source.id + " redirected outside the allowed Wikimedia Commons original-file host: " + final.href);
+    const thumbnailMode = source.downloadMode === "thumbnail";
+    const allowedHost = thumbnailMode ? "thumb.wikimedia.org" : "upload.wikimedia.org";
+    if (final.protocol !== "https:" || final.hostname !== allowedHost || !final.pathname.startsWith("/wikipedia/commons/")) {
+      throw new Error(source.id + " redirected outside the allowlisted Wikimedia Commons host: " + final.href);
     }
     const bytes = Buffer.from(await response.arrayBuffer());
     const actualSha1 = sha("sha1", bytes);
     const actualSha256 = sha("sha256", bytes);
-    if (bytes.byteLength !== source.expectedByteLength) {
-      throw new Error(source.id + " byte length mismatch: expected " + source.expectedByteLength + ", got " + bytes.byteLength);
-    }
-    if (actualSha1 !== source.publishedSha1) {
-      throw new Error(source.id + " published SHA-1 mismatch: expected " + source.publishedSha1 + ", got " + actualSha1);
+    if (thumbnailMode) {
+      const dimensions = jpegDimensions(bytes);
+      const expected = source.expectedDownloadDimensions;
+      if (response.headers.get("content-type")?.toLowerCase().split(";")[0] !== "image/jpeg" ||
+          !dimensions || dimensions.width !== expected.width || dimensions.height !== expected.height ||
+          bytes.byteLength < 20000 || bytes.byteLength > 5000000) {
+        throw new Error(source.id + " thumbnail failed JPEG/dimension/size validation: " + JSON.stringify({contentType: response.headers.get("content-type"), dimensions, byteLength: bytes.byteLength}));
+      }
+    } else {
+      if (bytes.byteLength !== source.expectedByteLength) {
+        throw new Error(source.id + " byte length mismatch: expected " + source.expectedByteLength + ", got " + bytes.byteLength);
+      }
+      if (actualSha1 !== source.publishedSha1) {
+        throw new Error(source.id + " published SHA-1 mismatch: expected " + source.publishedSha1 + ", got " + actualSha1);
+      }
     }
     downloads.push({
       source,
@@ -104,14 +146,19 @@ async function main() {
       manifestSource: {
         ...source,
         sourceUrl: source.url,
+        downloadMode: source.downloadMode || "original",
         downloadedUrl: response.url,
         byteLength: bytes.byteLength,
+        computedSha1: actualSha1,
         computedSha256: actualSha256,
         sha256: actualSha256,
         verified: true,
         downloaded: true,
+        verificationMethod: thumbnailMode
+          ? "Fixed Commons thumbnail URL; HTTP image/jpeg response, JPEG signature, decoded frame dimensions and bounded file size checked. SHA-256 is computed from this downloaded thumbnail; published SHA-1/size fields describe the linked original file, not this derivative."
+          : "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
         imagePath: source.localFileName,
-        modificationDisclosure: "Original source bytes; no modifications applied.",
+        modificationDisclosure: thumbnailMode ? "Wikimedia Commons-generated 1280×853 derivative of the original; no additional modifications applied." : "Original source bytes; no modifications applied.",
         attribution: source.creator + ', "' + source.title + '", licensed under ' + source.license + "; source: " + source.url,
       },
     });

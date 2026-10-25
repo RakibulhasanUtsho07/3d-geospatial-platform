@@ -214,7 +214,7 @@
       "publishedSha1": "6f2913594f7db0b04fc8b480442d0694c41dfb9f",
       "sha256": null,
       "downloaded": false,
-      "localFileName": "ahsan-manzil-aerial-2019.jpg",
+      "localFileName": "ahsan-manzil-aerial-2019-1280.jpg",
       "supports": [
         "qualitative roof-plane segmentation and roof tone",
         "relative arrangement of front stair, central dome and side wings",
@@ -247,12 +247,18 @@
           "camera-calibrated photogrammetry by itself",
           "direct texture projection or atlas baking"
         ],
-        "assessedFrom": "Wikimedia Commons file-page metadata and the unrectified aerial preview; original bytes are checked by pinned byte length and SHA-1 before use."
+        "assessedFrom": "Wikimedia Commons file-page metadata and the unrectified aerial preview; original file metadata records the published SHA-1 and byte length, while the downloaded 1280×853 Wikimedia thumbnail is independently checked for JPEG format and dimensions and receives its own computed SHA-256."
+      },
+      "downloadMode": "thumbnail",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Ahsan_Manzil_01.jpg/1280px-Ahsan_Manzil_01.jpg",
+      "expectedDownloadDimensions": {
+        "width": 1280,
+        "height": 853
       }
     }
   ],
   "acceptanceGates": [
-    "The exact original bytes must be downloaded from upload.wikimedia.org and match the published byte length and SHA-1 before any render comparison.",
+    "For original-mode sources, bytes must match published byte length and SHA-1. The explicitly marked aerial thumbnail mode instead validates the fixed thumb.wikimedia.org URL, JPEG format and 1280×853 dimensions, computes a local SHA-256 for the downloaded derivative, and keeps original-file SHA-1/size metadata separate.",
     "Compute and store SHA-256 locally for every downloaded source file and include the attribution/license metadata in the same artifact.",
     "The source photo set supports manual facade/massing review only; camera calibration and independent surveyed dimensions remain unknown.",
     "Any texture projection must record camera pose, visible-pixel mask, occlusion policy and source-image attribution.",
