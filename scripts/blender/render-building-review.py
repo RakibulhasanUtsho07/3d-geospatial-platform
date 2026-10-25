@@ -56,6 +56,32 @@ def scene_bounds(mesh_objects):
     center = Vector([(minimum[axis] + maximum[axis]) / 2.0 for axis in range(3)])
     return minimum, maximum, dimensions, center
 
+def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
+    """Fit an orthographic camera to the visible geometry projected into this view."""
+    camera_location = view_center + direction.normalized()
+    rotation = (view_center - camera_location).to_track_quat("-Z", "Y")
+    camera_right = rotation @ Vector((1.0, 0.0, 0.0))
+    camera_up = rotation @ Vector((0.0, 1.0, 0.0))
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    projected_right = []
+    projected_up = []
+    for obj in mesh_objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        for corner in evaluated.bound_box:
+            point = evaluated.matrix_world @ Vector(corner)
+            delta = point - view_center
+            projected_right.append(delta.dot(camera_right))
+            projected_up.append(delta.dot(camera_up))
+    if not projected_right or not projected_up:
+        raise RuntimeError("Cannot fit orthographic view without projected mesh bounds")
+    width = max(projected_right) - min(projected_right)
+    height = max(projected_up) - min(projected_up)
+    span = max(width, height)
+    if span <= 1e-9:
+        raise RuntimeError("Projected mesh bounds have zero extent")
+    return span * padding
+
+
 def sample_pixel_statistics(image, resolution):
     total = int(image.size[0] * image.size[1])
     if total < 1:
@@ -121,7 +147,6 @@ def main():
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
-    ortho_scale = max_dimension * 1.45
 
     # Match the real-world river-facing reference: the canonical front image is
     # a detail view of Rangmahal, not a full-footprint view with the rear-set
@@ -137,7 +162,6 @@ def main():
         raise RuntimeError("Could not find Rangmahal meshes for the focused front review view")
     _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
     rangmahal_camera_distance = max(rangmahal_dimensions) * 3.0
-    rangmahal_ortho_scale = max(rangmahal_dimensions) * 1.22
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -188,13 +212,29 @@ def main():
                             math.sin(elevation)))
         views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
 
+    original_render_visibility = [(obj, obj.hide_render) for obj in meshes]
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
-        view_center = rangmahal_center if view_id == "front" else center
-        view_distance = rangmahal_camera_distance if view_id == "front" else camera_distance
-        view_scale = rangmahal_ortho_scale if view_id == "front" else ortho_scale
-        view_framing = "rangmahal-south-facade" if view_id == "front" else "whole-model"
+        # Restore the normal whole-model visibility before every camera. The
+        # focused front image intentionally isolates the river-facing Rangmahal
+        # so the rear Andarmahal/whole-footprint roof rails cannot clip the facade.
+        for obj, was_hidden in original_render_visibility:
+            obj.hide_render = was_hidden
+        if view_id == "front":
+            for obj in meshes:
+                if obj not in rangmahal_review_meshes:
+                    obj.hide_render = True
+            visible_meshes = rangmahal_review_meshes
+            view_center = rangmahal_center
+            view_distance = rangmahal_camera_distance
+            view_framing = "rangmahal-south-facade-focused"
+        else:
+            visible_meshes = meshes
+            view_center = center
+            view_distance = camera_distance
+            view_framing = "whole-model"
+        view_scale = projected_ortho_scale(visible_meshes, view_center, direction)
         camera_data = bpy.data.cameras.new("ReviewCamera_" + view_id)
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
