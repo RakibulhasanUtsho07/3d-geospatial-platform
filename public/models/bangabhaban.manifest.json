@@ -31,34 +31,34 @@
           "uri": "/models/bangabhaban-lod1.glb",
           "lod": 1,
           "purpose": "coarse massing",
-          "sha256": "63bdae6c027b5b2900654cb0aa5da4c6cb65f6ecc2a2b9256e6e86e97dc6517e",
-          "byteLength": 84732,
-          "triangleCount": 900,
+          "sha256": "eefb5939b89f97c42c2d1baba47e460bae07dd754ced0adc86b0fa8afeb6eaf2",
+          "byteLength": 86396,
+          "triangleCount": 920,
           "degenerateTriangleCount": 0
         },
         "lod2": {
           "uri": "/models/bangabhaban-lod2.glb",
           "lod": 2,
           "purpose": "roofline and facade openings",
-          "sha256": "d18be7ac2af4f302ad66990618240890b08814f36dc93eab393eb2354d2d8da3",
-          "byteLength": 285492,
-          "triangleCount": 3252,
+          "sha256": "83de6f982491d92e0bb78117a75f8e9271c8cd1b66249a197d97a2baffec3a4a",
+          "byteLength": 288164,
+          "triangleCount": 3284,
           "degenerateTriangleCount": 0
         },
         "lod3": {
           "uri": "/models/bangabhaban-lod3.glb",
           "lod": 3,
           "purpose": "detailed exterior facade",
-          "sha256": "5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673",
-          "byteLength": 718276,
-          "triangleCount": 8396,
+          "sha256": "a13513940519ee3b96641ed0eca08056f1a472e5b5d12ae955048b497cccf964",
+          "byteLength": 722296,
+          "triangleCount": 8444,
           "degenerateTriangleCount": 0
         },
         "default": {
           "uri": "/models/bangabhaban.glb",
           "lod": 3,
-          "sha256": "5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673",
-          "byteLength": 718276
+          "sha256": "a13513940519ee3b96641ed0eca08056f1a472e5b5d12ae955048b497cccf964",
+          "byteLength": 722296
         }
       },
       "nodes": [

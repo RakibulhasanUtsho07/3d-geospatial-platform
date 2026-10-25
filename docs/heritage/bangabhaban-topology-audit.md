@@ -4,10 +4,10 @@ Decision: blocked-review-required. This is a geometry triage report, not a histo
 
 ## Candidate identity
 
-GLB SHA-256: 5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673
-GLB bytes: 718276
+GLB SHA-256: a13513940519ee3b96641ed0eca08056f1a472e5b5d12ae955048b497cccf964
+GLB bytes: 722296
 Geometry QA status: review-recommended
-Triangles: 8396
+Triangles: 8444
 Degenerate triangles: 0
 Meshes / primitives: 15 / 18
 
@@ -16,7 +16,6 @@ Meshes / primitives: 15 / 18
 - disconnected-mesh-components-present
 - long-triangle-edges-present
 - no-texture-atlas-embedded-or-declared
-- open-boundary-edges-present
 
 ## Per-primitive findings
 
@@ -31,7 +30,7 @@ Meshes / primitives: 15 / 18
 | 5 | RoofDeck | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
 | 6 | DomePavilion | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
 | 7 | DomeDrum | 128 | 1 | 0 | 0 | 128 | long-triangle-edges-present |
-| 8 | Dome | 816 | 1 | 48 | 0 | 48 | long-triangle-edges-present, open-boundary-edges-present |
+| 8 | Dome | 864 | 1 | 0 | 0 | 48 | long-triangle-edges-present |
 | 9 | Finial | 336 | 2 | 0 | 0 | 24 | disconnected-mesh-components-present, long-triangle-edges-present |
 | 10 | Loggia | 4552 | 284 | 0 | 0 | 0 | disconnected-mesh-components-present |
 | 10 | Loggia | 24 | 2 | 0 | 0 | 16 | disconnected-mesh-components-present, long-triangle-edges-present |
