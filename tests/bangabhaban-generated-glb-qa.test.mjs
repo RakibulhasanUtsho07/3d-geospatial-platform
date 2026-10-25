@@ -58,6 +58,8 @@ test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA",
     const parameters = JSON.parse(await readFile(path.join(root, "data/heritage/bangabhaban.parameters.json"), "utf8"));
     assert.ok(stairPosition.max[1] <= parameters.provisionalDimensions.stairRiseM.value + 1e-5,
       label + " stair risers must use the configured total rise, not cumulative overheight");
+    assert.ok(Math.abs(stairPosition.max[1] - parameters.provisionalDimensions.plinthHeightM.value) <= 1e-5,
+      label + " stair landing must meet the modeled plinth-top datum");
   }
 });
 test("default Bangabhaban GLB is byte-identical to LOD3 and manifest pins the GLB hash", async () => {
