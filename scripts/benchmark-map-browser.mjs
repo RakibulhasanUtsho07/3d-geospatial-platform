@@ -79,29 +79,38 @@ function safeGitValue(args) {
 }
 
 async function hashFile(relativePath) {
+  const absolutePath = path.isAbsolute(relativePath)
+    ? relativePath
+    : path.resolve(projectRoot, relativePath);
+  const relative = path.relative(projectRoot, absolutePath);
+  const reportPath = relative && !relative.startsWith("..") && !path.isAbsolute(relative)
+    ? relative : "external-configured-road-extract";
   try {
-    const bytes = await readFile(path.join(projectRoot, relativePath));
+    const bytes = await readFile(absolutePath);
     return {
-      path: relativePath,
+      path: reportPath,
       exists: true,
       bytes: bytes.byteLength,
       sha256: createHash("sha256").update(bytes).digest("hex"),
     };
   } catch (error) {
     if (error && error.code === "ENOENT") {
-      return { path: relativePath, exists: false, bytes: null, sha256: null };
+      return { path: reportPath, exists: false, bytes: null, sha256: null };
     }
     throw error;
   }
 }
 
-function createNetworkCounters() {
+export function createNetworkCounters() {
   const groups = Object.create(null);
   const failures = Object.create(null);
   const activeRoadRequests = new Set();
   const roadApi = {
     requestCount: 0, responseCount: 0, status2xx: 0, status3xx: 0,
     status4xx: 0, status5xx: 0, otherStatus: 0, failedRequests: 0,
+    detailLevelResponses: Object.create(null),
+    sourceResponses: Object.create(null),
+    upstreamAttempts: { sampleCount: 0, total: 0, max: null },
   };
 
   function isRoadApiUrl(resourceUrl, origin) {
@@ -120,7 +129,10 @@ function createNetworkCounters() {
       Object.assign(roadApi, {
         requestCount: 0, responseCount: 0, status2xx: 0, status3xx: 0,
         status4xx: 0, status5xx: 0, otherStatus: 0, failedRequests: 0,
+        upstreamAttempts: { sampleCount: 0, total: 0, max: null },
       });
+      for (const key of Object.keys(roadApi.detailLevelResponses)) delete roadApi.detailLevelResponses[key];
+      for (const key of Object.keys(roadApi.sourceResponses)) delete roadApi.sourceResponses[key];
       activeRoadRequests.clear();
     },
     recordRequest(resourceUrl, origin, request) {
@@ -134,7 +146,7 @@ function createNetworkCounters() {
     getPendingRoadRequestCount() {
       return activeRoadRequests.size;
     },
-    recordResponse(resourceUrl, origin, status) {
+    recordResponse(resourceUrl, origin, status, headers = {}) {
       const group = classifyResourceUrl(resourceUrl, origin);
       if (!groups[group]) {
         groups[group] = {
@@ -157,6 +169,21 @@ function createNetworkCounters() {
         else if (status >= 400 && status < 500) roadApi.status4xx += 1;
         else if (status >= 500 && status < 600) roadApi.status5xx += 1;
         else roadApi.otherStatus += 1;
+
+        const detailLevel = typeof headers["x-road-network-detail-level"] === "string"
+          ? headers["x-road-network-detail-level"] : "unreported";
+        const source = typeof headers["x-road-network-source"] === "string"
+          ? headers["x-road-network-source"] : "unreported";
+        roadApi.detailLevelResponses[detailLevel] = (roadApi.detailLevelResponses[detailLevel] || 0) + 1;
+        roadApi.sourceResponses[source] = (roadApi.sourceResponses[source] || 0) + 1;
+        const attemptsHeader = headers["x-road-network-upstream-attempts"];
+        if (typeof attemptsHeader === "string" && /^\d+$/.test(attemptsHeader)) {
+          const attempts = Number(attemptsHeader);
+          roadApi.upstreamAttempts.sampleCount += 1;
+          roadApi.upstreamAttempts.total += attempts;
+          roadApi.upstreamAttempts.max = roadApi.upstreamAttempts.max === null
+            ? attempts : Math.max(roadApi.upstreamAttempts.max, attempts);
+        }
       }
     },
     recordFailure(resourceUrl, origin) {
@@ -172,7 +199,13 @@ function createNetworkCounters() {
         failedRequestsByResourceGroup: Object.fromEntries(
           Object.entries(failures).sort(([a], [b]) => a.localeCompare(b)),
         ),
-        roadApi: { ...roadApi, pendingRequestsAtCapture: activeRoadRequests.size },
+        roadApi: {
+          ...roadApi,
+          detailLevelResponses: { ...roadApi.detailLevelResponses },
+          sourceResponses: { ...roadApi.sourceResponses },
+          upstreamAttempts: { ...roadApi.upstreamAttempts },
+          pendingRequestsAtCapture: activeRoadRequests.size,
+        },
       };
     },
   };
@@ -490,7 +523,7 @@ async function newInstrumentedPage(browser, viewport, origin) {
     counters.recordRequest(request.url(), origin, request);
   });
   page.on("response", (response) => {
-    counters.recordResponse(response.url(), origin, response.status());
+    counters.recordResponse(response.url(), origin, response.status(), response.headers());
   });
   page.on("requestfinished", (request) => {
     counters.finishRequest(request);
@@ -581,6 +614,8 @@ async function runBenchmark() {
   const dirtyTree = gitStatus === null ? null : gitStatus.length > 0;
   const dataInputs = [];
   for (const relativePath of DATA_INPUTS) dataInputs.push(await hashFile(relativePath));
+  const configuredRoadExtract = process.env.DHAKA_ROADS_EXTRACT_PATH?.trim();
+  if (configuredRoadExtract) dataInputs.push(await hashFile(configuredRoadExtract));
 
   const browser = await chromium.launch({
     headless: process.env.MAP_BENCHMARK_HEADLESS !== "0",

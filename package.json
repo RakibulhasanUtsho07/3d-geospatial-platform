@@ -36,7 +36,7 @@
     "test:property-listings": "node --test tests/property-listings.test.mjs",
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
     "test:architecture-research": "node --test tests/architecture-research.test.mjs",
-    "test:road-network": "node --test tests/road-network.test.mjs",
+    "test:road-network": "node --test tests/road-network.test.mjs tests/offline-road-extract.test.mjs",
     "test:road-layer-manager": "node --test tests/road-layer-manager-boundary.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
     "pretest:heritage-model": "npm run build:heritage-model",
@@ -113,6 +113,8 @@
     "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs",
     "test:building-accuracy-benchmark": "node --test tests/building-accuracy-benchmark.test.mjs",
     "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs",
+    "test:building-accuracy-evidence-pack": "node --test tests/building-accuracy-evidence-pack.test.mjs",
+    "build:building-accuracy-evidence-pack": "node scripts/build-building-accuracy-evidence-pack.mjs",
     "test:render-image-similarity-diagnostics": "node --test tests/render-image-similarity-diagnostics.test.mjs",
     "compare:render-reference-images": "node scripts/compare-render-reference-images.mjs",
     "test:render-reference-batch": "node --test tests/render-reference-batch-plan.test.mjs",
@@ -169,7 +171,10 @@
     "test:dhaka-3d-tiles-performance": "playwright test tests/browser/dhaka-3d-tiles-performance.spec.ts --config=playwright.config.ts",
     "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts",
     "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts",
-    "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs"
+    "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs",
+    "test:offline-road-extract": "node --test tests/offline-road-extract.test.mjs",
+    "prepare:dhaka-road-extract": "node scripts/prepare-dhaka-road-extract.mjs",
+    "test:prepare-dhaka-road-extract": "node --test tests/prepare-dhaka-road-extract.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

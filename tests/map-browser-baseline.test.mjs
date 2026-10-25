@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyResourceUrl, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
+import { classifyResourceUrl, createNetworkCounters, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
 
 test("summarizes browser samples using nearest-rank p50 and p95", () => {
   assert.deepEqual(summarizeValues([10, 20, 30, 40, 50]), {
@@ -169,4 +169,27 @@ test("does not count empty or unverified road-render telemetry as road-ready", (
   ] });
   assert.equal(unverified.status, "render-unverified");
   assert.equal(unverified.renderedFeatureCount, null);
+});
+
+test("captures offline road source/detail headers and pending-request lifecycle without storing URL values", () => {
+  const counters = createNetworkCounters();
+  const origin = "http://127.0.0.1:3000";
+  const url = origin + "/api/geospatial/roads?west=90.4&south=23.7";
+  const request = {};
+  counters.recordRequest(url, origin, request);
+  assert.equal(counters.getPendingRoadRequestCount(), 1);
+  counters.recordResponse(url, origin, 200, {
+    "x-road-network-detail-level": "offline",
+    "x-road-network-source": "local-extract",
+    "x-road-network-upstream-attempts": "0",
+  });
+  counters.finishRequest(request);
+  const snapshot = counters.snapshot();
+  assert.equal(snapshot.roadApi.requestCount, 1);
+  assert.equal(snapshot.roadApi.status2xx, 1);
+  assert.equal(snapshot.roadApi.detailLevelResponses.offline, 1);
+  assert.equal(snapshot.roadApi.sourceResponses["local-extract"], 1);
+  assert.deepEqual(snapshot.roadApi.upstreamAttempts, { sampleCount: 1, total: 0, max: 0 });
+  assert.equal(snapshot.roadApi.pendingRequestsAtCapture, 0);
+  assert.equal(JSON.stringify(snapshot).includes("west=90.4"), false);
 });
