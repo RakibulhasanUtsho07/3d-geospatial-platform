@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type MapControlsProps = {
   disabled: boolean;
   onHome: () => void;
@@ -68,8 +70,21 @@ export default function MapControls({
   onTiltDown,
   onResetOrientation,
 }: MapControlsProps) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-8rem)] flex-col items-end gap-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+    <div className="absolute right-4 top-[5.75rem] z-20 flex max-h-[calc(100%-8rem)] flex-col items-end gap-3 overflow-y-auto overscroll-contain pb-2 pr-1">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="map-camera-controls"
+        onClick={() => setExpanded((value) => !value)}
+        className="rounded-xl border border-white/10 bg-zinc-950/90 px-3 py-2 text-xs font-semibold text-zinc-100 shadow-2xl backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+      >
+        {expanded ? "Hide camera controls" : "Camera controls"}
+      </button>
+      {expanded && (
+        <div id="map-camera-controls" className="flex flex-col items-end gap-3">
       <div className="rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
         <ControlButton
           label="Zoom in"
@@ -88,7 +103,7 @@ export default function MapControls({
         <div className="mx-1 border-t border-white/10" />
 
         <ControlButton
-          label="Go to home view"
+          label="Return to Dhaka property-discovery view"
           symbol="⌂"
           disabled={disabled}
           onClick={onHome}
@@ -218,7 +233,8 @@ export default function MapControls({
         >
           {orbitTourActive ? "Stop tour" : "360° tour"}
         </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
