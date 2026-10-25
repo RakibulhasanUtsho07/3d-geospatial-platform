@@ -18,7 +18,7 @@ async function createFixture(t, options = {}) {
 
   const viewManifest = [];
   for (const id of REVIEW_VIEW_IDS) {
-    const imagePath = path.join(inputDir, \`\${id}.png\`);
+    const imagePath = path.join(inputDir, id + ".png");
     const background = sharp({
       create: { width: size, height: size, channels: 3, background: "#161d23" },
     });
@@ -36,8 +36,8 @@ async function createFixture(t, options = {}) {
     }]).png().toBuffer();
     await writeFile(imagePath, image);
     viewManifest.push({
-      id,
-      filename: \`\${id}.png\`,
+      id: id,
+      filename: id + ".png",
       sha256: createHash("sha256").update(image).digest("hex"),
       width: size,
       height: size,
@@ -49,7 +49,7 @@ async function createFixture(t, options = {}) {
     modelSha256: "a".repeat(64),
     views: viewManifest,
   }));
-  return { root, inputDir, outputPath: path.join(root, "out", "contact-sheet.png") };
+  return { root: root, inputDir: inputDir, outputPath: path.join(root, "out", "contact-sheet.png") };
 }
 
 test("contact sheet validates all fixed views and emits hash-pinned pixel occupancy evidence", async (t) => {
@@ -77,7 +77,7 @@ test("contact sheet validates all fixed views and emits hash-pinned pixel occupa
   assert.equal(report.views[0].maxAxisFillRatio, 0.75);
 });
 
-test("contact sheet writes diagnostics and fails closed when a fixed view is missing", async (t) => {
+test("contact sheet fails closed when a fixed view is missing", async (t) => {
   const fixture = await createFixture(t);
   await rm(path.join(fixture.inputDir, "front.png"));
 
