@@ -153,4 +153,4 @@ Trace OSM/satellite footprint → set centroid and azimuth → rectify south fac
 
 ### Roof-deck material note
 
-The dedicated `RoofDeck` plane uses `materials.roofDeck = #777168` ([E]), a muted grey-brown estimate from the licensed 2019 aerial reference. The image is oblique/unrectified; it does not provide a survey-grade roof plan or measured historic finish. The GLB remains without a baked texture/UV atlas.
+The dedicated `RoofDeck` plane uses `materials.roofDeck = #4A4740` ([E]), a dark neutral grey-brown estimate from the licensed 2019 aerial reference. The image is oblique/unrectified and the renderer is uncalibrated; it does not provide a survey-grade roof plan or measured historic finish. The previous #777168 tint looked too pale in the top view, so the proxy was reduced to #4A4740. The GLB remains without a baked texture/UV atlas.

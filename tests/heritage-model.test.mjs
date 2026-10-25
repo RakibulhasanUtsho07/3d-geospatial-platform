@@ -127,7 +127,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
   assert.equal(config.parameters.materials.glass.value, "#392B27");
-  assert.equal(config.parameters.materials.roofDeck.value, "#777168");
+  assert.equal(config.parameters.materials.roofDeck.value, "#4A4740");
   assert.equal(config.parameters.materials.roofDeck.confidence, "[E]");
   assert.match(config.parameters.materials.roofDeck.note, /no embedded texture atlas or UV projection/);
   assert.ok(builder.includes('roofDeck: V("materials", "roofDeck")'), "the roof planes use a separate estimated grey-brown material instead of decorative rose trim");
