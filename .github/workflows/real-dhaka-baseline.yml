@@ -1,0 +1,96 @@
+name: Real-Dhaka Browser Baseline
+
+on:
+  push:
+    branches:
+      - rakibul-hasan
+    paths:
+      - "src/app/**"
+      - "src/core/map-engine/**"
+      - "src/core/geospatial/**"
+      - "data/overture/**"
+      - "scripts/benchmark-map-browser.mjs"
+      - "tests/map-browser-baseline.test.mjs"
+      - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
+      - ".github/workflows/real-dhaka-baseline.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-dhaka-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    name: Capture repeatable real-data map evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build and validate the Overture spatial tiles
+        run: npm run build:geospatial-tiles && npm run test:geospatial-tiles
+
+      - name: Start development app and capture cold/warm browser samples
+        env:
+          MAP_BENCHMARK_COLD_RUNS: "3"
+          MAP_BENCHMARK_WARM_RUNS: "3"
+          MAP_BENCHMARK_SETTLE_MS: "5000"
+          MAP_BENCHMARK_READY_TIMEOUT_MS: "90000"
+          MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS: "45000"
+          MAP_BENCHMARK_ROAD_RETRY_GRACE_MS: "6000"
+          MAP_BENCHMARK_WIDTH: "1280"
+          MAP_BENCHMARK_HEIGHT: "800"
+          MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ github.sha }}
+          MAP_BENCHMARK_COMMIT_SHA: ${{ github.sha }}
+          MAP_BENCHMARK_SCENARIO: ci-real-dhaka-initial-camera
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "artifacts/real-dhaka-baseline/${GITHUB_SHA}"
+          npm run dev -- --hostname 127.0.0.1 --port 3000 > "$RUNNER_TEMP/next-dev.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; cp "$RUNNER_TEMP/next-dev.log" "artifacts/real-dhaka-baseline/${GITHUB_SHA}/dev-server.log" 2>/dev/null || true' EXIT
+
+          ready=0
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/map -o /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/next-dev.log"
+            echo "Next.js development server did not become ready within 90 seconds."
+            exit 1
+          fi
+
+          npm run benchmark:map-browser
+
+      - name: Upload real-Dhaka report, screenshots, and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-dhaka-browser-baseline-${{ github.sha }}
+          path: artifacts/real-dhaka-baseline/${{ github.sha }}/
+          if-no-files-found: warn
+          retention-days: 14

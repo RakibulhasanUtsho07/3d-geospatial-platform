@@ -116,12 +116,19 @@ export function buildRoadNetworkCacheKey(request) {
 }
 
 
-export function buildOverpassRoadQuery(request) {
-  const highwayPattern = INCLUDED_HIGHWAYS.join("|");
+export function buildOverpassRoadQuery(request, options = {}) {
+  const detailLevel = options.detailLevel === "reduced" ? "reduced" : "full";
+  const fallbackHighways = [
+    "motorway", "motorway_link", "trunk", "trunk_link",
+    "primary", "primary_link", "secondary", "secondary_link",
+    "tertiary", "tertiary_link", "residential", "unclassified",
+  ];
+  const highwayPattern = (detailLevel === "reduced" ? fallbackHighways : INCLUDED_HIGHWAYS).join("|");
+  const maxFeatures = detailLevel === "reduced" ? 350 : MAX_ROAD_FEATURES;
   return [
-    "[out:json][timeout:20][bbox:" + request.south + "," + request.west + "," + request.north + "," + request.east + "];",
+    "[out:json][timeout:8][bbox:" + request.south + "," + request.west + "," + request.north + "," + request.east + "];",
     'way["highway"~"^(' + highwayPattern + ')$"];',
-    "out body geom(" + request.south + "," + request.west + "," + request.north + "," + request.east + ") qt " + Math.min(request.limit ?? DEFAULT_ROAD_FEATURES, MAX_ROAD_FEATURES) + ";",
+    "out body geom(" + request.south + "," + request.west + "," + request.north + "," + request.east + ") qt " + Math.min(request.limit ?? DEFAULT_ROAD_FEATURES, maxFeatures) + ";",
   ].join("\n");
 }
 
