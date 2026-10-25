@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { performance } from "node:perf_hooks";
+import { flagCanvasRedPixelOutliers, measureCanvasRedPixelSignal } from "../src/core/map-engine/canvas-red-pixel-diagnostics.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_URL = "http://127.0.0.1:3000/map";
@@ -532,6 +533,12 @@ async function capturePageMetrics(
     };
   }, origin);
 
+  const canvasScreenshotBytes = await page
+    .getByTestId("cesium-map-container")
+    .locator("canvas")
+    .first()
+    .screenshot({ animations: "disabled" });
+  const visualRedPixelSignal = await measureCanvasRedPixelSignal(canvasScreenshotBytes);
   const screenshotBytes = await page.screenshot({
     path: screenshotPath,
     fullPage: false,
@@ -551,6 +558,7 @@ async function capturePageMetrics(
     resources: metrics.resources,
     mapTelemetry: metrics.telemetry,
     imageryTileErrors: metrics.imageryTileErrors,
+    visualRedPixelSignal,
     longTasks: metrics.longTasks,
     memory: metrics.memory,
     environment: metrics.environment,
@@ -783,6 +791,16 @@ async function runBenchmark() {
     await browser.close();
   }
 
+  const visualRuns = results.filter((run) =>
+    run.status === "ok" && run.visualRedPixelSignal,
+  );
+  const visualAssessments = flagCanvasRedPixelOutliers(
+    visualRuns.map((run) => run.visualRedPixelSignal),
+  );
+  for (let index = 0; index < visualRuns.length; index += 1) {
+    visualRuns[index].visualAnomalyReview = visualAssessments[index];
+  }
+
   const report = {
     schemaVersion: 1,
     benchmark: "real-dhaka-map-performance-baseline",
@@ -832,6 +850,11 @@ async function runBenchmark() {
     summary: {
       cold: summarizeRuns(results.filter((run) => run.mode === "cold")),
       warm: summarizeRuns(results.filter((run) => run.mode === "warm")),
+      visualAnomalyReview: {
+        method: "Conservative saturated-red signal on the Cesium canvas only; peer outlier flags request human review and do not identify the producing layer.",
+        evaluatedCanvasSamples: visualRuns.length,
+        flaggedCanvasSamples: visualAssessments.filter((item) => item.flagged).length,
+      },
     },
     runs: results,
   };
