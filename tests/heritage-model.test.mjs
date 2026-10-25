@@ -74,6 +74,12 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Eight open arched bays"));
   assert.ok(builder.includes("addFacadeDisk("));
   assert.ok(builder.includes("const stairBaseWidth = DIM.stairWidth;"));
+  assert.equal(config.parameters.roof.domeBasePlatformWidth.value, 14.0);
+  assert.equal(config.parameters.roof.domeBasePlatformDepth.value, 12.0);
+  assert.equal(config.parameters.roof.domeBasePlatformWidth.confidence, "[E]");
+  assert.equal(config.parameters.roof.domeBasePlatformDepth.confidence, "[E]");
+  assert.ok(builder.includes("const domeBasePlatformHeight = DIM.roofline - roofTop;"));
+  assert.ok(builder.includes('DIM.domeBasePlatformWidth,domeBasePlatformHeight,DIM.domeBasePlatformDepth,"roofDeck"'));
   assert.ok(builder.includes('box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roofDeck")'),
     "flat roof planes live in a dedicated node so front facade review can hide the plane without deleting roof geometry");
   assert.ok(builder.includes("const riserCenter=(riserBottom+riserTop)/2;"));

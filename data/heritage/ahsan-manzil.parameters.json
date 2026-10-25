@@ -575,16 +575,19 @@
       }
     },
     "roof": {
-      "covering": {
-        "value": "flat roof behind parapet; covering material unknown",
-        "confidence": "[?]",
-        "source": "Supplied brief"
+      "domeBasePlatformWidth": {
+        "value": 14,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Qualitative dome-base-to-Rangmahal-roof proportion in the licensed 2019 aerial image; oblique camera is not calibrated.",
+        "note": "Provisional central roof platform width to connect the roof deck to the octagonal drum and express the raised central pavilion seen in aerial/front views. Estimate only; not a traced or surveyed dimension."
       },
-      "structure": {
-        "value": "timber/iron beams, interior only",
-        "confidence": "[V]",
-        "source": "Supplied brief",
-        "note": "Not included in exterior mesh."
+      "domeBasePlatformDepth": {
+        "value": 12,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Qualitative roof-plane segmentation in the licensed 2019 aerial image; camera angle, focal calibration and orthorectification are unavailable.",
+        "note": "Provisional depth of the raised central dome-base roof platform. This adds a visible roof-section transition but must be replaced after tracing a calibrated roof plan or measured drawing."
       }
     },
     "runtimeLod": {

@@ -11,6 +11,8 @@ const V = (section, key) => P[section][key].value;
 const DIM = {
   length: V("footprint", "overallLength"),
   depth: V("footprint", "overallDepth"),
+  domeBasePlatformWidth: V("roof", "domeBasePlatformWidth"),
+  domeBasePlatformDepth: V("roof", "domeBasePlatformDepth"),
   rangmahalLength: V("footprint", "rangmahalBlockLength"),
   andarDepth: V("footprint", "andarmahalDepth"),
   andarCenterZ: V("footprint", "andarmahalNorthOffset"),
@@ -743,6 +745,11 @@ function buildGlb(lod) {
   const rangCenterX = (split + xMax) / 2;
   box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roofDeck");
   box(n.RoofDeck,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roofDeck");
+  // A shallow raised central roof platform bridges the deck/parapet datum to the drum base.
+  // Its footprint is a low-confidence estimate from the unrectified aerial image, not a survey.
+  const domeBasePlatformHeight = DIM.roofline - roofTop;
+  box(n.RoofDeck,domeX,roofTop+domeBasePlatformHeight/2,0,
+    DIM.domeBasePlatformWidth,domeBasePlatformHeight,DIM.domeBasePlatformDepth,"roofDeck");
 
   for(const side of [-1,1]){
     const rangZ=side*(half+.12);

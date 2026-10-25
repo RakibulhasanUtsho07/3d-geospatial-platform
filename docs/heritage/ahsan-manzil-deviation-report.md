@@ -108,6 +108,8 @@ Every geographic and model parameter from the JSON is listed below with its conf
 | materials.stairStone | [E] | #6E625A | User-supplied reference photo estimate | Dark grey-brown exterior stair material. |
 | materials.doorWood | [E] | #6B4A32 | User-supplied reference photo estimate | Brown wood for the upper portal door and shutters. |
 | roof.covering | [?] | flat roof behind parapet; covering material unknown | Supplied brief |  |
+| roof.domeBasePlatformWidth | [E] | 14.0 m | Qualitative width of raised central roof base in licensed aerial/front views; unrectified | Connects the flat deck to the drum base and expresses the raised central pavilion; replace from a traced roof plan or measured drawing. |
+| roof.domeBasePlatformDepth | [E] | 12.0 m | Qualitative roof-section depth in licensed aerial view; camera pose and scale uncalibrated | Provisional raised central dome-base platform; not a surveyed dimension. |
 | roof.structure | [V] | timber/iron beams, interior only | Supplied brief | Not included in exterior mesh. |
 | runtimeLod.lod1MaxDistance | [E] | 18000 m from view centre to provisional anchor | Rendering heuristic in heritage-landmarks.mjs | Show only when the view centre is within 18 km and camera height is at most 20 km. |
 | runtimeLod.lod1MaxCameraHeight | [E] | 20000 m | Rendering heuristic in heritage-landmarks.mjs | Rendering threshold, not a building measurement. |
@@ -154,3 +156,8 @@ Trace OSM/satellite footprint → set centroid and azimuth → rectify south fac
 ### Roof-deck material note
 
 The dedicated `RoofDeck` plane uses `materials.roofDeck = #4A4740` ([E]), a dark neutral grey-brown estimate from the licensed 2019 aerial reference. The image is oblique/unrectified and the renderer is uncalibrated; it does not provide a survey-grade roof plan or measured historic finish. The previous #777168 tint looked too pale in the top view, so the proxy was reduced to #4A4740. The GLB remains without a baked texture/UV atlas.
+
+
+### Raised central roof platform
+
+LOD geometry now includes an estimated 14.0 m × 12.0 m raised roof platform beneath the dome drum. This makes the central pavilion/roof transition explicit rather than leaving the dome visually detached above a single flat plane. Both dimensions are `[E]` estimates from an unrectified aerial/reference comparison; they are not measured control values and must be replaced after tracing a calibrated roof plan or locating a measured drawing. No texture/UV atlas is implied.

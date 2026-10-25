@@ -145,6 +145,7 @@ jobs:
             sourceCommit: process.env.SOURCE_COMMIT,
             reviewGeneratedAt: new Date().toISOString(),
             correctionScope: [
+              "add a 14.0 m × 12.0 m estimated raised central roof platform beneath the drum to express the roof-section transition; both dimensions remain [E]",
               "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
               "Rangmahal and Andarmahal roof-height separation",
               "photo-proportion-based 13.0 m triple-arch portico and 27.0 m estimated stair base; neither is surveyed",
@@ -195,7 +196,7 @@ jobs:
             views,
             visualReview: {
               contactSheet: "contact-sheet.png",
-              status: "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone now uses a low-confidence aerial-photo estimate; texture/UV, detailed roof segmentation, side/back framing and surveyed footprint remain unresolved.",
+              status: "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone uses a low-confidence aerial-photo estimate and the raised central dome-base platform adds a discrete roof section; texture/UV, fine roof segmentation, side/back framing and surveyed footprint remain unresolved.",
               findings: [
                 "Side-by-side comparison with the licensed south/front reference showed the 39 m estimated stair base visually dominating the facade; reduced it to a 27 m (~48% of the provisional 55.8 m frontage) estimate, pending rectification.",
                 "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -206,7 +207,7 @@ jobs:
                 "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
                 "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
                 "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
-                "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; the roof deck now uses a muted grey-brown estimate, but the top view remains a simplified parametric plane and does not claim detailed roof reconstruction.",
+                "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; a raised central dome-base platform was added using 14.0 m × 12.0 m [E] estimates, while other roof planes remain simplified parametric surfaces.",
                 "The first roof-tint estimate #777168 still rendered too pale in the top-view comparison; the roof-deck proxy was darkened to #4A4740 using the same uncalibrated aerial reference. Roof texture/UV and precise section geometry remain unresolved.",
                 "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
                 "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
