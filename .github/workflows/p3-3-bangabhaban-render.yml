@@ -1,0 +1,204 @@
+name: P3.3 Bangabhaban model correction loop
+
+on:
+  push:
+    branches:
+      - feat/bangabhaban-model-correction-loop
+    paths:
+      - 'data/heritage/bangabhaban.parameters.json'
+      - 'data/heritage/bangabhaban-reference-pack.json'
+      - 'scripts/build-bangabhaban-model.mjs'
+      - 'scripts/build-bangabhaban-topology-audit.mjs'
+      - 'scripts/fetch-bangabhaban-reference-pack.mjs'
+      - 'scripts/blender/render-building-review.py'
+      - 'scripts/build-render-contact-sheet.mjs'
+      - 'tests/build-render-contact-sheet.test.mjs'
+      - 'scripts/render-building-review-views.mjs'
+      - 'tests/bangabhaban-*.mjs'
+      - 'package.json'
+      - '.github/workflows/p3-3-bangabhaban-render.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: p3-3-bangabhaban-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-review:
+    name: Build candidate, run QA and render 13 review views
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out Bangabhaban correction branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Bangabhaban LOD models
+        run: npm run build:bangabhaban-model
+
+      - name: Fetch and verify licensed reference bytes
+        run: |
+          npm run test:bangabhaban-reference-pack
+          npm run fetch:bangabhaban-reference-pack -- artifacts/bangabhaban-reference-pack
+
+      - name: Run model, geometry and topology tests
+        run: |
+          npm run test:bangabhaban-model
+          npm run test:glb-geometry-qa
+          npm run test:glb-texture-binding-qa
+
+      - name: Create exact-candidate geometry, texture and topology reports
+        run: |
+          mkdir -p artifacts/bangabhaban-qa
+          npm run create:render-correction-qa-evidence -- \
+            public/models/bangabhaban-lod3.glb \
+            artifacts/bangabhaban-qa/geometry-qa-report.json \
+            artifacts/bangabhaban-qa/texture-qa-report.json
+          npm run audit:bangabhaban-topology -- \
+            public/models/bangabhaban-lod3.glb \
+            artifacts/bangabhaban-qa/topology-audit.json \
+            docs/heritage/bangabhaban-topology-audit.md
+
+      - name: Install cached Blender 4.0.2
+        uses: bradyajohnston/setup-blender@v5
+        with:
+          version: 4.0.2
+
+      - name: Install lightweight software-rendering libraries
+        run: |
+          timeout 60s sudo apt-get update -qq || echo 'Using runner package index if update times out.'
+          DEBIAN_FRONTEND=noninteractive timeout 180s sudo apt-get install -y --no-install-recommends libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
+      - name: Verify Blender runtime
+        run: |
+          blender --version
+          blender --background --factory-startup --python-expr "import bpy; assert bpy.app.version == (4, 0, 2), bpy.app.version_string; print('Verified Blender', bpy.app.version_string)"
+
+      - name: Render all 13 deterministic views
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          npm run render:building-review -- \
+            public/models/bangabhaban-lod3.glb \
+            artifacts/bangabhaban-render-set \
+            --resolution=1024 --blender=blender
+          cp artifacts/bangabhaban-qa/geometry-qa-report.json artifacts/bangabhaban-render-set/
+          cp artifacts/bangabhaban-qa/texture-qa-report.json artifacts/bangabhaban-render-set/
+          cp artifacts/bangabhaban-qa/topology-audit.json artifacts/bangabhaban-render-set/
+          mkdir -p artifacts/bangabhaban-render-set/reference-pack
+          cp -R artifacts/bangabhaban-reference-pack/. artifacts/bangabhaban-render-set/reference-pack/
+
+      - name: Build validated labeled contact sheet
+        run: |
+          node scripts/build-render-contact-sheet.mjs \
+            artifacts/bangabhaban-render-set \
+            artifacts/bangabhaban-render-set/contact-sheet.png \
+            1024
+
+      - name: Record exact model, references, QA and render hashes
+        run: |
+          SOURCE_COMMIT="$(git rev-parse HEAD)" node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile, writeFile } from "node:fs/promises";
+          import path from "node:path";
+          const root = "artifacts/bangabhaban-render-set";
+          const hash = (b) => createHash("sha256").update(b).digest("hex");
+          const manifestBytes = await readFile(path.join(root, "render-review-manifest.json"));
+          const render = JSON.parse(manifestBytes.toString("utf8"));
+          const geometryBytes = await readFile(path.join(root, "geometry-qa-report.json"));
+          const textureBytes = await readFile(path.join(root, "texture-qa-report.json"));
+          const visibilityBytes = await readFile(path.join(root, "foreground-visibility-report.json"));
+          const topologyBytes = await readFile(path.join(root, "topology-audit.json"));
+          const referenceBytes = await readFile(path.join(root, "reference-pack", "reference-pack.manifest.json"));
+          const reference = JSON.parse(referenceBytes.toString("utf8"));
+          const geometry = JSON.parse(geometryBytes.toString("utf8"));
+          const texture = JSON.parse(textureBytes.toString("utf8"));
+          const visibility = JSON.parse(visibilityBytes.toString("utf8"));
+          const topology = JSON.parse(topologyBytes.toString("utf8"));
+          if (reference.verified !== true || reference.sources?.length !== 3 || reference.sources.some((s) => s.verified !== true || !/^[a-f0-9]{64}$/.test(s.sha256 || ""))) {
+            throw new Error("Bangabhaban needs three individually licensed and hash-verified reference files");
+          }
+          const views = (render.views || []).map((v) => ({id:v.id,filename:v.filename,width:v.width,height:v.height,sha256:v.sha256}));
+          if (views.length !== 13 || new Set(views.map((v) => v.id)).size !== 13 || views.some((v) => !/^[a-f0-9]{64}$/.test(v.sha256 || ""))) {
+            throw new Error("Expected 13 unique, hash-pinned render views; got " + views.length);
+          }
+          const modelBytes = await readFile("public/models/bangabhaban-lod3.glb");
+          if (visibility.summary?.status !== "passed" || visibility.summary?.viewCount !== 13 || visibility.summary?.failedViews !== 0 || visibility.candidateModelSha256 !== hash(modelBytes)) {
+            throw new Error("Foreground visibility gate failed or is not bound to the exact candidate GLB");
+          }
+          const summary = {
+            task:"P3.3-Bangabhaban",building:"Bangabhaban, Dhaka",sourceCommit:process.env.SOURCE_COMMIT,
+            reviewGeneratedAt:new Date().toISOString(),
+            model:{filename:"bangabhaban-lod3.glb",sha256:hash(modelBytes),byteLength:modelBytes.length},
+            renderManifest:{filename:"render-review-manifest.json",sha256:hash(manifestBytes),valid:render.valid,status:render.status,renderer:render.renderer,rendererVersion:render.rendererVersion,sceneBounds:render.sceneBounds,viewCount:views.length},
+            qa:{
+              geometry:{sha256:hash(geometryBytes),status:geometry.status,valid:geometry.valid,counts:geometry.counts,warnings:geometry.warnings||[]},
+              texture:{sha256:hash(textureBytes),status:texture.status,valid:texture.valid,counts:texture.counts,warnings:texture.warnings||[]},
+              topology:{sha256:hash(topologyBytes),releaseGate:topology.summary.releaseGate,summary:topology.summary},
+              foregroundVisibility:{sha256:hash(visibilityBytes),summary:visibility.summary,limits:visibility.limits}
+            },
+            referencePack:{sha256:hash(referenceBytes),verified:reference.verified,licensePolicy:reference.licensePolicy,sources:reference.sources.map(s=>({id:s.id,filename:s.imagePath,sha256:s.sha256,byteLength:s.byteLength,license:s.license,author:s.author,url:s.sourcePage,viewRole:s.viewRole,cameraCalibration:s.cameraCalibration}))},
+            views,
+            visualReview:{
+              contactSheet:"contact-sheet.png",
+              status:"Deterministic 13-view render and hash checks passed. Visual/architectural fidelity remains pending manual review.",
+              findings:[
+                "The candidate is a source-controlled parametric visual proxy, not image-derived photogrammetry.",
+                "The front loggia, elevated dome, stepped roof planes and wing massing need side-by-side review against licensed references.",
+                "The roof fields and facade remain plain colour materials; no texture atlas or UV projection is claimed.",
+                "The stepped footprint, overall dimensions and orientation remain estimates; source camera poses are unknown."
+              ],
+              residualRisks:[
+                "All geometry parameters are estimates pending independently traced footprint and rectified/surveyed facades.",
+                "Geometry QA may retain open boundaries, detached components or non-manifold intersections; review primitive by primitive.",
+                "CC BY-SA 4.0 attribution/share-alike conditions apply to any adaptation of the 2006 source image."
+              ],
+              publicationEligible:false
+            },
+            policy:"Hashes verify artifact identity; they do not prove architectural fidelity, survey dimensions or publication eligibility."
+          };
+          await writeFile(path.join(root,"bangabhaban-render-review-summary.json"),JSON.stringify(summary,null,2)+"\n",{flag:"wx"});
+          await writeFile("docs/heritage/bangabhaban-render-review-summary.json",JSON.stringify(summary,null,2)+"\n");
+          NODE
+
+      - name: Commit candidate assets and evidence
+        run: |
+          cp artifacts/bangabhaban-render-set/contact-sheet.png docs/heritage/bangabhaban-render-contact-sheet.png
+          cp artifacts/bangabhaban-render-set/foreground-visibility-report.json docs/heritage/bangabhaban-render-foreground-visibility.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/heritage/bangabhaban-render-review-summary.json docs/heritage/bangabhaban-render-contact-sheet.png docs/heritage/bangabhaban-render-foreground-visibility.json docs/heritage/bangabhaban-topology-audit.md public/models/bangabhaban*.glb public/models/bangabhaban.manifest.json
+          if ! git diff --cached --quiet; then git commit -m "docs(heritage): record Bangabhaban render evidence"; fi
+          if [[ -n "$(git status --porcelain)" ]]; then git stash push --include-untracked -m "Bangabhaban transient QA reports before rebase"; fi
+          git fetch origin "+refs/heads/${{ github.ref_name }}:refs/remotes/origin/${{ github.ref_name }}"
+          git rebase "origin/${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Upload Bangabhaban review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bangabhaban-model-correction-review
+          path: |
+            artifacts/bangabhaban-reference-pack/
+            artifacts/bangabhaban-render-set/
+            artifacts/bangabhaban-qa/
+            public/models/bangabhaban*.glb
+            public/models/bangabhaban.manifest.json
+          if-no-files-found: error
+          retention-days: 30

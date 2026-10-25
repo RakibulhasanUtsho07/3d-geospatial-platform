@@ -1,0 +1,357 @@
+{
+  "schemaVersion": "1.0.0",
+  "candidateModelSha256": "6ed82d6e0d9717f5a0f26a789b722e3f1aee559f4f94ae48945e768da01a77c6",
+  "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29",
+  "imageSpaceForegroundThresholdRgb": 28,
+  "requiredViewCount": 13,
+  "limits": {
+    "minMaxAxisFillRatio": 0.7,
+    "maxAxisFillRatio": 0.97
+  },
+  "summary": {
+    "viewCount": 13,
+    "passedViews": 13,
+    "failedViews": 0,
+    "status": "passed"
+  },
+  "views": [
+    {
+      "filename": "front.png",
+      "sha256": "3552f74eeb70a4d9b9e2b1e65bf35b7c5184ff4839ab7221140e8c448a9f2cce",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 132082,
+      "foregroundPixelRatio": 0.125963,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 403,
+        "width": 916,
+        "height": 235
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.229492,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "front",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "back.png",
+      "sha256": "fa42be8fe7f095614ee6589d898c5c5f7d362e2d63a00946914002d34e0b0b1e",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 105797,
+      "foregroundPixelRatio": 0.100896,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 408,
+        "width": 916,
+        "height": 209
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.204102,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "back",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "left.png",
+      "sha256": "8fefda0c569a37629b49316ea6df90d5b73ad04daf2de3f74b2334b43eb30d0d",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 171306,
+      "foregroundPixelRatio": 0.16337,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 324,
+        "width": 916,
+        "height": 377
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.368164,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "left",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "right.png",
+      "sha256": "e78844d932e7b5fd9178fa0d41d87b1041cd8904672d387c4070f599b38b67aa",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 171267,
+      "foregroundPixelRatio": 0.163333,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 324,
+        "width": 916,
+        "height": 377
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.368164,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "right",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "top.png",
+      "sha256": "be546ae796ee95668197837e08a02f1bd44d49970b9a1f296678d7641cefddba",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 408359,
+      "foregroundPixelRatio": 0.389441,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 259,
+        "width": 916,
+        "height": 506
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.494141,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "top",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-000.png",
+      "sha256": "0730b2f024ba47ffaa830673c930f7c6558419aa86b69cc9b64b737c3b506150",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 540409,
+      "foregroundPixelRatio": 0.515374,
+      "foregroundBounds": {
+        "x": 80,
+        "y": 235,
+        "width": 864,
+        "height": 735
+      },
+      "widthFillRatio": 0.84375,
+      "heightFillRatio": 0.717773,
+      "maxAxisFillRatio": 0.84375,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-000",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-045.png",
+      "sha256": "aa3bda9ac550954c610ffecf49dfa5608e816c43b7e3c3cdf0dff61bf9341429",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 183286,
+      "foregroundPixelRatio": 0.174795,
+      "foregroundBounds": {
+        "x": 152,
+        "y": 367,
+        "width": 818,
+        "height": 405
+      },
+      "widthFillRatio": 0.798828,
+      "heightFillRatio": 0.395508,
+      "maxAxisFillRatio": 0.798828,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-045",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-090.png",
+      "sha256": "414f98f2e127eb14bd147cbd343d0b373ca78be9861e04fb122806b5b3e9e666",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 228803,
+      "foregroundPixelRatio": 0.218204,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 419,
+        "width": 916,
+        "height": 285
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.27832,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-090",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-135.png",
+      "sha256": "8094ba819b1a43f24198ca66b86c9204070db119484df93cb1b391d815b692d2",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 185463,
+      "foregroundPixelRatio": 0.176871,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 376,
+        "width": 878,
+        "height": 396
+      },
+      "widthFillRatio": 0.857422,
+      "heightFillRatio": 0.386719,
+      "maxAxisFillRatio": 0.857422,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-135",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-180.png",
+      "sha256": "a9eb2e46e945e88cef7f0a42ebb21d5bc107071f051f905202f583ae4e289544",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 542281,
+      "foregroundPixelRatio": 0.517159,
+      "foregroundBounds": {
+        "x": 80,
+        "y": 227,
+        "width": 864,
+        "height": 743
+      },
+      "widthFillRatio": 0.84375,
+      "heightFillRatio": 0.725586,
+      "maxAxisFillRatio": 0.84375,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-180",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-225.png",
+      "sha256": "b1d1a8c0b8b142750e22e6633882d5d825ac7ee7ca2838f12b3484d7e2a74d71",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 185205,
+      "foregroundPixelRatio": 0.176625,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 354,
+        "width": 818,
+        "height": 404
+      },
+      "widthFillRatio": 0.798828,
+      "heightFillRatio": 0.394531,
+      "maxAxisFillRatio": 0.798828,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-225",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-270.png",
+      "sha256": "8ec2d131552243fcf6f8a544bd941e6cb7d99cb538edeb581f59577e1d3d615f",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 229103,
+      "foregroundPixelRatio": 0.21849,
+      "foregroundBounds": {
+        "x": 54,
+        "y": 393,
+        "width": 916,
+        "height": 311
+      },
+      "widthFillRatio": 0.894531,
+      "heightFillRatio": 0.303711,
+      "maxAxisFillRatio": 0.894531,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-270",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    },
+    {
+      "filename": "turntable-315.png",
+      "sha256": "084bbf7dacb6bff733eb1cd20a2aa017a97b7f3620096c19234dd13374ecffc1",
+      "width": 1024,
+      "height": 1024,
+      "backgroundRgb": [
+        23,
+        29,
+        35
+      ],
+      "foregroundPixels": 185644,
+      "foregroundPixelRatio": 0.177044,
+      "foregroundBounds": {
+        "x": 92,
+        "y": 353,
+        "width": 878,
+        "height": 373
+      },
+      "widthFillRatio": 0.857422,
+      "heightFillRatio": 0.364258,
+      "maxAxisFillRatio": 0.857422,
+      "status": "passed",
+      "reason": null,
+      "id": "turntable-315",
+      "renderManifestSha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29"
+    }
+  ]
+}

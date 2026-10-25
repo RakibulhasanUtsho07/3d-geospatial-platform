@@ -258,6 +258,9 @@ jobs:
       - name: Test multi-view render review manifest validation
         run: npm run test:render-review-manifest
 
+      - name: Test validated render contact-sheet builder
+        run: node --test tests/build-render-contact-sheet.test.mjs
+
       - name: Test evidence-linked render reference review
         run: npm run test:render-reference-review
 
@@ -423,6 +426,12 @@ jobs:
       - name: Generate parametric Ahsan Manzil LOD assets
         run: npm run build:heritage-model
 
+      - name: Build and QA Bangabhaban provisional model
+        run: |
+          npm run build:bangabhaban-model
+          npm run test:bangabhaban-model
+          npm run test:glb-geometry-qa
+          npm run test:glb-texture-binding-qa
       - name: Test heritage model GLBs, parameters and map navigation
         run: npm run test:heritage-model
 

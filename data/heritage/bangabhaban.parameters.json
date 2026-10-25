@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "bangabhaban-dhaka",
+  "displayName": "Bangabhaban",
+  "status": "provisional-visual-proxy",
+  "purpose": "Deterministic exterior visual proxy for model QA and reference review. Not a photogrammetric reconstruction, BIM model or survey-grade representation.",
+  "location": {
+    "longitude": 90.418217,
+    "latitude": 23.723318,
+    "confidence": "[C]",
+    "source": "Public landmark coordinate from secondary mapping; not a surveyed building-centroid or ground-control coordinate."
+  },
+  "orientation": {
+    "longAxisAzimuthDegrees": 90,
+    "confidence": "[E]",
+    "basis": "Approximate east-west arrangement inferred from elevated photographs; confirm from a traced footprint."
+  },
+  "provisionalDimensions": {
+    "overallWidthM": {
+      "value": 88,
+      "confidence": "estimated",
+      "basis": "Photographic proportion proxy only; not measured or derived from floor-area reports."
+    },
+    "overallDepthM": {
+      "value": 43,
+      "confidence": "estimated",
+      "basis": "Photographic proportion proxy only; not traced or surveyed."
+    },
+    "plinthHeightM": {
+      "value": 0.75,
+      "confidence": "estimated",
+      "basis": "Visual proxy."
+    },
+    "floorHeightM": {
+      "value": 4.4,
+      "confidence": "estimated",
+      "basis": "Visual proxy; published sources describe differing two-/three-storey configurations across periods."
+    },
+    "westWingWidthM": {
+      "value": 27,
+      "confidence": "estimated"
+    },
+    "westWingDepthM": {
+      "value": 34,
+      "confidence": "estimated"
+    },
+    "centralHallWidthM": {
+      "value": 42,
+      "confidence": "estimated"
+    },
+    "centralHallDepthM": {
+      "value": 25,
+      "confidence": "estimated"
+    },
+    "eastWingWidthM": {
+      "value": 29,
+      "confidence": "estimated"
+    },
+    "eastWingDepthM": {
+      "value": 34,
+      "confidence": "estimated"
+    },
+    "domeRadiusM": {
+      "value": 5.25,
+      "confidence": "estimated",
+      "basis": "Proportion from uncalibrated elevated photographs."
+    },
+    "domeHeightM": {
+      "value": 5.8,
+      "confidence": "estimated",
+      "basis": "Proportion from uncalibrated elevated photographs."
+    },
+    "stairWidthM": {
+      "value": 15,
+      "confidence": "estimated"
+    },
+    "stairRunM": {
+      "value": 5.5,
+      "confidence": "estimated"
+    },
+    "stairRiseM": {
+      "value": 0.75,
+      "confidence": "estimated",
+      "basis": "Internally aligned to the estimated plinth-top datum so the stair landing meets the modeled plinth; still unmeasured and provisional."
+    }
+  },
+  "geometryPolicy": {
+    "footprint": "Provisional stepped polygon; not traced and not survey-verified.",
+    "dimensions": "Estimated visual proxy; must not be advertised as measured or accurate.",
+    "reconstruction": "Parametric geometry informed by permitted photographs; no photogrammetry is claimed.",
+    "sourceAreaPolicy": "Do not use compound area as building footprint or floor area. Published area descriptions differ; no reported area figure is used to scale this model.",
+    "dimensionsNote": "The 84,000-square-foot historical figure is a secondary-source floor-area statement with unresolved definition; it is not a measured plan or ground-floor footprint.",
+    "surfacePolicy": "Simple colour materials only; no reference image is used as a texture."
+  },
+  "sourceRefs": [
+    {
+      "id": "licensed-aerial-2006",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
+      "license": "CC BY-SA 4.0",
+      "role": "compound orientation and broad massing cues only"
+    },
+    {
+      "id": "licensed-exterior-2017",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
+      "license": "CC BY 2.0",
+      "role": "elevated oblique facade, dome and loggia silhouette"
+    },
+    {
+      "id": "licensed-aerial-2017",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban,_Dhaka_April_(33244270994).jpg",
+      "license": "CC BY 2.0",
+      "role": "roof blocks, wing arrangement and compound context"
+    }
+  ],
+  "acceptanceGates": [
+    "Exact GLB, reference-source and render hashes remain linked.",
+    "LOD1, LOD2 and LOD3 pass GLB structure and zero-degenerate-triangle checks.",
+    "The single stepped Plinth remains one connected manifold component.",
+    "Thirteen fixed views and per-image hashes are regenerated after model changes.",
+    "Topology warnings remain visible; no warning is auto-accepted without primitive-level review.",
+    "Roof/wing proportions, textures/UVs and real-world dimensions remain unverified until independent evidence is available."
+  ]
+}

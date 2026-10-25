@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+function parseGlb(bytes, label) {
+  assert.equal(bytes.readUInt32LE(0), 0x46546c67, label + " magic");
+  assert.equal(bytes.readUInt32LE(4), 2, label + " version");
+  assert.equal(bytes.readUInt32LE(8), bytes.length, label + " declared length");
+  const jsonLength = bytes.readUInt32LE(12);
+  assert.equal(bytes.readUInt32LE(16), 0x4e4f534a, label + " JSON chunk");
+  return JSON.parse(bytes.subarray(20, 20 + jsonLength).toString("utf8").trim());
+}
+test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA", async () => {
+  for (const lod of [1, 2, 3]) {
+    const label = "LOD" + lod;
+    const bytes = await readFile(path.join(root, "public/models/bangabhaban-lod" + lod + ".glb"));
+    const report = analyzeGlbQuality(bytes), gltf = parseGlb(bytes, label);
+    let indexedVertexCount = 0;
+    let indexCount = 0;
+    for (const mesh of gltf.meshes) {
+      for (const primitive of mesh.primitives) {
+        const positions = gltf.accessors[primitive.attributes.POSITION];
+        const indices = gltf.accessors[primitive.indices];
+        indexedVertexCount += positions.count;
+        indexCount += indices.count;
+        assert.ok([5123, 5125].includes(indices.componentType), label + " indices must use compact uint16/uint32 components");
+      }
+    }
+    assert.ok(indexedVertexCount < indexCount,
+      label + " should reuse identical position/normal vertices instead of exporting triangle soup");
+    assert.ok(gltf.accessors.some(accessor => accessor.componentType === 5123),
+      label + " should use uint16 indices when the compact mesh fits the uint16 vertex budget");
+    assert.equal(report.valid, true);
+    assert.equal(report.format, "glb");
+    assert.ok(report.counts.meshCount >= 11);
+    assert.ok(report.counts.triangleCount > (lod === 1 ? 800 : lod === 2 ? 1500 : 2000));
+    assert.equal(report.counts.degenerateTriangleCount, 0);
+    assert.ok(report.bounds.dimensions.every(value => Number.isFinite(value) && value > 0));
+    assert.equal((gltf.images || []).length, 0);
+    assert.equal((gltf.textures || []).length, 0);
+    assert.ok(report.warnings.includes("no-texture-atlas-embedded-or-declared"));
+    if (lod >= 2) {
+      const loggia = gltf.meshes.find(mesh => mesh.name === "Loggia");
+      assert.ok(loggia, "semantic Loggia mesh is required for LOD" + lod);
+      assert.ok(
+        loggia.primitives.some(primitive => gltf.materials[primitive.material]?.name === "RecessShadow"),
+        "Loggia arcade openings must have recessed shadow backing in LOD" + lod
+      );
+    }
+    const plinth = gltf.nodes.find(node => node.name === "Plinth");
+    assert.ok(plinth, "semantic Plinth node is required");
+    const details = report.meshDetails.find(d => d.meshIndex === plinth.mesh && d.primitiveIndex === 0);
+    assert.ok(details?.topology?.topologyAnalyzed);
+    assert.equal(details.topology.connectedComponentCount, 1);
+    assert.equal(details.topology.boundaryEdgeCount, 0);
+    assert.equal(details.topology.nonManifoldEdgeCount, 0);
+
+    const dome = gltf.nodes.find(node => node.name === "Dome");
+    assert.ok(dome, "semantic Dome node is required");
+    const domeDetails = report.meshDetails.find(d => d.meshIndex === dome.mesh && d.primitiveIndex === 0);
+    assert.ok(domeDetails?.topology?.topologyAnalyzed);
+    assert.equal(domeDetails.topology.boundaryEdgeCount, 0,
+      label + " dome shell must not retain an open top-ring boundary");
+
+    const stair = gltf.nodes.find(node => node.name === "EntranceStair");
+    assert.ok(stair, "semantic EntranceStair node is required");
+    const stairPosition = gltf.accessors[gltf.meshes[stair.mesh].primitives[0].attributes.POSITION];
+    assert.ok(stairPosition.min[1] >= -1e-6, label + " stair should start at model ground");
+    const parameters = JSON.parse(await readFile(path.join(root, "data/heritage/bangabhaban.parameters.json"), "utf8"));
+    assert.ok(stairPosition.max[1] <= parameters.provisionalDimensions.stairRiseM.value + 1e-5,
+      label + " stair risers must use the configured total rise, not cumulative overheight");
+    assert.ok(Math.abs(stairPosition.max[1] - parameters.provisionalDimensions.plinthHeightM.value) <= 1e-5,
+      label + " stair landing must meet the modeled plinth-top datum");
+  }
+});
+test("default Bangabhaban GLB is byte-identical to LOD3 and manifest pins the GLB hash", async () => {
+  const lod3 = await readFile(path.join(root, "public/models/bangabhaban-lod3.glb"));
+  const primary = await readFile(path.join(root, "public/models/bangabhaban.glb"));
+  assert.deepEqual(primary, lod3);
+  const manifest = JSON.parse(await readFile(path.join(root, "public/models/bangabhaban.manifest.json"), "utf8"));
+  assert.equal(manifest.entries[0].publicationEligible, false);
+  assert.equal(manifest.entries[0].status, "provisional-visual-proxy-not-survey-verified");
+  assert.equal(manifest.entries[0].assets.lod3.sha256, createHash("sha256").update(lod3).digest("hex"));
+});

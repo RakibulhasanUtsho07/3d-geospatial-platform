@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
+import { buildBangabhabanTopologyAudit } from "../scripts/build-bangabhaban-topology-audit.mjs";
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+test("Bangabhaban topology audit pins the model hash and preserves mesh/global warnings", async () => {
+  const bytes = await readFile(path.join(root, "public/models/bangabhaban-lod3.glb"));
+  const quality = analyzeGlbQuality(bytes), audit = buildBangabhabanTopologyAudit(bytes, quality);
+  assert.equal(audit.candidate.sha256.length, 64);
+  assert.equal(audit.summary.meshCount, quality.counts.meshCount);
+  assert.equal(audit.meshes.length, quality.meshDetails.length);
+  assert.ok(audit.meshes.every(m => m.nodeName && !m.nodeName.startsWith("mesh-")));
+  assert.equal(audit.summary.releaseGate, "blocked-review-required");
+  for (const warning of quality.warnings) assert.ok(audit.summary.globalWarnings.includes(warning), "lost warning " + warning);
+  const plinth = audit.meshes.find(m => m.nodeName === "Plinth");
+  assert.ok(plinth);
+  assert.equal(plinth.connectedComponentCount, 1);
+  assert.equal(plinth.boundaryEdgeCount, 0);
+  assert.equal(plinth.nonManifoldEdgeCount, 0);
+  const dome = audit.meshes.find(m => m.nodeName === "Dome");
+  assert.ok(dome);
+  assert.equal(dome.boundaryEdgeCount, 0, "closed dome shell should have no open top ring");
+});

@@ -66,6 +66,23 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     if (!sha256Pattern.test(file.sha256 ?? "")) errors.push("render-sha256-invalid:" + id);
     if (!Number.isSafeInteger(file.bytes) || file.bytes < 1) errors.push("render-byte-length-invalid:" + id);
     if (view.renderComplete !== true) errors.push("render-not-complete:" + id);
+    const framing = view.framing ?? {};
+    const framingFields = ["orthographicScale", "projectedBoundsWidth", "projectedBoundsHeight", "widthFillRatio", "heightFillRatio"];
+    if (framingFields.some((field) => !finite(framing[field]) || framing[field] <= 0)) {
+      errors.push("render-framing-invalid:" + id);
+    } else {
+      const expectedWidthFill = framing.projectedBoundsWidth / framing.orthographicScale;
+      const expectedHeightFill = framing.projectedBoundsHeight / framing.orthographicScale;
+      if (framing.orthographicScale + 1e-6 < Math.max(framing.projectedBoundsWidth, framing.projectedBoundsHeight)) {
+        errors.push("render-framing-crops-projected-bounds:" + id);
+      }
+      if (Math.abs(expectedWidthFill - framing.widthFillRatio) > 0.002 ||
+          Math.abs(expectedHeightFill - framing.heightFillRatio) > 0.002) {
+        errors.push("render-framing-ratio-mismatch:" + id);
+      }
+      const maximumFill = Math.max(framing.widthFillRatio, framing.heightFillRatio);
+      if (maximumFill < 0.70 || maximumFill > 0.91) errors.push("render-framing-coverage-out-of-range:" + id);
+    }
     const stats = view.pixelStatistics ?? {};
     if (!finite(stats.luminanceMean) || !finite(stats.luminanceStandardDeviation) ||
       !finite(stats.transparentRatio) || !Number.isSafeInteger(stats.sampledPixels) || stats.sampledPixels < 1) {
@@ -82,6 +99,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       bytes: file.bytes,
       sha256: file.sha256.toLowerCase(),
       renderComplete: view.renderComplete === true,
+      framing: view.framing ?? null,
       pixelStatistics: stats,
     });
   }
