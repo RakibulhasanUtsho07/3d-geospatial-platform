@@ -180,13 +180,17 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
           import { readFile } from "node:fs/promises";
           const report = JSON.parse(await readFile("artifacts/offline-road/baseline/report.json", "utf8"));
           assert.equal(report.runs.length, 6, "expected three cold and three warm runs");
           assert.equal(report.summary.cold.successfulRuns, 3);
           assert.equal(report.summary.warm.successfulRuns, 3);
-          const extract = report.candidate.dataInputs.find((entry) => entry.path === "artifacts/offline-road/data/dhaka-road-network-v1.json");
-          assert.ok(extract?.exists && /^[a-f0-9]{64}$/.test(extract.sha256), "offline extract hash is missing");
+          const runtimeExtract = await readFile("public/data/roads/dhaka-road-network-v1.json");
+          const artifactExtract = await readFile("artifacts/offline-road/data/dhaka-road-network-v1.json");
+          const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          assert.ok(runtimeExtract.length > 0, "bundled runtime road extract is empty");
+          assert.equal(sha256(runtimeExtract), sha256(artifactExtract), "bundled runtime extract differs from the validated generated extract");
           for (const run of report.runs) {
             assert.equal(run.status, "ok", run.mode + "-" + run.index + " browser sample failed");
             assert.equal(run.roadReadiness.status, "rendered", run.mode + "-" + run.index + " road layer not rendered");
