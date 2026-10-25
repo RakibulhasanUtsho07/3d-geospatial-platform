@@ -24,6 +24,15 @@ test("imagery diagnostics keep tile coordinates and retry metadata without URLs"
   assert.doesNotMatch(summary.message, /secret|123\/456/);
 });
 
+test("query values are redacted even when an error has no URL", () => {
+  const summary = summarizeImageryTileError({
+    message: "tile failure token=secret west=90.4 south=23.7",
+  });
+  assert.doesNotMatch(summary.message, /secret|90\.4|23\.7/);
+  assert.match(summary.message, /token=\[redacted\]/);
+  assert.match(summary.message, /west=\[redacted\]/);
+});
+
 test("invalid or absent tile coordinates fail closed to null", () => {
   assert.deepEqual(
     summarizeImageryTileError({ x: -1, y: 2.5, level: Number.NaN, timesRetried: -3 }),
