@@ -13,6 +13,11 @@ test("Bangabhaban reference downloader is wired as an explicit package command",
   assert.match(downloader, /expectedSha1/);
   assert.match(downloader, /verified: true/);
   assert.match(downloader, /process\.exitCode = 1/);
+  assert.match(downloader, /Existing reference file differs from the verified source/);
+  assert.match(downloader, /Existing reference manifest differs from the newly verified manifest/);
+  assert.match(downloader, /writeFile\(imagePath, bytes, \{ flag: "wx" \}\)/);
+  assert.match(downloader, /writeFile\(manifestPath, manifestText, \{ flag: "wx" \}\)/);
+  assert.match(downloader, /existingSha256/);
 });
 
 test("Bangabhaban pilot keeps public references and geometry claims provenance-gated", () => {
