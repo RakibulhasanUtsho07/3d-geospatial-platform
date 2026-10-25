@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import type { MapLayer, MapLayerId } from "@/core/map-engine/types";
 
 interface MapLayersPanelProps {
@@ -28,21 +30,32 @@ export default function MapLayersPanel({
   disabled,
   onToggle,
 }: MapLayersPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <aside
       aria-label="Map layers"
       className="absolute bottom-4 left-4 z-20 w-[min(290px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 text-white shadow-2xl backdrop-blur-xl"
     >
-      <div className="border-b border-white/10 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-          Map layers
-        </p>
-        <p className="mt-1 text-xs text-zinc-400">
-          Choose which data appears on the map
-        </p>
-      </div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="map-layers-list"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+      >
+        <span>
+          <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+            Map layers
+          </span>
+          <span className="mt-1 block text-xs text-zinc-400">
+            {expanded ? "Choose which data appears on the map" : "Manage visible data"}
+          </span>
+        </span>
+        <span aria-hidden="true" className="text-zinc-300">{expanded ? "−" : "+"}</span>
+      </button>
 
-      <ul className="space-y-1 p-2">
+      <ul id="map-layers-list" className={expanded ? "space-y-1 border-t border-white/10 p-2" : "hidden"}>
         {layers.map((layer) => (
           <li key={layer.id}>
             <label className="flex cursor-pointer items-start justify-between gap-3 rounded-xl px-2 py-3 transition hover:bg-white/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
