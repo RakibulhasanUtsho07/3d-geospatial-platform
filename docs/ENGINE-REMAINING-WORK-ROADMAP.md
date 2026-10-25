@@ -113,10 +113,11 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Phase 2 onward: remaining implementation phases above.
 
 
-## P3.4.3 — Offline road data pipeline (code added; real data pending)
+## P3.4.3 — Offline road data pipeline (data-backed workflow added; first run pending)
 
-- Added GeoJSON-to-normalized-road conversion while preserving the source OSM way ID.
+- Added GeoJSON-to-normalized-road conversion while preserving source OSM way IDs, multipart ways, supported footways and source tags.
 - Added a versioned local extract schema with ODbL/source/date/coverage/feature-count and geometry validation, size/count limits, parsed-file cache and per-viewport selection.
-- Added the local-first API path controlled by `DHAKA_ROADS_EXTRACT_PATH`; matching viewports bypass public Overpass and report offline detail/source provenance.
-- Added `prepare:dhaka-road-extract` to ingest an OSM-derived GeoJSON file and record its source hash.
-- **Still pending:** run the importer on an actual licensed Dhaka extract, configure it in the runtime, then verify the six baseline screenshots show a positive road-render feature count. The tests use synthetic fixtures only.
+- Added the local-first API path controlled by `DHAKA_ROADS_EXTRACT_PATH`; fully covered viewports bypass public Overpass and report offline detail/source provenance.
+- The importer now records the source PBF SHA-256 separately from the processed GeoJSON input SHA-256, validates those hashes, and rejects output exceeding the runtime loader's 256 MiB cap.
+- Added CLI integration tests and `.github/workflows/dhaka-offline-road-baseline.yml`, which downloads the official Geofabrik Bangladesh extract, clips the Dhaka bbox, creates the versioned offline file, and checks the API and six cold/warm rendered-road samples. It uploads the generated data and evidence but does not commit the PBF.
+- **Acceptance still pending until the new workflow run:** all six samples must record `detailLevel: offline`, zero Overpass attempts and positive rendered-feature counts. Deploying the reviewed artifact to the production runtime remains a separate step.
