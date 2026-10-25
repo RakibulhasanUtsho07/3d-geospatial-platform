@@ -10,3 +10,23 @@ export function shouldCancelRoadRequestForCachedViewport(
   return loadedRoadBoundsContainViewport === true &&
     hasActiveRoadRequest === true;
 }
+
+/**
+ * Avoid repeating an expensive road request for a viewport that just failed.
+ * Different viewports remain eligible to load, and expiry allows retry.
+ */
+export function shouldSkipFailedRoadViewportRetry(
+  requestKey,
+  lastFailedRequestKey,
+  retryAfterMs,
+  nowMs,
+) {
+  return typeof requestKey === "string" &&
+    requestKey.length > 0 &&
+    requestKey === lastFailedRequestKey &&
+    Number.isFinite(retryAfterMs) &&
+    retryAfterMs > 0 &&
+    Number.isFinite(nowMs) &&
+    nowMs >= 0 &&
+    nowMs < retryAfterMs;
+}
