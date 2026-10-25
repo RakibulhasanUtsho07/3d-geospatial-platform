@@ -2424,6 +2424,7 @@ export class CesiumAdapter implements MapEngine {
   }
 
   resetOrientation(): void {
+    this.heritageCameraController.stopOrbitTour();
     if (
       !this.viewer ||
       !this.cesium ||
@@ -2445,6 +2446,10 @@ export class CesiumAdapter implements MapEngine {
         roll: 0,
       },
     });
+  }
+
+  resetHomeView(): void {
+    this.heritageCameraController.resetHomeView();
   }
 
   flyTo(target: CameraTarget): void {
