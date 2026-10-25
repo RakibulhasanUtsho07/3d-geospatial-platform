@@ -149,3 +149,8 @@ Trace OSM/satellite footprint → set centroid and azimuth → rectify south fac
 - **Historic Mosque City of Bagerhat — UNESCO geographic information** — https://whc.unesco.org/document/216536
 - **Ahsan Manzil — Wikipedia** — https://en.wikipedia.org/wiki/Ahsan_Manzil — Coordinates near 23.7085972 N, 90.4060583 E agree closely with supplied anchor. Anchor still remains [C] until footprint polygon centroid is traced.
 - **A Palace on the River: Ahsan Manzil — The Daily Star, Adnan Zillur Morshed** — https://www.thedailystar.net/slow-reads/focus/news/palace-the-river-ahsan-manzil-1598293
+
+
+### Roof-deck material note
+
+The dedicated `RoofDeck` plane uses `materials.roofDeck = #777168` ([E]), a muted grey-brown estimate from the licensed 2019 aerial reference. The image is oblique/unrectified; it does not provide a survey-grade roof plan or measured historic finish. The GLB remains without a baked texture/UV atlas.

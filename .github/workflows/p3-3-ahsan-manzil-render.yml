@@ -145,13 +145,14 @@ jobs:
             sourceCommit: process.env.SOURCE_COMMIT,
             reviewGeneratedAt: new Date().toISOString(),
             correctionScope: [
+              "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
               "Rangmahal and Andarmahal roof-height separation",
               "photo-proportion-based 13.0 m triple-arch portico and 27.0 m estimated stair base; neither is surveyed",
               "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
               "10.5 m estimated octagonal drum with proportionally scaled 5.25 m maximum dome radius and unchanged 6.53 m profile height",
               "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
               "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
-              "separate the flat RoofDeck node and hide it only for the front-detail render; the GLB and 12 whole-model views retain the full roof geometry"
+              "use a separate grey-brown RoofDeck material informed by the licensed aerial view; preserve complete roof planes in the GLB and 12 whole-model views"
             ],
             model: {
               filename: "ahsan-manzil-lod3.glb",
@@ -190,7 +191,7 @@ jobs:
             views,
             visualReview: {
               contactSheet: "contact-sheet.png",
-              status: "13-view render and hash validation passed; visual-fidelity acceptance remains pending; a current contact-sheet review found unresolved roof-detail, material/texture, and side/back framing issues.",
+              status: "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone now uses a low-confidence aerial-photo estimate; texture/UV, detailed roof segmentation, side/back framing and surveyed footprint remain unresolved.",
               findings: [
                 "Side-by-side comparison with the licensed south/front reference showed the 39 m estimated stair base visually dominating the facade; reduced it to a 27 m (~48% of the provisional 55.8 m frontage) estimate, pending rectification.",
                 "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -201,10 +202,10 @@ jobs:
                 "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
                 "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
                 "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
-                "Human review of the exact generated 13-view contact sheet found the top view dominated by a broad, nearly blank roof deck with insufficient roof-level architectural detail; visual completeness is not accepted.",
+                "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; the roof deck now uses a muted grey-brown estimate, but the top view remains a simplified parametric plane and does not claim detailed roof reconstruction.",
                 "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
                 "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
-                "The narrowed portico/stair landing, scaled dome profile, and detail-only RoofDeck visibility policy are compared against the three hash-pinned images; all dimensions remain estimates pending rectified elevation or independent survey.",
+                "The narrowed portico/stair landing, scaled dome profile, roof tone and roof-plane relationship are compared against four hash-pinned licensed views, including an unrectified aerial image; all dimensions remain estimates pending rectified elevation or independent survey.",
                 "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
                 "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
               ],
