@@ -54,6 +54,7 @@ jobs:
           MAP_BENCHMARK_WARM_RUNS: "3"
           MAP_BENCHMARK_SETTLE_MS: "5000"
           MAP_BENCHMARK_READY_TIMEOUT_MS: "90000"
+          MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS: "30000"
           MAP_BENCHMARK_WIDTH: "1280"
           MAP_BENCHMARK_HEIGHT: "800"
           MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ github.sha }}

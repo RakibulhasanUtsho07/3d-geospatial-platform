@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyResourceUrl, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
+import { classifyResourceUrl, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
 
 test("summarizes browser samples using nearest-rank p50 and p95", () => {
   assert.deepEqual(summarizeValues([10, 20, 30, 40, 50]), {
@@ -97,4 +97,33 @@ test("rejects map readiness when initialization fails or telemetry is unavailabl
   assert.equal(validateMapReadyState({ ...valid, hasError: true }), false);
   assert.equal(validateMapReadyState({ ...valid, telemetryAvailable: false }), false);
   assert.equal(validateMapReadyState({ ...valid, canvasCount: 0 }), false);
+});
+
+test("records road rendering only when a render event follows a successful fetch", () => {
+  assert.deepEqual(resolveRoadReadiness({ recentEvents: [
+    { sequence: 10, metric: "roads.fetch", outcome: "success", durationMs: 14000 },
+    { sequence: 11, metric: "roads.render", outcome: "success", durationMs: 850 },
+  ] }), {
+    fetchOutcome: "success",
+    fetchDurationMs: 14000,
+    renderOutcome: "success",
+    renderDurationMs: 850,
+    status: "rendered",
+  });
+  assert.equal(resolveRoadReadiness({ recentEvents: [
+    { sequence: 10, metric: "roads.fetch", outcome: "success", durationMs: 14000 },
+  ] }), null);
+});
+
+test("separates road service errors and cancellation from successful building-stage readiness", () => {
+  assert.deepEqual(resolveRoadReadiness({ recentEvents: [
+    { sequence: 12, metric: "roads.fetch", outcome: "error", durationMs: 2390 },
+  ] }), { fetchOutcome: "error", fetchDurationMs: 2390, status: "fetch-error" });
+  assert.deepEqual(resolveRoadReadiness({ recentEvents: [
+    { sequence: 12, metric: "roads.fetch", outcome: "cancelled", durationMs: 1200 },
+  ] }), { fetchOutcome: "cancelled", fetchDurationMs: 1200, status: "fetch-cancelled" });
+  assert.equal(resolveRoadReadiness({ recentEvents: [
+    { sequence: 12, metric: "roads.fetch", outcome: "success", durationMs: 100 },
+    { sequence: 11, metric: "roads.render", outcome: "success", durationMs: 10 },
+  ] }), null);
 });

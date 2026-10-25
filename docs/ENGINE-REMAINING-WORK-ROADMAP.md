@@ -104,7 +104,9 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Confirmed that the initial P3.1 commit and its development promotion passed full CI; promotion PR #156 merged.
 - [x] Audited README, performance/release/accuracy/generation documentation, package scripts, CI workflow, branch state and open PR inventory.
 - [x] Added a current-branch P3.1 browser harness and helper tests; canvas-only false readiness is now rejected.
-- [x] Added a dedicated real-data capture workflow, pending its first run/artifact validation.
-- [ ] Phase 1 real-Dhaka capture: verify six successful screenshots and 3+3 cold/warm report on the actual workflow run.
-- [ ] Phase 1 human visual review and workstation-specific baseline.
+- [x] Dedicated real-data capture workflow produced artifact [run #40157388201](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40157388201), with 3/3 cold and 3/3 warm building-stage samples plus six PNG screenshots on SHA `76032ec65ab9d57069d2ce69c7e6c39fa20a0faa`.
+- [x] Initial visual review: 3D buildings are visible and no blank canvas occurs; facade/roof detail is still boxy, UI side panels obscure the map, and raster imagery differs between samples. One warm sample reported an OSM roads API HTTP 502; successful road requests took roughly 13–18 seconds in the server log.
+- [x] Improved benchmark to retain the actual staged-feature count, wait for road fetch/render terminal state and record per-sample road success/error/timeout; a refined run is now required because the first screenshots were taken before all map layers settled.
+- [ ] Refined baseline: capture six samples with explicit building readiness and road outcome per sample, and review the new screenshot hashes.
+- [ ] Human visual review of the refined screenshots and workstation-specific baseline.
 - [ ] Phase 2 onward: remaining implementation phases above.

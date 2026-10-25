@@ -206,6 +206,71 @@ async function waitForMapReady(page, timeoutMs) {
   return state;
 }
 
+export function resolveRoadReadiness(snapshot) {
+  const events = Array.isArray(snapshot?.recentEvents) ? snapshot.recentEvents : [];
+  const fetchEvent = events.slice().reverse().find((event) => event.metric === "roads.fetch");
+  if (!fetchEvent || !["success", "cache-hit", "error", "cancelled"].includes(fetchEvent.outcome)) return null;
+
+  const base = {
+    fetchOutcome: fetchEvent.outcome,
+    fetchDurationMs: Number.isFinite(fetchEvent.durationMs) ? fetchEvent.durationMs : null,
+  };
+  if (fetchEvent.outcome === "error") return { ...base, status: "fetch-error" };
+  if (fetchEvent.outcome === "cancelled") return { ...base, status: "fetch-cancelled" };
+
+  const renderEvent = events.slice().reverse().find((event) =>
+    event.metric === "roads.render" &&
+    Number.isSafeInteger(event.sequence) &&
+    Number.isSafeInteger(fetchEvent.sequence) &&
+    event.sequence > fetchEvent.sequence
+  );
+  if (!renderEvent || !["success", "error", "cancelled"].includes(renderEvent.outcome)) return null;
+  return {
+    ...base,
+    renderOutcome: renderEvent.outcome,
+    renderDurationMs: Number.isFinite(renderEvent.durationMs) ? renderEvent.durationMs : null,
+    status: renderEvent.outcome === "success"
+      ? "rendered"
+      : renderEvent.outcome === "error" ? "render-error" : "render-cancelled",
+  };
+}
+
+async function waitForRoadsSettled(page, timeoutMs) {
+  const startedAt = performance.now();
+  try {
+    await page.waitForFunction(() => {
+      const events = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.()?.recentEvents;
+      if (!Array.isArray(events)) return false;
+      const fetchEvent = events.slice().reverse().find((event) => event.metric === "roads.fetch");
+      if (!fetchEvent) return false;
+      if (fetchEvent.outcome === "error" || fetchEvent.outcome === "cancelled") return true;
+      if (fetchEvent.outcome !== "success" && fetchEvent.outcome !== "cache-hit") return false;
+      return events.some((event) =>
+        event.metric === "roads.render" &&
+        Number.isSafeInteger(event.sequence) &&
+        Number.isSafeInteger(fetchEvent.sequence) &&
+        event.sequence > fetchEvent.sequence &&
+        ["success", "error", "cancelled"].includes(event.outcome)
+      );
+    }, null, { timeout: timeoutMs });
+  } catch (error) {
+    if (!(error instanceof Error) || !/timeout/i.test(error.name + " " + error.message)) throw error;
+    const telemetry = await page.evaluate(() => window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null);
+    return {
+      status: "timeout",
+      waitStatus: "timeout",
+      elapsedMs: roundMs(performance.now() - startedAt),
+      observedState: resolveRoadReadiness(telemetry) ?? "no-terminal-road-event",
+    };
+  }
+  const telemetry = await page.evaluate(() => window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null);
+  return {
+    ...(resolveRoadReadiness(telemetry) ?? { status: "unclassified" }),
+    waitStatus: "settled",
+    elapsedMs: roundMs(performance.now() - startedAt),
+  };
+}
+
 export function validateMapReadyState(state) {
   return Boolean(
     state &&
@@ -220,7 +285,10 @@ export function validateMapReadyState(state) {
   );
 }
 
-async function capturePageMetrics(page, counters, origin, screenshotPath, loadToMapReadyMs, mode, index, scenario) {
+async function capturePageMetrics(
+  page, counters, origin, screenshotPath, loadToMapReadyMs, mode, index, scenario,
+  readiness, roadReadiness, loadToRoadTerminalMs,
+) {
   const metrics = await page.evaluate((pageOrigin) => {
     const nav = performance.getEntriesByType("navigation")[0];
     const paints = performance.getEntriesByType("paint");
@@ -319,6 +387,9 @@ async function capturePageMetrics(page, counters, origin, screenshotPath, loadTo
     status: "ok",
     scenario,
     loadToMapReadyMs,
+    readiness,
+    roadReadiness,
+    loadToRoadTerminalMs,
     navigation: metrics.navigation,
     paintTimingsMs: metrics.paintTimingsMs,
     resources: metrics.resources,
@@ -383,12 +454,19 @@ function summarizeRuns(runs) {
       cacheHitCount: summarizeValues(snapshots.map((item) => item.cacheHitCount)),
     };
   }
+  const roadReadinessCounts = {};
+  for (const run of successful) {
+    const status = run.roadReadiness?.status || "not-recorded";
+    roadReadinessCounts[status] = (roadReadinessCounts[status] || 0) + 1;
+  }
   return {
     totalRuns: runs.length,
     successfulRuns: successful.length,
     failedRuns: failed.length,
     failures: failed.map((run) => ({ index: run.index, error: run.error })),
+    roadReadinessCounts,
     loadToMapReadyMs: summarizeValues(successful.map((run) => run.loadToMapReadyMs)),
+    loadToRoadTerminalMs: summarizeValues(successful.map((run) => run.loadToRoadTerminalMs)),
     domContentLoadedMs: summarizeValues(successful.map((run) => run.navigation?.domContentLoadedMs)),
     loadEventEndMs: summarizeValues(successful.map((run) => run.navigation?.loadEventEndMs)),
     longTaskCount: summarizeValues(successful.map((run) => run.longTasks?.count)),
@@ -418,6 +496,7 @@ async function runBenchmark() {
   const warmCount = readInteger("MAP_BENCHMARK_WARM_RUNS", 3, 1, 10);
   const settleMs = readInteger("MAP_BENCHMARK_SETTLE_MS", 5000, 0, 120000);
   const readyTimeoutMs = readInteger("MAP_BENCHMARK_READY_TIMEOUT_MS", 90000, 1, 120000);
+  const roadReadyTimeoutMs = readInteger("MAP_BENCHMARK_ROAD_READY_TIMEOUT_MS", 30000, 1000, 120000);
   const runStamp = new Date().toISOString().replace(/[:.]/g, "-");
   const defaultOutput = path.join("artifacts", "map-performance-baseline", runStamp);
   const outputDirectory = path.resolve(projectRoot, process.env.MAP_BENCHMARK_OUT_DIR || defaultOutput);
@@ -460,11 +539,20 @@ async function runBenchmark() {
         await cdp.send("Network.clearBrowserCache");
         startedAt = performance.now();
         await session.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
-        await waitForMapReady(session.page, readyTimeoutMs);
+        const readiness = await waitForMapReady(session.page, readyTimeoutMs);
         const loadToMapReadyMs = roundMs(performance.now() - startedAt);
+        const roadReadiness = await waitForRoadsSettled(session.page, roadReadyTimeoutMs);
+        const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
         if (settleMs > 0) await session.page.waitForTimeout(settleMs);
         results.push(await capturePageMetrics(
           session.page, session.counters, origin, screenshotPath, loadToMapReadyMs, "cold", index, scenario,
+          {
+            canvasCount: readiness.canvasCount,
+            viewportStageSuccessCount: readiness.viewportStageSuccessCount,
+            stagedFeatureCount: readiness.stagedFeatureCount,
+          },
+          roadReadiness,
+          loadToRoadTerminalMs,
         ));
       } catch (error) {
         results.push({
@@ -484,6 +572,7 @@ async function runBenchmark() {
       warmSession = await newInstrumentedPage(browser, viewport);
       await warmSession.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
       await waitForMapReady(warmSession.page, readyTimeoutMs);
+      await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs);
       if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
       // The primer warms this isolated context's browser HTTP cache and is excluded from measurements.
       for (let index = 1; index <= warmCount; index += 1) {
@@ -492,11 +581,20 @@ async function runBenchmark() {
         try {
           warmSession.counters.reset();
           await warmSession.page.reload({ waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
-          await waitForMapReady(warmSession.page, readyTimeoutMs);
+          const readiness = await waitForMapReady(warmSession.page, readyTimeoutMs);
           const loadToMapReadyMs = roundMs(performance.now() - startedAt);
+          const roadReadiness = await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs);
+          const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
           if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
           results.push(await capturePageMetrics(
             warmSession.page, warmSession.counters, origin, screenshotPath, loadToMapReadyMs, "warm", index, scenario,
+            {
+              canvasCount: readiness.canvasCount,
+              viewportStageSuccessCount: readiness.viewportStageSuccessCount,
+              stagedFeatureCount: readiness.stagedFeatureCount,
+            },
+            roadReadiness,
+            loadToRoadTerminalMs,
           ));
         } catch (error) {
           results.push({
@@ -552,6 +650,9 @@ async function runBenchmark() {
       applicationMemoryCacheSurvivesReload: false,
       settleMs,
       readyTimeoutMs,
+      roadReadyTimeoutMs,
+      readyCondition: "A successful viewport.stage event with at least one building feature.",
+      roadSettlement: "Wait for roads.fetch and, after a successful fetch, the following roads.render event; record errors, cancellation and timeout instead of silently treating the canvas as fully ready.",
       screenshotDigestsProveCapturedFileIntegrityNotCrossMachineBitIdentity: true,
       telemetryWindow: "Map-engine telemetry generated during each navigation; in-app retention is bounded.",
       fpsClaimed: false,
