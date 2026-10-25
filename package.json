@@ -176,7 +176,8 @@
     "prepare:dhaka-road-extract": "node scripts/prepare-dhaka-road-extract.mjs",
     "test:prepare-dhaka-road-extract": "node --test tests/prepare-dhaka-road-extract.test.mjs",
     "test:real-dhaka-baseline": "node --test tests/real-dhaka-baseline-validation.test.mjs",
-    "verify:real-dhaka-baseline": "node scripts/validate-real-dhaka-baseline.mjs"
+    "verify:real-dhaka-baseline": "node scripts/validate-real-dhaka-baseline.mjs",
+    "test:bangabhaban-reference-pack": "node --test tests/bangabhaban-reference-pack.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
