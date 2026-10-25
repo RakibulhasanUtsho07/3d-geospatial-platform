@@ -352,7 +352,7 @@ jobs:
         run: npm run test:building-viewport-manager
 
       - name: Test dynamic map performance telemetry and baseline aggregation
-        run: npm run test:map-performance
+        run: npm run test:map-performance && npm run test:map-browser-baseline
 
       - name: Test P2.13 viewport performance trend evidence contract
         run: npm run test:viewport-trend-report
