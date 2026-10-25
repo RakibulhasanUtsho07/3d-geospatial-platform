@@ -24,16 +24,16 @@ test("Ahsan Manzil reference pack uses fixed, permission-documented Wikimedia so
   assert.match(downloader, /process\.exitCode = 1/);
 });
 
-test("three distinct views are explicitly rights-cleared but not treated as survey control", () => {
+test("four licensed view types include an unrectified aerial reference without treating it as survey control", () => {
   assert.equal(pack.schemaVersion, "1.0.0");
   assert.equal(pack.id, "ahsan-manzil-dhaka-reference-pack");
   assert.equal(pack.reconstructionStatus, "reference-intake-only");
   assert.equal(pack.geometryPolicy.dimensions.status, "published-reference-only");
   assert.equal(pack.geometryPolicy.footprint.status, "not-traced");
   assert.equal(pack.geometryPolicy.model.publicationEligible, false);
-  assert.equal(pack.sources.filter((source) => source.kind === "image").length, 3);
+  assert.equal(pack.sources.filter((source) => source.kind === "image").length, 4);
   assert.deepEqual(new Set(pack.sources.map((source) => source.viewRole)), new Set([
-    "south-front-elevation", "side-facade", "oblique-front-side"
+    "south-front-elevation", "side-facade", "oblique-front-side", "aerial-oblique-roof-plan"
   ]));
   for (const source of pack.sources) {
     assert.ok(source.url.startsWith("https://commons.wikimedia.org/wiki/File:"));
@@ -52,4 +52,11 @@ test("three distinct views are explicitly rights-cleared but not treated as surv
   }
   assert.ok(pack.acceptanceGates.some((gate) => gate.includes("Compute and store SHA-256 locally")));
   assert.ok(pack.acceptanceGates.some((gate) => gate.includes("independent surveyed dimensions")));
+  const aerial = pack.sources.find((source) => source.id === "licensed-aerial-2019");
+  assert.equal(aerial.expectedByteLength, 7908613);
+  assert.equal(aerial.publishedSha1, "6f2913594f7db0b04fc8b480442d0694c41dfb9f");
+  assert.equal(aerial.viewRole, "aerial-oblique-roof-plan");
+  assert.ok(aerial.notUsableFor.some((value) => value.includes("orthographic footprint")));
+  assert.ok(aerial.viewAssessment.geometryUse.includes("Qualitative"));
+  assert.ok(aerial.viewAssessment.reportedCameraCoordinates.confidence.includes("not-surveyed"));
 });

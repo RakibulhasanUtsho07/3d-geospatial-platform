@@ -74,7 +74,7 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Eight open arched bays"));
   assert.ok(builder.includes("addFacadeDisk("));
   assert.ok(builder.includes("const stairBaseWidth = DIM.stairWidth;"));
-  assert.ok(builder.includes('box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof")'),
+  assert.ok(builder.includes('box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roofDeck")'),
     "flat roof planes live in a dedicated node so front facade review can hide the plane without deleting roof geometry");
   assert.ok(builder.includes("const riserCenter=(riserBottom+riserTop)/2;"));
   assert.ok(builder.includes('box(stair,domeX,riserCenter,z,width,rise,stepDepth,"stair")'));
@@ -127,6 +127,10 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.equal(config.parameters.materials.stairStone.value, "#6E625A");
   assert.equal(config.parameters.materials.doorWood.value, "#6B4A32");
   assert.equal(config.parameters.materials.glass.value, "#392B27");
+  assert.equal(config.parameters.materials.roofDeck.value, "#777168");
+  assert.equal(config.parameters.materials.roofDeck.confidence, "[E]");
+  assert.match(config.parameters.materials.roofDeck.note, /no embedded texture atlas or UV projection/);
+  assert.ok(builder.includes('roofDeck: V("materials", "roofDeck")'), "the roof planes use a separate estimated grey-brown material instead of decorative rose trim");
   assert.equal(config.parameters.dome.drumOpeningCount.value, 8);
   assert.equal(config.parameters.dome.drumOpeningWidth.value, 2.7);
   assert.equal(config.parameters.runtimeCamera.frontFocusOffsetEastMeters.value, 34.8);

@@ -566,6 +566,12 @@
         "confidence": "[E]",
         "source": "User-supplied reference photo estimate",
         "note": "Brown wood for the central glazed doors and timber shutter details."
+      },
+      "roofDeck": {
+        "value": "#777168",
+        "confidence": "[E]",
+        "source": "Relative roof tone in the licensed Wikimedia Commons aerial photograph by Azim Khan Ronnie (2019); image exposure, white balance and oblique perspective are uncalibrated.",
+        "note": "Muted grey-brown roof-deck proxy to avoid the pale rose/white plane in earlier render reviews. This is a visual material estimate, not evidence of a surveyed or historic finish; the GLB still has no embedded texture atlas or UV projection."
       }
     },
     "roof": {

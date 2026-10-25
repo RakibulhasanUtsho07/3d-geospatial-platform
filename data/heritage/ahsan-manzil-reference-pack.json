@@ -16,7 +16,7 @@
       "basis": "Historic-building site vicinity supported by Wikimedia photo metadata; not an independently surveyed building-centroid measurement."
     }
   },
-  "purpose": "Reproducible, rights-documented reference intake for the P3.3 parametric Ahsan Manzil reconstruction review.",
+  "purpose": "Reproducible, rights-documented reference intake for P3.3 Ahsan Manzil reconstruction review, including an unrectified aerial view for qualitative roof-plane context.",
   "reconstructionStatus": "reference-intake-only",
   "geometryPolicy": {
     "dimensions": {
@@ -192,6 +192,63 @@
         ],
         "assessedFrom": "Wikimedia Commons file-page metadata and preview; source bytes have not yet been downloaded or hashed locally."
       }
+    },
+    {
+      "id": "licensed-aerial-2019",
+      "kind": "image",
+      "viewRole": "aerial-oblique-roof-plan",
+      "title": "Ahsan Manzil 01.jpg",
+      "url": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_01.jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Ahsan_Manzil_01.jpg",
+      "date": "2019-04-11",
+      "creator": "Azim Khan Ronnie",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 5464,
+        "height": 3640
+      },
+      "expectedByteLength": 7908613,
+      "publishedSha1": "6f2913594f7db0b04fc8b480442d0694c41dfb9f",
+      "sha256": null,
+      "downloaded": false,
+      "localFileName": "ahsan-manzil-aerial-2019.jpg",
+      "supports": [
+        "qualitative roof-plane segmentation and roof tone",
+        "relative arrangement of front stair, central dome and side wings",
+        "broad stepped footprint and roof-section relationships"
+      ],
+      "notUsableFor": [
+        "independent dimension survey",
+        "survey-grade or orthographic footprint",
+        "true roof-plane dimensions without aerial-camera calibration and orthorectification",
+        "texture baking or facade projection without per-pixel camera calibration",
+        "exact facade heights or hidden surfaces"
+      ],
+      "viewAssessment": {
+        "viewpoint": "Oblique aerial/drone view with the building roof visible; it is not a nadir orthophoto.",
+        "reportedCameraCoordinates": {
+          "latitude": 23.707567,
+          "longitude": 90.405646,
+          "altitudeAboveSeaLevelM": 57,
+          "source": "Wikimedia Commons file-page metadata",
+          "confidence": "metadata-reported-not-surveyed"
+        },
+        "cameraCalibration": "unknown",
+        "occlusions": [
+          "surrounding trees, adjacent buildings and perspective distortion affect visible roof edges"
+        ],
+        "geometryUse": "Qualitative roof-plane segmentation and broad stepped-massing comparison only; no scale or angles are derived from the image.",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "orthographic roof plan or traced footprint",
+          "camera-calibrated photogrammetry by itself",
+          "direct texture projection or atlas baking"
+        ],
+        "assessedFrom": "Wikimedia Commons file-page metadata and the unrectified aerial preview; original bytes are checked by pinned byte length and SHA-1 before use."
+      }
     }
   ],
   "acceptanceGates": [
@@ -199,6 +256,7 @@
     "Compute and store SHA-256 locally for every downloaded source file and include the attribution/license metadata in the same artifact.",
     "The source photo set supports manual facade/massing review only; camera calibration and independent surveyed dimensions remain unknown.",
     "Any texture projection must record camera pose, visible-pixel mask, occlusion policy and source-image attribution.",
-    "Do not mark architectural fidelity or release readiness as passed from a successful CI run, a valid GLB, or a three-photo reference pack alone."
+    "Do not mark architectural fidelity or release readiness as passed from a successful CI run, a valid GLB, or a three-photo reference pack alone.",
+    "The 2019 aerial image is an unrectified oblique view: use it only for qualitative roof-plane and stepped-massing review; do not infer scale, surveyed dimensions, or UV projection from it."
   ]
 }

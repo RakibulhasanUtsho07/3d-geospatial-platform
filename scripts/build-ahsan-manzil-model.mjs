@@ -57,6 +57,7 @@ const COLORS = {
   trim: V("materials", "trimOffWhite"),
   glass: V("materials", "glass"),
   roof: V("materials", "roof"),
+  roofDeck: V("materials", "roofDeck"),
   marble: V("materials", "verandaFloor"),
   rail: "#6D444A",
   gold: "#B58B55",
@@ -740,8 +741,8 @@ function buildGlb(lod) {
   // render can hide this broad horizontal plane while preserving it in the GLB
   // and all whole-model views; the visible cornice/parapet remains in Parapet.
   const rangCenterX = (split + xMax) / 2;
-  box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
-  box(n.RoofDeck,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
+  box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roofDeck");
+  box(n.RoofDeck,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roofDeck");
 
   for(const side of [-1,1]){
     const rangZ=side*(half+.12);
