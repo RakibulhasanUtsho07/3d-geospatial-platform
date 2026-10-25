@@ -41,14 +41,50 @@ async function main() {
   const imageSources = sourcePack.sources.filter((source) => source.kind === "image");
   if (imageSources.length < 3) throw new Error("At least three source images are required.");
   const downloads = [];
+  const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+  async function fetchWithRetry(source, maxAttempts = 5) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      let response;
+      try {
+        response = await fetch(source.originalFileUrl, {
+          redirect: "follow",
+          headers: { "user-agent": "3d-geospatial-platform-ahsan-manzil-reference-audit/1.0" },
+          signal: AbortSignal.timeout(30000),
+        });
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          throw new Error(source.id + " download request failed after " + maxAttempts + " attempts: " + (error instanceof Error ? error.message : String(error)));
+        }
+        const waitMs = Math.min(3000 * (2 ** (attempt - 1)), 30000);
+        console.warn(source.id + " request error; retrying in " + waitMs + "ms (attempt " + (attempt + 1) + "/" + maxAttempts + ").");
+        await delay(waitMs);
+        continue;
+      }
+      if (response.ok) return response;
+      const status = response.status;
+      const retryAfterHeader = response.headers.get("retry-after");
+      await response.body?.cancel().catch(() => {});
+      const retryable = status === 429 || status >= 500;
+      if (!retryable || attempt === maxAttempts) {
+        throw new Error(source.id + " download failed with HTTP " + status + " after " + attempt + " attempt(s)");
+      }
+      const retryAfterSeconds = Number(retryAfterHeader);
+      const retryAfterDate = retryAfterHeader ? Date.parse(retryAfterHeader) - Date.now() : Number.NaN;
+      const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? retryAfterSeconds * 1000
+        : Number.isFinite(retryAfterDate) && retryAfterDate > 0
+          ? retryAfterDate
+          : Math.min(3000 * (2 ** (attempt - 1)), 30000);
+      const waitMs = Math.min(Math.max(retryAfterMs, 1000), 30000);
+      console.warn(source.id + " received HTTP " + status + "; retrying in " + waitMs + "ms (attempt " + (attempt + 1) + "/" + maxAttempts + ").");
+      await delay(waitMs);
+    }
+    throw new Error(source.id + " download exhausted all retries");
+  }
+
   for (const source of imageSources) {
     assertAllowedSource(source);
-    const response = await fetch(source.originalFileUrl, {
-      redirect: "follow",
-      headers: { "user-agent": "3d-geospatial-platform-ahsan-manzil-reference-audit/1.0" },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!response.ok) throw new Error(source.id + " download failed with HTTP " + response.status);
+    const response = await fetchWithRetry(source);
     const final = new URL(response.url);
     if (final.protocol !== "https:" || final.hostname !== "upload.wikimedia.org" || !final.pathname.startsWith("/wikipedia/commons/")) {
       throw new Error(source.id + " redirected outside the allowed Wikimedia Commons original-file host: " + final.href);
@@ -79,6 +115,7 @@ async function main() {
         attribution: source.creator + ', "' + source.title + '", licensed under ' + source.license + "; source: " + source.url,
       },
     });
+    await delay(1500);
   }
   const manifest = {
     schemaVersion: "1.0.0",
