@@ -456,6 +456,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Verify viewport API against the production server
+        timeout-minutes: 30
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
           NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
@@ -466,7 +467,7 @@ jobs:
           # but uses the exact same built app and generated tile manifest.
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3001 > /tmp/geospatial-next-repeat.log 2>&1 &
           repeat_server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "Primary production server log:"; cat /tmp/geospatial-next.log; echo "Repeat production server log:"; cat /tmp/geospatial-next-repeat.log; fi; kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true; exit "$status"' EXIT
 
           node --input-type=module <<'NODE'
           const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
