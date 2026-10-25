@@ -10,6 +10,13 @@ function fixture(overrides = {}) {
     width: 512,
     height: 512,
     renderComplete: true,
+    framing: {
+      orthographicScale: 56,
+      projectedBoundsWidth: 50,
+      projectedBoundsHeight: 12,
+      widthFillRatio: 50 / 56,
+      heightFillRatio: 12 / 56,
+    },
     pixelStatistics: {
       sampledPixels: 50000,
       luminanceMean: 0.4,
@@ -86,4 +93,35 @@ test("rejects invalid hashes, invalid dimensions and incomplete render records",
   const report = finalizeRenderReviewManifest(bad);
   assert.ok(report.errors.includes("render-not-complete:front"));
   assert.ok(report.errors.includes("render-sha256-invalid:front"));
+});
+
+
+test("rejects uncropped but underfilled or falsely reported camera frames", () => {
+  const missing = fixture();
+  delete missing.rawManifest.views[0].framing;
+  const missingReport = finalizeRenderReviewManifest(missing);
+  assert.ok(missingReport.errors.includes("render-framing-invalid:front"));
+
+  const underfilled = fixture();
+  underfilled.rawManifest.views[0].framing = {
+    orthographicScale: 200,
+    projectedBoundsWidth: 50,
+    projectedBoundsHeight: 12,
+    widthFillRatio: 0.25,
+    heightFillRatio: 0.06,
+  };
+  const underfilledReport = finalizeRenderReviewManifest(underfilled);
+  assert.ok(underfilledReport.errors.includes("render-framing-coverage-out-of-range:front"));
+
+  const cropped = fixture();
+  cropped.rawManifest.views[0].framing = {
+    orthographicScale: 40,
+    projectedBoundsWidth: 50,
+    projectedBoundsHeight: 12,
+    widthFillRatio: 1.25,
+    heightFillRatio: 0.30,
+  };
+  const croppedReport = finalizeRenderReviewManifest(cropped);
+  assert.ok(croppedReport.errors.includes("render-framing-crops-projected-bounds:front"));
+  assert.ok(croppedReport.errors.includes("render-framing-coverage-out-of-range:front"));
 });
