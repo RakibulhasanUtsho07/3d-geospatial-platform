@@ -38,8 +38,12 @@ async function downloadSource(source) {
         throw new Error("Byte length changed for " + source.id + ": expected " + source.expectedBytes + ", got " + bytes.length);
       }
       const actualSha1 = sha1(bytes);
+      const actualSha256 = sha256(bytes);
       if (source.expectedSha1 && actualSha1.toLowerCase() !== source.expectedSha1.toLowerCase()) {
         throw new Error("SHA-1 mismatch for " + source.id + ": expected " + source.expectedSha1 + ", got " + actualSha1);
+      }
+      if (source.expectedSha256 && actualSha256.toLowerCase() !== source.expectedSha256.toLowerCase()) {
+        throw new Error("SHA-256 mismatch for " + source.id + ": expected " + source.expectedSha256 + ", got " + actualSha256);
       }
       return {
         bytes,
@@ -47,9 +51,10 @@ async function downloadSource(source) {
           id: source.id, fileName: source.fileName, mediaTitle: source.mediaTitle, viewRole: source.viewRole,
           sourcePageUrl: source.sourcePageUrl, requestedDownloadUrl: source.downloadUrl, resolvedDownloadUrl: response.url,
           sourceRevision: source.sourceRevision, attribution: source.attribution, license: source.license, licenseUrl: source.licenseUrl,
-          width: dimensions.width, height: dimensions.height, byteLength: bytes.length, sha1: actualSha1, sha256: sha256(bytes),
-          expectedSha1: source.expectedSha1, sha1Pinned: Boolean(source.expectedSha1),
-          integrityStatus: source.expectedSha1 ? "verified-against-pinned-sha1" : "captured-hash-recorded-awaiting-review",
+          width: dimensions.width, height: dimensions.height, byteLength: bytes.length, sha1: actualSha1, sha256: actualSha256,
+          expectedSha1: source.expectedSha1, expectedSha256: source.expectedSha256,
+          sha1Pinned: Boolean(source.expectedSha1), sha256Pinned: Boolean(source.expectedSha256),
+          integrityStatus: source.expectedSha1 && source.expectedSha256 ? "verified-against-pinned-sha1-and-sha256" : "captured-hash-recorded-awaiting-review",
           evidenceClass: "photographic-reference",
           useLimits: ["not-an-independent-survey-dimension", "not-geodetic-ground-control", "not-proof-of-occluded-or-unseen-surfaces"]
         }
@@ -90,7 +95,7 @@ async function main() {
     await writeFile(path.join(imageDir, source.fileName), bytes, { flag: "wx", mode: 0o644 });
     results.push(record);
   }
-  const pendingHashPins = results.filter((item) => !item.sha1Pinned).map((item) => item.id);
+  const pendingHashPins = results.filter((item) => !item.sha1Pinned || !item.sha256Pinned).map((item) => item.id);
   const intakeManifest = {
     schemaVersion: "1.0.0", bundleId: registry.registryId, capturedAt: new Date().toISOString(),
     sourceCommit: process.env.GITHUB_SHA ?? null,
@@ -118,7 +123,7 @@ async function main() {
       "- Source page: " + item.sourcePageUrl,
       "- License: [" + item.license + "](" + item.licenseUrl + ")",
       "- SHA-1: `" + item.sha1 + "` (" + (item.sha1Pinned ? "matches the registry pin" : "captured on intake; review and pin before treating the source version as immutable") + ")",
-      "- SHA-256: `" + item.sha256 + "`",
+      "- SHA-256: `" + item.sha256 + "` (" + (item.sha256Pinned ? "matches the registry pin" : "captured on intake; review and pin before treating the source version as immutable") + ")",
       "- View role: " + item.viewRole, ""
     ]),
     "## Use and limitations", "",

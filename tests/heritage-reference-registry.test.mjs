@@ -14,7 +14,8 @@ test("checked-in Ahsan Manzil reference registry covers front, side and high-ang
   assert.equal(result.sourceCount, 3);
   assert.deepEqual(result.requiredRoles, ["front-facade", "side-facade", "high-angle-roof"]);
   assert.deepEqual([...REQUIRED_HERITAGE_REFERENCE_ROLES], ["front-facade", "side-facade", "high-angle-roof"]);
-  assert.deepEqual(result.pendingHashPins, ["ahsan-high-angle-rayhan9d-2020"]);
+  assert.deepEqual(result.pendingHashPins, []);
+  assert.equal(registry.sources.filter((source) => source.hashPinStatus === "pinned" && source.expectedSha1 && source.expectedSha256).length, 3);
 });
 
 test("review-only photographic evidence cannot claim surveyed dimensions, ground control or release eligibility", () => {
@@ -36,13 +37,25 @@ test("rejects missing attribution, a non-Commons download host, and a wrong lice
   assert.ok(result.errors.includes("source-2-license-metadata-invalid"));
 });
 
-test("requires a pinned SHA-1 to be well formed and labels an unpinned image explicitly", () => {
+test("requires both pinned checksums to be well formed", () => {
   const altered = structuredClone(registry);
   altered.sources[0].expectedSha1 = "abc";
-  altered.sources[2].hashPinStatus = "pinned";
+  altered.sources[2].expectedSha1 = null;
+  altered.sources[2].expectedSha256 = null;
   const result = validateHeritageReferenceRegistry(altered);
   assert.ok(result.errors.includes("source-0-pinned-sha1-invalid"));
   assert.ok(result.errors.includes("source-2-pinned-sha1-invalid"));
+  assert.ok(result.errors.includes("source-2-pinned-sha256-invalid"));
+});
+
+test("allows an explicitly pending source pin without claiming source integrity is verified", () => {
+  const altered = structuredClone(registry);
+  altered.sources[2].expectedSha1 = null;
+  altered.sources[2].expectedSha256 = null;
+  altered.sources[2].hashPinStatus = "capture-and-pin-required";
+  const result = validateHeritageReferenceRegistry(altered);
+  assert.equal(result.valid, true, result.errors.join(", "));
+  assert.deepEqual(result.pendingHashPins, ["ahsan-high-angle-rayhan9d-2020"]);
 });
 
 test("requires all expected view roles and forbids unsafe output names", () => {

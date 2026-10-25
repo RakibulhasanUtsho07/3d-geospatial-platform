@@ -79,8 +79,10 @@ export function validateHeritageReferenceRegistry(registry) {
 
     if (source.hashPinStatus === "pinned") {
       if (!SHA1.test(source.expectedSha1 ?? "")) errors.push(label + "-pinned-sha1-invalid");
+      if (!SHA256.test(source.expectedSha256 ?? "")) errors.push(label + "-pinned-sha256-invalid");
     } else if (source.hashPinStatus === "capture-and-pin-required") {
       if (source.expectedSha1 !== null) errors.push(label + "-un-pinned-sha1-must-be-null");
+      if (source.expectedSha256 !== null) errors.push(label + "-un-pinned-sha256-must-be-null");
       pendingHashPins.push(source.id || label);
     } else {
       errors.push(label + "-hash-pin-status-invalid");

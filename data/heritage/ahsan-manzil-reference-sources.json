@@ -37,7 +37,8 @@
       "expectedBytes": 3223750,
       "expectedSha1": "95d95db884582236a5c5298532dc155e8fbb9d67",
       "hashPinStatus": "pinned",
-      "sourceNotes": "Front elevation reference; viewpoint metadata is not a survey control point."
+      "sourceNotes": "Front elevation reference; viewpoint metadata is not a survey control point.",
+      "expectedSha256": "90c5ca2c27020d5d49294675c8cb662a40ec50874c298bff227a95aa90de7a99"
     },
     {
       "id": "ahsan-side-mrpluto11-2017",
@@ -55,7 +56,8 @@
       "expectedBytes": 1322192,
       "expectedSha1": "82c310dd395aa0a595af523fd51ecbf66d926c46",
       "hashPinStatus": "pinned",
-      "sourceNotes": "Side elevation reference; use only for visible surfaces and architectural proportions."
+      "sourceNotes": "Side elevation reference; use only for visible surfaces and architectural proportions.",
+      "expectedSha256": "6330269884ed2a34927e41e3cc14223795cc6d6f3e92a96cf279a28e34a4a0b0"
     },
     {
       "id": "ahsan-high-angle-rayhan9d-2020",
@@ -70,9 +72,11 @@
       "sourceRevision": "976902213",
       "expectedWidth": 3888,
       "expectedHeight": 2524,
-      "expectedSha1": null,
-      "hashPinStatus": "capture-and-pin-required",
-      "sourceNotes": "High-angle view useful for visible roof-deck layout; perspective and occlusion mean this is not a measured roof plan."
+      "expectedSha1": "3f592a0dff877fe37e28c5ebf427016921e3b248",
+      "hashPinStatus": "pinned",
+      "sourceNotes": "High-angle view useful for visible roof-deck layout; perspective and occlusion mean this is not a measured roof plan.",
+      "expectedSha256": "3f1d55da415617916e275c16d18ddb08dc8c5b2bf71457e44c03769b7d11e475",
+      "expectedBytes": 4677204
     }
   ]
 }
