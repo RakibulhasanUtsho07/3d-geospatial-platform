@@ -4,6 +4,17 @@ import test from "node:test";
 
 const pack = JSON.parse(await readFile(new URL("../data/heritage/bangabhaban-reference-pack.json", import.meta.url), "utf8"));
 
+test("Bangabhaban reference downloader is wired as an explicit package command", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(packageJson.scripts["fetch:bangabhaban-reference"], "node scripts/fetch-bangabhaban-reference.mjs");
+  const downloader = await readFile(new URL("../scripts/fetch-bangabhaban-reference.mjs", import.meta.url), "utf8");
+  assert.match(downloader, /createHash\("sha256"\)/);
+  assert.match(downloader, /expectedByteLength/);
+  assert.match(downloader, /expectedSha1/);
+  assert.match(downloader, /verified: true/);
+  assert.match(downloader, /process\.exitCode = 1/);
+});
+
 test("Bangabhaban pilot keeps public references and geometry claims provenance-gated", () => {
   assert.equal(pack.schemaVersion, "1.0.0");
   assert.equal(pack.id, "bangabhaban-dhaka-reference-pack");
