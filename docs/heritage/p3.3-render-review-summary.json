@@ -1,8 +1,8 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "83141e060b0bae59be22f4972f7b3d22a19253fc",
-  "reviewGeneratedAt": "2026-10-25T07:50:50.264Z",
+  "sourceCommit": "82149abebc7d00260cb590069fda96178d5e01aa",
+  "reviewGeneratedAt": "2026-10-25T08:39:23.401Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
     "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
@@ -14,12 +14,12 @@
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "689b3fb6b1aa28a8649f34317aa539439e4e6b9d40db5db9625e5e673213e17e",
-    "byteLength": 7049752
+    "sha256": "cfb8e7b65594e8b9aa422b62dc6cae24364fed6d78b798398214224b80da24f9",
+    "byteLength": 6884776
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "d49f0acb3556895f189924bd9f64c25302c7f6e84aada984e2d9cccbacb9dd13",
+    "sha256": "0d85538a2274dfe4b183bee7dad77c7e072bcbb0eb0c3ece5eba3a92a6bada1e",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -46,13 +46,11 @@
   "qa": {
     "geometry": {
       "filename": "geometry-qa-report.json",
-      "sha256": "ae419f7c38898a9c0b6ef4c4d6f6411fe30013864bd686c94d8ffcb07a48bd4d",
+      "sha256": "dd2242a29dbc901b8b10654ad88bbf685d77ec1729dd653333da3d05ae52843d",
       "valid": true,
       "status": "review-recommended",
       "errors": [],
       "warnings": [
-        "degenerate-triangles-present",
-        "degenerate-triangle-ratio-exceeds-threshold",
         "long-triangle-edges-present",
         "non-manifold-edges-present",
         "disconnected-mesh-components-present",
@@ -101,96 +99,96 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "7ba1f44b777cc03f8661392299c67e135da6c30d8365b78ee34c1a9b27ed3a9b"
+      "sha256": "d7009b152acfd9ab80d334bccc889352b5c006466daf702a736354775ebd67bc"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "db6b8372c7ae637be33c28e76812906e64a5b75890744ffd6203ee3b838a3d68"
+      "sha256": "14685c1730e897d11ef293335af84ab68dd58d21a06f27e471ac554479067a62"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "0a76ea1b24674ce9ab0a8af79988b4fa2f44b9146f4500935fc6a52f94bb0487"
+      "sha256": "3c6e987a2fb800c5a554a36e8e37618b95b1806e7b0b6f103f28ff85b165661d"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2fae5986e78fbb2bf331a00bbf77b1a879a14f9b95670812031ab5e66a45db82"
+      "sha256": "4e5d4cb34be01591886b261dfadf45a79b00b8e521d10eaca1ebda23c254913f"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "42ca88c7f021feb7db89fd27731192241bdaee3b625f3da355db2713225faf43"
+      "sha256": "7ebb29271b5b67b838c9d661d50e457a8225c0084fa5d91f6089f80e455d459d"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a6b7d1489f8901b8ea60195e7f813664a65e5f2b4b6f55fce8bf784dc188d0ac"
+      "sha256": "93099aa39b9dd8ace55602a51cd2e1253536bd74b498ce2549d53b7dd346f993"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "f9473f79eb4578f7e6f4a02b5b7f25140fa91dcf06ce5539f5f52ef2b2a5ff27"
+      "sha256": "8a6b082244f59143fc6159486f81ca2a6583d5df9c63c0f51d804b84956bdfca"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9fb6fd9369733b190494ccf7364d9af81d5d8244c45bd2d42237cc8a846578d2"
+      "sha256": "a98a4b3fa6935b31f7d52bfec2a343400c50c3d83d9f44a635355dcadbe64379"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2f6deeb07a335085c1b03af09687b1b92bcd38db2d37ccc645d8008aef690a74"
+      "sha256": "16d28dd5ad585a45dd06b52ed06d3970623e41815023420f272821d01284aa86"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "aa9249eaf2f247fd298b6c0d696db9c0106477d5c6b678300856437d90c417ad"
+      "sha256": "18e900d88fc25089bfa58ae45c988aae105d4db718c043614a6baeae090b99a8"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d624bce86994153efdc2e9ed47dfe18eb7639b43010a85f506a45029c93d8a69"
+      "sha256": "8efafd98f699a4fcba5914e4c203154d94b41a3e311620443254385c93d43c31"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ecc736435aaf17ead23b67f6e6b56d4cd3255fcfbc1978982532f03376772479"
+      "sha256": "f510b95943f611e96deab5a3656827fb69396c71994c73a0a3ad8fca7da4915a"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c1107a0f0c3dfee824fcc3e056bc79510e74d2e61ac4db524cd4e358804605a2"
+      "sha256": "73b837e557beeba5999f58716eb58d07fde530f171d1b43f74b287b593e18ce0"
     }
   ],
   "visualReview": {
     "contactSheet": "contact-sheet.png",
-    "status": "13/13 deterministic renders completed and screenshot SHA-256 values verified. Manual review confirms the framing correction, but architectural visual-fidelity and release acceptance remain pending.",
+    "status": "13-view render and hash validation passed; visual-fidelity acceptance remains pending; a current contact-sheet review found unresolved roof-detail, material/texture, and side/back framing issues.",
     "findings": [
       "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
       "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -202,66 +200,15 @@
       "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
       "Human review of the exact generated 13-view contact sheet found the top view dominated by a broad, nearly blank roof deck with insufficient roof-level architectural detail; visual completeness is not accepted.",
-      "Manual review of the regenerated front.png confirms the Rangmahal facade and stair are fully visible and centred; the previous rear/left-wing crop is removed. This passes camera framing only, not facade proportions or architectural fidelity.",
-      "Manual review confirms per-view projected-bounds fitting made left/right and oblique views large enough for useful inspection; back elevation is fully visible. Architectural acceptance of these views remains pending because their wall detail and proportions are not independently verified.",
+      "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
+      "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
       "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
-      "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance.",
-      "Manual review of front.png and the contact sheet found a broad plain upper spandrel/roofline band, simplified facade surfaces, and visibly faceted dome; these remain unaccepted visual-quality issues.",
-      "Geometry QA reports 83,716 triangles with 1,964 degenerate triangles (2.346%) plus long-edge, non-manifold, open-boundary, disconnected-component and small-component warnings. Status remains review-recommended, with publication eligibility false.",
-      "Texture QA reports zero images, zero textures, zero UV accessors and all 21 primitives untextured. The flat material appearance is not a photorealistic texture pass.",
-      "Do not invent rooftop or facade detail to fill gaps; use permission-cleared references and measured elevations to guide the next correction."
+      "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
     ],
     "residualRisks": [
       "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
       "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
     ],
-    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility.",
-    "reviewedOn": "2026-10-25",
-    "manualReview": {
-      "reviewedViews": [
-        {
-          "id": "front",
-          "sha256": "7ba1f44b777cc03f8661392299c67e135da6c30d8365b78ee34c1a9b27ed3a9b",
-          "assessment": "FRAMING_PASS_ONLY",
-          "finding": "Rangmahal facade and staircase are fully within frame and centred; the earlier rear/left-wing crop is gone. Plain upper spandrel/roofline band and flat surface appearance remain visual defects."
-        },
-        {
-          "id": "back",
-          "sha256": "db6b8372c7ae637be33c28e76812906e64a5b75890744ffd6203ee3b838a3d68",
-          "assessment": "FRAME_VISIBLE_FIDELITY_PENDING",
-          "finding": "Full long rear elevation visible. It occupies a narrow height in the square image due to the building's long, low proportions; detailed acceptance still needs elevation references."
-        },
-        {
-          "id": "left",
-          "sha256": "0a76ea1b24674ce9ab0a8af79988b4fa2f44b9146f4500935fc6a52f94bb0487",
-          "assessment": "FRAMING_PASS_FIDELITY_PENDING",
-          "finding": "Side elevation and full stair outline are visible at useful scale, but wall surfaces remain simplified and the stair side profile needs reference comparison."
-        },
-        {
-          "id": "right",
-          "sha256": "2fae5986e78fbb2bf331a00bbf77b1a879a14f9b95670812031ab5e66a45db82",
-          "assessment": "FRAMING_PASS_FIDELITY_PENDING",
-          "finding": "Side elevation and stair outline are visible at useful scale; no independent reference dimensions were available to accept proportions."
-        },
-        {
-          "id": "top",
-          "sha256": "42ca88c7f021feb7db89fd27731192241bdaee3b625f3da355db2713225faf43",
-          "assessment": "FOOTPRINT_VISIBLE_ROOF_DETAIL_PENDING",
-          "finding": "Complete footprint is visible. Roof deck remains broad and mostly undecorated; no roof details were invented without reference evidence."
-        },
-        {
-          "id": "contact-sheet",
-          "sha256": "f642312f4d27907f54c4b08981487659fd554c35ae040dd5567aed903ccae370",
-          "assessment": "13_VIEWS_INSPECTED_VISUAL_FIDELITY_PENDING",
-          "finding": "Side/back camera fitting is visibly improved. Dome and facade remain stylized; several oblique silhouettes and blank upper roofline band still need source-backed review."
-        }
-      ],
-      "overallDecision": "ACCEPT_CAMERA_FRAMING_CORRECTION_ONLY; DO_NOT_PASS_ARCHITECTURAL_FIDELITY_OR_RELEASE",
-      "evidenceLimitations": [
-        "This review checks the generated renders and hashes, not historical accuracy.",
-        "GLB model-space units remain unverified against an independent survey.",
-        "No permission-cleared multi-view reference package and independent dimensions were available for this model during this correction pass."
-      ]
-    }
+    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
   }
 }
