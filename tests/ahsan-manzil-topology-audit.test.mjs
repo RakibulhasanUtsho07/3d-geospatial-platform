@@ -35,6 +35,13 @@ test('topology audit maps every generated GLB mesh to a named node without suppr
   assert.ok(audit.meshes.filter((mesh) => mesh.nodeName === 'Rangmahal_GF' || mesh.nodeName === 'Rangmahal_FF')
     .every((mesh) => mesh.architecturalAccuracyRelevant));
   assert.ok(audit.meshes.some((mesh) => mesh.nodeName === 'RoofDeck' && mesh.designNote.includes('raised central platform')));
+  const plinth = audit.meshes.find((mesh) => mesh.nodeName === 'Plinth');
+  assert.ok(plinth, 'Plinth must be present in the per-mesh topology audit');
+  assert.equal(plinth.connectedComponents, 1, 'stepped Plinth should be one connected component');
+  assert.equal(plinth.boundaryEdges, 0, 'stepped Plinth should have no open boundary edges');
+  assert.equal(plinth.nonManifoldEdges, 0, 'stepped Plinth should have no non-manifold edges');
+  assert.ok(!plinth.designNote.includes('non-manifold edge may indicate'),
+    'Plinth narrative must not retain the pre-fix defect description');
   assert.ok(audit.limitations.some((limitation) => limitation.includes('does not repair meshes')));
   assert.ok(formatTopologyAuditMarkdown(audit).includes(expectedSha));
 });

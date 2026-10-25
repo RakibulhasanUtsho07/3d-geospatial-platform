@@ -34,7 +34,7 @@ const ROLE = {
   Site_Context_Blocks: 'illustrative-context-building-massing',
 };
 const NOTE = {
-  Plinth: 'Two stepped base volumes meet in one semantic mesh. The non-manifold edge may indicate coincident or overlapping faces at their junction; inspect the base union rather than treating it as an intentional pass.',
+  Plinth: 'Current candidate uses one stepped L-footprint prism. QA reports one connected component and zero boundary/non-manifold edges; the long-edge warning remains and the provisional footprint still needs independent trace or survey.',
   Rangmahal_GF: 'Wall segments, piers, arched reveals, glazing and trims are combined as separate triangle-soup parts. Disconnected parts/open boundaries may be expected; non-manifold edges need overlap review.',
   Rangmahal_FF: 'First-floor arches, balustrades, pilasters and trims are separate parts. Disconnected parts/open boundaries may be expected; non-manifold edges need overlap review.',
   Portico_S: 'Distinct columns, arches, beams and small decorative parts are expected. The small detached component and long-edge warnings still need view-by-view inspection.',
