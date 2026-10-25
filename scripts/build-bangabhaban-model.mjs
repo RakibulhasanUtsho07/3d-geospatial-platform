@@ -278,7 +278,7 @@ function buildLod(lod) {
     }
     for(const side of [-1,1]){
       const x=side*(W*0.31+widthE*0.5+0.02);
-      for(let i=0;i<4;i++)addWindow("WindowsAndDoors",x,base+floor*0.50,-D*0.23+i*7.2,0.10,1.4,side>0?"right":"left");
+      for(let i=0;i<4;i++)addWindow("WindowsAndDoors",x,base+floor*0.50,-D*0.23+i*7.2,1.2,1.4,side>0?"right":"left");
     }
     const topY=base+heightC+0.65;
     box("Parapet","IvoryTrim",0,topY,D*0.31,W*0.74,0.8,0.36);
