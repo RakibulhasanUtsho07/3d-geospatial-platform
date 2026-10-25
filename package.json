@@ -113,6 +113,8 @@
     "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs",
     "test:building-accuracy-benchmark": "node --test tests/building-accuracy-benchmark.test.mjs",
     "benchmark:building-accuracy": "node scripts/benchmark-building-accuracy.mjs",
+    "test:building-accuracy-evidence-pack": "node --test tests/building-accuracy-evidence-pack.test.mjs",
+    "build:building-accuracy-evidence-pack": "node scripts/build-building-accuracy-evidence-pack.mjs",
     "test:render-image-similarity-diagnostics": "node --test tests/render-image-similarity-diagnostics.test.mjs",
     "compare:render-reference-images": "node scripts/compare-render-reference-images.mjs",
     "test:render-reference-batch": "node --test tests/render-reference-batch-plan.test.mjs",

@@ -293,6 +293,9 @@ jobs:
       - name: Test evidence-based building accuracy benchmark
         run: npm run test:building-accuracy-benchmark
 
+      - name: Test multi-building accuracy evidence pack integrity and fail-closed release policy
+        run: npm run test:building-accuracy-evidence-pack
+
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py
 

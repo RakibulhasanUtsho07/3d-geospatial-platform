@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "replace-with-pilot-run-id",
+  "candidateCommit": null,
+  "buildings": [
+    {
+      "buildingId": "landmark-id",
+      "category": "complex-landmark",
+      "candidateGlbPath": "artifacts/models/landmark.glb",
+      "expectedGlbSha256": null,
+      "benchmarkConfigPath": "docs/evidence/landmark-benchmark.json",
+      "sourceIdentity": {
+        "verified": false,
+        "sourceId": "",
+        "evidenceDescription": "",
+        "verifiedBy": "",
+        "verifiedAt": ""
+      },
+      "sourceMedia": [],
+      "referenceImages": [],
+      "renderEvidence": {
+        "manifestPath": "artifacts/renders/landmark/render-review-manifest.json",
+        "directory": "artifacts/renders/landmark",
+        "expectedManifestSha256": null
+      },
+      "verticalDatum": { "status": "not-solved" }
+    },
+    {
+      "buildingId": "ordinary-building-id",
+      "category": "ordinary-low-rise",
+      "candidateGlbPath": "artifacts/models/ordinary-building.glb",
+      "expectedGlbSha256": null,
+      "benchmarkConfigPath": "docs/evidence/ordinary-building-benchmark.json",
+      "sourceIdentity": {
+        "verified": false,
+        "sourceId": "",
+        "evidenceDescription": "",
+        "verifiedBy": "",
+        "verifiedAt": ""
+      },
+      "sourceMedia": [],
+      "referenceImages": [],
+      "renderEvidence": {
+        "manifestPath": "artifacts/renders/ordinary-building/render-review-manifest.json",
+        "directory": "artifacts/renders/ordinary-building",
+        "expectedManifestSha256": null
+      },
+      "verticalDatum": { "status": "not-solved" }
+    }
+  ]
+}
