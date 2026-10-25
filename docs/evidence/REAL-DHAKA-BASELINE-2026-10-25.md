@@ -48,3 +48,10 @@ The CI runner is Linux/SwiftShader and is not a proxy for every end-user GPU. No
 - All six screenshots had the same SHA-256. The missing evidence was whether a follow-up road request was still in flight or subsequently rendered after the first failure.
 
 **Corrective action:** the benchmark now tracks road API request lifecycle, records road-specific HTTP status counts and pending requests, waits for a configurable retry quiet period after failure, and requires a later `roads.render` success before reporting road-ready.
+
+
+## Final capture-order and render-integrity correction
+
+The run's report exposed that some samples had a road API request still pending at screenshot time: the script waited for road status and then delayed for 5 seconds before the screenshot. A new camera-move-triggered request could start in that gap. The benchmark now applies the visual settle delay first, then waits for road-request quiescence/retry grace immediately before capturing.
+
+The road manager's successful render telemetry now includes `featureCount` (actual road entities rendered) separately from `returnedWays` (API ways returned). A fetch success or render event without a positive feature count is not accepted as road-ready.

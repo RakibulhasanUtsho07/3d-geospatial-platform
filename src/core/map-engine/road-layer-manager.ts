@@ -329,6 +329,7 @@ export class RoadLayerManager {
       this.loadedRoadBounds = bounds;
       viewer.scene.requestRender();
       dependencies.recordMapPerformance("roads.render", "success", performance.now() - (roadRenderStartedAt ?? performance.now()), {
+        featureCount: renderedRoads,
         returnedWays: payload.results.length,
       });
       roadRenderTelemetryRecorded = true;

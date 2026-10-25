@@ -269,8 +269,11 @@ export function resolveRoadReadiness(snapshot) {
     renderSequence: renderEvent.sequence,
     renderOutcome: renderEvent.outcome,
     renderDurationMs: Number.isFinite(renderEvent.durationMs) ? renderEvent.durationMs : null,
+    renderedFeatureCount: Number.isSafeInteger(renderEvent.featureCount) ? renderEvent.featureCount : null,
     status: renderEvent.outcome === "success"
-      ? "rendered"
+      ? Number.isSafeInteger(renderEvent.featureCount)
+        ? renderEvent.featureCount > 0 ? "rendered" : "render-empty"
+        : "render-unverified"
       : renderEvent.outcome === "error" ? "render-error" : "render-cancelled",
   };
 }
@@ -280,7 +283,7 @@ async function waitForRoadsSettled(page, timeoutMs, getPendingRoadRequestCount, 
   let failureQuietSince = null;
   let failureSignature = null;
   const isFailureTerminal = (status) => [
-    "fetch-error", "fetch-cancelled", "render-error", "render-cancelled",
+    "fetch-error", "fetch-cancelled", "render-error", "render-cancelled", "render-empty", "render-unverified",
   ].includes(status);
 
   while (performance.now() - startedAt < timeoutMs) {
@@ -608,9 +611,9 @@ async function runBenchmark() {
         await session.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
         const readiness = await waitForMapReady(session.page, readyTimeoutMs);
         const loadToMapReadyMs = roundMs(performance.now() - startedAt);
+        if (settleMs > 0) await session.page.waitForTimeout(settleMs);
         const roadReadiness = await waitForRoadsSettled(session.page, roadReadyTimeoutMs, session.counters.getPendingRoadRequestCount, roadRetryGraceMs);
         const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
-        if (settleMs > 0) await session.page.waitForTimeout(settleMs);
         results.push(await capturePageMetrics(
           session.page, session.counters, origin, screenshotPath, loadToMapReadyMs, "cold", index, scenario,
           {
@@ -639,8 +642,8 @@ async function runBenchmark() {
       warmSession = await newInstrumentedPage(browser, viewport, origin);
       await warmSession.page.goto(benchmarkUrl, { waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
       await waitForMapReady(warmSession.page, readyTimeoutMs);
-      await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs, warmSession.counters.getPendingRoadRequestCount, roadRetryGraceMs);
       if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
+      await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs, warmSession.counters.getPendingRoadRequestCount, roadRetryGraceMs);
       // The primer warms this isolated context's browser HTTP cache and is excluded from measurements.
       for (let index = 1; index <= warmCount; index += 1) {
         const startedAt = performance.now();
@@ -650,9 +653,9 @@ async function runBenchmark() {
           await warmSession.page.reload({ waitUntil: "domcontentloaded", timeout: readyTimeoutMs });
           const readiness = await waitForMapReady(warmSession.page, readyTimeoutMs);
           const loadToMapReadyMs = roundMs(performance.now() - startedAt);
+          if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
           const roadReadiness = await waitForRoadsSettled(warmSession.page, roadReadyTimeoutMs, warmSession.counters.getPendingRoadRequestCount, roadRetryGraceMs);
           const loadToRoadTerminalMs = roundMs(performance.now() - startedAt);
-          if (settleMs > 0) await warmSession.page.waitForTimeout(settleMs);
           results.push(await capturePageMetrics(
             warmSession.page, warmSession.counters, origin, screenshotPath, loadToMapReadyMs, "warm", index, scenario,
             {
