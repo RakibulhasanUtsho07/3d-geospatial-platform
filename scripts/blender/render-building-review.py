@@ -144,7 +144,7 @@ def main():
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
 
     views = [
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+        ("front", Vector((0.0, -math.cos(math.radians(5.0)), math.sin(math.radians(5.0)))), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),

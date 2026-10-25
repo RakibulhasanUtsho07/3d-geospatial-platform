@@ -12,6 +12,9 @@ test("headless Blender QA samples the exact saved PNG rather than relying on tra
   assert.match(renderer, /bpy\.data\.images\.remove\(result\)/);
   assert.doesNotMatch(renderer, /bpy\.data\.images\.get\("Render Result"\)/);
 });
+test("front review camera uses a small elevation to expose stair treads", () => {
+  assert.match(renderer, /\("front", Vector\(\(0\.0, -math\.cos\(math\.radians\(5\.0\)\), math\.sin\(math\.radians\(5\.0\)\)\)\), "ORTHO"\)/);
+});
 test("heritage render lighting preserves facade contrast on large models", () => {
   assert.match(renderer, /default_value = \(0\.055, 0\.070, 0\.090, 1\.0\)/);
   assert.match(renderer, /AgX - Medium High Contrast/);
