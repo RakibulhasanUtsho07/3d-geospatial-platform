@@ -1,8 +1,8 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "03a4b56ddb55386b1be6f0cfac68236e3683212a",
-  "reviewGeneratedAt": "2026-10-25T11:43:47.208Z",
+  "sourceCommit": "ac589a3159412c7e4d8d6bac65f691cb6a37e33b",
+  "reviewGeneratedAt": "2026-10-25T12:15:06.521Z",
   "correctionScope": [
     "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
     "Rangmahal and Andarmahal roof-height separation",
@@ -15,12 +15,12 @@
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "e90222f205894efffa1401df8e1cfc56fdc5bfed5f1ec1f795b8b9f003b16c7c",
+    "sha256": "68cee49e666995948ba66bea17134bcbe0d0a4f8bbeacb95cd5a25d7c908f3e0",
     "byteLength": 7234300
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "78b3f3f31a2f0901ee45684cd1353d0cbccf0f607a6b083cc6c9cb1610666537",
+    "sha256": "d84e64e92cdcf76f4771ceb1186927c49cd99027e786598bd3a6798c55107bbb",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -97,7 +97,7 @@
   },
   "referencePack": {
     "filename": "reference-pack/reference-pack.manifest.json",
-    "sha256": "40fa7a84c68eaf8e19e723abdc51d5903a25714bfca2f73389887c0775cfcdb2",
+    "sha256": "74982cf7913e3abee41c3cc3f8e6b35495afc972168a8c1b325af368ee412bca",
     "verified": true,
     "licensePolicy": "These reference images are licensed CC BY-SA 4.0. Preserve creator attribution, link the license, disclose any changes, and comply with share-alike terms for redistributed/adapted material. This metadata file does not grant any rights beyond the individual source licenses.",
     "sources": [
@@ -107,8 +107,12 @@
         "sha256": "90c5ca2c27020d5d49294675c8cb662a40ec50874c298bff227a95aa90de7a99",
         "license": "CC BY-SA 4.0",
         "sourceUrl": "https://commons.wikimedia.org/wiki/File:Front_view_of_Ahsan_Manzil.jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Front_view_of_Ahsan_Manzil.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "95d95db884582236a5c5298532dc155e8fbb9d67",
         "viewRole": "south-front-elevation",
         "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
         "cameraCalibration": "unknown"
       },
       {
@@ -117,8 +121,12 @@
         "sha256": "6330269884ed2a34927e41e3cc14223795cc6d6f3e92a96cf279a28e34a4a0b0",
         "license": "CC BY-SA 4.0",
         "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Ahsan_Manzil_%28side%29.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "82c310dd395aa0a595af523fd51ecbf66d926c46",
         "viewRole": "side-facade",
         "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
         "cameraCalibration": "unknown"
       },
       {
@@ -127,18 +135,26 @@
         "sha256": "e8d2076274c078aa6bef7de9c1ff968135a55dd5df8c60dca1b1636764ccbe77",
         "license": "CC BY-SA 4.0",
         "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ahsan_Manzil_Side_View.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "9b8ea70335c280a9dd4b9e9c3e87a03c20613711",
         "viewRole": "oblique-front-side",
         "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
         "cameraCalibration": "unknown"
       },
       {
         "id": "licensed-aerial-2019",
-        "imagePath": "reference-pack/ahsan-manzil-aerial-2019.jpg",
-        "sha256": "9826daf16d73df64b103cc99aaa4259c40a60764aac40e7492eeded93ab3b1e8",
+        "imagePath": "reference-pack/ahsan-manzil-aerial-2019-1280.jpg",
+        "sha256": "bd09cb982800dc42cbf80e096d59ccb70126f5816939ea9d55c00ef3c45d29d9",
         "license": "CC BY-SA 4.0",
         "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_01.jpg",
+        "downloadedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Ahsan_Manzil_01.jpg/1280px-Ahsan_Manzil_01.jpg",
+        "downloadMode": "thumbnail",
+        "originalPublishedSha1": "6f2913594f7db0b04fc8b480442d0694c41dfb9f",
         "viewRole": "aerial-oblique-roof-plan",
         "verified": true,
+        "verificationMethod": "Fixed Commons thumbnail URL; HTTP image/jpeg response, JPEG signature, decoded frame dimensions and bounded file size checked. SHA-256 is computed from this downloaded thumbnail; published SHA-1/size fields describe the linked original file, not this derivative.",
         "cameraCalibration": "unknown"
       }
     ]
@@ -149,91 +165,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "099da8c012b2aa0bfe6d674e4381eeb143259dd4b85270be136883e76f29e4b4"
+      "sha256": "c4945c41f89d79e32b207fb3f0c83448c23f28d338f3f48f8678c63ed142b00f"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "8af02f1668357d4f21751615c0c3f84bc369e3b09898fcfec5b514c35c51b028"
+      "sha256": "1c7ffb38eab482586fe99bbae9191a386881ecb5ea88ad875df2b417ba4209ab"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "da5b28b89e46ef50f110badacc16fe4a697f89577e8e45b9da58467e8ff5d8b2"
+      "sha256": "dce757d9bdc2f151be057320e033cafdfc9a719321fffb6cb967ba16818236b1"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "7c505cc0ec67a262bb0597ba56705915070d1b46fe8614b308c8f2fece0a6523"
+      "sha256": "0339144b5281f3102fde7f83fc19185ceca09a8ac2de3a0c59eb6a9314bc6c45"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "733f211497e4a5651eff1bec42621e69e28000e6f355b93a0cb9d325f735df14"
+      "sha256": "783ab8b5762f65c87b7eae4b8a0f9e89ef5dfbd85492176106f540a32592b0e3"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "7e626a7f9fa51cdae2fec3759fa48cfe2a4d9623823b478949847f3fa09a2dcb"
+      "sha256": "07bb3112d78ce2db65572d20afffa9753cd13d54d3543f2c29922ffdaa33ea6e"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "dd5ad84f6d399c023237aba63cb81a9e1c6be69cb924d10a0156b0733e56851b"
+      "sha256": "63d934a978ad5c775017bae83a42b5e0cdf7686e4f3eea9d8c5c4705d4001d6c"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "087908cfd53a0a55800b02c1011d71241c54bdc54b99aafde10f0d2e79214b5f"
+      "sha256": "9b5e59617c3d5ec8d2627e6ab98683753b7368db0485b8bcd23775027e3b3105"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b441fd6a96a996c6038142b254d04f33bcd135b5c0a874b015fa653d1d0f699a"
+      "sha256": "244caf874be048b37821b2f01ec7b44fd88c0b925be9e128477ffeb430138b10"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2bb9d641f843064919791fec538980da08a0e2eb6ff37623cc07134bd1f61cb2"
+      "sha256": "a559a7ccebc6db739f6c700158b4be9a7e9663a89cdca40501d619a3a7bc7bca"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "59493dfcf82757d8bcbe98628c985d944afdbefb6aaf66189b719fb150d58268"
+      "sha256": "288b9d98dfaec4202567beb300306ca229958c91cf2ca7789d6eca85060dbcfd"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "805c9afdbb5bc891fc0e792dbcc8591a8d085381c5aaaf5bffe8ca5b3ed5bc39"
+      "sha256": "dc6b5aaf7677142b863f964127932891745480acc3c8d65869f6b9214d977b5c"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "6fbb58d71bf4a73834c8878d499346a02fc5d7da2b68d91b119a26d837a1f1f0"
+      "sha256": "5ff099bcc81b2e9759d92aeca07669635a4d6f41b0bd6fb756921ff618cb92d4"
     }
   ],
   "visualReview": {
@@ -250,6 +266,7 @@
       "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
       "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; the roof deck now uses a muted grey-brown estimate, but the top view remains a simplified parametric plane and does not claim detailed roof reconstruction.",
+      "The first roof-tint estimate #777168 still rendered too pale in the top-view comparison; the roof-deck proxy was darkened to #4A4740 using the same uncalibrated aerial reference. Roof texture/UV and precise section geometry remain unresolved.",
       "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
       "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
       "The narrowed portico/stair landing, scaled dome profile, roof tone and roof-plane relationship are compared against four hash-pinned licensed views, including an unrectified aerial image; all dimensions remain estimates pending rectified elevation or independent survey.",
