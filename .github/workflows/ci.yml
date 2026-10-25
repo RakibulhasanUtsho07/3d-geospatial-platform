@@ -152,6 +152,12 @@ jobs:
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
+      - name: Test privacy-safe imagery tile error diagnostics
+        run: npm run test:imagery-tile-error-diagnostics
+
+      - name: Test map canvas visual anomaly diagnostics
+        run: npm run test:canvas-red-pixel-diagnostics
+
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
@@ -378,6 +384,9 @@ jobs:
 
       - name: Test bounded selected geometry cache eviction and signature invalidation
         run: npm run test:selected-geometry-cache
+
+      - name: Test map viewport UX regression contracts
+        run: node --test tests/map-viewport-ux.test.mjs
 
       - name: Test dynamic map optimization parity and visual style policies
         run: npm run test:map-optimization
