@@ -112,10 +112,12 @@ function buildGlb(lod) {
   const byName = Object.fromEntries(nodes.map((node) => [node.name, node]));
   function triangle(node, a, b, c, key) {
     const areaVector = cross(sub(b, a), sub(c, a));
-    // Parametric arches, dome rings and intersecting trim can converge at their
-    // endpoints. Do not serialize zero-area faces: they create unstable normals
-    // and inflate downstream GLB geometry-QA warnings.
-    if (Math.hypot(...areaVector) <= 1e-9) return;
+    // Keep the builder's degeneracy threshold identical to glb-geometry-qa:
+    // that QA computes triangle area as |cross(b-a, c-a)| / 2 and rejects
+    // area <= 1e-10. Using a cross-product threshold of 1e-9 here was 5x
+    // looser, so tiny triangles could be serialized even though both stages
+    // claimed to filter degenerate faces. Compare the same area quantity.
+    if (Math.hypot(...areaVector) * 0.5 <= 1e-10) return;
     const normal = normalize(areaVector);
     const rgba = color(key);
     for (const point of [a, b, c]) {
