@@ -220,8 +220,8 @@ jobs:
                 "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
                 "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
               ],
-                "The plinth topology regression checks only mesh integrity for the provisional L-shaped footprint; the footprint itself remains estimated pending north-up tracing or survey.",
               residualRisks: [
+                "The plinth topology regression checks only mesh integrity for the provisional L-shaped footprint; the footprint itself remains estimated pending north-up tracing or survey.",
                 "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
                 "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
               ],
