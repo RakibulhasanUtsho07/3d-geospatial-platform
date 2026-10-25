@@ -346,7 +346,20 @@ export class CesiumAdapter implements MapEngine {
         },
       });
       viewer.scene.requestRender();
-      this.handleCameraMoveEnd(viewer, currentCesium);
+
+      // Force a fresh, bounded viewport request for the opt-in benchmark even
+      // when the currently loaded full pilot dataset would normally cover it.
+      // Without this explicit request, the cancellation test can observe no
+      // live AbortController after the initial full-dataset load has completed.
+      const viewportBounds = this.getBuildingViewportBounds(viewer, currentCesium);
+      if (!viewportBounds) return false;
+      void this.loadOvertureBuildings(viewer, currentCesium, viewportBounds).catch((error: unknown) => {
+        if (isAbortError(error)) return;
+        console.warn(
+          "[Map workload benchmark] Forced viewport request failed.",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
       return true;
     };
     diagnostics.notifyCameraIntent = () => {
