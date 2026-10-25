@@ -1,8 +1,8 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "82149abebc7d00260cb590069fda96178d5e01aa",
-  "reviewGeneratedAt": "2026-10-25T08:39:23.401Z",
+  "sourceCommit": "ce02474db23c8896b64b9fe650224f456738b445",
+  "reviewGeneratedAt": "2026-10-25T08:45:33.766Z",
   "correctionScope": [
     "Rangmahal and Andarmahal roof-height separation",
     "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
@@ -14,12 +14,12 @@
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "cfb8e7b65594e8b9aa422b62dc6cae24364fed6d78b798398214224b80da24f9",
-    "byteLength": 6884776
+    "sha256": "47a67936f9e2c7cfae4e86d3550bf72a6d2f7cf21806957d0d8158aeeef31f04",
+    "byteLength": 7007752
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "0d85538a2274dfe4b183bee7dad77c7e072bcbb0eb0c3ece5eba3a92a6bada1e",
+    "sha256": "2c86b7f1eebc35e3044d8c89940323fa6a1ed0f24977effb4ffaba09cfacf396",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -46,7 +46,7 @@
   "qa": {
     "geometry": {
       "filename": "geometry-qa-report.json",
-      "sha256": "dd2242a29dbc901b8b10654ad88bbf685d77ec1729dd653333da3d05ae52843d",
+      "sha256": "51574ea0f9e5d35a6fa038c3f895fee59c534e2577ecd01d7a4f145587cfdf81",
       "valid": true,
       "status": "review-recommended",
       "errors": [],
@@ -99,91 +99,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d7009b152acfd9ab80d334bccc889352b5c006466daf702a736354775ebd67bc"
+      "sha256": "b6b7c5d2f5942b06655426bef4b5518bab701e9081cf48e065fce86625206702"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "14685c1730e897d11ef293335af84ab68dd58d21a06f27e471ac554479067a62"
+      "sha256": "3af56124c16b0d758eba95716d1c73cbe5c1c79fab4ce8c2911c8af96ea96344"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "3c6e987a2fb800c5a554a36e8e37618b95b1806e7b0b6f103f28ff85b165661d"
+      "sha256": "40f2a7dfe44228055758294a664f1689f1750839a465d5f3a49c9cc4f921d982"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "4e5d4cb34be01591886b261dfadf45a79b00b8e521d10eaca1ebda23c254913f"
+      "sha256": "4285c4fbb9570a070deeb52ce4eb20216e29fda236a40406d779ecf5c7a5269b"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "7ebb29271b5b67b838c9d661d50e457a8225c0084fa5d91f6089f80e455d459d"
+      "sha256": "fff2a53efa9e82d4fd3c2797c08cba778f0bcb060caafac976c6c90f8f71aa90"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "93099aa39b9dd8ace55602a51cd2e1253536bd74b498ce2549d53b7dd346f993"
+      "sha256": "9e3654409b2b38319a0a03142cf9c672877b9dd6ffd5e65a7a6dd8d05640faac"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "8a6b082244f59143fc6159486f81ca2a6583d5df9c63c0f51d804b84956bdfca"
+      "sha256": "fe89a20c81a537aeec42d04b48800ede8e88f50b8bbce6412735ffba9351afa5"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a98a4b3fa6935b31f7d52bfec2a343400c50c3d83d9f44a635355dcadbe64379"
+      "sha256": "573cf2917ebc5a73d579afd8c5911311de003cf87f4d10fe3d8e14d43cd6895a"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "16d28dd5ad585a45dd06b52ed06d3970623e41815023420f272821d01284aa86"
+      "sha256": "e23115b55b4cfca35703a27a193385f18c7c361fe7dc44ebf49c1554e0b78803"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "18e900d88fc25089bfa58ae45c988aae105d4db718c043614a6baeae090b99a8"
+      "sha256": "376a64745ab134c041180db34857ef0c70f6d32b85f0f98a94b8d017676dc9f5"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "8efafd98f699a4fcba5914e4c203154d94b41a3e311620443254385c93d43c31"
+      "sha256": "aa76d29433d74414f08fceba78c2d309b4ef2afe6fd4016a0c1e9cf464231991"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "f510b95943f611e96deab5a3656827fb69396c71994c73a0a3ad8fca7da4915a"
+      "sha256": "75a74067f380458785302646b8363fb613c3a065a41d5d3ae3b52ea0256a2b81"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "73b837e557beeba5999f58716eb58d07fde530f171d1b43f74b287b593e18ce0"
+      "sha256": "47e181d36790b615b6a2a327a1fe62a7b862644f109856df8ea3a4b045b12ce9"
     }
   ],
   "visualReview": {
