@@ -149,8 +149,8 @@ export function validateRealDhakaBaselineReport(report, options = {}) {
         if (!isRecord(tileError)
             || typeof tileError.message !== "string"
             || tileError.message.length > 240
-            || /https?:\\/\\//i.test(tileError.message)
-            || /\\b(?:access_token|token)=(?!\\[redacted\\])[^&\\s)]+/i.test(tileError.message)
+            || /https?:\/\//i.test(tileError.message)
+            || /\b(?:access_token|token)=(?!\[redacted\])[^&\s)]+/i.test(tileError.message)
             || !validCoordinate(tileError.x)
             || !validCoordinate(tileError.y)
             || !validCoordinate(tileError.level)
