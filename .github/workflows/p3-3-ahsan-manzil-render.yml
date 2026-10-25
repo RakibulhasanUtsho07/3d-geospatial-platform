@@ -6,6 +6,7 @@ on:
       - rakibul-hasan
     paths:
       - 'data/heritage/ahsan-manzil.parameters.json'
+      - 'public/models/ahsan-manzil.manifest.json'
       - 'data/heritage/ahsan-manzil-reference-pack.json'
       - 'scripts/fetch-ahsan-manzil-reference-pack.mjs'
       - 'tests/ahsan-manzil-reference-pack.test.mjs'
