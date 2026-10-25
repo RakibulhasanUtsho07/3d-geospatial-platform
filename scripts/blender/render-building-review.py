@@ -166,9 +166,9 @@ def main():
         camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         filename = view_id + ".png"
-        scene.render.filepath = os.path.join(output_dir, filename)
+        rendered_path = os.path.join(output_dir, filename)
+        scene.render.filepath = rendered_path
         bpy.ops.render.render(write_still=True)
-        rendered_path = scene.render.filepath
         if not os.path.isfile(rendered_path):
             raise RuntimeError("Blender reported success but the render file is missing: " + rendered_path)
         result = bpy.data.images.load(rendered_path, check_existing=False)
