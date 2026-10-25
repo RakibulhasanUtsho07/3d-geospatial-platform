@@ -372,47 +372,52 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   const movementStartedAtMs = performance.now();
   const movementActions: string[] = [];
-  for (let index = 0; index < 4; index += 1) {
-    await page.getByRole("button", { name: "Zoom out" }).click();
-    movementActions.push("zoom-out");
-    await wait(90);
-  }
-  for (let index = 0; index < 2; index += 1) {
-    await page.getByRole("button", { name: "Zoom in" }).click();
-    movementActions.push("zoom-in");
-    await wait(90);
-  }
 
-  const box = await canvas.boundingBox();
-  assert.ok(box, "The Cesium map canvas must have a stable bounding box for pan workload.");
-  const startX = box.x + box.width * 0.43;
-  const startY = box.y + box.height * 0.56;
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(startX + 185, startY + 62, { steps: 6 });
-  await page.mouse.up();
-  movementActions.push("drag-pan");
+  // Use the opt-in workload hook to move to a known local viewport and trigger
+  // the normal production camera-intent handler before running rapid gestures.
+  // This avoids the gesture sequence coalescing every request before we can
+  // observe a live AbortController.
+  const focusedForCancellation = await page.evaluate(() => {
+    const target = window as Window & {
+      __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
+        focusViewportForBenchmark?: (
+          longitudeDegrees: number,
+          latitudeDegrees: number,
+          heightMeters: number,
+        ) => boolean;
+      };
+    };
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+      90.4058,
+      23.7086,
+      2_500,
+    ) ?? false;
+  });
+  assert.equal(focusedForCancellation, true,
+    "The opt-in Cesium hook must focus the real camera before the cancellation workload.");
+  movementActions.push("focus-local-viewport-for-cancellation");
 
   await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
-  // Wait until a real request is in flight, then ask the engine's opt-in
-  // workload hook to produce one additional distinct camera intent. This makes
-  // cancellation deterministic instead of relying on runner-dependent timing
-  // between scripted zoom clicks and Cesium's moveEnd events.
-  const hasInFlightBuildingRequest = async () => page.evaluate(() => {
+
+  const getBuildingRequestLifecycle = async () => page.evaluate(() => {
     const target = window as Window & {
       __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
         getRequestLifecycleDiagnostics?: () => {
+          intentRevision: number;
           loadInProgress: boolean;
           hasActiveEndpoint: boolean;
           hasAbortController: boolean;
           hasPendingRequest: boolean;
-        };
+        } | null;
       };
     };
-    const state = target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.();
-    return Boolean(state?.loadInProgress && state.hasActiveEndpoint && state.hasAbortController);
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.() ?? null;
   });
-  await expect.poll(hasInFlightBuildingRequest, { timeout: 15_000, intervals: [50, 100, 250] }).toBe(true);
+  await expect.poll(async () => {
+    const state = await getBuildingRequestLifecycle();
+    return Boolean(state?.loadInProgress && state.hasActiveEndpoint && state.hasAbortController);
+  }, { timeout: 15_000, intervals: [25, 50, 100] }).toBe(true);
+
   const cancellationProbe = await page.evaluate(() => {
     const target = window as Window & {
       __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
@@ -439,17 +444,41 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null;
   });
   assert.ok(cancellationProbe, "The opt-in viewport lifecycle diagnostic must be installed.");
-  assert.equal(cancellationProbe.lifecycleBefore.loadInProgress, true, "Cancellation probe must start during an active viewport request.");
-  assert.equal(cancellationProbe.lifecycleBefore.hasAbortController, true, "Cancellation probe must observe a live AbortController.");
-  assert.equal(cancellationProbe.cameraBoundsChanged, true, "Cancellation probe must change the real Cesium camera bounds.");
+  assert.equal(cancellationProbe.lifecycleBefore.loadInProgress, true,
+    "Cancellation probe must start during an active viewport request.");
+  assert.equal(cancellationProbe.lifecycleBefore.hasAbortController, true,
+    "Cancellation probe must observe a live AbortController.");
+  assert.equal(cancellationProbe.cameraBoundsChanged, true,
+    "Cancellation probe must change the real Cesium camera bounds.");
   assert.ok(cancellationProbe.intentRevisionAfter > cancellationProbe.intentRevisionBefore,
     "A distinct camera intent must invalidate the obsolete viewport revision.");
   assert.equal(cancellationProbe.lifecycleAfter.hasPendingRequest, true,
     "The newest viewport intent must remain queued after cancellation.");
 
-  // Only wait for road coverage after triggering cancellation; waiting for both
-  // layers first can allow the held building request to finish and erase the
-  // live AbortController before the cancellation probe runs.
+  // Continue the normal repeated zoom/pan workload after the deterministic
+  // cancellation was captured; newer requests use short fixture delays.
+  for (let index = 0; index < 4; index += 1) {
+    await page.getByRole("button", { name: "Zoom out" }).click();
+    movementActions.push("zoom-out");
+    await wait(90);
+  }
+  for (let index = 0; index < 2; index += 1) {
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    movementActions.push("zoom-in");
+    await wait(90);
+  }
+
+  const box = await canvas.boundingBox();
+  assert.ok(box, "The Cesium map canvas must have a stable bounding box for pan workload.");
+  const startX = box.x + box.width * 0.43;
+  const startY = box.y + box.height * 0.56;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 185, startY + 62, { steps: 6 });
+  await page.mouse.up();
+  movementActions.push("drag-pan");
+
+  await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
   await expect.poll(() => roadRoutes.length, { timeout: 45_000 }).toBeGreaterThan(1);
 
   await expect.poll(async () => {
