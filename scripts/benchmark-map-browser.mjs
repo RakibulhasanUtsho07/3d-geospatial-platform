@@ -13,6 +13,7 @@ const DEFAULT_URL = "http://127.0.0.1:3000/map";
 const DATA_INPUTS = [
   "data/overture/spatial-tiles/manifest.json",
   "data/overture/dhaka-buildings-3d-pilot.geojson",
+  "public/data/roads/dhaka-road-network-v1.json",
 ];
 
 function readInteger(name, fallback, minimum, maximum) {
