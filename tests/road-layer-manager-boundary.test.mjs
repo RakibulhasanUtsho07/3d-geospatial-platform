@@ -38,6 +38,9 @@ test("RoadLayerManager owns cache, cancellation, rendering and request telemetry
     "roadRequestAbortController",
     "activeRoadRequestKey",
     "shouldCancelRoadRequestForCachedViewport",
+    "shouldSkipFailedRoadViewportRetry",
+    "ROAD_FAILURE_COOLDOWN_MS = 60_000",
+    "lastFailedRoadRequestKey",
     "AbortSignal.timeout(25_000)",
     "flattenRoadCoordinates",
     "resolveRoadVisualStyle",
@@ -60,4 +63,10 @@ test("road lifecycle APIs abort stale work and clear per-viewport state", () => 
 test("successful road render telemetry distinguishes actual rendered entities from upstream ways", () => {
   assert.match(manager, /dependencies\.recordMapPerformance\("roads\.render", "success"[\s\S]*?featureCount:\s*renderedRoads/);
   assert.match(manager, /featureCount:\s*renderedRoads,[\s\S]*?returnedWays:\s*payload\.results\.length/);
+});
+
+test("failed viewport cooldown is recorded only for non-cancelled road failures", () => {
+  assert.match(manager, /if \(!roadWasCancelled && dependencies\.isViewerActive\(\)\)[\s\S]*?lastFailedRoadRequestKey = requestKey[\s\S]*?failedRoadRetryAfterMs = performance\.now\(\) \+ ROAD_FAILURE_COOLDOWN_MS/);
+  assert.match(manager, /setVisible\(visible: boolean\)[\s\S]*?clearFailedRequestCooldown\(\)/);
+  assert.match(manager, /this\.loadedRoadBounds = bounds;[\s\S]*?this\.clearFailedRequestCooldown\(\)/);
 });
