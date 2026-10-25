@@ -170,7 +170,8 @@
     "test:dhaka-3d-tiles-performance-repeatability": "playwright test tests/browser/dhaka-3d-tiles-performance-repeatability.spec.ts --config=playwright.config.ts",
     "test:map-dynamic-viewport-workload": "playwright test --config=playwright.dynamic-map-workload.config.ts",
     "test:overpass-road-provider": "node --test tests/overpass-road-provider.test.mjs",
-    "test:offline-road-extract": "node --test tests/offline-road-extract.test.mjs"
+    "test:offline-road-extract": "node --test tests/offline-road-extract.test.mjs",
+    "prepare:dhaka-road-extract": "node scripts/prepare-dhaka-road-extract.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

@@ -111,3 +111,12 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Human visual review of the refined screenshots and workstation-specific baseline.
 - [ ] P3.4 road reliability slice: current branch implementation is awaiting focused/full CI and refined real-data verification.
 - [ ] Phase 2 onward: remaining implementation phases above.
+
+
+## P3.4.3 — Offline road data pipeline (code added; real data pending)
+
+- Added GeoJSON-to-normalized-road conversion while preserving the source OSM way ID.
+- Added a versioned local extract schema with ODbL/source/date/coverage/feature-count and geometry validation, size/count limits, parsed-file cache and per-viewport selection.
+- Added the local-first API path controlled by `DHAKA_ROADS_EXTRACT_PATH`; matching viewports bypass public Overpass and report offline detail/source provenance.
+- Added `prepare:dhaka-road-extract` to ingest an OSM-derived GeoJSON file and record its source hash.
+- **Still pending:** run the importer on an actual licensed Dhaka extract, configure it in the runtime, then verify the six baseline screenshots show a positive road-render feature count. The tests use synthetic fixtures only.
