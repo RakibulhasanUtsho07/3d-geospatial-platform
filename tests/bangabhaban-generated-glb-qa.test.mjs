@@ -19,6 +19,21 @@ test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA",
     const label = "LOD" + lod;
     const bytes = await readFile(path.join(root, "public/models/bangabhaban-lod" + lod + ".glb"));
     const report = analyzeGlbQuality(bytes), gltf = parseGlb(bytes, label);
+    let indexedVertexCount = 0;
+    let indexCount = 0;
+    for (const mesh of gltf.meshes) {
+      for (const primitive of mesh.primitives) {
+        const positions = gltf.accessors[primitive.attributes.POSITION];
+        const indices = gltf.accessors[primitive.indices];
+        indexedVertexCount += positions.count;
+        indexCount += indices.count;
+        assert.ok([5123, 5125].includes(indices.componentType), label + " indices must use compact uint16/uint32 components");
+      }
+    }
+    assert.ok(indexedVertexCount < indexCount,
+      label + " should reuse identical position/normal vertices instead of exporting triangle soup");
+    assert.ok(gltf.accessors.some(accessor => accessor.componentType === 5123),
+      label + " should use uint16 indices when the compact mesh fits the uint16 vertex budget");
     assert.equal(report.valid, true);
     assert.equal(report.format, "glb");
     assert.ok(report.counts.meshCount >= 11);
