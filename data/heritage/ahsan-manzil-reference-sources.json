@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "1.0.0",
+  "registryId": "ahsan-manzil-reference-set-v1",
+  "building": {
+    "id": "ahsan-manzil-kumartuli-dhaka",
+    "name": "Ahsan Manzil (Pink Palace)",
+    "location": "Kumartoli, Dhaka, Bangladesh"
+  },
+  "candidateModel": {
+    "sha256": "689b3fb6b1aa28a8649f34317aa539439e4e6b9d40db5db9625e5e673213e17e",
+    "sourceCommit": "83141e060b0bae59be22f4972f7b3d22a19253fc"
+  },
+  "evidenceClass": "photographic-reference",
+  "policy": {
+    "sourcesArePhotographsOnly": true,
+    "establishesSurveyedDimensions": false,
+    "establishesGeodeticGroundControl": false,
+    "verifiesOccludedOrUnseenGeometry": false,
+    "enablesPublication": false,
+    "humanReviewRequired": true,
+    "note": "Photo viewpoints and pixels are not independent survey measurements. Perspective, lens distortion, occlusion and image crops must be considered before dimension inference."
+  },
+  "sources": [
+    {
+      "id": "ahsan-front-sumonto-2018",
+      "fileName": "ahsan-manzil-front.jpg",
+      "mediaTitle": "Front view of Ahsan Manzil.jpg",
+      "viewRole": "front-facade",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Front_view_of_Ahsan_Manzil.jpg?oldid=1262215007",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Front_view_of_Ahsan_Manzil.jpg?oldid=1262215007",
+      "attribution": "Sumonto.ck",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceRevision": "1262215007",
+      "expectedWidth": 4160,
+      "expectedHeight": 3120,
+      "expectedBytes": 3223750,
+      "expectedSha1": "95d95db884582236a5c5298532dc155e8fbb9d67",
+      "hashPinStatus": "pinned",
+      "sourceNotes": "Front elevation reference; viewpoint metadata is not a survey control point."
+    },
+    {
+      "id": "ahsan-side-mrpluto11-2017",
+      "fileName": "ahsan-manzil-side.jpg",
+      "mediaTitle": "Ahsan Manzil (side).jpg",
+      "viewRole": "side-facade",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg?oldid=974364158",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Ahsan_Manzil_(side).jpg?oldid=974364158",
+      "attribution": "Mrpluto11",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceRevision": "974364158",
+      "expectedWidth": 3096,
+      "expectedHeight": 2322,
+      "expectedBytes": 1322192,
+      "expectedSha1": "82c310dd395aa0a595af523fd51ecbf66d926c46",
+      "hashPinStatus": "pinned",
+      "sourceNotes": "Side elevation reference; use only for visible surfaces and architectural proportions."
+    },
+    {
+      "id": "ahsan-high-angle-rayhan9d-2020",
+      "fileName": "ahsan-manzil-high-angle-roof.jpg",
+      "mediaTitle": "আহসান মঞ্জিল 01.jpg",
+      "viewRole": "high-angle-roof",
+      "sourcePageUrl": "https://commons.wikimedia.org/wiki/File:%E0%A6%86%E0%A6%B9%E0%A6%B8%E0%A6%BE%E0%A6%A8_%E0%A6%AE%E0%A6%9E%E0%A7%8D%E0%A6%9C%E0%A6%B2_01.jpg?oldid=976902213",
+      "downloadUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/%E0%A6%86%E0%A6%B9%E0%A6%B8%E0%A6%BE%E0%A6%A8_%E0%A6%AE%E0%A6%9E%E0%A6%9C%E0%A6%B2_01.jpg?oldid=976902213",
+      "attribution": "Rayhan9d (Rayhan Ahmed)",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sourceRevision": "976902213",
+      "expectedWidth": 3888,
+      "expectedHeight": 2524,
+      "expectedBytes": 4460259,
+      "expectedSha1": null,
+      "hashPinStatus": "capture-and-pin-required",
+      "sourceNotes": "High-angle view useful for visible roof-deck layout; perspective and occlusion mean this is not a measured roof plan."
+    }
+  ]
+}
