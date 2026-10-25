@@ -27,7 +27,8 @@ function building(buildingId, category, overrides = {}) {
   };
   const benchmarkReport = { status: "benchmark-passed-review-required", candidateGlbSha256: modelHash,
     checks: ["dimension-reference-provenance", "reference-dimensions-within-tolerance", "ground-control-model-binding",
-      "ground-control-residuals-within-tolerance", "render-reference-review"].map((id) => ({ id, status: "passed" })) };
+      "ground-control-residuals-within-tolerance", "render-reference-report-valid",
+      "render-reference-candidate-binding", "render-reference-outcomes"].map((id) => ({ id, status: "passed" })) };
   const views = REQUIRED_RENDER_VIEWS.map((id, index) => ({
     id, filename: id + ".png", sha256: hash(index + 50), bytes: 20000 + index, width: 1024, height: 1024, verified: true,
   }));

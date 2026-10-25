@@ -118,7 +118,9 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       benchmarkChecks.get("reference-dimensions-within-tolerance") === "passed" &&
       benchmarkChecks.get("ground-control-model-binding") === "passed" &&
       benchmarkChecks.get("ground-control-residuals-within-tolerance") === "passed" &&
-      benchmarkChecks.get("render-reference-review") === "passed" &&
+      benchmarkChecks.get("render-reference-report-valid") === "passed" &&
+      benchmarkChecks.get("render-reference-candidate-binding") === "passed" &&
+      benchmarkChecks.get("render-reference-outcomes") === "passed" &&
       sameHash(benchmark.candidateGlbSha256, candidate.sha256);
     add("dimension-and-horizontal-georeference-benchmark", benchmarkPassed,
       "Independent dimension evidence and horizontal control-point residuals must pass for this GLB.",
