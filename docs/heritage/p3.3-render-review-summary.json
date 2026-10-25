@@ -1,8 +1,8 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "9a489f3b0e781917343f289163ad1952ea14f123",
-  "reviewGeneratedAt": "2026-10-25T12:58:52.426Z",
+  "sourceCommit": "acca28bbe252888e807507c15bc9de1cd85cb695",
+  "reviewGeneratedAt": "2026-10-25T14:10:01.077Z",
   "correctionScope": [
     "add a 14.0 m × 12.0 m estimated raised central roof platform beneath the drum to express the roof-section transition; both dimensions remain [E]",
     "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
@@ -21,7 +21,7 @@
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "6cb84bfba1d1cd743be385ac7b93fc26c80b296a63b20bec58670d1d0b13816f",
+    "sha256": "f30c40d1af0da118465813c09a01d09e3ca92b858146e472abdd6b571f788186",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -166,91 +166,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a2e5c922c21e05ab8a3279f1480218f9901bc3151f6f1e22d94bcc2f1ca91e53"
+      "sha256": "c36d6eb0a6a8dce183af943c60996f5746e04c899ad7dc483b36bd3fce0e6d06"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "fc02b74542bf5cccce67f7173c3fe1f4d5df10eeef3b88c231ce69f95acc074c"
+      "sha256": "3198f66f244a63d6bb3e05c934ebe33ec51bafa478895a345f29be754fedec3c"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "5be61fd8d64e5f8b8f494e78dcd443200fab4c313af565d09ff5620238971275"
+      "sha256": "971ac6edc2cc81dab8b0ec67bbc7f3962d1e431146d2ab6d714c61dc8dcd1e02"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c20fc0aa21d7840d93d2892f40082240f8f759c3f6ee482d9541ee42d08fdb49"
+      "sha256": "5559e76991a68627dd7a96e9906e79551356d50955a380b997f8fc639b2cd3fc"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "f4b00b433f87f0036463850f62d1a18a8a484df04e01b0ca1717a820e692cfa4"
+      "sha256": "f63a4899f28c6554056c0d6eedc4ee3d5c363c32e1b0bc980eaa89512cc8b856"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b1f4b3d3095f8c056d8f7ba8e46a8bbe3bfd7b865ed57f53580e3b734636a132"
+      "sha256": "d9442695568ae12da8aad7b70d6534abb2957acf6be2b0cd93cf08e3f6d4c3cf"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c0789db371aa8c8c7757ebffe78d75be7616e2774ae5726a6ea548fcf7d4cf34"
+      "sha256": "db98e9e2627546f6dbb3eac39b7927c15653fa034e6ca56572bad2a6d1dee896"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "8b0f86c0ca60c4b6297f6165d6e8fcf95fcd0c48159153a59c0e9a9c293bb4ec"
+      "sha256": "d49f8de7bd9f70b7841e6168d851fbf19608289cbc3a57addd6e95560e27314a"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "bbff96a737c69665c6c0d7cfbc2dedbfa8bdce007b9087c97695f44960c2680b"
+      "sha256": "2d30f3ed380b5797c600fdbca5bf174d1be71654a4c33ce6242efec788347c9a"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c76c7df301eea60e88dea6a03489ee14a9cde9e21db1c9beb506f26f39a8d1a9"
+      "sha256": "1dff56ab00719395654668f5fddcaf6f8e7a44342d60a47b49da79c61e92348c"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "fb3e643857636431fe9b32294e2be3a63ad98c11229341370b725b98e216d1d2"
+      "sha256": "78c72354d1160f45315e155a6509101d9944c72c0261cd07cbb9f3a6ab662a7a"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "515ef782f6accf54108e2b7b5dedb75f7d40f171df7fb9101b446067910f4bb5"
+      "sha256": "415ab6c548f2dace4a324b95b3b1e62825ec0fac782c7f927ba11e611bd1ab55"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "3aae0018f52134778d3bd3b8ecdb70b1c700a683583b80c9ac45967a432c7153"
+      "sha256": "adccb7469cf3b8fa1c893170c9bf060b559f04a0c9927173044cab63c9fc0613"
     }
   ],
   "visualReview": {
