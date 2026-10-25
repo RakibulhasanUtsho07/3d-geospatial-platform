@@ -75,6 +75,7 @@ async function main() {
   const registry = JSON.parse(registryBytes.toString("utf8"));
   const validation = validateHeritageReferenceRegistry(registry);
   if (!validation.valid) throw new Error("Reference registry validation failed: " + validation.errors.join(", "));
+  await mkdir(path.dirname(outputDir), { recursive: true });
   try {
     await mkdir(outputDir, { recursive: false });
   } catch (error) {
