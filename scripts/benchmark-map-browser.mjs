@@ -487,6 +487,13 @@ async function capturePageMetrics(
     }
 
     const telemetry = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null;
+    const rawImageryErrors = window.__MAP_ENGINE_IMAGERY_TILE_ERRORS__;
+    const imageryTileErrors = rawImageryErrors && typeof rawImageryErrors === "object"
+      ? {
+          total: Number.isSafeInteger(rawImageryErrors.total) ? rawImageryErrors.total : 0,
+          recent: Array.isArray(rawImageryErrors.recent) ? rawImageryErrors.recent.slice(-50) : [],
+        }
+      : { total: 0, recent: [] };
     const tasks = window.__MAP_BASELINE_LONG_TASKS__ ?? null;
     const memory = performance.memory && Number.isFinite(performance.memory.usedJSHeapSize)
       ? {
@@ -508,6 +515,7 @@ async function capturePageMetrics(
       paintTimingsMs: Object.fromEntries(paints.map((entry) => [entry.name, Number(entry.startTime.toFixed(2))])),
       resources: resourceSummary,
       telemetry,
+      imageryTileErrors,
       longTasks: tasks ? {
         count: tasks.count,
         totalDurationMs: Number(tasks.totalDurationMs.toFixed(2)),
@@ -542,6 +550,7 @@ async function capturePageMetrics(
     paintTimingsMs: metrics.paintTimingsMs,
     resources: metrics.resources,
     mapTelemetry: metrics.telemetry,
+    imageryTileErrors: metrics.imageryTileErrors,
     longTasks: metrics.longTasks,
     memory: metrics.memory,
     environment: metrics.environment,
