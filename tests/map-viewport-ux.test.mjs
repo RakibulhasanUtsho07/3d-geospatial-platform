@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [controls, layers, properties, canvas, controller, adapter, engineTypes] = await Promise.all([
+const [controls, layers, properties, canvas, controller, adapter, engineTypes, benchmark] = await Promise.all([
   readFile(new URL("../src/features/map/components/MapControls.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/features/map/components/MapLayersPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/features/map/components/PropertyListingsPanel.tsx", import.meta.url), "utf8"),
@@ -10,6 +10,7 @@ const [controls, layers, properties, canvas, controller, adapter, engineTypes] =
   readFile(new URL("../src/core/map-engine/heritage-camera-controller.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/core/map-engine/cesium-adapter.ts", import.meta.url), "utf8"),
   readFile(new URL("../src/core/map-engine/types.ts", import.meta.url), "utf8"),
+  readFile(new URL("../scripts/benchmark-map-browser.mjs", import.meta.url), "utf8"),
 ]);
 
 test("camera controls start collapsed and expose an accessible toggle", () => {
@@ -60,4 +61,13 @@ test("reset home camera cancels any flight, stops the orbit, and reapplies the D
   assert.match(body, /viewer\.scene\.requestRender\(\)/);
   assert.match(adapter, /resetHomeView\(\): void \{\s*this\.heritageCameraController\.resetHomeView\(\);\s*\}/);
   assert.match(engineTypes, /resetHomeView\(\): void/);
+});
+
+test("browser benchmark uses the actual loading overlay and waits for settled imagery", () => {
+  assert.match(canvas, /data-testid="map-loading-overlay"/);
+  assert.match(benchmark, /data-testid="map-loading-overlay"/);
+  assert.doesNotMatch(benchmark, /text\.includes\("Loading Ahsan Manzil 3D map"\)/);
+  assert.match(benchmark, /imageryTilesLoaded === true/);
+  assert.match(benchmark, /async function waitForStableImagery/);
+  assert.match(benchmark, /stableForMs/);
 });

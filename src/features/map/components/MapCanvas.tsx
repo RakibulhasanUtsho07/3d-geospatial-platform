@@ -790,7 +790,7 @@ export default function MapCanvas({
       />
 
       {status === "loading" && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20">
+        <div data-testid="map-loading-overlay" className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20">
           <div className="rounded-2xl border border-white/10 bg-black/75 px-6 py-5 text-center shadow-2xl backdrop-blur-xl">
             <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
 

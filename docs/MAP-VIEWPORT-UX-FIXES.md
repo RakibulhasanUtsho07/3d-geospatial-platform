@@ -23,3 +23,7 @@
 The `tests/map-viewport-ux.test.mjs` source-contract tests protect these behaviors in CI. Full ESLint, TypeScript/production build, map integration and browser checks must pass on the exact reviewed head before merge.
 
 This batch does **not** fix or explain the one-off bright red imagery/overlay artifact observed in an earlier real-Dhaka screenshot. That issue remains open for a separate reproduction and layer/material lifecycle investigation. It also does not claim surveyed building accuracy or visual acceptance for heritage proxy models.
+
+## Additional readiness correction
+
+The real-Dhaka browser benchmark previously recognized only the old text "Loading Ahsan Manzil 3D map". Once the app label was corrected to "Loading Dhaka 3D map", that string check could incorrectly treat a still-loading map as ready. The benchmark now watches the actual loading-overlay test ID and requires the Cesium viewer, at least one imagery layer, and `scene.globe.tilesLoaded`. It also requires imagery readiness to remain true for 750 ms before writing a screenshot, and records that readiness state in each result. This reduces timing-related ambiguity for the red ground artifact seen in one earlier capture, but does not declare its root cause fixed until a rerun confirms it disappears.

@@ -77,6 +77,12 @@ type CesiumCartesian3 = import("cesium").Cartesian3;
 type MapPerformanceDiagnosticsHandle = {
   snapshot: () => MapPerformanceSnapshot;
   reset: () => void;
+  /** Development-only readiness probe for reproducible browser screenshots. */
+  renderReadiness: () => {
+    viewerAvailable: boolean;
+    imageryLayerCount: number;
+    imageryTilesLoaded: boolean;
+  };
 };
 
 type PerformanceDiagnosticsWindow = Window & {
@@ -420,6 +426,21 @@ export class CesiumAdapter implements MapEngine {
     const handle: MapPerformanceDiagnosticsHandle = {
       snapshot: () => this.performanceTelemetry.getSnapshot(),
       reset: () => this.performanceTelemetry.reset(),
+      renderReadiness: () => {
+        const viewer = this.viewer;
+        if (!viewer || viewer.isDestroyed()) {
+          return {
+            viewerAvailable: false,
+            imageryLayerCount: 0,
+            imageryTilesLoaded: false,
+          };
+        }
+        return {
+          viewerAvailable: true,
+          imageryLayerCount: viewer.imageryLayers.length,
+          imageryTilesLoaded: viewer.scene.globe.tilesLoaded,
+        };
+      },
     };
     target.__MAP_ENGINE_PERFORMANCE__ = handle;
     this.performanceDiagnosticsHandle = handle;
