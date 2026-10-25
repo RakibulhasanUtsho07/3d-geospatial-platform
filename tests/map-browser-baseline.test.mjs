@@ -63,6 +63,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 0,
     stagedFeatureCount: 120,
@@ -70,6 +74,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 0,
@@ -80,6 +88,10 @@ test("accepts a map readiness record only when a viewport staged real building f
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 2,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 157,
@@ -90,6 +102,10 @@ test("rejects map readiness when initialization fails or telemetry is unavailabl
   const valid = {
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 12,
@@ -192,4 +208,22 @@ test("captures offline road source/detail headers and pending-request lifecycle 
   assert.deepEqual(snapshot.roadApi.upstreamAttempts, { sampleCount: 1, total: 0, max: 0 });
   assert.equal(snapshot.roadApi.pendingRequestsAtCapture, 0);
   assert.equal(JSON.stringify(snapshot).includes("west=90.4"), false);
+});
+
+test("rejects canvas and buildings as ready while the overlay is visible or imagery is unsettled", () => {
+  const ready = {
+    hasError: false,
+    telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 12,
+  };
+  assert.equal(validateMapReadyState({ ...ready, loadingOverlayVisible: true }), false);
+  assert.equal(validateMapReadyState({ ...ready, viewerAvailable: false }), false);
+  assert.equal(validateMapReadyState({ ...ready, imageryLayerCount: 0 }), false);
+  assert.equal(validateMapReadyState({ ...ready, imageryTilesLoaded: false }), false);
 });
