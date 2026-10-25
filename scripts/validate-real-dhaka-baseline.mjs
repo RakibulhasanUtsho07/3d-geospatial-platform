@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SHA256 = /^[a-f0-9]{64}$/i;
+const COMMIT_SHA = /^[a-f0-9]{40}$/i;
 const EXPECTED_RUNS = [
   ...[1, 2, 3].map((index) => ({ mode: "cold", index })),
   ...[1, 2, 3].map((index) => ({ mode: "warm", index })),
@@ -49,7 +50,7 @@ export function validateRealDhakaBaselineReport(report, options = {}) {
   if (report.schemaVersion !== 1 || report.benchmark !== "real-dhaka-map-performance-baseline") {
     addError(errors, "Report schema or benchmark identifier is not supported.");
   }
-  if (typeof expectedCommitSha !== "string" || !SHA256.test(expectedCommitSha)) {
+  if (typeof expectedCommitSha !== "string" || !COMMIT_SHA.test(expectedCommitSha)) {
     addError(errors, "An expected 40-character candidate commit SHA is required.");
   } else if (report.candidate?.gitCommitSha !== expectedCommitSha) {
     addError(errors, "Report candidate SHA does not match the workflow commit SHA.");
