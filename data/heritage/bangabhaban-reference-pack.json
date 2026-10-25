@@ -69,6 +69,34 @@
       "notes": "Commons page records a free-use permission and CC BY-SA 4.0; download and hash the exact file before using it in reproducible tests."
     },
     {
+      "id": "licensed-exterior-2017",
+      "kind": "image",
+      "title": "Bangabhaban (33310655331).jpg — exterior/context photograph",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Bangabhaban_%2833310655331%29.jpg",
+      "date": "2017-03-14",
+      "creator": "ASaber91",
+      "license": "CC BY 2.0",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 1800,
+        "height": 1153
+      },
+      "byteLength": 2420452,
+      "publishedSha1": "08c42b61fb435cf2bd9ac8e90f8261e8edc03b4a",
+      "sha256": null,
+      "downloaded": false,
+      "usableFor": [
+        "visual exterior/context comparison after confirming visible facade and viewpoint suitability"
+      ],
+      "notUsableAs": [
+        "independent dimension survey",
+        "calibrated multi-view reconstruction by itself"
+      ],
+      "notes": "Commons page identifies the source as a 2017 photo by ASaber91 under CC BY 2.0. The published SHA-1 is source metadata, not a locally recomputed checksum; download and compute SHA-256 before using it in reproducible reconstruction."
+    },
+    {
       "id": "commons-category",
       "kind": "image-index",
       "title": "Bangabhaban media category — Wikimedia Commons",
