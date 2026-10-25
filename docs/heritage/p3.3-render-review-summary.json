@@ -1,0 +1,211 @@
+{
+  "task": "P3.3",
+  "building": "Ahsan Manzil (Pink Palace), Dhaka",
+  "sourceCommit": "4c295e794f89f5cdb79ef874a6043b7e172643c3",
+  "reviewGeneratedAt": "2026-10-25T07:39:45.130Z",
+  "correctionScope": [
+    "Rangmahal and Andarmahal roof-height separation",
+    "proportional 18.6 m triple-arch portico and 39 m estimated stair base",
+    "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
+    "14 m octagonal drum with fuller 6.9 m rounded lotus-bud dome profile",
+    "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
+    "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
+    "lower 8-degree south-elevation review camera so the flat roof deck no longer dominates the facade-detail view"
+  ],
+  "model": {
+    "filename": "ahsan-manzil-lod3.glb",
+    "sha256": "689b3fb6b1aa28a8649f34317aa539439e4e6b9d40db5db9625e5e673213e17e",
+    "byteLength": 7049752
+  },
+  "renderManifest": {
+    "filename": "render-review-manifest.json",
+    "sha256": "0ea493b9dad2b2e191ecfa3bc42c60e22718eabf16c46bd1f4bfe8fea3d67f37",
+    "valid": true,
+    "status": "render-set-ready-for-human-review",
+    "renderer": "Blender",
+    "rendererVersion": "4.0.2",
+    "sceneBounds": {
+      "min": [
+        -63.81499863,
+        -33.73500061,
+        0
+      ],
+      "max": [
+        63.81499863,
+        19.41500092,
+        27.12999916
+      ],
+      "dimensions": [
+        127.62999725,
+        53.15000153,
+        27.12999916
+      ],
+      "coordinateUnits": "imported-model-units-unverified"
+    }
+  },
+  "qa": {
+    "geometry": {
+      "filename": "geometry-qa-report.json",
+      "sha256": "ae419f7c38898a9c0b6ef4c4d6f6411fe30013864bd686c94d8ffcb07a48bd4d",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "degenerate-triangles-present",
+        "degenerate-triangle-ratio-exceeds-threshold",
+        "long-triangle-edges-present",
+        "non-manifold-edges-present",
+        "disconnected-mesh-components-present",
+        "open-boundary-edges-present",
+        "small-detached-components-present",
+        "no-texture-atlas-embedded-or-declared"
+      ]
+    },
+    "textures": {
+      "filename": "texture-qa-report.json",
+      "sha256": "51ce3c38409927f6a548543ee3b1e6bcd6a1785da10e6bd9bb904e00b58ab6d3",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "mesh-0-primitive-0-no-supported-material-textures",
+        "mesh-1-primitive-0-no-supported-material-textures",
+        "mesh-2-primitive-0-no-supported-material-textures",
+        "mesh-3-primitive-0-no-supported-material-textures",
+        "mesh-4-primitive-0-no-supported-material-textures",
+        "mesh-5-primitive-0-no-supported-material-textures",
+        "mesh-6-primitive-0-no-supported-material-textures",
+        "mesh-7-primitive-0-no-supported-material-textures",
+        "mesh-8-primitive-0-no-supported-material-textures",
+        "mesh-9-primitive-0-no-supported-material-textures",
+        "mesh-10-primitive-0-no-supported-material-textures",
+        "mesh-11-primitive-0-no-supported-material-textures",
+        "mesh-12-primitive-0-no-supported-material-textures",
+        "mesh-13-primitive-0-no-supported-material-textures",
+        "mesh-14-primitive-0-no-supported-material-textures",
+        "mesh-15-primitive-0-no-supported-material-textures",
+        "mesh-16-primitive-0-no-supported-material-textures",
+        "mesh-17-primitive-0-no-supported-material-textures",
+        "mesh-18-primitive-0-no-supported-material-textures",
+        "mesh-19-primitive-0-no-supported-material-textures",
+        "mesh-20-primitive-0-no-supported-material-textures",
+        "no-images-declared",
+        "no-textures-declared",
+        "one-or-more-primitives-untextured"
+      ]
+    }
+  },
+  "views": [
+    {
+      "id": "front",
+      "filename": "front.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "93ca96274903a6db83e02e3927a2827f26e8e9f38f71391b0e4f8daedf63aaae"
+    },
+    {
+      "id": "back",
+      "filename": "back.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "cbe0cd186a464070cb70ea58aecd1c7645287c8c1f63a8742eb225721e5bf11e"
+    },
+    {
+      "id": "left",
+      "filename": "left.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "5bb23fff9baae6b93a7ce23a930bdf98aa2656679fcf180f86dafc01cf88c0b2"
+    },
+    {
+      "id": "right",
+      "filename": "right.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "360be24a1242079a9faeacd111d44330f66336916a7c911e054b3a33388057e8"
+    },
+    {
+      "id": "top",
+      "filename": "top.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "df88a659e3fb612f699f9d06547fe97020adc0ad05696dcc6a48453b66ba7e5f"
+    },
+    {
+      "id": "turntable-000",
+      "filename": "turntable-000.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "bf86aa1a9c4880b53023362189ca0ac548925b108b8971eae367f0a86fc3320c"
+    },
+    {
+      "id": "turntable-045",
+      "filename": "turntable-045.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "afa144b765ea9145f02ee0c9ae56f8f23812a7c0333df5d117588f01e2b3746f"
+    },
+    {
+      "id": "turntable-090",
+      "filename": "turntable-090.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "eb329f8c3e631da8eca88c5c8c32af35d3f2e24bf70516326f5198dbf910ddf7"
+    },
+    {
+      "id": "turntable-135",
+      "filename": "turntable-135.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "2f84a81bd19ab3f998cd68d372980b90b5f3e81ebb876ba78b0cddae1be48cbb"
+    },
+    {
+      "id": "turntable-180",
+      "filename": "turntable-180.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "e7f80db4347f9e63ac5fb93bd22d5ee6b58d6009013ca69cc7f4db194bd351bf"
+    },
+    {
+      "id": "turntable-225",
+      "filename": "turntable-225.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "3a3926cf06857c00a91a96c2f4bd28979ea1c1a1d5bf285a97c2b86ee783ef85"
+    },
+    {
+      "id": "turntable-270",
+      "filename": "turntable-270.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "d7d1c36a6308a4d6d6139650f63998cb51fe35147b325c39dea8fb0319347fec"
+    },
+    {
+      "id": "turntable-315",
+      "filename": "turntable-315.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "a9229eea811fa65f2036e131d2cf20cd0001dc284818702f25d695c707d4e954"
+    }
+  ],
+  "visualReview": {
+    "contactSheet": "contact-sheet.png",
+    "status": "13-view render and hash validation passed; visual comparison was performed against a published front exterior photo; survey-grade validation remains open",
+    "findings": [
+      "The previous 26 m stair base appeared too narrow relative to the published broad, flared stair; widened to an estimated 39 m (about 70% of the provisional 55.8 m frontage).",
+      "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
+      "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
+      "Review lighting was raised and moved closer because the first contact sheet under-lit facade and roof detail.",
+      "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
+      "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
+      "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
+      "The front review camera was lowered from about 20 degrees to about 8 degrees to prioritize the south facade instead of the visible flat roof deck; the 12 other views retain whole-model/angled coverage.",
+      "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage."
+    ],
+    "residualRisks": [
+      "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
+      "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
+    ],
+    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
+  }
+}
