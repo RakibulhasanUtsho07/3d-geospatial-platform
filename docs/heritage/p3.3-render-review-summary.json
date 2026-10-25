@@ -1,9 +1,10 @@
 {
   "task": "P3.3",
   "building": "Ahsan Manzil (Pink Palace), Dhaka",
-  "sourceCommit": "ac589a3159412c7e4d8d6bac65f691cb6a37e33b",
-  "reviewGeneratedAt": "2026-10-25T12:15:06.521Z",
+  "sourceCommit": "5be0dc514127ee76375a2d9b4b7910f40d08c3d8",
+  "reviewGeneratedAt": "2026-10-25T12:35:21.847Z",
   "correctionScope": [
+    "add a 14.0 m × 12.0 m estimated raised central roof platform beneath the drum to express the roof-section transition; both dimensions remain [E]",
     "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
     "Rangmahal and Andarmahal roof-height separation",
     "photo-proportion-based 13.0 m triple-arch portico and 27.0 m estimated stair base; neither is surveyed",
@@ -15,12 +16,12 @@
   ],
   "model": {
     "filename": "ahsan-manzil-lod3.glb",
-    "sha256": "68cee49e666995948ba66bea17134bcbe0d0a4f8bbeacb95cd5a25d7c908f3e0",
-    "byteLength": 7234300
+    "sha256": "1d0a49cc57e3de2309a1e74ec02f4f159bdd1abb936a637343ddeb35e491322f",
+    "byteLength": 7235312
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "d84e64e92cdcf76f4771ceb1186927c49cd99027e786598bd3a6798c55107bbb",
+    "sha256": "5e8fb32a8a72a89a429167143b12e232ceea7eaca245c15cfc680c2fe04451a4",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -47,7 +48,7 @@
   "qa": {
     "geometry": {
       "filename": "geometry-qa-report.json",
-      "sha256": "104260918a656ee16f705214940e94b38fe89b2abe51f995bc9cc26a3640ce84",
+      "sha256": "4698060c54b61eae4db1960afe66aa0ce9bc89a782c76336d21139e68abe13ff",
       "valid": true,
       "status": "review-recommended",
       "errors": [],
@@ -165,96 +166,96 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c4945c41f89d79e32b207fb3f0c83448c23f28d338f3f48f8678c63ed142b00f"
+      "sha256": "7949c4f2ad514526ecf50c02b8f68af761b8e0f6c7f45fdee6f2d3049f07533e"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "1c7ffb38eab482586fe99bbae9191a386881ecb5ea88ad875df2b417ba4209ab"
+      "sha256": "f0c0145165381e94b969a9026f021c7d704f884a7b209d00a509c195c7501117"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "dce757d9bdc2f151be057320e033cafdfc9a719321fffb6cb967ba16818236b1"
+      "sha256": "3fd239b70813baeac5885ac75df698af0c3392fd7ad7b976702a70ae1b575de5"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "0339144b5281f3102fde7f83fc19185ceca09a8ac2de3a0c59eb6a9314bc6c45"
+      "sha256": "3a31589c9f9682d0591d6a0cddc577bb902db12e758defbe52f2cb411f439f35"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "783ab8b5762f65c87b7eae4b8a0f9e89ef5dfbd85492176106f540a32592b0e3"
+      "sha256": "a9d69dd1cfbb71f4fab71df5e256dc372a5c317c3152e779a9cc816eab21585c"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "07bb3112d78ce2db65572d20afffa9753cd13d54d3543f2c29922ffdaa33ea6e"
+      "sha256": "1c136e379a5b5ee4c33f6c0ec793a361db3cd787114d357821529831d8ae7453"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "63d934a978ad5c775017bae83a42b5e0cdf7686e4f3eea9d8c5c4705d4001d6c"
+      "sha256": "7e1ecf361cb7af3d8f6f38dc9695bb4d120096704907abc46fa0439dc98f2e7a"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "9b5e59617c3d5ec8d2627e6ab98683753b7368db0485b8bcd23775027e3b3105"
+      "sha256": "d75cd28fff8bb406ab2b9c159a1821fedd8d47101946e0b35b54d3eb0653f6bd"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "244caf874be048b37821b2f01ec7b44fd88c0b925be9e128477ffeb430138b10"
+      "sha256": "aa596941a4b5d33d05b53c008feea1ca72ba5598ace88b6eb2e63214eeff43a0"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a559a7ccebc6db739f6c700158b4be9a7e9663a89cdca40501d619a3a7bc7bca"
+      "sha256": "be93ce642b1dbfc66b680dd20c448572555a5fbb669e4153fc25c1717c44ec33"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "288b9d98dfaec4202567beb300306ca229958c91cf2ca7789d6eca85060dbcfd"
+      "sha256": "f939576df5ab6085a5c135937a2f74df5d09a3ad095f8680ed8b87cd30df8575"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "dc6b5aaf7677142b863f964127932891745480acc3c8d65869f6b9214d977b5c"
+      "sha256": "91f0ab2ca60f6dead443db32d22217be28d175938e125e3eb12eab1fdbaeea25"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "5ff099bcc81b2e9759d92aeca07669635a4d6f41b0bd6fb756921ff618cb92d4"
+      "sha256": "3840adb3c4b9bba4943d3ddeb64c50896c153917693e78a62b6b8d3a32cf91b5"
     }
   ],
   "visualReview": {
     "contactSheet": "contact-sheet.png",
-    "status": "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone now uses a low-confidence aerial-photo estimate; texture/UV, detailed roof segmentation, side/back framing and surveyed footprint remain unresolved.",
+    "status": "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone uses a low-confidence aerial-photo estimate and the raised central dome-base platform adds a discrete roof section; texture/UV, fine roof segmentation, side/back framing and surveyed footprint remain unresolved.",
     "findings": [
       "Side-by-side comparison with the licensed south/front reference showed the 39 m estimated stair base visually dominating the facade; reduced it to a 27 m (~48% of the provisional 55.8 m frontage) estimate, pending rectification.",
       "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
@@ -265,7 +266,7 @@
       "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
       "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
       "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
-      "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; the roof deck now uses a muted grey-brown estimate, but the top view remains a simplified parametric plane and does not claim detailed roof reconstruction.",
+      "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; a raised central dome-base platform was added using 14.0 m × 12.0 m [E] estimates, while other roof planes remain simplified parametric surfaces.",
       "The first roof-tint estimate #777168 still rendered too pale in the top-view comparison; the roof-deck proxy was darkened to #4A4740 using the same uncalibrated aerial reference. Roof texture/UV and precise section geometry remain unresolved.",
       "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
       "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
