@@ -111,7 +111,12 @@ function buildGlb(lod) {
   const nodes = [...REQUIRED_NODES, ...SITE_CONTEXT_NODES].map((name) => ({ name, positions: [], normals: [], colors: [] }));
   const byName = Object.fromEntries(nodes.map((node) => [node.name, node]));
   function triangle(node, a, b, c, key) {
-    const normal = normalize(cross(sub(b, a), sub(c, a)));
+    const areaVector = cross(sub(b, a), sub(c, a));
+    // Parametric arches, dome rings and intersecting trim can converge at their
+    // endpoints. Do not serialize zero-area faces: they create unstable normals
+    // and inflate downstream GLB geometry-QA warnings.
+    if (Math.hypot(...areaVector) <= 1e-9) return;
+    const normal = normalize(areaVector);
     const rgba = color(key);
     for (const point of [a, b, c]) {
       node.positions.push(...point);
