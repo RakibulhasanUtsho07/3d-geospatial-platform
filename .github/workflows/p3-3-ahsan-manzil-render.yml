@@ -6,6 +6,9 @@ on:
       - rakibul-hasan
     paths:
       - 'data/heritage/ahsan-manzil.parameters.json'
+      - 'data/heritage/ahsan-manzil-reference-pack.json'
+      - 'scripts/fetch-ahsan-manzil-reference-pack.mjs'
+      - 'tests/ahsan-manzil-reference-pack.test.mjs'
       - 'scripts/build-ahsan-manzil-model.mjs'
       - 'scripts/blender/render-building-review.py'
       - 'docs/BLENDER-RENDER-REVIEW.md'
@@ -45,6 +48,11 @@ jobs:
       - name: Build corrected LOD models
         run: npm run build:heritage-model
 
+      - name: Fetch and verify licensed multi-view source references
+        run: |
+          npm run test:ahsan-manzil-reference-pack
+          npm run fetch:ahsan-manzil-reference-pack -- artifacts/p3-3-reference-pack
+
       - name: Run model and GLB quality tests
         run: |
           npm run test:heritage-model
@@ -75,6 +83,8 @@ jobs:
             --resolution=1024 --blender=blender
           cp artifacts/p3-3-qa/geometry-qa-report.json artifacts/p3-3-render-set/
           cp artifacts/p3-3-qa/texture-qa-report.json artifacts/p3-3-render-set/
+          mkdir -p artifacts/p3-3-render-set/reference-pack
+          cp -R artifacts/p3-3-reference-pack/. artifacts/p3-3-render-set/reference-pack/
 
       - name: Build labeled contact sheet
         run: |
@@ -112,6 +122,11 @@ jobs:
           const textureBytes = await readFile(path.join(out, "texture-qa-report.json"));
           const geometry = JSON.parse(geometryBytes.toString("utf8"));
           const texture = JSON.parse(textureBytes.toString("utf8"));
+          const referencePackBytes = await readFile(path.join(out, "reference-pack", "reference-pack.manifest.json"));
+          const referencePack = JSON.parse(referencePackBytes.toString("utf8"));
+          if (referencePack.verified !== true || referencePack.sources?.length < 3 || referencePack.sources.some((source) => source.verified !== true || !/^[a-f0-9]{64}$/.test(source.sha256 || ""))) {
+            throw new Error("P3.3 requires at least three downloaded, hash-verified licensed Ahsan Manzil reference views");
+          }
           const views = (manifest.views || []).map((view) => ({
             id: view.id,
             filename: view.filename,
@@ -154,6 +169,22 @@ jobs:
             qa: {
               geometry: {filename:"geometry-qa-report.json",sha256:hash(geometryBytes),valid:geometry.valid,status:geometry.status,errors:geometry.errors || [],warnings:geometry.warnings || []},
               textures: {filename:"texture-qa-report.json",sha256:hash(textureBytes),valid:texture.valid,status:texture.status,errors:texture.errors || [],warnings:texture.warnings || []}
+            },
+            referencePack: {
+              filename: "reference-pack/reference-pack.manifest.json",
+              sha256: hash(referencePackBytes),
+              verified: referencePack.verified,
+              licensePolicy: referencePack.licensePolicy,
+              sources: referencePack.sources.map((source) => ({
+                id: source.id,
+                imagePath: "reference-pack/" + source.imagePath,
+                sha256: source.sha256,
+                license: source.license,
+                sourceUrl: source.url,
+                viewRole: source.viewRole,
+                verified: source.verified,
+                cameraCalibration: source.viewAssessment?.cameraCalibration ?? "unknown"
+              }))
             },
             views,
             visualReview: {

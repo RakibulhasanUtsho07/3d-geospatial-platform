@@ -178,7 +178,9 @@
     "test:real-dhaka-baseline": "node --test tests/real-dhaka-baseline-validation.test.mjs",
     "verify:real-dhaka-baseline": "node scripts/validate-real-dhaka-baseline.mjs",
     "test:bangabhaban-reference-pack": "node --test tests/bangabhaban-reference-pack.test.mjs",
-    "fetch:bangabhaban-reference": "node scripts/fetch-bangabhaban-reference.mjs"
+    "fetch:bangabhaban-reference": "node scripts/fetch-bangabhaban-reference.mjs",
+    "fetch:ahsan-manzil-reference-pack": "node scripts/fetch-ahsan-manzil-reference-pack.mjs",
+    "test:ahsan-manzil-reference-pack": "node --test tests/ahsan-manzil-reference-pack.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
