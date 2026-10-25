@@ -30,3 +30,6 @@ No architectural-accuracy pass follows from a successful build, valid GLB or det
 - [x] Entrance stair changed from elevated over-height slabs to ground-based filled stair blocks whose top stays at the configured total rise.
 - [ ] Confirm the new candidate hash, per-LOD topology/test result and fresh 13-view renders before accepting the correction.
 - [ ] Human visual review of stair treads and dome profile against the licensed, uncalibrated images remains required.
+
+
+| BGB-V03 | Front loggia arches blend into pale facade in orthographic renders | Recess-shadow panels added behind arcade bays for better visibility | Compare against the licensed exterior photo; panel depth/bay rhythm remain estimates |

@@ -28,6 +28,14 @@ test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA",
     assert.equal((gltf.images || []).length, 0);
     assert.equal((gltf.textures || []).length, 0);
     assert.ok(report.warnings.includes("no-texture-atlas-embedded-or-declared"));
+    if (lod >= 2) {
+      const loggia = gltf.meshes.find(mesh => mesh.name === "Loggia");
+      assert.ok(loggia, "semantic Loggia mesh is required for LOD" + lod);
+      assert.ok(
+        loggia.primitives.some(primitive => gltf.materials[primitive.material]?.name === "RecessShadow"),
+        "Loggia arcade openings must have recessed shadow backing in LOD" + lod
+      );
+    }
     const plinth = gltf.nodes.find(node => node.name === "Plinth");
     assert.ok(plinth, "semantic Plinth node is required");
     const details = report.meshDetails.find(d => d.meshIndex === plinth.mesh && d.primitiveIndex === 0);

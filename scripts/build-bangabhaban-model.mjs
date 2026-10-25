@@ -252,6 +252,14 @@ function buildLod(lod) {
   sphere("Finial","IvoryTrim",domeX,domeBase+domeHeight+1.24,domeZ,0.34,0.34,0.34,16,8);
   if(lod>=2){
     const firstX=-W*0.37,lastX=W*0.12,bays=10,spacing=(lastX-firstX)/bays,faceZ=D/2-2.0;
+    // Recessed shadow panels make the ivory arcade piers/arches readable in
+    // fixed orthographic review renders. Their size/depth is illustrative [E].
+    for(let i=0;i<bays;i++){
+      const cx=firstX+(i+0.5)*spacing;
+      const recessZ=faceZ-0.52;
+      box("Loggia","RecessShadow",cx,base+0.45,recessZ,spacing*0.58,floor*0.72,0.12);
+      box("Loggia","RecessShadow",cx,base+floor+0.40,recessZ,spacing*0.58,floor*0.70,0.12);
+    }
     for(let i=0;i<=bays;i++){
       const x=firstX+i*spacing;
       cylinderY("Loggia","IvoryTrim",x,base+0.05,base+floor+0.35,faceZ,0.28,lod===2?10:16);

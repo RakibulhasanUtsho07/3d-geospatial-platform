@@ -35,3 +35,8 @@ The first candidate exposed two concrete issues, now addressed in the generator:
 - Stair blocks previously started at progressively higher Y values while also increasing height, creating an overhanging solid stack. The corrected staircase uses ground-based cumulative fill blocks at progressively higher tread elevations, capped at the configured total rise; regression QA checks the entrance-stair bounding height against that parameter.
 
 These source changes require a new exact-hash GLB, QA report and full 13-view render before they are accepted. The overall footprint, wing proportions, dome dimensions and colors remain provisional visual estimates.
+
+
+## Front arcade visibility correction
+
+LOD2/LOD3 include dark recessed backing panels behind the front loggia bays so the ivory piers and arches read clearly in fixed orthographic review views. Their depth and bay rhythm are illustrative only, not calibrated from a measured plan. This remains a visual proxy, not verified historical geometry.
