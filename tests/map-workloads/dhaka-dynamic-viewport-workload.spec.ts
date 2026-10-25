@@ -284,7 +284,9 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
       url: route.request().url(),
       startedAtMs,
       routeOrdinal,
-      // Hold the first two network requests so the workload can deterministically\n      // invalidate an in-flight viewport after the camera has moved.\n      routeDelayMs: routeOrdinal <= 2 ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
+      // Hold the first two network requests so the workload can deterministically
+      // invalidate an in-flight viewport after the camera has moved.
+      routeDelayMs: routeOrdinal <= 2 ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
     };
     buildingRoutes.push(routeRecord);
     await wait(routeRecord.routeDelayMs);
