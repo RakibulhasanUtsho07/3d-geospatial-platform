@@ -36,7 +36,7 @@ test("Bangabhaban pilot keeps public references and geometry claims provenance-g
   assert.equal(exterior.viewAssessment.captureCoordinates, "unknown");
   assert.ok(exterior.viewAssessment.occlusions.length > 0);
   assert.ok(exterior.viewAssessment.notSufficientFor.includes("multi-view photogrammetry"));
-  assert.ok(pack.acceptanceGates.some((gate) => gate.includes("view angle, visible features, occlusions")));
+  assert.ok(pack.acceptanceGates.some((gate) => gate.includes("approximate camera pose") && gate.includes("visible occlusion")), "reference review gate must cover camera pose and occlusion classification");
   const video = pack.sources.find((source) => source.id === "official-video-2016");
   assert.equal(video.downloaded, false);
   assert.match(video.license, /not established/i);
