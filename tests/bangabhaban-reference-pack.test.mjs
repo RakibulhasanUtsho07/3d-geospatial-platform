@@ -29,4 +29,7 @@ test("Bangabhaban reference downloader validates image bytes and published check
   assert.match(downloader, /image\/jpeg/);
   assert.match(downloader, /verified: true/);
   assert.match(downloader, /redirect: "follow"/);
+  assert.match(downloader, /async function fetchSource/);
+  assert.match(downloader, /retry-after/);
+  assert.match(downloader, /Special:FilePath/);
 });

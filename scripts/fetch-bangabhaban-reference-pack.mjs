@@ -9,6 +9,7 @@ const sources = [
     id: "licensed-aerial-2006",
     filename: "bangabhaban-aerial-2006.jpg",
     url: "https://upload.wikimedia.org/wikipedia/commons/4/4b/Bangabhaban.jpg",
+    fallbackUrls: ["https://commons.wikimedia.org/wiki/Special:FilePath/Bangabhaban.jpg"],
     sourcePage: "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
     author: "Naira Al Husain",
     license: "CC BY-SA 4.0",
@@ -21,6 +22,7 @@ const sources = [
     id: "licensed-exterior-2017",
     filename: "bangabhaban-exterior-2017.jpg",
     url: "https://upload.wikimedia.org/wikipedia/commons/e/ed/Bangabhaban_%2833310655331%29.jpg",
+    fallbackUrls: ["https://commons.wikimedia.org/wiki/Special:FilePath/Bangabhaban_(33310655331).jpg"],
     sourcePage: "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
     author: "ASaber91",
     license: "CC BY 2.0",
@@ -35,6 +37,7 @@ const sources = [
     id: "licensed-aerial-2017",
     filename: "bangabhaban-aerial-2017.jpg",
     url: "https://upload.wikimedia.org/wikipedia/commons/8/81/Bangabhaban%2C_Dhaka_April_%2833244270994%29.jpg",
+    fallbackUrls: ["https://commons.wikimedia.org/wiki/Special:FilePath/Bangabhaban,_Dhaka_April_(33244270994).jpg"],
     sourcePage: "https://commons.wikimedia.org/wiki/File:Bangabhaban,_Dhaka_April_(33244270994).jpg",
     author: "ASaber91",
     license: "CC BY 2.0",
@@ -47,13 +50,43 @@ const sources = [
 const sha = (bytes, algorithm = "sha256") => createHash(algorithm).update(bytes).digest("hex");
 const records = [];
 await mkdir(outputDir, { recursive: true });
+async function fetchSource(source) {
+  const urls = [source.url, ...(source.fallbackUrls || [])];
+  const failures = [];
+  for (const url of urls) {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      let response;
+      try {
+        response = await fetch(url, {
+          redirect: "follow",
+          headers: {
+            "user-agent": "3D-Geospatial-Platform/1.0 (https://github.com/RakibulhasanUtsho07/3d-geospatial-platform; licensed-reference QA)",
+            "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+          },
+          signal: AbortSignal.timeout(30000)
+        });
+      } catch (error) {
+        failures.push(url + " attempt " + (attempt + 1) + ": " + (error instanceof Error ? error.message : String(error)));
+        if (attempt < 3) await new Promise(resolve => setTimeout(resolve, Math.min(4000 * (2 ** attempt), 30000)));
+        continue;
+      }
+      if (response.ok) return response;
+      const retryable = response.status === 429 || response.status >= 500;
+      failures.push(url + " attempt " + (attempt + 1) + ": HTTP " + response.status);
+      if (!retryable) break;
+      if (attempt < 3) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(retryAfter * 1000, 30000)
+          : Math.min(4000 * (2 ** attempt), 30000);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
+    }
+  }
+  throw new Error(source.id + " download failed after retry/fallback: " + failures.join("; "));
+}
 for (const source of sources) {
-  const response = await fetch(source.url, {
-    redirect: "follow",
-    headers: { "user-agent": "3d-geospatial-platform-bangabhaban-reference-audit/1.0" },
-    signal: AbortSignal.timeout(30000)
-  });
-  if (!response.ok) throw new Error(source.id + " download failed with HTTP " + response.status);
+  const response = await fetchSource(source);
   const finalUrl = response.url;
   if (new URL(finalUrl).hostname !== "upload.wikimedia.org") throw new Error(source.id + " redirected to an unexpected host");
   const contentType = (response.headers.get("content-type") || "").toLowerCase();
@@ -72,7 +105,7 @@ for (const source of sources) {
   try { existing = await readFile(imagePath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
   if (existing && sha(existing) !== sha256) throw new Error(source.id + " existing image differs from fresh source bytes");
   if (!existing) await writeFile(imagePath, bytes, { flag: "wx" });
-  const { expectedByteLength, expectedSha1, ...metadata } = source;
+  const { expectedByteLength, expectedSha1, fallbackUrls, ...metadata } = source;
   records.push({
     ...metadata,
     downloadedUrl: finalUrl,
