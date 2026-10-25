@@ -2,6 +2,7 @@ const DEFAULTS = Object.freeze({
   maxTopologyVertices: 250_000,
   weldToleranceRelative: 1e-6,
   maxLongEdgeRatio: 0.15,
+  maxTriangleEdgeRatio: 8,
   maxLongEdgeTriangleRatio: 0.01,
   maxSmallComponentTriangles: 10,
 });
@@ -21,6 +22,9 @@ function validateOptions(options) {
   }
   if (!validNumber(settings.maxLongEdgeRatio) || settings.maxLongEdgeRatio <= 0 || settings.maxLongEdgeRatio > 1) {
     throw new RangeError("maxLongEdgeRatio must be greater than 0 and at most 1");
+  }
+  if (!validNumber(settings.maxTriangleEdgeRatio) || settings.maxTriangleEdgeRatio <= 1 || settings.maxTriangleEdgeRatio > 1000) {
+    throw new RangeError("maxTriangleEdgeRatio must be greater than 1 and at most 1000");
   }
   if (!validNumber(settings.maxLongEdgeTriangleRatio) || settings.maxLongEdgeTriangleRatio < 0 || settings.maxLongEdgeTriangleRatio > 1) {
     throw new RangeError("maxLongEdgeTriangleRatio must be between 0 and 1");
@@ -89,10 +93,12 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   }
   const diagonal = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
   const longEdgeThreshold = diagonal * settings.maxLongEdgeRatio;
-  let maxEdgeLength = 0, totalEdgeLength = 0, longEdgeCount = 0, longEdgeTriangleCount = 0;
+  let maxEdgeLength = 0, totalEdgeLength = 0;
+  let longEdgeCount = 0, longEdgeTriangleCount = 0, elongatedTriangleCount = 0;
   for (let i = 0; i < indices.count; i += 3) {
     const triangle = [indices.read(i), indices.read(i + 1), indices.read(i + 2)];
     let triangleHasLongEdge = false;
+    let triangleMinEdge = Infinity, triangleMaxEdge = 0;
     for (const index of triangle) {
       if (!Number.isSafeInteger(index) || index < 0 || index >= vertexCount) {
         throw new RangeError("topology triangle index is outside the POSITION accessor");
@@ -102,12 +108,21 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
       const length = distance(positions, a, b);
       maxEdgeLength = Math.max(maxEdgeLength, length);
       totalEdgeLength += length;
+      triangleMinEdge = Math.min(triangleMinEdge, length);
+      triangleMaxEdge = Math.max(triangleMaxEdge, length);
       if (diagonal > 0 && length > longEdgeThreshold) {
         longEdgeCount++;
         triangleHasLongEdge = true;
       }
     }
-    if (triangleHasLongEdge) longEdgeTriangleCount++;
+    if (triangleHasLongEdge) {
+      longEdgeTriangleCount++;
+      // Absolute edge length alone is not a defect: a valid wall or roof triangle
+      // can be large. Warn only if a model-scale edge is disproportionate to its
+      // other edges.
+      const edgeAspectRatio = triangleMaxEdge / Math.max(triangleMinEdge, 1e-9);
+      if (edgeAspectRatio >= settings.maxTriangleEdgeRatio) elongatedTriangleCount++;
+    }
   }
 
   const common = {
@@ -120,6 +135,9 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
     longEdgeCount,
     longEdgeTriangleCount,
     longEdgeTriangleRatio: Number((longEdgeTriangleCount / triangleCount).toFixed(6)),
+    maxTriangleEdgeRatio: settings.maxTriangleEdgeRatio,
+    elongatedTriangleCount,
+    elongatedTriangleRatio: Number((elongatedTriangleCount / triangleCount).toFixed(6)),
     weldedVertexCount: null,
     connectedComponentCount: null,
     smallDetachedComponentCount: null,
@@ -135,7 +153,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   if (vertexCount > settings.maxTopologyVertices) {
     common.topologySkipReason = "vertex-limit";
     common.warnings.push("topology-analysis-skipped-vertex-limit");
-    if (common.longEdgeTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
+    if (common.elongatedTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
     return common;
   }
 
@@ -202,7 +220,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
 
   if (connectedComponentCount > 1) common.warnings.push("disconnected-mesh-components-present");
   if (smallDetachedComponentCount > 0) common.warnings.push("small-detached-components-present");
-  if (common.longEdgeTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
+  if (common.elongatedTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
   if (boundaryEdgeCount > 0) common.warnings.push("open-boundary-edges-present");
   if (nonManifoldEdgeCount > 0) common.warnings.push("non-manifold-edges-present");
   return common;

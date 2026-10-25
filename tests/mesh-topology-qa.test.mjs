@@ -47,6 +47,32 @@ test("flags extremely long triangle edges relative to the primitive bounds", () 
   assert.ok(result.warnings.includes("long-triangle-edges-present"));
 });
 
+test("does not warn on broad, proportionate roof or wall triangles just because their edges are large", () => {
+  const positions = new Float32Array([
+    -50, 0, -50, 50, 0, -50, 50, 0, 50,
+    -50, 0, -50, 50, 0, 50, -50, 0, 50,
+  ]);
+  const result = analyzeTriangleTopology(positions, triangleIndices([0, 1, 2, 3, 4, 5]));
+
+  assert.equal(result.longEdgeTriangleCount, 2, "raw scale-relative edge telemetry remains available");
+  assert.equal(result.elongatedTriangleCount, 0);
+  assert.equal(result.elongatedTriangleRatio, 0);
+  assert.ok(!result.warnings.includes("long-triangle-edges-present"));
+});
+
+test("applies the configurable aspect-ratio threshold to elongated triangles", () => {
+  const positions = new Float32Array([0, 0, 0, 100, 0, 0, 0, 1, 0]);
+  const result = analyzeTriangleTopology(positions, triangleIndices([0, 1, 2]), {
+    maxTriangleEdgeRatio: 20,
+  });
+
+  assert.equal(result.elongatedTriangleCount, 1);
+  assert.ok(result.warnings.includes("long-triangle-edges-present"));
+  assert.throws(() => analyzeTriangleTopology(positions, triangleIndices([0, 1, 2]), {
+    maxTriangleEdgeRatio: 1,
+  }), /maxTriangleEdgeRatio/);
+});
+
 test("detects non-manifold edges used by more than two triangles", () => {
   const positions = new Float32Array([
     0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 1,
