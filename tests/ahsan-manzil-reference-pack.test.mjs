@@ -9,8 +9,9 @@ test("Ahsan Manzil reference pack uses fixed, permission-documented Wikimedia so
   assert.equal(packageJson.scripts["fetch:ahsan-manzil-reference-pack"], "node scripts/fetch-ahsan-manzil-reference-pack.mjs");
   assert.equal(packageJson.scripts["test:ahsan-manzil-reference-pack"], "node --test tests/ahsan-manzil-reference-pack.test.mjs");
   const downloader = await readFile(new URL("../scripts/fetch-ahsan-manzil-reference-pack.mjs", import.meta.url), "utf8");
-  assert.match(downloader, /createHash\("sha256"\)/);
-  assert.match(downloader, /createHash\("sha1"\)/);
+  assert.match(downloader, /createHash\(algorithm\)/);
+  assert.match(downloader, /sha\("sha256", bytes\)/);
+  assert.match(downloader, /sha\("sha1", bytes\)/);
   assert.match(downloader, /expectedByteLength/);
   assert.match(downloader, /publishedSha1/);
   assert.match(downloader, /upload\.wikimedia\.org/);
