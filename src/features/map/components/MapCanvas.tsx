@@ -355,12 +355,23 @@ export default function MapCanvas({
     setOrbitTourActive(false);
   }
 
-  function goHomeToAhsanManzil() {
+  function goHomeToDefaultMapView() {
     stopOrbitTourForManualControl();
-    engineRef.current?.setNavigationPath(null, null);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.setNavigationPath(null, null);
+    engine.clearFeatureSelection();
+    setSelectedFeature(null);
+    onSelectedFeatureChangeRef.current?.(null);
     setSelectedRoad(null);
+    setSelectedPlace(null);
     setSelectedProperty(null);
-    engineRef.current?.focusAhsanManzil(850);
+    engine.resetHomeView();
+  }
+
+  function resetMapOrientation() {
+    stopOrbitTourForManualControl();
+    engineRef.current?.resetOrientation();
   }
 
   function goToAhsanManzil() {
@@ -759,7 +770,7 @@ export default function MapCanvas({
 
       <MapControls
         disabled={status !== "ready"}
-        onHome={goHomeToAhsanManzil}
+        onHome={goHomeToDefaultMapView}
         onAhsanManzil={goToAhsanManzil}
         onWholeModel={goToAhsanManzilWhole}
         onRearView={goToAhsanManzilRear}
@@ -775,7 +786,7 @@ export default function MapCanvas({
         orbitTourActive={orbitTourActive}
         onTiltUp={() => { stopOrbitTourForManualControl(); cameraRef.current?.tiltUp(); }}
         onTiltDown={() => { stopOrbitTourForManualControl(); cameraRef.current?.tiltDown(); }}
-        onResetOrientation={goHomeToAhsanManzil}
+        onResetOrientation={resetMapOrientation}
       />
 
       {status === "loading" && (
@@ -784,7 +795,7 @@ export default function MapCanvas({
             <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
 
             <p className="text-sm font-medium text-white">
-              Loading Ahsan Manzil 3D map
+              Loading Dhaka 3D map
             </p>
 
             <p className="mt-1 text-xs text-zinc-400">
