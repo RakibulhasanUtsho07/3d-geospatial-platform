@@ -191,6 +191,9 @@ function addWindow(part,x,y,z,w,h,facing="front"){
 function buildLod(lod) {
   PARTS.clear();
   const W=MODEL.overallWidthM.value,D=MODEL.overallDepthM.value,floor=MODEL.floorHeightM.value,base=MODEL.plinthHeightM.value;
+  if (Math.abs(MODEL.stairRiseM.value - base) > 1e-6) {
+    throw new Error("Entrance stair rise must meet the modeled plinth-top datum (stairRiseM === plinthHeightM)");
+  }
   const widthW=MODEL.westWingWidthM.value,depthW=MODEL.westWingDepthM.value,heightW=floor*2;
   const widthC=MODEL.centralHallWidthM.value,depthC=MODEL.centralHallDepthM.value,heightC=floor*2+0.5;
   const widthE=MODEL.eastWingWidthM.value,depthE=MODEL.eastWingDepthM.value,heightE=floor*2;
