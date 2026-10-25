@@ -20,4 +20,7 @@ test("Bangabhaban topology audit pins the model hash and preserves mesh/global w
   assert.equal(plinth.connectedComponentCount, 1);
   assert.equal(plinth.boundaryEdgeCount, 0);
   assert.equal(plinth.nonManifoldEdgeCount, 0);
+  const dome = audit.meshes.find(m => m.nodeName === "Dome");
+  assert.ok(dome);
+  assert.equal(dome.boundaryEdgeCount, 0, "closed dome shell should have no open top ring");
 });

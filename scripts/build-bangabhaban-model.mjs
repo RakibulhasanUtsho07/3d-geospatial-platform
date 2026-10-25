@@ -237,6 +237,17 @@ function buildLod(lod) {
     const b=[domeX+domeRadius*Math.cos(2*Math.PI*n/segments),domeBase,domeZ+domeRadius*Math.sin(2*Math.PI*n/segments)];
     triangle("Dome","PalaceWhite",domeBottom,b,a);
   }
+  // Close the truncated last profile ring so the dome shell has no open top boundary.
+  const finalProfile=profile[profile.length-1];
+  const domeTopY=domeBase+finalProfile[0]*domeHeight;
+  const domeTopRadius=domeRadius*finalProfile[1];
+  const domeTip=[domeX,domeBase+domeHeight,domeZ];
+  for(let s=0;s<segments;s++){
+    const next=(s+1)%segments;
+    const a=[domeX+domeTopRadius*Math.cos(2*Math.PI*s/segments),domeTopY,domeZ+domeTopRadius*Math.sin(2*Math.PI*s/segments)];
+    const b=[domeX+domeTopRadius*Math.cos(2*Math.PI*next/segments),domeTopY,domeZ+domeTopRadius*Math.sin(2*Math.PI*next/segments)];
+    triangle("Dome","PalaceWhite",a,domeTip,b);
+  }
   cylinderY("Finial","IvoryTrim",domeX,domeBase+domeHeight-0.03,domeBase+domeHeight+1.15,domeZ,0.22,lod===1?8:12);
   sphere("Finial","IvoryTrim",domeX,domeBase+domeHeight+1.24,domeZ,0.34,0.34,0.34,16,8);
   if(lod>=2){
@@ -288,10 +299,12 @@ function buildLod(lod) {
       for(let i=0;i<9;i++)box("FacadeTrim","IvoryTrim",-W*0.35+i*W*0.70/8,topY+0.30,D*0.31,0.42,0.20,0.42);
     }
   }
-  const steps=lod===1?3:7,stairWidth=MODEL.stairWidthM.value,stairRun=MODEL.stairRunM.value,stairRise=MODEL.stairRiseM.value,stepDepth=stairRun/steps;
+  const steps=lod===1?3:7,stairWidth=MODEL.stairWidthM.value,stairRun=MODEL.stairRunM.value,stairRise=MODEL.stairRiseM.value,stepDepth=stairRun/steps,stepHeight=stairRise/steps;
   for(let i=0;i<steps;i++){
-    const height=0.24+(i+1)*stairRise/steps,y=0.12+i*stairRise/steps,z=D/2+(steps-i-0.5)*stepDepth;
-    box("EntranceStair","StepStone",0,y,z,stairWidth,height,stepDepth+0.20);
+    // Each tread block starts at ground with cumulative elevation, creating a solid stepped profile.
+    // The previous proxy started each tall block above ground, which produced an overhanging slab stack.
+    const height=(i+1)*stepHeight,z=D/2+(steps-i-0.5)*stepDepth;
+    box("EntranceStair","StepStone",0,0,z,stairWidth,height,stepDepth+0.20);
   }
   return {parts:PARTS,lod};
 }

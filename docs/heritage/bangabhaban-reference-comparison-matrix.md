@@ -22,3 +22,11 @@
 ## Release policy
 
 No architectural-accuracy pass follows from a successful build, valid GLB or deterministic render. Keep this candidate provisional until the geometry and evidence gates have been reviewed.
+
+
+## Geometry correction gate from first visual review
+
+- [x] Source generator updated to close the dome shell's final ring with a top cap fan; acceptance requires zero dome boundary edges across LOD1/LOD2/LOD3.
+- [x] Entrance stair changed from elevated over-height slabs to ground-based filled stair blocks whose top stays at the configured total rise.
+- [ ] Confirm the new candidate hash, per-LOD topology/test result and fresh 13-view renders before accepting the correction.
+- [ ] Human visual review of stair treads and dome profile against the licensed, uncalibrated images remains required.

@@ -27,3 +27,11 @@ Published descriptions vary on storey count and floor-area definition. The model
 ## Contrast / large-model lighting correction
 
 The headless renderer uses a dark neutral studio background, AgX medium-high contrast, and key-light energy scaled against imported model bounds (with a finite 8 MW guard) so large pale facades are not lost against the background. This improves inspection visibility; it does not imply visual similarity to a real building.
+
+## Geometry correction from the first 13-view review
+
+The first candidate exposed two concrete issues, now addressed in the generator:
+- The dome shell's last profile ring was left open. LOD generation now adds a cap fan to the top tip; regression QA requires zero open boundary edges for the Dome mesh.
+- Stair blocks previously started at progressively higher Y values while also increasing height, creating an overhanging solid stack. The corrected staircase uses ground-based cumulative fill blocks at progressively higher tread elevations, capped at the configured total rise; regression QA checks the entrance-stair bounding height against that parameter.
+
+These source changes require a new exact-hash GLB, QA report and full 13-view render before they are accepted. The overall footprint, wing proportions, dome dimensions and colors remain provisional visual estimates.

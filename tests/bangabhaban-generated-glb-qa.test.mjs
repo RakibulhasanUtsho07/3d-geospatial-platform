@@ -35,6 +35,21 @@ test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA",
     assert.equal(details.topology.connectedComponentCount, 1);
     assert.equal(details.topology.boundaryEdgeCount, 0);
     assert.equal(details.topology.nonManifoldEdgeCount, 0);
+
+    const dome = gltf.nodes.find(node => node.name === "Dome");
+    assert.ok(dome, "semantic Dome node is required");
+    const domeDetails = report.meshDetails.find(d => d.meshIndex === dome.mesh && d.primitiveIndex === 0);
+    assert.ok(domeDetails?.topology?.topologyAnalyzed);
+    assert.equal(domeDetails.topology.boundaryEdgeCount, 0,
+      label + " dome shell must not retain an open top-ring boundary");
+
+    const stair = gltf.nodes.find(node => node.name === "EntranceStair");
+    assert.ok(stair, "semantic EntranceStair node is required");
+    const stairPosition = gltf.accessors[gltf.meshes[stair.mesh].primitives[0].attributes.POSITION];
+    assert.ok(stairPosition.min[1] >= -1e-6, label + " stair should start at model ground");
+    const parameters = JSON.parse(await readFile(path.join(root, "data/heritage/bangabhaban.parameters.json"), "utf8"));
+    assert.ok(stairPosition.max[1] <= parameters.provisionalDimensions.stairRiseM.value + 1e-5,
+      label + " stair risers must use the configured total rise, not cumulative overheight");
   }
 });
 test("default Bangabhaban GLB is byte-identical to LOD3 and manifest pins the GLB hash", async () => {
