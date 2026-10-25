@@ -122,6 +122,7 @@ jobs:
       - name: Start the map with the generated offline road extract
         env:
           DHAKA_ROADS_EXTRACT_PATH: artifacts/offline-road/data/dhaka-road-network-v1.json
+          MAP_BENCHMARK_OUT_DIR: artifacts/offline-road/baseline
         shell: bash
         run: |
           set -euo pipefail
