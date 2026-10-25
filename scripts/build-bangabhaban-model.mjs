@@ -333,7 +333,10 @@ function toGlb(parts,lod) {
     materials:MATERIALS.map(m=>({name:m.name,doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[parseInt(m.color.slice(1,3),16)/255,parseInt(m.color.slice(3,5),16)/255,parseInt(m.color.slice(5,7),16)/255,1],metallicFactor:0,roughnessFactor:m.roughness}})),
     buffers:[{byteLength:bin.length}],bufferViews,accessors,
   };
-  const json=pad4(Buffer.from(JSON.stringify(gltf),"utf8")),binChunk=pad4(bin),total=12+8+json.length+8+binChunk.length;
+  const jsonRaw=Buffer.from(JSON.stringify(gltf),"utf8");
+  const jsonPadding=(4-jsonRaw.length%4)%4;
+  const json=jsonPadding?Buffer.concat([jsonRaw,Buffer.alloc(jsonPadding,0x20)]):jsonRaw;
+  const binChunk=pad4(bin),total=12+8+json.length+8+binChunk.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
   const jsonHeader=Buffer.alloc(8);jsonHeader.writeUInt32LE(json.length,0);jsonHeader.writeUInt32LE(0x4e4f534a,4);
   const binHeader=Buffer.alloc(8);binHeader.writeUInt32LE(binChunk.length,0);binHeader.writeUInt32LE(0x004e4942,4);

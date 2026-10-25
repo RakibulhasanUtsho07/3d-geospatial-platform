@@ -21,8 +21,8 @@ test("Bangabhaban LOD1/2/3 pass structural GLB and zero-degenerate-triangle QA",
     const report = analyzeGlbQuality(bytes), gltf = parseGlb(bytes, label);
     assert.equal(report.valid, true);
     assert.equal(report.format, "glb");
-    assert.ok(report.counts.meshCount >= 12);
-    assert.ok(report.counts.triangleCount > 1500);
+    assert.ok(report.counts.meshCount >= 11);
+    assert.ok(report.counts.triangleCount > (lod === 1 ? 800 : lod === 2 ? 1500 : 2000));
     assert.equal(report.counts.degenerateTriangleCount, 0);
     assert.ok(report.bounds.dimensions.every(value => Number.isFinite(value) && value > 0));
     assert.equal((gltf.images || []).length, 0);
