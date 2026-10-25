@@ -195,10 +195,10 @@ def main():
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
-        # Low-angle (~8 degree) south-elevation camera prioritizes the facade.
-        # The previous 20 degree view exposed too much flat roof deck and visually masked the upper arcade.
-        # The stair run itself slopes steeply enough for its tread rhythm to remain visible.
-        ("front", Vector((0.0, -0.990268, 0.139173)), "ORTHO"),
+        # Near-level (~2.5 degree) south-elevation view keeps the facade dominant.
+        # The 8-degree render still projected the full roof depth into a broad blank band above the arcade.
+        # At 2.5 degrees, roof-depth projection is smaller; the other 12 views retain roof context.
+        ("front", Vector((0.0, -0.999048, 0.043619)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),

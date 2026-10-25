@@ -219,8 +219,8 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
-  assert.ok(renderer.includes('("front", Vector((0.0, -0.990268, 0.139173)), "ORTHO")'));
-  assert.ok(renderer.includes("Low-angle (~8 degree) south-elevation camera prioritizes the facade."));
+  assert.ok(renderer.includes('("front", Vector((0.0, -0.999048, 0.043619)), "ORTHO")'));
+  assert.ok(renderer.includes("Near-level (~2.5 degree) south-elevation view limits blank roof-depth projection over the facade."));
   assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.45'));
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
   assert.ok(renderer.includes("light_power * 0.33, light_size * 1.05"));
