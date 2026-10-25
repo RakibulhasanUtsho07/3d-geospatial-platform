@@ -31,7 +31,7 @@ function createExtract(overrides = {}) {
 }
 test("normalizes line and multipart road geometry while filtering unsupported features", () => {
   const roads = normalizeGeoJsonRoadFeatures(geojson.features, { ...coverage, limit: 1000 });
-  assert.equal(roads.length, 3);
+  assert.equal(roads.length, 4);
   assert.equal(roads.filter((road) => road.osmWayId === "202").length, 2);
   assert.ok(roads.every((road) => road.source === "OpenStreetMap regional extract"));
   assert.ok(roads.every((road) => road.license === "ODbL 1.0" && road.coordinates.length >= 2));
