@@ -39,7 +39,21 @@ try {
     throw new Error("Published SHA-1 mismatch: expected " + source.expectedSha1 + ", got " + sha1);
   }
   await mkdir(outputDir, { recursive: true });
-  await writeFile(imagePath, bytes, { flag: "wx" });
+  // Idempotent reruns: reuse an existing verified image, but fail closed if it differs.
+  let existingBytes = null;
+  try {
+    existingBytes = await readFile(imagePath);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  if (existingBytes) {
+    const existingSha256 = createHash("sha256").update(existingBytes).digest("hex");
+    if (existingBytes.byteLength !== bytes.byteLength || existingSha256 !== sha256) {
+      throw new Error("Existing reference file differs from the verified source; refusing to overwrite it.");
+    }
+  } else {
+    await writeFile(imagePath, bytes, { flag: "wx" });
+  }
   const manifest = {
     schemaVersion: "1.0.0",
     sourceId: source.id,
@@ -62,7 +76,19 @@ try {
       "Do not claim multi-view photogrammetry or architectural fidelity from this file alone.",
     ],
   };
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", { flag: "wx" });
+  const manifestText = JSON.stringify(manifest, null, 2) + "\n";
+  let existingManifest = null;
+  try {
+    existingManifest = await readFile(manifestPath, "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  if (existingManifest !== null && existingManifest !== manifestText) {
+    throw new Error("Existing reference manifest differs from the newly verified manifest; refusing to overwrite it.");
+  }
+  if (existingManifest === null) {
+    await writeFile(manifestPath, manifestText, { flag: "wx" });
+  }
   console.log(JSON.stringify({ imagePath, manifestPath, byteLength: bytes.byteLength, sha1, sha256, verified: true }, null, 2));
 } catch (error) {
   console.error(JSON.stringify({ verified: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
