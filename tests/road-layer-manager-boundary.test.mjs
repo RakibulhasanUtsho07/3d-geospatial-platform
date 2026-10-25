@@ -55,7 +55,7 @@ test("RoadLayerManager owns cache, cancellation, rendering and request telemetry
 });
 
 test("road lifecycle APIs abort stale work and clear per-viewport state", () => {
-  assert.match(manager, /setVisible\(visible: boolean\)[\s\S]*?if \(!visible\) this\.cancelPendingRequest\(\)/);
+  assert.match(manager, /setVisible\(visible: boolean\)[\s\S]*?if \(!visible\) \{[\s\S]*?this\.cancelPendingRequest\(\);[\s\S]*?this\.clearFailedRequestCooldown\(\);[\s\S]*?\}/);
   assert.match(manager, /cancelPendingRequest\(\): void[\s\S]*?this\.roadRequestAbortController\?\.abort\(\)/);
   assert.match(manager, /destroy\(\): void[\s\S]*?this\.roadByEntityId\.clear\(\)[\s\S]*?this\.loadedRoadBounds = null/);
 });
