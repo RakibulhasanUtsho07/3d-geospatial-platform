@@ -11,6 +11,8 @@ on:
       - 'scripts/build-bangabhaban-topology-audit.mjs'
       - 'scripts/fetch-bangabhaban-reference-pack.mjs'
       - 'scripts/blender/render-building-review.py'
+      - 'scripts/build-render-contact-sheet.mjs'
+      - 'tests/build-render-contact-sheet.test.mjs'
       - 'scripts/render-building-review-views.mjs'
       - 'tests/bangabhaban-*.mjs'
       - 'package.json'
@@ -71,10 +73,15 @@ jobs:
             artifacts/bangabhaban-qa/topology-audit.json \
             docs/heritage/bangabhaban-topology-audit.md
 
-      - name: Install Blender and contact-sheet libraries
+      - name: Install cached Blender 4.0.2
+        uses: bradyajohnston/setup-blender@v5
+        with:
+          version: 4.0.2
+
+      - name: Verify Blender runtime
         run: |
-          timeout 60s sudo apt-get update -qq || echo 'Using runner package index if update times out.'
-          DEBIAN_FRONTEND=noninteractive timeout 900s sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          blender --version
+          blender --background --factory-startup --python-expr "import bpy; assert bpy.app.version == (4, 0, 2), bpy.app.version_string; print('Verified Blender', bpy.app.version_string)"
 
       - name: Render all 13 deterministic views
         env:
@@ -91,25 +98,12 @@ jobs:
           mkdir -p artifacts/bangabhaban-render-set/reference-pack
           cp -R artifacts/bangabhaban-reference-pack/. artifacts/bangabhaban-render-set/reference-pack/
 
-      - name: Build labeled contact sheet
+      - name: Build validated labeled contact sheet
         run: |
-          python3 - <<'PY'
-          from PIL import Image, ImageDraw
-          from pathlib import Path
-          root = Path("artifacts/bangabhaban-render-set")
-          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
-          thumb, label_h, cols = 256, 28, 4
-          rows = (len(views) + cols - 1) // cols
-          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 239, 232))
-          draw = ImageDraw.Draw(sheet)
-          for i, view_id in enumerate(views):
-              with Image.open(root / (view_id + ".png")) as source:
-                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
-              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
-              sheet.paste(image, (x, y))
-              draw.text((x + 8, y + thumb + 6), view_id, fill=(30, 30, 30))
-          sheet.save(root / "contact-sheet.png", optimize=True)
-          PY
+          node scripts/build-render-contact-sheet.mjs \
+            artifacts/bangabhaban-render-set \
+            artifacts/bangabhaban-render-set/contact-sheet.png \
+            1024
 
       - name: Record exact model, references, QA and render hashes
         env:
