@@ -87,7 +87,7 @@ export function validateOfflineRoadExtract(value) {
       || (value.source.sourceSha256 !== null && value.source.sourceSha256 !== undefined
         && (typeof value.source.sourceSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.source.sourceSha256)))
       || (value.source.normalizationInputSha256 !== null && value.source.normalizationInputSha256 !== undefined
-        && (typeof value.source.normalizationInputSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.source.normalizationInputSha256))) {
+        && (typeof value.source.normalizationInputSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(value.source.normalizationInputSha256)))) {
     throw new TypeError("Offline road extract source metadata must include HTTPS source, extract date, ODbL 1.0 and OpenStreetMap attribution.");
   }
   let sourceUrl;
