@@ -70,9 +70,12 @@ export function validateRealDhakaBaselineReport(report, options = {}) {
     }
   }
 
-  if (!Array.isArray(report.runs) || report.runs.length !== EXPECTED_RUNS.length) {
-    addError(errors, "Exactly six measured runs (three cold and three warm) are required.");
+  if (!Array.isArray(report.runs)) {
+    addError(errors, "The report runs field must be an array.");
     return errors;
+  }
+  if (report.runs.length !== EXPECTED_RUNS.length) {
+    addError(errors, "Exactly six measured runs (three cold and three warm) are required.");
   }
 
   if (!isRecord(report.summary)) {
