@@ -332,7 +332,30 @@ function toGlb(parts,lod) {
     const primitives=[];
     for(const [materialName,g] of groups.entries()){
       if(!g.indices.length)continue;
-      const positions=Float32Array.from(g.positions),normals=Float32Array.from(g.normals),indices=Uint32Array.from(g.indices);
+      const compactPositions=[],compactNormals=[],compactIndices=[],vertexIndexByKey=new Map();
+      for(const sourceIndex of g.indices){
+        const sourceOffset=sourceIndex*3;
+        const vertex=[
+          Math.fround(g.positions[sourceOffset]),
+          Math.fround(g.positions[sourceOffset+1]),
+          Math.fround(g.positions[sourceOffset+2]),
+          Math.fround(g.normals[sourceOffset]),
+          Math.fround(g.normals[sourceOffset+1]),
+          Math.fround(g.normals[sourceOffset+2]),
+        ];
+        const key=vertex.join(",");
+        let compactIndex=vertexIndexByKey.get(key);
+        if(compactIndex===undefined){
+          compactIndex=compactPositions.length/3;
+          vertexIndexByKey.set(key,compactIndex);
+          compactPositions.push(vertex[0],vertex[1],vertex[2]);
+          compactNormals.push(vertex[3],vertex[4],vertex[5]);
+        }
+        compactIndices.push(compactIndex);
+      }
+      const positions=Float32Array.from(compactPositions),normals=Float32Array.from(compactNormals);
+      const indexComponentType=positions.length/3<=65536?5123:5125;
+      const indices=indexComponentType===5123?Uint16Array.from(compactIndices):Uint32Array.from(compactIndices);
       const posView=appendView(Buffer.from(positions.buffer,positions.byteOffset,positions.byteLength),34962);
       const normalView=appendView(Buffer.from(normals.buffer,normals.byteOffset,normals.byteLength),34962);
       const indexView=appendView(Buffer.from(indices.buffer,indices.byteOffset,indices.byteLength),34963);
@@ -343,7 +366,7 @@ function toGlb(parts,lod) {
       const posAccessor=accessors.length;
       accessors.push({bufferView:posView,componentType:5126,count:positions.length/3,type:"VEC3",min,max});
       const normalAccessor=accessors.length;accessors.push({bufferView:normalView,componentType:5126,count:normals.length/3,type:"VEC3"});
-      const indexAccessor=accessors.length;accessors.push({bufferView:indexView,componentType:5125,count:indices.length,type:"SCALAR"});
+      const indexAccessor=accessors.length;accessors.push({bufferView:indexView,componentType:indexComponentType,count:indices.length,type:"SCALAR"});
       primitives.push({attributes:{POSITION:posAccessor,NORMAL:normalAccessor},indices:indexAccessor,material:MATERIALS.findIndex(m=>m.name===materialName),mode:4});
     }
     if(primitives.length){
