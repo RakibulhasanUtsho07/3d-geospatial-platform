@@ -11,21 +11,30 @@ import type {
   RoadFeature,
   RoadNetworkRequest,
 } from "@/core/geospatial/road-network.mjs";
+import {
+  fetchOverpassElements,
+  resolveOverpassEndpoints,
+} from "@/core/geospatial/overpass-road-provider.mjs";
 
-type CachedRoads = { expiresAt: number; roads: RoadFeature[] };
+type RoadQueryResult = {
+  roads: RoadFeature[];
+  detailLevel: "full" | "reduced";
+  upstreamAttempts: number;
+  upstreamEndpoint: string;
+};
+type CachedRoads = { expiresAt: number; payload: RoadQueryResult };
 type UpstreamFailure = Error & { statusCode?: number; retryAfter?: string };
 type InFlightRoadRequest = {
   controller: AbortController;
   consumers: number;
   settled: boolean;
-  promise: Promise<RoadFeature[]>;
+  promise: Promise<RoadQueryResult>;
 };
 
-const DEFAULT_OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 24;
 const MAX_CONCURRENT_REQUESTS = 1;
-const UPSTREAM_TIMEOUT_MS = 22_000;
+const UPSTREAM_TIMEOUT_MS = 9_000;
 const responseCache = new Map<string, CachedRoads>();
 const inFlightRequests = new Map<string, InFlightRoadRequest>();
 let activeRequests = 0;
@@ -38,103 +47,73 @@ function isAbortError(error: unknown): boolean {
 }
 
 
-function getOverpassUrl(): string {
-  const candidate = process.env.OVERPASS_API_URL?.trim() || DEFAULT_OVERPASS_URL;
-  let parsed: URL;
-  try {
-    parsed = new URL(candidate);
-  } catch {
-    throw new Error("OVERPASS_API_URL must be a valid HTTPS URL.");
-  }
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
-    throw new Error("OVERPASS_API_URL must be an HTTPS URL without embedded credentials.");
-  }
-  return parsed.toString();
-}
-
-function remember(key: string, roads: RoadFeature[]): void {
+function remember(key: string, payload: RoadQueryResult): void {
   responseCache.delete(key);
   while (responseCache.size >= MAX_CACHE_ENTRIES) {
     const oldest = responseCache.keys().next().value;
     if (oldest === undefined) break;
     responseCache.delete(oldest);
   }
-  responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, roads });
+  responseCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
 }
 
-async function queryRoads(request: RoadNetworkRequest, upstreamSignal: AbortSignal): Promise<RoadFeature[]> {
-  let response: Response;
-  try {
-    response = await fetch(getOverpassUrl(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        Accept: "application/json",
-        "User-Agent": "3D-Geospatial-Platform/0.1 (https://github.com/RakibulhasanUtsho07/3d-geospatial-platform)",
-      },
-      body: new URLSearchParams({ data: buildOverpassRoadQuery(request) }).toString(),
-      cache: "no-store",
-      signal: AbortSignal.any([upstreamSignal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]),
+async function queryRoads(request: RoadNetworkRequest, upstreamSignal: AbortSignal): Promise<RoadQueryResult> {
+  const upstream = await fetchOverpassElements({
+    endpoints: resolveOverpassEndpoints(process.env),
+    queries: [
+      buildOverpassRoadQuery(request),
+      buildOverpassRoadQuery({ ...request, limit: Math.min(request.limit, 350) }, { detailLevel: "reduced" }),
+    ],
+    signal: upstreamSignal,
+    timeoutMs: UPSTREAM_TIMEOUT_MS,
+    userAgent: "3D-Geospatial-Platform/0.1 (https://github.com/RakibulhasanUtsho07/3d-geospatial-platform)",
+  });
+  if (upstream.attempts > 1) {
+    console.warn("[Roads] Primary Overpass query failed; reduced-query fallback succeeded.", {
+      attempts: upstream.attempts,
+      detailLevel: upstream.detailLevel,
     });
-  } catch (error: unknown) {
-    const errorName = typeof error === "object" && error !== null && "name" in error
-      ? error.name
-      : null;
-    if (errorName === "AbortError") throw error;
-    const timeout = errorName === "TimeoutError";
-    throw Object.assign(
-      new Error(timeout ? "The OpenStreetMap road query timed out." : "The OpenStreetMap road service is temporarily unreachable."),
-      { statusCode: timeout ? 504 : 502 },
-    ) as UpstreamFailure;
   }
-
-  if (!response.ok) {
-    const overloaded = response.status === 429 || response.status === 503 || response.status === 504;
-    throw Object.assign(
-      new Error(overloaded
-        ? "The shared OpenStreetMap road query service is busy. Please retry shortly."
-        : "The OpenStreetMap road service returned HTTP " + response.status + "."),
-      {
-        statusCode: overloaded ? 503 : 502,
-        retryAfter: overloaded ? (response.headers.get("retry-after") ?? "30") : undefined,
-      },
-    ) as UpstreamFailure;
-  }
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    throw Object.assign(new Error("The OpenStreetMap road service returned invalid JSON."), { statusCode: 502 }) as UpstreamFailure;
-  }
-  if (!payload || typeof payload !== "object" || !("elements" in payload) || !Array.isArray(payload.elements)) {
-    throw Object.assign(new Error("The OpenStreetMap road response is missing its elements array."), { statusCode: 502 }) as UpstreamFailure;
-  }
-  return normalizeOverpassRoadElements(payload.elements, request);
+  return {
+    roads: normalizeOverpassRoadElements(upstream.elements, request),
+    detailLevel: upstream.detailLevel,
+    upstreamAttempts: upstream.attempts,
+    upstreamEndpoint: upstream.endpoint,
+  };
 }
 
-function respond(roads: RoadFeature[], request: RoadNetworkRequest, cacheStatus: "HIT" | "MISS" | "COALESCED"): Response {
+function respond(
+  payload: RoadQueryResult,
+  request: RoadNetworkRequest,
+  cacheStatus: "HIT" | "MISS" | "COALESCED",
+  upstreamAttempts = payload.upstreamAttempts,
+): Response {
   return NextResponse.json(
     {
       dataStatus: "openstreetmap-road-network",
+      detailLevel: payload.detailLevel,
       bbox: {
         west: request.west,
         south: request.south,
         east: request.east,
         north: request.north,
       },
-      count: roads.length,
-      results: roads,
+      count: payload.roads.length,
+      results: payload.roads,
       source: "OpenStreetMap via Overpass API",
       license: "ODbL 1.0",
       attribution: "© OpenStreetMap contributors",
-      note: "Road geometry reflects mapped OpenStreetMap centerlines and tags. Unmapped/private roads, incomplete widths and stale tags remain possible. Rendered road widths are sourced where tagged, otherwise estimated from highway class/lanes.",
+      note: payload.detailLevel === "reduced"
+        ? "Road geometry is a reduced fallback after the primary query failed; some local, service and pedestrian roads may be omitted. Unmapped/private roads and stale tags remain possible."
+        : "Road geometry reflects mapped OpenStreetMap centerlines and tags. Unmapped/private roads, incomplete widths and stale tags remain possible. Rendered road widths are sourced where tagged, otherwise estimated from highway class/lanes.",
     },
     {
       headers: {
         "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
         "X-Road-Network-Cache": cacheStatus,
-        "X-Road-Network-Count": String(roads.length),
+        "X-Road-Network-Count": String(payload.roads.length),
+        "X-Road-Network-Upstream-Attempts": String(upstreamAttempts),
+        "X-Road-Network-Detail-Level": payload.detailLevel,
       },
     },
   );
@@ -152,7 +131,7 @@ export async function GET(request: Request): Promise<Response> {
   if (cached && cached.expiresAt > Date.now()) {
     responseCache.delete(key);
     responseCache.set(key, cached);
-    return respond(cached.roads, bounds, "HIT");
+    return respond(cached.payload, bounds, "HIT", 0);
   }
   if (cached) responseCache.delete(key);
 
@@ -175,18 +154,18 @@ export async function GET(request: Request): Promise<Response> {
       controller,
       consumers: 0,
       settled: false,
-      promise: Promise.resolve([]),
+      promise: Promise.resolve({ roads: [], detailLevel: "full", upstreamAttempts: 0, upstreamEndpoint: "" }),
     };
     activeRequests += 1;
     entry.promise = queryRoads(bounds, controller.signal)
-      .then((roads) => {
+      .then((payload) => {
         // A disconnected final consumer must not populate the cache with a
         // response that no active viewport still needs.
         if (controller.signal.aborted) {
           throw new DOMException("Road request was aborted.", "AbortError");
         }
-        remember(key, roads);
-        return roads;
+        remember(key, payload);
+        return payload;
       })
       .finally(() => {
         entry.settled = true;
@@ -205,9 +184,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const roads = await entry.promise;
+    const payload = await entry.promise;
     if (request.signal.aborted) return new Response(null, { status: 499 });
-    return respond(roads, bounds, cacheStatus);
+    return respond(payload, bounds, cacheStatus, payload.upstreamAttempts);
   } catch (error: unknown) {
     if (request.signal.aborted || isAbortError(error)) {
       return new Response(null, { status: 499 });
