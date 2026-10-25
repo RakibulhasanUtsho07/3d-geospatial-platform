@@ -66,7 +66,26 @@
         "independent dimension survey",
         "facade texture without confirming resolution and suitability"
       ],
-      "notes": "Commons page records a free-use permission and CC BY-SA 4.0; download and hash the exact file before using it in reproducible tests."
+      "notes": "Commons page records a free-use permission and CC BY-SA 4.0; download and hash the exact file before using it in reproducible tests.",
+      "viewAssessment": {
+        "viewpoint": "aerial image; unknown exact pose",
+        "visibleFeatures": [
+          "compound orientation",
+          "broad roof/building massing"
+        ],
+        "occlusions": [
+          "perspective and surrounding buildings obscure parts of the lower facade"
+        ],
+        "cameraCalibration": "unknown",
+        "captureCoordinates": "unknown",
+        "geometryUse": "qualitative visual comparison only",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "calibrated photogrammetry",
+          "texture projection without review"
+        ],
+        "assessedAt": "2026-10-25"
+      }
     },
     {
       "id": "licensed-exterior-2017",
