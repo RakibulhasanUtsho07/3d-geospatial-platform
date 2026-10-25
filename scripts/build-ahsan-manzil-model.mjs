@@ -736,11 +736,12 @@ function buildGlb(lod) {
   box(n.Andarmahal,andarCenterX,andarGf.base+andarGf.height+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
   box(n.Andarmahal,andarCenterX,andarFf.base+andarFf.height+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
 
-  // Separate roof decks keep the stepped footprint explicit and give the older
-  // Andarmahal a slightly lower roofline than the river-facing Rangmahal.
+  // Keep flat roof planes in a dedicated semantic node. The focused front-detail
+  // render can hide this broad horizontal plane while preserving it in the GLB
+  // and all whole-model views; the visible cornice/parapet remains in Parapet.
   const rangCenterX = (split + xMax) / 2;
-  box(n.Parapet,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
-  box(n.Parapet,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
+  box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
+  box(n.RoofDeck,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
 
   for(const side of [-1,1]){
     const rangZ=side*(half+.12);

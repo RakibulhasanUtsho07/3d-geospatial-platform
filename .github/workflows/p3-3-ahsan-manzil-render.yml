@@ -150,7 +150,7 @@ jobs:
               "10.5 m estimated octagonal drum with proportionally scaled 5.25 m maximum dome radius and unchanged 6.53 m profile height",
               "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
               "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
-              "use a straight-on 0-degree south-elevation camera to minimize roof-depth projection; retain 12 roof-context and oblique views"
+              "separate the flat RoofDeck node and hide it only for the front-detail render; the GLB and 12 whole-model views retain the full roof geometry"
             ],
             model: {
               filename: "ahsan-manzil-lod3.glb",
@@ -198,12 +198,12 @@ jobs:
                 "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
                 "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
                 "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
-                "The front review camera is now straight-on at 0 degrees to avoid projecting roof depth over the facade; 12 other views preserve roof and oblique context. This camera change is not a geometry-accuracy claim.",
+                "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
                 "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
                 "Human review of the exact generated 13-view contact sheet found the top view dominated by a broad, nearly blank roof deck with insufficient roof-level architectural detail; visual completeness is not accepted.",
                 "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
                 "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
-                "The straight-on front view, narrower portico/stair landing, and scaled dome profile form one photo-proportion correction pass; dimensions remain estimates and need rectified-elevation or independent survey confirmation.",
+                "The narrowed portico/stair landing, scaled dome profile, and detail-only RoofDeck visibility policy are compared against the three hash-pinned images; all dimensions remain estimates pending rectified elevation or independent survey.",
                 "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
                 "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
               ],

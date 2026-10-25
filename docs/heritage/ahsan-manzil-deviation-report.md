@@ -15,7 +15,7 @@
 | `scripts/build-ahsan-manzil-model.mjs` | Reproducible source-controlled GLB generator |
 | `tests/heritage-model.test.mjs` | GLB/node/parameter/navigation/LOD integrity tests |
 
-Build assets with `npm run build:heritage-model`. All models include nodes `Plinth`, `Rangmahal_GF`, `Rangmahal_FF`, `Portico_S`, `Portico_N`, `Stair_S`, `Veranda_S`, `Veranda_N`, `Parapet`, `Dome_Drum`, `Dome`, `Finial`, `Andarmahal`.
+Build assets with `npm run build:heritage-model`. All models include nodes `Plinth`, `Rangmahal_GF`, `Rangmahal_FF`, `Portico_S`, `Portico_N`, `Stair_S`, `Veranda_S`, `Veranda_N`, `RoofDeck`, `Parapet`, `Dome_Drum`, `Dome`, `Finial`, `Andarmahal`. `RoofDeck` contains flat roof planes separately from cornices/parapets so the facade-detail render can omit only the plane while whole-model views and the map GLB retain the complete geometry.
 
 ## Coordinate system and runtime behavior
 

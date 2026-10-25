@@ -151,6 +151,9 @@ def main():
     # Match the real-world river-facing reference: the canonical front image is
     # a detail view of Rangmahal, not a full-footprint view with the rear-set
     # Andarmahal extension shifting the dome away from the centre of the frame.
+    # RoofDeck is intentionally not in this allowlist: its flat plane is hidden
+    # only in the facade-detail render so it cannot blanket the facade or steps.
+    # Whole-model views restore it and retain the complete generated roof geometry.
     rangmahal_review_names = {
         "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
         "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
@@ -195,9 +198,9 @@ def main():
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
-        # Straight-on (0 degree) south-elevation view minimizes blank roof-depth projection over the facade.
-        # The other 12 views retain roof context and oblique visibility for the dome and roofline.
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+        # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
+        # only from this facade-detail camera, while the other 12 views retain roof context.
+        ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),

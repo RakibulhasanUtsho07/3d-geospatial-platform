@@ -8,7 +8,7 @@ import { AHSAN_MANZIL_LOD_THRESHOLDS, AHSAN_MANZIL_CAMERA_TARGET, AHSAN_MANZIL_F
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredNodes = [
   "Plinth", "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
-  "Stair_S", "Veranda_S", "Veranda_N", "Parapet", "Dome_Drum", "Dome",
+  "Stair_S", "Veranda_S", "Veranda_N", "RoofDeck", "Parapet", "Dome_Drum", "Dome",
   "Finial", "Andarmahal",
 ];
 
@@ -74,6 +74,8 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes("Eight open arched bays"));
   assert.ok(builder.includes("addFacadeDisk("));
   assert.ok(builder.includes("const stairBaseWidth = DIM.stairWidth;"));
+  assert.ok(builder.includes('box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof")'),
+    "flat roof planes live in a dedicated node so front facade review can hide the plane without deleting roof geometry");
   assert.ok(builder.includes("const riserCenter=(riserBottom+riserTop)/2;"));
   assert.ok(builder.includes('box(stair,domeX,riserCenter,z,width,rise,stepDepth,"stair")'));
   assert.ok(builder.includes('box(stair,domeX,riserTop-.018,z+stepDepth*.32,width,.036,stepDepth*.16,"trim")'));
@@ -225,8 +227,9 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
-  assert.ok(renderer.includes('("front", Vector((0.0, -1.0, 0.0)), "ORTHO")'));
-  assert.ok(renderer.includes("Straight-on (0 degree) south-elevation view minimizes blank roof-depth projection over the facade."));
+  assert.ok(renderer.includes('("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO")'));
+  assert.ok(renderer.includes("Five-degree south-elevation view reveals stair treads; RoofDeck is excluded"));
+  assert.ok(renderer.includes("Whole-model views restore it and retain the complete generated roof geometry."));
   assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.45'));
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
   assert.ok(renderer.includes("light_power * 0.33, light_size * 1.05"));
