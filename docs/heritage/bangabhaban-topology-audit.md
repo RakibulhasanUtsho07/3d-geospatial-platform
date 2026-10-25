@@ -4,12 +4,12 @@ Decision: blocked-review-required. This is a geometry triage report, not a histo
 
 ## Candidate identity
 
-GLB SHA-256: a13513940519ee3b96641ed0eca08056f1a472e5b5d12ae955048b497cccf964
-GLB bytes: 722296
+GLB SHA-256: b51d01087e205b8051921cfc2427293309ff91e3180b3f6b4bcdfc2f4d2a0399
+GLB bytes: 743056
 Geometry QA status: review-recommended
-Triangles: 8444
+Triangles: 8684
 Degenerate triangles: 0
-Meshes / primitives: 15 / 18
+Meshes / primitives: 15 / 19
 
 ## Global warnings
 
@@ -32,6 +32,7 @@ Meshes / primitives: 15 / 18
 | 7 | DomeDrum | 128 | 1 | 0 | 0 | 128 | long-triangle-edges-present |
 | 8 | Dome | 864 | 1 | 0 | 0 | 48 | long-triangle-edges-present |
 | 9 | Finial | 336 | 2 | 0 | 0 | 24 | disconnected-mesh-components-present, long-triangle-edges-present |
+| 10 | Loggia | 240 | 20 | 0 | 0 | 0 | disconnected-mesh-components-present |
 | 10 | Loggia | 4552 | 284 | 0 | 0 | 0 | disconnected-mesh-components-present |
 | 10 | Loggia | 24 | 2 | 0 | 0 | 16 | disconnected-mesh-components-present, long-triangle-edges-present |
 | 11 | FacadeTrim | 168 | 14 | 0 | 0 | 0 | disconnected-mesh-components-present |

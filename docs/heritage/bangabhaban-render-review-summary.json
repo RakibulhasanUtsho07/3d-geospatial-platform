@@ -1,16 +1,16 @@
 {
   "task": "P3.3-Bangabhaban",
   "building": "Bangabhaban, Dhaka",
-  "sourceCommit": "73b3309fe25da4061ea5ab75b7b53e33cd6941de",
-  "reviewGeneratedAt": "2026-10-25T15:24:25.408Z",
+  "sourceCommit": "28f1aa86a49ca5c0ac156abda8e43efebf12a24a",
+  "reviewGeneratedAt": "2026-10-25T15:27:22.108Z",
   "model": {
     "filename": "bangabhaban-lod3.glb",
-    "sha256": "a13513940519ee3b96641ed0eca08056f1a472e5b5d12ae955048b497cccf964",
-    "byteLength": 722296
+    "sha256": "b51d01087e205b8051921cfc2427293309ff91e3180b3f6b4bcdfc2f4d2a0399",
+    "byteLength": 743056
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "c097a3c9e4b3c9d4c49dc1f444df3c0d931ae45d403c655a12042d22320eb781",
+    "sha256": "cabe7f31a1892b2ea053afa6f40ff5ff7cd296e45475843c010e4926bfc10822",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -37,14 +37,14 @@
   },
   "qa": {
     "geometry": {
-      "sha256": "eb6def7e814dfa8990c82c1ac38750f962b5395aa6ba4bf803d97b0c0470eabe",
+      "sha256": "e1c47eaffd9b220d35fb519e24f83395f12bcfbfe886ed9568881db20da1a63a",
       "status": "review-recommended",
       "valid": true,
       "counts": {
         "meshCount": 15,
-        "primitiveCount": 18,
-        "vertexCount": 25332,
-        "triangleCount": 8444,
+        "primitiveCount": 19,
+        "vertexCount": 26052,
+        "triangleCount": 8684,
         "degenerateTriangleCount": 0,
         "degenerateTriangleRatio": 0,
         "materialCount": 6,
@@ -59,7 +59,7 @@
       ]
     },
     "texture": {
-      "sha256": "3c47aef10642550513fa769b1851c4b345887e6bf4f7f305ff3a0bb2ee28fba1",
+      "sha256": "5c2a58219d1763809c5ef84c999a5b460348acb9225e5aa0aead9a8108b32358",
       "status": "review-recommended",
       "valid": true,
       "counts": {
@@ -68,7 +68,7 @@
         "textureCount": 0,
         "imageCount": 0,
         "texturedPrimitiveCount": 0,
-        "untexturedPrimitiveCount": 18,
+        "untexturedPrimitiveCount": 19,
         "uvAccessorCount": 0,
         "uvVertexCount": 0,
         "uvSeamCandidateCount": 0,
@@ -91,6 +91,7 @@
         "mesh-9-primitive-0-no-supported-material-textures",
         "mesh-10-primitive-0-no-supported-material-textures",
         "mesh-10-primitive-1-no-supported-material-textures",
+        "mesh-10-primitive-2-no-supported-material-textures",
         "mesh-11-primitive-0-no-supported-material-textures",
         "mesh-12-primitive-0-no-supported-material-textures",
         "mesh-12-primitive-1-no-supported-material-textures",
@@ -102,16 +103,16 @@
       ]
     },
     "topology": {
-      "sha256": "6338f40f39929b9a26155830b1f728f0f776370d1631112d2ecccfc6b1c64457",
+      "sha256": "79852f35cd026ee5a4218f7292844cc7414db0c32a0021deeb28b98213d4ca05",
       "releaseGate": "blocked-review-required",
       "summary": {
         "meshCount": 15,
-        "primitiveCount": 18,
-        "triangles": 8444,
+        "primitiveCount": 19,
+        "triangles": 8684,
         "degenerateTriangles": 0,
-        "meshesWithWarnings": 18,
+        "meshesWithWarnings": 19,
         "warningMeshCounts": {
-          "disconnected-mesh-components-present": 9,
+          "disconnected-mesh-components-present": 10,
           "long-triangle-edges-present": 14
         },
         "globalWarnings": [
@@ -169,91 +170,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "59066e8f9a3ece859b126ddf174bda4f7cb46593826157fe62930bd79d6c9007"
+      "sha256": "8e28976027a8970850baf3766fffcc1303d68778cb1d16497dd49648183cfee1"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "561334950f269b2544435372f0e44c2221034275504a9feef1d269269b8e6361"
+      "sha256": "44878fbd2edba33ac1a7a80cb329fb5f5ab921c47030399c1b20ff6abd3d9ce6"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "396eb86b78ab7ace9e5c87acbf97ef327e8830090a08b6fb4409eb77b9d47b74"
+      "sha256": "72a521fcfe0d26f142fc965a3546ebf9c5d88afbe7afc36626a941872f5cfe3b"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "6c9288a3e76382ced70de5e56586484d4833b5545a1843121b411bb4a480670f"
+      "sha256": "2e7dc9f8690a6214702bb20b9014d50d81d4dcde144602e8feaa57b68c200cb2"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "3f8e6120bccbd35ce04d7ef4a353e3f787032e008146308536476361a1640677"
+      "sha256": "26d9a9a661fd3c5b1451f3dfc7cdc46f4f58912aa0dc3eacb9a367ca5df6b9ab"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "225680dfd24f0fd1be91e1142b6724066309eede19c4d4635e5bac2e5e8f7644"
+      "sha256": "e502fef632dda6e3834550cd2f754d1f9f61c6f3b58ac68ec52d4c3b95c705eb"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b63764aa663fba8ca94fc0113e93f319c3ba670e2382b8016b631343a9164a51"
+      "sha256": "a55d1b16aab13acaf8e2f4e37da1771d5ed53477f0d7ee1ea6759e182fcb0c6e"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "e848ccf608589572ad3266d2475dc7d338f86d248ec07a7e793abb55c2c3a8a6"
+      "sha256": "c6207587d32cc9b4622a9ccdcb7008335f7e2fec45ac39861cbae2110e240bd3"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "6d6564dd32342f0a87f95a9439cb5b31ddd9fce168c216ee22ab41dc7fb61001"
+      "sha256": "b8c2b3c4df2683e71066e410135f06e02a9ef46a702365ce8c4f58401b05e8cf"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "99919d22e265658ca1c06cf87caa328cffc5a7bb82e85f3c3ee345cb308c13c1"
+      "sha256": "fa2df5a4ded3e86895ceb37b0a96de5ce1d79620ccbe49251e99741fcedc6a5f"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2380a43ed0df60ed9b9e5a0e7ba99bad412bdfd91535a912531a3e8567141a85"
+      "sha256": "b7ad475d74b63d52cfac82d5b255b8ccf7b3f348475efadaee211f24287c00f4"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "6c2c5c3664e6c40730e56ff3040799d6efa179bddf860b0599a3892a29901b04"
+      "sha256": "4e0bb1ae0bc3ca5c48b0d359584c8954de2d3989f9722d26ac6a0bbfddd46a3e"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "77d12feabf8ecfdf79b3ca3f7a11a1cb7daeb170e41c3ba15d1ba47c3955ec0b"
+      "sha256": "d5aa29294b46afb733d82737a3d78168fcb00e0b75c8148e3e1ee771ae6ce7fc"
     }
   ],
   "visualReview": {
