@@ -40,7 +40,7 @@
     "test:road-layer-manager": "node --test tests/road-layer-manager-boundary.test.mjs",
     "test:building-style": "node --test tests/building-style.test.mjs",
     "pretest:heritage-model": "npm run build:heritage-model",
-    "test:heritage-model": "node --test tests/heritage-model.test.mjs tests/ahsan-manzil-generated-glb-qa.test.mjs",
+    "test:heritage-model": "node --test tests/heritage-model.test.mjs tests/ahsan-manzil-generated-glb-qa.test.mjs tests/ahsan-manzil-topology-audit.test.mjs",
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
     "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
@@ -180,7 +180,9 @@
     "test:bangabhaban-reference-pack": "node --test tests/bangabhaban-reference-pack.test.mjs",
     "fetch:bangabhaban-reference": "node scripts/fetch-bangabhaban-reference.mjs",
     "fetch:ahsan-manzil-reference-pack": "node scripts/fetch-ahsan-manzil-reference-pack.mjs",
-    "test:ahsan-manzil-reference-pack": "node --test tests/ahsan-manzil-reference-pack.test.mjs"
+    "test:ahsan-manzil-reference-pack": "node --test tests/ahsan-manzil-reference-pack.test.mjs",
+    "audit:ahsan-manzil-topology": "node scripts/build-ahsan-manzil-topology-audit.mjs",
+    "test:ahsan-manzil-topology-audit": "node --test tests/ahsan-manzil-topology-audit.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
