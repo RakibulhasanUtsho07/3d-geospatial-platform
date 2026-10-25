@@ -1,8 +1,8 @@
 {
   "task": "P3.3-Bangabhaban",
   "building": "Bangabhaban, Dhaka",
-  "sourceCommit": "1b8651c6b591a013cc346c5ad49b93a3742e08a7",
-  "reviewGeneratedAt": "2026-10-25T15:16:58.797Z",
+  "sourceCommit": "31f0ed3a301b2584ccae34f82af8e50cd3441c83",
+  "reviewGeneratedAt": "2026-10-25T15:22:00.981Z",
   "model": {
     "filename": "bangabhaban-lod3.glb",
     "sha256": "5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673",
@@ -10,7 +10,7 @@
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "71c0c4045f026161c5ad2373cbea130784e8e2425919f85baa7cc910f0cabd83",
+    "sha256": "66b09fc62145be9f73df21c8cedda9c37e090528269341190a02a620d6b84cf8",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -172,91 +172,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d82ce6c85b827ff5cb521f7e0487855dc8af6b1fcc0a4e6fb21ee98b2e6c4685"
+      "sha256": "0ce21e006e873aa4b4383977bd52e0d7b444f452ce04acf21fa8b471be84feb8"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "16ed5f8266ee7dfda6635f8420b82851fe682d806b4d5f18817ca9899805d751"
+      "sha256": "a042ac81cf3b28285312cde206cb366ea6ce9e5bd24c9c1d597f01c509719221"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "ce350809cf207680ad5e7db81fc46b6784679ad7d3a98b37c2eff882acbad7df"
+      "sha256": "b61b8443782aa3c7fc699832ee8b2690f3fd47c0f7c1cbf3dbedf81ea36427ce"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "f6703afd2a584b29e6cfee44c42b5a885e713d277d74372416a2e6d005cb0fb4"
+      "sha256": "b10b22260e0ff52f8be51f0af069786dd20bd3761c8d2c30429676a8310bc805"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "36f61595fc0ea49f39c5e1d454ede09e59ed673998a2bf3f47d5b6003139404d"
+      "sha256": "327ab408c154bcfe2e6a79ecbbbd3c85df53942043760afb263919d6606f71e9"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "bb26b657f2a89fb40e1533786b7b9f8334eb822751ee4ccef0f4a4fff04fad26"
+      "sha256": "611b1b08e2810516f20068f051b7c71945bf42e6786e23c93a0541242d061ba8"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "5b3dbbf820dec7c9183b438b649bccab573215801e962ab4ad74d5af0a3b8530"
+      "sha256": "510fa52ce05f509a6bb8eeb335dac7fbf8dc0e27843ecab7dd112642a030f6c5"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d58f49ebc406e159e4ce47e9670a99abecc9b11d16244d2b9dfeb81ab784be1e"
+      "sha256": "1e8c3345395dbc4b297d9d0531d5dcd5cb57c5c75233ea3f04d5002972327fba"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b56512f7e9b54fea40d4a9b45d097c71c64cdc0b23a0bb92d2fac7bb02285eab"
+      "sha256": "a33543b3a89cdb637fa1c2e436ce342020246dca19af6c8167ebebecde72c245"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "e969a172f8816bc59c89ca742e82fab704a2330874744fda911b1e7d051dfc6e"
+      "sha256": "2577016f0ea301ad5654f91a875dfe978a521e406309a37a9fe52895c4655dfd"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "3489460de248dec41a1d862197bb32cc4997e6e693ff6904c18cefeeb19a6830"
+      "sha256": "047216c2fa3ab8d723e7cc4a5eaa4a8aa4aac63932facd8cf397c54a5e1ec8d3"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "4539bb5cc42843258b67a99960ecac9db258cdcac9ea46ae87c498d166469672"
+      "sha256": "b5805c7a7c7d610f1a582bec10e4c25a4d8e9f7606d793b35baffd8d23074b8a"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2376625c5acb4e935558d866fee8681f72e879cadf0a9427cb07e853a2989dce"
+      "sha256": "d105616065294c70e4e6c555be781cfd3fa1e3c6263eb97ef1a44095b8d72fc7"
     }
   ],
   "visualReview": {
