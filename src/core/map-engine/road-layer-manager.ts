@@ -1,7 +1,10 @@
 import type { RoadFeature } from "../geospatial/road-network.mjs";
 import { flattenRoadCoordinates } from "../geospatial/flatten-road-coordinates.mjs";
 import { resolveRoadVisualStyle } from "./road-visual-style.mjs";
-import { shouldCancelRoadRequestForCachedViewport } from "./road-network-request-policy.mjs";
+import {
+  shouldCancelRoadRequestForCachedViewport,
+  shouldSkipFailedRoadViewportRetry,
+} from "./road-network-request-policy.mjs";
 import type {
   MapPerformanceMetric,
   MapPerformanceOutcome,
@@ -9,6 +12,8 @@ import type {
 
 type CesiumModule = typeof import("cesium");
 type CesiumViewer = import("cesium").Viewer;
+
+const ROAD_FAILURE_COOLDOWN_MS = 60_000;
 
 export type RoadViewportBounds = {
   west: number;
@@ -48,6 +53,8 @@ export class RoadLayerManager {
   private roadRequestAbortController: AbortController | null = null;
   private activeRoadRequestKey: string | null = null;
   private loadedRoadBounds: RoadViewportBounds | null = null;
+  private lastFailedRoadRequestKey: string | null = null;
+  private failedRoadRetryAfterMs = 0;
 
   getDataSource(): import("cesium").CustomDataSource | null {
     return this.roadNetworkDataSource;
@@ -61,7 +68,15 @@ export class RoadLayerManager {
     if (this.roadNetworkDataSource) {
       this.roadNetworkDataSource.show = visible;
     }
-    if (!visible) this.cancelPendingRequest();
+    if (!visible) {
+      this.cancelPendingRequest();
+      this.clearFailedRequestCooldown();
+    }
+  }
+
+  private clearFailedRequestCooldown(): void {
+    this.lastFailedRoadRequestKey = null;
+    this.failedRoadRetryAfterMs = 0;
   }
 
   cancelPendingRequest(): void {
@@ -72,6 +87,7 @@ export class RoadLayerManager {
 
   destroy(): void {
     this.cancelPendingRequest();
+    this.clearFailedRequestCooldown();
     this.roadByEntityId.clear();
     this.loadedRoadBounds = null;
     this.roadNetworkDataSource = null;
@@ -127,6 +143,17 @@ export class RoadLayerManager {
       bounds.north.toFixed(4),
     ].join("|");
     if (this.activeRoadRequestKey === requestKey) return;
+    if (shouldSkipFailedRoadViewportRetry(
+      requestKey,
+      this.lastFailedRoadRequestKey,
+      this.failedRoadRetryAfterMs,
+      performance.now(),
+    )) {
+      console.info("[Roads] Skipping repeated failed viewport request during cooldown.", {
+        retryInMs: Math.max(0, Math.ceil(this.failedRoadRetryAfterMs - performance.now())),
+      });
+      return;
+    }
 
     // Camera moves can supersede an in-flight public road query; keep only the
     // newest viewport request and retain the old rendered roads until success.
@@ -327,6 +354,7 @@ export class RoadLayerManager {
 
       dataSource.show = dependencies.isLayerVisible();
       this.loadedRoadBounds = bounds;
+      this.clearFailedRequestCooldown();
       viewer.scene.requestRender();
       dependencies.recordMapPerformance("roads.render", "success", performance.now() - (roadRenderStartedAt ?? performance.now()), {
         featureCount: renderedRoads,
@@ -368,11 +396,13 @@ export class RoadLayerManager {
         );
         roadRenderTelemetryRecorded = true;
       }
-      if (
-        !roadWasCancelled &&
-        dependencies.isViewerActive()
-      ) {
-        console.warn("[Roads] Detailed road layer could not refresh.", error instanceof Error ? error.message : String(error));
+      if (!roadWasCancelled && dependencies.isViewerActive()) {
+        this.lastFailedRoadRequestKey = requestKey;
+        this.failedRoadRetryAfterMs = performance.now() + ROAD_FAILURE_COOLDOWN_MS;
+        console.warn("[Roads] Detailed road layer could not refresh; same-viewport retry is cooling down.", {
+          retryCooldownMs: ROAD_FAILURE_COOLDOWN_MS,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     } finally {
       if (!roadFetchTelemetryRecorded) {
