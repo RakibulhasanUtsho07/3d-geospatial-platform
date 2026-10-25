@@ -63,8 +63,8 @@ test("Ahsan Manzil uses the corrected riverfront and stepped footprint geometry"
   assert.ok(builder.includes('addFacadeSection("Andarmahal",xMin,split,andarBays,[andarGf,andarFf],lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes('addEndFacade("Andarmahal", xMin, -1, [andarGf, andarFf], 6, lod,andarCenterZ,andarDepth);'));
   assert.ok(builder.includes("const areaVector = cross(sub(b, a), sub(c, a));"));
-  assert.ok(builder.includes("if (Math.hypot(...areaVector) <= 1e-9) return;"),
-    "degenerate triangles are filtered before they enter the generated GLB");
+  assert.ok(builder.includes("if (Math.hypot(...areaVector) * 0.5 <= 1e-10) return;"),
+    "degenerate triangles use the same area threshold as GLB geometry QA before entering the generated GLB");
   assert.ok(builder.includes("Source-backed Rangmahal roofline ventilation/oculus band"));
   assert.ok(builder.includes("addFacadeRing(n.Rangmahal_FF, ventX, ventY, faceZ + side * 0.012"));
   assert.ok(builder.includes("A continuous, shallow cornice separates the facade from the roof deck."));
