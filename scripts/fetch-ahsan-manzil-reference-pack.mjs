@@ -42,7 +42,7 @@ async function main() {
   if (imageSources.length < 3) throw new Error("At least three source images are required.");
   const downloads = [];
   const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-  async function fetchWithRetry(source, maxAttempts = 5) {
+  async function fetchWithRetry(source, maxAttempts = 8) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       let response;
       try {
@@ -74,8 +74,8 @@ async function main() {
         ? retryAfterSeconds * 1000
         : Number.isFinite(retryAfterDate) && retryAfterDate > 0
           ? retryAfterDate
-          : Math.min(3000 * (2 ** (attempt - 1)), 30000);
-      const waitMs = Math.min(Math.max(retryAfterMs, 1000), 30000);
+          : Math.min(3000 * (2 ** (attempt - 1)), 120000);
+      const waitMs = Math.min(Math.max(retryAfterMs, 1000), 120000);
       console.warn(source.id + " received HTTP " + status + "; retrying in " + waitMs + "ms (attempt " + (attempt + 1) + "/" + maxAttempts + ").");
       await delay(waitMs);
     }

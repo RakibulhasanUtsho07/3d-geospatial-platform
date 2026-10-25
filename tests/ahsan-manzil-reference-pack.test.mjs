@@ -15,6 +15,9 @@ test("Ahsan Manzil reference pack uses fixed, permission-documented Wikimedia so
   assert.match(downloader, /expectedByteLength/);
   assert.match(downloader, /publishedSha1/);
   assert.match(downloader, /fetchWithRetry/);
+  assert.match(downloader, /fetchWithRetry\(source, maxAttempts = 8\)/);
+  assert.match(downloader, /Math\.min\(Math\.max\(retryAfterMs, 1000\), 120000\)/);
+  assert.match(downloader, /3000 \* \(2 \*\* \(attempt - 1\)\), 120000\)/);
   assert.match(downloader, /status === 429/);
   assert.match(downloader, /retry-after/);
   assert.match(downloader, /upload\.wikimedia\.org/);
