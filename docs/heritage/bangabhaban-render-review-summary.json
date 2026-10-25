@@ -1,16 +1,16 @@
 {
   "task": "P3.3-Bangabhaban",
   "building": "Bangabhaban, Dhaka",
-  "sourceCommit": "28f1aa86a49ca5c0ac156abda8e43efebf12a24a",
-  "reviewGeneratedAt": "2026-10-25T15:27:22.108Z",
+  "sourceCommit": "eee7e0011656bc4e4640cc3a1d7aecb4824d56a2",
+  "reviewGeneratedAt": "2026-10-25T17:36:24.621Z",
   "model": {
     "filename": "bangabhaban-lod3.glb",
-    "sha256": "b51d01087e205b8051921cfc2427293309ff91e3180b3f6b4bcdfc2f4d2a0399",
-    "byteLength": 743056
+    "sha256": "6ed82d6e0d9717f5a0f26a789b722e3f1aee559f4f94ae48945e768da01a77c6",
+    "byteLength": 429992
   },
   "renderManifest": {
     "filename": "render-review-manifest.json",
-    "sha256": "cabe7f31a1892b2ea053afa6f40ff5ff7cd296e45475843c010e4926bfc10822",
+    "sha256": "08425452cd77aa873fb34a253729064d77ec1255e51cf808b9584d38c1d79c29",
     "valid": true,
     "status": "render-set-ready-for-human-review",
     "renderer": "Blender",
@@ -37,13 +37,13 @@
   },
   "qa": {
     "geometry": {
-      "sha256": "e1c47eaffd9b220d35fb519e24f83395f12bcfbfe886ed9568881db20da1a63a",
+      "sha256": "364431f69ef9f691408b376e3ca731d13040b2ef3e847b5f310c01715f4a1d84",
       "status": "review-recommended",
       "valid": true,
       "counts": {
         "meshCount": 15,
         "primitiveCount": 19,
-        "vertexCount": 26052,
+        "vertexCount": 15181,
         "triangleCount": 8684,
         "degenerateTriangleCount": 0,
         "degenerateTriangleRatio": 0,
@@ -103,7 +103,7 @@
       ]
     },
     "topology": {
-      "sha256": "79852f35cd026ee5a4218f7292844cc7414db0c32a0021deeb28b98213d4ca05",
+      "sha256": "8aa5fecfd4a08371b6f2ad6991393c1e30dc543d733911893df7bedcbb4b5a47",
       "releaseGate": "blocked-review-required",
       "summary": {
         "meshCount": 15,
@@ -121,6 +121,19 @@
           "no-texture-atlas-embedded-or-declared"
         ],
         "releaseGate": "blocked-review-required"
+      }
+    },
+    "foregroundVisibility": {
+      "sha256": "ae9e32c2fc9452dd0a9e7d4afa7cf4694922f92de9c0bc9b756522382fab6bf1",
+      "summary": {
+        "viewCount": 13,
+        "passedViews": 13,
+        "failedViews": 0,
+        "status": "passed"
+      },
+      "limits": {
+        "minMaxAxisFillRatio": 0.7,
+        "maxAxisFillRatio": 0.97
       }
     }
   },
@@ -170,91 +183,91 @@
       "filename": "front.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "8e28976027a8970850baf3766fffcc1303d68778cb1d16497dd49648183cfee1"
+      "sha256": "3552f74eeb70a4d9b9e2b1e65bf35b7c5184ff4839ab7221140e8c448a9f2cce"
     },
     {
       "id": "back",
       "filename": "back.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "44878fbd2edba33ac1a7a80cb329fb5f5ab921c47030399c1b20ff6abd3d9ce6"
+      "sha256": "fa42be8fe7f095614ee6589d898c5c5f7d362e2d63a00946914002d34e0b0b1e"
     },
     {
       "id": "left",
       "filename": "left.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "72a521fcfe0d26f142fc965a3546ebf9c5d88afbe7afc36626a941872f5cfe3b"
+      "sha256": "8fefda0c569a37629b49316ea6df90d5b73ad04daf2de3f74b2334b43eb30d0d"
     },
     {
       "id": "right",
       "filename": "right.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "2e7dc9f8690a6214702bb20b9014d50d81d4dcde144602e8feaa57b68c200cb2"
+      "sha256": "e78844d932e7b5fd9178fa0d41d87b1041cd8904672d387c4070f599b38b67aa"
     },
     {
       "id": "top",
       "filename": "top.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "26d9a9a661fd3c5b1451f3dfc7cdc46f4f58912aa0dc3eacb9a367ca5df6b9ab"
+      "sha256": "be546ae796ee95668197837e08a02f1bd44d49970b9a1f296678d7641cefddba"
     },
     {
       "id": "turntable-000",
       "filename": "turntable-000.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "e502fef632dda6e3834550cd2f754d1f9f61c6f3b58ac68ec52d4c3b95c705eb"
+      "sha256": "0730b2f024ba47ffaa830673c930f7c6558419aa86b69cc9b64b737c3b506150"
     },
     {
       "id": "turntable-045",
       "filename": "turntable-045.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "a55d1b16aab13acaf8e2f4e37da1771d5ed53477f0d7ee1ea6759e182fcb0c6e"
+      "sha256": "aa3bda9ac550954c610ffecf49dfa5608e816c43b7e3c3cdf0dff61bf9341429"
     },
     {
       "id": "turntable-090",
       "filename": "turntable-090.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "c6207587d32cc9b4622a9ccdcb7008335f7e2fec45ac39861cbae2110e240bd3"
+      "sha256": "414f98f2e127eb14bd147cbd343d0b373ca78be9861e04fb122806b5b3e9e666"
     },
     {
       "id": "turntable-135",
       "filename": "turntable-135.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b8c2b3c4df2683e71066e410135f06e02a9ef46a702365ce8c4f58401b05e8cf"
+      "sha256": "8094ba819b1a43f24198ca66b86c9204070db119484df93cb1b391d815b692d2"
     },
     {
       "id": "turntable-180",
       "filename": "turntable-180.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "fa2df5a4ded3e86895ceb37b0a96de5ce1d79620ccbe49251e99741fcedc6a5f"
+      "sha256": "a9eb2e46e945e88cef7f0a42ebb21d5bc107071f051f905202f583ae4e289544"
     },
     {
       "id": "turntable-225",
       "filename": "turntable-225.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "b7ad475d74b63d52cfac82d5b255b8ccf7b3f348475efadaee211f24287c00f4"
+      "sha256": "b1d1a8c0b8b142750e22e6633882d5d825ac7ee7ca2838f12b3484d7e2a74d71"
     },
     {
       "id": "turntable-270",
       "filename": "turntable-270.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "4e0bb1ae0bc3ca5c48b0d359584c8954de2d3989f9722d26ac6a0bbfddd46a3e"
+      "sha256": "8ec2d131552243fcf6f8a544bd941e6cb7d99cb538edeb581f59577e1d3d615f"
     },
     {
       "id": "turntable-315",
       "filename": "turntable-315.png",
       "width": 1024,
       "height": 1024,
-      "sha256": "d5aa29294b46afb733d82737a3d78168fcb00e0b75c8148e3e1ee771ae6ce7fc"
+      "sha256": "084bbf7dacb6bff733eb1cd20a2aa017a97b7f3620096c19234dd13374ecffc1"
     }
   ],
   "visualReview": {

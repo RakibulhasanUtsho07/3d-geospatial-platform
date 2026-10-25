@@ -4,8 +4,8 @@ Decision: blocked-review-required. This is a geometry triage report, not a histo
 
 ## Candidate identity
 
-GLB SHA-256: b51d01087e205b8051921cfc2427293309ff91e3180b3f6b4bcdfc2f4d2a0399
-GLB bytes: 743056
+GLB SHA-256: 6ed82d6e0d9717f5a0f26a789b722e3f1aee559f4f94ae48945e768da01a77c6
+GLB bytes: 429992
 Geometry QA status: review-recommended
 Triangles: 8684
 Degenerate triangles: 0
