@@ -79,8 +79,9 @@
       "confidence": "estimated"
     },
     "stairRiseM": {
-      "value": 1.2,
-      "confidence": "estimated"
+      "value": 0.75,
+      "confidence": "estimated",
+      "basis": "Internally aligned to the estimated plinth-top datum so the stair landing meets the modeled plinth; still unmeasured and provisional."
     }
   },
   "geometryPolicy": {
