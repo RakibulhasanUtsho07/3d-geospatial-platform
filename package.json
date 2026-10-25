@@ -182,7 +182,9 @@
     "fetch:ahsan-manzil-reference-pack": "node scripts/fetch-ahsan-manzil-reference-pack.mjs",
     "test:ahsan-manzil-reference-pack": "node --test tests/ahsan-manzil-reference-pack.test.mjs",
     "audit:ahsan-manzil-topology": "node scripts/build-ahsan-manzil-topology-audit.mjs",
-    "test:ahsan-manzil-topology-audit": "node --test tests/ahsan-manzil-topology-audit.test.mjs"
+    "test:ahsan-manzil-topology-audit": "node --test tests/ahsan-manzil-topology-audit.test.mjs",
+    "test:imagery-tile-error-diagnostics": "node --test tests/imagery-tile-error-diagnostics.test.mjs",
+    "test:canvas-red-pixel-diagnostics": "node --test tests/canvas-red-pixel-diagnostics.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

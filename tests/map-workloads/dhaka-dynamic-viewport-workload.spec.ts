@@ -164,7 +164,6 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const roadRoutes: TimedRoute[] = [];
   const renderEvents: MapRenderEvent[] = [];
   const fixtureSha256 = sha256(Buffer.from(JSON.stringify({ buildings, roads })));
-  let firstBuildingDelayUsed = false;
   let firstRoadDelayUsed = false;
   const browserEvents: BrowserMetricEvent[] = [];
   const requestEvents = new WeakMap<object, BrowserMetricEvent>();
@@ -285,10 +284,11 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
       url: route.request().url(),
       startedAtMs,
       routeOrdinal,
-      routeDelayMs: !firstBuildingDelayUsed ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
+      // Hold the first two network requests so the workload can deterministically
+      // invalidate an in-flight viewport after the camera has moved.
+      routeDelayMs: routeOrdinal <= 4 ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
     };
     buildingRoutes.push(routeRecord);
-    if (!firstBuildingDelayUsed) firstBuildingDelayUsed = true;
     await wait(routeRecord.routeDelayMs);
     try {
       await route.fulfill({
@@ -329,8 +329,33 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   });
 
   await page.setViewportSize({ width: 1600, height: 950 });
+  // Enable manager-owned lifecycle diagnostics before Cesium initializes; this
+  // hook is opt-in and is only exposed to the deterministic browser workload.
+  await page.addInitScript(() => {
+    (window as Window & { __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean })
+      .__MAP_ENGINE_WORKLOAD_BENCHMARK__ = true;
+  });
   await page.goto("/map", { waitUntil: "domcontentloaded", timeout: 60_000 });
+
+  // The map UX intentionally keeps the layer list collapsed at startup.
+  // Open it before asserting the road-layer control is ready; otherwise the
+  // accessibility query cannot discover a checkbox in the collapsed panel.
+  const layersToggle = page.getByRole("button", { name: /Map layers/i });
+  await expect(layersToggle).toBeVisible({ timeout: 45_000 });
+  await expect(layersToggle).toHaveAttribute("aria-expanded", "false");
+  await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
+
+  // Camera controls are collapsed by default too. Expand them before zooming,
+  // then explicitly wait for the previously hidden buttons to become usable.
+  const cameraToggle = page.getByRole("button", { name: "Camera controls" });
+  await expect(cameraToggle).toBeVisible({ timeout: 45_000 });
+  await expect(cameraToggle).toHaveAttribute("aria-expanded", "false");
+  await cameraToggle.click();
+  await expect(cameraToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "Zoom out" })).toBeEnabled({ timeout: 45_000 });
+
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
   const initial = await page.evaluate(() => {
@@ -347,6 +372,92 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   const movementStartedAtMs = performance.now();
   const movementActions: string[] = [];
+  const buildingRoutesBeforeCancellationFocus = buildingRoutes.length;
+
+  // Use the opt-in workload hook to move to a known local viewport and trigger
+  // the normal production camera-intent handler before running rapid gestures.
+  // This avoids the gesture sequence coalescing every request before we can
+  // observe a live AbortController.
+  const focusedForCancellation = await page.evaluate(() => {
+    const target = window as Window & {
+      __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
+        focusViewportForBenchmark?: (
+          longitudeDegrees: number,
+          latitudeDegrees: number,
+          heightMeters: number,
+        ) => boolean;
+      };
+    };
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+      90.4058,
+      23.7086,
+      2_500,
+    ) ?? false;
+  });
+  assert.equal(focusedForCancellation, true,
+    "The opt-in Cesium hook must focus the real camera before the cancellation workload.");
+  movementActions.push("focus-local-viewport-for-cancellation");
+
+  await expect.poll(() => buildingRoutes.length, { timeout: 45_000 }).toBeGreaterThan(buildingRoutesBeforeCancellationFocus);
+
+  const getBuildingRequestLifecycle = async () => page.evaluate(() => {
+    const target = window as Window & {
+      __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
+        getRequestLifecycleDiagnostics?: () => {
+          intentRevision: number;
+          loadInProgress: boolean;
+          hasActiveEndpoint: boolean;
+          hasAbortController: boolean;
+          hasPendingRequest: boolean;
+        } | null;
+      };
+    };
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.() ?? null;
+  });
+  await expect.poll(async () => {
+    const state = await getBuildingRequestLifecycle();
+    return Boolean(state?.loadInProgress && state.hasActiveEndpoint && state.hasAbortController);
+  }, { timeout: 15_000, intervals: [25, 50, 100] }).toBe(true);
+
+  const cancellationProbe = await page.evaluate(() => {
+    const target = window as Window & {
+      __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: {
+        notifyCameraIntent?: () => {
+          loadInProgress: boolean;
+          intentRevisionBefore: number;
+          intentRevisionAfter: number;
+          lifecycleBefore: {
+            loadInProgress: boolean;
+            hasActiveEndpoint: boolean;
+            hasAbortController: boolean;
+            hasPendingRequest: boolean;
+          };
+          lifecycleAfter: {
+            loadInProgress: boolean;
+            hasActiveEndpoint: boolean;
+            hasAbortController: boolean;
+            hasPendingRequest: boolean;
+          };
+          cameraBoundsChanged: boolean;
+        } | null;
+      };
+    };
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null;
+  });
+  assert.ok(cancellationProbe, "The opt-in viewport lifecycle diagnostic must be installed.");
+  assert.equal(cancellationProbe.lifecycleBefore.loadInProgress, true,
+    "Cancellation probe must start during an active viewport request.");
+  assert.equal(cancellationProbe.lifecycleBefore.hasAbortController, true,
+    "Cancellation probe must observe a live AbortController.");
+  assert.equal(cancellationProbe.cameraBoundsChanged, true,
+    "Cancellation probe must change the real Cesium camera bounds.");
+  assert.ok(cancellationProbe.intentRevisionAfter > cancellationProbe.intentRevisionBefore,
+    "A distinct camera intent must invalidate the obsolete viewport revision.");
+  assert.equal(cancellationProbe.lifecycleAfter.hasPendingRequest, true,
+    "The newest viewport intent must remain queued after cancellation.");
+
+  // Continue the normal repeated zoom/pan workload after the deterministic
+  // cancellation was captured; newer requests use short fixture delays.
   for (let index = 0; index < 4; index += 1) {
     await page.getByRole("button", { name: "Zoom out" }).click();
     movementActions.push("zoom-out");
@@ -451,6 +562,12 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     });
   });
 
+  await expect.poll(
+    () => browserEvents.filter((event) => event.kind === "fetch-cancelled").length
+      + renderEvents.filter((event) => event.kind === "building-cancelled").length,
+    { timeout: 15_000, intervals: [50, 100, 250] },
+  ).toBeGreaterThan(0);
+
   const successfulFetches = browserEvents.filter((event) => event.kind === "fetch-end" && event.status === 200);
   const cancelledFetches = browserEvents.filter((event) => event.kind === "fetch-cancelled");
   const failedFetches = browserEvents.filter((event) => event.kind === "fetch-error");
@@ -481,7 +598,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   assert.ok(uniqueBuildingBounds.size >= 2, "Workload must request at least two unique building viewport bounds.");
   assert.ok(uniqueRoadBounds.size >= 2, "Workload must request at least two unique road viewport bounds.");
   assert.ok(cancelledFetches.length + renderEvents.filter((event) => event.kind === "building-cancelled").length >= 1,
-    "Rapid camera movement must exercise at least one obsolete-request cancellation.");
+    "The deterministic in-flight camera-intent probe must cancel at least one obsolete viewport request.");
   assert.ok(lastBuildingStart, "At least one building fetch must be observed.");
   assert.ok(finalBuildingStage, "The latest viewport must be staged to Cesium.");
   assert.ok(finalRoadStage, "A road viewport must render after camera movement.");
@@ -513,6 +630,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     },
     workload: {
       movementActions,
+      cancellationProbe,
       elapsedSinceCameraWorkStartedMs: Number((performance.now() - movementStartedAtMs).toFixed(3)),
       timeToLatestBuildingStageMs,
       uniqueBuildingViewportBounds: uniqueBuildingBounds.size,

@@ -39,7 +39,7 @@ export default function PropertyListingsPanel({
   disabled, getCenter, onPropertiesLoaded, nearbyPlaces, selectedProperty,
   onSelectProperty, onCheckNearbyServices, onClearSelectedProperty,
 }: PropertyListingsPanelProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const [radius, setRadius] = useState("5000");
   const [minRent, setMinRent] = useState("");
