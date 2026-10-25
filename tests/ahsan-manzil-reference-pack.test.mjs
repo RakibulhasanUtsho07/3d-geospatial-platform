@@ -21,7 +21,7 @@ test("Ahsan Manzil reference pack uses fixed, permission-documented Wikimedia so
   assert.match(downloader, /status === 429/);
   assert.match(downloader, /retry-after/);
   assert.match(downloader, /upload\.wikimedia\.org/);
-  assert.match(downloader, /thumb\\.wikimedia\\.org/);
+  assert.ok(downloader.includes("thumb.wikimedia.org"));
   assert.match(downloader, /jpegDimensions/);
   assert.match(downloader, /expectedDownloadDimensions/);
   assert.match(downloader, /Existing reference file differs from its verified source/);
