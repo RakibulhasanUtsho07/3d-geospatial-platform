@@ -527,6 +527,12 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     });
   });
 
+  await expect.poll(
+    () => browserEvents.filter((event) => event.kind === "fetch-cancelled").length
+      + renderEvents.filter((event) => event.kind === "building-cancelled").length,
+    { timeout: 15_000, intervals: [50, 100, 250] },
+  ).toBeGreaterThan(0);
+
   const successfulFetches = browserEvents.filter((event) => event.kind === "fetch-end" && event.status === 200);
   const cancelledFetches = browserEvents.filter((event) => event.kind === "fetch-cancelled");
   const failedFetches = browserEvents.filter((event) => event.kind === "fetch-error");
