@@ -714,7 +714,7 @@ function buildGlb(lod) {
     // A continuous, shallow cornice separates the facade from the roof deck.
     // This follows the visible reference band and avoids inventing roof objects.
     for (const side of [-1, 1]) {
-      box(n.Parapet, rangCenterX, roofTop - 0.06, side * (half + 0.10),
+      box(n.Parapet, (split + xMax) / 2, roofTop - 0.06, side * (half + 0.10),
         rangLength, 0.14, 0.20, "trim");
     }
   }
