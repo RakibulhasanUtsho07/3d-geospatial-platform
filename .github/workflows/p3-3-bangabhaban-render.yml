@@ -106,10 +106,8 @@ jobs:
             1024
 
       - name: Record exact model, references, QA and render hashes
-        env:
-          SOURCE_COMMIT: ${{ github.sha }}
         run: |
-          node --input-type=module <<'NODE'
+          SOURCE_COMMIT="$(git rev-parse HEAD)" node --input-type=module <<'NODE'
           import { createHash } from "node:crypto";
           import { readFile, writeFile } from "node:fs/promises";
           import path from "node:path";
