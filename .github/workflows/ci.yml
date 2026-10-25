@@ -469,13 +469,14 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true' EXIT
 
           node --input-type=module <<'NODE'
+          const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
 
           while (Date.now() < deadline) {
             try {
-              const response = await fetch(endpoint);
+              const response = await fetchWithTimeout(endpoint);
               await response.arrayBuffer();
               if (response.status === 400) {
                 ready = true;
@@ -493,7 +494,7 @@ jobs:
             process.exit(1);
           }
 
-          const nearby = await fetch(
+          const nearby = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/nearby-places",
           );
           if (nearby.status !== 400) {
@@ -501,7 +502,7 @@ jobs:
             process.exit(1);
           }
 
-          const properties = await fetch(
+          const properties = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/properties",
           );
           if (properties.status !== 400) {
@@ -509,7 +510,7 @@ jobs:
             process.exit(1);
           }
 
-          const streetImagery = await fetch(
+          const streetImagery = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/street-imagery",
           );
           if (streetImagery.status !== 400) {
@@ -517,7 +518,7 @@ jobs:
             process.exit(1);
           }
 
-          const roads = await fetch(
+          const roads = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/roads",
           );
           if (roads.status !== 400) {
@@ -525,7 +526,7 @@ jobs:
             process.exit(1);
           }
 
-          const architectureResearch = await fetch(
+          const architectureResearch = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?limit=50",
           );
           const architecturePayload = await architectureResearch.json();
@@ -540,7 +541,7 @@ jobs:
             process.exit(1);
           }
 
-          const filteredArchitecture = await fetch(
+          const filteredArchitecture = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?area=Mugda&mediaType=image",
           );
           const filteredArchitecturePayload = await filteredArchitecture.json();
@@ -555,7 +556,7 @@ jobs:
             process.exit(1);
           }
 
-          const commonsMedia = await fetch(
+          const commonsMedia = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?q=Mugda&mediaType=image&limit=10",
           );
           const commonsPayload = await commonsMedia.json();
@@ -572,7 +573,7 @@ jobs:
             process.exit(1);
           }
 
-          const videoMedia = await fetch(
+          const videoMedia = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?mediaType=video&limit=10",
           );
           const videoPayload = await videoMedia.json();
@@ -589,7 +590,7 @@ jobs:
             process.exit(1);
           }
 
-          const propertySearch = await fetch(
+          const propertySearch = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/properties?lat=23.7461&lon=90.3742&radius=20000&minRent=20000&maxRent=40000&minBedrooms=2&type=apartment&limit=10",
           );
           const propertyPayload = await propertySearch.json();
@@ -606,12 +607,13 @@ jobs:
 
           # Readiness probes use invalid bounds, so both servers' tile indexes are still cold.
           node --input-type=module <<'NODE'
+          const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3001/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
           while (Date.now() < deadline) {
             try {
-              const response = await fetch(endpoint);
+              const response = await fetchWithTimeout(endpoint);
               await response.arrayBuffer();
               if (response.status === 400) {
                 ready = true;
