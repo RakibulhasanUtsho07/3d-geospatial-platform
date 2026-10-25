@@ -1,0 +1,47 @@
+# Bangabhaban — candidate-specific topology audit
+
+Decision: blocked-review-required. This is a geometry triage report, not a historical accuracy certificate.
+
+## Candidate identity
+
+GLB SHA-256: 5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673
+GLB bytes: 718276
+Geometry QA status: review-recommended
+Triangles: 8396
+Degenerate triangles: 0
+Meshes / primitives: 15 / 18
+
+## Global warnings
+
+- disconnected-mesh-components-present
+- long-triangle-edges-present
+- no-texture-atlas-embedded-or-declared
+- open-boundary-edges-present
+
+## Per-primitive findings
+
+| Mesh | Semantic node | Triangles | Components | Boundary edges | Non-manifold edges | Long-edge triangles | Warnings |
+|---:|---|---:|---:|---:|---:|---:|---|
+| 0 | Plinth | 20 | 1 | 0 | 0 | 16 | long-triangle-edges-present |
+| 1 | WestWing | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 2 | CentralHall | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 3 | EastWing | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 4 | RearHall | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 5 | RoofDeck | 48 | 4 | 0 | 0 | 44 | disconnected-mesh-components-present, long-triangle-edges-present |
+| 5 | RoofDeck | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 6 | DomePavilion | 12 | 1 | 0 | 0 | 12 | long-triangle-edges-present |
+| 7 | DomeDrum | 128 | 1 | 0 | 0 | 128 | long-triangle-edges-present |
+| 8 | Dome | 816 | 1 | 48 | 0 | 48 | long-triangle-edges-present, open-boundary-edges-present |
+| 9 | Finial | 336 | 2 | 0 | 0 | 24 | disconnected-mesh-components-present, long-triangle-edges-present |
+| 10 | Loggia | 4552 | 284 | 0 | 0 | 0 | disconnected-mesh-components-present |
+| 10 | Loggia | 24 | 2 | 0 | 0 | 16 | disconnected-mesh-components-present, long-triangle-edges-present |
+| 11 | FacadeTrim | 168 | 14 | 0 | 0 | 0 | disconnected-mesh-components-present |
+| 12 | WindowsAndDoors | 1584 | 132 | 0 | 0 | 0 | disconnected-mesh-components-present |
+| 12 | WindowsAndDoors | 528 | 44 | 0 | 0 | 0 | disconnected-mesh-components-present |
+| 13 | Parapet | 36 | 3 | 0 | 0 | 24 | disconnected-mesh-components-present, long-triangle-edges-present |
+| 14 | EntranceStair | 84 | 7 | 0 | 0 | 56 | disconnected-mesh-components-present, long-triangle-edges-present |
+
+## Review policy
+
+Warnings are preserved rather than suppressed. Inspect high-impact facade, dome, plinth, roof and wing primitives before accepting any warning.
+A valid GLB, a clean plinth or zero degenerate triangles does not prove architectural accuracy.

@@ -1,0 +1,279 @@
+{
+  "task": "P3.3-Bangabhaban",
+  "building": "Bangabhaban, Dhaka",
+  "sourceCommit": "1b8651c6b591a013cc346c5ad49b93a3742e08a7",
+  "reviewGeneratedAt": "2026-10-25T15:16:58.797Z",
+  "model": {
+    "filename": "bangabhaban-lod3.glb",
+    "sha256": "5b70a1b2b221b6400718ded292cd4e623c67a8e094052886ca003c9241884673",
+    "byteLength": 718276
+  },
+  "renderManifest": {
+    "filename": "render-review-manifest.json",
+    "sha256": "71c0c4045f026161c5ad2373cbea130784e8e2425919f85baa7cc910f0cabd83",
+    "valid": true,
+    "status": "render-set-ready-for-human-review",
+    "renderer": "Blender",
+    "rendererVersion": "4.0.2",
+    "sceneBounds": {
+      "min": [
+        -44,
+        -27.10000038,
+        0
+      ],
+      "max": [
+        44,
+        21.5,
+        19.97999954
+      ],
+      "dimensions": [
+        88,
+        48.60000038,
+        19.97999954
+      ],
+      "coordinateUnits": "imported-model-units-unverified"
+    },
+    "viewCount": 13
+  },
+  "qa": {
+    "geometry": {
+      "sha256": "c99a079760a71ecf916cde5a76db7a5799f6a57f6f6538c87758b2aca2a06f44",
+      "status": "review-recommended",
+      "valid": true,
+      "counts": {
+        "meshCount": 15,
+        "primitiveCount": 18,
+        "vertexCount": 25188,
+        "triangleCount": 8396,
+        "degenerateTriangleCount": 0,
+        "degenerateTriangleRatio": 0,
+        "materialCount": 6,
+        "textureCount": 0,
+        "imageCount": 0,
+        "embeddedImageCount": 0
+      },
+      "warnings": [
+        "long-triangle-edges-present",
+        "disconnected-mesh-components-present",
+        "open-boundary-edges-present",
+        "no-texture-atlas-embedded-or-declared"
+      ]
+    },
+    "texture": {
+      "sha256": "3c47aef10642550513fa769b1851c4b345887e6bf4f7f305ff3a0bb2ee28fba1",
+      "status": "review-recommended",
+      "valid": true,
+      "counts": {
+        "meshCount": 15,
+        "materialCount": 6,
+        "textureCount": 0,
+        "imageCount": 0,
+        "texturedPrimitiveCount": 0,
+        "untexturedPrimitiveCount": 18,
+        "uvAccessorCount": 0,
+        "uvVertexCount": 0,
+        "uvSeamCandidateCount": 0,
+        "texturePixelSeamCandidateCount": 0,
+        "highTexturePixelSeamCount": 0,
+        "moderateTexturePixelSeamCount": 0,
+        "textureContentRiskCount": 0
+      },
+      "warnings": [
+        "mesh-0-primitive-0-no-supported-material-textures",
+        "mesh-1-primitive-0-no-supported-material-textures",
+        "mesh-2-primitive-0-no-supported-material-textures",
+        "mesh-3-primitive-0-no-supported-material-textures",
+        "mesh-4-primitive-0-no-supported-material-textures",
+        "mesh-5-primitive-0-no-supported-material-textures",
+        "mesh-5-primitive-1-no-supported-material-textures",
+        "mesh-6-primitive-0-no-supported-material-textures",
+        "mesh-7-primitive-0-no-supported-material-textures",
+        "mesh-8-primitive-0-no-supported-material-textures",
+        "mesh-9-primitive-0-no-supported-material-textures",
+        "mesh-10-primitive-0-no-supported-material-textures",
+        "mesh-10-primitive-1-no-supported-material-textures",
+        "mesh-11-primitive-0-no-supported-material-textures",
+        "mesh-12-primitive-0-no-supported-material-textures",
+        "mesh-12-primitive-1-no-supported-material-textures",
+        "mesh-13-primitive-0-no-supported-material-textures",
+        "mesh-14-primitive-0-no-supported-material-textures",
+        "no-images-declared",
+        "no-textures-declared",
+        "one-or-more-primitives-untextured"
+      ]
+    },
+    "topology": {
+      "sha256": "80ec5d0724750a4bc38913d7b3aa5e1a2e46a2c1acf8c16f914dc3d095306657",
+      "releaseGate": "blocked-review-required",
+      "summary": {
+        "meshCount": 15,
+        "primitiveCount": 18,
+        "triangles": 8396,
+        "degenerateTriangles": 0,
+        "meshesWithWarnings": 18,
+        "warningMeshCounts": {
+          "disconnected-mesh-components-present": 9,
+          "long-triangle-edges-present": 14,
+          "open-boundary-edges-present": 1
+        },
+        "globalWarnings": [
+          "disconnected-mesh-components-present",
+          "long-triangle-edges-present",
+          "no-texture-atlas-embedded-or-declared",
+          "open-boundary-edges-present"
+        ],
+        "releaseGate": "blocked-review-required"
+      }
+    }
+  },
+  "referencePack": {
+    "sha256": "13f65dfe8a740c02a8e81f589f18a8e29880ba3d651cf3ffde1edb16906e3632",
+    "verified": true,
+    "licensePolicy": "Retain per-file attribution and license links; disclose changes; respect CC BY-SA 4.0 share-alike terms for adaptations of that source.",
+    "sources": [
+      {
+        "id": "licensed-aerial-2006",
+        "filename": "bangabhaban-aerial-2006.jpg",
+        "sha256": "69bdfdb46ba9cb28aa625ac150ed4eba2057139072bc9d61aaeeab50bc8bcac1",
+        "byteLength": 357829,
+        "license": "CC BY-SA 4.0",
+        "author": "Naira Al Husain",
+        "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
+        "viewRole": "elevated aerial; compound orientation and broad roof/building massing only",
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-exterior-2017",
+        "filename": "bangabhaban-exterior-2017.jpg",
+        "sha256": "2a288b631e38e277a145626d42d31925d0dcfec9208a08e0256c90c415561611",
+        "byteLength": 2420452,
+        "license": "CC BY 2.0",
+        "author": "ASaber91",
+        "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
+        "viewRole": "elevated oblique exterior; central dome, facade rhythm, loggia and wing silhouette",
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-aerial-2017",
+        "filename": "bangabhaban-aerial-2017.jpg",
+        "sha256": "3cd9ead006448924f8da33b0bba6a0702b5f6784c9173a2a60eb5ed6c46cfddb",
+        "byteLength": 1598021,
+        "license": "CC BY 2.0",
+        "author": "ASaber91",
+        "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban,_Dhaka_April_(33244270994).jpg",
+        "viewRole": "elevated aerial/cityscape; roof blocks and visible building arrangement only",
+        "cameraCalibration": "unknown"
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "front",
+      "filename": "front.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "d82ce6c85b827ff5cb521f7e0487855dc8af6b1fcc0a4e6fb21ee98b2e6c4685"
+    },
+    {
+      "id": "back",
+      "filename": "back.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "16ed5f8266ee7dfda6635f8420b82851fe682d806b4d5f18817ca9899805d751"
+    },
+    {
+      "id": "left",
+      "filename": "left.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "ce350809cf207680ad5e7db81fc46b6784679ad7d3a98b37c2eff882acbad7df"
+    },
+    {
+      "id": "right",
+      "filename": "right.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "f6703afd2a584b29e6cfee44c42b5a885e713d277d74372416a2e6d005cb0fb4"
+    },
+    {
+      "id": "top",
+      "filename": "top.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "36f61595fc0ea49f39c5e1d454ede09e59ed673998a2bf3f47d5b6003139404d"
+    },
+    {
+      "id": "turntable-000",
+      "filename": "turntable-000.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "bb26b657f2a89fb40e1533786b7b9f8334eb822751ee4ccef0f4a4fff04fad26"
+    },
+    {
+      "id": "turntable-045",
+      "filename": "turntable-045.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "5b3dbbf820dec7c9183b438b649bccab573215801e962ab4ad74d5af0a3b8530"
+    },
+    {
+      "id": "turntable-090",
+      "filename": "turntable-090.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "d58f49ebc406e159e4ce47e9670a99abecc9b11d16244d2b9dfeb81ab784be1e"
+    },
+    {
+      "id": "turntable-135",
+      "filename": "turntable-135.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b56512f7e9b54fea40d4a9b45d097c71c64cdc0b23a0bb92d2fac7bb02285eab"
+    },
+    {
+      "id": "turntable-180",
+      "filename": "turntable-180.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "e969a172f8816bc59c89ca742e82fab704a2330874744fda911b1e7d051dfc6e"
+    },
+    {
+      "id": "turntable-225",
+      "filename": "turntable-225.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "3489460de248dec41a1d862197bb32cc4997e6e693ff6904c18cefeeb19a6830"
+    },
+    {
+      "id": "turntable-270",
+      "filename": "turntable-270.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "4539bb5cc42843258b67a99960ecac9db258cdcac9ea46ae87c498d166469672"
+    },
+    {
+      "id": "turntable-315",
+      "filename": "turntable-315.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "2376625c5acb4e935558d866fee8681f72e879cadf0a9427cb07e853a2989dce"
+    }
+  ],
+  "visualReview": {
+    "contactSheet": "contact-sheet.png",
+    "status": "Deterministic 13-view render and hash checks passed. Visual/architectural fidelity remains pending manual review.",
+    "findings": [
+      "The candidate is a source-controlled parametric visual proxy, not image-derived photogrammetry.",
+      "The front loggia, elevated dome, stepped roof planes and wing massing need side-by-side review against licensed references.",
+      "The roof fields and facade remain plain colour materials; no texture atlas or UV projection is claimed.",
+      "The stepped footprint, overall dimensions and orientation remain estimates; source camera poses are unknown."
+    ],
+    "residualRisks": [
+      "All geometry parameters are estimates pending independently traced footprint and rectified/surveyed facades.",
+      "Geometry QA may retain open boundaries, detached components or non-manifold intersections; review primitive by primitive.",
+      "CC BY-SA 4.0 attribution/share-alike conditions apply to any adaptation of the 2006 source image."
+    ],
+    "publicationEligible": false
+  },
+  "policy": "Hashes verify artifact identity; they do not prove architectural fidelity, survey dimensions or publication eligibility."
+}
