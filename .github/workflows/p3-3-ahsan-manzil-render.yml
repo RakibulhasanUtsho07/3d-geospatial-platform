@@ -67,6 +67,11 @@ jobs:
             public/models/ahsan-manzil-lod3.glb \
             artifacts/p3-3-qa/geometry-qa-report.json \
             artifacts/p3-3-qa/texture-qa-report.json
+          npm run audit:ahsan-manzil-topology -- \
+            public/models/ahsan-manzil-lod3.glb \
+            artifacts/p3-3-qa/geometry-qa-report.json \
+            artifacts/p3-3-qa/topology-audit.json \
+            docs/heritage/p3.3-topology-audit.md
 
       - name: Install Blender and contact-sheet library
         run: |
@@ -215,6 +220,7 @@ jobs:
                 "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
                 "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
               ],
+                "The plinth topology regression checks only mesh integrity for the provisional L-shaped footprint; the footprint itself remains estimated pending north-up tracing or survey.",
               residualRisks: [
                 "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
                 "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
@@ -232,7 +238,7 @@ jobs:
           cp artifacts/p3-3-render-set/contact-sheet.png docs/heritage/p3.3-render-contact-sheet.png
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/heritage/p3.3-render-review-summary.json docs/heritage/p3.3-render-contact-sheet.png public/models/ahsan-manzil-lod1.glb public/models/ahsan-manzil-lod2.glb public/models/ahsan-manzil-lod3.glb public/models/ahsan-manzil.glb public/models/ahsan-manzil.manifest.json
+          git add docs/heritage/p3.3-render-review-summary.json docs/heritage/p3.3-render-contact-sheet.png docs/heritage/p3.3-topology-audit.md public/models/ahsan-manzil-lod1.glb public/models/ahsan-manzil-lod2.glb public/models/ahsan-manzil-lod3.glb public/models/ahsan-manzil.glb public/models/ahsan-manzil.manifest.json
           if ! git diff --cached --quiet; then
             git commit -m "docs(heritage): record P3.3 render evidence [skip ci]"
           fi

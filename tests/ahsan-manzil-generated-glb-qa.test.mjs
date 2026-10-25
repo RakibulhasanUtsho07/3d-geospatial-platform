@@ -31,6 +31,17 @@ test("all generated Ahsan Manzil LODs pass structural GLB and triangle-area QA w
     assert.ok(report.bounds.dimensions.every((value) => Number.isFinite(value) && value > 0));
     assert.ok(report.limitations.some((limitation) => limitation.includes("architectural fidelity")));
     const gltf = readGlbJson(bytes, label);
+    const plinthNode = (gltf.nodes ?? []).find((node) => node.name === "Plinth");
+    assert.ok(plinthNode, label + " should retain its semantic plinth node");
+    const plinthReport = report.meshDetails.find((mesh) =>
+      mesh.meshIndex === plinthNode.mesh && mesh.primitiveIndex === 0);
+    assert.ok(plinthReport?.topology?.topologyAnalyzed, label + " plinth topology should be analyzed");
+    assert.equal(plinthReport.topology.connectedComponentCount, 1,
+      label + " plinth should be one connected stepped solid");
+    assert.equal(plinthReport.topology.boundaryEdgeCount, 0,
+      label + " plinth should have no open boundary edges");
+    assert.equal(plinthReport.topology.nonManifoldEdgeCount, 0,
+      label + " plinth should have no non-manifold edges");
     assert.equal((gltf.images ?? []).length, 0, label + " must not silently claim embedded photo textures");
     assert.equal((gltf.textures ?? []).length, 0, label + " must not silently claim texture bindings");
     assert.ok(report.warnings.includes("no-texture-atlas-embedded-or-declared"),

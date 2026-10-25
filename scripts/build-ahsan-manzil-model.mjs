@@ -143,6 +143,40 @@ function buildGlb(lod) {
     quad(node,e,f,g,h,key); quad(node,b,a,d,c,key); quad(node,a,e,h,d,key);
     quad(node,f,b,c,g,key); quad(node,d,h,g,c,key); quad(node,a,b,f,e,key);
   }
+  // Build the stepped plinth as one L-footprint prism instead of two touching boxes.
+  // This avoids duplicated internal faces at the Rangmahal/Andarmahal junction.
+  // Cap and side patches are deliberately split at matching coordinates to avoid T-junctions.
+  function steppedPlinthXZ(node, xMin, split, xMax, zMin, stepZ, zMax, y0, y1, key) {
+    const values = [xMin, split, xMax, zMin, stepZ, zMax, y0, y1];
+    if (!values.every(Number.isFinite) || !(xMin < split && split < xMax &&
+        zMin < stepZ && stepZ < zMax && y0 < y1)) {
+      throw new Error("Invalid stepped plinth footprint; inspect the footprint parameters before generating the GLB.");
+    }
+    const p = (x, y, z) => [x, y, z];
+
+    // Top cap (+Y), tiled so each edge matches its neighbouring face exactly.
+    quad(node, p(xMin,y1,zMin), p(xMin,y1,stepZ), p(split,y1,stepZ), p(split,y1,zMin), key);
+    quad(node, p(split,y1,zMin), p(split,y1,stepZ), p(xMax,y1,stepZ), p(xMax,y1,zMin), key);
+    quad(node, p(split,y1,stepZ), p(split,y1,zMax), p(xMax,y1,zMax), p(xMax,y1,stepZ), key);
+
+    // Bottom cap (-Y).
+    quad(node, p(xMin,y0,zMin), p(split,y0,zMin), p(split,y0,stepZ), p(xMin,y0,stepZ), key);
+    quad(node, p(split,y0,zMin), p(xMax,y0,zMin), p(xMax,y0,stepZ), p(split,y0,stepZ), key);
+    quad(node, p(split,y0,stepZ), p(xMax,y0,stepZ), p(xMax,y0,zMax), p(split,y0,zMax), key);
+
+    // Outer shell. Split the north/east walls where the cap edges are split.
+    quad(node, p(xMin,y0,zMin), p(xMin,y1,zMin), p(split,y1,zMin), p(split,y0,zMin), key);
+    quad(node, p(split,y0,zMin), p(split,y1,zMin), p(xMax,y1,zMin), p(xMax,y0,zMin), key);
+    quad(node, p(split,y0,zMax), p(xMax,y0,zMax), p(xMax,y1,zMax), p(split,y1,zMax), key);
+    quad(node, p(xMin,y0,zMin), p(xMin,y0,stepZ), p(xMin,y1,stepZ), p(xMin,y1,zMin), key);
+    quad(node, p(xMax,y0,zMin), p(xMax,y1,zMin), p(xMax,y1,stepZ), p(xMax,y0,stepZ), key);
+    quad(node, p(xMax,y0,stepZ), p(xMax,y1,stepZ), p(xMax,y1,zMax), p(xMax,y0,zMax), key);
+
+    // Re-entrant step face and the exposed west end of the Rangmahal wing.
+    quad(node, p(xMin,y0,stepZ), p(split,y0,stepZ), p(split,y1,stepZ), p(xMin,y1,stepZ), key);
+    quad(node, p(split,y0,stepZ), p(split,y0,zMax), p(split,y1,zMax), p(split,y1,stepZ), key);
+  }
+
   function orientedBoxXZ(node, cx, cy, cz, length, height, depth, angle, key) {
     const tx = -Math.sin(angle), tz = Math.cos(angle);
     const nx = Math.cos(angle), nz = Math.sin(angle);
@@ -693,8 +727,18 @@ function buildGlb(lod) {
   const andarFf={base:andarGf.base+andarGf.height+DIM.slab,height:ffHeight*DIM.andarmahalHeightScale,width:DIM.windowFF,crown:DIM.crownFF};
   const andarRoofTop=andarFf.base+andarFf.height+DIM.slab;
 
-  box(n.Plinth,(split+xMax)/2,DIM.ground+DIM.plinth/2,0,rangLength,DIM.plinth,D,"sceneStone");
-  box(n.Plinth,andarCenterX,DIM.ground+DIM.plinth/2,andarCenterZ,andarLength,DIM.plinth,andarDepth,"sceneStone");
+  const plinthZMin = -D / 2;
+  const plinthZMax = D / 2;
+  const andarZMin = andarCenterZ - andarDepth / 2;
+  const andarZMax = andarCenterZ + andarDepth / 2;
+  if (Math.abs(andarZMin - plinthZMin) > 1e-5) {
+    throw new Error("The stepped plinth requires the Andarmahal and Rangmahal north edges to align; trace the footprint before changing this constraint.");
+  }
+  steppedPlinthXZ(
+    n.Plinth, xMin, split, xMax,
+    plinthZMin, andarZMax, plinthZMax,
+    DIM.ground, plinthTop, "sceneStone",
+  );
 
   addFacadeSection("Rangmahal_GF",split,xMax,rangBays,[gf],lod);
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
