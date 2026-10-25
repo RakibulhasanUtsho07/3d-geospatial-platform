@@ -385,6 +385,9 @@ jobs:
       - name: Test privacy-safe imagery tile error diagnostics
         run: npm run test:imagery-tile-error-diagnostics
 
+      - name: Test map canvas visual anomaly diagnostics
+        run: npm run test:canvas-red-pixel-diagnostics
+
       - name: Test building search index
         run: npm run test:building-search
 
