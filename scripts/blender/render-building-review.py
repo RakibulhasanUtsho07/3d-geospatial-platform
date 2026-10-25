@@ -25,8 +25,9 @@ def ensure_world(scene):
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is not None:
-        background.inputs["Color"].default_value = (0.38, 0.40, 0.43, 1.0)
-        background.inputs["Strength"].default_value = 0.7
+        # Dark neutral studio background preserves contrast for pale heritage facades.
+        background.inputs["Color"].default_value = (0.055, 0.070, 0.090, 1.0)
+        background.inputs["Strength"].default_value = 0.35
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -129,11 +130,14 @@ def main():
     scene.render.resolution_percentage = 100
     try:
         scene.view_settings.view_transform = "AgX"
+        scene.view_settings.look = "AgX - Medium High Contrast"
     except Exception:
         pass
     ensure_world(scene)
 
-    light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
+    # Scale lights with the imported model bounds. A hard 50 kW cap under-lit
+    # large (80 m+) heritage buildings in headless review renders.
+    light_power = max(1000.0, min(8000000.0, max_dimension * max_dimension * 180.0))
     light_size = max_dimension * 1.2
     add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
     add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)

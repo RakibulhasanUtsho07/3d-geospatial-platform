@@ -22,3 +22,8 @@ Published descriptions vary on storey count and floor-area definition. The model
 3. Review front/oblique/top/side/back views against matching visible features and record occlusions.
 4. Remaining topology warnings need primitive-by-primitive review; no automatic visual acceptance follows from a valid GLB.
 5. A traced footprint, rectified facade views or independent survey/control points are required before real-world dimensional accuracy can be claimed.
+
+
+## Contrast / large-model lighting correction
+
+The headless renderer uses a dark neutral studio background, AgX medium-high contrast, and key-light energy scaled against imported model bounds (with a finite 8 MW guard) so large pale facades are not lost against the background. This improves inspection visibility; it does not imply visual similarity to a real building.

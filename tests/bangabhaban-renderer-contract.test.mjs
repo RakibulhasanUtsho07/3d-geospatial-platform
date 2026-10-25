@@ -12,3 +12,9 @@ test("headless Blender QA samples the exact saved PNG rather than relying on tra
   assert.match(renderer, /bpy\.data\.images\.remove\(result\)/);
   assert.doesNotMatch(renderer, /bpy\.data\.images\.get\("Render Result"\)/);
 });
+test("heritage render lighting preserves facade contrast on large models", () => {
+  assert.match(renderer, /default_value = \(0\.055, 0\.070, 0\.090, 1\.0\)/);
+  assert.match(renderer, /AgX - Medium High Contrast/);
+  assert.match(renderer, /min\(8000000\.0, max_dimension \* max_dimension \* 180\.0\)/);
+  assert.doesNotMatch(renderer, /min\(50000\.0, max_dimension \* max_dimension/);
+});
