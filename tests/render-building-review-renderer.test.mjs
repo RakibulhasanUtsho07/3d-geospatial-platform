@@ -46,9 +46,13 @@ test("rejects unbounded renderer timeouts, invalid resolutions, and unknown flag
 test("renders a calibrated source photo camera from its pose, focal lengths, principal point and image size", () => {
   assert.match(rendererSource, /def render_source_camera\(opts, meshes, scene, output_dir, dimensions, center\):/);
   assert.match(cameraSetupSource, /camera_data\.lens = fx \* camera_data\.sensor_width \/ width/);
-  assert.match(cameraSetupSource, /camera_data\.shift_x = \(width \/ 2\.0 - cx\) \/ width/);
-  assert.match(cameraSetupSource, /camera_data\.shift_y = \(cy - height \/ 2\.0\) \/ width/);
+  assert.match(cameraSetupSource, /camera_data\.shift_x = \(cx - \(width - 1\.0\) \/ 2\.0\) \/ -width/);
+  assert.match(cameraSetupSource, /camera_data\.shift_y = \(\(cy - \(height - 1\.0\) \/ 2\.0\) \/ width\) \* pixel_aspect_ratio/);
   assert.match(cameraSetupSource, /camera\.rotation_quaternion = Quaternion\(\(quaternion\[0\], quaternion\[1\], quaternion\[2\], quaternion\[3\]\)\)/);
+  assert.match(cameraSetupSource, /if fx > fy:/);
+  assert.match(cameraSetupSource, /elif fx < fy:/);
+  assert.match(cameraSetupSource, /scene\.render\.pixel_aspect_x = pixel_aspect_x/);
+  assert.match(cameraSetupSource, /scene\.render\.pixel_aspect_y = pixel_aspect_y/);
   assert.match(cameraSetupSource, /scene\.render\.resolution_x = width/);
   assert.match(cameraSetupSource, /scene\.render\.resolution_y = height/);
   assert.match(rendererSource, /sourceCameraView/);
