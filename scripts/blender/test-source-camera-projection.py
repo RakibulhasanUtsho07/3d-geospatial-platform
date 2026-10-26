@@ -1,6 +1,8 @@
 import json
 import math
+import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mathutils import Vector
 from bpy_extras.object_utils import world_to_camera_view
 
