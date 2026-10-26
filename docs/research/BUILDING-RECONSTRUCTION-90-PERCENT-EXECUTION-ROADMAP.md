@@ -6,6 +6,19 @@
 **Status:** Proposed implementation plan; this document does not itself change engine code.  
 **Related research:** [Building Accuracy Upgrade Plan](./BUILDING-ACCURACY-UPGRADE-PLAN.md)
 
+## New-chat continuation protocol
+
+When resuming this engineering work in a new chat, read this document first and then review the linked research plan. Before editing code, inspect the current GitHub branch/PR head, exact commit SHA, open review threads and CI state; the execution log below is the source of the next-step pointer, not a substitute for checking live GitHub state.
+
+1. Continue the earliest backlog item marked **IN PROGRESS**. If none is in progress, take the earliest unchecked task in the order defined in Section 7.
+2. Make one small, scoped implementation per feature branch/PR. Preserve existing unrelated changes and use the existing branch relationship recorded in the live PR.
+3. Add/adjust automated tests and a regression test for the gap being fixed. Run CI on the exact commit SHA; don't describe pending checks as passing.
+4. At task end, update this roadmap's checkbox and execution log with the changed files, commit SHA, PR link, test/workflow ID and actual result, known limitations, and exactly one next task.
+5. Do not merge through to `development` or `main` until exact-head CI and applicable evidence/review gates pass. Do not claim a model's architectural accuracy from a green code CI run.
+
+`PASS` is a test/evidence outcome, not a promise of universal 90% fidelity. Keep missing data explicitly missing and carry confidence/observed/inferred distinctions throughout.
+
+
 ## 1. Goal and honest definition
 
 Upgrade the building-generation system to make evidence-backed, high-fidelity models across diverse building types. “Around 90% match” is a target to validate on suitable, well-documented cases, not a guarantee for any building from any input. A rectangular block with surveyed dimensions is easier to reconstruct than a heritage palace with occluded wings, curved roofs, deep arcades and only one frontal photo.
@@ -332,3 +345,16 @@ The related [Building Accuracy Upgrade Plan](./BUILDING-ACCURACY-UPGRADE-PLAN.md
 Start with BRF-01 through BRF-04. This gives the engine a generic renderer, an evidence contract, input quality gates and a measurable baseline. Then integrate per-view semantics and confidence-aware fusion, followed by hybrid geometry, bounded fixes and texture.
 
 A model that looks good is not automatically accurate. The roadmap makes independent truth, reproducible comparison and regression prevention part of the engine rather than an afterthought.
+
+
+## 11. Execution log — update after every task
+
+### 2026-10-26 — BRF-01 Generic renderer (in progress)
+
+- **Branch:** `feat/brf-01-generic-renderer`, based on `fix/bangabhaban-front-dome-alignment`.
+- **PR:** [#187 — feat(renderer): make building review renderer generic](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/187) (Draft).
+- **Exact head commit at PR creation:** `967d84f213cfe90a254445938ef1cdc7d2d8b757`.
+- **Implemented in this task:** removed building-specific node lists from the Blender renderer; added a validated review-profile schema and a dedicated Rangmahal profile; added profile ID/hash, front-axis and profile-selection evidence to manifests; validated required profile nodes/hash; updated renderer documentation and tests; enabled CI triggers for the feature branch and parent PR target.
+- **Files:** `scripts/blender/render-building-review.py`; `scripts/render-building-review-views.mjs`; `src/core/building-generation/render-review-profile.mjs`; `src/core/building-generation/render-review-manifest.mjs`; `data/heritage/rangmahal-render-review-profile.json`; the related renderer/profile/manifest tests; `docs/BLENDER-RENDER-REVIEW.md`; `package.json`; `.github/workflows/ci.yml`.
+- **Verification observed so far:** GitHub Actions CI run `40332334876` is `in_progress`; the job is `Lint and production build`. No full green result has been verified at this log entry. This is not yet complete/release-ready.
+- **Next action:** fetch run `40332334876` until it reaches a terminal result, inspect failing step logs if any, fix issues on the same feature branch, and re-check CI against its latest exact head. Once BRF-01 passes, proceed to **BRF-02 — shared candidate evidence manifest**; don't start BRF-02 before resolving BRF-01's checks.
