@@ -192,6 +192,7 @@ test("missing actual-file hashes keep the evidence incomplete rather than verifi
   const { input } = fixture();
   const report = assessBuildingCandidateEvidenceManifest(input);
   assert.equal(report.status, "incomplete");
+  assert.notEqual(report.evidenceTier, "A");
   assert.equal(report.publicationEligible, false);
   assert.ok(report.warnings.some((warning) => warning.id === "actual-artifact-bytes-verified"));
 });
