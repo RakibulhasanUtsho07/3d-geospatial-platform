@@ -83,10 +83,10 @@ export function buildBinaryMaskReviewOverlaySvg({
       sourceWidth * sourceHeight > MAX_ANALYSIS_PIXELS) {
     throw new RangeError("Source image dimensions are invalid or exceed the bounded overlay limit.");
   }
-  const mask = finitePixelPlane({ width: maskWidth, height: maskHeight, pixels: maskPixels }, "Mask");
-  if (mask.width !== sourceWidth || mask.height !== sourceHeight) {
+  if (maskWidth !== sourceWidth || maskHeight !== sourceHeight) {
     throw new RangeError("Mask dimensions must exactly match the original source image.");
   }
+  const mask = finitePixelPlane({ width: maskWidth, height: maskHeight, pixels: maskPixels }, "Mask");
   if (!SAFE_ID.test(role)) throw new TypeError("Mask role must be a safe identifier.");
   if (!Number.isSafeInteger(maxRuns) || maxRuns < 1 || maxRuns > MAX_OVERLAY_RUNS) {
     throw new RangeError("maxRuns must be an integer between 1 and " + MAX_OVERLAY_RUNS + ".");
