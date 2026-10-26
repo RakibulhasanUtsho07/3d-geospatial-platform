@@ -291,7 +291,7 @@ Each golden fixture should include inputs, expected dimensions, camera matrices,
 These are proposed tasks, not code changes already completed.
 
 - [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
-- [ ] **BRF-02 (P0):** Shared candidate evidence manifest with source/model/config/report hashes, camera provenance and review state.
+- [ ] **BRF-02 (P0, IN PROGRESS):** Shared candidate evidence manifest is implemented in Draft PR #188; exact-head CI is running after fixing a confidence/evidence test-fixture contradiction. Do not mark complete until all CI checks pass.
 - [ ] **BRF-03 (P0):** Capture manifest and input quality/coverage preflight.
 - [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
@@ -360,3 +360,15 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Install issues fixed during this task:** first, Ubuntu Azure archive download timed out while fetching Blender; switched to the regular Ubuntu archive with bounded retries/timeouts. The first actual renderer run then exposed missing NumPy; added `python3-numpy`. The subsequent dedicated smoke test passed.
 - **Scope caveat:** BRF-01 verifies generic review rendering, not real-building fidelity, and publication remains disabled.
 - **Next action:** begin **BRF-02 — shared candidate evidence manifest**, consolidating source/model/config/camera/reference/render hashes and confidence states into one versioned candidate evidence contract. Do not merge the stacked feature PR to `development`/`main` without review of the complete feature chain.
+
+
+### 2026-10-26 — BRF-02 Shared candidate evidence manifest (in progress)
+
+- **Branch:** `feat/brf-02-candidate-evidence-manifest`, stacked on `feat/brf-01-generic-renderer`.
+- **PR:** [#188 — shared building candidate evidence manifest](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/188) (Draft).
+- **Latest recorded head:** `73a4200bc96b47d2c3b7c890f6e086d7c4496864`.
+- **Implemented:** added `src/core/building-generation/building-candidate-evidence-manifest.mjs` with schema normalization and an evidence assessor; added 10 regression tests plus an explicit contradictory-measured-confidence test; registered `npm run test:building-candidate-evidence-manifest` and the CI step; wrote `docs/research/BUILDING-CANDIDATE-EVIDENCE-MANIFEST.md`.
+- **Contract coverage:** hashes/bytes/relative paths for present artifacts, explicit missing artifacts, candidate/building binding, camera pose/calibration/frame alignment, dimensions and uncertainty basis, ground-control frame, 13 fixed render views, QA/reference/accuracy/release output bindings, evidence-backed confidence, and publication-disabled policy.
+- **Failure found and fixed:** CI run `40345789120` failed one test because the fixture downgraded independent dimensions to estimated but left their confidence status `measured`. The fixture now marks dimensions inferred for the incomplete-state test; a separate test confirms the contradictory `measured` label correctly fails closed.
+- **Current exact-head CI:** [run #40347288990](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40347288990) for commit `73a4200bc96b47d2c3b7c890f6e086d7c4496864` is pending at the latest observation. **BRF-02 remains in progress** until that exact head completes successfully.
+- **Next action:** inspect run `40347288990`. Fix any failing test on the same feature branch, then verify the exact head is green and update this log with the terminal result. Only then mark BRF-02 complete; next task is **BRF-03 — capture manifest and input quality/coverage preflight**.
