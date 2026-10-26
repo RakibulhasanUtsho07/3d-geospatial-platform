@@ -31,7 +31,10 @@ function fixture() {
   }));
   return {
     buildingId: "building-a",
-    manifest: { schemaVersion: "1.0.0", manifestId: "capture-a", buildingId: "building-a", sources,
+    manifest: { schemaVersion: "1.0.0", manifestId: "capture-a", buildingId: "building-a", createdAt: reviewedAt,
+      buildingIdentity: { status: "verified", sourceId: "building-register",
+        evidenceDescription: "Identity linked to a reviewed register.", verifiedBy: "reviewer-a", verifiedAt: reviewedAt },
+      sources,
       measurements: ["x", "y", "z"].map((axis, index) => ({ id: "dimension-" + axis, axis, valueM: [20, 12, 30][index],
         uncertaintyM: 0.1, basis: "surveyed", status: "verified", sourceId: "survey-record",
         evidenceId: "survey-book-2026", verifiedBy: "surveyor-a", verifiedAt: reviewedAt })),
