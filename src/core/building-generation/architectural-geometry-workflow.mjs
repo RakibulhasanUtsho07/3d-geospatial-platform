@@ -1029,7 +1029,13 @@ export async function runArchitecturalGeometryWorkflow(options) {
       const glbResult = glbExport.artifact.payload;
       const glbQa = glbValidationPayload.report;
       const blockers = [];
-      if (wireframe.status !== "candidate-wireframe" || wireframe.issues.length) blockers.push("multi-view-registration-needs-review");
+      const blockingRegistrationIssues = wireframe.issues.filter((issue) => !(
+        issue.type === "correspondence-review-required" &&
+        issue.reason === "insufficient-views-for-outlier-rejection"
+      ));
+      if (wireframe.status !== "candidate-wireframe" || blockingRegistrationIssues.length) {
+        blockers.push("multi-view-registration-needs-review");
+      }
       if (!wireframe.vertices.length) blockers.push("no-triangulated-vertices");
       if (qaReport.status !== "qa-clean") blockers.push("wireframe-qa-needs-review");
       if (qaReport.repairs.length) blockers.push("wireframe-safe-repairs-were-applied");
