@@ -198,11 +198,18 @@ async function main() {
       if (sourceCameraAssessment.sameCameraComparable) {
         const sourceCameraView = raw.sourceCameraView;
         if (!sourceCameraView || sourceCameraView.renderComplete !== true) {
+          const renderFailure = ["blender-source-camera-render-missing-or-incomplete"];
+          if (sourceCameraView && typeof sourceCameraView.errorCode === "string") {
+            renderFailure.push(sourceCameraView.errorCode);
+          }
+          if (sourceCameraView && typeof sourceCameraView.errorMessage === "string" && sourceCameraView.errorMessage.trim()) {
+            renderFailure.push("blender-source-camera-error:" + sourceCameraView.errorMessage.trim().slice(0, 1000));
+          }
           sourceCameraAssessment = {
             ...sourceCameraAssessment,
             status: "not-comparable",
             sameCameraComparable: false,
-            errors: [...sourceCameraAssessment.errors, "blender-source-camera-render-missing-or-incomplete"],
+            errors: [...sourceCameraAssessment.errors, ...renderFailure],
           };
         } else {
           const sourceCameraPath = path.join(outputDir, "source-camera.png");
