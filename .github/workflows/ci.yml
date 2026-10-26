@@ -230,6 +230,9 @@ jobs:
       - name: Test camera calibration evidence and correspondence outlier QA
         run: npm run test:camera-projection-validation && npm run test:correspondence-outlier-qa
 
+      - name: Test confidence-aware wireframe fusion
+        run: npm run test:confidence-aware-wireframe-fusion
+
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
