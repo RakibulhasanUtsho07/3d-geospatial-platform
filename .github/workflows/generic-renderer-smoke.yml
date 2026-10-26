@@ -1,0 +1,115 @@
+name: Generic building renderer smoke test
+
+on:
+  push:
+    branches:
+      - feat/brf-01-generic-renderer
+    paths:
+      - ".github/workflows/generic-renderer-smoke.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/render-review-profile.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "tests/render-review-profile.test.mjs"
+      - "tests/render-review-manifest.test.mjs"
+      - "tests/render-building-review-renderer.test.mjs"
+      - "tests/fixtures/demo-building-spec.json"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - fix/bangabhaban-front-dome-alignment
+      - development
+      - main
+    paths:
+      - ".github/workflows/generic-renderer-smoke.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/render-review-profile.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "tests/render-review-profile.test.mjs"
+      - "tests/render-review-manifest.test.mjs"
+      - "tests/render-building-review-renderer.test.mjs"
+      - "tests/fixtures/demo-building-spec.json"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generic-renderer-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  renderer-smoke:
+    name: Render generic GLB in Blender and verify evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender from a responsive Ubuntu archive mirror
+        timeout-minutes: 28
+        run: |
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's|azure.archive.ubuntu.com/ubuntu|archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          sudo timeout 5m apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive timeout 22m apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Run renderer profile and manifest tests
+        run: |
+          npm run test:render-review-profile
+          node --test tests/render-review-manifest.test.mjs tests/render-building-review-renderer.test.mjs tests/heritage-model.test.mjs
+
+      - name: Generate a generic demo-building GLB
+        run: |
+          mkdir -p "$RUNNER_TEMP/building-review-smoke"
+          npm run generate:building-model -- tests/fixtures/demo-building-spec.json "$RUNNER_TEMP/building-review-smoke/demo.glb"
+
+      - name: Render 13 views and validate the generic review manifest
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          smoke_root="$RUNNER_TEMP/building-review-smoke"
+          npm run render:building-review -- "$smoke_root/demo.glb" "$smoke_root/rendered" --resolution=256 --blender=blender
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import path from "node:path";
+          const root = path.join(process.env.RUNNER_TEMP, "building-review-smoke", "rendered");
+          const manifest = JSON.parse(await readFile(path.join(root, "render-review-manifest.json"), "utf8"));
+          if (manifest.valid !== true || manifest.counts?.generatedViews !== 13) {
+            throw new Error("Generic renderer did not produce a valid 13-view review set: " + manifest.status);
+          }
+          if (manifest.reviewProfile?.profileId !== "generic-whole-model-v1" ||
+              manifest.reviewProfile?.source !== "built-in-default" ||
+              manifest.reviewProfile?.globalExcludedMeshCount !== 0 ||
+              manifest.reviewProfile?.frontVisibleMeshCount < 1) {
+            throw new Error("Generic render profile metadata is missing or unexpected.");
+          }
+          if (manifest.publicationEligible !== false) {
+            throw new Error("A technical render smoke test must never make a model publication-eligible.");
+          }
+          console.log(JSON.stringify({
+            status: manifest.status,
+            valid: manifest.valid,
+            generatedViews: manifest.counts.generatedViews,
+            reviewProfile: manifest.reviewProfile,
+            publicationEligible: manifest.publicationEligible,
+          }, null, 2));
+          NODE
