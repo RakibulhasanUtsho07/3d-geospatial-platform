@@ -43,6 +43,7 @@
     "test:heritage-model": "node --test tests/heritage-model.test.mjs tests/ahsan-manzil-generated-glb-qa.test.mjs tests/ahsan-manzil-topology-audit.test.mjs",
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
+    "test:generated-model-layer-boundary": "node --test tests/generated-model-layer-boundary.test.mjs",
     "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
     "generate:building-model": "node scripts/generate-building-model.mjs",
     "test:building-media": "node --test tests/media-pipeline.test.mjs",
