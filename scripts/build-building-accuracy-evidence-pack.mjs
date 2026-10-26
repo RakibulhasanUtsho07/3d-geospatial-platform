@@ -211,6 +211,7 @@ export function evaluateCaptureManifestBindings({ buildingId, manifest, captureR
     }
     const declaredIds = new Set(declared.map((item) => item.id));
     const manifestIds = new Set(captured.map((item) => item.id));
+    if (declaredIds.size !== declared.length || manifestIds.size !== captured.length) failed = true;
     if ([...declaredIds].some((id) => !manifestIds.has(id))) failed = true;
     if ([...manifestIds].some((id) => !declaredIds.has(id))) incomplete = true;
     const status = failed ? "failed" : incomplete ? "warning" : "passed";
