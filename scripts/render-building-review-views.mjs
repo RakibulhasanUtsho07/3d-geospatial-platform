@@ -73,7 +73,9 @@ async function main() {
   const singleFlag = (name) => {
     const matches = allFlags.filter((flag) => flag.startsWith("--" + name + "="));
     if (matches.length > 1) throw new Error("Specify --" + name + " only once");
-    return matches.length ? matches[0].slice(name.length + 3) : null;
+    const value = matches.length ? matches[0].slice(name.length + 3) : null;
+    if (value !== null && !value.trim()) throw new Error("--" + name + " cannot be empty");
+    return value;
   };
   const sourceCameraPathArg = singleFlag("source-camera");
   const sourceImagePathArg = singleFlag("source-image");
@@ -99,8 +101,6 @@ async function main() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  await mkdir(outputDir, { recursive: false });
-
   const modelBytes = await readFile(modelPath);
   let sourceCameraAssessment = null;
   let sourceCameraPath = null;
@@ -134,6 +134,8 @@ async function main() {
       console.error("Source-camera pair is not comparable: " + sourceCameraAssessment.errors.join(", "));
     }
   }
+  await mkdir(outputDir, { recursive: false });
+
   let textureQaSummary = null;
   try {
     textureQaSummary = summarizeTextureQa(reviewGlbTextureBindings(modelBytes));
