@@ -32,7 +32,7 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-rasterized-texture-visibility-v5";
+const WORKFLOW_VERSION = "architectural-geometry-correspondence-consensus-v6";
 const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
 const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
@@ -431,6 +431,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
         },
         outputs: {
           status: wireframe.status,
+          qualityStatus: wireframe.qualityStatus ?? wireframe.status,
+          reviewRequiredFeatureCount: wireframe.reviewRequiredFeatureCount ?? 0,
           cameraCount: wireframe.cameraCount,
           inputFeatureCount: wireframe.inputFeatureCount,
           triangulatedVertexCount: wireframe.triangulatedVertexCount,
@@ -1083,6 +1085,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
         },
         checks: {
           registrationStatus: wireframe.status,
+          registrationQualityStatus: wireframe.qualityStatus ?? wireframe.status,
+          registrationReviewRequiredFeatureCount: wireframe.reviewRequiredFeatureCount ?? 0,
           registrationIssueCount: wireframe.issues.length,
           triangulatedVertexCount: wireframe.triangulatedVertexCount,
           wireframeQaStatus: qaReport.status,
