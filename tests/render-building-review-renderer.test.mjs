@@ -42,6 +42,28 @@ test("rejects unbounded renderer timeouts, invalid resolutions, and unknown flag
   assert.throws(() => parseRenderOptions(["--blender=   "]), /Blender executable/);
 });
 
+test("renders a calibrated source photo camera from its pose, focal lengths, principal point and image size", () => {
+  assert.match(rendererSource, /def render_source_camera\(opts, meshes, scene, output_dir, dimensions, center\):/);
+  assert.match(rendererSource, /camera_data\.lens = fx \* camera_data\.sensor_width \/ width/);
+  assert.match(rendererSource, /camera_data\.shift_x = \(width \/ 2\.0 - cx\) \/ width/);
+  assert.match(rendererSource, /camera_data\.shift_y = \(cy - height \/ 2\.0\) \/ width/);
+  assert.match(rendererSource, /camera\.rotation_quaternion = Quaternion\(\(quaternion\[0\], quaternion\[1\], quaternion\[2\], quaternion\[3\]\)\)/);
+  assert.match(rendererSource, /scene\.render\.resolution_x = width/);
+  assert.match(rendererSource, /scene\.render\.resolution_y = height/);
+  assert.match(rendererSource, /sourceCameraView/);
+  assert.doesNotMatch(rendererSource, /source-camera.*projected_ortho_scale/);
+});
+
+test("keeps source-camera evidence separate and blocks stale or unverified pairs", async () => {
+  const wrapper = await readFile(new URL("../scripts/render-building-review-views.mjs", import.meta.url), "utf8");
+  assert.match(wrapper, /assessSourceCameraForRender/);
+  assert.match(wrapper, /sourceImageSha256: sha256\(sourceImageBytes\)/);
+  assert.match(wrapper, /sourceImageSize: rasterDimensions\(sourceImageBytes, sourceImagePath\)/);
+  assert.match(wrapper, /source-camera-render-manifest\.json/);
+  assert.match(wrapper, /sourceCameraReport\?\.sameCameraComparable === false/);
+  assert.match(wrapper, /--source-camera and --source-image must be supplied together/);
+});
+
 test("terminates a stalled Blender process and never promotes its partial output", async () => {
   const wrapper = await readFile(new URL("../scripts/render-building-review-views.mjs", import.meta.url), "utf8");
   assert.match(wrapper, /timeout: timeoutMs/);
