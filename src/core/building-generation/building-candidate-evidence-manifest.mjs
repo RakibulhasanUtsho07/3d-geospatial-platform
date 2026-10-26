@@ -183,8 +183,9 @@ export function normalizeBuildingCandidateEvidenceManifest(input = {}) {
   const glbArtifactId = artifactRef(candidateRaw.glbArtifactId, artifactById, "candidate.glbArtifactId", ["candidate-glb"]);
   const buildingSpecArtifactId = artifactRef(candidateRaw.buildingSpecArtifactId, artifactById, "candidate.buildingSpecArtifactId", ["building-spec"]);
   const generationReportArtifactId = artifactRef(candidateRaw.generationReportArtifactId, artifactById, "candidate.generationReportArtifactId", ["generation-report"]);
-  if ([glbArtifactId, buildingSpecArtifactId, generationReportArtifactId].some((id) => artifactById.get(id).status !== "present")) {
-    throw new TypeError("candidate GLB, BuildingSpec and generation report must be present");
+  if ([glbArtifactId, buildingSpecArtifactId, generationReportArtifactId].some((id) =>
+      artifactById.get(id).status !== "present" || artifactById.get(id).subjectBuildingId !== buildingId)) {
+    throw new TypeError("candidate GLB, BuildingSpec and generation report must be present and bound to the same building");
   }
   const generatorRaw = requireObject(candidateRaw.generator, "candidate.generator");
   for (const key of ["name", "version", "strategy"]) {
@@ -205,21 +206,25 @@ export function normalizeBuildingCandidateEvidenceManifest(input = {}) {
   }
   const captureManifestArtifactId = artifactRef(captureManifest.artifactId, artifactById,
     "evidence.captureManifest.artifactId", ["capture-manifest"], { allowMissing: captureManifestStatus !== "verified" });
-  if (captureManifestStatus === "verified" && (!captureManifestArtifactId || artifactById.get(captureManifestArtifactId).status !== "present")) {
-    throw new TypeError("verified capture manifest requires a present capture-manifest artifact");
+  if (captureManifestStatus === "verified" && (!captureManifestArtifactId ||
+      artifactById.get(captureManifestArtifactId).status !== "present" ||
+      artifactById.get(captureManifestArtifactId).subjectBuildingId !== buildingId)) {
+    throw new TypeError("verified capture manifest requires a present artifact explicitly bound to the same building");
   }
   const captureArtifactIds = normaliseIds(evidenceRaw.captureArtifactIds ?? [], "evidence.captureArtifactIds", 200);
   for (const id of captureArtifactIds) {
     const artifact = artifactById.get(id);
-    if (!artifact || artifact.type !== "source-image" || artifact.status !== "present" || artifact.purpose !== "capture") {
-      throw new TypeError("captureArtifactIds must reference present source-image artifacts with purpose capture");
+    if (!artifact || artifact.type !== "source-image" || artifact.status !== "present" ||
+        artifact.purpose !== "capture" || artifact.subjectBuildingId !== buildingId) {
+      throw new TypeError("captureArtifactIds must reference present source-image artifacts for this building with purpose capture");
     }
   }
   const referenceArtifactIds = normaliseIds(evidenceRaw.referenceArtifactIds ?? [], "evidence.referenceArtifactIds", 200);
   for (const id of referenceArtifactIds) {
     const artifact = artifactById.get(id);
-    if (!artifact || artifact.type !== "reference-image" || artifact.status !== "present" || artifact.purpose !== "reference") {
-      throw new TypeError("referenceArtifactIds must reference present reference-image artifacts with purpose reference");
+    if (!artifact || artifact.type !== "reference-image" || artifact.status !== "present" ||
+        artifact.purpose !== "reference" || artifact.subjectBuildingId !== buildingId) {
+      throw new TypeError("referenceArtifactIds must reference present reference-image artifacts for this building with purpose reference");
     }
   }
   const cameraEvidenceRaw = evidenceRaw.cameraEvidence ?? [];
@@ -242,11 +247,18 @@ export function normalizeBuildingCandidateEvidenceManifest(input = {}) {
     if (!POSE.has(poseStatus) || !PROOF.has(calibrationStatus) || !PROOF.has(frameAlignmentStatus)) {
       throw new TypeError("camera evidence status is unsupported for " + id);
     }
-    if (["calibrated", "estimated", "supplied"].includes(poseStatus) && !cameraArtifactId) {
-      throw new TypeError("camera evidence with a declared pose requires cameraArtifactId: " + id);
+    if (["calibrated", "estimated", "supplied"].includes(poseStatus) &&
+        (!cameraArtifactId || artifactById.get(cameraArtifactId).status !== "present")) {
+      throw new TypeError("camera evidence with a declared pose requires a present camera artifact: " + id);
     }
-    if (calibrationStatus === "verified" && !calibrationArtifactId) throw new TypeError("verified calibration requires an artifact: " + id);
-    if (frameAlignmentStatus === "verified" && !frameAlignmentArtifactId) throw new TypeError("verified frame alignment requires an artifact: " + id);
+    if (calibrationStatus === "verified" &&
+        (!calibrationArtifactId || artifactById.get(calibrationArtifactId).status !== "present")) {
+      throw new TypeError("verified calibration requires a present calibration artifact: " + id);
+    }
+    if (frameAlignmentStatus === "verified" &&
+        (!frameAlignmentArtifactId || artifactById.get(frameAlignmentArtifactId).status !== "present")) {
+      throw new TypeError("verified frame alignment requires a present frame-alignment artifact: " + id);
+    }
     return { id, sourceImageArtifactId, cameraArtifactId, calibrationArtifactId, frameAlignmentArtifactId, poseStatus, calibrationStatus, frameAlignmentStatus };
   });
   uniqueIds(cameraEvidence.map((item) => item.id), "evidence.cameraEvidence IDs");
@@ -389,11 +401,17 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
     const actualById = new Map();
     let actualListValid = true;
     for (const [index, item] of actualArtifacts.entries()) {
-      if (!object(item) || !idOk(item.id) || !hashOk(item.sha256) || !Number.isSafeInteger(item.bytes) || item.bytes < 1 || actualById.has(item.id)) {
+      if (!object(item) || !idOk(item.id) || !relativePathOk(item.relativePath) ||
+          !hashOk(item.sha256) || !Number.isSafeInteger(item.bytes) || item.bytes < 1 || actualById.has(item.id)) {
         actualListValid = false;
         break;
       }
-      actualById.set(item.id, { sha256: item.sha256.toLowerCase(), bytes: item.bytes });
+      const declared = byId.get(item.id);
+      if (!declared || declared.status !== "present" || declared.relativePath !== item.relativePath) {
+        actualListValid = false;
+        break;
+      }
+      actualById.set(item.id, { relativePath: item.relativePath, sha256: item.sha256.toLowerCase(), bytes: item.bytes });
     }
     record("actual-artifact-list-valid", actualListValid,
       "Actual file evidence must have unique IDs, byte lengths and SHA-256 hashes.", "failed");
@@ -408,6 +426,8 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
         }
         const hashMatches = actual.sha256 === artifact.sha256;
         const bytesMatch = actual.bytes === artifact.bytes;
+        record("artifact-path-matches:" + artifact.id, actual.relativePath === artifact.relativePath,
+          "Actual file must be read from the exact path pinned by the candidate manifest.", "failed");
         record("artifact-hash-matches:" + artifact.id, hashMatches,
           "Actual SHA-256 must match the candidate manifest.", "failed");
         record("artifact-size-matches:" + artifact.id, bytesMatch,
@@ -445,12 +465,15 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
   record("reference-coverage-rights", referenceCoverage,
     "Independent reference evidence needs rights-verified front/back/left/right views.");
   const captureManifest = manifest.evidence.captureManifest;
+  record("capture-manifest-declared-not-failed", captureManifest.status !== "failed",
+    "A capture manifest explicitly marked failed blocks the candidate evidence package.", "failed");
   record("capture-manifest-present", captureManifest.status === "verified" &&
     captureManifest.artifactId && byId.get(captureManifest.artifactId)?.status === "present",
   "Capture manifest must be present and declared verified before its metadata is treated as verified.");
-  if (captureManifest.artifactId && byId.get(captureManifest.artifactId)?.subjectBuildingId) {
-    record("capture-manifest-building-binding", byId.get(captureManifest.artifactId).subjectBuildingId === manifest.buildingId,
-      "Capture manifest must identify the same building as the candidate.", "failed");
+  if (captureManifest.artifactId) {
+    record("capture-manifest-building-binding",
+      byId.get(captureManifest.artifactId)?.subjectBuildingId === manifest.buildingId,
+      "Capture manifest artifact must identify the same building as the candidate.", "failed");
   }
 
   const cameraBySource = new Map(manifest.evidence.cameraEvidence.map((camera) => [camera.sourceImageArtifactId, camera]));
@@ -514,11 +537,15 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
   const accuracy = manifest.outputs.accuracyReport;
   record("accuracy-report-candidate-binding", accuracy.status === "missing" || accuracy.candidateSha256 === candidateHash,
     "Accuracy report must reference the exact candidate GLB.", "failed");
+  record("accuracy-report-not-failed", accuracy.status !== "failed",
+    "An accuracy report explicitly marked failed blocks candidate review.", "failed");
   record("accuracy-report-verified", accuracy.status === "verified",
     "Accuracy report must be verified against independent truth; visual rendering alone is not accuracy evidence.");
   const release = manifest.outputs.releaseReadiness;
   record("release-readiness-candidate-binding", release.status === "missing" || release.candidateSha256 === candidateHash,
     "Release readiness must reference the exact candidate GLB.", "failed");
+  record("release-readiness-not-blocked", release.status !== "blocked",
+    "A release-readiness report explicitly marked blocked blocks the candidate review.", "failed");
   record("publication-disabled", release.publicationEligible === false,
     "Candidate evidence assessment must never enable publication by itself.", "failed");
   record("release-review-state", ["ready-for-final-human-review", "ready-for-final-human-review-with-warnings"].includes(release.status),
@@ -545,8 +572,12 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
 
   const status = failures.length ? "failed" : warnings.length ? "incomplete" : "ready-for-review";
   let evidenceTier = "D";
-  if (captureCoverage && referenceCoverage && cameraPosesAcceptable && dimensions.status === "verified" && ground.status === "verified") {
-    evidenceTier = cameraCalibrated && frameAlignment ? "A" : "B";
+  const independentEvidenceReady = captureCoverage && referenceCoverage && cameraCoverage && cameraPosesAcceptable &&
+    dimensions.status === "verified" && ground.status === "verified";
+  const frameAlignmentVerified = manifest.evidence.cameraEvidence.length > 0 &&
+    manifest.evidence.cameraEvidence.every((camera) => camera.frameAlignmentStatus === "verified");
+  if (independentEvidenceReady) {
+    evidenceTier = cameraCalibrated && frameAlignmentVerified ? "A" : "B";
   } else if (referenceArtifacts.length > 0 && manifest.evidence.cameraEvidence.length > 0) evidenceTier = "C";
   const counts = {
     artifacts: manifest.artifacts.length,
