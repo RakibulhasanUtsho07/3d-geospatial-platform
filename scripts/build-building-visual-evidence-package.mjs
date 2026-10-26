@@ -147,8 +147,11 @@ async function buildInput(root, bundle) {
     decodedWidth: sourceImage.width, decodedHeight: sourceImage.height,
     mimeType: sourceImage.mimeType,
   };
-  const rightsFile = await loadOptional(root, source.rights?.evidencePath, "Source-rights evidence");
-  if (source.rights?.evidencePath) {
+  const rightsAsset = typeof source.rights?.evidencePath === "string"
+    ? { path: source.rights.evidencePath, sha256: source.rights.evidenceSha256 }
+    : null;
+  const rightsFile = rightsAsset ? await loadOptional(root, rightsAsset, "Source-rights evidence") : null;
+  if (rightsAsset && rightsFile) {
     source.rights = { ...source.rights, evidenceBytes: rightsFile.bytes, evidenceSha256: rightsFile.sha256 };
   }
 
