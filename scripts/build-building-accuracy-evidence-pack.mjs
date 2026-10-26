@@ -210,7 +210,7 @@ export function evaluateCaptureManifestBindings({ buildingId, manifest, captureR
       }
       if (!Number.isFinite(configured[axis])) { missing = true; continue; }
       if (Math.abs(configured[axis] - item.valueM) > item.uncertaintyM + 1e-3) mismatch = true;
-      if (item.basis !== evidence.basis) mismatch = true;
+      if (nonEmpty(evidence.basis) && item.basis !== evidence.basis) mismatch = true;
       if (nonEmpty(evidence.referenceId) && !(item.sourceId === evidence.referenceId || item.evidenceId === evidence.referenceId)) mismatch = true;
     }
     const status = mismatch ? "failed" : missing ? "warning" : "passed";
