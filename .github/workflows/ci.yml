@@ -256,6 +256,8 @@ jobs:
         run: npm run test:architectural-observation-schema
       - name: Test bounded per-view feature proposals and reviewed comparison
         run: npm run test:architectural-feature-proposals
+      - name: Test integrated BRF-05–07 visual evidence package and fail-closed real-world gates
+        run: npm run test:building-visual-evidence-package
 
       - name: Test bounded wireframe QA and safe repair passes
         run: npm run test:wireframe-qa-repair-passes
