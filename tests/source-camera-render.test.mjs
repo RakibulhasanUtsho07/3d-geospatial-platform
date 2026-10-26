@@ -64,6 +64,23 @@ test("projects known world points into the calibrated source-image pixels", () =
   assert.ok(Math.abs(offset.pixel.y - 49.5) < 1e-12);
 });
 
+test("reconstructs off-centre principal point and both focal lengths from Blender camera settings", () => {
+  const data = fixture();
+  data.cameraEvidence.camera.intrinsics = { fx: 125, fy: 80, cx: 43.25, cy: 31.75 };
+  const prepared = prepareSourceCameraRender(data);
+  assert.equal(prepared.valid, true);
+  const cam = prepared.renderPlan.blenderCamera;
+  const aspect = cam.pixelAspectY / cam.pixelAspectX;
+  const focalX = cam.lensMm / cam.sensorWidthMm * cam.imageWidth;
+  const recoveredCx = (cam.imageWidth - 1) / 2 - cam.shiftX * cam.imageWidth;
+  const recoveredCy = (cam.imageHeight - 1) / 2 + cam.shiftY * cam.imageWidth / aspect;
+  const focalY = focalX / aspect;
+  assert.ok(Math.abs(focalX - 125) < 1e-9);
+  assert.ok(Math.abs(focalY - 80) < 1e-9);
+  assert.ok(Math.abs(recoveredCx - 43.25) < 1e-9);
+  assert.ok(Math.abs(recoveredCy - 31.75) < 1e-9);
+});
+
 test("marks a point at or behind the source camera as non-visible", () => {
   const { camera } = fixture().cameraEvidence;
   assert.equal(projectWorldPointToSourceImage(camera, [0,0,-1]).visible, false);
