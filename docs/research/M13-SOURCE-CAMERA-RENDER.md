@@ -15,11 +15,12 @@ The camera evidence JSON has `schemaVersion: "1.0.0"` and a `camera` object cont
 - `convention: "vision-x-right-y-down-z-forward"`.
 - `pose.rotation`: a proper orthonormal 3×3 rotation mapping the vision-camera basis to the model/world frame; `pose.translation`: camera centre in that same frame.
 - Pinhole intrinsics `fx`, `fy`, `cx`, `cy` in source-image pixels.
+- A root `sourceImage.rightsAttestation` with `status: "permitted"`, a non-empty `sourceId` and SHA-256 of the permission/rights record. This is an operator-attested input; it does not independently prove that the permission claim is true.
 - `distortion: { "model": "none", "coefficients": [] }` or `pinhole-zero` with finite zero coefficients only.
 
 The camera file may include `sourceImage.crop`. If present, it records `x`, `y`, `width`, `height`, `originalWidth`, `originalHeight`, and `appliedToImage: true`. The image supplied to the renderer must already be that crop; crop dimensions must match the actual input raster, and camera intrinsics must already use crop-relative pixel coordinates. M13 does not silently crop or recalibrate pixels.
 
-The source camera and GLB must use the same explicit coordinate-frame label. This is an assertion by the workflow operator, not independent proof that the frames are correctly aligned. M13 does not estimate camera pose, scale, georeferencing, or hidden surfaces.
+The source camera and GLB must use the same explicit coordinate-frame label. The top-level `sourceImage` object in the JSON carries the `rightsAttestation` and optional `crop` metadata; the runner calculates the actual image SHA-256 and pixel dimensions from the supplied file. This is an assertion by the workflow operator, not independent proof that the frames are correctly aligned. M13 does not estimate camera pose, scale, georeferencing, or hidden surfaces.
 
 ## Coordinate mapping
 
