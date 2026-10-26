@@ -61,7 +61,7 @@ test("keeps source-camera evidence separate and blocks stale or unverified pairs
   assert.match(wrapper, /sourceImageSize: rasterDimensions\(sourceImageBytes, sourceImagePath\)/);
   assert.match(wrapper, /source-camera-render-manifest\.json/);
   assert.match(wrapper, /sourceCameraReport\?\.sameCameraComparable === false/);
-  assert.match(wrapper, /--source-camera and --source-image must be supplied together/);
+  assert.match(wrapper, /--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together/);
 });
 
 test("terminates a stalled Blender process and never promotes its partial output", async () => {
