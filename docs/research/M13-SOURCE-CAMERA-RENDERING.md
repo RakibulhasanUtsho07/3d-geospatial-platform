@@ -74,6 +74,8 @@ node scripts/render-building-review-views.mjs candidate.glb out/review-2026-01 \
 
 The renderer creates the normal canonical render set and writes `source-camera.png` plus `source-camera-render-manifest.json` only when the same-camera gate passes. If metadata or any of the four input files is missing/inconsistent, including either evidence file hash, no source-camera PNG is produced; the sidecar reports `not-comparable` with stable error codes and the command exits non-zero after recording the canonical render manifest. The current implementation supports PNG and JPEG source images; camera input is not inferred from image pixels.
 
+A source-camera render is not accepted merely because a PNG file exists or has the expected dimensions. Blender reloads the exact saved image and records pixel statistics. A frame with fewer than one sampled pixel, missing statistics, or a luminance standard deviation below 0.01 is rejected as `not-comparable` (background-only/near-uniform frame). The sidecar records the inspected pixel statistics alongside the PNG hash. This content gate catches the class of false-positive where a blank frame is technically a valid, correctly sized PNG.
+
 ## Projection model and tolerances
 
 For camera-local point ((X,Y,Z)), positive depth is (d=-Z). The pixel projection is
