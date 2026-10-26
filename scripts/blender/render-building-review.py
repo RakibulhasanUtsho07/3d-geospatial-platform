@@ -124,9 +124,12 @@ def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
         "frameAlignmentEvidence": camera_evidence.get("frameAlignmentEvidence"),
         "crop": image.get("crop"),
     }
+    # Keep the camera datablock reference before removing its object: Blender
+    # invalidates the object's RNA wrapper after unlink/removal.
+    camera_data = camera.data
     scene.camera = None
     bpy.data.objects.remove(camera, do_unlink=True)
-    bpy.data.cameras.remove(camera.data)
+    bpy.data.cameras.remove(camera_data)
     print("Rendered calibrated source camera -> " + filename)
     return view
 
@@ -347,6 +350,7 @@ def main():
                 "filename": "source-camera.png",
                 "renderComplete": False,
                 "errorCode": source_camera_render_error,
+                "errorMessage": str(error)[:1000],
             }
 
     raw_manifest = {
