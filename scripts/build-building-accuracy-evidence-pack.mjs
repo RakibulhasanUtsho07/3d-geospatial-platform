@@ -10,6 +10,7 @@ import { assessBuildingAccuracyEvidencePack, REQUIRED_RENDER_VIEWS } from "../sr
 import { validateBuildingCaptureManifestFile } from "./validate-building-capture-manifest.mjs";
 
 const HASH = /^[a-f0-9]{64}$/i;
+const nonEmpty = (value) => typeof value === "string" && value.trim().length > 0;
 const SAFE_PNG = /^[A-Za-z0-9][A-Za-z0-9._-]*\.png$/i;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
