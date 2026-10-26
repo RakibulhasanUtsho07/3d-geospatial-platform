@@ -91,6 +91,8 @@ function validateCamera(camera) {
     errors.push("at-least-four-independent-control-points-required");
   } else {
     const seen = new Set();
+    const seenWorldPoints = new Set();
+    const seenImagePoints = new Set();
     for (const point of camera.controlPoints) {
       if (!point || typeof point.id !== "string" || !point.id.trim() || seen.has(point.id) ||
           !validVector3(point.worldPoint) || !point.imagePoint ||
@@ -98,7 +100,15 @@ function validateCamera(camera) {
         errors.push("camera-control-point-invalid-or-duplicated");
         break;
       }
+      const worldKey = JSON.stringify(point.worldPoint);
+      const imageKey = JSON.stringify([point.imagePoint.x, point.imagePoint.y]);
+      if (seenWorldPoints.has(worldKey) || seenImagePoints.has(imageKey)) {
+        errors.push("camera-control-points-not-distinct");
+        break;
+      }
       seen.add(point.id);
+      seenWorldPoints.add(worldKey);
+      seenImagePoints.add(imageKey);
     }
   }
   return errors;
