@@ -349,14 +349,14 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 
 ## 11. Execution log — update after every task
 
-### 2026-10-26 — BRF-01 Generic renderer (in progress)
+### 2026-10-26 — BRF-01 Generic renderer (complete)
 
 - **Branch:** `feat/brf-01-generic-renderer`, based on `fix/bangabhaban-front-dome-alignment`.
-- **PR:** [#187 — feat(renderer): make building review renderer generic](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/187) (Draft).
-- **Latest recorded head commit:** `4d1eb5e03ba3add31c7333c6dae391e312ab4b0c`.
-- **Implemented:** removed building-specific node lists from the Blender renderer; added a validated review-profile schema and a dedicated Rangmahal profile; added profile ID/hash, mesh counts, front-bearing source and framing in manifests; added fail-closed checks for invalid/stale profiles and missing required nodes; updated documentation and regression tests.
-- **Integration guard:** CI now installs Blender, generates the repository demo BuildingSpec GLB, renders 13 views at 256×256 with the generic default profile and verifies profile provenance plus `publicationEligible: false`. This is a runtime smoke test, not an architectural-accuracy benchmark.
-- **Changed files:** `scripts/blender/render-building-review.py`; `scripts/render-building-review-views.mjs`; `src/core/building-generation/render-review-profile.mjs`; `src/core/building-generation/render-review-manifest.mjs`; `data/heritage/rangmahal-render-review-profile.json`; renderer/profile/manifest/heritage regression tests; `docs/BLENDER-RENDER-REVIEW.md`; `package.json`; `.github/workflows/ci.yml`.
-- **Validation history:** earlier CI run `40332334876` failed because `tests/heritage-model.test.mjs` still expected the old hard-coded camera vector. That test now checks the generic-profile contract. On the corrected test commit, profile tests, Blender Python syntax check, heritage regression tests and production build were observed passing before that run was superseded/cancelled by a later commit.
-- **Current exact-head CI:** Dedicated renderer workflow run `40339003923` is `in_progress` at `Install Blender with bounded package-manager timeouts`; general CI run `40339003689` is `pending`. The previous rerun `40333770319` did not finish successfully and is not considered a pass. Profile unit tests and Python syntax validation passed earlier. **BRF-01 remains in progress** until the current exact-head workflows receive terminal all-green results.
-- **Next action:** inspect runs `40339003923` and `40339003689`. Fix failures on `feat/brf-01-generic-renderer`, update this log with the new exact head and test evidence, and rerun. After green CI, mark BRF-01 complete and start **BRF-02 — shared candidate evidence manifest**. Do not merge this stacked PR into `development` or `main` before review/evidence gates pass.
+- **PR:** [#187 — feat(renderer): make building review renderer generic](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/187) (still Draft; not merged into development/main).
+- **Exact-head commit:** `5ec16ed677019c28c8380362b56de4062c683e4a`.
+- **Implemented:** removed building-specific node selectors from the Blender renderer; added a validated generic profile and external Rangmahal profile; added profile ID/hash, front bearing and mesh-count provenance to manifests; reject invalid/stale profiles and missing requested meshes; updated docs/tests and CI.
+- **Dedicated runtime evidence:** [run #40341288926](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40341288926) — **success**. Blender install, NumPy dependency, renderer/profile/manifest/heritage tests, demo GLB generation, 13 renders at 256×256, profile provenance checks and the `publicationEligible: false` guard passed.
+- **General CI:** [run #40341288833](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40341288833) — **success**, 131 successful workflow steps.
+- **Install issues fixed during this task:** first, Ubuntu Azure archive download timed out while fetching Blender; switched to the regular Ubuntu archive with bounded retries/timeouts. The first actual renderer run then exposed missing NumPy; added `python3-numpy`. The subsequent dedicated smoke test passed.
+- **Scope caveat:** BRF-01 verifies generic review rendering, not real-building fidelity, and publication remains disabled.
+- **Next action:** begin **BRF-02 — shared candidate evidence manifest**, consolidating source/model/config/camera/reference/render hashes and confidence states into one versioned candidate evidence contract. Do not merge the stacked feature PR to `development`/`main` without review of the complete feature chain.
