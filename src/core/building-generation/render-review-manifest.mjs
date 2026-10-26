@@ -99,6 +99,28 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   }
   if (rawManifest.width !== resolution || rawManifest.height !== resolution) errors.push("render-manifest-resolution-mismatch");
 
+  if (rawManifest.reviewProfile !== undefined && rawManifest.reviewProfile !== null) {
+    const profile = rawManifest.reviewProfile;
+    const countFields = ["globalExcludedMeshCount", "frontVisibleMeshCount"];
+    if (!profile || typeof profile !== "object" || Array.isArray(profile) ||
+        typeof profile.profileId !== "string" || !profile.profileId.trim() ||
+        !["built-in-default", "explicit-file"].includes(profile.source) ||
+        !sha256Pattern.test(profile.sha256 ?? "") ||
+        countFields.some((key) => !Number.isSafeInteger(profile[key]) || profile[key] < 0) ||
+        typeof profile.frontFramingLabel !== "string" || !profile.frontFramingLabel.trim()) {
+      errors.push("render-review-profile-metadata-invalid");
+    }
+  }
+  const bearing = rawManifest.frontFacingAzimuthDegrees;
+  const axisSource = rawManifest.frontAxisSource ?? "renderer-default";
+  if (bearing !== undefined && bearing !== null &&
+      (!finite(bearing) || bearing < 0 || bearing > 360 || axisSource !== "glb-extras.frontFacingAzimuthDegrees")) {
+    errors.push("render-front-bearing-metadata-invalid");
+  }
+  if (bearing === null && axisSource === "glb-extras.frontFacingAzimuthDegrees") {
+    errors.push("render-front-bearing-source-mismatch");
+  }
+
   const status = errors.length ? "failed" : warnings.length ? "review-required" : "render-set-ready-for-human-review";
   return {
     schemaVersion: "1.0.0",
