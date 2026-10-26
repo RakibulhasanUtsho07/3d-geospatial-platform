@@ -58,7 +58,7 @@ A compact illustrative fragment follows. Every identifier, file and number is a 
       "bytes": 12345,
       "sourceId": "replace-with-source-record-id",
       "rights": {
-        "status": "operator-attested",
+        "status": "verified",
         "evidenceId": "replace-with-rights-evidence-id",
         "reviewedBy": "replace-with-reviewer",
         "reviewedAt": "2026-10-26T10:00:00Z"
@@ -91,7 +91,7 @@ A compact illustrative fragment follows. Every identifier, file and number is a 
 }
 ```
 
-For a complete multi-view pilot, include separate capture photos covering front/back/left/right, independent reference photos for those sides, a measurement-evidence asset, verified X/Y/Z dimensions and at least three non-collinear surveyed control points. The one-record fragment above is only a schema illustration.
+For a complete multi-view pilot, include separate capture photos covering front/back/left/right, independent reference photos for those sides, a measurement-evidence asset, verified X/Y/Z dimensions and at least three non-collinear surveyed control points. The one-record fragment above is only a schema illustration. For a complete accuracy pack, the existing release evaluator also requires its stricter rights/source identity fields to be independently reviewed; an operator attestation alone does not authenticate copyright.
 
 ## M03 — Validate source files and readiness
 
