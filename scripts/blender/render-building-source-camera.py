@@ -102,7 +102,10 @@ def main():
         raise RuntimeError("Model bounds have zero extent")
 
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    try:
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
+    except TypeError:
+        scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = width
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
@@ -128,7 +131,7 @@ def main():
     camera_data.shift_x = float(camera_plan["shiftX"])
     camera_data.shift_y = float(camera_plan["shiftY"])
     camera_data.clip_start = max(extent * 1e-6, 1e-4)
-    camera_data.clip_end = max(extent * 100.0, camera_plan["location"][0] * 0.0 + 100.0)
+    camera_data.clip_end = max(extent * 100.0, 100.0)
     camera_obj = bpy.data.objects.new("CalibratedSourceCamera", camera_data)
     scene.collection.objects.link(camera_obj)
     camera_obj.location = Vector(camera_plan["location"])
@@ -158,7 +161,7 @@ def main():
         raise RuntimeError("Reference image dimensions changed; refusing to create a misleading overlay")
     scene.use_nodes = True
     scene.render.use_compositing = True
-    scene.render.film_transparent = False
+    scene.render.film_transparent = True
     nodes = scene.node_tree.nodes
     nodes.clear()
     render_node = nodes.new("CompositorNodeRLayers")
