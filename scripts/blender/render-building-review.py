@@ -82,6 +82,58 @@ def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
     return span * padding
 
 
+def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
+    """Render the candidate using an explicit, reviewed source-photo camera."""
+    camera_path = os.path.abspath(opts["--source-camera-json"])
+    module_dir = os.path.abspath(opts["--source-camera-module-dir"])
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+    from source_camera_camera import configure_source_camera
+
+    with open(camera_path, "r", encoding="utf-8") as stream:
+        camera_evidence = json.load(stream)
+    image = camera_evidence.get("sourceImage", {})
+    intrinsics = camera_evidence.get("intrinsics", {})
+    pose = camera_evidence.get("pose", {})
+    camera, width, height = configure_source_camera(
+        scene, camera_evidence, max(math.sqrt(sum(value * value for value in dimensions)), 1.0)
+    )
+    filename = "source-camera.png"
+    scene.render.filepath = os.path.join(output_dir, filename)
+    bpy.ops.render.render(write_still=True)
+    rendered_path = os.path.join(output_dir, filename)
+    if not os.path.isfile(rendered_path):
+        raise RuntimeError("Blender reported success but the source-camera render is missing")
+    rendered = bpy.data.images.load(rendered_path, check_existing=False)
+    try:
+        stats = sample_pixel_statistics(rendered, width)
+    finally:
+        bpy.data.images.remove(rendered)
+    view = {
+        "id": camera_evidence.get("id"),
+        "filename": filename,
+        "width": width,
+        "height": height,
+        "renderComplete": True,
+        "pixelStatistics": stats,
+        "sourceImage": image,
+        "intrinsics": intrinsics,
+        "pose": pose,
+        "coordinateFrame": camera_evidence.get("coordinateFrame"),
+        "calibrationEvidence": camera_evidence.get("calibrationEvidence"),
+        "frameAlignmentEvidence": camera_evidence.get("frameAlignmentEvidence"),
+        "crop": image.get("crop"),
+    }
+    # Keep the camera datablock reference before removing its object: Blender
+    # invalidates the object's RNA wrapper after unlink/removal.
+    camera_data = camera.data
+    scene.camera = None
+    bpy.data.objects.remove(camera, do_unlink=True)
+    bpy.data.cameras.remove(camera_data)
+    print("Rendered calibrated source camera -> " + filename)
+    return view
+
+
 def sample_pixel_statistics(image, resolution):
     total = int(image.size[0] * image.size[1])
     if total < 1:
@@ -279,6 +331,28 @@ def main():
         bpy.data.cameras.remove(camera_data)
         print("Rendered " + view_id + " -> " + filename)
 
+    source_camera_view = None
+    source_camera_render_error = None
+    if "--source-camera-json" in opts:
+        try:
+            source_camera_view = render_source_camera(opts, meshes, scene, output_dir, dimensions, center)
+        except Exception as error:
+            # Preserve the already completed canonical review renders. The Node
+            # wrapper emits a not-comparable sidecar and non-zero exit for this
+            # failed optional view; never treat it as a successful camera pair.
+            source_camera_render_error = "blender-source-camera-render-failed"
+            partial_source_path = os.path.join(output_dir, "source-camera.png")
+            if os.path.isfile(partial_source_path):
+                os.remove(partial_source_path)
+            print("Source-camera render failed: " + str(error), file=sys.stderr)
+            source_camera_view = {
+                "id": None,
+                "filename": "source-camera.png",
+                "renderComplete": False,
+                "errorCode": source_camera_render_error,
+                "errorMessage": str(error)[:1000],
+            }
+
     raw_manifest = {
         "schemaVersion": "1.0.0",
         "renderer": "Blender",
@@ -292,6 +366,7 @@ def main():
             "coordinateUnits": "imported-model-units-unverified",
         },
         "views": raw_views,
+        "sourceCameraView": source_camera_view,
     }
     raw_path = os.path.join(output_dir, ".blender-render-manifest.raw.json")
     with open(raw_path, "x", encoding="utf-8") as stream:

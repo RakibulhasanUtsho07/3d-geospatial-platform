@@ -270,6 +270,8 @@ This is a dependency guide, not a claim that all tasks are already implemented. 
 
 ### M13 — Render using each reference photo's camera
 
+**Implementation note (26 October 2026):** A candidate source-camera contract, reprojection checker, optional Blender render path, source-image/camera/model hash binding, and sidecar manifest have been added on `feat/m13-source-camera-rendering`. CI and code review remain pending. No real-building acceptance is claimed because no permissioned source photograph, independently verified calibration, or model-frame control evidence was supplied in this task.
+
 **Priority:** P0 · **Size:** M
 
 **Scope**

@@ -7,6 +7,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
+import {
+  assessSourceCameraForRender,
+  finalizeSourceCameraRenderManifest,
+} from "../src/core/building-generation/source-camera-render.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -23,6 +27,34 @@ function pngDimensions(bytes, label) {
   return { width, height };
 }
 
+function rasterDimensions(bytes, label) {
+  const signature = Buffer.from([137,80,78,71,13,10,26,10]);
+  if (bytes.length >= 24 && bytes.subarray(0,8).equals(signature) && bytes.toString("ascii",12,16) === "IHDR") {
+    return pngDimensions(bytes,label);
+  }
+  if (bytes.length >= 4 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    const startOfFrame = new Set([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf]);
+    let offset = 2;
+    while (offset + 4 <= bytes.length) {
+      if (bytes[offset] !== 0xff) { offset += 1; continue; }
+      while (offset < bytes.length && bytes[offset] === 0xff) offset += 1;
+      const marker = bytes[offset++];
+      if (marker === 0xd9 || marker === 0xda) break;
+      if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      if (offset + 2 > bytes.length) break;
+      const length = bytes.readUInt16BE(offset);
+      if (length < 2 || offset + length > bytes.length) break;
+      if (startOfFrame.has(marker) && length >= 7) {
+        const height = bytes.readUInt16BE(offset + 3);
+        const width = bytes.readUInt16BE(offset + 5);
+        if (width > 0 && height > 0) return { width, height };
+      }
+      offset += length;
+    }
+  }
+  throw new TypeError("source image must be a readable PNG or JPEG: " + label);
+}
+
 function summarizeTextureQa(report) {
   return {
     status: report.status,
@@ -34,10 +66,27 @@ function summarizeTextureQa(report) {
 }
 
 async function main() {
-  const [modelArg, outputArg, ...flags] = process.argv.slice(2);
+  const [modelArg, outputArg, ...allFlags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
-    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000]");
+    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000] [--source-camera=camera.json --source-image=photo.jpg --calibration-evidence=calibration.json --frame-alignment-evidence=alignment.json]");
   }
+  const singleFlag = (name) => {
+    const matches = allFlags.filter((flag) => flag.startsWith("--" + name + "="));
+    if (matches.length > 1) throw new Error("Specify --" + name + " only once");
+    const value = matches.length ? matches[0].slice(name.length + 3) : null;
+    if (value !== null && !value.trim()) throw new Error("--" + name + " cannot be empty");
+    return value;
+  };
+  const sourceCameraPathArg = singleFlag("source-camera");
+  const sourceImagePathArg = singleFlag("source-image");
+  const calibrationEvidencePathArg = singleFlag("calibration-evidence");
+  const frameAlignmentEvidencePathArg = singleFlag("frame-alignment-evidence");
+  const cameraInputs = [sourceCameraPathArg, sourceImagePathArg, calibrationEvidencePathArg, frameAlignmentEvidencePathArg];
+  if (cameraInputs.some(Boolean) && !cameraInputs.every(Boolean)) {
+    throw new Error("--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together");
+  }
+  const cameraFlags = ["--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
+  const flags = allFlags.filter((flag) => !cameraFlags.some((prefix) => flag.startsWith(prefix)));
   const { resolution, blender, timeoutMs } = parseRenderOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
@@ -52,9 +101,41 @@ async function main() {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
+  const modelBytes = await readFile(modelPath);
+  let sourceCameraAssessment = null;
+  let sourceCameraPath = null;
+  if (cameraInputs.every(Boolean)) {
+    sourceCameraPath = path.resolve(sourceCameraPathArg);
+    const sourceImagePath = path.resolve(sourceImagePathArg);
+    const calibrationEvidencePath = path.resolve(calibrationEvidencePathArg);
+    const frameAlignmentEvidencePath = path.resolve(frameAlignmentEvidencePathArg);
+    const [cameraBytes, sourceImageBytes, calibrationEvidenceBytes, frameAlignmentEvidenceBytes] = await Promise.all([
+      readFile(sourceCameraPath),
+      readFile(sourceImagePath),
+      readFile(calibrationEvidencePath),
+      readFile(frameAlignmentEvidencePath),
+    ]);
+    let camera;
+    try {
+      camera = JSON.parse(cameraBytes.toString("utf8"));
+    } catch (error) {
+      throw new TypeError("source-camera JSON is invalid: " + (error instanceof Error ? error.message : String(error)));
+    }
+    sourceCameraAssessment = assessSourceCameraForRender({
+      camera,
+      sourceImageSha256: sha256(sourceImageBytes),
+      sourceImageSize: rasterDimensions(sourceImageBytes, sourceImagePath),
+      cameraManifestSha256: sha256(cameraBytes),
+      calibrationEvidenceSha256: sha256(calibrationEvidenceBytes),
+      frameAlignmentEvidenceSha256: sha256(frameAlignmentEvidenceBytes),
+      modelSha256: sha256(modelBytes),
+    });
+    if (!sourceCameraAssessment.sameCameraComparable) {
+      console.error("Source-camera pair is not comparable: " + sourceCameraAssessment.errors.join(", "));
+    }
+  }
   await mkdir(outputDir, { recursive: false });
 
-  const modelBytes = await readFile(modelPath);
   let textureQaSummary = null;
   try {
     textureQaSummary = summarizeTextureQa(reviewGlbTextureBindings(modelBytes));
@@ -72,6 +153,9 @@ async function main() {
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
     ];
+    if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
+      args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
+    }
     const result = spawnSync(blender, args, { encoding: "utf8", windowsHide: true, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 });
     if (result.error) {
       if (result.error.code === "ETIMEDOUT") {
@@ -108,6 +192,44 @@ async function main() {
     });
     const reportPath = path.join(outputDir, "render-review-manifest.json");
     await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    let sourceCameraReport = null;
+    if (sourceCameraAssessment) {
+      let renderFile = null;
+      if (sourceCameraAssessment.sameCameraComparable) {
+        const sourceCameraView = raw.sourceCameraView;
+        if (!sourceCameraView || sourceCameraView.renderComplete !== true) {
+          const renderFailure = ["blender-source-camera-render-missing-or-incomplete"];
+          if (sourceCameraView && typeof sourceCameraView.errorCode === "string") {
+            renderFailure.push(sourceCameraView.errorCode);
+          }
+          if (sourceCameraView && typeof sourceCameraView.errorMessage === "string" && sourceCameraView.errorMessage.trim()) {
+            renderFailure.push("blender-source-camera-error:" + sourceCameraView.errorMessage.trim().slice(0, 1000));
+          }
+          sourceCameraAssessment = {
+            ...sourceCameraAssessment,
+            status: "not-comparable",
+            sameCameraComparable: false,
+            errors: [...sourceCameraAssessment.errors, ...renderFailure],
+          };
+        } else {
+          const sourceCameraPath = path.join(outputDir, "source-camera.png");
+          const bytes = await readFile(sourceCameraPath);
+          const dimensions = pngDimensions(bytes, "source-camera.png");
+          renderFile = {
+            filename: "source-camera.png", ...dimensions, bytes: bytes.length, sha256: sha256(bytes),
+          };
+        }
+      }
+      sourceCameraReport = finalizeSourceCameraRenderManifest({
+        assessment: sourceCameraAssessment,
+        renderFile,
+      });
+      await writeFile(
+        path.join(outputDir, "source-camera-render-manifest.json"),
+        JSON.stringify(sourceCameraReport, null, 2) + "\n",
+        { flag: "wx", mode: 0o600 },
+      );
+    }
     await rm(rawPath, { force: true });
     console.log(JSON.stringify({
       report: reportPath,
@@ -117,9 +239,15 @@ async function main() {
       resolution: resolution + "x" + resolution,
       errors: report.errors.length,
       warnings: report.warnings.length,
+      sourceCamera: sourceCameraReport ? {
+        report: path.join(outputDir, "source-camera-render-manifest.json"),
+        status: sourceCameraReport.status,
+        sameCameraComparable: sourceCameraReport.sameCameraComparable,
+        errors: sourceCameraReport.errors,
+      } : null,
       publicationEligible: false,
     }, null, 2));
-    if (!report.valid) process.exitCode = 2;
+    if (!report.valid || sourceCameraReport?.sameCameraComparable === false) process.exitCode = 2;
   } finally {
     await rm(pythonScript, { force: true });
   }
