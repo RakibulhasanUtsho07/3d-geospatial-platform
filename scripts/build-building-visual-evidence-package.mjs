@@ -170,6 +170,10 @@ async function buildInput(root, bundle) {
   const edgeAsset = await loadOptional(root, bundle.edgeMap, "Edge map");
   let edgeMap = null;
   if (bundle.edgeMap) {
+    if (bundle.edgeMap.sourceImageSha256?.toLowerCase() !== sourceFile.sha256 ||
+        bundle.edgeMap.width !== source.width || bundle.edgeMap.height !== source.height) {
+      throw new TypeError("Edge-map source hash and declared dimensions must match the exact source image.");
+    }
     const decoded = await sharp(edgeAsset.bytes, { failOn: "error" })
       .greyscale().removeAlpha().raw().toBuffer({ resolveWithObject: true });
     if (decoded.info.width !== source.width || decoded.info.height !== source.height) {
@@ -189,6 +193,9 @@ async function buildInput(root, bundle) {
   let sourceCameraRender = null;
   if (bundle.sourceCameraRender) {
     const renderFile = await safeRead(root, bundle.sourceCameraRender.path, "Source-camera render");
+    if (renderFile.bytes.length < 8 || !renderFile.bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+      throw new TypeError("Source-camera render must be an actual PNG image.");
+    }
     const renderStats = await readRenderStatistics(renderFile.bytes, "Source-camera render");
     if (renderStats.width !== source.width || renderStats.height !== source.height) {
       throw new RangeError("Source-camera render dimensions must match the exact source image.");
@@ -270,7 +277,7 @@ async function main() {
     outputDirectory: path.relative(root, outputDirectory).split(path.sep).join("/"),
     status: result.status,
     evidenceGraphSha256: result.evidenceGraphSha256,
-    stages: Object.fromEntries(Object.entries(result.stages).map(([key, value]) => [key, value.status ?? value.status])),
+    stages: Object.fromEntries(Object.entries(result.stages).map(([key, value]) => [key, value.status ?? "unspecified"])),
     errorCount: result.errors.length,
     warningCount: result.warnings.length,
     acceptanceEligible: result.acceptanceEligible,
