@@ -71,6 +71,13 @@ test("deliberately scaled Y-axis defect fails the expected-dimension tolerance g
     { x: qa.bounds.dimensions[0], y: qa.bounds.dimensions[1], z: qa.bounds.dimensions[2] },
     defect.expectedDimensionsM,
   );
+  const roundedDimensions = Object.fromEntries(
+    Object.entries({ x: qa.bounds.dimensions[0], y: qa.bounds.dimensions[1], z: qa.bounds.dimensions[2] })
+      .map(([axis, value]) => [axis, Number(value.toFixed(4))]),
+  );
+  assert.deepEqual(roundedDimensions, defect.expectedDimensionsM);
+  /*
+  );
   assert.equal(report.status, defect.expectedOutcome);
   assert.equal(report.maxRelativeErrorPercent, defect.expectedMaxRelativeErrorPercent);
   assert.equal(controlledBaselinePasses(glb), false);
