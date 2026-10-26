@@ -31,7 +31,10 @@ on:
       - feat/glb-uv-seam-review
       - feat/blender-render-review-views
       - feat/brf-02-candidate-evidence-manifest
+      - feat/brf-03-capture-quality-coverage
       - feat/brf-01-generic-renderer
+      - feat/brf-02-candidate-evidence-manifest
+      - feat/brf-03-capture-quality-coverage
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
       - feat/render-correction-verification
