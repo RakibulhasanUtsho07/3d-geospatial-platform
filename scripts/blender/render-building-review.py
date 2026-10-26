@@ -151,6 +151,7 @@ def main():
     # Keep the heritage-specific facade framing where its named meshes exist, but
     # never make those names a prerequisite for reviewing an ordinary building GLB.
     # Other buildings use the complete non-site mesh set for the canonical front view.
+    # Whole-model views restore it and retain the complete generated roof geometry.
     rangmahal_review_names = {
         "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
         "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
