@@ -154,7 +154,7 @@ async function main() {
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
     ];
     if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
-      args.push("--source-camera-json", sourceCameraPath);
+      args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
     }
     const result = spawnSync(blender, args, { encoding: "utf8", windowsHide: true, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 });
     if (result.error) {
