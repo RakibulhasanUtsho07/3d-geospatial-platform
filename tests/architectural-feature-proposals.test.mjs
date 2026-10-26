@@ -12,7 +12,7 @@ function fixture(withEdges = true) {
   for (let y = 2; y <= 17; y += 1) for (let x = 3; x <= 16; x += 1) pixels[y * width + x] = 255;
   const edges = new Uint8Array(width * height);
   if (withEdges) {
-    for (const y of [10, 14]) for (let x = 3; x <= 16; x += 1) edges[y * width + x] = 255;
+    for (const y of [10]) for (let x = 3; x <= 16; x += 1) edges[y * width + x] = 255;
     for (const [x1,y1,x2,y2] of [[6,5,8,7],[11,5,13,7],[7,12,10,17]]) {
       for (let x=x1; x<=x2; x+=1) { edges[y1*width+x]=255; edges[y2*width+x]=255; }
       for (let y=y1; y<=y2; y+=1) { edges[y*width+x1]=255; edges[y*width+x2]=255; }
