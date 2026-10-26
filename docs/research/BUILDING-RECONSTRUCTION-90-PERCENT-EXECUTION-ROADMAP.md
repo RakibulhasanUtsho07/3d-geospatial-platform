@@ -393,7 +393,7 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 ### 2026-10-26 — BRF-04 Baseline fixtures and deliberate defect injection (in progress)
 
 - **Branch:** `feat/brf-04-baseline-defect-benchmarks`, stacked on `feat/brf-03-capture-quality-coverage`.
-- **PR:** pending creation after validating the first exact-head run; branch head is currently `b55cc858e04334860a34d8784c6d45fa44f940bc`.
+- **PR:** pending creation after validating the first exact-head run; latest corrected head is `165f2ff0583ae42e50730271e8c1df957a48abf5`.
 - **Fixture:** `benchmarks/building-reconstruction/brf-04-controlled-baseline-v1.json`; synthetic closed cuboid with known dimensions 10×8×6 model metres, 12 triangles, zero degenerate triangles and a 2% dimension screen tolerance.
 - **Defect injection:** `tests/fixtures/building-baseline-glb.mjs` generates a byte-repeatable GLB and injects (1) a +20% Y-axis scaling defect and (2) a degenerate triangle index. These verify dimension tolerance and topology QA detect controlled faults. The test explicitly demonstrates that `valid: true` structural GLB status does not mean geometry quality or real-world correctness.
 - **Tests/CI:** `tests/building-baseline-defect-injection.test.mjs` has five checks; `npm run test:building-baseline-defect-injection` is wired into `.github/workflows/ci.yml`. The new branch is included in push triggers and its parent `feat/brf-03-capture-quality-coverage` is included as a PR target.
