@@ -255,16 +255,16 @@ This is a dependency guide, not a claim that all tasks are already implemented. 
 **Priority:** P0 · **Size:** M
 
 **Scope**
-- Define measurable readiness checks between the sparse wireframe and existing mesh-construction/surface-review stages.
-- Verify connectivity, face/edge references, orientation/degeneracy, open-boundary expectations and required facade coverage before attempting mesh creation.
-- Preserve existing mesh review rather than adding an alternative mesh generator.
+- Add a fail-closed readiness report before the existing explicit-face mesh builder.
+- Validate vertex/edge review state, explicit face references, boundary expectations, face winding, degeneracy, connected components and required facade coverage.
+- Preserve the existing mesh builder and surface review; do not create or repair geometry automatically.
 
 **Acceptance criteria**
-- Underdetermined wireframes do not silently generate a publishable mesh.
-- Failed readiness checks list actionable reasons.
-- A mesh produced from a sparse candidate remains a candidate until independent dimension and visual review passes.
+- A sparse wireframe with no explicit faces cannot proceed to mesh construction.
+- Every blocker has an actionable code and supporting details.
+- A structurally ready candidate remains non-publishable until independent dimensions and visual review pass.
 
-**Verification:** Run `npm run test:wireframe-to-mesh` and `npm run test:mesh-surface-review`; add pass/fail readiness fixtures.
+**Verification:** Run `npm run test:wireframe-mesh-readiness`, `npm run test:wireframe-to-mesh`, and `npm run test:mesh-surface-review`.
 
 **Depends on:** M11.
 
