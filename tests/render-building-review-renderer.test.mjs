@@ -68,6 +68,9 @@ test("keeps source-camera evidence separate and blocks stale or unverified pairs
   assert.match(wrapper, /sourceCameraReport\?\.sameCameraComparable === false/);
   assert.match(wrapper, /blender-source-camera-error:/);
   assert.match(rendererSource, /errorMessage": str\(error\)\[:1000\]/);
+  assert.match(rendererSource, /luminanceStandardDeviation.*< 0\.01/);
+  assert.match(rendererSource, /source-camera-render-has-no-visible-geometry-content/);
+  assert.match(wrapper, /pixelStatistics: sourceCameraView\.pixelStatistics/);
   assert.match(rendererSource, /camera_data = camera\.data[\s\S]*bpy\.data\.objects\.remove\(camera, do_unlink=True\)[\s\S]*bpy\.data\.cameras\.remove\(camera_data\)/);
   assert.match(wrapper, /--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together/);
 });
