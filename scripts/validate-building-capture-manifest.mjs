@@ -66,8 +66,8 @@ export async function validateBuildingCaptureManifestFile({ manifestPath, rootDi
     if (!source.path) {
       fileIntegrity.push({ sourceId: source.id, status: "warning", detail: "source path is missing", sha256: null, bytes: null });
       if (qualityCandidates.some((item) => item.id === source.id)) {
-        qualityById.set(source.id, { sourceId: source.id, side: source.side, status: "failed",
-          warnings: ["quality-analysis-unavailable"], error: "source path is missing" });
+        qualityById.set(source.id, { sourceId: source.id, side: source.side, status: "missing",
+          warnings: ["quality-analysis-unavailable"], detail: "source path is missing" });
       }
       continue;
     }
@@ -134,7 +134,7 @@ export async function validateBuildingCaptureManifestFile({ manifestPath, rootDi
         (item.error ? "failed" : (compared.warnings?.length ? "review-recommended" : "basic-quality-check-passed")) };
   });
   const imageQualityFailures = imageQuality.filter((item) => item.status === "failed");
-  const imageQualityWarnings = imageQuality.filter((item) => item.status === "review-recommended");
+  const imageQualityWarnings = imageQuality.filter((item) => ["review-recommended", "missing"].includes(item.status));
   const nearDuplicatePairs = [];
   for (const item of imageQuality) for (const otherId of item.nearDuplicateIds ?? []) {
     if (item.sourceId < otherId) nearDuplicatePairs.push({ sourceIds: [item.sourceId, otherId] });
