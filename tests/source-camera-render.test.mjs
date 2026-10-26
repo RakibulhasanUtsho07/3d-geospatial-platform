@@ -22,7 +22,8 @@ function fixture(overrides = {}) {
     distortion: { model: "none", coefficients: [] },
   };
   const cameraEvidence = { schemaVersion: "1.0.0", camera, ...overrides.cameraEvidence };
-  const sourceImage = { path: "/fixture/reference.png", sha256: sourceSha, imageSize: { width: 100, height: 80 }, ...overrides.sourceImage };
+  const sourceImage = { path: "/fixture/reference.png", sha256: sourceSha, imageSize: { width: 100, height: 80 },
+    rightsAttestation: { status: "permitted", sourceId: "permission-record-01", sha256: hash("e") }, ...overrides.sourceImage };
   return {
     cameraEvidence,
     sourceImage,
@@ -43,6 +44,11 @@ test("prepares a same-camera render plan with explicit axis conversion and origi
   assert.equal(plan.blenderCamera.lensMm, 36);
   assert.equal(plan.blenderCamera.pixelAspectX, 1);\n  assert.equal(plan.blenderCamera.pixelAspectY, 2);\n  assert.equal(plan.blenderCamera.shiftX, 0);\n  assert.equal(plan.blenderCamera.shiftY, 0);
   assert.equal(plan.publicationEligible, false);
+});
+
+test("fails closed when the source photo has no explicit permission attestation", () => {
+  const data = fixture({ sourceImage: { rightsAttestation: null } });
+  assert.ok(prepareSourceCameraRender(data).errors.includes("source-image-rights-attestation-invalid"));
 });
 
 test("projects known world points into the calibrated source-image pixels", () => {
@@ -110,6 +116,7 @@ test("finalizes candidate and overlay hashes without promoting publication", () 
   assert.equal(report.valid, true);
   assert.equal(report.status, "render-pair-ready-for-human-review");
   assert.equal(report.sourceImage.sha256, hash("c"));
+  assert.equal(report.sourceImage.rightsAttestation.status, "permitted");
   assert.equal(report.camera.evidenceSha256, hash("b"));
   assert.equal(report.render.candidate.sha256, hash("d"));
   assert.equal(report.humanReview.status, "pending");
