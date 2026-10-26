@@ -52,6 +52,8 @@ jobs:
         run: |
           timeout 600s sudo apt-get update -qq
           DEBIAN_FRONTEND=noninteractive timeout 900s sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+      - name: Prepare artifact output directory
+        run: mkdir -p artifacts
       - name: Render fixed 13-view set with bounded execution
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
