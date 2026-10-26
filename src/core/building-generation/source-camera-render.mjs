@@ -114,6 +114,8 @@ export function assessSourceCameraForRender({
   sourceImageSha256,
   sourceImageSize,
   cameraManifestSha256,
+  calibrationEvidenceSha256,
+  frameAlignmentEvidenceSha256,
   modelSha256,
   maxControlPointErrorPixels = 3,
 } = {}) {
@@ -127,6 +129,16 @@ export function assessSourceCameraForRender({
     errors.push("actual-source-image-dimensions-invalid");
   }
   if (!validHash(cameraManifestSha256)) errors.push("camera-manifest-sha256-invalid");
+  if (!validHash(calibrationEvidenceSha256)) errors.push("calibration-evidence-file-sha256-invalid");
+  if (!validHash(frameAlignmentEvidenceSha256)) errors.push("frame-alignment-evidence-file-sha256-invalid");
+  if (validHash(calibrationEvidenceSha256) && validHash(camera?.calibrationEvidence?.sha256) &&
+      calibrationEvidenceSha256.toLowerCase() !== camera.calibrationEvidence.sha256.toLowerCase()) {
+    errors.push("calibration-evidence-sha256-mismatch");
+  }
+  if (validHash(frameAlignmentEvidenceSha256) && validHash(camera?.frameAlignmentEvidence?.sha256) &&
+      frameAlignmentEvidenceSha256.toLowerCase() !== camera.frameAlignmentEvidence.sha256.toLowerCase()) {
+    errors.push("frame-alignment-evidence-sha256-mismatch");
+  }
   if (!validHash(modelSha256)) errors.push("model-sha256-invalid");
   if (validHash(sourceImageSha256) && validHash(camera?.sourceImage?.sha256) &&
       sourceImageSha256.toLowerCase() !== camera.sourceImage.sha256.toLowerCase()) {
@@ -176,9 +188,9 @@ export function assessSourceCameraForRender({
     cameraManifestSha256: validHash(cameraManifestSha256) ? cameraManifestSha256.toLowerCase() : null,
     cameraEvidenceId: typeof camera?.id === "string" ? camera.id : null,
     calibrationEvidenceId: typeof camera?.calibrationEvidence?.id === "string" ? camera.calibrationEvidence.id : null,
-    calibrationEvidenceSha256: validHash(camera?.calibrationEvidence?.sha256) ? camera.calibrationEvidence.sha256.toLowerCase() : null,
+    calibrationEvidenceSha256: validHash(calibrationEvidenceSha256) ? calibrationEvidenceSha256.toLowerCase() : null,
     frameAlignmentEvidenceId: typeof camera?.frameAlignmentEvidence?.id === "string" ? camera.frameAlignmentEvidence.id : null,
-    frameAlignmentEvidenceSha256: validHash(camera?.frameAlignmentEvidence?.sha256) ? camera.frameAlignmentEvidence.sha256.toLowerCase() : null,
+    frameAlignmentEvidenceSha256: validHash(frameAlignmentEvidenceSha256) ? frameAlignmentEvidenceSha256.toLowerCase() : null,
     coordinateFrame: typeof camera?.coordinateFrame === "string" ? camera.coordinateFrame : null,
     cameraPose: camera?.pose ?? null,
     cameraIntrinsics: camera?.intrinsics ?? null,
