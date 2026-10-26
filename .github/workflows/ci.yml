@@ -157,6 +157,8 @@ jobs:
 
       - name: Test Bangabhaban facade bearing, dome anchor and renderer alignment
         run: npm run test:bangabhaban-correction
+      - name: Test generic render review profiles
+        run: npm run test:render-review-profile
 
       - name: Test measured floor-plan vector to GLB generation
         run: npm run test:floor-plan-model
