@@ -104,7 +104,7 @@ async function writeAtomically(filePath, bytes) {
  * source was already ingested through the protected media-intake pipeline.
  * This does not publish the result or assert that its geometry is accurate.
  */
-export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, traceEvidence }) {
+export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, traceEvidence = undefined }) {
   if (!floorPlan || typeof floorPlan !== "object" || Array.isArray(floorPlan)) {
     throw new TypeError("floorPlan must be a JSON object.");
   }
