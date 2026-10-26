@@ -104,7 +104,8 @@ test("an observation assigned to two correspondence groups is flagged, not dupli
   assert.equal(graph.vertices.some((vertex) => vertex.id === "cornerA"), false);
   assert.equal(graph.vertices.some((vertex) => vertex.id === "cornerA-conflict"), false);
   assert.equal(graph.issues.filter((issue) => issue.type === "correspondence-conflict").length, 2);
-  assert.ok(graph.correspondences.every((item) => item.status === "review-required"));
+  assert.ok(graph.correspondences.filter((item) => ["cornerA", "cornerA-conflict"].includes(item.correspondenceId)).every((item) => item.status === "review-required"));
+  assert.equal(graph.correspondences.find((item) => item.correspondenceId === "cornerB").status, "accepted");
 });
 
 test("a two-view group remains review-required because outlier rejection is underdetermined", () => {
