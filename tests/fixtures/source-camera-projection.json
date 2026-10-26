@@ -23,14 +23,14 @@
   "intrinsics": {
     "fx": 400,
     "fy": 400,
-    "cx": 320,
-    "cy": 240,
+    "cx": 300,
+    "cy": 220,
     "distortionModel": "none"
   },
   "controlPoints": [
-    { "id": "p1", "worldPoint": [0, 0, -10], "imagePoint": { "x": 320, "y": 240 } },
-    { "id": "p2", "worldPoint": [1, 0, -10], "imagePoint": { "x": 360, "y": 240 } },
-    { "id": "p3", "worldPoint": [0, 1, -10], "imagePoint": { "x": 320, "y": 200 } },
-    { "id": "p4", "worldPoint": [-1, -1, -10], "imagePoint": { "x": 280, "y": 280 } }
+    { "id": "p1", "worldPoint": [0, 0, -10], "imagePoint": { "x": 300, "y": 220 } },
+    { "id": "p2", "worldPoint": [1, 0, -10], "imagePoint": { "x": 340, "y": 220 } },
+    { "id": "p3", "worldPoint": [0, 1, -10], "imagePoint": { "x": 300, "y": 180 } },
+    { "id": "p4", "worldPoint": [-1, -1, -10], "imagePoint": { "x": 260, "y": 260 } }
   ]
 }
