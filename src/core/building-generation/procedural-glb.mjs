@@ -131,7 +131,15 @@ export function generateProceduralGlb(rawSpec) {
         const a0=segment/segments*Math.PI*2,a1=(segment+1)/segments*Math.PI*2,am=(a0+a1)/2,tm=(t0+t1)/2;
         const p=(radius,y,angle)=>[cx+radius*Math.cos(angle),y,cz+radius*Math.sin(angle)];
         const p00=p(r0,y0,a0),p10=p(r0,y0,a1),p11=p(r1,y1,a1),p01=p(r1,y1,a0);
-        geo.quad("roof",p00,p10,p11,p01,[Math.cos(am)*Math.sin(tm),Math.cos(tm),Math.sin(am)*Math.sin(tm)]);
+        const outward=[Math.cos(am)*Math.sin(tm),Math.cos(tm),Math.sin(am)*Math.sin(tm)];
+        if (ring === steps - 1) {
+          // The final ring meets at a single dome apex. Use one triangle per sector
+          // rather than a quad with duplicate apex vertices (degenerate triangles).
+          const apex=[cx,domeY+dome.riseM,cz];
+          geo.triangle("roof",p00,p10,apex,outward);
+        } else {
+          geo.quad("roof",p00,p10,p11,p01,outward);
+        }
       }
     }
     // Narrow clerestory-like panels around the drum create a readable transition into the dome.
