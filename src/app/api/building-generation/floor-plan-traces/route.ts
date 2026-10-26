@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 import { authorizeGenerationApiRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
 import { traceFloorPlanImageSource } from "@/core/building-generation/floor-plan-raster-trace-job.mjs";
 
-export const runtime = "nodejs";
-
 const MAX_BODY_BYTES = 16 * 1024;
 const ALLOWED_OPTIONS = new Set([
   "maxEdge", "threshold", "maxGapPx", "lineMergeTolerancePx",
