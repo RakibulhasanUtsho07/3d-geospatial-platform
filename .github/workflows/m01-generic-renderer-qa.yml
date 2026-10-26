@@ -1,0 +1,135 @@
+name: M01 Generic GLB Renderer QA
+
+on:
+  push:
+    branches:
+      - rakibul-hasan
+    paths:
+      - ".github/workflows/m01-generic-renderer-qa.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "scripts/build-bangabhaban-model-candidate.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/generation-engine.mjs"
+      - "data/heritage/bangabhaban-building-spec.json"
+  pull_request:
+    branches:
+      - rakibul-hasan
+      - development
+    paths:
+      - ".github/workflows/m01-generic-renderer-qa.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "scripts/build-bangabhaban-model-candidate.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/generation-engine.mjs"
+      - "data/heritage/bangabhaban-building-spec.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m01-generic-renderer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-generic-building:
+    name: Render a non-Rangmahal 13-view GLB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Regenerate the generic Bangabhaban candidate
+        run: node scripts/build-bangabhaban-model-candidate.mjs
+      - name: Install headless Blender render dependencies
+        run: |
+          timeout 600s sudo apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive timeout 900s sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+      - name: Render fixed 13-view set with bounded execution
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender
+      - name: Validate exact GLB, generic framing, all views and PNG hashes
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
+          import { readFile, stat } from "node:fs/promises";
+          import path from "node:path";
+          const root = "artifacts/m01-generic-renderer";
+          const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          const model = await readFile("data/heritage/generated/bangabhaban-candidate.glb");
+          const manifestBytes = await readFile(path.join(root, "render-review-manifest.json"));
+          const manifest = JSON.parse(manifestBytes.toString("utf8"));
+          const expected = ["front", "back", "left", "right", "top",
+            ...[0,45,90,135,180,225,270,315].map((n) => "turntable-" + String(n).padStart(3, "0"))];
+          assert.equal(manifest.valid, true, "render manifest must be valid");
+          assert.ok(["render-set-ready-for-human-review", "review-required"].includes(manifest.status),
+            "unexpected renderer status: " + manifest.status);
+          assert.equal(manifest.publicationEligible, false);
+          assert.equal(manifest.modelSha256, hash(model), "render manifest must bind to exact GLB bytes");
+          assert.equal(manifest.renderResolution.width, 1024);
+          assert.equal(manifest.renderResolution.height, 1024);
+          assert.equal(manifest.views.length, expected.length, "expected exactly 13 rendered views");
+          assert.deepEqual(manifest.views.map((v) => v.id), expected, "view set/order must be deterministic");
+          assert.equal(manifest.views.find((v) => v.id === "front")?.framing, "whole-model-generic-front",
+            "a generic building must use whole-model framing instead of Rangmahal-specific selection");
+          for (const view of manifest.views) {
+            const bytes = await readFile(path.join(root, view.filename));
+            const info = await stat(path.join(root, view.filename));
+            assert.equal(hash(bytes), view.sha256, "PNG hash mismatch for " + view.id);
+            assert.equal(bytes.length, view.bytes, "PNG byte count mismatch for " + view.id);
+            assert.equal(info.size, view.bytes);
+            assert.equal(view.width, 1024);
+            assert.equal(view.height, 1024);
+            assert.equal(view.renderComplete, true);
+          }
+          console.log(JSON.stringify({ status: manifest.status, valid: manifest.valid,
+            modelSha256: manifest.modelSha256, renderManifestSha256: hash(manifestBytes),
+            views: manifest.views.length, genericFront: true, publicationEligible: false }, null, 2));
+          NODE
+      - name: Build a labeled contact sheet for human review
+        if: always()
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          root = Path("artifacts/m01-generic-renderer")
+          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
+          existing = [name for name in views if (root / (name + ".png")).is_file()]
+          if not existing:
+              print("No render images were produced; preserving the failure report only.")
+              raise SystemExit(0)
+          thumb, label_h, cols = 256, 28, 4
+          rows = (len(existing) + cols - 1) // cols
+          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 238, 232))
+          draw = ImageDraw.Draw(sheet)
+          for i, name in enumerate(existing):
+              with Image.open(root / (name + ".png")) as source:
+                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
+              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
+              sheet.paste(image, (x, y))
+              draw.text((x + 8, y + thumb + 6), name, fill=(30, 30, 30))
+          sheet.save(root / "contact-sheet.png", optimize=True)
+          PY
+      - name: Upload renderer outputs and review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m01-generic-renderer-${{ github.run_id }}
+          path: |
+            data/heritage/generated/bangabhaban-candidate.glb
+            data/heritage/generated/bangabhaban-candidate.report.json
+            artifacts/m01-generic-renderer/**
+          if-no-files-found: warn
+          retention-days: 30
