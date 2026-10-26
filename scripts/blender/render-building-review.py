@@ -395,11 +395,11 @@ def main():
         views = [
             ("front", Vector((sin_bearing * math.cos(front_elevation),
                               -cos_bearing * math.cos(front_elevation),
-                              math.sin(front_elevation)), "ORTHO"),
-            ("back", Vector((-sin_bearing, cos_bearing, 0.0), "ORTHO"),
-            ("left", Vector((cos_bearing, -sin_bearing, 0.0), "ORTHO"),
-            ("right", Vector((-cos_bearing, sin_bearing, 0.0), "ORTHO"),
-            ("top", Vector((0.0, 0.0, 1.0), "ORTHO"),
+                              math.sin(front_elevation))), "ORTHO"),
+            ("back", Vector((-sin_bearing, cos_bearing, 0.0)), "ORTHO"),
+            ("left", Vector((cos_bearing, -sin_bearing, 0.0)), "ORTHO"),
+            ("right", Vector((-cos_bearing, sin_bearing, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
         ]
         front_axis_source = "glb-extras.frontFacingAzimuthDegrees"
     elevation = math.radians(22.0)
