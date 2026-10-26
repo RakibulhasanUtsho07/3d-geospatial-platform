@@ -18,7 +18,7 @@ npm run test:render-review-manifest
 npm run render:building-review -- .\\artifacts\\candidate.glb .\\artifacts\\candidate-review
 ```
 
-Blender must be installed and available as `blender` or supplied using `--blender=<path>`. The renderer's front/back labels still follow imported GLB axes; they are not automatic proof of true-world facade direction. A successful renderer run produces evidence for human review, never direct publication.
+Blender must be installed and available as `blender` or supplied using `--blender=<path>`. Rendering has a bounded 600,000 ms default timeout; use `--timeout-ms=1000..900000` to set an explicit limit. A timeout stops the child process and reports retained partial files without accepting them as a render set. The renderer's front/back labels still follow imported GLB axes; they are not automatic proof of true-world facade direction. A successful renderer run produces evidence for human review, never direct publication.
 
 ## M02 — Capture manifest contract
 
@@ -118,7 +118,7 @@ Each building in the evidence-pack manifest may now declare:
 - `captureManifestPath` — relative path to the versioned capture manifest;
 - `expectedCaptureManifestSha256` — digest reviewed and pinned after bootstrap.
 
-For a complete evidence-pack result, these declared assets must be bound to the manifest by ID, purpose, path, content SHA-256, byte length, side/facade and rights-review provenance. The independent `dimensionReference` values and source basis/reference ID must match the capture-manifest measurements within their recorded uncertainty. Ground-control IDs, WGS84 coordinates and evidence-source references must match the documented control points. The existing benchmark still binds model-space controls to the exact candidate GLB hash.
+For a complete evidence-pack result, these declared assets must be bound to the manifest by ID, purpose, path, content SHA-256, byte length, side/facade and rights-review provenance. The independent `dimensionReference` values and source basis/reference ID must match unique, verified `surveyed` or `published-measurement` X/Y/Z records sourced from a `measurement-evidence` asset, within their recorded uncertainty. Duplicate axes, estimated/inferred dimensions, repeated asset/control IDs, collinear controls, and conflicting GCP coordinates/source links cannot pass their binding checks. A failed source-manifest integrity result remains failed and is never downgraded to incomplete by a separate binding check. Ground-control IDs, WGS84 coordinates and evidence-source references must match the documented control points. The existing benchmark still binds model-space controls to the exact candidate GLB hash.
 
 If the capture manifest is missing, incomplete, unpinned, tied to another building, or inconsistent with declared evidence, the evidence pack cannot report the new binding gate as passed. Existing legacy inputs can still be inspected, but the combined status remains incomplete or failed instead of being promoted to a clean pass.
 
