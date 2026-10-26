@@ -109,6 +109,11 @@ def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
         stats = sample_pixel_statistics(rendered, width)
     finally:
         bpy.data.images.remove(rendered)
+    # A PNG file and valid dimensions are not proof that the GLB was visible.
+    # Reject a near-uniform frame so an empty/background-only render can never
+    # receive a same-camera-comparable status.
+    if stats["sampledPixels"] < 1 or stats["luminanceStandardDeviation"] < 0.01:
+        raise RuntimeError("source-camera-render-has-no-visible-geometry-content")
     view = {
         "id": camera_evidence.get("id"),
         "filename": filename,
