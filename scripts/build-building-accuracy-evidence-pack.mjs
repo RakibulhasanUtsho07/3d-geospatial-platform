@@ -129,7 +129,7 @@ async function inspectRenders(declaration, root, modelHash, buildingId) {
 }
 
 function normalizedPath(value) {
-  return typeof value === "string" ? value.replaceAll("\\\\", "/") : null;
+  return typeof value === "string" ? value.replaceAll(String.fromCharCode(92), "/") : null;
 }
 function matchingDate(left, right) {
   return typeof left === "string" && typeof right === "string" &&
