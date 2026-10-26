@@ -572,6 +572,12 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   };
 
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  // The layer panel is intentionally collapsed on initial load.
+  const layersToggle = page.getByRole("button", { name: /Map layers/i });
+  await expect(layersToggle).toBeVisible({ timeout: 45_000 });
+  if (await layersToggle.getAttribute("aria-expanded") === "false") {
+    await layersToggle.click();
+  }
   await expect(
     page.getByRole("checkbox", { name: "Detailed OSM roads" }),
   ).toBeEnabled({ timeout: 45_000 });
