@@ -81,7 +81,7 @@ test("keeps a missing capture manifest incomplete rather than treating legacy in
 
 test("does not accept estimates or duplicate axes as independent dimension evidence", () => {
   const estimated = fixture();
-  estimated.manifest.measurements[0].basis = "operator-estimate";
+  estimated.manifest.measurements.forEach((measurement) => { measurement.basis = "operator-estimate"; });
   estimated.dimensionReference.evidence.basis = "operator-estimate";
   assert.equal(evaluateCaptureManifestBindings(estimated).status, "incomplete");
 
