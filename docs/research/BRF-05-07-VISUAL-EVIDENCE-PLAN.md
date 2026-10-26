@@ -33,6 +33,23 @@ Treat these items as prerequisites to inspect at implementation time, not as pro
 
 Before coding, re-check the current branch heads, existing PRs, overlapping code, CI state, and the schemas already in the repository. Reuse existing names and contracts when compatible; do not create a second competing source-manifest, geometry-QA, or status system.
 
+### Existing capabilities discovered on the planning branch
+
+The planning branch is based on rakibul-hasan at 2fa1570e418d2e80eb6956e7461ec4b2f99a7dc2. An initial source-tree inspection found meaningful existing work. This package must close integration and validation gaps rather than recreate these components:
+
+| Existing component | What is already present in the current working branch | Remaining package question |
+|---|---|---|
+| M05 segmentation benchmark — src/core/building-generation/building-segmentation-benchmark.mjs and scripts/evaluate-building-segmentation-benchmark.mjs | Versioned hash/byte/dimension and label-palette validation; development/held-out split checks; per-class precision/recall/IoU/F1 reporting; no auto-approval | Build and independently review a lawful, hash-pinned real-building pilot dataset; report a real held-out result or retain the benchmark as incomplete |
+| M06 mask provider — src/core/building-generation/building-mask-provider.mjs | Source-bound binary mask validation; reject edge-preview-as-mask; automatic/manual candidate state and fail-closed validation | Verify end-to-end provider-to-mask artifacts, reviewer corrections, overlays and real-image behavior; do not select a provider from synthetic tests alone |
+| M07 observation schema — src/core/building-generation/architectural-observation-schema.mjs | Source/view/hash binding, original pixel geometry, visibility and review-history contracts | Compare current categories with required heritage/architectural classes; extend only missing categories and maintain schema compatibility |
+| M08 feature proposals — src/core/building-generation/architectural-feature-proposals.mjs and its CLI | Bounded deterministic proposals based on reviewed masks and same-resolution edge maps; JSON/SVG/PNG overlay artifacts | Confirm overlays against reviewed real photos; preserve heuristic candidates as proposals, not verified facade semantics |
+| M13 source-camera render — src/core/building-generation/source-camera-render.mjs, source-camera plan and Blender renderer | Verified-camera contract, control-point/reprojection checks, exact source image identity/dimensions and non-comparable failure paths | Prove the whole source-camera-to-reference comparison on permissioned real examples and connect metrics/evidence hashes into the candidate report |
+| Reference review and similarity diagnostics — render-reference-review.mjs and render-image-similarity-diagnostics.mjs | Traceable reviewer-authored comparisons and image-similarity/structure diagnostics | Treat similarity as triage only; define and validate source-camera silhouette/contour/semantic metrics with defensible preconditions |
+
+The existing test suites are included in the current working branch's CI workflow, but the repository's segmentation research note explicitly says that a rights-cleared real-image/ground-truth dataset, accepted automatic provider, real held-out evaluation and visually accepted real-photo overlays are still missing. Existing source-camera tests use synthetic projection examples and do not validate architectural accuracy on a real building.
+
+Therefore, Stage A is a mandatory **gap audit**, not a rewrite: map each acceptance item to the current source file, test and workflow; mark it IMPLEMENTED, PARTIAL, or MISSING; and change code only for the partial/missing integration or real-evidence gates. Do not report BRF-05/06/07 complete merely because their unit tests exist.
+
 ## 3. Package design and dependency order
 
 Implement one feature branch and one integration PR for the full package, with a separate, reviewable commit for each work package where practical.
