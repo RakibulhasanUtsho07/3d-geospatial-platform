@@ -68,7 +68,7 @@ function summarizeTextureQa(report) {
 async function main() {
   const [modelArg, outputArg, ...allFlags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
-    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000] [--source-camera=camera.json --source-image=photo.jpg]");
+    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000] [--source-camera=camera.json --source-image=photo.jpg --calibration-evidence=calibration.json --frame-alignment-evidence=alignment.json]");
   }
   const singleFlag = (name) => {
     const matches = allFlags.filter((flag) => flag.startsWith("--" + name + "="));
@@ -77,10 +77,14 @@ async function main() {
   };
   const sourceCameraPathArg = singleFlag("source-camera");
   const sourceImagePathArg = singleFlag("source-image");
-  if (Boolean(sourceCameraPathArg) !== Boolean(sourceImagePathArg)) {
-    throw new Error("--source-camera and --source-image must be supplied together");
+  const calibrationEvidencePathArg = singleFlag("calibration-evidence");
+  const frameAlignmentEvidencePathArg = singleFlag("frame-alignment-evidence");
+  const cameraInputs = [sourceCameraPathArg, sourceImagePathArg, calibrationEvidencePathArg, frameAlignmentEvidencePathArg];
+  if (cameraInputs.some(Boolean) && !cameraInputs.every(Boolean)) {
+    throw new Error("--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together");
   }
-  const flags = allFlags.filter((flag) => !flag.startsWith("--source-camera=") && !flag.startsWith("--source-image="));
+  const cameraFlags = ["--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
+  const flags = allFlags.filter((flag) => !cameraFlags.some((prefix) => flag.startsWith(prefix)));
   const { resolution, blender, timeoutMs } = parseRenderOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
@@ -100,12 +104,16 @@ async function main() {
   const modelBytes = await readFile(modelPath);
   let sourceCameraAssessment = null;
   let sourceCameraPath = null;
-  if (sourceCameraPathArg && sourceImagePathArg) {
+  if (cameraInputs.every(Boolean)) {
     sourceCameraPath = path.resolve(sourceCameraPathArg);
     const sourceImagePath = path.resolve(sourceImagePathArg);
-    const [cameraBytes, sourceImageBytes] = await Promise.all([
+    const calibrationEvidencePath = path.resolve(calibrationEvidencePathArg);
+    const frameAlignmentEvidencePath = path.resolve(frameAlignmentEvidencePathArg);
+    const [cameraBytes, sourceImageBytes, calibrationEvidenceBytes, frameAlignmentEvidenceBytes] = await Promise.all([
       readFile(sourceCameraPath),
       readFile(sourceImagePath),
+      readFile(calibrationEvidencePath),
+      readFile(frameAlignmentEvidencePath),
     ]);
     let camera;
     try {
@@ -118,6 +126,8 @@ async function main() {
       sourceImageSha256: sha256(sourceImageBytes),
       sourceImageSize: rasterDimensions(sourceImageBytes, sourceImagePath),
       cameraManifestSha256: sha256(cameraBytes),
+      calibrationEvidenceSha256: sha256(calibrationEvidenceBytes),
+      frameAlignmentEvidenceSha256: sha256(frameAlignmentEvidenceBytes),
       modelSha256: sha256(modelBytes),
     });
     if (!sourceCameraAssessment.sameCameraComparable) {
