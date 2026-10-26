@@ -112,3 +112,21 @@ test("retains validated review-profile and facade-axis provenance without treati
   assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
   assert.equal(report.publicationEligible, false);
 });
+
+test("fails when review-profile evidence has an invalid hash or impossible counts", () => {
+  const report = finalizeRenderReviewManifest(fixture({
+    raw: {
+      reviewProfile: {
+        profileId: "generic-whole-model-v1",
+        source: "built-in-default",
+        sha256: "not-a-hash",
+        globalExcludedMeshCount: -1,
+        frontVisibleMeshCount: 4,
+        frontFramingLabel: "whole-model-generic-front",
+      },
+    },
+  }));
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("render-review-profile-metadata-invalid"));
+  assert.equal(report.publicationEligible, false);
+});
