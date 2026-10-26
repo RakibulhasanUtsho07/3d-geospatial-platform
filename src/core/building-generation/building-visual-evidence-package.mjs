@@ -13,6 +13,7 @@ import {
   assessSourceCameraForRender,
   finalizeSourceCameraRenderManifest,
 } from "./source-camera-render.mjs";
+import { validateSegmentationBenchmarkManifest } from "./building-segmentation-benchmark.mjs";
 
 const HASH = /^[a-f0-9]{64}$/i;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
@@ -544,8 +545,7 @@ export function buildBuildingVisualEvidencePackage(input = {}) {
 
   let silhouetteMetrics = null;
   const referenceSilhouette = input.referenceSilhouette;
-  const candidateSilhouette = input.sourceCameraRender?.silhouetteMask
-    ? { ...input.sourceCameraRender.silhouetteMask, sourceCameraRenderSha256: renderSha256 } : null;
+  const candidateSilhouette = input.sourceCameraRender?.silhouetteMask ?? null;
   if (sourceReady && sourceCameraRenderManifest?.sameCameraComparable &&
       candidateSilhouette && referenceSilhouette) {
     silhouetteMetrics = calculateBinarySilhouetteMetrics({
@@ -562,14 +562,37 @@ export function buildBuildingVisualEvidencePackage(input = {}) {
 
   const benchmark = input.realBuildingBenchmark;
   let realBenchmarkStatus = "incomplete";
-  if (isRecord(benchmark) && benchmark.report?.engine === "building-segmentation-benchmark-v1" &&
-      benchmark.report.status === "benchmark-review-required" &&
-      isPositiveInt(benchmark.report.counts?.evaluatedPairs) &&
-      benchmark.report.perImage?.some((item) => item.split === "held-out-evaluation" && item.status === "evaluated") &&
-      benchmark.rightsReviewStatus === "verified" &&
-      benchmark.independentAnnotationReviewStatus === "verified" &&
-      hasHash(benchmark.manifestSha256) && hasHash(benchmark.reportSha256)) {
-    realBenchmarkStatus = "held-out-report-present-review-required";
+  if (isRecord(benchmark)) {
+    try {
+      const manifestBytes = asBytes(benchmark.manifestBytes);
+      const reportBytes = asBytes(benchmark.reportBytes);
+      if (!manifestBytes || !reportBytes) throw new TypeError("Exact benchmark manifest and report bytes are required.");
+      const parsedManifest = JSON.parse(manifestBytes.toString("utf8"));
+      const parsedReport = JSON.parse(reportBytes.toString("utf8"));
+      const manifestValidation = validateSegmentationBenchmarkManifest(parsedManifest);
+      const reportBytesMatchObject = stableJson(parsedReport) === stableJson(benchmark.report);
+      const reportHeldOut = benchmark.report?.perImage?.filter((item) =>
+        item.split === "held-out-evaluation" && item.status === "evaluated" &&
+        hasHash(item.sourceSha256) && hasHash(item.groundTruthSha256) && hasHash(item.predictionSha256)) ?? [];
+      const summaryHasHeldOut = benchmark.report?.candidateSummaries?.some((item) =>
+        isPositiveInt(item.heldOutImageCount) && isFiniteNumber(item.heldOutMeanMacroForegroundIoU)) ?? false;
+      const hashesMatch = hasHash(benchmark.manifestSha256) && digest(manifestBytes) === benchmark.manifestSha256.toLowerCase() &&
+        hasHash(benchmark.reportSha256) && digest(reportBytes) === benchmark.reportSha256.toLowerCase();
+      if (manifestValidation.status === "ready-for-evaluation" && reportBytesMatchObject && hashesMatch &&
+          benchmark.report?.engine === "building-segmentation-benchmark-v1" &&
+          benchmark.report.status === "benchmark-review-required" &&
+          isPositiveInt(benchmark.report.counts?.evaluatedPairs) && reportHeldOut.length > 0 && summaryHasHeldOut &&
+          benchmark.rightsReviewStatus === "verified" &&
+          benchmark.independentAnnotationReviewStatus === "verified" &&
+          benchmark.report.benchmarkId === parsedManifest.benchmarkId) {
+        realBenchmarkStatus = "held-out-report-present-review-required";
+      } else {
+        warnings.push({ stage: "real-world-validation", code: "real-held-out-benchmark-validation-incomplete",
+          detail: "Benchmark manifest/report hashes, reviewed real masks, held-out rows, class metrics and review attestations did not all satisfy the evidence gate." });
+      }
+    } catch (error) {
+      warnings.push({ stage: "real-world-validation", code: "real-held-out-benchmark-invalid", detail: error.message });
+    }
   } else {
     warnings.push({ stage: "real-world-validation", code: "licensed-hash-pinned-real-held-out-benchmark-missing-or-incomplete",
       detail: "Synthetic tests and caller-supplied status strings cannot substitute for a verified real-building dataset, held-out metrics and independently reviewed overlays." });
@@ -587,7 +610,10 @@ export function buildBuildingVisualEvidencePackage(input = {}) {
   };
 
   const sourceRights = source?.rights;
-  const sourceRightsReady = sourceRights?.status === "verified" && hasHash(sourceRights.evidenceSha256) &&
+  const sourceRightsBytes = asBytes(sourceRights?.evidenceBytes);
+  const sourceRightsReady = sourceRights?.status === "verified" && sourceRightsBytes &&
+    hasHash(sourceRights.evidenceSha256) && digest(sourceRightsBytes) === sourceRights.evidenceSha256.toLowerCase() &&
+    typeof sourceRights.evidenceId === "string" && sourceRights.evidenceId.trim().length > 0 &&
     typeof sourceRights.reviewerId === "string" && sourceRights.reviewerId.trim().length > 0 &&
     Number.isFinite(Date.parse(sourceRights.reviewedAt ?? ""));
   if (!sourceRightsReady) warnings.push({ stage: "rights", code: "source-image-rights-evidence-not-verified" });
