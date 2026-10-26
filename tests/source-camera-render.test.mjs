@@ -83,6 +83,14 @@ test("verifies evidence file bytes against the hashes declared by the camera man
   assert.ok(missing.errors.includes("frame-alignment-evidence-file-sha256-invalid"));
 });
 
+test("rejects reused 3D or image coordinates even when control-point IDs differ", () => {
+  const camera = cameraFixture();
+  camera.controlPoints[3].worldPoint = [...camera.controlPoints[1].worldPoint];
+  const report = assessSourceCameraForRender(args(camera));
+  assert.equal(report.status, "not-comparable");
+  assert.ok(report.errors.includes("camera-control-points-not-distinct"));
+});
+
 test("blocks control points outside the image and reprojection errors above tolerance", () => {
   const camera = cameraFixture();
   camera.controlPoints[0].imagePoint.x = -1;
