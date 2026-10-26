@@ -283,6 +283,9 @@ def main():
     add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
+    # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
+    # only from this facade-detail camera, while the other 12 views retain roof context.
+    # Whole-model views restore it and retain the complete generated roof geometry.
     # Legacy GLBs without a declared facade bearing keep the established camera convention.
     # The BuildingSpec generator writes the actual facade bearing into GLB extras; use it
     # to keep "front" on the intended facade instead of relying on polygon order.
