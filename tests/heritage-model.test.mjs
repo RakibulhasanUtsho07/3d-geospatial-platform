@@ -235,20 +235,23 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 });
 
 
-test("Blender front review view prioritizes the facade over the roof deck", async () => {
+test("Blender review views use generic framing and an explicit profile for focused facade review", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
-  assert.ok(renderer.includes('("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO")'));
-  assert.ok(renderer.includes("Five-degree south-elevation view reveals stair treads; RoofDeck is excluded"));
-  assert.ok(renderer.includes("Whole-model views restore it and retain the complete generated roof geometry."));
+  const profile = JSON.parse(await readFile(path.join(root, "data/heritage/rangmahal-render-review-profile.json"), "utf8"));
+  assert.ok(renderer.includes('("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO")'));
+  assert.ok(renderer.includes('front_elevation = math.radians(front_profile["elevationDegrees"])'));
+  assert.ok(profile.frontView.excludeNodeNames.includes("RoofDeck"));
+  assert.ok(profile.frontView.includeNodeNames.includes("Portico_S"));
+  assert.ok(profile.excludeNodeNamePrefixes.includes("Site_"));
   assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.45'));
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
   assert.ok(renderer.includes("light_power * 0.33, light_size * 1.05"));
   assert.ok(renderer.includes("light_power * 0.38, light_size"));
   assert.ok(renderer.includes('("turntable-" + str(angle).zfill(3), direction, "ORTHO")'));
   assert.ok(renderer.includes("def projected_ortho_scale("), "review views fit to their projected geometry bounds");
-  assert.ok(renderer.includes("original_render_visibility"), "renderer restores whole-model visibility for each view");
-  assert.ok(renderer.includes("if focus_rangmahal:"), "front-detail filtering applies only when Rangmahal facade meshes are present");
-  assert.ok(renderer.includes("if obj not in front_review_meshes:"), "focused Rangmahal front view excludes off-facade meshes");
-  assert.ok(renderer.includes('view_framing = "rangmahal-south-facade-focused"'));
+  assert.ok(renderer.includes("original_render_visibility"), "renderer restores normal visibility for each view");
+  assert.ok(renderer.includes("if obj not in front_review_meshes:"), "profile-selected front view can exclude off-facade meshes");
+  assert.ok(renderer.includes('view_framing = front_view_framing'));
   assert.ok(renderer.includes("view_scale = projected_ortho_scale(visible_meshes, view_center, direction)"));
+  assert.doesNotMatch(renderer, /Rangmahal|Andarmahal|RoofDeck|Site_/, "building-specific selectors belong in profiles, not renderer code");
 });
