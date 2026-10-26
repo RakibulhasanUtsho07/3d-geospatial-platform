@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateCaptureManifestBindings } from "../scripts/build-building-accuracy-evidence-pack.mjs";
+import { combineCaptureManifestEvidenceStatus, evaluateCaptureManifestBindings } from "../scripts/build-building-accuracy-evidence-pack.mjs";
 
 const reviewedAt = "2026-10-24T10:00:00.000Z";
 const hash = (seed) => seed.toString(16).padStart(64, "0").slice(-64);
@@ -77,4 +77,32 @@ test("keeps a missing capture manifest incomplete rather than treating legacy in
   assert.equal(report.status, "incomplete");
   assert.equal(report.bindingsValid, false);
   assert.ok(report.checks.every((check) => check.status === "warning"));
+});
+
+test("does not accept estimates or duplicate axes as independent dimension evidence", () => {
+  const estimated = fixture();
+  estimated.manifest.measurements[0].basis = "operator-estimate";
+  estimated.dimensionReference.evidence.basis = "operator-estimate";
+  assert.equal(evaluateCaptureManifestBindings(estimated).status, "incomplete");
+
+  const duplicateAxis = fixture();
+  duplicateAxis.manifest.measurements[1].axis = "x";
+  assert.equal(evaluateCaptureManifestBindings(duplicateAxis).status, "failed");
+});
+
+test("rejects duplicated source/reference declarations and repeated control-point IDs", () => {
+  const duplicateAsset = fixture();
+  duplicateAsset.referenceImages[1].id = duplicateAsset.referenceImages[0].id;
+  assert.equal(evaluateCaptureManifestBindings(duplicateAsset).status, "failed");
+
+  const duplicateControl = fixture();
+  duplicateControl.groundControl.controlPoints[1].id = duplicateControl.groundControl.controlPoints[0].id;
+  assert.equal(evaluateCaptureManifestBindings(duplicateControl).status, "failed");
+});
+
+test("preserves a failed capture-manifest validation instead of downgrading it to incomplete", () => {
+  assert.equal(combineCaptureManifestEvidenceStatus("failed", "incomplete"), "failed");
+  assert.equal(combineCaptureManifestEvidenceStatus("ready-for-review", "failed"), "failed");
+  assert.equal(combineCaptureManifestEvidenceStatus("incomplete", "ready-for-review"), "incomplete");
+  assert.equal(combineCaptureManifestEvidenceStatus("ready-for-review", "ready-for-review"), "ready-for-review");
 });
