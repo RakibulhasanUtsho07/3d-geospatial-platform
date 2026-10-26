@@ -148,6 +148,8 @@ test("runs registration, wireframe QA, explicit-face meshing, surface review and
   assert.ok(result.state.stages.every(stage => stage.status === "completed" && stage.artifacts.length === 1));
   assert.equal(result.report.status, "technical-checks-passed-requires-human-review");
   assert.equal(result.report.checks.registrationStatus, "candidate-wireframe");
+  assert.equal(result.report.checks.registrationQualityStatus, "review-required");
+  assert.equal(result.report.checks.registrationReviewRequiredFeatureCount, 4);
   assert.equal(result.report.checks.triangulatedVertexCount, 4);
   assert.equal(result.report.checks.acceptedMeshTriangleCount, 4);
   assert.equal(result.report.checks.boundaryEdgeCount, 0);

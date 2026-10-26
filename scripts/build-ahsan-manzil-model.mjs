@@ -11,6 +11,8 @@ const V = (section, key) => P[section][key].value;
 const DIM = {
   length: V("footprint", "overallLength"),
   depth: V("footprint", "overallDepth"),
+  domeBasePlatformWidth: V("roof", "domeBasePlatformWidth"),
+  domeBasePlatformDepth: V("roof", "domeBasePlatformDepth"),
   rangmahalLength: V("footprint", "rangmahalBlockLength"),
   andarDepth: V("footprint", "andarmahalDepth"),
   andarCenterZ: V("footprint", "andarmahalNorthOffset"),
@@ -23,6 +25,7 @@ const DIM = {
   wall: V("vertical", "wallThickness"),
   parapet: V("vertical", "parapetHeight"),
   roofline: V("vertical", "rooflineHeight"),
+  andarmahalHeightScale: V("vertical", "andarmahalHeightScale"),
   windowGF: V("facade", "gfOpeningWidth"),
   crownGF: V("facade", "gfOpeningCrownHeight"),
   windowFF: V("facade", "ffOpeningWidth"),
@@ -56,6 +59,7 @@ const COLORS = {
   trim: V("materials", "trimOffWhite"),
   glass: V("materials", "glass"),
   roof: V("materials", "roof"),
+  roofDeck: V("materials", "roofDeck"),
   marble: V("materials", "verandaFloor"),
   rail: "#6D444A",
   gold: "#B58B55",
@@ -110,7 +114,14 @@ function buildGlb(lod) {
   const nodes = [...REQUIRED_NODES, ...SITE_CONTEXT_NODES].map((name) => ({ name, positions: [], normals: [], colors: [] }));
   const byName = Object.fromEntries(nodes.map((node) => [node.name, node]));
   function triangle(node, a, b, c, key) {
-    const normal = normalize(cross(sub(b, a), sub(c, a)));
+    const areaVector = cross(sub(b, a), sub(c, a));
+    // Keep the builder's degeneracy threshold identical to glb-geometry-qa:
+    // that QA computes triangle area as |cross(b-a, c-a)| / 2 and rejects
+    // area <= 1e-10. Using a cross-product threshold of 1e-9 here was 5x
+    // looser, so tiny triangles could be serialized even though both stages
+    // claimed to filter degenerate faces. Compare the same area quantity.
+    if (Math.hypot(...areaVector) * 0.5 <= 1e-10) return;
+    const normal = normalize(areaVector);
     const rgba = color(key);
     for (const point of [a, b, c]) {
       node.positions.push(...point);
@@ -132,6 +143,40 @@ function buildGlb(lod) {
     quad(node,e,f,g,h,key); quad(node,b,a,d,c,key); quad(node,a,e,h,d,key);
     quad(node,f,b,c,g,key); quad(node,d,h,g,c,key); quad(node,a,b,f,e,key);
   }
+  // Build the stepped plinth as one L-footprint prism instead of two touching boxes.
+  // This avoids duplicated internal faces at the Rangmahal/Andarmahal junction.
+  // Cap and side patches are deliberately split at matching coordinates to avoid T-junctions.
+  function steppedPlinthXZ(node, xMin, split, xMax, zMin, stepZ, zMax, y0, y1, key) {
+    const values = [xMin, split, xMax, zMin, stepZ, zMax, y0, y1];
+    if (!values.every(Number.isFinite) || !(xMin < split && split < xMax &&
+        zMin < stepZ && stepZ < zMax && y0 < y1)) {
+      throw new Error("Invalid stepped plinth footprint; inspect the footprint parameters before generating the GLB.");
+    }
+    const p = (x, y, z) => [x, y, z];
+
+    // Top cap (+Y), tiled so each edge matches its neighbouring face exactly.
+    quad(node, p(xMin,y1,zMin), p(xMin,y1,stepZ), p(split,y1,stepZ), p(split,y1,zMin), key);
+    quad(node, p(split,y1,zMin), p(split,y1,stepZ), p(xMax,y1,stepZ), p(xMax,y1,zMin), key);
+    quad(node, p(split,y1,stepZ), p(split,y1,zMax), p(xMax,y1,zMax), p(xMax,y1,stepZ), key);
+
+    // Bottom cap (-Y).
+    quad(node, p(xMin,y0,zMin), p(split,y0,zMin), p(split,y0,stepZ), p(xMin,y0,stepZ), key);
+    quad(node, p(split,y0,zMin), p(xMax,y0,zMin), p(xMax,y0,stepZ), p(split,y0,stepZ), key);
+    quad(node, p(split,y0,stepZ), p(xMax,y0,stepZ), p(xMax,y0,zMax), p(split,y0,zMax), key);
+
+    // Outer shell. Split the north/east walls where the cap edges are split.
+    quad(node, p(xMin,y0,zMin), p(xMin,y1,zMin), p(split,y1,zMin), p(split,y0,zMin), key);
+    quad(node, p(split,y0,zMin), p(split,y1,zMin), p(xMax,y1,zMin), p(xMax,y0,zMin), key);
+    quad(node, p(split,y0,zMax), p(xMax,y0,zMax), p(xMax,y1,zMax), p(split,y1,zMax), key);
+    quad(node, p(xMin,y0,zMin), p(xMin,y0,stepZ), p(xMin,y1,stepZ), p(xMin,y1,zMin), key);
+    quad(node, p(xMax,y0,zMin), p(xMax,y1,zMin), p(xMax,y1,stepZ), p(xMax,y0,stepZ), key);
+    quad(node, p(xMax,y0,stepZ), p(xMax,y1,stepZ), p(xMax,y1,zMax), p(xMax,y0,zMax), key);
+
+    // Re-entrant step face and the exposed west end of the Rangmahal wing.
+    quad(node, p(xMin,y0,stepZ), p(split,y0,stepZ), p(split,y1,stepZ), p(xMin,y1,stepZ), key);
+    quad(node, p(split,y0,stepZ), p(split,y0,zMax), p(split,y1,zMax), p(split,y1,stepZ), key);
+  }
+
   function orientedBoxXZ(node, cx, cy, cz, length, height, depth, angle, key) {
     const tx = -Math.sin(angle), tz = Math.cos(angle);
     const nx = Math.cos(angle), nz = Math.sin(angle);
@@ -201,6 +246,12 @@ function buildGlb(lod) {
       box(node,cx-radius-.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       box(node,cx+radius+.05,base+stem/2,trimZ,.1,stem,.12,"trim");
       archBand(node,cx,spring,trimZ,radius+.02,.085,"trim",detail===2?16:10);
+      if(detail===2){
+        // A restrained central keystone and impost blocks make the arch mouldings read as masonry rather than flat trim.
+        box(node,cx,spring+radius-.015,trimZ+side*.045,Math.max(.16,width*.11),.28,.16,"trim");
+        box(node,cx-radius,spring,trimZ+side*.045,.16,.18,.16,"trim");
+        box(node,cx+radius,spring,trimZ+side*.045,.16,.18,.16,"trim");
+      }
     }
     // Door glazing is modelled on the wooden leaf below, inside the reveal.
     if (isDoor && detail >= 1) {
@@ -672,17 +723,54 @@ function buildGlb(lod) {
   const andarBays=DIM.andarBayCount;
   const gf={base:gfBase,height:gfHeight,width:DIM.windowGF,crown:DIM.crownGF};
   const ff={base:ffBase,height:ffHeight,width:DIM.windowFF,crown:DIM.crownFF};
+  const andarGf={base:gfBase,height:gfHeight*DIM.andarmahalHeightScale,width:DIM.windowGF,crown:DIM.crownGF};
+  const andarFf={base:andarGf.base+andarGf.height+DIM.slab,height:ffHeight*DIM.andarmahalHeightScale,width:DIM.windowFF,crown:DIM.crownFF};
+  const andarRoofTop=andarFf.base+andarFf.height+DIM.slab;
 
-  box(n.Plinth,(split+xMax)/2,DIM.ground+DIM.plinth/2,0,rangLength,DIM.plinth,D,"sceneStone");
-  box(n.Plinth,andarCenterX,DIM.ground+DIM.plinth/2,andarCenterZ,andarLength,DIM.plinth,andarDepth,"sceneStone");
+  const plinthZMin = -D / 2;
+  const plinthZMax = D / 2;
+  const andarZMin = andarCenterZ - andarDepth / 2;
+  const andarZMax = andarCenterZ + andarDepth / 2;
+  if (Math.abs(andarZMin - plinthZMin) > 1e-5) {
+    throw new Error("The stepped plinth requires the Andarmahal and Rangmahal north edges to align; trace the footprint before changing this constraint.");
+  }
+  steppedPlinthXZ(
+    n.Plinth, xMin, split, xMax,
+    plinthZMin, andarZMax, plinthZMax,
+    DIM.ground, plinthTop, "sceneStone",
+  );
 
   addFacadeSection("Rangmahal_GF",split,xMax,rangBays,[gf],lod);
   addFacadeSection("Rangmahal_FF",split,xMax,rangBays,[ff],lod);
-  addFacadeSection("Andarmahal",xMin,split,andarBays,[gf,ff],lod,andarCenterZ,andarDepth);
+  addFacadeSection("Andarmahal",xMin,split,andarBays,[andarGf,andarFf],lod,andarCenterZ,andarDepth);
+
+  // Source-backed Rangmahal roofline ventilation/oculus band.
+  // The licensed front reference shows small circular openings along the
+  // upper cornice on both wings; the central portico is intentionally skipped.
+  // Their spacing/diameter remain estimates until a rectified elevation exists.
+  if (lod === 3) {
+    const pitch = rangLength / rangBays;
+    const ventY = Math.min(ff.base + ff.height - 0.30, roofTop - 0.20);
+    for (const side of [-1, 1]) {
+      const faceZ = side * (half + 0.115);
+      for (let bay = 0; bay < rangBays; bay++) {
+        if (bay >= Math.floor(rangBays / 2) - 1 && bay <= Math.floor(rangBays / 2) + 1) continue;
+        const ventX = split + (bay + 0.5) * pitch;
+        addFacadeDisk(n.Rangmahal_FF, ventX, ventY, faceZ, 0.105, "sceneDark", side, 20);
+        addFacadeRing(n.Rangmahal_FF, ventX, ventY, faceZ + side * 0.012, 0.155, 0.108, "trim", side, 20);
+      }
+    }
+    // A continuous, shallow cornice separates the facade from the roof deck.
+    // This follows the visible reference band and avoids inventing roof objects.
+    for (const side of [-1, 1]) {
+      box(n.Parapet, (split + xMax) / 2, roofTop - 0.06, side * (half + 0.10),
+        rangLength, 0.14, 0.20, "trim");
+    }
+  }
 
   // Model the short elevations of both blocks, including the exposed Rangmahal
   // west end beside the rear-set Andarmahal junction.
-  addEndFacade("Andarmahal", xMin, -1, [gf, ff], 6, lod,andarCenterZ,andarDepth);
+  addEndFacade("Andarmahal", xMin, -1, [andarGf, andarFf], 6, lod,andarCenterZ,andarDepth);
   // Only the south half of the Rangmahal west end is exposed; its north
   // half joins the set-back Andarmahal instead of double-stacking two walls.
   addEndFacade("Rangmahal_GF", split, -1, [gf], 6, lod, D / 4, D / 2);
@@ -692,54 +780,56 @@ function buildGlb(lod) {
 
   box(n.Rangmahal_GF,(split+xMax)/2,gfBase+gfHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
   box(n.Rangmahal_FF,(split+xMax)/2,ffBase+ffHeight+DIM.slab/2,0,rangLength,DIM.slab,D,"marble");
-  box(n.Andarmahal,andarCenterX,gfBase+gfHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
-  box(n.Andarmahal,andarCenterX,ffBase+ffHeight+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
+  box(n.Andarmahal,andarCenterX,andarGf.base+andarGf.height+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
+  box(n.Andarmahal,andarCenterX,andarFf.base+andarFf.height+DIM.slab/2,andarCenterZ,andarLength,DIM.slab,andarDepth,"marble");
 
-  // Separate roof decks preserve the stepped/L-shaped footprint: the main
-  // Rangmahal faces the river, while Andarmahal is set back to the north.
+  // Keep flat roof planes in a dedicated semantic node. The focused front-detail
+  // render can hide this broad horizontal plane while preserving it in the GLB
+  // and all whole-model views; the visible cornice/parapet remains in Parapet.
   const rangCenterX = (split + xMax) / 2;
-  box(n.Parapet,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roof");
-  box(n.Parapet,andarCenterX,roofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roof");
+  box(n.RoofDeck,rangCenterX,roofTop-.08,0,rangLength,.16,D,"roofDeck");
+  box(n.RoofDeck,andarCenterX,andarRoofTop-.08,andarCenterZ,andarLength,.16,andarDepth,"roofDeck");
+  // A shallow raised central roof platform bridges the deck/parapet datum to the drum base.
+  // Its footprint is a low-confidence estimate from the unrectified aerial image, not a survey.
+  const domeBasePlatformHeight = DIM.roofline - roofTop;
+  box(n.RoofDeck,domeX,roofTop+domeBasePlatformHeight/2,0,
+    DIM.domeBasePlatformWidth,domeBasePlatformHeight,DIM.domeBasePlatformDepth,"roofDeck");
 
   for(const side of [-1,1]){
     const rangZ=side*(half+.12);
     const andarZ=andarCenterZ+side*(andarDepth/2+.12);
     if(lod<3){
-      // Low-detail LODs keep a compact silhouette from neighbourhood scale.
       box(n.Parapet,rangCenterX,roofTop+DIM.parapet/2,side*(half-.12),rangLength,DIM.parapet,.4,"pink");
-      box(n.Parapet,andarCenterX,roofTop+DIM.parapet/2,andarCenterZ+side*(andarDepth/2-.12),andarLength,DIM.parapet,.4,"pink");
+      box(n.Parapet,andarCenterX,andarRoofTop+DIM.parapet/2,andarCenterZ+side*(andarDepth/2-.12),andarLength,DIM.parapet,.4,"pink");
     }else{
-      // LOD3 uses the open baluster parapet from the HTML scene instead of
-      // a solid pink wall, which was making the roof read as a block.
       box(n.Parapet,rangCenterX,roofTop+.71,rangZ,rangLength,.18,.42,"sceneTrim");
-      box(n.Parapet,andarCenterX,roofTop+.71,andarZ,andarLength,.18,.42,"sceneTrim");
+      box(n.Parapet,andarCenterX,andarRoofTop+.71,andarZ,andarLength,.18,.42,"sceneTrim");
       for(let i=0;i<=28;i++){
         const x=split+rangLength*i/28;
         siteFrustum(n.Parapet,x,rangZ,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
       }
       for(let i=0;i<=34;i++){
         const x=xMin+andarLength*i/34;
-        siteFrustum(n.Parapet,x,andarZ,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
+        siteFrustum(n.Parapet,x,andarZ,andarRoofTop+.03,andarRoofTop+.65,.13,.09,"sceneTrim",8);
       }
     }
   }
 
-  // Short-end roof rails are open in the detailed model, as in the HTML scene.
-  // Distant LODs retain simple solid returns to avoid expensive tiny balusters.
+  // Short-end roof rails follow the level of the building block they frame.
   const endRails=[
-    {x:xMax+.12,z:0,depth:D},
-    {x:split-.12,z:D/4,depth:D/2},
-    {x:xMin-.12,z:andarCenterZ,depth:andarDepth},
+    {x:xMax+.12,z:0,depth:D,roofTop},
+    {x:split-.12,z:D/4,depth:D/2,roofTop},
+    {x:xMin-.12,z:andarCenterZ,depth:andarDepth,roofTop:andarRoofTop},
   ];
   for (const edge of endRails) {
     if(lod<3){
-      box(n.Parapet,edge.x,roofTop+DIM.parapet/2,edge.z,.4,DIM.parapet,edge.depth,"pink");
+      box(n.Parapet,edge.x,edge.roofTop+DIM.parapet/2,edge.z,.4,DIM.parapet,edge.depth,"pink");
     }else{
-      box(n.Parapet,edge.x,roofTop+.71,edge.z,.42,.18,edge.depth,"sceneTrim");
+      box(n.Parapet,edge.x,edge.roofTop+.71,edge.z,.42,.18,edge.depth,"sceneTrim");
       const count=Math.max(4,Math.ceil(edge.depth/2));
       for(let i=0;i<=count;i++){
         const z=edge.z-edge.depth/2+edge.depth*i/count;
-        siteFrustum(n.Parapet,edge.x,z,roofTop+.03,roofTop+.65,.13,.09,"sceneTrim",8);
+        siteFrustum(n.Parapet,edge.x,z,edge.roofTop+.03,edge.roofTop+.65,.13,.09,"sceneTrim",8);
       }
     }
   }
@@ -771,30 +861,36 @@ function buildGlb(lod) {
     }
   }
 
-  // South veranda follows the 62.7 m Rangmahal facade; the north veranda follows
-  // the rear edge of both blocks, with the columns kept aligned along the facade.
+  // The south veranda follows Rangmahal; the north/rear veranda is split so
+  // each building block's deck, arcade and upper datum follow its own height.
   for(const [name,side] of [["Veranda_S",1],["Veranda_N",-1]]){
-    const verandaStart = side===1 ? split : xMin;
-    const verandaLength = side===1 ? rangLength : L;
-    const verandaCenterX = verandaStart + verandaLength/2;
-    const verandaCount=Math.max(8,Math.round(verandaLength/DIM.verandaSpan));
-    const verandaPitch=verandaLength/verandaCount;
     const z=side===1 ? half+1.22 : -(half+1.22);
-    box(byName[name],verandaCenterX,gfBase+.12,z,verandaLength,.24,2.44,"marble");
-    box(byName[name],verandaCenterX,ffBase+.12,z,verandaLength,.24,2.44,"marble");
-    if(lod>=2){
-      for(const [base,h] of [[gfBase,gfHeight],[ffBase,ffHeight]]){
-        const spring=base+h-verandaPitch/2;
-        for(let i=0;i<=verandaCount;i++){
-          const x=verandaStart+i*verandaPitch;
-          verticalCylinder(byName[name],x,base,base+h,z,.18,"trim",8);
-          box(byName[name],x,base+.13,z,.48,.26,.48,"trim");
-          box(byName[name],x,base+h-.12,z,.48,.24,.48,"trim");
-        }
-        if(lod===3){
-          for(let i=0;i<verandaCount;i++){
-            const x=verandaStart+(i+.5)*verandaPitch;
-            archBand(byName[name],x,spring,z,verandaPitch/2,.10,"trim",12);
+    const sections = side===1
+      ? [{start:split,length:rangLength,floors:[gf,ff]}]
+      : [
+          {start:xMin,length:andarLength,floors:[andarGf,andarFf]},
+          {start:split,length:rangLength,floors:[gf,ff]},
+        ];
+    for(const section of sections){
+      const verandaCenterX=section.start+section.length/2;
+      const verandaCount=Math.max(8,Math.round(section.length/DIM.verandaSpan));
+      const verandaPitch=section.length/verandaCount;
+      box(byName[name],verandaCenterX,section.floors[0].base+.12,z,section.length,.24,2.44,"marble");
+      box(byName[name],verandaCenterX,section.floors[1].base+.12,z,section.length,.24,2.44,"marble");
+      if(lod>=2){
+        for(const floor of section.floors){
+          const spring=floor.base+floor.height-verandaPitch/2;
+          for(let i=0;i<=verandaCount;i++){
+            const x=section.start+section.length*i/verandaCount;
+            verticalCylinder(byName[name],x,floor.base,floor.base+floor.height,z,.18,"trim",8);
+            box(byName[name],x,floor.base+.13,z,.48,.26,.48,"trim");
+            box(byName[name],x,floor.base+floor.height-.12,z,.48,.24,.48,"trim");
+          }
+          if(lod===3){
+            for(let i=0;i<verandaCount;i++){
+              const x=section.start+(i+.5)*verandaPitch;
+              archBand(byName[name],x,spring,z,verandaPitch/2,.10,"trim",12);
+            }
           }
         }
       }
@@ -804,21 +900,27 @@ function buildGlb(lod) {
   // Upper veranda balustrades: the public south-facing balcony belongs to
   // Rangmahal; the north/rear railing spans the full back edge.
   if (lod === 3) {
-    const railBase = ffBase + 0.22;
-    const railTop = railBase + DIM.balustradeHeight;
     for (const side of [-1, 1]) {
-      const railStart = side===1 ? split : xMin;
-      const railLength = side===1 ? rangLength : L;
       const railZ = side===1 ? half + 2.26 : -(half + 2.26);
-      const balusterCount = Math.ceil(railLength / DIM.balusterSpacing);
-      const node = byName[side === 1 ? "Veranda_S" : "Veranda_N"];
-      barBetween(node,
-        [railStart, railBase, railZ], [railStart+railLength, railBase, railZ], 0.11, "rail");
-      barBetween(node,
-        [railStart, railTop, railZ], [railStart+railLength, railTop, railZ], 0.11, "rail");
-      for (let i = 0; i <= balusterCount; i++) {
-        const x = railStart + (railLength * i / balusterCount);
-        verticalCylinder(node,x,railBase,railTop,railZ,.035,"rail",6);
+      const railNode = byName[side === 1 ? "Veranda_S" : "Veranda_N"];
+      const sections = side===1
+        ? [{start:split,length:rangLength,floor:ff}]
+        : [
+            {start:xMin,length:andarLength,floor:andarFf},
+            {start:split,length:rangLength,floor:ff},
+          ];
+      for(const section of sections){
+        const railBase=section.floor.base+.22;
+        const railTop=railBase+DIM.balustradeHeight;
+        const balusterCount=Math.ceil(section.length/DIM.balusterSpacing);
+        barBetween(railNode,
+          [section.start,railBase,railZ],[section.start+section.length,railBase,railZ],.11,"rail");
+        barBetween(railNode,
+          [section.start,railTop,railZ],[section.start+section.length,railTop,railZ],.11,"rail");
+        for(let i=0;i<=balusterCount;i++){
+          const x=section.start+section.length*i/balusterCount;
+          verticalCylinder(railNode,x,railBase,railTop,railZ,.035,"rail",6);
+        }
       }
     }
   }
@@ -835,7 +937,16 @@ function buildGlb(lod) {
         const x=domeX-width/2+i*span;
         verticalCylinder(byName[name],x,gfBase,gfBase+gfHeight,faceZ,.25,"trim",12);
         box(byName[name],x,gfBase+.16,faceZ,.60,.32,.58,"trim");
+        if(lod>=2){
+          verticalCylinder(byName[name],x,gfBase+.20,gfBase+.32,faceZ,.33,"trim",12);
+          verticalCylinder(byName[name],x,gfBase+gfHeight-.34,gfBase+gfHeight-.20,faceZ,.34,"trim",12);
+        }
         box(byName[name],x,gfBase+gfHeight-.12,faceZ,.70,.24,.62,"trim");
+        if(lod===3){
+          for(const offset of [-.21,.21]){
+            ellipsoid(byName[name],x+offset,gfBase+gfHeight-.20,faceZ+side*.08,.11,.08,.09,"trim",8,4);
+          }
+        }
       }
       const spring=gfBase+gfHeight-span/2;
       for(let i=0;i<3;i++){
@@ -859,7 +970,16 @@ function buildGlb(lod) {
             lod === 3 ? 16 : 10,
           );
           box(byName[name], x, upperBase + .12, faceZ, .58, .24, .58, "trim");
+          if(lod>=2){
+            verticalCylinder(byName[name],x,upperBase+.18,upperBase+.31,faceZ,.30,"trim",12);
+            verticalCylinder(byName[name],x,upperTop-.34,upperTop-.20,faceZ,.31,"trim",12);
+          }
           box(byName[name], x, upperTop - .12, faceZ, .68, .24, .68, "trim");
+          if(lod===3){
+            for(const offset of [-.19,.19]){
+              ellipsoid(byName[name],x+offset,upperTop-.20,faceZ+side*.08,.10,.08,.08,"trim",8,4);
+            }
+          }
           if (lod === 3) {
             // Light impost/capital bands emphasize the upper arcade rhythm.
             box(byName[name], x, upperSpring, faceZ + side * .035, .82, .18, .80, "marble");
@@ -956,10 +1076,17 @@ function buildGlb(lod) {
   }
   for(let i=0;i<steps;i++){
     const t = steps <= 1 ? 1 : i / (steps - 1);
-    const top=(i+1)*rise;
+    const riserBottom=i*rise;
+    const riserTop=(i+1)*rise;
+    const riserCenter=(riserBottom+riserTop)/2;
     const z=stairTopZ+stepDepth*(steps-1-i);
     const width=stairBaseWidth+(stairTopWidth-stairBaseWidth)*t;
-    box(stair,domeX,top/2,z,width,top,stepDepth,"stair");
+    // One riser-height block per step. The old cumulative-height blocks
+    // overlapped all lower treads and made the staircase render as a single ramp.
+    box(stair,domeX,riserCenter,z,width,rise,stepDepth,"stair");
+    // A narrow contrasting nosing on each leading tread edge makes the 28
+    // horizontal steps readable in elevation without changing their dimensions.
+    box(stair,domeX,riserTop-.018,z+stepDepth*.32,width,.036,stepDepth*.16,"trim");
   }
   if(lod>=2){
     // Tapered cheek balustrades follow the stair and connect to the portal.
@@ -1010,13 +1137,25 @@ function buildGlb(lod) {
   // Match the smooth, vertically stretched hemispherical dome in the HTML scene.
   addDomeProfile(n.Dome,domeX,0,drumTop,domeProfile,lod===1?12:lod===2?20:36,"sceneDome");
   if(lod===3){
-    // The HTML reference has four horizontal torus mouldings rather than
-    // radial ribs. Thin annular bands reproduce that recognizable silhouette.
-    for(const phi of [.35,.68,1.0,1.28]){
-      horizontalRing(n.Dome,domeX,0,drumTop+domeRise*Math.sin(phi),
-        domeRadius*Math.cos(phi),.15,"sceneTrim",48);
+    // Align decorative rings with the actual lotus-bud profile samples rather
+    // than the smaller sphere-based curve that previously made them float.
+    for(const index of [1,3,5,7]){
+      const [ringRadius,ringHeight]=domeProfile[index];
+      horizontalRing(n.Dome,domeX,0,drumTop+ringHeight,ringRadius,.13,"sceneTrim",48);
     }
-    horizontalRing(n.Dome,domeX,0,drumTop+.16,domeRadius,.14,"sceneTrim",48);
+    horizontalRing(n.Dome,domeX,0,drumTop+.08,domeRadius,.14,"sceneTrim",48);
+    // Dome meridian ribs follow each sampled profile segment; this adds a subtle, repeatable fluted rhythm without replacing the measured silhouette.
+    const meridianRibCount = 16;
+    for(let rib=0;rib<meridianRibCount;rib++){
+      const angle=2*Math.PI*rib/meridianRibCount;
+      for(let j=0;j<domeProfile.length-1;j++){
+        const [r0,h0]=domeProfile[j], [r1,h1]=domeProfile[j+1];
+        const offset=.045;
+        const p0=[domeX+(r0+offset)*Math.cos(angle),drumTop+h0,(r0+offset)*Math.sin(angle)];
+        const p1=[domeX+(r1+offset)*Math.cos(angle),drumTop+h1,(r1+offset)*Math.sin(angle)];
+        barBetween(n.Dome,p0,p1,.055,"sceneTrim");
+      }
+    }
   }
   const finialBase=DIM.peak-DIM.finialHeight;
   verticalCylinder(n.Finial,domeX,finialBase,finialBase+.9,0,.12,"trim",12);

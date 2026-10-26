@@ -1,0 +1,221 @@
+name: M01 Generic GLB Renderer QA
+
+on:
+  push:
+    branches:
+      - rakibul-hasan
+    paths:
+      - ".github/workflows/m01-generic-renderer-qa.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/blender/source_camera_camera.py"
+      - "scripts/blender/test-source-camera-projection.py"
+      - "scripts/blender/prepare-source-camera-fixture.py"
+      - "tests/fixtures/source-camera-projection.json"
+      - "scripts/render-building-review-views.mjs"
+      - "scripts/build-bangabhaban-model-candidate.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/generation-engine.mjs"
+      - "data/heritage/bangabhaban-building-spec.json"
+  pull_request:
+    branches:
+      - rakibul-hasan
+      - development
+    paths:
+      - ".github/workflows/m01-generic-renderer-qa.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/blender/source_camera_camera.py"
+      - "scripts/blender/test-source-camera-projection.py"
+      - "scripts/blender/prepare-source-camera-fixture.py"
+      - "tests/fixtures/source-camera-projection.json"
+      - "scripts/render-building-review-views.mjs"
+      - "scripts/build-bangabhaban-model-candidate.mjs"
+      - "src/core/building-generation/render-review-options.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "src/core/building-generation/generation-engine.mjs"
+      - "data/heritage/bangabhaban-building-spec.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m01-generic-renderer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-generic-building:
+    name: Render a non-Rangmahal 13-view GLB
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Regenerate the generic Bangabhaban candidate
+        run: node scripts/build-bangabhaban-model-candidate.mjs
+      - name: Install headless Blender render dependencies
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=90 -o Acquire::https::Timeout=90 update -qq
+          # Ubuntu's hosted-runner mirror can be slow for blender-data and FFmpeg.
+          # Keep the installation bounded, but do not fail at 15 minutes while
+          # apt is still fetching packages.
+          sudo DEBIAN_FRONTEND=noninteractive timeout 2700s apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=90 -o Acquire::https::Timeout=90 install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+      - name: Verify calibrated source-camera projection against known pixel controls
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          blender --background --factory-startup --python-exit-code 17 --python scripts/blender/test-source-camera-projection.py -- --camera-manifest tests/fixtures/source-camera-projection.json --tolerance-px 3
+      - name: Prepare source-camera end-to-end fixture
+        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture data/heritage/generated/bangabhaban-candidate.report.json
+      - name: Prepare artifact output directory
+        run: mkdir -p artifacts
+      - name: Render fixed 13-view set with bounded execution
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender --source-camera=artifacts/m13-source-camera-fixture/synthetic-source-camera.json --source-image=artifacts/m13-source-camera-fixture/synthetic-source.png --calibration-evidence=artifacts/m13-source-camera-fixture/synthetic-calibration-evidence.json --frame-alignment-evidence=artifacts/m13-source-camera-fixture/synthetic-frame-alignment-evidence.json
+      - name: Independently verify calibrated source-camera frame has visible pixels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          path = Path("artifacts/m01-generic-renderer/source-camera.png")
+          if not path.is_file():
+              raise SystemExit("source-camera.png is missing")
+          with Image.open(path) as source:
+              if source.size != (640, 480):
+                  raise SystemExit(f"unexpected source-camera dimensions: {source.size}")
+              gray = source.convert("L")
+              deviation = ImageStat.Stat(gray).stddev[0] / 255.0
+              extrema = gray.getextrema()
+              unique_colors = len(gray.getcolors(maxcolors=640 * 480) or [])
+          print({
+              "size": list(source.size),
+              "luminanceStandardDeviationSrgb": round(deviation, 6),
+              "luminanceExtrema": extrema,
+              "uniqueLuminanceValues": unique_colors,
+          })
+          if deviation < 0.01 or unique_colors < 8:
+              raise SystemExit("calibrated source-camera frame is blank or nearly uniform")
+          PY
+      - name: Validate exact GLB, generic framing, all views and PNG hashes
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { createHash } from "node:crypto";
+          import { readFile, stat } from "node:fs/promises";
+          import path from "node:path";
+          const root = "artifacts/m01-generic-renderer";
+          const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+          const model = await readFile("data/heritage/generated/bangabhaban-candidate.glb");
+          const manifestBytes = await readFile(path.join(root, "render-review-manifest.json"));
+          const manifest = JSON.parse(manifestBytes.toString("utf8"));
+          const expected = ["front", "back", "left", "right", "top",
+            ...[0,45,90,135,180,225,270,315].map((n) => "turntable-" + String(n).padStart(3, "0"))];
+          assert.equal(manifest.valid, true, "render manifest must be valid");
+          assert.ok(["render-set-ready-for-human-review", "review-required"].includes(manifest.status),
+            "unexpected renderer status: " + manifest.status);
+          assert.equal(manifest.publicationEligible, false);
+          assert.equal(manifest.modelSha256, hash(model), "render manifest must bind to exact GLB bytes");
+          assert.equal(manifest.renderResolution.width, 1024);
+          assert.equal(manifest.renderResolution.height, 1024);
+          assert.equal(manifest.views.length, expected.length, "expected exactly 13 rendered views");
+          assert.deepEqual(manifest.views.map((v) => v.id), expected, "view set/order must be deterministic");
+          assert.equal(manifest.views.find((v) => v.id === "front")?.framing, "whole-model-generic-front",
+            "a generic building must use whole-model framing instead of Rangmahal-specific selection");
+          for (const view of manifest.views) {
+            const bytes = await readFile(path.join(root, view.filename));
+            const info = await stat(path.join(root, view.filename));
+            assert.equal(hash(bytes), view.sha256, "PNG hash mismatch for " + view.id);
+            assert.equal(bytes.length, view.bytes, "PNG byte count mismatch for " + view.id);
+            assert.equal(info.size, view.bytes);
+            assert.equal(view.width, 1024);
+            assert.equal(view.height, 1024);
+            assert.equal(view.renderComplete, true);
+          }
+          const cameraFixtureRoot = "artifacts/m13-source-camera-fixture";
+          const cameraReportBytes = await readFile(path.join(root, "source-camera-render-manifest.json"));
+          const cameraReport = JSON.parse(cameraReportBytes.toString("utf8"));
+          const cameraPng = await readFile(path.join(root, "source-camera.png"));
+          const sourceImage = await readFile(path.join(cameraFixtureRoot, "synthetic-source.png"));
+          const cameraManifest = await readFile(path.join(cameraFixtureRoot, "synthetic-source-camera.json"));
+          const calibrationEvidence = await readFile(path.join(cameraFixtureRoot, "synthetic-calibration-evidence.json"));
+          const alignmentEvidence = await readFile(path.join(cameraFixtureRoot, "synthetic-frame-alignment-evidence.json"));
+          assert.equal(cameraReport.status, "same-camera-comparable");
+          assert.equal(cameraReport.sameCameraComparable, true);
+          assert.equal(cameraReport.publicationEligible, false);
+          assert.equal(cameraReport.modelSha256, hash(model), "source-camera report must bind to exact GLB");
+          assert.equal(cameraReport.sourceImageSha256, hash(sourceImage), "source image hash must match the supplied image bytes");
+          assert.equal(cameraReport.cameraManifestSha256, hash(cameraManifest), "camera manifest hash must bind to input bytes");
+          assert.equal(cameraReport.calibrationEvidenceSha256, hash(calibrationEvidence));
+          assert.equal(cameraReport.frameAlignmentEvidenceSha256, hash(alignmentEvidence));
+          assert.equal(cameraReport.controlPointReports.length, 4);
+          assert.ok(cameraReport.controlPointReports.every((point) => point.status === "within-tolerance"),
+            "every camera control point must stay within tolerance");
+          assert.equal(cameraReport.render.filename, "source-camera.png");
+          assert.equal(cameraReport.render.width, 640);
+          assert.equal(cameraReport.render.height, 480);
+          assert.equal(cameraReport.render.sha256, hash(cameraPng), "source-camera render hash must match exact PNG bytes");
+          assert.equal(cameraReport.render.bytes, cameraPng.length);
+          assert.ok(cameraReport.render.pixelStatistics.sampledPixels > 0,
+            "source-camera render must include sampled image content metrics");
+          assert.ok(cameraReport.render.pixelStatistics.luminanceStandardDeviation >= 0.01,
+            "source-camera render must contain visible geometry, not a uniform background");
+          assert.ok(cameraReport.render.pixelStatistics.transparentRatio <= 0.98,
+            "source-camera render must not be nearly entirely transparent");
+          console.log(JSON.stringify({ status: manifest.status, valid: manifest.valid,
+            modelSha256: manifest.modelSha256, renderManifestSha256: hash(manifestBytes),
+            views: manifest.views.length, genericFront: true,
+            sourceCameraStatus: cameraReport.status,
+            sourceCameraManifestSha256: hash(cameraReportBytes),
+            sourceCameraImageSha256: cameraReport.render.sha256,
+            sourceImageSha256: cameraReport.sourceImageSha256,
+            sourceCameraSize: [cameraReport.render.width, cameraReport.render.height],
+            publicationEligible: false }, null, 2));
+          NODE
+      - name: Build a labeled contact sheet for human review
+        if: always()
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("artifacts/m01-generic-renderer")
+          try:
+              from PIL import Image, ImageDraw
+          except ImportError:
+              print("Pillow is unavailable because the dependency setup did not complete; keeping original render artifacts only.")
+              raise SystemExit(0)
+          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
+          existing = [name for name in views if (root / (name + ".png")).is_file()]
+          if not existing:
+              print("No render images were produced; preserving the failure report only.")
+              raise SystemExit(0)
+          thumb, label_h, cols = 256, 28, 4
+          rows = (len(existing) + cols - 1) // cols
+          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 238, 232))
+          draw = ImageDraw.Draw(sheet)
+          for i, name in enumerate(existing):
+              with Image.open(root / (name + ".png")) as source:
+                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
+              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
+              sheet.paste(image, (x, y))
+              draw.text((x + 8, y + thumb + 6), name, fill=(30, 30, 30))
+          sheet.save(root / "contact-sheet.png", optimize=True)
+          PY
+      - name: Upload renderer outputs and review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m01-generic-renderer-${{ github.run_id }}
+          path: |
+            data/heritage/generated/bangabhaban-candidate.glb
+            data/heritage/generated/bangabhaban-candidate.report.json
+            artifacts/m01-generic-renderer/**
+            artifacts/m13-source-camera-fixture/**
+          if-no-files-found: warn
+          retention-days: 30

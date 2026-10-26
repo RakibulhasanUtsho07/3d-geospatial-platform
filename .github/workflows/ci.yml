@@ -140,6 +140,9 @@ jobs:
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
 
+      - name: Test generated-model layer boundary
+        run: npm run test:generated-model-layer-boundary
+
       - name: Test heritage camera controller boundary
         run: npm run test:heritage-camera-controller-boundary
 
@@ -174,6 +177,9 @@ jobs:
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
 
+      - name: Test versioned capture manifest, source integrity and measurement evidence readiness
+        run: npm run test:building-capture-manifest
+
       - name: Test standalone source-media quality assessment
         run: npm run test:media-quality-preflight
 
@@ -200,13 +206,23 @@ jobs:
 
       - name: Install FFmpeg for deterministic texture atlas baking
         uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
+        continue-on-error: true
         with:
           ffmpeg-version: release
           architecture: x64
           linking-type: static
 
-      - name: Verify FFmpeg installation
-        run: ffmpeg -hide_banner -version
+      - name: Verify or install FFmpeg fallback
+        shell: bash
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1 && ffmpeg -hide_banner -version >/dev/null 2>&1; then
+            ffmpeg -hide_banner -version
+            exit 0
+          fi
+          echo "Static FFmpeg bootstrap was unavailable; installing the Ubuntu runner package as fallback."
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -hide_banner -version
 
       - name: Test textured GLB exporter and embedded texture contract
         run: npm run test:textured-glb-export
@@ -214,10 +230,30 @@ jobs:
       - name: Test calibrated geometry, wireframe QA, explicit mesh, baked atlas and textured GLB workflow
         run: npm run test:architectural-geometry-workflow
 
+      - name: Test camera calibration evidence and correspondence outlier QA
+        run: npm run test:camera-projection-validation && npm run test:correspondence-outlier-qa
+
+      - name: Test confidence-aware wireframe fusion
+        run: npm run test:confidence-aware-wireframe-fusion
+
+      - name: Test wireframe mesh readiness gate
+        run: npm run test:wireframe-mesh-readiness && npm run test:wireframe-to-mesh && npm run test:mesh-surface-review
+
+      - name: Test calibrated source-camera render plan, provenance and renderer contract
+        run: npm run test:source-camera-render
+
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
         run: npm run test:mask-guided-building-sketches
+      - name: Test labelled segmentation benchmark, held-out split and class metrics
+        run: npm run test:building-segmentation-benchmark
+      - name: Test source-bound semantic mask provider and reviewed fallback
+        run: npm run test:building-mask-provider
+      - name: Test evidence-linked architectural observation schema and review history
+        run: npm run test:architectural-observation-schema
+      - name: Test bounded per-view feature proposals and reviewed comparison
+        run: npm run test:architectural-feature-proposals
 
       - name: Test bounded wireframe QA and safe repair passes
         run: npm run test:wireframe-qa-repair-passes
@@ -258,6 +294,9 @@ jobs:
       - name: Test multi-view render review manifest validation
         run: npm run test:render-review-manifest
 
+      - name: Test calibrated source-camera render evidence and projection
+        run: npm run test:source-camera-render
+
       - name: Test evidence-linked render reference review
         run: npm run test:render-reference-review
 
@@ -297,7 +336,7 @@ jobs:
         run: npm run test:building-accuracy-evidence-pack
 
       - name: Validate Blender render automation Python syntax
-        run: python3 -m py_compile scripts/blender/render-building-review.py
+        run: python3 -m py_compile scripts/blender/render-building-review.py scripts/blender/source_camera_camera.py scripts/blender/test-source-camera-projection.py scripts/blender/prepare-source-camera-fixture.py
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
@@ -402,6 +441,12 @@ jobs:
       - name: Test architecture research filters and metadata
         run: npm run test:architecture-research
 
+      - name: Test Bangabhaban reference provenance and reconstruction gates
+        run: npm run test:bangabhaban-reference-pack
+
+      - name: Test Ahsan Manzil licensed reference pack provenance and reconstruction gates
+        run: npm run test:ahsan-manzil-reference-pack
+
       - name: Test shared request cancellation lifecycle
         run: npm run test:shared-request-lifecycle
 
@@ -453,6 +498,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Verify viewport API against the production server
+        timeout-minutes: 30
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
           NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
@@ -463,16 +509,17 @@ jobs:
           # but uses the exact same built app and generated tile manifest.
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3001 > /tmp/geospatial-next-repeat.log 2>&1 &
           repeat_server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true' EXIT
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "Primary production server log:"; cat /tmp/geospatial-next.log; echo "Repeat production server log:"; cat /tmp/geospatial-next-repeat.log; fi; kill "$server_pid" 2>/dev/null || true; kill "$repeat_server_pid" 2>/dev/null || true; exit "$status"' EXIT
 
           node --input-type=module <<'NODE'
+          const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3000/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
 
           while (Date.now() < deadline) {
             try {
-              const response = await fetch(endpoint);
+              const response = await fetchWithTimeout(endpoint);
               await response.arrayBuffer();
               if (response.status === 400) {
                 ready = true;
@@ -490,7 +537,7 @@ jobs:
             process.exit(1);
           }
 
-          const nearby = await fetch(
+          const nearby = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/nearby-places",
           );
           if (nearby.status !== 400) {
@@ -498,7 +545,7 @@ jobs:
             process.exit(1);
           }
 
-          const properties = await fetch(
+          const properties = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/properties",
           );
           if (properties.status !== 400) {
@@ -506,7 +553,7 @@ jobs:
             process.exit(1);
           }
 
-          const streetImagery = await fetch(
+          const streetImagery = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/street-imagery",
           );
           if (streetImagery.status !== 400) {
@@ -514,7 +561,7 @@ jobs:
             process.exit(1);
           }
 
-          const roads = await fetch(
+          const roads = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/roads",
           );
           if (roads.status !== 400) {
@@ -522,7 +569,7 @@ jobs:
             process.exit(1);
           }
 
-          const architectureResearch = await fetch(
+          const architectureResearch = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?limit=50",
           );
           const architecturePayload = await architectureResearch.json();
@@ -537,7 +584,7 @@ jobs:
             process.exit(1);
           }
 
-          const filteredArchitecture = await fetch(
+          const filteredArchitecture = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?area=Mugda&mediaType=image",
           );
           const filteredArchitecturePayload = await filteredArchitecture.json();
@@ -552,7 +599,7 @@ jobs:
             process.exit(1);
           }
 
-          const commonsMedia = await fetch(
+          const commonsMedia = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?q=Mugda&mediaType=image&limit=10",
           );
           const commonsPayload = await commonsMedia.json();
@@ -569,7 +616,7 @@ jobs:
             process.exit(1);
           }
 
-          const videoMedia = await fetch(
+          const videoMedia = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/architecture-research?mediaType=video&limit=10",
           );
           const videoPayload = await videoMedia.json();
@@ -586,7 +633,7 @@ jobs:
             process.exit(1);
           }
 
-          const propertySearch = await fetch(
+          const propertySearch = await fetchWithTimeout(
             "http://127.0.0.1:3000/api/geospatial/properties?lat=23.7461&lon=90.3742&radius=20000&minRent=20000&maxRent=40000&minBedrooms=2&type=apartment&limit=10",
           );
           const propertyPayload = await propertySearch.json();
@@ -603,12 +650,13 @@ jobs:
 
           # Readiness probes use invalid bounds, so both servers' tile indexes are still cold.
           node --input-type=module <<'NODE'
+          const fetchWithTimeout = (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
           const endpoint = "http://127.0.0.1:3001/api/geospatial/overture-buildings/viewport";
           const deadline = Date.now() + 60000;
           let ready = false;
           while (Date.now() < deadline) {
             try {
-              const response = await fetch(endpoint);
+              const response = await fetchWithTimeout(endpoint);
               await response.arrayBuffer();
               if (response.status === 400) {
                 ready = true;

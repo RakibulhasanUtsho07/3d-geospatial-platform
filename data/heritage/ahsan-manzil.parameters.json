@@ -244,6 +244,13 @@
         "unit": "m",
         "confidence": "[V]",
         "source": "Bangladesh Tourism Board"
+      },
+      "andarmahalHeightScale": {
+        "value": 0.94,
+        "unit": "scale",
+        "confidence": "[E]",
+        "source": "Architectural descriptions characterize the older Andarmahal as slightly lower than Rangmahal",
+        "note": "Provisional 6% reduction in the clear-height stack (about 0.65 m lower roof deck); an estimate, not a surveyed height."
       }
     },
     "facade": {
@@ -253,28 +260,32 @@
         "source": "Supplied brief"
       },
       "gfOpeningWidth": {
-        "value": 1.2,
+        "value": 1.65,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Supplied brief"
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Widened from the early placeholder to improve the arched opening-to-pier proportion; confirm from a rectified facade."
       },
       "gfOpeningCrownHeight": {
-        "value": 3.2,
-        "unit": "m",
-        "confidence": "[E]",
-        "source": "Supplied brief"
-      },
-      "ffOpeningWidth": {
-        "value": 1.3,
-        "unit": "m",
-        "confidence": "[E]",
-        "source": "Supplied brief"
-      },
-      "ffOpeningCrownHeight": {
         "value": 3.8,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Supplied brief"
+        "source": "Visual refinement against published south-elevation exterior photographs",
+        "note": "Raised the ground-floor arch crown to reduce excessive blank spandrel wall; estimate pending rectified elevation."
+      },
+      "ffOpeningWidth": {
+        "value": 2,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Second visual-refinement pass against published south-elevation exterior photographs",
+        "note": "Widened slightly and paired with a higher crown so the upper arches approach the floor cornice. Provisional photo-based estimate; confirm from a rectified facade."
+      },
+      "ffOpeningCrownHeight": {
+        "value": 5.3,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Second visual-refinement pass against published south-elevation exterior photographs",
+        "note": "Places the arch crown about 0.5 m below the 5.8 m clear-storey top to avoid the oversized blank spandrel band seen in the previous render. Rectified-elevation verification is still required."
       },
       "verandaArchSpan": {
         "value": 3.3,
@@ -299,11 +310,11 @@
         "source": "Placeholder; exact pattern unknown"
       },
       "porticoWidth": {
-        "value": 16.5,
+        "value": 13,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single south-elevation reference image, ±20% estimate",
-        "note": "Working projection width for the central three-arch pavilion; recalibrate by counting its three arches from a straight-on photo."
+        "source": "Licensed front-elevation image proportion: about 3.5 estimated bays at the provisional 3.72 m bay pitch; camera perspective is not rectified.",
+        "note": "Reduced from five bay pitches (18.6 m) because side-by-side comparison showed the modelled central pavilion/portico too wide against the facade. Use as a visual proportion estimate only; verify from a rectified elevation."
       },
       "porticoDepth": {
         "value": 4,
@@ -363,18 +374,18 @@
     },
     "stair": {
       "riserHeight": {
-        "value": 0.23,
+        "value": 0.2285714286,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single reference photo, ±20% estimate",
-        "note": "28 risers at 0.23 m give approximately 6.44 m rise to the upper portal."
+        "source": "6.4 m upper portal datum / 28 estimated risers",
+        "note": "28 estimated risers align to a 6.4 m upper portal datum; confirm step count and datum from a measured elevation."
       },
       "treadDepth": {
-        "value": 0.34,
+        "value": 0.5714285714,
         "unit": "m",
         "confidence": "[E]",
-        "source": "16 m total stair run / 28 steps",
-        "note": "Matched to the reference HTML stair geometry (0.34 m per tread); visual estimate pending survey."
+        "source": "16.0 m horizontal stair run / 28 estimated steps",
+        "note": "Shallow ceremonial tread; replaces the compressed 9.52 m run. Visual estimate pending a measured plan."
       },
       "stepCount": {
         "value": 28,
@@ -384,11 +395,11 @@
         "note": "28 steps; calibrate by counting steps in a straight-on image."
       },
       "width": {
-        "value": 16.5,
+        "value": 27,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single front reference photo estimate",
-        "note": "Approximate clear width at the garden-facing base of the stair."
+        "source": "Visual ratio against the licensed south/front exterior photograph, referenced to the provisional 55.8 m Rangmahal frontage.",
+        "note": "Reduced from 39 m (~70% of frontage) after comparison showed the stair base dominating the facade. 27 m is about 48% of the provisional frontage; perspective and foreground make this an estimate, not a surveyed width."
       },
       "sideRail": {
         "value": "simple low side rails",
@@ -396,18 +407,18 @@
         "source": "Stylized placeholder"
       },
       "runLength": {
-        "value": 9.52,
+        "value": 16,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Procedural placeholder",
-        "note": "Matched to the reference HTML: 28 steps × 0.34 m tread depth = 9.52 m horizontal run. Visual estimate; verify against measured site drawings."
+        "source": "Visual estimate from the broad river-facing stair reference image",
+        "note": "28 shallow treads at 0.5714285714 m give a 16 m horizontal run; verify against a measured plan."
       },
       "topWidth": {
-        "value": 13.5,
+        "value": 13,
         "unit": "m",
         "confidence": "[E]",
-        "source": "Single front reference photo estimate",
-        "note": "Approximate clear width at the upper portal; the stair tapers from 16.5 m at the base."
+        "source": "Aligned to the revised 13.0 m provisional triple-arch portico width, estimated at about 3.5 bay pitches.",
+        "note": "Reduced from 18.6 m so the stair landing aligns with the narrower central pavilion in the licensed front image. Confirm using a rectified elevation or measured plan."
       }
     },
     "dome": {
@@ -436,10 +447,11 @@
         "source": "Supplied placeholder"
       },
       "drumWidth": {
-        "value": 14,
+        "value": 10.5,
         "unit": "m",
-        "confidence": "[?]",
-        "source": "Placeholder; calibrate from elevation photo"
+        "confidence": "[E]",
+        "source": "Relative silhouette proportion against the licensed front and oblique reference images; no camera calibration or independent measurement.",
+        "note": "Reduced from the 14 m placeholder because the generated drum/dome diameter was too broad relative to the front elevation. 10.5 m is an image-based proportion estimate pending rectification or survey."
       },
       "profile": {
         "value": "square base room → octagonal drum → lotus-bud dome → finial",
@@ -471,78 +483,46 @@
       "profileRings": {
         "value": [
           [
-            4,
+            5.25,
             0
           ],
           [
-            3.9922,
-            0.4131
+            5.24,
+            0.35
           ],
           [
-            3.9686,
-            0.8263
+            5.17,
+            1.1
           ],
           [
-            3.9291,
-            1.2394
+            5,
+            2
           ],
           [
-            3.873,
-            1.6525
+            4.7,
+            2.9
           ],
           [
-            3.7997,
-            2.0656
+            4.27,
+            3.8
           ],
           [
-            3.7081,
-            2.4788
+            3.72,
+            4.65
           ],
           [
-            3.5969,
-            2.8919
+            2.89,
+            5.45
           ],
           [
-            3.4641,
-            3.305
-          ],
-          [
-            3.3072,
-            3.7181
-          ],
-          [
-            3.1225,
-            4.1313
-          ],
-          [
-            2.9047,
-            4.5444
-          ],
-          [
-            2.6458,
-            4.9575
-          ],
-          [
-            2.3319,
-            5.3706
-          ],
-          [
-            1.9364,
-            5.7838
-          ],
-          [
-            1.3919,
-            6.1969
-          ],
-          [
-            0,
-            6.61
+            0.21,
+            6.53
           ]
         ],
         "unit": "[radius_m, height_above_dome_base_m] pairs",
         "confidence": "[E]",
-        "source": "Procedural lotus-bud profile constrained to the 27.13 m peak",
-        "note": "Profile samples approximate the stretched hemispherical SphereGeometry in the reference Three.js HTML scene (4.0 m base radius, 6.61 m rise). These are visual estimates, not survey-measured heritage dimensions."
+        "source": "Lotus-bud dome silhouette interpreted from the licensed exterior reference set; radii scaled to the 10.5 m estimated drum width while preserving the 6.53 m profile height and 27.13 m published peak.",
+        "note": "The previous 6.9 m maximum radius produced a dome/drum that was too broad against the facade. The revised 5.25 m maximum radius keeps the rounded lower shoulder while reducing diameter; shape and radii remain estimates pending rectified elevation imagery."
       }
     },
     "materials": {
@@ -586,19 +566,28 @@
         "confidence": "[E]",
         "source": "User-supplied reference photo estimate",
         "note": "Brown wood for the central glazed doors and timber shutter details."
+      },
+      "roofDeck": {
+        "value": "#4A4740",
+        "confidence": "[E]",
+        "source": "Dark roof-plane tone estimated by comparing the rendered GLB with the licensed 2019 aerial reference; both photographic exposure and renderer lighting are uncalibrated.",
+        "note": "Dark neutral grey-brown roof-deck proxy; reduced from #777168 because the prior Blender top view remained too pale against the aerial photo. This is still a visual estimate, not a measured historic finish; the GLB has no embedded texture atlas or UV projection."
       }
     },
     "roof": {
-      "covering": {
-        "value": "flat roof behind parapet; covering material unknown",
-        "confidence": "[?]",
-        "source": "Supplied brief"
+      "domeBasePlatformWidth": {
+        "value": 14,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Qualitative dome-base-to-Rangmahal-roof proportion in the licensed 2019 aerial image; oblique camera is not calibrated.",
+        "note": "Provisional central roof platform width to connect the roof deck to the octagonal drum and express the raised central pavilion seen in aerial/front views. Estimate only; not a traced or surveyed dimension."
       },
-      "structure": {
-        "value": "timber/iron beams, interior only",
-        "confidence": "[V]",
-        "source": "Supplied brief",
-        "note": "Not included in exterior mesh."
+      "domeBasePlatformDepth": {
+        "value": 12,
+        "unit": "m",
+        "confidence": "[E]",
+        "source": "Qualitative roof-plane segmentation in the licensed 2019 aerial image; camera angle, focal calibration and orthorectification are unavailable.",
+        "note": "Provisional depth of the raised central dome-base roof platform. This adds a visible roof-section transition but must be replaced after tracing a calibrated roof plan or measured drawing."
       }
     },
     "runtimeLod": {
@@ -714,6 +703,7 @@
     "Stair_S",
     "Veranda_S",
     "Veranda_N",
+    "RoofDeck",
     "Parapet",
     "Dome_Drum",
     "Dome",

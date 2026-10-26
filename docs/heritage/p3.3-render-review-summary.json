@@ -1,0 +1,284 @@
+{
+  "task": "P3.3",
+  "building": "Ahsan Manzil (Pink Palace), Dhaka",
+  "sourceCommit": "2267ee26787067bbd69ff36814a25204f511471f",
+  "reviewGeneratedAt": "2026-10-26T11:48:20.111Z",
+  "correctionScope": [
+    "add a 14.0 m × 12.0 m estimated raised central roof platform beneath the drum to express the roof-section transition; both dimensions remain [E]",
+    "add a CC BY-SA 4.0 aerial roof reference for qualitative roof-plane review only; camera calibration and surveyed roof plan remain unknown",
+    "Rangmahal and Andarmahal roof-height separation",
+    "photo-proportion-based 13.0 m triple-arch portico and 27.0 m estimated stair base; neither is surveyed",
+    "16 m ceremonial stair run with 28 discrete risers/treads and contrasting nosing",
+    "10.5 m estimated octagonal drum with proportionally scaled 5.25 m maximum dome radius and unchanged 6.53 m profile height",
+    "wider/taller arched openings, LOD3 arch keystones and imposts, profile-following dome meridian ribs",
+    "rebalanced deterministic review lighting to preserve salmon facade tone and opening recesses",
+    "use a separate grey-brown RoofDeck material informed by the licensed aerial view; preserve complete roof planes in the GLB and 12 whole-model views"
+  ],
+  "model": {
+    "filename": "ahsan-manzil-lod3.glb",
+    "sha256": "10285b0c68c7ca9b137f4d05aa03f4b6c7cf1908c4d67d749beeedaef3e83f70",
+    "byteLength": 7235652
+  },
+  "renderManifest": {
+    "filename": "render-review-manifest.json",
+    "sha256": "731124b1f1d8b71d77ffeb13eb18d6e309f171dedb8c1915c51d65774a42853e",
+    "valid": true,
+    "status": "render-set-ready-for-human-review",
+    "renderer": "Blender",
+    "rendererVersion": "4.0.2",
+    "sceneBounds": {
+      "min": [
+        -63.81499863,
+        -33.73500061,
+        0
+      ],
+      "max": [
+        63.81499863,
+        19.41500092,
+        27.12999916
+      ],
+      "dimensions": [
+        127.62999725,
+        53.15000153,
+        27.12999916
+      ],
+      "coordinateUnits": "imported-model-units-unverified"
+    }
+  },
+  "qa": {
+    "geometry": {
+      "filename": "geometry-qa-report.json",
+      "sha256": "51528f0ee5b3c560093ffc1a6b97d5cf7b6b3e0b4b6d41307bfa5949918ea373",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "long-triangle-edges-present",
+        "disconnected-mesh-components-present",
+        "open-boundary-edges-present",
+        "non-manifold-edges-present",
+        "small-detached-components-present",
+        "no-texture-atlas-embedded-or-declared"
+      ]
+    },
+    "textures": {
+      "filename": "texture-qa-report.json",
+      "sha256": "bd88f532dd4cc9809f489dc5b3e926a30813ecdeda731e08b858639fd326d17d",
+      "valid": true,
+      "status": "review-recommended",
+      "errors": [],
+      "warnings": [
+        "mesh-0-primitive-0-no-supported-material-textures",
+        "mesh-1-primitive-0-no-supported-material-textures",
+        "mesh-2-primitive-0-no-supported-material-textures",
+        "mesh-3-primitive-0-no-supported-material-textures",
+        "mesh-4-primitive-0-no-supported-material-textures",
+        "mesh-5-primitive-0-no-supported-material-textures",
+        "mesh-6-primitive-0-no-supported-material-textures",
+        "mesh-7-primitive-0-no-supported-material-textures",
+        "mesh-8-primitive-0-no-supported-material-textures",
+        "mesh-9-primitive-0-no-supported-material-textures",
+        "mesh-10-primitive-0-no-supported-material-textures",
+        "mesh-11-primitive-0-no-supported-material-textures",
+        "mesh-12-primitive-0-no-supported-material-textures",
+        "mesh-13-primitive-0-no-supported-material-textures",
+        "mesh-14-primitive-0-no-supported-material-textures",
+        "mesh-15-primitive-0-no-supported-material-textures",
+        "mesh-16-primitive-0-no-supported-material-textures",
+        "mesh-17-primitive-0-no-supported-material-textures",
+        "mesh-18-primitive-0-no-supported-material-textures",
+        "mesh-19-primitive-0-no-supported-material-textures",
+        "mesh-20-primitive-0-no-supported-material-textures",
+        "mesh-21-primitive-0-no-supported-material-textures",
+        "no-images-declared",
+        "no-textures-declared",
+        "one-or-more-primitives-untextured"
+      ]
+    }
+  },
+  "referencePack": {
+    "filename": "reference-pack/reference-pack.manifest.json",
+    "sha256": "74982cf7913e3abee41c3cc3f8e6b35495afc972168a8c1b325af368ee412bca",
+    "verified": true,
+    "licensePolicy": "These reference images are licensed CC BY-SA 4.0. Preserve creator attribution, link the license, disclose any changes, and comply with share-alike terms for redistributed/adapted material. This metadata file does not grant any rights beyond the individual source licenses.",
+    "sources": [
+      {
+        "id": "licensed-front-2018",
+        "imagePath": "reference-pack/ahsan-manzil-front-2018.jpg",
+        "sha256": "90c5ca2c27020d5d49294675c8cb662a40ec50874c298bff227a95aa90de7a99",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Front_view_of_Ahsan_Manzil.jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Front_view_of_Ahsan_Manzil.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "95d95db884582236a5c5298532dc155e8fbb9d67",
+        "viewRole": "south-front-elevation",
+        "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-side-2017",
+        "imagePath": "reference-pack/ahsan-manzil-side-2017.jpg",
+        "sha256": "6330269884ed2a34927e41e3cc14223795cc6d6f3e92a96cf279a28e34a4a0b0",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Ahsan_Manzil_%28side%29.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "82c310dd395aa0a595af523fd51ecbf66d926c46",
+        "viewRole": "side-facade",
+        "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-oblique-2019",
+        "imagePath": "reference-pack/ahsan-manzil-oblique-2019.jpg",
+        "sha256": "e8d2076274c078aa6bef7de9c1ff968135a55dd5df8c60dca1b1636764ccbe77",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+        "downloadedUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ahsan_Manzil_Side_View.jpg",
+        "downloadMode": "original",
+        "originalPublishedSha1": "9b8ea70335c280a9dd4b9e9c3e87a03c20613711",
+        "viewRole": "oblique-front-side",
+        "verified": true,
+        "verificationMethod": "Original bytes match the published file byte length and SHA-1; SHA-256 computed locally.",
+        "cameraCalibration": "unknown"
+      },
+      {
+        "id": "licensed-aerial-2019",
+        "imagePath": "reference-pack/ahsan-manzil-aerial-2019-1280.jpg",
+        "sha256": "bd09cb982800dc42cbf80e096d59ccb70126f5816939ea9d55c00ef3c45d29d9",
+        "license": "CC BY-SA 4.0",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_01.jpg",
+        "downloadedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Ahsan_Manzil_01.jpg/1280px-Ahsan_Manzil_01.jpg",
+        "downloadMode": "thumbnail",
+        "originalPublishedSha1": "6f2913594f7db0b04fc8b480442d0694c41dfb9f",
+        "viewRole": "aerial-oblique-roof-plan",
+        "verified": true,
+        "verificationMethod": "Fixed Commons thumbnail URL; HTTP image/jpeg response, JPEG signature, decoded frame dimensions and bounded file size checked. SHA-256 is computed from this downloaded thumbnail; published SHA-1/size fields describe the linked original file, not this derivative.",
+        "cameraCalibration": "unknown"
+      }
+    ]
+  },
+  "views": [
+    {
+      "id": "front",
+      "filename": "front.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b84bc8e1b8a11a5b5264c7f3b307f25538d76039515e3025cd92b235c1fca0f5"
+    },
+    {
+      "id": "back",
+      "filename": "back.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "de7c8fca32e055b842452967447a98a57bdbf10aa2f105ceeb1579defcfc31f8"
+    },
+    {
+      "id": "left",
+      "filename": "left.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "337ff995ed0958467cc7d085901cf27c26883164c40d46237b0b076b0e042695"
+    },
+    {
+      "id": "right",
+      "filename": "right.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "fa942c04df97410f8394f8fc2f35bd768f650d827393e5b3b940078df4cb8493"
+    },
+    {
+      "id": "top",
+      "filename": "top.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "50b09e234158e690d916f2f3615aaa3c6e426738c19721f19511379bb3409d16"
+    },
+    {
+      "id": "turntable-000",
+      "filename": "turntable-000.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "916ac1b5e44ba8a464ee00fc1883ef393942c3acd13326d4676a191cb4fe0c5d"
+    },
+    {
+      "id": "turntable-045",
+      "filename": "turntable-045.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "013e32139c3d269436a7b9e5aca284698ad5e51f7922389d40fd49b1b391776d"
+    },
+    {
+      "id": "turntable-090",
+      "filename": "turntable-090.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "5a8634f5c66d0f2b62a666156e5f5c33136fe0cfff18baca418397673d662fd9"
+    },
+    {
+      "id": "turntable-135",
+      "filename": "turntable-135.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b1c40cc35c36ffc1d1275c58903b1a2592e9c8a2937335bef524fc9b3da21b24"
+    },
+    {
+      "id": "turntable-180",
+      "filename": "turntable-180.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "f6fe9fbc8ceb480e687e19239591ecf519c9d38b3817624d2764eac6982518d2"
+    },
+    {
+      "id": "turntable-225",
+      "filename": "turntable-225.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "f41dfacfc588effdc0d5f602b80611faa1ab54d5128e97ccf7540e1a15da5c34"
+    },
+    {
+      "id": "turntable-270",
+      "filename": "turntable-270.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "b5938439d5b5818a78609ad108e3c89b50730fe6f1a1afcd77cfdb3d5dcfdb23"
+    },
+    {
+      "id": "turntable-315",
+      "filename": "turntable-315.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "cd0ca3199eb151b2e9293329c9eafc33dc3999d82b712685dff66649beecd346"
+    }
+  ],
+  "visualReview": {
+    "contactSheet": "contact-sheet.png",
+    "status": "13-view render and hash validation passed; visual-fidelity acceptance remains pending. Roof tone uses a low-confidence aerial-photo estimate and the raised central dome-base platform adds a discrete roof section; texture/UV, fine roof segmentation, side/back framing and surveyed footprint remain unresolved.",
+    "findings": [
+      "Side-by-side comparison with the licensed south/front reference showed the 39 m estimated stair base visually dominating the facade; reduced it to a 27 m (~48% of the provisional 55.8 m frontage) estimate, pending rectification.",
+      "The original cumulative stair blocks concealed tread faces; generated one fixed-rise block per tread plus nosing detail, preserving the 16 m run and 6.4 m rise.",
+      "Dome mid-body radii were enlarged to remove the visibly conical taper while retaining the 6.53 m body-height budget.",
+      "Review lighting was raised and moved closer because the first contact sheet under-lit facade and roof detail.",
+      "Wider/taller opening proportions reduce the excessive blank spandrel band; dimensions remain estimates pending rectified elevation.",
+      "LOD3 adds small arch keystones/imposts and 16 dome meridian rib lines that follow the current profile samples.",
+      "The review light rig was reduced and rebalanced to improve pink tone, window recess contrast, and stair tread definition.",
+      "The front review camera uses a five-degree elevation to show stair treads; the dedicated RoofDeck plane is hidden only in this detail render and remains in the GLB/other 12 views. This is render framing, not a geometry-accuracy claim.",
+      "Rangmahal-focused front plus 12 whole-model views preserve both facade-detail and full-footprint review coverage.",
+      "A hash-pinned unrectified aerial photo shows large flat roof planes with multiple roof sections; a raised central dome-base platform was added using 14.0 m × 12.0 m [E] estimates, while other roof planes remain simplified parametric surfaces.",
+      "The first roof-tint estimate #777168 still rendered too pale in the top-view comparison; the roof-deck proxy was darkened to #4A4740 using the same uncalibrated aerial reference. Roof texture/UV and precise section geometry remain unresolved.",
+      "The prior focused-front render included an unrelated rear/left wing and clipped the facade edge. P3.3 now hides non-Rangmahal meshes for the front-detail view and fits that camera to the visible projected bounds; the regenerated front.png must be inspected before the framing change is accepted.",
+      "The prior back and left/right orthographic views had too much whitespace for useful detail inspection. P3.3 now computes orthographic scale from each camera's projected mesh bounds; the regenerated images must be inspected before the framing change is accepted.",
+      "The narrowed portico/stair landing, scaled dome profile, roof tone and roof-plane relationship are compared against four hash-pinned licensed views, including an unrectified aerial image; all dimensions remain estimates pending rectified elevation or independent survey.",
+      "The facade remains highly stylized with pale, flat material appearance. Texture QA confirms zero images, zero textures, zero UV accessors, and all 21 primitives untextured; texture/facade fidelity is not verified.",
+      "Several oblique views show a visually awkward stepped/elongated massing silhouette; it must be checked against permission-cleared multi-view references and a traced footprint before acceptance."
+    ],
+    "residualRisks": [
+      "The plinth topology regression checks only mesh integrity for the provisional L-shaped footprint; the footprint itself remains estimated pending north-up tracing or survey.",
+      "Historical proportions and all [E]/[C]/[?] parameters require rectified elevations or measured survey.",
+      "Geometry QA still reports topology warnings; texture QA reports no embedded texture images/atlas. Publication eligibility remains false."
+    ],
+    "policy": "Hashes and QA metrics prove artifact identity and basic GLB integrity, not historical accuracy or release eligibility."
+  }
+}
