@@ -155,6 +155,9 @@ jobs:
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
+      - name: Test Bangabhaban facade bearing, dome anchor and renderer alignment
+        run: npm run test:bangabhaban-correction
+
       - name: Test measured floor-plan vector to GLB generation
         run: npm run test:floor-plan-model
       - name: Test uploaded-source verification and private floor-plan candidate API service
