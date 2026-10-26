@@ -236,6 +236,9 @@ jobs:
       - name: Test wireframe mesh readiness gate
         run: npm run test:wireframe-mesh-readiness && npm run test:wireframe-to-mesh && npm run test:mesh-surface-review
 
+      - name: Test calibrated source-camera render plan, provenance and renderer contract
+        run: npm run test:source-camera-render
+
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
