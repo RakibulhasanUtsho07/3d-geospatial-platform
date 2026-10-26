@@ -232,7 +232,7 @@ The backend can create a private interior GLB candidate from a complete measured
 
 ### Floor-plan review and publication
 
-Candidates created from measured floor-plan vectors can be reviewed through a separate authenticated review API, then published only via an explicit hash-verified catalog command after approval. Source rights must be reviewed before candidate generation; rejected or changes-requested reviews do not create a publishing attestation. Run `npm run publish:floor-plan-candidate -- <workspaceRoot> <buildingId> <candidateId>` only after an approved review. Automatic PDF/image-to-vector tracing remains unimplemented. See section 14 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
+Candidates created from measured floor-plan vectors can be reviewed through a separate authenticated review API, then published only via an explicit hash-verified catalog command after approval. Source rights must be reviewed before candidate generation; rejected or changes-requested reviews do not create a publishing attestation. Run `npm run publish:floor-plan-candidate -- <workspaceRoot> <buildingId> <candidateId>` only after an approved review. Raster-based line and rectangular-room tracing is available as a limited human-review aid; it does not automatically recover a validated architectural plan, and PDF pages must be rasterized separately. See sections 14–17 in [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
 
 
 ### Raster floor-plan line proposals
@@ -244,3 +244,8 @@ A new authenticated endpoint analyzes an already-ingested JPEG/PNG/WebP floor-pl
 
 - [Dynamic Map Performance Baseline](docs/MAP-PERFORMANCE-BASELINE.md) — inspect local viewport/building/road timings and run reference-vs-optimized CPU microbenchmarks.
 - [Dynamic Map Release Checklist](docs/DYNAMIC-MAP-RELEASE-CHECKLIST.md) — pre-release browser, real-data visual QA, attribution, resilience checks, rollback guidance and known limitations.
+
+
+### Raster floor-plan trace to private GLB candidate
+
+The authenticated trace endpoint can propose orthogonal wall lines and rectangular room cells from an already-ingested JPEG/PNG/WebP floor-plan image. A human must correct the proposals, select returned line/room IDs, provide a measured scale segment, and supply a surveyed WGS84 origin before requesting a private GLB draft. Trace and transformation hashes are retained as evidence; candidates remain `mapReady=false` and `publicationEligible=false` until independent review and explicit publication. Run `npm run test:floor-plan-raster-trace` for the trace, persistence, vector-conversion and candidate-generation regression suite. See sections 16–17 of [the engine guide](docs/BUILDING-GENERATION-ENGINE.md).
