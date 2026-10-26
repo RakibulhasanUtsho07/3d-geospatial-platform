@@ -91,7 +91,7 @@ async function main() {
     path: sourceImagePath,
     sha256: sha256(sourceBytes),
     imageSize: { width: sourceDimensions.width, height: sourceDimensions.height },
-    crop: cameraEvidence.sourceImage?.crop ?? null,
+    crop: cameraEvidence.sourceImage?.crop ?? null,\n    rightsAttestation: cameraEvidence.sourceImage?.rightsAttestation ?? null,
   };
   const prepared = prepareSourceCameraRender({
     cameraEvidence,
