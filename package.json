@@ -192,7 +192,8 @@
     "test:building-mask-provider": "node --test tests/building-mask-provider.test.mjs",
     "test:architectural-observation-schema": "node --test tests/architectural-observation-schema.test.mjs",
     "test:architectural-feature-proposals": "node --test tests/architectural-feature-proposals.test.mjs tests/architectural-feature-proposals-cli.test.mjs",
-    "propose:architectural-features": "node scripts/propose-architectural-features.mjs"
+    "propose:architectural-features": "node scripts/propose-architectural-features.mjs",
+    "test:confidence-aware-wireframe-fusion": "node --test tests/confidence-aware-wireframe-fusion.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
