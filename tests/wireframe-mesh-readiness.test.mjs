@@ -49,7 +49,9 @@ test("rejects face boundaries that are not present in the reviewed wireframe",()
 
 test("rejects non-manifold edges used by three faces",()=>{
   const graph=structuredClone(tetra);
-  graph.faces.push(["a","b","c"]);
+  graph.vertices.push({id:"e",point:[0.5,0.5,2],reviewState:"accepted"});
+  graph.edges.push({id:"ae",from:"a",to:"e",reviewState:"accepted"},{id:"be",from:"b",to:"e",reviewState:"accepted"});
+  graph.faces.push(["a","b","e"]);
   const report=assessWireframeMeshReadiness(graph);
   assert.ok(report.blockers.some(b=>b.code==="non-manifold-edge"));
 });
