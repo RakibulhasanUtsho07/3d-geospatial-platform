@@ -95,6 +95,9 @@ export async function validateBuildingCaptureManifestFile({ manifestPath, rootDi
   return { ...assessment, status, readyForModelReview: status === "ready-for-review",
     input: { manifestPath: path.relative(root, manifestTarget).split(path.sep).join("/"), manifestSha256, expectedSha256: expectedSha256 || null,
       expectedSha256Pinned: pinCheck.status === "passed" },
+    counts: { ...assessment.counts, passed: checks.filter((check) => check.status === "passed").length,
+      warnings: checks.filter((check) => check.status === "warning").length,
+      failed: checks.filter((check) => check.status === "failed").length },
     checks, fileIntegrity, policy: { mapReady: false, publicationEligible: false, automaticApproval: false } };
 }
 async function main() {
