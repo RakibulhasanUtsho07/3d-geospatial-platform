@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { normalizeArchitecturalObservationBatch } from "./architectural-observation-schema.mjs";
 
 const HASH = /^[a-f0-9]{64}$/i;
@@ -7,7 +6,6 @@ const DEFAULTS = Object.freeze({ edgeThreshold: 160, horizontalBandDensityThresh
   minimumBandSeparationRatio: 0.04, maximumProposals: 200 });
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const validHash = (value) => typeof value === "string" && HASH.test(value);
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 
 function bytePlane(value, width, height, label, required = true) {
@@ -101,10 +99,13 @@ function componentsOfMaskedEdges(maskPixels, edgePixels, width, height, bounds, 
   return components.sort((a, b) => a.minY - b.minY || a.minX - b.minX);
 }
 
-export function proposeArchitecturalFeatures({ buildingId, viewId, source, mask, edgeMap = null, options = {} } = {}) {
+export function proposeArchitecturalFeatures({ buildingId, viewId, source, mask, edgeMap = null, options = {}, generatedAt = new Date().toISOString() } = {}) {
   if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(buildingId ?? "") ||
       !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(viewId ?? "")) {
     throw new TypeError("buildingId and viewId must be safe identifiers.");
+  }
+  if (typeof generatedAt !== "string" || !Number.isFinite(Date.parse(generatedAt))) {
+    throw new TypeError("generatedAt must be a valid timestamp.");
   }
   const { maskPixels, edgePixels, foregroundCount, options: config } = validateParams(source, mask, edgeMap, options);
   const bounds = foregroundBounds(maskPixels, source.width, source.height);
@@ -121,10 +122,14 @@ export function proposeArchitecturalFeatures({ buildingId, viewId, source, mask,
   if (bounds) {
     add("silhouette-bounds", { type: "BoundingBox", coordinates: [bounds.minX, bounds.minY, bounds.width, bounds.height] },
       0.4, "mask-foreground-bounds", "silhouette-bounds-01");
-    const top = [];
-    for (let x = bounds.minX; x <= bounds.maxX; x += 1) if (maskPixels[bounds.minY * source.width + x] === 255) top.push(x);
-    const firstX = top.length ? Math.min(...top) : bounds.minX;
-    const lastX = top.length ? Math.max(...top) : bounds.maxX;
+    let firstX = bounds.maxX, lastX = bounds.minX;
+    for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
+      if (maskPixels[bounds.minY * source.width + x] === 255) {
+        if (x < firstX) firstX = x;
+        if (x > lastX) lastX = x;
+      }
+    }
+    if (firstX > lastX) { firstX = bounds.minX; lastX = bounds.maxX; }
     add("roofline-segment", { type: "LineString", coordinates: [[firstX, bounds.minY], [lastX, bounds.minY]] },
       0.35, "mask-top-envelope", "roofline-envelope-01");
     for (const [label, x, y] of [
@@ -188,8 +193,8 @@ export function proposeArchitecturalFeatures({ buildingId, viewId, source, mask,
     add("balcony-candidate", null, 0, "masked-edge-component", "balcony-not-detected", "not-detected");
   }
   const normalized = normalizeArchitecturalObservationBatch({
-    schemaVersion: "1.0.0", batchId: "features-" + buildingId + "-" + viewId,
-    buildingId, viewId, createdAt: new Date().toISOString(),
+    schemaVersion: "1.0.0", batchId: ("features-" + buildingId + "-" + viewId).slice(0, 80),
+    buildingId, viewId, createdAt: new Date(generatedAt).toISOString(),
     source: { id: source.id, sha256: source.sha256, width: source.width, height: source.height },
     mask: { sha256: mask.sha256, width: mask.width, height: mask.height }, observations,
   });
@@ -202,7 +207,7 @@ export function proposeArchitecturalFeatures({ buildingId, viewId, source, mask,
   const status = foregroundCount === 0 || !edgeMap ? "incomplete" : "proposal-review-required";
   return {
     schemaVersion: "1.0.0", engine: "architectural-feature-proposals-v1", buildingId, viewId,
-    generatedAt: new Date().toISOString(), status, publishable: false,
+    generatedAt: new Date(generatedAt).toISOString(), status, publishable: false,
     source: { id: source.id, sha256: source.sha256.toLowerCase(), width: source.width, height: source.height },
     evidence: { maskSha256: mask.sha256.toLowerCase(), edgeMapSha256: edgeMap?.sha256?.toLowerCase() ?? null },
     method: "bounded-rule-based-proposals-over-reviewed-mask-and-edge-map",
