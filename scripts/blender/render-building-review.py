@@ -329,8 +329,25 @@ def main():
         print("Rendered " + view_id + " -> " + filename)
 
     source_camera_view = None
+    source_camera_render_error = None
     if "--source-camera-json" in opts:
-        source_camera_view = render_source_camera(opts, meshes, scene, output_dir, dimensions, center)
+        try:
+            source_camera_view = render_source_camera(opts, meshes, scene, output_dir, dimensions, center)
+        except Exception as error:
+            # Preserve the already completed canonical review renders. The Node
+            # wrapper emits a not-comparable sidecar and non-zero exit for this
+            # failed optional view; never treat it as a successful camera pair.
+            source_camera_render_error = "blender-source-camera-render-failed"
+            partial_source_path = os.path.join(output_dir, "source-camera.png")
+            if os.path.isfile(partial_source_path):
+                os.remove(partial_source_path)
+            print("Source-camera render failed: " + str(error), file=sys.stderr)
+            source_camera_view = {
+                "id": None,
+                "filename": "source-camera.png",
+                "renderComplete": False,
+                "errorCode": source_camera_render_error,
+            }
 
     raw_manifest = {
         "schemaVersion": "1.0.0",
