@@ -2554,8 +2554,7 @@ export class CesiumAdapter implements MapEngine {
     };
   }
 
-  private createGeneratedModelMatrix(definition: GeneratedModelDefinition, Cesium: CesiumModule): import("cesium").Matrix4 {
-    const origin = Cesium.Cartesian3.fromDegrees(definition.position.longitude, definition.position.lati  /** Add one validated GLB model to the existing Cesium map. */
+  /** Add one validated GLB model to the existing Cesium map. */
   async addGeneratedModel(definition: GeneratedModelDefinition): Promise<void> {
     return this.generatedModelLayer.add(definition);
   }
@@ -2577,7 +2576,16 @@ export class CesiumAdapter implements MapEngine {
     return this.generatedModelLayer.getIds();
   }
 
-
+  getCapabilities(): MapEngineCapabilities {
+    return {
+      globe: true,
+      terrain: true,
+      imagery: true,
+      threeDTiles: true,
+      vectorLayers: true,
+      modelLayers: true,
+      featurePicking: true,
+    };
   }
 
   private isLayerVisible(layerId: MapLayerId): boolean {
