@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedAt": "2026-10-26T03:35:13.950Z",
+  "generatedAt": "2026-10-26T03:36:15.712Z",
   "status": "candidate-generated-review-required",
   "engine": "procedural-glb-v1",
   "building": {
@@ -64,8 +64,8 @@
   },
   "model": {
     "path": "data/heritage/generated/bangabhaban-candidate.glb",
-    "bytes": 630564,
-    "sha256": "9d664c473aece6554594ebc7860ecdd2e9d7d7d7f393fac7a529513e54577ac5",
+    "bytes": 628068,
+    "sha256": "a3d0c9c6dde5432c24efc95c2cf8035aefd6f285f72bc3e48f44681c03633cc6",
     "format": "glb",
     "textureStatus": "untextured-procedural-materials-only"
   },
@@ -194,10 +194,10 @@
     "counts": {
       "meshCount": 6,
       "primitiveCount": 6,
-      "vertexCount": 24018,
-      "triangleCount": 8006,
-      "degenerateTriangleCount": 32,
-      "degenerateTriangleRatio": 0.003997,
+      "vertexCount": 23922,
+      "triangleCount": 7974,
+      "degenerateTriangleCount": 0,
+      "degenerateTriangleRatio": 0,
       "materialCount": 6,
       "textureCount": 0,
       "imageCount": 0,
@@ -261,20 +261,20 @@
       {
         "meshIndex": 1,
         "primitiveIndex": 0,
-        "vertexCount": 2310,
-        "triangleCount": 770,
-        "degenerateTriangleCount": 32,
+        "vertexCount": 2214,
+        "triangleCount": 738,
+        "degenerateTriangleCount": 0,
         "materialIndex": 1,
         "topology": {
-          "vertexCount": 2310,
-          "triangleCount": 770,
+          "vertexCount": 2214,
+          "triangleCount": 738,
           "modelDiagonal": 49.407564,
           "longEdgeThreshold": 7.411135,
           "maxEdgeLength": 48.747358,
-          "meanEdgeLength": 0.768304,
+          "meanEdgeLength": 0.78571,
           "longEdgeCount": 6,
           "longEdgeTriangleCount": 2,
-          "longEdgeTriangleRatio": 0.002597,
+          "longEdgeTriangleRatio": 0.00271,
           "maxTriangleEdgeRatio": 8,
           "elongatedTriangleCount": 0,
           "elongatedTriangleRatio": 0,
@@ -284,14 +284,13 @@
           "uniqueEdgeCount": 1125,
           "boundaryEdgeCount": 36,
           "boundaryEdgeRatio": 0.032,
-          "nonManifoldEdgeCount": 32,
+          "nonManifoldEdgeCount": 0,
           "topologyAnalyzed": true,
           "topologySkipReason": null,
           "warnings": [
             "disconnected-mesh-components-present",
             "small-detached-components-present",
-            "open-boundary-edges-present",
-            "non-manifold-edges-present"
+            "open-boundary-edges-present"
           ]
         }
       },
@@ -436,7 +435,6 @@
       }
     ],
     "warnings": [
-      "degenerate-triangles-present",
       "disconnected-mesh-components-present",
       "long-triangle-edges-present",
       "non-manifold-edges-present",
@@ -459,7 +457,7 @@
     "strategy": "reference-assisted-procedural",
     "output": {
       "format": "glb",
-      "bytes": 630564,
+      "bytes": 628068,
       "heightM": 10.8
     },
     "geometry": {
@@ -576,7 +574,6 @@
       "The procedural preview does not run image understanding; visual media do not alter geometry unless an explicit reconstruction strategy runs. Video frame extraction, photogrammetry and single-image AI are separate optional routes, and selecting a route does not prove that a reconstruction worker ran successfully.",
       "Estimated or AI-proposed properties need review before they are treated as verified: location, footprint, centralDome, frontArcade, floorHeightM.",
       "Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.",
-      "GLB geometry QA: degenerate-triangles-present.",
       "GLB geometry QA: disconnected-mesh-components-present.",
       "GLB geometry QA: long-triangle-edges-present.",
       "GLB geometry QA: non-manifold-edges-present.",
@@ -619,10 +616,10 @@
       "counts": {
         "meshCount": 6,
         "primitiveCount": 6,
-        "vertexCount": 24018,
-        "triangleCount": 8006,
-        "degenerateTriangleCount": 32,
-        "degenerateTriangleRatio": 0.003997,
+        "vertexCount": 23922,
+        "triangleCount": 7974,
+        "degenerateTriangleCount": 0,
+        "degenerateTriangleRatio": 0,
         "materialCount": 6,
         "textureCount": 0,
         "imageCount": 0,
@@ -686,20 +683,20 @@
         {
           "meshIndex": 1,
           "primitiveIndex": 0,
-          "vertexCount": 2310,
-          "triangleCount": 770,
-          "degenerateTriangleCount": 32,
+          "vertexCount": 2214,
+          "triangleCount": 738,
+          "degenerateTriangleCount": 0,
           "materialIndex": 1,
           "topology": {
-            "vertexCount": 2310,
-            "triangleCount": 770,
+            "vertexCount": 2214,
+            "triangleCount": 738,
             "modelDiagonal": 49.407564,
             "longEdgeThreshold": 7.411135,
             "maxEdgeLength": 48.747358,
-            "meanEdgeLength": 0.768304,
+            "meanEdgeLength": 0.78571,
             "longEdgeCount": 6,
             "longEdgeTriangleCount": 2,
-            "longEdgeTriangleRatio": 0.002597,
+            "longEdgeTriangleRatio": 0.00271,
             "maxTriangleEdgeRatio": 8,
             "elongatedTriangleCount": 0,
             "elongatedTriangleRatio": 0,
@@ -709,14 +706,13 @@
             "uniqueEdgeCount": 1125,
             "boundaryEdgeCount": 36,
             "boundaryEdgeRatio": 0.032,
-            "nonManifoldEdgeCount": 32,
+            "nonManifoldEdgeCount": 0,
             "topologyAnalyzed": true,
             "topologySkipReason": null,
             "warnings": [
               "disconnected-mesh-components-present",
               "small-detached-components-present",
-              "open-boundary-edges-present",
-              "non-manifold-edges-present"
+              "open-boundary-edges-present"
             ]
           }
         },
@@ -861,7 +857,6 @@
         }
       ],
       "warnings": [
-        "degenerate-triangles-present",
         "disconnected-mesh-components-present",
         "long-triangle-edges-present",
         "non-manifold-edges-present",
