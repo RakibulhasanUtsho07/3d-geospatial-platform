@@ -60,17 +60,19 @@ The values above are a synthetic test example only, not a camera calibration for
 - Intrinsics are measured in pixels with a top-left image origin. `fx` and `fy` must be positive. The source image must already be undistorted or rectified (`distortionModel` is `none` or `rectified`).
 - The image passed as `--source-image=<photo.png|photo.jpg|photo.jpeg>` must match the declared bytes hash and dimensions exactly. Resizing/re-encoding after calibration invalidates the pair.
 - At least four distinct, independently checked 3D-to-image control points are required; the default maximum reprojection error is 3 pixels per point. A project can use a stricter documented tolerance. Reprojection checks validate consistency, not the truth of the survey.
-- Calibration and model-frame alignment each need a stable evidence ID and evidence SHA-256. A hash establishes file identity only; it does not authenticate the evidence's truth.
+- Calibration and model-frame alignment each need a stable evidence ID and evidence SHA-256. Pass the actual evidence files to the CLI; their bytes are hashed and must match the hashes declared by the camera manifest. A hash establishes file identity only; it does not authenticate the evidence's truth.
 
 ## Usage
 
 ```sh
 node scripts/render-building-review-views.mjs candidate.glb out/review-2026-01 \
   --source-camera=references/front-camera.json \
-  --source-image=references/front.jpg
+  --source-image=references/front.jpg \
+  --calibration-evidence=references/front-calibration-report.json \
+  --frame-alignment-evidence=references/glb-frame-alignment.json
 ```
 
-The renderer creates the normal canonical render set and writes `source-camera.png` plus `source-camera-render-manifest.json` only when the same-camera gate passes. If metadata or hashes are missing/inconsistent, no source-camera PNG is produced; the sidecar reports `not-comparable` with stable error codes and the command exits non-zero after recording the canonical render manifest. The current implementation supports PNG and JPEG source images; camera input is not inferred from image pixels.
+The renderer creates the normal canonical render set and writes `source-camera.png` plus `source-camera-render-manifest.json` only when the same-camera gate passes. If metadata or any of the four input files is missing/inconsistent, including either evidence file hash, no source-camera PNG is produced; the sidecar reports `not-comparable` with stable error codes and the command exits non-zero after recording the canonical render manifest. The current implementation supports PNG and JPEG source images; camera input is not inferred from image pixels.
 
 ## Projection model and tolerances
 
