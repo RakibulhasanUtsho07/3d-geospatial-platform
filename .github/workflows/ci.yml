@@ -166,6 +166,8 @@ jobs:
         run: npm run test:floor-plan-review
       - name: Test raster floor-plan line proposal extraction
         run: npm run test:floor-plan-raster-line-proposals
+      - name: Test raster floor-plan line/room tracing and private trace API service
+        run: npm run test:floor-plan-raster-trace
       - name: Test private raster proposal persistence and integrity
         run: npm run test:floor-plan-raster-line-job
 
