@@ -230,7 +230,8 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
     "At least four independent reference assets must cover front/back/left/right and retain rights/source provenance.");
 
   const captureCameraOk = captured.length >= 1 && captured.every((source) =>
-    ["verified", "estimated"].includes(source.camera.status) && source.occlusion.status !== "unknown");
+    ["verified", "estimated"].includes(source.camera.status) &&
+    Object.keys(source.camera).some((key) => key !== "status") && source.occlusion.status !== "unknown");
   add("camera-and-occlusion-metadata", captureCameraOk,
     "Each capture needs a declared camera/pose status and a reviewed occlusion status; estimated camera poses remain estimates.");
 
