@@ -70,7 +70,7 @@ jobs:
         run: |
           blender --background --factory-startup --python-exit-code 17 --python scripts/blender/test-source-camera-projection.py -- --camera-manifest tests/fixtures/source-camera-projection.json --tolerance-px 3
       - name: Prepare source-camera end-to-end fixture
-        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture
+        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture data/heritage/generated/bangabhaban-candidate.report.json
       - name: Prepare artifact output directory
         run: mkdir -p artifacts
       - name: Render fixed 13-view set with bounded execution
@@ -79,6 +79,30 @@ jobs:
           MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
         run: |
           npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender --source-camera=artifacts/m13-source-camera-fixture/synthetic-source-camera.json --source-image=artifacts/m13-source-camera-fixture/synthetic-source.png --calibration-evidence=artifacts/m13-source-camera-fixture/synthetic-calibration-evidence.json --frame-alignment-evidence=artifacts/m13-source-camera-fixture/synthetic-frame-alignment-evidence.json
+      - name: Independently verify calibrated source-camera frame has visible pixels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          path = Path("artifacts/m01-generic-renderer/source-camera.png")
+          if not path.is_file():
+              raise SystemExit("source-camera.png is missing")
+          with Image.open(path) as source:
+              if source.size != (640, 480):
+                  raise SystemExit(f"unexpected source-camera dimensions: {source.size}")
+              gray = source.convert("L")
+              deviation = ImageStat.Stat(gray).stddev[0] / 255.0
+              extrema = gray.getextrema()
+              unique_colors = len(gray.getcolors(maxcolors=640 * 480) or [])
+          print({
+              "size": list(source.size),
+              "luminanceStandardDeviationSrgb": round(deviation, 6),
+              "luminanceExtrema": extrema,
+              "uniqueLuminanceValues": unique_colors,
+          })
+          if deviation < 0.01 or unique_colors < 8:
+              raise SystemExit("calibrated source-camera frame is blank or nearly uniform")
+          PY
       - name: Validate exact GLB, generic framing, all views and PNG hashes
         run: |
           node --input-type=module <<'NODE'
@@ -138,6 +162,12 @@ jobs:
           assert.equal(cameraReport.render.height, 480);
           assert.equal(cameraReport.render.sha256, hash(cameraPng), "source-camera render hash must match exact PNG bytes");
           assert.equal(cameraReport.render.bytes, cameraPng.length);
+          assert.ok(cameraReport.render.pixelStatistics.sampledPixels > 0,
+            "source-camera render must include sampled image content metrics");
+          assert.ok(cameraReport.render.pixelStatistics.luminanceStandardDeviation >= 0.01,
+            "source-camera render must contain visible geometry, not a uniform background");
+          assert.ok(cameraReport.render.pixelStatistics.transparentRatio <= 0.98,
+            "source-camera render must not be nearly entirely transparent");
           console.log(JSON.stringify({ status: manifest.status, valid: manifest.valid,
             modelSha256: manifest.modelSha256, renderManifestSha256: hash(manifestBytes),
             views: manifest.views.length, genericFront: true,

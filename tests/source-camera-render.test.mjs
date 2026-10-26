@@ -101,7 +101,7 @@ test("blocks control points outside the image and reprojection errors above tole
   assert.ok(report.errors.some((code) => code.startsWith("control-point-reprojection-error-exceeds-tolerance:")));
 });
 
-test("refuses same-camera output if the PNG is absent, wrong-sized, or not hashed", () => {
+test("refuses missing, wrong-sized, unhashed, or blank source-camera renders", () => {
   const assessment = assessSourceCameraForRender(args());
   const missing = finalizeSourceCameraRenderManifest({ assessment });
   assert.equal(missing.status, "not-comparable");
@@ -109,16 +109,42 @@ test("refuses same-camera output if the PNG is absent, wrong-sized, or not hashe
 
   const valid = finalizeSourceCameraRenderManifest({
     assessment,
-    renderFile: { filename: "source-camera.png", width: 640, height: 480, bytes: 9000, sha256: hash("f") },
+    renderFile: {
+      filename: "source-camera.png", width: 640, height: 480, bytes: 9000, sha256: hash("f"),
+      pixelStatistics: { sampledPixels: 60000, luminanceMean: 0.2, luminanceStandardDeviation: 0.15, transparentRatio: 0 },
+    },
   });
   assert.equal(valid.status, "same-camera-comparable");
   assert.equal(valid.render.sha256, hash("f"));
 
   const invalid = finalizeSourceCameraRenderManifest({
     assessment,
-    renderFile: { filename: "source-camera.png", width: 320, height: 240, bytes: 10, sha256: hash("f") },
+    renderFile: {
+      filename: "source-camera.png", width: 320, height: 240, bytes: 10, sha256: hash("f"),
+      pixelStatistics: { sampledPixels: 60000, luminanceMean: 0.2, luminanceStandardDeviation: 0.15, transparentRatio: 0 },
+    },
   });
   assert.equal(invalid.sameCameraComparable, false);
+  assert.equal(invalid.render, null);
+
+  const blank = finalizeSourceCameraRenderManifest({
+    assessment,
+    renderFile: {
+      filename: "source-camera.png", width: 640, height: 480, bytes: 9000, sha256: hash("f"),
+      pixelStatistics: { sampledPixels: 60000, luminanceMean: 0.1, luminanceStandardDeviation: 0.0001, transparentRatio: 0 },
+    },
+  });
+  assert.equal(blank.status, "not-comparable");
+  assert.equal(blank.sameCameraComparable, false);
+  assert.equal(blank.render, null);
+  assert.ok(blank.errors.includes("source-camera-render-has-no-visible-geometry-content"));
+
+  const missingStats = finalizeSourceCameraRenderManifest({
+    assessment,
+    renderFile: { filename: "source-camera.png", width: 640, height: 480, bytes: 9000, sha256: hash("f") },
+  });
+  assert.equal(missingStats.status, "not-comparable");
+  assert.ok(missingStats.errors.includes("source-camera-render-pixel-statistics-missing-or-invalid"));
 });
 
 test("fails closed without throwing when a source-image object is missing", () => {

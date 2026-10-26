@@ -233,23 +233,38 @@ export function finalizeSourceCameraRenderManifest({ assessment, renderFile = nu
         !validHash(renderFile.sha256) || !Number.isSafeInteger(renderFile.bytes) || renderFile.bytes < 1) {
       errors.push("source-camera-render-output-missing-or-invalid");
     } else {
-      render = {
-        filename: renderFile.filename,
-        width: renderFile.width,
-        height: renderFile.height,
-        bytes: renderFile.bytes,
-        sha256: renderFile.sha256.toLowerCase(),
-      };
+      const stats = renderFile.pixelStatistics;
+      if (!stats || !Number.isSafeInteger(stats.sampledPixels) || stats.sampledPixels < 1 ||
+          !finite(stats.luminanceMean) || !finite(stats.luminanceStandardDeviation) ||
+          !finite(stats.transparentRatio) || stats.transparentRatio < 0 || stats.transparentRatio > 1) {
+        errors.push("source-camera-render-pixel-statistics-missing-or-invalid");
+      } else if (stats.luminanceStandardDeviation < 0.01) {
+        errors.push("source-camera-render-has-no-visible-geometry-content");
+      } else {
+        render = {
+          filename: renderFile.filename,
+          width: renderFile.width,
+          height: renderFile.height,
+          bytes: renderFile.bytes,
+          sha256: renderFile.sha256.toLowerCase(),
+          pixelStatistics: {
+            sampledPixels: stats.sampledPixels,
+            luminanceMean: stats.luminanceMean,
+            luminanceStandardDeviation: stats.luminanceStandardDeviation,
+            transparentRatio: stats.transparentRatio,
+          },
+        };
+      }
     }
   } else if (renderFile) {
     errors.push("render-must-not-be-produced-for-non-comparable-camera");
   }
-  const sameCameraComparable = assessment.sameCameraComparable && errors.length === 0;
+  const sameCameraComparable = assessment.sameCameraComparable && errors.length === 0 && render !== null;
   return {
     ...assessment,
     status: sameCameraComparable ? "same-camera-comparable" : "not-comparable",
     sameCameraComparable,
-    render,
+    render: sameCameraComparable ? render : null,
     errors: [...new Set(errors)],
     publicationEligible: false,
   };
