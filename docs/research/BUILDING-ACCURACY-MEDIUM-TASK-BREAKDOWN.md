@@ -4,7 +4,7 @@
 **Version:** 1.0  
 **Date:** 26 October 2026  
 **Branch target:** `rakibul-hasan` first; review through `development`; merge to `main` only after required checks and evidence pass  
-**Status:** M05–M08 implementation candidate is in `feat/m05-m08-segmentation-features`; contract, evaluator CLI, reviewed-mask gate, observation schema and proposal overlay are implemented with synthetic regression fixtures. Real labelled-building pilot acceptance remains incomplete.  
+**Status (26 October 2026):** M12 wireframe-to-mesh readiness gate is merged to `rakibul-hasan`; M13 calibrated source-camera rendering is under review in a feature PR with synthetic contract tests. Real permissioned imagery, independently verified camera calibration/control points and human-inspected outputs remain required; synthetic tests are not a real-building accuracy pass.  
 **Parent plan:** [Building Accuracy Upgrade Plan](./BUILDING-ACCURACY-UPGRADE-PLAN.md)
 
 ## Purpose and sizing rule
