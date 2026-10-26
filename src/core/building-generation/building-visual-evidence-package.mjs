@@ -316,10 +316,6 @@ export function buildBuildingVisualEvidencePackage(input = {}) {
       sourceReady = true;
     }
   }
-  const sourceIdentity = sourceReady ? {
-    id: source.id, sourceId: source.sourceId, sha256: sourceSha256,
-    width: source.width, height: source.height, mimeType: source.mimeType,
-  } : null;
   stages.source = { status: sourceReady ? "verified-bytes-and-dimensions" : "failed", sha256: sourceSha256 };
 
   const model = validateGlbBytes(input.model?.glbBytes);
