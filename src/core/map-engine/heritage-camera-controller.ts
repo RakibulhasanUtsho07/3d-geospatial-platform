@@ -57,6 +57,17 @@ export class HeritageCameraController {
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
   }
 
+  /** Return to the Dhaka property-discovery camera configured at map startup. */
+  resetHomeView(): void {
+    const viewer = this.getViewer();
+    const Cesium = this.getCesium();
+    if (!viewer || !Cesium || viewer.isDestroyed()) return;
+    this.stopOrbitTour();
+    viewer.camera.cancelFlight();
+    this.configureInitialCamera();
+    viewer.scene.requestRender();
+  }
+
   /** Front facade preset. */
   focusFront(durationMs = 1200): void {
     this.stopOrbitTour();
