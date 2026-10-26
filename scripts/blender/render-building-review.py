@@ -4,7 +4,7 @@ import math
 import os
 import sys
 from array import array
-from mathutils import Vector, Quaternion
+from mathutils import Vector
 
 def parse_args():
     if "--" not in sys.argv:
@@ -85,61 +85,19 @@ def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
 def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
     """Render the candidate using an explicit, reviewed source-photo camera."""
     camera_path = os.path.abspath(opts["--source-camera-json"])
+    module_dir = os.path.abspath(opts["--source-camera-module-dir"])
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+    from source_camera_camera import configure_source_camera
+
     with open(camera_path, "r", encoding="utf-8") as stream:
         camera_evidence = json.load(stream)
-    if camera_evidence.get("schemaVersion") != "1.0.0":
-        raise RuntimeError("Unsupported source-camera manifest schema")
-    if camera_evidence.get("calibrationStatus") != "verified":
-        raise RuntimeError("Source-camera calibration is not independently verified")
-    if not camera_evidence.get("calibrationEvidence", {}).get("id") or not camera_evidence.get("frameAlignmentEvidence", {}).get("id"):
-        raise RuntimeError("Source-camera calibration and model-frame alignment evidence are required")
     image = camera_evidence.get("sourceImage", {})
     intrinsics = camera_evidence.get("intrinsics", {})
     pose = camera_evidence.get("pose", {})
-    width, height = image.get("width"), image.get("height")
-    fx, fy, cx, cy = (intrinsics.get(key) for key in ("fx", "fy", "cx", "cy"))
-    position = pose.get("position")
-    quaternion = pose.get("quaternionWxyz")
-    if not isinstance(width, int) or not isinstance(height, int) or width < 1 or height < 1:
-        raise RuntimeError("Source-camera image dimensions are invalid")
-    if not all(isinstance(value, (int, float)) and math.isfinite(value) for value in (fx, fy, cx, cy)):
-        raise RuntimeError("Source-camera intrinsics are invalid")
-    if fx <= 0 or fy <= 0 or not (0 <= cx < width and 0 <= cy < height):
-        raise RuntimeError("Source-camera focal lengths or principal point are out of bounds")
-    if intrinsics.get("distortionModel") not in ("none", "rectified"):
-        raise RuntimeError("Source image must be undistorted or rectified before same-camera rendering")
-    if not isinstance(position, list) or len(position) != 3 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in position):
-        raise RuntimeError("Source-camera position is invalid")
-    if not isinstance(quaternion, list) or len(quaternion) != 4 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in quaternion):
-        raise RuntimeError("Source-camera quaternion is invalid")
-    quaternion_norm = math.sqrt(sum(value * value for value in quaternion))
-    if abs(quaternion_norm - 1.0) > 1e-3:
-        raise RuntimeError("Source-camera quaternion must be unit length")
-    if len(camera_evidence.get("controlPoints", [])) < 4:
-        raise RuntimeError("At least four checked source-camera control points are required")
-
-    scene.render.resolution_x = width
-    scene.render.resolution_y = height
-    scene.render.resolution_percentage = 100
-    scene.render.pixel_aspect_x = 1.0
-    scene.render.pixel_aspect_y = fx / fy
-    camera_data = bpy.data.cameras.new("SourcePhotoCamera_" + camera_evidence.get("id", "unknown"))
-    camera = bpy.data.objects.new("SourcePhotoCamera_" + camera_evidence.get("id", "unknown"), camera_data)
-    scene.collection.objects.link(camera)
-    camera_data.type = "PERSP"
-    camera_data.sensor_fit = "HORIZONTAL"
-    camera_data.sensor_width = 36.0
-    camera_data.lens = fx * camera_data.sensor_width / width
-    # Blender shift is relative to the image width. These offsets preserve a
-    # non-central principal point rather than silently re-centering the photo.
-    camera_data.shift_x = (width / 2.0 - cx) / width
-    camera_data.shift_y = (cy - height / 2.0) / width
-    camera_data.clip_start = 0.001
-    camera_data.clip_end = max(math.sqrt(sum(value * value for value in dimensions)) * 1000.0, 1000.0)
-    camera.location = Vector(position)
-    camera.rotation_mode = "QUATERNION"
-    camera.rotation_quaternion = Quaternion((quaternion[0], quaternion[1], quaternion[2], quaternion[3]))
-    scene.camera = camera
+    camera, width, height = configure_source_camera(
+        scene, camera_evidence, max(math.sqrt(sum(value * value for value in dimensions)), 1.0)
+    )
     filename = "source-camera.png"
     scene.render.filepath = os.path.join(output_dir, filename)
     bpy.ops.render.render(write_still=True)
@@ -168,7 +126,7 @@ def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
     }
     scene.camera = None
     bpy.data.objects.remove(camera, do_unlink=True)
-    bpy.data.cameras.remove(camera_data)
+    bpy.data.cameras.remove(camera.data)
     print("Rendered calibrated source camera -> " + filename)
     return view
 
