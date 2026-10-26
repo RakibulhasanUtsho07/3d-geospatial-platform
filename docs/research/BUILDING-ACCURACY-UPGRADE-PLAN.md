@@ -337,4 +337,3 @@ The gate should reject any candidate whose score is low and should also block a 
 
 Approve the plan before engine implementation begins. The first implementation package should be **Phase 0: generic renderer + reproducible baseline/evidence manifest**, followed by the pilot dataset and capture/per-image analysis. No new reconstruction model/provider should be added until the baseline demonstrates which error classes the existing stages cannot solve. Any proposed new dependency must be justified against the existing repository code, its operational requirements, source/licence implications and the measured pilot failure modes.
 
-**Change-control:** this document adds no code, does not alter model assets, and does not approve any building for publication. Implementation changes must be made in the repository, tested and reviewed against the gates in this plan.
