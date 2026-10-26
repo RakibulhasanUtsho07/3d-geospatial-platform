@@ -56,6 +56,8 @@
     "review:building-source": "node scripts/review-building-source.mjs",
     "prepare:building-spec": "node scripts/prepare-building-spec.mjs",
     "test:building-source-workflow": "node --test tests/building-source-workflow.test.mjs",
+    "test:building-capture-manifest": "node --test tests/building-capture-manifest.test.mjs",
+    "validate:building-capture-manifest": "node scripts/validate-building-capture-manifest.mjs",
     "test:media-quality-preflight": "node --test tests/media-quality-preflight.test.mjs",
     "assess:building-media": "node scripts/assess-building-media.mjs",
     "test:image-quality-preflight": "node --test tests/image-quality-preflight.test.mjs",
