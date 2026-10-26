@@ -27,7 +27,7 @@ test("keeps the five orthographic views and eight turntable views in the rendere
 });
 
 test("parses a bounded timeout without changing deterministic render defaults", () => {
-  assert.deepEqual(parseRenderOptions([]), { resolution: 1024, blender: "blender", timeoutMs: 600000 });
+  assert.deepEqual(parseRenderOptions([], {}), { resolution: 1024, blender: "blender", timeoutMs: 600000 });
   assert.deepEqual(parseRenderOptions(["--resolution=512", "--blender=/opt/blender", "--timeout-ms=120000"]), {
     resolution: 512, blender: "/opt/blender", timeoutMs: 120000,
   });
