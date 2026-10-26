@@ -339,6 +339,46 @@ jobs:
       - name: Validate Blender render automation Python syntax
         run: python3 -m py_compile scripts/blender/render-building-review.py scripts/blender/source_camera_camera.py scripts/blender/test-source-camera-projection.py scripts/blender/prepare-source-camera-fixture.py
 
+      - name: Install Blender for generic renderer smoke test
+        run: |
+          sudo apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends blender libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
+      - name: Render generic fixture GLB and verify the 13-view manifest
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          smoke_root="$RUNNER_TEMP/building-review-smoke"
+          mkdir -p "$smoke_root"
+          npm run generate:building-model -- tests/fixtures/demo-building-spec.json "$smoke_root/demo.glb"
+          npm run render:building-review -- "$smoke_root/demo.glb" "$smoke_root/rendered" --resolution=256 --blender=blender
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import path from "node:path";
+          const root = path.join(process.env.RUNNER_TEMP, "building-review-smoke", "rendered");
+          const manifest = JSON.parse(await readFile(path.join(root, "render-review-manifest.json"), "utf8"));
+          if (manifest.valid !== true || manifest.counts?.generatedViews !== 13) {
+            throw new Error("Generic renderer did not produce a valid 13-view review set: " + manifest.status);
+          }
+          if (manifest.reviewProfile?.profileId !== "generic-whole-model-v1" ||
+              manifest.reviewProfile?.source !== "built-in-default" ||
+              manifest.reviewProfile?.globalExcludedMeshCount !== 0 ||
+              manifest.reviewProfile?.frontVisibleMeshCount < 1) {
+            throw new Error("Generic render profile metadata is missing or unexpected.");
+          }
+          if (manifest.publicationEligible !== false) {
+            throw new Error("A technical render smoke test must never make a model publication-eligible.");
+          }
+          console.log(JSON.stringify({
+            status: manifest.status,
+            valid: manifest.valid,
+            generatedViews: manifest.counts.generatedViews,
+            reviewProfile: manifest.reviewProfile,
+            publicationEligible: manifest.publicationEligible,
+          }, null, 2));
+          NODE
+
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
 
