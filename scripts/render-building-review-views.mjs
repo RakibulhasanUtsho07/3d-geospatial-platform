@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
+import { validateRenderReviewProfile } from "../src/core/building-generation/render-review-profile.mjs";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
 import {
   assessSourceCameraForRender,
@@ -68,7 +69,7 @@ function summarizeTextureQa(report) {
 async function main() {
   const [modelArg, outputArg, ...allFlags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
-    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000] [--source-camera=camera.json --source-image=photo.jpg --calibration-evidence=calibration.json --frame-alignment-evidence=alignment.json]");
+    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000] [--review-profile=profile.json] [--source-camera=camera.json --source-image=photo.jpg --calibration-evidence=calibration.json --frame-alignment-evidence=alignment.json]");
   }
   const singleFlag = (name) => {
     const matches = allFlags.filter((flag) => flag.startsWith("--" + name + "="));
@@ -77,6 +78,7 @@ async function main() {
     if (value !== null && !value.trim()) throw new Error("--" + name + " cannot be empty");
     return value;
   };
+  const reviewProfilePathArg = singleFlag("review-profile");
   const sourceCameraPathArg = singleFlag("source-camera");
   const sourceImagePathArg = singleFlag("source-image");
   const calibrationEvidencePathArg = singleFlag("calibration-evidence");
@@ -85,12 +87,26 @@ async function main() {
   if (cameraInputs.some(Boolean) && !cameraInputs.every(Boolean)) {
     throw new Error("--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together");
   }
-  const cameraFlags = ["--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
-  const flags = allFlags.filter((flag) => !cameraFlags.some((prefix) => flag.startsWith(prefix)));
+  const auxiliaryFlags = ["--review-profile=", "--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
+  const flags = allFlags.filter((flag) => !auxiliaryFlags.some((prefix) => flag.startsWith(prefix)));
   const { resolution, blender, timeoutMs } = parseRenderOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
   const outputDir = path.resolve(outputArg);
+  let reviewProfilePath = null;
+  let reviewProfileSha256 = null;
+  if (reviewProfilePathArg) {
+    reviewProfilePath = path.resolve(reviewProfilePathArg);
+    const profileBytes = await readFile(reviewProfilePath);
+    let parsedProfile;
+    try {
+      parsedProfile = JSON.parse(profileBytes.toString("utf8"));
+    } catch (error) {
+      throw new TypeError("review-profile JSON is invalid: " + (error instanceof Error ? error.message : String(error)));
+    }
+    validateRenderReviewProfile(parsedProfile);
+    reviewProfileSha256 = sha256(profileBytes);
+  }
   const modelStat = await stat(modelPath);
   if (!modelStat.isFile() || path.extname(modelPath).toLowerCase() !== ".glb") {
     throw new TypeError("model input must be a .glb file");
@@ -153,6 +169,9 @@ async function main() {
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
     ];
+    if (reviewProfilePath && reviewProfileSha256) {
+      args.push("--review-profile-json", reviewProfilePath, "--review-profile-sha256", reviewProfileSha256);
+    }
     if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
       args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
     }
