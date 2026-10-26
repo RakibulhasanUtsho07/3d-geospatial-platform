@@ -18,8 +18,9 @@ test("falls back to a full-model front render for generic building GLBs", () => 
 });
 
 test("keeps the five orthographic views and eight turntable views in the renderer", () => {
-  for (const view of ["front", "back", "left", "right", "top", "turntable-" + '000']) {
-    assert.ok(rendererSource.includes('"' + view + '"') || rendererSource.includes(view), "missing view " + view);
+  for (const view of ["front", "back", "left", "right", "top"]) {
+    assert.ok(rendererSource.includes('"' + view + '"'), "missing orthographic view " + view);
   }
   assert.match(rendererSource, /for angle in range\(0, 360, 45\)/);
+  assert.match(rendererSource, /"turntable-" \+ str\(angle\)\.zfill\(3\)/);
 });
