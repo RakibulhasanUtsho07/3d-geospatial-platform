@@ -103,7 +103,7 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       referenceImages.every((item) => sameHash(item.expectedSha256, item.sha256)),
       "Pin the expected SHA-256 for every independent reference image after reviewing the bootstrap report.");
     const captureHashes = sourceMedia.filter((item) => hashOk(item?.sha256)).map((item) => item.sha256.toLowerCase());
-    const captureHashesUnique = new Set(captureHashes).size === captureHashes.length;
+    const captureHashesUnique = captureHashes.length === sourceMedia.length && new Set(captureHashes).size === captureHashes.length;
     add("capture-source-byte-uniqueness", sourceMedia.length > 0 && captureHashesUnique,
       "Repeated byte-identical capture files cannot count as independent facade views.",
       !captureHashesUnique);
