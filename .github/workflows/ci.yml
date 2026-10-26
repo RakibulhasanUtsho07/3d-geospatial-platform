@@ -30,6 +30,7 @@ on:
       - feat/glb-texture-binding-qa
       - feat/glb-uv-seam-review
       - feat/blender-render-review-views
+      - feat/brf-02-candidate-evidence-manifest
       - feat/brf-01-generic-renderer
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
@@ -183,6 +184,8 @@ jobs:
 
       - name: Test versioned capture manifest, source integrity and measurement evidence readiness
         run: npm run test:building-capture-manifest
+      - name: Test shared candidate evidence manifest and confidence gates
+        run: npm run test:building-candidate-evidence-manifest
 
       - name: Test standalone source-media quality assessment
         run: npm run test:media-quality-preflight
