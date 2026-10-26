@@ -44,7 +44,7 @@ jobs:
   render-generic-building:
     name: Render a non-Rangmahal 13-view GLB
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@v4
@@ -56,8 +56,11 @@ jobs:
         run: node scripts/build-bangabhaban-model-candidate.mjs
       - name: Install headless Blender render dependencies
         run: |
-          timeout 600s sudo apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive timeout 900s sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+          DEBIAN_FRONTEND=noninteractive sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=90 -o Acquire::https::Timeout=90 update -qq
+          # Ubuntu's hosted-runner mirror can be slow for blender-data and FFmpeg.
+          # Keep the installation bounded, but do not fail at 15 minutes while
+          # apt is still fetching packages.
+          DEBIAN_FRONTEND=noninteractive timeout 2700s sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=90 -o Acquire::https::Timeout=90 install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
       - name: Verify calibrated source-camera projection against known pixel controls
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
@@ -117,8 +120,12 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageDraw
           root = Path("artifacts/m01-generic-renderer")
+          try:
+              from PIL import Image, ImageDraw
+          except ImportError:
+              print("Pillow is unavailable because the dependency setup did not complete; keeping original render artifacts only.")
+              raise SystemExit(0)
           views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
           existing = [name for name in views if (root / (name + ".png")).is_file()]
           if not existing:
