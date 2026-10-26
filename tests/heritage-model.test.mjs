@@ -247,7 +247,8 @@ test("Blender front review view prioritizes the facade over the roof deck", asyn
   assert.ok(renderer.includes('("turntable-" + str(angle).zfill(3), direction, "ORTHO")'));
   assert.ok(renderer.includes("def projected_ortho_scale("), "review views fit to their projected geometry bounds");
   assert.ok(renderer.includes("original_render_visibility"), "renderer restores whole-model visibility for each view");
-  assert.ok(renderer.includes("if obj not in rangmahal_review_meshes:"), "front-detail view excludes off-facade meshes");
+  assert.ok(renderer.includes("if focus_rangmahal:"), "front-detail filtering applies only when Rangmahal facade meshes are present");
+  assert.ok(renderer.includes("if obj not in front_review_meshes:"), "focused Rangmahal front view excludes off-facade meshes");
   assert.ok(renderer.includes('view_framing = "rangmahal-south-facade-focused"'));
   assert.ok(renderer.includes("view_scale = projected_ortho_scale(visible_meshes, view_center, direction)"));
 });
