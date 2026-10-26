@@ -149,10 +149,16 @@ export function evaluateCaptureManifestBindings({ buildingId, manifest, captureR
     }
     return { status: "incomplete", bindingsValid: false, checks };
   }
+  const identityMatches = manifest.schemaVersion === "1.0.0" &&
+    manifest.buildingId === buildingId && captureReport.buildingId === buildingId;
+  const manifestReady = captureReport.status === "ready-for-review" &&
+    captureReport.input?.expectedSha256Pinned === true;
   add("capture-manifest-present",
-    manifest.schemaVersion === "1.0.0" && manifest.buildingId === buildingId && captureReport.buildingId === buildingId,
-    "Capture manifest identity and schema must match this exact building.",
-    manifest.buildingId !== buildingId || captureReport.buildingId !== buildingId ? "failed" : "warning");
+    identityMatches && manifestReady ? "passed" :
+      (!identityMatches || captureReport.status === "failed" ? "failed" : "warning"),
+    !identityMatches ? "Capture manifest identity/schema must match this exact building." :
+      !manifestReady ? "Capture manifest needs complete asset/source evidence and a matching expected manifest SHA-256." :
+        "Hash-pinned capture manifest identity and schema match this exact building.");
 
   const bindAssets = (declared, purpose, checkId) => {
     const captured = Array.isArray(manifest.sources) ? manifest.sources.filter((item) => item?.purpose === purpose) : [];
