@@ -32,6 +32,8 @@ const args = (camera = cameraFixture()) => ({
   sourceImageSha256: hash("a"),
   sourceImageSize: { width: 640, height: 480 },
   cameraManifestSha256: hash("d"),
+  calibrationEvidenceSha256: hash("b"),
+  frameAlignmentEvidenceSha256: hash("c"),
   modelSha256: hash("e"),
 });
 
@@ -70,6 +72,15 @@ test("blocks stale image hashes, dimension changes, and missing calibration evid
   const unverifiedReport = assessSourceCameraForRender(args(unverified));
   assert.equal(unverifiedReport.status, "not-comparable");
   assert.ok(unverifiedReport.errors.includes("camera-calibration-not-verified"));
+});
+
+test("verifies evidence file bytes against the hashes declared by the camera manifest", () => {
+  const mismatch = assessSourceCameraForRender({ ...args(), calibrationEvidenceSha256: hash("f") });
+  assert.equal(mismatch.status, "not-comparable");
+  assert.ok(mismatch.errors.includes("calibration-evidence-sha256-mismatch"));
+
+  const missing = assessSourceCameraForRender({ ...args(), frameAlignmentEvidenceSha256: undefined });
+  assert.ok(missing.errors.includes("frame-alignment-evidence-file-sha256-invalid"));
 });
 
 test("blocks control points outside the image and reprojection errors above tolerance", () => {
