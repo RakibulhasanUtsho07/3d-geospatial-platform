@@ -19,7 +19,7 @@ function fixture(overrides = {}) {
     assessment: { status: "reviewed", confidence: 1, humanReviewed: true, reviewerId: "reviewer-a", reviewedAt: "2026-10-26T10:00:00Z" },
     ...overrides,
   };
-  return { source, result, actualMaskSha256: hash(3), decodedMask: { width: 4, height: 3, pixels } };
+  return { source, result, actualMaskSha256: hash(3), actualMaskBytes: 120, decodedMask: { width: 4, height: 3, pixels } };
 }
 
 test("accepts a source-bound binary mask only after explicit review", () => {
@@ -37,6 +37,9 @@ test("rejects stale source/mask hashes, dimension mismatch and non-binary masks"
   const changed = fixture();
   changed.actualMaskSha256 = hash(90);
   assert.ok(validateBuildingMaskArtifact(changed).errors.some((e) => e.code === "mask-hash-mismatch"));
+  const badLength = fixture();
+  badLength.actualMaskBytes = 121;
+  assert.ok(validateBuildingMaskArtifact(badLength).errors.some((e) => e.code === "mask-byte-length-mismatch"));
 
   const dimensions = fixture();
   dimensions.result.mask.width = 3;
