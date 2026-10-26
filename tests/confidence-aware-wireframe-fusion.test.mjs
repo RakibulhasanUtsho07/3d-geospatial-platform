@@ -75,7 +75,7 @@ test("fuses accepted cross-view corners with pixel provenance and reprojection e
   assert.equal(vertex.sourceObservations.length, 3);
   assert.deepEqual(vertex.sourceObservations[0].sourcePixel.length, 2);
   assert.match(vertex.sourceObservations[0].sourceSha256, /^[a-f0-9]{64}$/i);
-  assert.equal(vertex.sourceObservations[0].reprojection.classification, "inlier");
+  assert.equal(vertex.sourceObservations[0].reprojection.classification, "inlier-candidate");
   assert.equal(vertex.reprojectionEvidence.perObservation.length, 3);
   assert.equal(vertex.confidence.semantics, "heuristic-confidence-score-not-a-calibrated-probability");
   assert.ok(vertex.confidence.score > 0);
