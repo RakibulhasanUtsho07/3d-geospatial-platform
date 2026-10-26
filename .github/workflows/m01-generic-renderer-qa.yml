@@ -9,6 +9,7 @@ on:
       - "scripts/blender/render-building-review.py"
       - "scripts/blender/source_camera_camera.py"
       - "scripts/blender/test-source-camera-projection.py"
+      - "scripts/blender/prepare-source-camera-fixture.py"
       - "tests/fixtures/source-camera-projection.json"
       - "scripts/render-building-review-views.mjs"
       - "scripts/build-bangabhaban-model-candidate.mjs"
@@ -25,6 +26,7 @@ on:
       - "scripts/blender/render-building-review.py"
       - "scripts/blender/source_camera_camera.py"
       - "scripts/blender/test-source-camera-projection.py"
+      - "scripts/blender/prepare-source-camera-fixture.py"
       - "tests/fixtures/source-camera-projection.json"
       - "scripts/render-building-review-views.mjs"
       - "scripts/build-bangabhaban-model-candidate.mjs"
@@ -67,6 +69,8 @@ jobs:
           MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
         run: |
           blender --background --factory-startup --python-exit-code 17 --python scripts/blender/test-source-camera-projection.py -- --camera-manifest tests/fixtures/source-camera-projection.json --tolerance-px 3
+      - name: Prepare source-camera end-to-end fixture
+        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture
       - name: Prepare artifact output directory
         run: mkdir -p artifacts
       - name: Render fixed 13-view set with bounded execution
@@ -74,7 +78,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
           MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
         run: |
-          npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender
+          npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender --source-camera=artifacts/m13-source-camera-fixture/synthetic-source-camera.json --source-image=artifacts/m13-source-camera-fixture/synthetic-source.png --calibration-evidence=artifacts/m13-source-camera-fixture/synthetic-calibration-evidence.json --frame-alignment-evidence=artifacts/m13-source-camera-fixture/synthetic-frame-alignment-evidence.json
       - name: Validate exact GLB, generic framing, all views and PNG hashes
         run: |
           node --input-type=module <<'NODE'
@@ -110,9 +114,39 @@ jobs:
             assert.equal(view.height, 1024);
             assert.equal(view.renderComplete, true);
           }
+          const cameraFixtureRoot = "artifacts/m13-source-camera-fixture";
+          const cameraReportBytes = await readFile(path.join(root, "source-camera-render-manifest.json"));
+          const cameraReport = JSON.parse(cameraReportBytes.toString("utf8"));
+          const cameraPng = await readFile(path.join(root, "source-camera.png"));
+          const sourceImage = await readFile(path.join(cameraFixtureRoot, "synthetic-source.png"));
+          const cameraManifest = await readFile(path.join(cameraFixtureRoot, "synthetic-source-camera.json"));
+          const calibrationEvidence = await readFile(path.join(cameraFixtureRoot, "synthetic-calibration-evidence.json"));
+          const alignmentEvidence = await readFile(path.join(cameraFixtureRoot, "synthetic-frame-alignment-evidence.json"));
+          assert.equal(cameraReport.status, "same-camera-comparable");
+          assert.equal(cameraReport.sameCameraComparable, true);
+          assert.equal(cameraReport.publicationEligible, false);
+          assert.equal(cameraReport.modelSha256, hash(model), "source-camera report must bind to exact GLB");
+          assert.equal(cameraReport.sourceImageSha256, hash(sourceImage), "source image hash must match the supplied image bytes");
+          assert.equal(cameraReport.cameraManifestSha256, hash(cameraManifest), "camera manifest hash must bind to input bytes");
+          assert.equal(cameraReport.calibrationEvidenceSha256, hash(calibrationEvidence));
+          assert.equal(cameraReport.frameAlignmentEvidenceSha256, hash(alignmentEvidence));
+          assert.equal(cameraReport.controlPointReports.length, 4);
+          assert.ok(cameraReport.controlPointReports.every((point) => point.status === "within-tolerance"),
+            "every camera control point must stay within tolerance");
+          assert.equal(cameraReport.render.filename, "source-camera.png");
+          assert.equal(cameraReport.render.width, 640);
+          assert.equal(cameraReport.render.height, 480);
+          assert.equal(cameraReport.render.sha256, hash(cameraPng), "source-camera render hash must match exact PNG bytes");
+          assert.equal(cameraReport.render.bytes, cameraPng.length);
           console.log(JSON.stringify({ status: manifest.status, valid: manifest.valid,
             modelSha256: manifest.modelSha256, renderManifestSha256: hash(manifestBytes),
-            views: manifest.views.length, genericFront: true, publicationEligible: false }, null, 2));
+            views: manifest.views.length, genericFront: true,
+            sourceCameraStatus: cameraReport.status,
+            sourceCameraManifestSha256: hash(cameraReportBytes),
+            sourceCameraImageSha256: cameraReport.render.sha256,
+            sourceImageSha256: cameraReport.sourceImageSha256,
+            sourceCameraSize: [cameraReport.render.width, cameraReport.render.height],
+            publicationEligible: false }, null, 2));
           NODE
       - name: Build a labeled contact sheet for human review
         if: always()
@@ -152,5 +186,6 @@ jobs:
             data/heritage/generated/bangabhaban-candidate.glb
             data/heritage/generated/bangabhaban-candidate.report.json
             artifacts/m01-generic-renderer/**
+            artifacts/m13-source-camera-fixture/**
           if-no-files-found: warn
           retention-days: 30
