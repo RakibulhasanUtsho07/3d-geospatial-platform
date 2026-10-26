@@ -6,25 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
+import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
-function parseOptions(args) {
-  let resolution = 1024;
-  let blender = process.env.BLENDER_BIN || "blender";
-  for (const arg of args) {
-    if (arg.startsWith("--resolution=")) resolution = Number(arg.slice("--resolution=".length));
-    else if (arg.startsWith("--blender=")) blender = arg.slice("--blender=".length);
-    else throw new Error("Unknown option: " + arg);
-  }
-  if (!Number.isSafeInteger(resolution) || resolution < 256 || resolution > 2048 ||
-    (resolution & (resolution - 1)) !== 0) {
-    throw new RangeError("resolution must be a power-of-two integer between 256 and 2048");
-  }
-  if (!blender.trim()) throw new TypeError("Blender executable cannot be empty");
-  return { resolution, blender };
-}
 
 function pngDimensions(bytes, label) {
   const signature = Buffer.from([137,80,78,71,13,10,26,10]);
@@ -50,9 +36,9 @@ function summarizeTextureQa(report) {
 async function main() {
   const [modelArg, outputArg, ...flags] = process.argv.slice(2);
   if (!modelArg || !outputArg) {
-    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender]");
+    throw new Error("Usage: node scripts/render-building-review-views.mjs <model.glb> <new-output-directory> [--resolution=1024] [--blender=blender] [--timeout-ms=600000]");
   }
-  const { resolution, blender } = parseOptions(flags);
+  const { resolution, blender, timeoutMs } = parseRenderOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
   const modelPath = path.resolve(modelArg);
   const outputDir = path.resolve(outputArg);
@@ -86,8 +72,11 @@ async function main() {
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
     ];
-    const result = spawnSync(blender, args, { encoding: "utf8", windowsHide: true, maxBuffer: 32 * 1024 * 1024 });
+    const result = spawnSync(blender, args, { encoding: "utf8", windowsHide: true, timeout: timeoutMs, maxBuffer: 32 * 1024 * 1024 });
     if (result.error) {
+      if (result.error.code === "ETIMEDOUT") {
+        throw new Error("Blender render exceeded the " + timeoutMs + " ms timeout. Partial output is retained in " + outputDir + "; no render set is accepted.");
+      }
       if (result.error.code === "ENOENT") {
         throw new Error("Blender executable was not found. Install Blender and ensure 'blender' is on PATH, or pass --blender=<path>. No render was produced.");
       }
