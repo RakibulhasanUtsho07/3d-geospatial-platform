@@ -120,6 +120,7 @@ export function analyzeGlbQuality(input,options={}){
     maxTopologyVertices:options.maxTopologyVertices,
     weldToleranceRelative:options.weldToleranceRelative,
     maxLongEdgeRatio:options.maxLongEdgeRatio,
+    maxTriangleEdgeRatio:options.maxTriangleEdgeRatio,
     maxLongEdgeTriangleRatio:options.maxLongEdgeTriangleRatio,
     maxSmallComponentTriangles:options.maxSmallComponentTriangles
    });

@@ -10,6 +10,7 @@ function fixture(overrides = {}) {
     width: 512,
     height: 512,
     renderComplete: true,
+    framing: id === "front" ? "rangmahal-south-facade" : "whole-model",
     pixelStatistics: {
       sampledPixels: 50000,
       luminanceMean: 0.4,
@@ -44,6 +45,8 @@ test("finalizes the full five-axis plus eight-angle render set", () => {
   assert.equal(report.publicationEligible, false);
   assert.equal(report.humanReview.status, "pending");
   assert.equal(report.humanReview.checklist.length, 5);
+  assert.equal(report.views.find((view) => view.id === "front").framing, "rangmahal-south-facade");
+  assert.equal(report.views.find((view) => view.id === "back").framing, "whole-model");
 });
 
 test("fails when a required view is missing", () => {

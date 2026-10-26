@@ -25,8 +25,8 @@ def ensure_world(scene):
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is not None:
-        background.inputs["Color"].default_value = (0.38, 0.40, 0.43, 1.0)
-        background.inputs["Strength"].default_value = 0.7
+        background.inputs["Color"].default_value = (0.13, 0.15, 0.18, 1.0)
+        background.inputs["Strength"].default_value = 0.45
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -55,6 +55,89 @@ def scene_bounds(mesh_objects):
         raise RuntimeError("The imported GLB bounds have zero extent")
     center = Vector([(minimum[axis] + maximum[axis]) / 2.0 for axis in range(3)])
     return minimum, maximum, dimensions, center
+
+def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
+    """Fit an orthographic camera to the visible geometry projected into this view."""
+    camera_location = view_center + direction.normalized()
+    rotation = (view_center - camera_location).to_track_quat("-Z", "Y")
+    camera_right = rotation @ Vector((1.0, 0.0, 0.0))
+    camera_up = rotation @ Vector((0.0, 1.0, 0.0))
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    projected_right = []
+    projected_up = []
+    for obj in mesh_objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        for corner in evaluated.bound_box:
+            point = evaluated.matrix_world @ Vector(corner)
+            delta = point - view_center
+            projected_right.append(delta.dot(camera_right))
+            projected_up.append(delta.dot(camera_up))
+    if not projected_right or not projected_up:
+        raise RuntimeError("Cannot fit orthographic view without projected mesh bounds")
+    width = max(projected_right) - min(projected_right)
+    height = max(projected_up) - min(projected_up)
+    span = max(width, height)
+    if span <= 1e-9:
+        raise RuntimeError("Projected mesh bounds have zero extent")
+    return span * padding
+
+
+def render_source_camera(opts, meshes, scene, output_dir, dimensions, center):
+    """Render the candidate using an explicit, reviewed source-photo camera."""
+    camera_path = os.path.abspath(opts["--source-camera-json"])
+    module_dir = os.path.abspath(opts["--source-camera-module-dir"])
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+    from source_camera_camera import configure_source_camera
+
+    with open(camera_path, "r", encoding="utf-8") as stream:
+        camera_evidence = json.load(stream)
+    image = camera_evidence.get("sourceImage", {})
+    intrinsics = camera_evidence.get("intrinsics", {})
+    pose = camera_evidence.get("pose", {})
+    camera, width, height = configure_source_camera(
+        scene, camera_evidence, max(math.sqrt(sum(value * value for value in dimensions)), 1.0)
+    )
+    filename = "source-camera.png"
+    scene.render.filepath = os.path.join(output_dir, filename)
+    bpy.ops.render.render(write_still=True)
+    rendered_path = os.path.join(output_dir, filename)
+    if not os.path.isfile(rendered_path):
+        raise RuntimeError("Blender reported success but the source-camera render is missing")
+    rendered = bpy.data.images.load(rendered_path, check_existing=False)
+    try:
+        stats = sample_pixel_statistics(rendered, width)
+    finally:
+        bpy.data.images.remove(rendered)
+    # A PNG file and valid dimensions are not proof that the GLB was visible.
+    # Reject a near-uniform frame so an empty/background-only render can never
+    # receive a same-camera-comparable status.
+    if stats["sampledPixels"] < 1 or stats["luminanceStandardDeviation"] < 0.01:
+        raise RuntimeError("source-camera-render-has-no-visible-geometry-content")
+    view = {
+        "id": camera_evidence.get("id"),
+        "filename": filename,
+        "width": width,
+        "height": height,
+        "renderComplete": True,
+        "pixelStatistics": stats,
+        "sourceImage": image,
+        "intrinsics": intrinsics,
+        "pose": pose,
+        "coordinateFrame": camera_evidence.get("coordinateFrame"),
+        "calibrationEvidence": camera_evidence.get("calibrationEvidence"),
+        "frameAlignmentEvidence": camera_evidence.get("frameAlignmentEvidence"),
+        "crop": image.get("crop"),
+    }
+    # Keep the camera datablock reference before removing its object: Blender
+    # invalidates the object's RNA wrapper after unlink/removal.
+    camera_data = camera.data
+    scene.camera = None
+    bpy.data.objects.remove(camera, do_unlink=True)
+    bpy.data.cameras.remove(camera_data)
+    print("Rendered calibrated source camera -> " + filename)
+    return view
+
 
 def sample_pixel_statistics(image, resolution):
     total = int(image.size[0] * image.size[1])
@@ -106,11 +189,45 @@ def main():
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    # Keep site context in the source GLB, but hide it for model-detail review.
+    # Large Site_Ground / Site_River planes otherwise make the palace tiny.
+    site_context_meshes = [
+        obj for obj in imported_meshes
+        if obj.name.split(".")[0].startswith("Site_")
+    ]
+    for obj in site_context_meshes:
+        obj.hide_render = True
+    meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
+    if not meshes:
+        raise RuntimeError("The imported GLB has no building meshes after excluding Site_ context nodes")
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
-    ortho_scale = max_dimension * 1.45
+
+    # Keep the heritage-specific facade framing where its named meshes exist, but
+    # never make those names a prerequisite for reviewing an ordinary building GLB.
+    # Other buildings use the complete non-site mesh set for the canonical front view.
+    # Whole-model views restore it and retain the complete generated roof geometry.
+    rangmahal_review_names = {
+        "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+        "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
+    }
+    rangmahal_review_meshes = [
+        obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
+    ]
+    focus_rangmahal = bool(rangmahal_review_meshes)
+    if focus_rangmahal:
+        _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
+        front_review_meshes = rangmahal_review_meshes
+        front_review_center = rangmahal_center
+        front_camera_distance = max(rangmahal_dimensions) * 3.0
+        front_view_framing = "rangmahal-south-facade-focused"
+    else:
+        front_review_meshes = meshes
+        front_review_center = center
+        front_camera_distance = camera_distance
+        front_view_framing = "whole-model-generic-front"
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -129,18 +246,24 @@ def main():
     scene.render.resolution_percentage = 100
     try:
         scene.view_settings.view_transform = "AgX"
+        scene.view_settings.look = "AgX - Medium High Contrast"
     except Exception:
         pass
     ensure_world(scene)
 
-    light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
-    light_size = max_dimension * 1.2
-    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    # Tune the inspection rig to retain the salmon facade, darker recesses and step shadows.
+    # Power remains dimension-scaled and clamped so render reviews stay deterministic.
+    light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
+    light_size = max_dimension * 0.68
+    light_offset = max_dimension * 0.65
+    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+        # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
+        # only from this facade-detail camera, while the other 12 views retain roof context.
+        ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
@@ -154,35 +277,86 @@ def main():
                             math.sin(elevation)))
         views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
 
+    original_render_visibility = [(obj, obj.hide_render) for obj in meshes]
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
+        # Restore the normal whole-model visibility before every camera. The
+        # focused front image intentionally isolates the river-facing Rangmahal
+        # so the rear Andarmahal/whole-footprint roof rails cannot clip the facade.
+        for obj, was_hidden in original_render_visibility:
+            obj.hide_render = was_hidden
+        if view_id == "front":
+            if focus_rangmahal:
+                for obj in meshes:
+                    if obj not in front_review_meshes:
+                        obj.hide_render = True
+            visible_meshes = front_review_meshes
+            view_center = front_review_center
+            view_distance = front_camera_distance
+            view_framing = front_view_framing
+        else:
+            visible_meshes = meshes
+            view_center = center
+            view_distance = camera_distance
+            view_framing = "whole-model"
+        view_scale = projected_ortho_scale(visible_meshes, view_center, direction)
         camera_data = bpy.data.cameras.new("ReviewCamera_" + view_id)
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
         camera_data.type = camera_type
-        camera_data.ortho_scale = ortho_scale
-        camera.location = center + direction * camera_distance
-        camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        camera_data.ortho_scale = view_scale
+        camera.location = view_center + direction * view_distance
+        camera.rotation_euler = (view_center - camera.location).to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
         bpy.ops.render.render(write_still=True)
-        result = bpy.data.images.get("Render Result")
-        if result is None:
-            raise RuntimeError("Blender did not provide a render result for " + view_id)
-        stats = sample_pixel_statistics(result, resolution)
+        # Blender 4.x can release the headless Render Result pixel buffer
+        # after saving the PNG. Reload the saved file so statistics are based
+        # on the exact artifact whose SHA-256 is recorded by the Node runner.
+        rendered_path = os.path.join(output_dir, filename)
+        if not os.path.isfile(rendered_path):
+            raise RuntimeError("Blender reported success but the render file is missing: " + rendered_path)
+        result = bpy.data.images.load(rendered_path, check_existing=False)
+        try:
+            stats = sample_pixel_statistics(result, resolution)
+        finally:
+            bpy.data.images.remove(result)
         raw_views.append({
             "id": view_id,
             "filename": filename,
             "width": resolution,
             "height": resolution,
             "renderComplete": True,
+            "framing": view_framing,
             "pixelStatistics": stats,
         })
         bpy.data.objects.remove(camera, do_unlink=True)
         bpy.data.cameras.remove(camera_data)
         print("Rendered " + view_id + " -> " + filename)
+
+    source_camera_view = None
+    source_camera_render_error = None
+    if "--source-camera-json" in opts:
+        try:
+            source_camera_view = render_source_camera(opts, meshes, scene, output_dir, dimensions, center)
+        except Exception as error:
+            # Preserve the already completed canonical review renders. The Node
+            # wrapper emits a not-comparable sidecar and non-zero exit for this
+            # failed optional view; never treat it as a successful camera pair.
+            source_camera_render_error = "blender-source-camera-render-failed"
+            partial_source_path = os.path.join(output_dir, "source-camera.png")
+            if os.path.isfile(partial_source_path):
+                os.remove(partial_source_path)
+            print("Source-camera render failed: " + str(error), file=sys.stderr)
+            source_camera_view = {
+                "id": None,
+                "filename": "source-camera.png",
+                "renderComplete": False,
+                "errorCode": source_camera_render_error,
+                "errorMessage": str(error)[:1000],
+            }
 
     raw_manifest = {
         "schemaVersion": "1.0.0",
@@ -197,6 +371,7 @@ def main():
             "coordinateUnits": "imported-model-units-unverified",
         },
         "views": raw_views,
+        "sourceCameraView": source_camera_view,
     }
     raw_path = os.path.join(output_dir, ".blender-render-manifest.raw.json")
     with open(raw_path, "x", encoding="utf-8") as stream:

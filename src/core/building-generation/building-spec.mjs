@@ -109,6 +109,8 @@ export function normalizeBuildingSpec(raw) {
   if (!ROOFS.has(roofType)) throw new TypeError("unsupported roofType");
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
+  const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
+  const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
     if (typeof value !== "boolean") throw new TypeError(label + " must be boolean");
@@ -134,9 +136,27 @@ export function normalizeBuildingSpec(raw) {
       enabled: bool(windows.enabled, true, "windows.enabled"),
       widthM: windows.widthM === undefined ? 1.15 : num(windows.widthM, "windows.widthM", 0.4, 3),
       heightM: windows.heightM === undefined ? 1.25 : num(windows.heightM, "windows.heightM", 0.4, 3)
+    },
+    centralDome: {
+      enabled: bool(dome.enabled, false, "centralDome.enabled"),
+      radiusM: dome.radiusM === undefined ? 3.5 : num(dome.radiusM, "centralDome.radiusM", 1, 15),
+      riseM: dome.riseM === undefined ? 4.5 : num(dome.riseM, "centralDome.riseM", 1, 20),
+      drumHeightM: dome.drumHeightM === undefined ? 1.5 : num(dome.drumHeightM, "centralDome.drumHeightM", 0.5, 8),
+      insetFromFrontM: dome.insetFromFrontM === undefined ? 5 : num(dome.insetFromFrontM, "centralDome.insetFromFrontM", 0, 100)
+    },
+    frontArcade: {
+      enabled: bool(arcade.enabled, false, "frontArcade.enabled"),
+      bayCount: arcade.bayCount === undefined ? 3 : num(arcade.bayCount, "frontArcade.bayCount", 1, 10),
+      spanRatio: arcade.spanRatio === undefined ? 0.42 : num(arcade.spanRatio, "frontArcade.spanRatio", 0.2, 0.9),
+      columnWidthM: arcade.columnWidthM === undefined ? 0.5 : num(arcade.columnWidthM, "frontArcade.columnWidthM", 0.15, 1.5),
+      columnDepthM: arcade.columnDepthM === undefined ? 0.5 : num(arcade.columnDepthM, "frontArcade.columnDepthM", 0.15, 2),
+      projectionM: arcade.projectionM === undefined ? 1 : num(arcade.projectionM, "frontArcade.projectionM", 0.25, 5),
+      archThicknessM: arcade.archThicknessM === undefined ? 0.35 : num(arcade.archThicknessM, "frontArcade.archThicknessM", 0.15, 1),
+      heightM: arcade.heightM === undefined ? 6.2 : num(arcade.heightM, "frontArcade.heightM", 2, 20)
     }
   };
   if (!Number.isInteger(architecture.balcony.everyFloors)) throw new RangeError("balcony.everyFloors must be an integer");
+  if (!Number.isInteger(architecture.frontArcade.bayCount)) throw new RangeError("frontArcade.bayCount must be an integer");
   const sources = sourcesOf(input.sources);
   const sourceIds = new Set(sources.map(s => s.id));
   const evidenceRaw = input.evidence === undefined ? [] : input.evidence;

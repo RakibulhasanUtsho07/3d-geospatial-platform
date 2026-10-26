@@ -290,10 +290,10 @@ Each golden fixture should include inputs, expected dimensions, camera matrices,
 
 These are proposed tasks, not code changes already completed.
 
-- [ ] **BRF-01 (P0, IN PROGRESS):** Generic renderer contract; implementation is in Draft PR #187 and includes a real Blender 13-view smoke test. Latest exact-head CI is still running; don't mark complete until it passes and any failures are fixed.
-- [ ] **BRF-02 (P0):** Shared candidate evidence manifest with source/model/config/report hashes, camera provenance and review state.
-- [ ] **BRF-03 (P0):** Capture manifest and input quality/coverage preflight.
-- [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
+- [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
+- [x] **BRF-02 (P0, COMPLETE):** Shared candidate evidence manifest implemented in Draft PR #188; exact-head CI #40347926520 passed with 132 successful workflow steps. Hash/path, camera provenance, confidence and publication-disabled gates are tested.
+- [x] **BRF-03 (P0, COMPLETE):** Draft PR #189 passed exact-head CI #40352859459 (132 successful workflow steps). JPEG/PNG quality screening, near-duplicate hints, dimension consistency, safe file integrity and still/video-frame coverage are regression-tested; publication remains disabled.
+- [x] **BRF-04 (P0, COMPLETE):** Controlled synthetic cuboid baseline (10×8×6 m), fixed 2% dimension tolerance, deterministic repeatability, and injected 20% Y-scale / degenerate-triangle defects are implemented in Draft PR #190. Exact documentation-updated head `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13` passed full CI run #40360853267. This is a synthetic QA baseline, not proof of real-building accuracy.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
 - [ ] **BRF-07 (P0):** Source-camera render comparison with silhouette/contour and facade-part metrics.
@@ -349,14 +349,57 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 
 ## 11. Execution log — update after every task
 
-### 2026-10-26 — BRF-01 Generic renderer (in progress)
+### 2026-10-26 — BRF-01 Generic renderer (complete)
 
 - **Branch:** `feat/brf-01-generic-renderer`, based on `fix/bangabhaban-front-dome-alignment`.
-- **PR:** [#187 — feat(renderer): make building review renderer generic](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/187) (Draft).
-- **Latest recorded head commit:** `21759deab83be1f7fa4b68723f10b0fa7377cd3f`.
-- **Implemented:** removed building-specific node lists from the Blender renderer; added a validated review-profile schema and a dedicated Rangmahal profile; added profile ID/hash, mesh counts, front-bearing source and framing in manifests; added fail-closed checks for invalid/stale profiles and missing required nodes; updated documentation and regression tests.
-- **Integration guard:** CI now installs Blender, generates the repository demo BuildingSpec GLB, renders 13 views at 256×256 with the generic default profile and verifies profile provenance plus `publicationEligible: false`. This is a runtime smoke test, not an architectural-accuracy benchmark.
-- **Changed files:** `scripts/blender/render-building-review.py`; `scripts/render-building-review-views.mjs`; `src/core/building-generation/render-review-profile.mjs`; `src/core/building-generation/render-review-manifest.mjs`; `data/heritage/rangmahal-render-review-profile.json`; renderer/profile/manifest/heritage regression tests; `docs/BLENDER-RENDER-REVIEW.md`; `package.json`; `.github/workflows/ci.yml`.
-- **Validation history:** earlier CI run `40332334876` failed because `tests/heritage-model.test.mjs` still expected the old hard-coded camera vector. That test now checks the generic-profile contract. On the corrected test commit, profile tests, Blender Python syntax check, heritage regression tests and production build were observed passing before that run was superseded/cancelled by a later commit.
-- **Current exact-head CI:** run `40333770319` for commit `21759deab83be1f7fa4b68723f10b0fa7377cd3f` is `pending` at the latest check. **BRF-01 remains in progress** until this exact head receives a terminal all-green result.
-- **Next action:** inspect run `40333770319` and its jobs. Fix any failed stage on the same feature branch, update the PR and this log, then rerun exact-head CI. After green CI, mark BRF-01 complete and start **BRF-02 — shared candidate evidence manifest**. Do not merge this stacked PR into `development` or `main` before review/evidence gates pass.
+- **PR:** [#187 — feat(renderer): make building review renderer generic](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/187) (still Draft; not merged into development/main).
+- **Exact-head commit:** `5ec16ed677019c28c8380362b56de4062c683e4a`.
+- **Implemented:** removed building-specific node selectors from the Blender renderer; added a validated generic profile and external Rangmahal profile; added profile ID/hash, front bearing and mesh-count provenance to manifests; reject invalid/stale profiles and missing requested meshes; updated docs/tests and CI.
+- **Dedicated runtime evidence:** [run #40341288926](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40341288926) — **success**. Blender install, NumPy dependency, renderer/profile/manifest/heritage tests, demo GLB generation, 13 renders at 256×256, profile provenance checks and the `publicationEligible: false` guard passed.
+- **General CI:** [run #40341288833](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40341288833) — **success**, 131 successful workflow steps.
+- **Install issues fixed during this task:** first, Ubuntu Azure archive download timed out while fetching Blender; switched to the regular Ubuntu archive with bounded retries/timeouts. The first actual renderer run then exposed missing NumPy; added `python3-numpy`. The subsequent dedicated smoke test passed.
+- **Scope caveat:** BRF-01 verifies generic review rendering, not real-building fidelity, and publication remains disabled.
+- **Next action:** begin **BRF-02 — shared candidate evidence manifest**, consolidating source/model/config/camera/reference/render hashes and confidence states into one versioned candidate evidence contract. Do not merge the stacked feature PR to `development`/`main` without review of the complete feature chain.
+
+
+### 2026-10-26 — BRF-02 Shared candidate evidence manifest (complete)
+
+- **Branch:** `feat/brf-02-candidate-evidence-manifest`, stacked on `feat/brf-01-generic-renderer`.
+- **PR:** [#188 — shared building candidate evidence manifest](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/188) (Draft; not merged into development/main).
+- **Exact-head commit:** `21b0df2fc527f6e9adbe70f2918c9a690fa3cbd7`.
+- **Implemented:** `src/core/building-generation/building-candidate-evidence-manifest.mjs` provides normalization and assessment for a single candidate's evidence graph; `tests/building-candidate-evidence-manifest.test.mjs` has 11 regression tests; `package.json` and `.github/workflows/ci.yml` run them; contract documentation is at `docs/research/BUILDING-CANDIDATE-EVIDENCE-MANIFEST.md`.
+- **Contract coverage:** model/spec/config/report artifacts; capture/reference assets; camera calibration and frame alignment; independent dimensions with uncertainty and ground control; 13-view render set; QA/comparison/accuracy/release-report bindings to the exact candidate hash; confidence-to-artifact provenance; explicit missing evidence; safe paths and actual byte integrity.
+- **Hardening:** evidence tier A/B requires verification of the actual artifact path, SHA-256 and byte count. An unsupported measured-confidence claim fails; missing evidence stays incomplete; any report forces `publicationEligible: false`.
+- **Test correction:** run `40345789120` exposed an inconsistent fixture (estimated dimensions still labelled `measured`). The fixture was corrected and a regression test for contradictory confidence added.
+- **Exact-head CI:** [run #40347926520](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40347926520) — **success**, 132 successful workflow steps, zero failed steps.
+- **Scope caveat:** this is an evidence-linking contract. Hashes prove byte identity, not survey truth, photo identity, rights, or architectural accuracy. It does not create model geometry from photos or approve publication.
+- **Next action:** start **BRF-03 — capture manifest and input quality/coverage preflight**. Do not merge PR #188 through `development`/`main` until the full feature chain and review/evidence gates pass.
+
+
+### 2026-10-26 — BRF-03 Capture quality and coverage preflight (complete)
+
+- **Branch:** `feat/brf-03-capture-quality-coverage`, stacked on `feat/brf-02-candidate-evidence-manifest`.
+- **PR:** [#189 — validate capture image quality and coverage](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/189) (Draft; not merged).
+- **Exact head:** `69eb71ec90d60f49f0913ddf25533a074b70c63d`.
+- **Implemented:** filesystem capture-manifest validator analyzes photo/video-frame JPEG/PNG sources only after path/hash/byte integrity checks; JSON output includes dimensions, bounded grayscale sharpness/contrast/luminance heuristics and perceptual-hash near-duplicate hints.
+- **Fail-closed behavior:** declared camera image-dimension mismatch and file/hash/byte contradictions fail; missing image paths and low-quality/repeated views remain incomplete/warn rather than being falsely marked ready.
+- **Coverage rule:** raw video cannot satisfy a front/back/left/right view; extracted `video-frame` records need to be linked through matching source provenance.
+- **Regression tests:** capture-manifest unit + CLI tests cover low-resolution images, near-duplicate warnings, actual-vs-declared image dimensions, raw-video coverage and missing-path state.
+- **Exact-head CI:** [run #40352859459](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40352859459) — **success**, 132 successful workflow steps, zero failures.
+- **Limitations:** quality metrics are screening heuristics, not proof of correct building identity, licensing, calibrated camera poses, geometric overlap or architectural fidelity. Publication/map readiness remain disabled.
+- **Next action:** start **BRF-04 — baseline fixtures, expected measurements and deliberate defect injection**. Keep the stacked PR chain unmerged into `development`/`main` until review/evidence gates pass.
+
+
+### 2026-10-26 — BRF-04 Baseline fixtures and deliberate defect injection (complete)
+
+- **Branch:** `feat/brf-04-baseline-defect-benchmarks`, stacked on `feat/brf-03-capture-quality-coverage`.
+- **PR:** [#190 — controlled baseline and deliberate defect injection](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/190) (Draft).
+- **Controlled baseline:** `benchmarks/building-reconstruction/brf-04-controlled-baseline-v1.json` defines a synthetic closed cuboid 10×8×6 model-space metres, 1 mesh, 12 triangles, zero degenerate triangles and a 2% dimensional screening tolerance.
+- **Defect injection:** `tests/fixtures/building-baseline-glb.mjs` generates deterministic GLB bytes and injects (1) +20% Y scaling and (2) a repeated triangle index. Five tests validate baseline dimensions/counts, repeatability, both detection gates and synthetic/publication-policy disclaimers.
+- **Documentation:** `docs/BUILDING-ACCURACY-BENCHMARK.md` now explains how to run the suite, expected controlled results and what this does not prove.
+- **CI test gate:** `npm run test:building-baseline-defect-injection` is wired into the full CI workflow.
+- **Code/test head passed:** `165f2ff0583ae42e50730271e8c1df957a48abf5`, [run #40356308562](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40356308562) — **success**, 133 successful steps, no failures. Step 73 (the new baseline/defect-injection suite) passed.
+- **Precision issue fixed:** initial run #40355894005 used exact equality against 9.6 but GLB float32 produced 9.60000038. The regression test now rounds observed bounds to four decimal places; 2% tolerance remains unchanged.
+- **Latest docs-updated head:** `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13`, [run #40360853267](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40360853267) — **success**; exact-head full CI completed successfully.
+- **Limitation:** this synthetic fixture verifies the baseline/QA harness only. It is not a measured building, image-based reconstruction or real-world accuracy test. `mapReady`, `publicationEligible`, and automatic approval remain false.
+- **Next action:** start **BRF-05 — image-to-geometry correspondence and per-view semantic evidence**. Keep PR #190 and the stacked chain out of `development`/`main` until their human visual and evidence gates pass.
