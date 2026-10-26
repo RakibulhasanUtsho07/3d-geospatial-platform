@@ -81,7 +81,7 @@ For camera-local point ((X,Y,Z)), positive depth is (d=-Z). The pixel projection
 - (u = f_x X/d + c_x)
 - (v = c_y - f_y Y/d)
 
-Points behind the camera are non-projectable. The renderer must use the supplied pose/intrinsics and exact input frame dimensions; it must never auto-fit, recenter, resize, or silently substitute an orthographic view for this pair. The contract test includes a known synthetic projection; Blender camera wiring is also checked by source-level tests and Python syntax validation in CI.
+Points behind the camera are non-projectable. The renderer must use the supplied pose/intrinsics and exact input frame dimensions; it must never auto-fit, recenter, resize, or silently substitute an orthographic view for this pair. The Node contract test includes a known synthetic projection. The separate Blender CI job uses Blender's own `world_to_camera_view` projection against a synthetic fixture with an off-centre principal point and a documented 3-pixel tolerance, so camera shifts and pixel aspect are exercised rather than checked only by source-text assertions.
 
 ## Limitations / acceptance boundary
 
