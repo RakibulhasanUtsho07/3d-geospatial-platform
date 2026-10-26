@@ -22,7 +22,7 @@ function validReview(reviewedBy, reviewedAt) {
     typeof reviewedAt === "string" && Number.isFinite(Date.parse(reviewedAt));
 }
 function normalizeReviewStatus(status) {
-  return ["accepted", "review-required", "rejected", "conflict"].includes(status);
+  return ["proposed", "accepted", "review-required", "rejected", "conflict"].includes(status);
 }
 function sourceObservation(batch, observation, cameraId) {
   return {
@@ -372,6 +372,7 @@ export function fuseReviewedObservationsIntoWireframe({
     return { id, label, status: "observed", sourceViewIds: item.sourceViewIds,
       reviewedBy: item.reviewedBy, reviewedAt: new Date(item.reviewedAt).toISOString() };
   });
+  if (!inventory.length) issues.push({ type: "facade-inventory-not-supplied", reason: "unknown-facades-cannot-be-enumerated" });
   for (const facade of facades) if (facade.status !== "observed") {
     issues.push({ type: "facade-coverage-not-confirmed", facadeId: facade.id, status: facade.status, reason: facade.reason });
   }
