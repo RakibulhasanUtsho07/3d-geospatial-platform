@@ -6,19 +6,24 @@ import { parseRenderOptions } from "../src/core/building-generation/render-revie
 const rendererSource = await readFile(new URL("../scripts/blender/render-building-review.py", import.meta.url), "utf8");
 const cameraSetupSource = await readFile(new URL("../scripts/blender/source_camera_camera.py", import.meta.url), "utf8");
 
-test("uses focused Rangmahal framing when its named facade meshes are available", () => {
-  assert.match(rendererSource, /focus_rangmahal = bool\(rangmahal_review_meshes\)/);
-  assert.match(rendererSource, /front_review_meshes = rangmahal_review_meshes/);
-  assert.match(rendererSource, /front_view_framing = "rangmahal-south-facade-focused"/);
+test("keeps the renderer generic and moves building-specific framing into a review profile", async () => {
+  assert.match(rendererSource, /def read_review_profile\(opts\):/);
+  assert.match(rendererSource, /DEFAULT_REVIEW_PROFILE/);
+  assert.match(rendererSource, /front_review_meshes = \[/);
+  assert.doesNotMatch(rendererSource, /Rangmahal|Andarmahal|RoofDeck|Site_/);
+  const profile = JSON.parse(await readFile(new URL("../data/heritage/rangmahal-render-review-profile.json", import.meta.url), "utf8"));
+  assert.equal(profile.profileId, "rangmahal-south-facade-review");
+  assert.ok(profile.frontView.includeNodeNames.includes("Portico_S"));
+  assert.ok(profile.excludeNodeNamePrefixes.includes("Site_"));
 });
 
-test("falls back to a full-model front render for generic building GLBs", () => {
-  assert.match(rendererSource, /else:\n\s+front_review_meshes = meshes\n\s+front_review_center = center/);
-  assert.match(rendererSource, /front_view_framing = "whole-model-generic-front"/);
-  assert.match(rendererSource, /if view_id == "front":\n\s+if focus_rangmahal:/);
-  assert.doesNotMatch(rendererSource, /Could not find Rangmahal meshes for the focused front review view/);
+test("uses all non-excluded meshes for generic whole-model views and lets a profile scope only the front view", () => {
+  assert.match(rendererSource, /profileId": "generic-whole-model-v1"/);
+  assert.match(rendererSource, /for obj in meshes:[\s\S]*if obj not in front_review_meshes:[\s\S]*obj\.hide_render = True/);
+  assert.match(rendererSource, /view_framing = "whole-model"/);
+  assert.match(rendererSource, /front_view_framing = front_profile\["framingLabel"\]/);
+  assert.doesNotMatch(rendererSource, /focus_rangmahal/);
 });
-
 test("uses the candidate GLB's explicit front bearing and keeps a legacy fallback", () => {
   assert.match(rendererSource, /def read_front_facing_azimuth\(model_path\):/);
   assert.match(rendererSource, /front_azimuth = read_front_facing_azimuth\(model_path\)/);
@@ -90,4 +95,12 @@ test("terminates a stalled Blender process and never promotes its partial output
   assert.match(wrapper, /timeout: timeoutMs/);
   assert.match(wrapper, /result\.error\.code === "ETIMEDOUT"/);
   assert.match(wrapper, /no render set is accepted/);
+});
+
+test("validates and forwards an optional review profile, while generic mode stays the default", async () => {
+  const wrapper = await readFile(new URL("../scripts/render-building-review-views.mjs", import.meta.url), "utf8");
+  assert.match(wrapper, /singleFlag\("review-profile"\)/);
+  assert.match(wrapper, /validateRenderReviewProfile\(parsedProfile\)/);
+  assert.match(wrapper, /--review-profile-json/);
+  assert.match(wrapper, /--review-profile-sha256/);
 });

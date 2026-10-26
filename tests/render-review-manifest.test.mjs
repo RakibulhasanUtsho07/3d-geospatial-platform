@@ -10,7 +10,7 @@ function fixture(overrides = {}) {
     width: 512,
     height: 512,
     renderComplete: true,
-    framing: id === "front" ? "rangmahal-south-facade" : "whole-model",
+    framing: id === "front" ? "whole-model-generic-front" : "whole-model",
     pixelStatistics: {
       sampledPixels: 50000,
       luminanceMean: 0.4,
@@ -45,7 +45,7 @@ test("finalizes the full five-axis plus eight-angle render set", () => {
   assert.equal(report.publicationEligible, false);
   assert.equal(report.humanReview.status, "pending");
   assert.equal(report.humanReview.checklist.length, 5);
-  assert.equal(report.views.find((view) => view.id === "front").framing, "rangmahal-south-facade");
+  assert.equal(report.views.find((view) => view.id === "front").framing, "whole-model-generic-front");
   assert.equal(report.views.find((view) => view.id === "back").framing, "whole-model");
 });
 
@@ -89,4 +89,44 @@ test("rejects invalid hashes, invalid dimensions and incomplete render records",
   const report = finalizeRenderReviewManifest(bad);
   assert.ok(report.errors.includes("render-not-complete:front"));
   assert.ok(report.errors.includes("render-sha256-invalid:front"));
+});
+
+test("retains validated review-profile and facade-axis provenance without treating it as accuracy evidence", () => {
+  const profile = {
+    profileId: "generic-whole-model-v1",
+    source: "built-in-default",
+    sha256: hash,
+    globalExcludedMeshCount: 0,
+    frontVisibleMeshCount: 4,
+    frontFramingLabel: "whole-model-generic-front",
+  };
+  const report = finalizeRenderReviewManifest(fixture({
+    raw: {
+      reviewProfile: profile,
+      frontFacingAzimuthDegrees: 180,
+      frontAxisSource: "glb-extras.frontFacingAzimuthDegrees",
+    },
+  }));
+  assert.deepEqual(report.reviewProfile, profile);
+  assert.equal(report.frontFacingAzimuthDegrees, 180);
+  assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
+  assert.equal(report.publicationEligible, false);
+});
+
+test("fails when review-profile evidence has an invalid hash or impossible counts", () => {
+  const report = finalizeRenderReviewManifest(fixture({
+    raw: {
+      reviewProfile: {
+        profileId: "generic-whole-model-v1",
+        source: "built-in-default",
+        sha256: "not-a-hash",
+        globalExcludedMeshCount: -1,
+        frontVisibleMeshCount: 4,
+        frontFramingLabel: "whole-model-generic-front",
+      },
+    },
+  }));
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.includes("render-review-profile-metadata-invalid"));
+  assert.equal(report.publicationEligible, false);
 });

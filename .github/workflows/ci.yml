@@ -30,6 +30,7 @@ on:
       - feat/glb-texture-binding-qa
       - feat/glb-uv-seam-review
       - feat/blender-render-review-views
+      - feat/brf-01-generic-renderer
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
       - feat/render-correction-verification
@@ -78,6 +79,7 @@ on:
       - refactor/p1-feature-pick-routing
       - refactor/p1-selection-event-dispatch
       - rakibul-hasan
+      - fix/bangabhaban-front-dome-alignment
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
@@ -157,6 +159,8 @@ jobs:
 
       - name: Test Bangabhaban facade bearing, dome anchor and renderer alignment
         run: npm run test:bangabhaban-correction
+      - name: Test generic render review profiles
+        run: npm run test:render-review-profile
 
       - name: Test measured floor-plan vector to GLB generation
         run: npm run test:floor-plan-model
