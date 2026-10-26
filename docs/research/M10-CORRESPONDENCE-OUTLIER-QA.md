@@ -15,7 +15,7 @@ The existing DLT triangulator can compute a point from supplied matches and repo
 ## Output and status
 - Every feature reports per-view observed/projected coordinates, residual, inlier-candidate classification, suspected-outlier review classification, consensus size, inlier camera IDs and parallax diagnostics.
 - A mismatch with three views remains review-required because the data may identify a conflict but are weak evidence for which observation is wrong. Four or more views can give stronger consensus; any suspected mismatch still requires review.
-- Two-view triangulation is explicitly `insufficient-views-for-outlier-rejection`; it cannot claim it has identified a wrong observation.
+- Each two-view vertex is explicitly marked `review-required` with `insufficient-views-for-outlier-rejection`; it cannot claim it has identified a wrong observation. The top-level `status: candidate-wireframe` means the sparse structure can be represented, while `qualityStatus: review-required` retains the evidence gate for downstream callers.
 - Low-parallax and unavailable-parallax cases are review-required even when residuals are small.
 - The wireframe report and all candidate outputs retain `publicationEligible: false`.
 
