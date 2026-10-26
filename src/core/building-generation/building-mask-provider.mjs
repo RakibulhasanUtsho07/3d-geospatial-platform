@@ -12,7 +12,7 @@ const positiveInt = (value) => Number.isSafeInteger(value) && value > 0;
  * decodedMask.pixels is a decoded single-channel 0/255 image; callers must separately
  * compute actualMaskSha256 from the encoded PNG bytes, not from decoded pixels.
  */
-export function validateBuildingMaskArtifact({ source, result, actualMaskSha256, decodedMask } = {}) {
+export function validateBuildingMaskArtifact({ source, result, actualMaskSha256, actualMaskBytes, decodedMask } = {}) {
   const errors = [], warnings = [];
   const addError = (code, detail) => errors.push({ code, detail });
   const addWarning = (code, detail) => warnings.push({ code, detail });
@@ -42,6 +42,9 @@ export function validateBuildingMaskArtifact({ source, result, actualMaskSha256,
     addError("mask-hash-missing", "Declared and computed encoded-mask SHA-256 are required.");
   } else if (mask.sha256.toLowerCase() !== actualMaskSha256.toLowerCase()) {
     addError("mask-hash-mismatch", "Encoded mask bytes do not match the declared SHA-256.");
+  }
+  if (!positiveInt(actualMaskBytes) || mask?.bytes !== actualMaskBytes) {
+    addError("mask-byte-length-mismatch", "Declared mask byte length must equal the actual encoded mask file size.");
   }
   if (!mask || !positiveInt(mask.width) || !positiveInt(mask.height) ||
       !positiveInt(mask.bytes) || mask.encoding !== BINARY_MASK_ENCODING ||
