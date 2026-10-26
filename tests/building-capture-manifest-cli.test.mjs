@@ -108,9 +108,9 @@ test("validates source files and requires a pinned manifest hash for ready statu
 
 test("rejects a stale source file hash and a mismatched manifest pin", async (t) => {
   const data = await fixture(t);
-  await writeFile(path.join(data.root, "evidence", "capture-front.bin"), "changed source bytes");
+  await writeFile(path.join(data.root, "evidence", "capture-front.png"), "changed source bytes");
   const assetMismatch = await validateBuildingCaptureManifestFile({ manifestPath: "capture-manifest.json", rootDir: data.root,
-    expectedSha256: data.expectedManifestSha256 });
+    expectedSha256: data.expectedManifestSha256, spawnImpl: mockFfmpegSpawn });
   assert.equal(assetMismatch.status, "failed");
   assert.ok(assetMismatch.fileIntegrity.some((item) => item.sourceId === "capture-front" && item.status === "failed"));
 
