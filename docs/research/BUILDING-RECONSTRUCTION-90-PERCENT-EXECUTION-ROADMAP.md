@@ -293,7 +293,7 @@ These are proposed tasks, not code changes already completed.
 - [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
 - [x] **BRF-02 (P0, COMPLETE):** Shared candidate evidence manifest implemented in Draft PR #188; exact-head CI #40347926520 passed with 132 successful workflow steps. Hash/path, camera provenance, confidence and publication-disabled gates are tested.
 - [x] **BRF-03 (P0, COMPLETE):** Draft PR #189 passed exact-head CI #40352859459 (132 successful workflow steps). JPEG/PNG quality screening, near-duplicate hints, dimension consistency, safe file integrity and still/video-frame coverage are regression-tested; publication remains disabled.
-- [ ] **BRF-04 (P0, IN PROGRESS):** Controlled synthetic cuboid baseline (10×8×6 m), fixed 2% dimension tolerance, repeatability check, and injected 20% Y-scale / degenerate-triangle defects are in Draft PR #190. Code/test head passed CI; the documentation-updated exact head is being revalidated.
+- [x] **BRF-04 (P0, COMPLETE):** Controlled synthetic cuboid baseline (10×8×6 m), fixed 2% dimension tolerance, deterministic repeatability, and injected 20% Y-scale / degenerate-triangle defects are implemented in Draft PR #190. Exact documentation-updated head `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13` passed full CI run #40360853267. This is a synthetic QA baseline, not proof of real-building accuracy.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
 - [ ] **BRF-07 (P0):** Source-camera render comparison with silhouette/contour and facade-part metrics.
@@ -390,7 +390,7 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Next action:** start **BRF-04 — baseline fixtures, expected measurements and deliberate defect injection**. Keep the stacked PR chain unmerged into `development`/`main` until review/evidence gates pass.
 
 
-### 2026-10-26 — BRF-04 Baseline fixtures and deliberate defect injection (in progress)
+### 2026-10-26 — BRF-04 Baseline fixtures and deliberate defect injection (complete)
 
 - **Branch:** `feat/brf-04-baseline-defect-benchmarks`, stacked on `feat/brf-03-capture-quality-coverage`.
 - **PR:** [#190 — controlled baseline and deliberate defect injection](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/190) (Draft).
@@ -400,6 +400,6 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **CI test gate:** `npm run test:building-baseline-defect-injection` is wired into the full CI workflow.
 - **Code/test head passed:** `165f2ff0583ae42e50730271e8c1df957a48abf5`, [run #40356308562](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40356308562) — **success**, 133 successful steps, no failures. Step 73 (the new baseline/defect-injection suite) passed.
 - **Precision issue fixed:** initial run #40355894005 used exact equality against 9.6 but GLB float32 produced 9.60000038. The regression test now rounds observed bounds to four decimal places; 2% tolerance remains unchanged.
-- **Latest docs-updated head:** `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13`, [run #40360853267](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40360853267) is queued. **BRF-04 remains in progress until that exact head has a terminal green CI result.**
+- **Latest docs-updated head:** `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13`, [run #40360853267](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40360853267) — **success**; exact-head full CI completed successfully.
 - **Limitation:** this synthetic fixture verifies the baseline/QA harness only. It is not a measured building, image-based reconstruction or real-world accuracy test. `mapReady`, `publicationEligible`, and automatic approval remain false.
-- **Next action:** verify run `40360853267`; if it passes, mark BRF-04 complete and start **BRF-05 — image-to-geometry correspondence and per-view semantic evidence**. Do not merge PR #190 or the stacked chain to `development`/`main` before review/evidence gates pass.
+- **Next action:** start **BRF-05 — image-to-geometry correspondence and per-view semantic evidence**. Keep PR #190 and the stacked chain out of `development`/`main` until their human visual and evidence gates pass.
