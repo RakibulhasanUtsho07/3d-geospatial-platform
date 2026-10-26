@@ -46,6 +46,17 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       nonEmpty(sourceIdentity.evidenceDescription) && nonEmpty(sourceIdentity.verifiedBy) && dateOk(sourceIdentity.verifiedAt),
       "Building identity must be linked to a documented source; identity claims remain operator-attested.");
 
+    const captureEvidence = building.captureManifestEvidence ?? {};
+    const captureBound = captureEvidence.status === "ready-for-review" &&
+      captureEvidence.expectedSha256Pinned === true && captureEvidence.bindingsValid === true &&
+      captureEvidence.buildingId === building.buildingId && hashOk(captureEvidence.manifestSha256);
+    const captureBindingFailed = captureEvidence.status === "failed" ||
+      captureEvidence.bindingStatus === "failed" ||
+      (nonEmpty(captureEvidence.buildingId) && captureEvidence.buildingId !== building.buildingId);
+    add("capture-manifest-and-independent-evidence-binding", captureBound,
+      "A hash-pinned capture manifest for this building must bind source/reference files, independent dimensions and control points.",
+      captureBindingFailed ? "failed" : "warning");
+
     const candidate = building.candidate ?? {};
     const candidateHashValid = hashOk(candidate.sha256);
     add("candidate-glb-hash", candidateHashValid, "Candidate GLB must have a valid SHA-256 digest.", "failed");
@@ -162,6 +173,16 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       status,
       candidate: { path: candidate.path ?? null, bytes: candidate.bytes ?? null, sha256: candidate.sha256 ?? null,
         expectedSha256Pinned: sameHash(candidate.expectedSha256, candidate.sha256), geometryQaStatus: geometry.status ?? "missing" },
+      captureManifestEvidence: {
+        status: captureEvidence.status ?? "missing",
+        buildingId: captureEvidence.buildingId ?? null,
+        manifestPath: captureEvidence.manifestPath ?? null,
+        manifestSha256: captureEvidence.manifestSha256 ?? null,
+        expectedSha256Pinned: captureEvidence.expectedSha256Pinned === true,
+        bindingsValid: captureEvidence.bindingsValid === true,
+        bindingStatus: captureEvidence.bindingStatus ?? "missing",
+        checks: Array.isArray(captureEvidence.checks) ? captureEvidence.checks : [],
+      },
       sourceCoverage: { requiredSides: [...REQUIRED_SOURCE_SIDES], coveredSides, sourceMediaCount: sourceMedia.length },
       sourceMediaEvidence: sourceMedia.map((item) => ({ id: item.id ?? null, path: item.path ?? null, kind: item.kind ?? null,
         side: item.side ?? null, sha256: item.sha256 ?? null, bytes: item.bytes ?? null, expectedSha256Pinned: sameHash(item.expectedSha256, item.sha256),
