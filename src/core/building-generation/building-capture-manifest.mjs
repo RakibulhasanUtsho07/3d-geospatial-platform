@@ -226,7 +226,10 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const checks = [];
   const add = (id, pass, detail, fail = false) => checks.push({ id, status: pass ? "passed" : fail ? "failed" : "warning", detail });
   const sources = manifest.sources;
-  const captured = sources.filter((source) => source.purpose === "capture" && ["photo", "video", "video-frame"].includes(source.kind));
+  // Only decoded stills/frames count as independently inspectable reconstruction views.
+  // A raw video file needs explicit frame extraction before it can satisfy side coverage.
+  const captured = sources.filter((source) => source.purpose === "capture" && ["photo", "video-frame"].includes(source.kind));
+  const videos = sources.filter((source) => source.purpose === "capture" && source.kind === "video");
   const references = sources.filter((source) => source.purpose === "reference" && ["photo", "video-frame"].includes(source.kind));
   const measurementSources = sources.filter((source) => source.purpose === "measurement-evidence");
   const rightsOk = (source) => ["verified", "operator-attested"].includes(source.rights.status) &&
@@ -244,7 +247,12 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const captureSides = new Set(validCaptures.map((source) => source.side));
   const captureCoverage = validCaptures.length >= 4 && ["front", "back", "left", "right"].every((side) => captureSides.has(side));
   add("capture-source-coverage-and-rights", captureCoverage,
-    "At least four hash-declared capture assets must cover front/back/left/right and have reviewed rights evidence.");
+    "At least four hash-declared still images or extracted video frames must cover front/back/left/right and have reviewed rights evidence.");
+  const videosWithFrames = videos.filter((video) => sources.some((source) =>
+    source.purpose === "capture" && source.kind === "video-frame" &&
+    nonEmpty(video.sourceId) && source.sourceId === video.sourceId));
+  add("video-frame-extraction", videos.length === 0 || videosWithFrames.length === videos.length,
+    "Raw videos do not count as a facade view until extracted video-frame evidence is linked to each video source.");
   const validCaptureHashes = validCaptures.map((source) => source.sha256.toLowerCase());
   const duplicateCaptureBytes = new Set(validCaptureHashes).size !== validCaptureHashes.length;
   add("capture-source-byte-uniqueness", validCaptureHashes.length > 0 && !duplicateCaptureBytes,
@@ -314,7 +322,7 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
     checks.some((check) => check.status === "warning") ? "incomplete" : "ready-for-review";
   return { schemaVersion: "1.0.0", engine: "building-capture-manifest-validator-v1", manifestId: manifest.manifestId,
     buildingId: manifest.buildingId, generatedAt: new Date().toISOString(), status, readyForModelReview: status === "ready-for-review",
-    counts: { sources: sources.length, captures: captured.length, references: references.length,
+    counts: { sources: sources.length, captures: captured.length, videos: videos.length, references: references.length,
       measurementSources: measurementSources.length, measurements: manifest.measurements.length, controlPoints: manifest.controlPoints.length,
       passed: checks.filter((check) => check.status === "passed").length, warnings: checks.filter((check) => check.status === "warning").length,
       failed: checks.filter((check) => check.status === "failed").length },
