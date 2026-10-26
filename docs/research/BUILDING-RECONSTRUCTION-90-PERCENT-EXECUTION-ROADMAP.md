@@ -403,3 +403,19 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Latest docs-updated head:** `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13`, [run #40360853267](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40360853267) — **success**; exact-head full CI completed successfully.
 - **Limitation:** this synthetic fixture verifies the baseline/QA harness only. It is not a measured building, image-based reconstruction or real-world accuracy test. `mapReady`, `publicationEligible`, and automatic approval remain false.
 - **Next action:** start **BRF-05 — image-to-geometry correspondence and per-view semantic evidence**. Keep PR #190 and the stacked chain out of `development`/`main` until their human visual and evidence gates pass.
+
+
+## 12. Consolidated implementation package — BRF-05 through BRF-07
+
+**Tracking issue:** [#199 — Building visual evidence and source-camera validation](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/199)  
+**Detailed plan:** [BRF-05–07 Visual Evidence Plan](./BRF-05-07-VISUAL-EVIDENCE-PLAN.md)  
+**Status:** Planning only. BRF-05, BRF-06 and BRF-07 remain unchecked and are not implemented by this documentation update.
+
+Bundle the next three sequential items as one evidence-driven implementation package:
+1. **BRF-05:** building/occluder masks, safe source-to-mask hash/dimension binding and review overlays.
+2. **BRF-06:** per-view semantic features with original-pixel coordinates, confidence, visibility and provenance.
+3. **BRF-07:** source-camera rendering, comparability checks and separate silhouette/contour/semantic metrics.
+
+Keep these as distinct commits or reviewable stages within one implementation PR where practical. Missing camera/ground-truth evidence must result in an explicit incomplete/low-confidence/not-comparable/fail state, never an invented pass. Preserve publication/map readiness as disabled until separate release gates pass.
+
+**Next implementation task:** start BRF-05–07 on a fresh feature branch after inspecting current branch heads and existing PRs. First reconcile the plan with current manifest/renderer/QA contracts, then add the schema/fixture groundwork, mask implementation and regression tests. Record exact-head CI and inspected visual artifacts before promoting through development and main.
