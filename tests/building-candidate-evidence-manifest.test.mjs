@@ -295,6 +295,7 @@ test("rejects unsafe paths, duplicate artifacts, unknown confidence references a
   const unmeasured = fixture();
   unmeasured.input.evidence.independentDimensions.status = "estimated";
   unmeasured.input.evidence.independentDimensions.basis = "operator-estimate";
+  unmeasured.input.confidence.dimensions.status = "inferred";
   const report = assessBuildingCandidateEvidenceManifest(unmeasured.input, { actualArtifacts: unmeasured.actualArtifacts });
   assert.equal(report.status, "incomplete");
   assert.ok(report.warnings.some((warning) => warning.id === "independent-dimensions"));
@@ -307,4 +308,13 @@ test("publication eligibility cannot be enabled by the candidate evidence manife
   assert.equal(report.status, "failed");
   assert.equal(report.publicationEligible, false);
   assert.ok(report.failures.some((failure) => failure.id === "publication-disabled"));
+});
+
+test("rejects a measured-dimensions confidence label when only estimated dimensions are supplied", () => {
+  const inconsistent = fixture();
+  inconsistent.input.evidence.independentDimensions.status = "estimated";
+  inconsistent.input.evidence.independentDimensions.basis = "operator-estimate";
+  const report = assessBuildingCandidateEvidenceManifest(inconsistent.input, { actualArtifacts: inconsistent.actualArtifacts });
+  assert.equal(report.status, "failed");
+  assert.ok(report.failures.some((failure) => failure.id === "measured-dimensions-not-overstated"));
 });
