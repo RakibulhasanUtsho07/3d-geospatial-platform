@@ -137,3 +137,25 @@ The evidence-pack report continues to keep `mapReady=false`, `publicationEligibl
 The committed renderer regression test checks that the Rangmahal-specific hard failure is removed and the generic whole-model fallback remains in the renderer source. That test is not a substitute for executing Blender on a generic GLB. An actual 13-view render must be generated and its images inspected before M01 can be called visually verified. Likewise, passing schema/hash tests does not supply genuine building measurements, permissions, or survey control.
 
 No real-building capture manifest, independent measurement pack, model, or visual accuracy result is fabricated or included here.
+
+
+## BRF-03 — Capture quality and coverage preflight
+
+The capture-manifest file validator now runs real local image quality analysis for every declared `photo` and `video-frame` source with `purpose: capture` or `purpose: reference`, after the source file has passed its path, SHA-256 and byte-length integrity check. It uses the existing bounded 64×64 grayscale/FFmpeg analyzer and writes the results into `inputQuality` in the report.
+
+Checks include:
+- decoded JPEG/PNG dimensions, 640×480 minimum-resolution heuristic, luminance/contrast and Laplacian-sharpness warnings;
+- cross-view perceptual near-duplicate hints (they are warnings, do not delete any input or count duplicates as an independent view);
+- comparison of declared `camera.imageWidth` / `camera.imageHeight` to the actual decoded image dimensions (a mismatch fails the preflight);
+- exact source-file path/hash/byte verification before decoding; files with failed integrity are not passed to FFmpeg;
+- required front/back/left/right coverage using photos or extracted video frames only. A raw `video` asset cannot fill a missing side by itself; link `video-frame` records to the parent video with the same source provenance before it can count as view evidence.
+
+If image decoding fails, metadata contradicts the actual image, or source-file integrity fails, the report is `failed`. Low resolution, suspected blur/exposure, near-duplicate views, missing quality evidence or incomplete side coverage leaves the report `incomplete`; it cannot be marked `ready-for-review`. The console summary and persisted JSON include decoded image count, warnings, failures and near-duplicate pair count.
+
+The command uses FFmpeg for JPEG/PNG pixel sampling, so ensure `ffmpeg` is installed and available on PATH (or configure `FFMPEG_BIN`). Example:
+
+```bash
+node scripts/validate-building-capture-manifest.mjs capture-manifest.json capture-preflight-report.json --root=./building-evidence --expected-sha256=<reviewed-manifest-sha256>
+```
+
+These are screening heuristics, not a learned model or a guarantee of reconstruction quality. A visually detailed image can still show the wrong building, repeated viewpoint or poor geometric overlap. Human confirmation, calibrated camera evidence and independent measurements remain separate requirements. Publication and map readiness stay disabled.
