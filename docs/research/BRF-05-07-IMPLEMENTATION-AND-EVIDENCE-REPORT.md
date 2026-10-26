@@ -88,3 +88,118 @@ The new integration command is added to \`.github/workflows/ci.yml\`. Exact-head
 5. Render the exact candidate GLB and inspect each source-camera image against its own reference. A mismatched or uncertain camera remains \`not-comparable\`.
 6. Record metric definitions, per-class sample counts, per-building failures, reviewer decisions and artifact hashes.
 7. Only after these artifacts and exact-head CI are reviewed may the tracking issue's remaining acceptance boxes be closed. No provider is automatically selected and no candidate is made map-ready by this package.
+
+
+## Runnable bundle CLI
+
+The package can now be executed through the repository's safe, manifest-driven CLI:
+
+\`\`\`bash
+npm run build:building-visual-evidence-package -- path/to/evidence-bundle.json
+\`\`\`
+
+The bundle and every referenced asset path must be project-relative and stay inside the repository root. The CLI rejects traversal/symlink inputs, checks the source image's decoded dimensions and bytes, decodes binary mask assets to source-resolution 0/255 planes, verifies GLB and evidence bytes, creates the hash-bound report, and writes each generated overlay to a new output directory without silently overwriting previous artifacts. Supply an explicit second output-directory argument when the default artifact location already exists. Use \`--root=path/to/project\` when running from another working directory.
+
+A minimal bundle shape is shown below. The entries in angle brackets are placeholders, not valid evidence; every path, digest, reviewed annotation and camera/calibration file must be supplied by the real capture package.
+
+\`\`\`json
+{
+  "schemaVersion": "1.0.0",
+  "buildingId": "building-example",
+  "viewId": "front",
+  "generatedAt": "2026-10-27T00:00:00Z",
+  "datasetTier": "real-building",
+  "source": {
+    "id": "source-front",
+    "sourceId": "capture-front",
+    "path": "data/source/front.png",
+    "sha256": "<actual-source-sha256>",
+    "width": 1600,
+    "height": 1200,
+    "mimeType": "image/png",
+    "rights": {
+      "status": "verified",
+      "evidenceId": "rights-review-01",
+      "evidencePath": "data/rights/front-permission.pdf",
+      "evidenceSha256": "<actual-rights-file-sha256>",
+      "reviewerId": "reviewer-id",
+      "reviewedAt": "2026-10-27T00:00:00Z"
+    }
+  },
+  "model": {
+    "path": "data/candidate/building.glb",
+    "sha256": "<actual-glb-sha256>"
+  },
+  "buildingMask": {
+    "path": "data/masks/front-building.png",
+    "result": {
+      "schemaVersion": "1.0.0",
+      "sourceId": "capture-front",
+      "inputSha256": "<actual-source-sha256>",
+      "provider": {
+        "id": "manual-review-v1",
+        "kind": "human-reviewed-mask",
+        "version": "1",
+        "configurationSha256": "<actual-configuration-sha256>"
+      },
+      "mask": {
+        "sha256": "<actual-encoded-mask-sha256>",
+        "bytes": 12345,
+        "width": 1600,
+        "height": 1200,
+        "encoding": "binary-8bit-white-foreground-v1",
+        "coordinateConvention": "pixel-origin-top-left",
+        "backgroundValue": 0,
+        "foregroundValue": 255
+      },
+      "assessment": {
+        "status": "reviewed",
+        "confidence": 1,
+        "humanReviewed": true,
+        "reviewerId": "reviewer-id",
+        "reviewedAt": "2026-10-27T00:00:00Z"
+      }
+    }
+  },
+  "occluderMasks": [
+    {
+      "role": "vegetation",
+      "path": "data/masks/front-vegetation.png",
+      "result": {
+        "...": "provide the same source-bound reviewed mask result contract"
+      }
+    }
+  ],
+  "edgeMap": {
+    "path": "data/edges/front.png",
+    "sha256": "<actual-edge-map-sha256>",
+    "width": 1600,
+    "height": 1200
+  },
+  "reviewedAnnotationsBatch": {},
+  "camera": {
+    "manifestPath": "data/camera/front.json",
+    "calibrationEvidencePath": "data/camera/calibration.json",
+    "frameAlignmentEvidencePath": "data/camera/model-frame-alignment.json"
+  },
+  "sourceCameraRender": {
+    "path": "data/renders/source-camera.png",
+    "silhouetteMask": {
+      "path": "data/renders/source-camera-silhouette.png",
+      "extractionVersion": "reviewed-mask-extractor-v1"
+    }
+  },
+  "referenceSilhouette": {
+    "path": "data/reference/front-silhouette.png",
+    "review": {
+      "status": "reviewed",
+      "independentlyReviewed": true,
+      "annotationId": "independent-mask-01",
+      "reviewerId": "independent-reviewer",
+      "reviewedAt": "2026-10-27T00:00:00Z"
+    }
+  }
+}
+\`\`\`
+
+The CLI report is diagnostic evidence, not the final sign-off. The reference silhouette must be independently reviewed and source-bound; the candidate silhouette must have been extracted from the exact source-camera render. The candidate GLB still needs the existing geometry/topology/texture QA and visual review workflows. A \`review-required\` report is not approval, and \`incomplete\` / \`not-comparable\` should be treated as blocked acceptance.
