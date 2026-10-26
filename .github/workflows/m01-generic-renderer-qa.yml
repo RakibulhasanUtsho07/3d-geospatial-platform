@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - development
     paths:
       - ".github/workflows/m01-generic-renderer-qa.yml"
       - "scripts/blender/render-building-review.py"
