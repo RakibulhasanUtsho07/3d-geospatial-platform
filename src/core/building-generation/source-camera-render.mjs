@@ -100,7 +100,7 @@ export function prepareSourceCameraRender({ cameraEvidence, sourceImage, modelCo
   if (fx > fy) pixelAspectY = fx / fy;
   else if (fx < fy) pixelAspectX = fy / fx;
   const pixelAspectRatio = pixelAspectY / pixelAspectX;
-  const rotation = pose.rotation.map((row) => [row[0], -row[1], -row[2]]);
+  const rotation = pose.rotation.map((row) => [row[0], row[1] === 0 ? 0 : -row[1], row[2] === 0 ? 0 : -row[2]]);
   const renderPlan = {
     schemaVersion: "1.0.0",
     mode: "calibrated-source-camera",
