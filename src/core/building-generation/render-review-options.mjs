@@ -4,12 +4,15 @@ const MIN_TIMEOUT_MS = 1000;
 const MAX_TIMEOUT_MS = 900000;
 
 /** Parse bounded, repeatable options for the headless building review renderer. */
-export function parseRenderOptions(args = []) {
+export function parseRenderOptions(args = [], env = process.env) {
   if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string")) {
     throw new TypeError("renderer options must be an array of strings");
   }
+  if (!env || typeof env !== "object" || Array.isArray(env)) {
+    throw new TypeError("renderer environment must be an object");
+  }
   let resolution = DEFAULT_RESOLUTION;
-  let blender = process.env.BLENDER_BIN || "blender";
+  let blender = env.BLENDER_BIN || "blender";
   let timeoutMs = DEFAULT_TIMEOUT_MS;
 
   for (const arg of args) {
