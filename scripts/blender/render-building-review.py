@@ -1,7 +1,9 @@
 import bpy
+import hashlib
 import json
 import math
 import os
+import re
 import sys
 from array import array
 from mathutils import Vector
@@ -60,6 +62,101 @@ def read_front_facing_azimuth(model_path):
     if isinstance(angle, bool) or not isinstance(angle, (int, float)) or not math.isfinite(angle) or angle < 0 or angle > 360:
         raise RuntimeError("GLB frontFacingAzimuthDegrees must be a finite bearing from 0 to 360")
     return float(angle)
+
+
+DEFAULT_REVIEW_PROFILE = {
+    "schemaVersion": "1.0.0",
+    "profileId": "generic-whole-model-v1",
+    "excludeNodeNamePrefixes": [],
+    "frontView": {
+        "includeNodeNames": [],
+        "excludeNodeNames": [],
+        "elevationDegrees": 5,
+        "framingLabel": "whole-model-generic-front",
+    },
+}
+
+
+def normalize_node_name(name):
+    """Remove only Blender's numeric duplicate suffix, preserving other punctuation."""
+    return re.sub(r"\.\d{3}$", "", name)
+
+
+def validate_profile_name_list(value, label):
+    if not isinstance(value, list):
+        raise RuntimeError(label + " must be a list of exact node-name strings")
+    result = []
+    for index, name in enumerate(value):
+        if not isinstance(name, str) or not name.strip() or len(name) > 200 or "*" in name:
+            raise RuntimeError(label + "[" + str(index) + "] must be a non-empty exact node name without wildcards")
+        result.append(name.strip())
+    if len(set(result)) != len(result):
+        raise RuntimeError(label + " must not contain duplicates")
+    return result
+
+
+def read_review_profile(opts):
+    """Load explicit, review-only selectors or the generic whole-model default."""
+    if "--review-profile-json" in opts:
+        profile_path = os.path.abspath(opts["--review-profile-json"])
+        with open(profile_path, "rb") as stream:
+            profile_bytes = stream.read()
+        try:
+            profile = json.loads(profile_bytes.decode("utf-8"))
+        except Exception as error:
+            raise RuntimeError("Review profile JSON is invalid: " + str(error))
+        source = "explicit-file"
+        profile_hash = hashlib.sha256(profile_bytes).hexdigest()
+        expected_hash = opts.get("--review-profile-sha256")
+        if expected_hash is not None and expected_hash != profile_hash:
+            raise RuntimeError("Review profile changed after preflight; SHA-256 does not match")
+    else:
+        profile = json.loads(json.dumps(DEFAULT_REVIEW_PROFILE))
+        profile_bytes = json.dumps(profile, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        profile_hash = hashlib.sha256(profile_bytes).hexdigest()
+        source = "built-in-default"
+
+    if not isinstance(profile, dict):
+        raise RuntimeError("Review profile must be a JSON object")
+    allowed_keys = {"schemaVersion", "profileId", "excludeNodeNamePrefixes", "frontView"}
+    unknown_keys = set(profile) - allowed_keys
+    if unknown_keys:
+        raise RuntimeError("Unsupported review profile field: " + ", ".join(sorted(unknown_keys)))
+    if profile.get("schemaVersion") != "1.0.0":
+        raise RuntimeError("Review profile schemaVersion must be 1.0.0")
+    profile_id = profile.get("profileId")
+    if not isinstance(profile_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}", profile_id):
+        raise RuntimeError("Review profile profileId must be a short stable identifier")
+    exclude_prefixes = validate_profile_name_list(profile.get("excludeNodeNamePrefixes", []), "excludeNodeNamePrefixes")
+    front = profile.get("frontView", {})
+    if not isinstance(front, dict):
+        raise RuntimeError("Review profile frontView must be an object")
+    allowed_front_keys = {"includeNodeNames", "excludeNodeNames", "elevationDegrees", "framingLabel"}
+    unknown_front_keys = set(front) - allowed_front_keys
+    if unknown_front_keys:
+        raise RuntimeError("Unsupported frontView field: " + ", ".join(sorted(unknown_front_keys)))
+    include_names = validate_profile_name_list(front.get("includeNodeNames", []), "frontView.includeNodeNames")
+    exclude_names = validate_profile_name_list(front.get("excludeNodeNames", []), "frontView.excludeNodeNames")
+    overlap = set(include_names).intersection(exclude_names)
+    if overlap:
+        raise RuntimeError("Front-view node names cannot be both included and excluded: " + ", ".join(sorted(overlap)))
+    elevation = front.get("elevationDegrees", 5)
+    if isinstance(elevation, bool) or not isinstance(elevation, (int, float)) or not math.isfinite(elevation) or elevation < 0 or elevation > 60:
+        raise RuntimeError("frontView.elevationDegrees must be between 0 and 60")
+    framing = front.get("framingLabel", "whole-model-generic-front")
+    if not isinstance(framing, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._ -]{0,79}", framing):
+        raise RuntimeError("frontView.framingLabel must be a short human-readable label")
+    return {
+        "schemaVersion": "1.0.0",
+        "profileId": profile_id,
+        "excludeNodeNamePrefixes": exclude_prefixes,
+        "frontView": {
+            "includeNodeNames": include_names,
+            "excludeNodeNames": exclude_names,
+            "elevationDegrees": float(elevation),
+            "framingLabel": framing,
+        },
+    }, {"profileId": profile_id, "source": source, "sha256": profile_hash}
 
 
 def scene_bounds(mesh_objects):
@@ -213,44 +310,40 @@ def main():
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
     imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
-    # Keep site context in the source GLB, but hide it for model-detail review.
-    # Large Site_Ground / Site_River planes otherwise make the palace tiny.
-    site_context_meshes = [
+    review_profile, review_profile_evidence = read_review_profile(opts)
+    excluded_prefixes = review_profile["excludeNodeNamePrefixes"]
+    excluded_meshes = [
         obj for obj in imported_meshes
-        if obj.name.split(".")[0].startswith("Site_")
+        if any(normalize_node_name(obj.name).startswith(prefix) for prefix in excluded_prefixes)
     ]
-    for obj in site_context_meshes:
+    for obj in excluded_meshes:
         obj.hide_render = True
-    meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
+    meshes = [obj for obj in imported_meshes if obj not in excluded_meshes]
     if not meshes:
-        raise RuntimeError("The imported GLB has no building meshes after excluding Site_ context nodes")
+        raise RuntimeError("The imported GLB has no renderable meshes after applying the review profile")
+
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
 
-    # Keep the heritage-specific facade framing where its named meshes exist, but
-    # never make those names a prerequisite for reviewing an ordinary building GLB.
-    # Other buildings use the complete non-site mesh set for the canonical front view.
-    # Whole-model views restore it and retain the complete generated roof geometry.
-    rangmahal_review_names = {
-        "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
-        "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
-    }
-    rangmahal_review_meshes = [
-        obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
+    front_profile = review_profile["frontView"]
+    include_names = set(front_profile["includeNodeNames"])
+    exclude_names = set(front_profile["excludeNodeNames"])
+    available_names = {normalize_node_name(obj.name) for obj in meshes}
+    missing_front_names = sorted(include_names - available_names)
+    if missing_front_names:
+        raise RuntimeError("Review profile references missing front-view nodes: " + ", ".join(missing_front_names))
+    front_review_meshes = [
+        obj for obj in meshes
+        if (not include_names or normalize_node_name(obj.name) in include_names)
+        and normalize_node_name(obj.name) not in exclude_names
     ]
-    focus_rangmahal = bool(rangmahal_review_meshes)
-    if focus_rangmahal:
-        _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
-        front_review_meshes = rangmahal_review_meshes
-        front_review_center = rangmahal_center
-        front_camera_distance = max(rangmahal_dimensions) * 3.0
-        front_view_framing = "rangmahal-south-facade-focused"
-    else:
-        front_review_meshes = meshes
-        front_review_center = center
-        front_camera_distance = camera_distance
-        front_view_framing = "whole-model-generic-front"
+    if not front_review_meshes:
+        raise RuntimeError("Review profile selects no visible meshes for the front view")
+    _, _, front_review_dimensions, front_review_center = scene_bounds(front_review_meshes)
+    front_camera_distance = max(front_review_dimensions) * 3.0
+    front_view_framing = front_profile["framingLabel"]
+    front_elevation = math.radians(front_profile["elevationDegrees"])
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -283,16 +376,13 @@ def main():
     add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
-    # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
-    # only from this facade-detail camera, while the other 12 views retain roof context.
-    # Whole-model views restore it and retain the complete generated roof geometry.
-    # Legacy GLBs without a declared facade bearing keep the established camera convention.
-    # The BuildingSpec generator writes the actual facade bearing into GLB extras; use it
-    # to keep "front" on the intended facade instead of relying on polygon order.
+    # Use the declared facade bearing when present, and keep a deterministic
+    # legacy direction when a GLB does not record its intended front facade.
+    # The review profile controls front-view elevation and visible mesh selection.
     front_azimuth = read_front_facing_azimuth(model_path)
     if front_azimuth is None:
         views = [
-            ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
+            ("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO"),
             ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
             ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
             ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
@@ -301,16 +391,15 @@ def main():
         front_axis_source = "renderer-default"
     else:
         bearing = math.radians(front_azimuth)
-        front_elevation = math.radians(5.0)
         sin_bearing, cos_bearing = math.sin(bearing), math.cos(bearing)
         views = [
             ("front", Vector((sin_bearing * math.cos(front_elevation),
                               -cos_bearing * math.cos(front_elevation),
-                              math.sin(front_elevation))), "ORTHO"),
-            ("back", Vector((-sin_bearing, cos_bearing, 0.0)), "ORTHO"),
-            ("left", Vector((cos_bearing, -sin_bearing, 0.0)), "ORTHO"),
-            ("right", Vector((-cos_bearing, sin_bearing, 0.0)), "ORTHO"),
-            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
+                              math.sin(front_elevation)), "ORTHO"),
+            ("back", Vector((-sin_bearing, cos_bearing, 0.0), "ORTHO"),
+            ("left", Vector((cos_bearing, -sin_bearing, 0.0), "ORTHO"),
+            ("right", Vector((-cos_bearing, sin_bearing, 0.0), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0), "ORTHO"),
         ]
         front_axis_source = "glb-extras.frontFacingAzimuthDegrees"
     elevation = math.radians(22.0)
@@ -325,16 +414,14 @@ def main():
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
-        # Restore the normal whole-model visibility before every camera. The
-        # focused front image intentionally isolates the river-facing Rangmahal
-        # so the rear Andarmahal/whole-footprint roof rails cannot clip the facade.
+        # Restore normal visibility before each view; only a profile can focus
+        # or exclude mesh nodes for the dedicated front-detail view.
         for obj, was_hidden in original_render_visibility:
             obj.hide_render = was_hidden
         if view_id == "front":
-            if focus_rangmahal:
-                for obj in meshes:
-                    if obj not in front_review_meshes:
-                        obj.hide_render = True
+            for obj in meshes:
+                if obj not in front_review_meshes:
+                    obj.hide_render = True
             visible_meshes = front_review_meshes
             view_center = front_review_center
             view_distance = front_camera_distance
@@ -410,6 +497,12 @@ def main():
         "height": resolution,
         "frontFacingAzimuthDegrees": front_azimuth,
         "frontAxisSource": front_axis_source,
+        "reviewProfile": {
+            **review_profile_evidence,
+            "globalExcludedMeshCount": len(excluded_meshes),
+            "frontVisibleMeshCount": len(front_review_meshes),
+            "frontFramingLabel": front_view_framing,
+        },
         "sceneBounds": {
             "min": [round(float(value), 8) for value in minimum],
             "max": [round(float(value), 8) for value in maximum],
