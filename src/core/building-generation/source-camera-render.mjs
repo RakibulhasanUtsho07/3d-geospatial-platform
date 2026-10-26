@@ -170,8 +170,8 @@ export function assessSourceCameraForRender({
         errorPixels,
         status: errorPixels <= maxControlPointErrorPixels ? "within-tolerance" : "failed",
       });
-      if (point.imagePoint.x < 0 || point.imagePoint.y < 0 ||
-          point.imagePoint.x >= camera.sourceImage.width || point.imagePoint.y >= camera.sourceImage.height) {
+      if (camera.sourceImage && (point.imagePoint.x < 0 || point.imagePoint.y < 0 ||
+          point.imagePoint.x >= camera.sourceImage.width || point.imagePoint.y >= camera.sourceImage.height)) {
         errors.push("control-point-outside-image:" + point.id);
       }
       if (errorPixels > maxControlPointErrorPixels) errors.push("control-point-reprojection-error-exceeds-tolerance:" + point.id);
