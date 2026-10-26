@@ -20,9 +20,11 @@ test("engine emits a structurally parseable dome-and-arcade GLB candidate", () =
   assert.ok(Buffer.isBuffer(result.glb));
   assert.ok(result.glb.length > 20_000);
   const qa = analyzeGlbQuality(result.glb);
-  assert.ok(qa.triangleCount > 0);
-  assert.ok(qa.primitiveCount >= 4);
-  assert.ok(qa.bounds?.dimensions?.every((value) => Number.isFinite(value) && value > 0));
+  assert.equal(qa.valid, true);
+  assert.ok(qa.counts.triangleCount > 0);
+  assert.ok(qa.counts.meshCount >= 4);
+  assert.ok(qa.counts.vertexCount > 100);
+  assert.ok(qa.bounds.dimensions.every((value) => Number.isFinite(value) && value > 0));
   assert.equal(result.report.reviewRequired, true);
 });
 
