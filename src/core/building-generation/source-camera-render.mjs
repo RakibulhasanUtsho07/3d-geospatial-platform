@@ -55,6 +55,10 @@ export function prepareSourceCameraRender({ cameraEvidence, sourceImage, modelCo
 
   if (!sourceImage || typeof sourceImage.path !== "string" || !sourceImage.path.trim()) errors.push("source-image-path-required");
   if (!HASH.test(sourceImage?.sha256 ?? "")) errors.push("source-image-sha256-invalid");
+  const rights = sourceImage?.rightsAttestation;
+  if (!rights || rights.status !== "permitted" || typeof rights.sourceId !== "string" || !rights.sourceId.trim() || !HASH.test(rights.sha256 ?? "")) {
+    errors.push("source-image-rights-attestation-invalid");
+  }
   if (camera?.sourceImageSha256 !== sourceImage?.sha256) errors.push("camera-source-image-hash-mismatch");
   const imageSize = sourceImage?.imageSize;
   if (!imageSize || !positiveInt(imageSize.width) || !positiveInt(imageSize.height) ||
@@ -112,6 +116,7 @@ export function prepareSourceCameraRender({ cameraEvidence, sourceImage, modelCo
     sourceImageSha256: sourceImage.sha256.toLowerCase(),
     sourceImageSize: { width, height },
     sourceImageCrop: sourceImage.crop ?? null,
+    sourceImageRightsAttestation: { status: rights.status, sourceId: rights.sourceId, sha256: rights.sha256.toLowerCase() },
     modelCoordinateFrame,
     modelSha256: modelSha256.toLowerCase(),
     visionCameraConvention: camera.convention,
@@ -183,7 +188,7 @@ export function finalizeSourceCameraRenderManifest({ renderPlan, renderFiles } =
     publicationEligible: false,
     modelSha256: renderPlan.modelSha256,
     sourceImage: { path: renderPlan.sourceImagePath, sha256: renderPlan.sourceImageSha256,
-      width: size.width, height: size.height, crop: renderPlan.sourceImageCrop },
+      width: size.width, height: size.height, crop: renderPlan.sourceImageCrop, rightsAttestation: renderPlan.sourceImageRightsAttestation },
     camera: { id: renderPlan.cameraId, evidenceId: renderPlan.cameraEvidenceId,
       evidenceSourceId: renderPlan.cameraEvidenceSourceId, evidenceSha256: renderPlan.cameraEvidenceSha256,
       convention: renderPlan.visionCameraConvention, coordinateFrame: renderPlan.modelCoordinateFrame,
