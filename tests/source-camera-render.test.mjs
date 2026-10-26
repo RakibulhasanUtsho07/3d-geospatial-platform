@@ -113,6 +113,14 @@ test("refuses same-camera output if the PNG is absent, wrong-sized, or not hashe
   assert.equal(invalid.sameCameraComparable, false);
 });
 
+test("fails closed without throwing when a source-image object is missing", () => {
+  const camera = cameraFixture();
+  delete camera.sourceImage;
+  const report = assessSourceCameraForRender(args(camera));
+  assert.equal(report.status, "not-comparable");
+  assert.ok(report.errors.includes("source-image-metadata-invalid"));
+});
+
 test("never records a render for a non-comparable camera", () => {
   const assessment = assessSourceCameraForRender({ ...args(), camera: null });
   const report = finalizeSourceCameraRenderManifest({ assessment, renderFile: { filename: "source-camera.png", width: 640, height: 480, bytes: 1, sha256: hash("f") } });
