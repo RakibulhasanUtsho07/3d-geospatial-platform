@@ -183,7 +183,8 @@ export function buildMultiViewWireframe({cameras,features,edges,options={}}){
   wireEdges.push({from:edge[0],to:edge[1]});
  }
  const blockingIssueTypes=new Set(["triangulation-failed","high-reprojection-error","invalid-edge-reference","edge-endpoint-untriangulated"]);
- const blockingIssueCount=issues.filter(issue=>blockingIssueTypes.has(issue.type)).length;
+ const blockingIssueCount=issues.filter(issue=>blockingIssueTypes.has(issue.type)).length+
+  issues.filter(issue=>issue.type==="correspondence-review-required"&&issue.reason!=="insufficient-views-for-outlier-rejection").length;
  const qualityStatus=issues.length?"review-required":"candidate-wireframe";
  return {schemaVersion:"1.1.0",method:"deterministic-pair-consensus-then-linear-refit",status:blockingIssueCount?"review-required":"candidate-wireframe",qualityStatus,reviewRequiredFeatureCount:vertices.filter(vertex=>vertex.status==="review-required").length,assumptions:["Camera projection matrices must be correctly calibrated and expressed in a common coordinate frame.","Image observations must refer to the same physical architectural feature across views.","Reprojection thresholds use the projection matrix image-coordinate convention; these are pixels only if the projection matrices produce pixels.","Outlier labels are review suggestions; no observation is deleted or auto-rejected.","This is a sparse wireframe of supplied correspondences, not dense building geometry.","No camera calibration, semantic feature matching or automatic geometry repair is performed."],cameraCount:cameras.length,inputFeatureCount:features.length,triangulatedVertexCount:vertices.filter(v=>v.point).length,edgeCount:wireEdges.length,maxRmsReprojectionError:maxRms,vertices,edges:wireEdges,issues,repairPasses:0,publicationEligible:false};
 }
