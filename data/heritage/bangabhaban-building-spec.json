@@ -1,0 +1,205 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "bangabhaban-dhaka",
+  "name": "Bangabhaban — provisional procedural candidate",
+  "location": {
+    "longitude": 90.41782,
+    "latitude": 23.723302,
+    "heightM": 0
+  },
+  "footprint": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          90.417604,
+          23.723208
+        ],
+        [
+          90.418036,
+          23.723208
+        ],
+        [
+          90.418036,
+          23.723396
+        ],
+        [
+          90.417604,
+          23.723396
+        ],
+        [
+          90.417604,
+          23.723208
+        ]
+      ]
+    ]
+  },
+  "dimensions": {
+    "floorCount": 3,
+    "floorHeightM": 3.35,
+    "parapetHeightM": 0.75,
+    "wallThicknessM": 0.25
+  },
+  "architecture": {
+    "style": "bangabhaban-palatial-islamic-bangla",
+    "roofType": "flat",
+    "wallColor": "#F1EEE6",
+    "roofColor": "#E8E5DE",
+    "glassColor": "#353936",
+    "frameColor": "#FCFAF4",
+    "concreteColor": "#E5E0D6",
+    "doorColor": "#3F342A",
+    "includeDoor": true,
+    "balcony": {
+      "enabled": false,
+      "everyFloors": 2,
+      "widthM": 1.6,
+      "depthM": 0.85
+    },
+    "windows": {
+      "enabled": true,
+      "widthM": 1.45,
+      "heightM": 1.6
+    },
+    "centralDome": {
+      "enabled": true,
+      "radiusM": 4.2,
+      "riseM": 5.6,
+      "drumHeightM": 1.7,
+      "insetFromFrontM": 6.2
+    },
+    "frontArcade": {
+      "enabled": true,
+      "bayCount": 3,
+      "spanRatio": 0.42,
+      "columnWidthM": 0.48,
+      "columnDepthM": 0.55,
+      "projectionM": 1,
+      "archThicknessM": 0.38,
+      "heightM": 6.5
+    }
+  },
+  "sources": [
+    {
+      "id": "pwd-main-building-record",
+      "kind": "text",
+      "title": "Public Works Department building database — BANGABHABAN",
+      "url": "https://old.pwd.gov.bd/buildingdatabase",
+      "licence": "Factual public record; not a measured survey drawing",
+      "usageStatus": "approved",
+      "description": "The public record lists 9,962 square feet plinth area and allowable floors 3. The permitted-floor field is not itself proof of the current number of floors."
+    },
+    {
+      "id": "building-description",
+      "kind": "text",
+      "title": "Bangabhaban — Commonwealth Walkway",
+      "url": "https://commonwealthwalkway.info/place/bangabhaban/",
+      "licence": "Factual architectural description; not a survey drawing",
+      "usageStatus": "approved",
+      "description": "Describes the main building as a three-storeyed palatial complex."
+    },
+    {
+      "id": "commons-aerial-2006",
+      "kind": "image",
+      "title": "Bangabhaban.jpg aerial reference (2006)",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban.jpg",
+      "licence": "CC BY-SA 4.0",
+      "attribution": "Wikimedia Commons, Bangabhaban.jpg; attribution and share-alike required",
+      "usageStatus": "approved",
+      "description": "Visual massing/orientation reference only; image pixels are not used as a dimension survey."
+    },
+    {
+      "id": "commons-exterior-2017",
+      "kind": "image",
+      "title": "Bangabhaban exterior/context photograph (2017)",
+      "url": "https://commons.wikimedia.org/wiki/File:Bangabhaban_(33310655331).jpg",
+      "licence": "CC BY 2.0",
+      "attribution": "ASaber91, Bangabhaban (33310655331).jpg, CC BY 2.0",
+      "usageStatus": "approved",
+      "description": "Broad exterior massing and central-dome reference; no camera calibration or independent dimension survey."
+    }
+  ],
+  "evidence": [
+    {
+      "field": "location",
+      "value": {
+        "longitude": 90.41782,
+        "latitude": 23.723302
+      },
+      "confidence": "estimated",
+      "sourceIds": [
+        "commons-aerial-2006"
+      ],
+      "notes": "Reference-pack coordinate is approximate and explicitly is not a surveyed building centroid."
+    },
+    {
+      "field": "footprint",
+      "value": {
+        "shape": "rectangle",
+        "lengthM": 44,
+        "widthM": 21,
+        "areaM2": 924
+      },
+      "confidence": "estimated",
+      "sourceIds": [
+        "pwd-main-building-record",
+        "commons-aerial-2006"
+      ],
+      "notes": "Approximate synthetic rectangle whose area is close to the PWD-listed 9,962 sq ft (about 925 m²); it is not traced, independently measured, or validated as the real building footprint."
+    },
+    {
+      "field": "floorCount",
+      "value": 3,
+      "confidence": "derived",
+      "sourceIds": [
+        "building-description",
+        "pwd-main-building-record"
+      ],
+      "notes": "The Commonwealth Walkway describes three storeys; PWD lists three allowable floors. Exact present-day floor arrangement still needs direct review."
+    },
+    {
+      "field": "centralDome",
+      "value": {
+        "radiusM": 4.2,
+        "riseM": 5.6,
+        "drumHeightM": 1.7
+      },
+      "confidence": "estimated",
+      "sourceIds": [
+        "commons-aerial-2006",
+        "commons-exterior-2017"
+      ],
+      "notes": "Parametric proportions are visual estimates, not measured dimensions."
+    },
+    {
+      "field": "frontArcade",
+      "value": {
+        "bayCount": 3,
+        "spanRatio": 0.42,
+        "heightM": 6.5
+      },
+      "confidence": "estimated",
+      "sourceIds": [
+        "commons-exterior-2017"
+      ],
+      "notes": "Three-bay arched facade is a procedural interpretation of reference photography; openings and mouldings are not survey-traced."
+    },
+    {
+      "field": "floorHeightM",
+      "value": 3.35,
+      "confidence": "estimated",
+      "sourceIds": [
+        "building-description",
+        "commons-exterior-2017"
+      ],
+      "notes": "Assumed for massing only; no section drawing or survey height is available."
+    }
+  ],
+  "tags": [
+    "heritage",
+    "bangabhaban",
+    "procedural-candidate",
+    "estimated-footprint",
+    "not-map-ready"
+  ]
+}

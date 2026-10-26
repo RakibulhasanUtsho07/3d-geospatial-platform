@@ -26,7 +26,22 @@ function geometryBuilder() {
     quad(material,p(-x,-y,z),p(x,-y,z),p(x,y,z),p(-x,y,z),[0,0,1]);
     quad(material,p(-x,-y,-z),p(-x,y,-z),p(x,y,-z),p(x,-y,-z),[0,0,-1]);
   }
-  return { groups, triangle, box };
+  function cylinder(material, cx, baseY, cz, radius, height, segments = 24) {
+    for (let segment = 0; segment < segments; segment++) {
+      const a0 = segment / segments * Math.PI * 2;
+      const a1 = (segment + 1) / segments * Math.PI * 2;
+      const b0 = [cx + radius * Math.cos(a0), baseY, cz + radius * Math.sin(a0)];
+      const b1 = [cx + radius * Math.cos(a1), baseY, cz + radius * Math.sin(a1)];
+      const t0 = [b0[0], baseY + height, b0[2]];
+      const t1 = [b1[0], baseY + height, b1[2]];
+      const mid = (a0 + a1) / 2;
+      const outward = [Math.cos(mid), 0, Math.sin(mid)];
+      quad(material, b0, b1, t1, t0, outward);
+      triangle(material, [cx, baseY + height, cz], t0, t1, [0, 1, 0]);
+      triangle(material, [cx, baseY, cz], b1, b0, [0, -1, 0]);
+    }
+  }
+  return { groups, triangle, quad, box, cylinder };
 }
 function triangulate(points) {
   const area=points.reduce((s,p,i)=>{const n=points[(i+1)%points.length];return s+p.x*n.z-n.x*p.z;},0)/2;
@@ -98,6 +113,81 @@ export function generateProceduralGlb(rawSpec) {
   for(const [a,b,c] of triangulate(points)){const at=i=>[points[i].x,height,points[i].z];geo.triangle("roof",at(a),at(c),at(b),[0,1,0]);}
   if(spec.dimensions.parapetHeightM>0)for(const e of edges){geo.box("concrete",(e.p.x+e.n.x)/2-e.out.x*wt/2,height+spec.dimensions.parapetHeightM/2,(e.p.z+e.n.z)/2-e.out.z*wt/2,e.len+wt*0.3,spec.dimensions.parapetHeightM,wt,e.yaw);}
   if(spec.architecture.roofType==="terrace"){const b=spec.footprint.bounds,w=b.maxX-b.minX,d=b.maxZ-b.minZ;if(w>2.5&&d>2.5)geo.box("concrete",(b.minX+b.maxX)/2,height+0.025,(b.minZ+b.maxZ)/2,Math.min(w*0.55,4.2),0.05,Math.min(d*0.35,2.8));}
+
+  // Optional architectural massing features: retained in the normalized BuildingSpec
+  // and generated deterministically so specialist buildings need not be reduced to a box.
+  const dome=spec.architecture.centralDome;
+  if(dome.enabled){
+    const e=edges[front],midX=(e.p.x+e.n.x)/2,midZ=(e.p.z+e.n.z)/2;
+    const cx=midX-e.out.x*dome.insetFromFrontM,cz=midZ-e.out.z*dome.insetFromFrontM;
+    const baseY=height+spec.dimensions.parapetHeightM;
+    geo.cylinder("concrete",cx,baseY,cz,dome.radiusM*0.88,dome.drumHeightM,24);
+    const domeY=baseY+dome.drumHeightM,segments=32,steps=12;
+    for(let ring=0;ring<steps;ring++){
+      const t0=ring/steps*Math.PI/2,t1=(ring+1)/steps*Math.PI/2;
+      const r0=dome.radiusM*Math.cos(t0),r1=dome.radiusM*Math.cos(t1);
+      const y0=domeY+dome.riseM*Math.sin(t0),y1=domeY+dome.riseM*Math.sin(t1);
+      for(let segment=0;segment<segments;segment++){
+        const a0=segment/segments*Math.PI*2,a1=(segment+1)/segments*Math.PI*2,am=(a0+a1)/2,tm=(t0+t1)/2;
+        const p=(radius,y,angle)=>[cx+radius*Math.cos(angle),y,cz+radius*Math.sin(angle)];
+        const p00=p(r0,y0,a0),p10=p(r0,y0,a1),p11=p(r1,y1,a1),p01=p(r1,y1,a0);
+        geo.quad("roof",p00,p10,p11,p01,[Math.cos(am)*Math.sin(tm),Math.cos(tm),Math.sin(am)*Math.sin(tm)]);
+      }
+    }
+    // Narrow clerestory-like panels around the drum create a readable transition into the dome.
+    for(let segment=0;segment<12;segment++){
+      const angle=segment/12*Math.PI*2;
+      const radius=dome.radiusM*0.88+0.045;
+      const x=cx+radius*Math.cos(angle),z=cz+radius*Math.sin(angle);
+      geo.box("glass",x,baseY+dome.drumHeightM*0.52,z,0.22,Math.min(0.72,dome.drumHeightM*0.55),0.06,angle+Math.PI/2);
+    }
+  }
+
+  const arcade=spec.architecture.frontArcade;
+  if(arcade.enabled){
+    const e=edges[front],ux=(e.n.x-e.p.x)/e.len,uz=(e.n.z-e.p.z)/e.len;
+    const span=e.len*arcade.spanRatio,bay=span/arcade.bayCount,start=(e.len-span)/2;
+    const arcadeHeight=Math.min(arcade.heightM,height-0.25);
+    const outerRadius=Math.max(arcade.columnWidthM*1.6,(bay-arcade.columnWidthM)/2);
+    const innerRadius=Math.max(0.35,outerRadius-arcade.archThicknessM);
+    const springY=arcadeHeight-outerRadius;
+    if(springY>0.5){
+      const wallOffset=wt/2+0.08,columnOffset=wt/2+arcade.projectionM;
+      const archOffset=columnOffset+arcade.columnDepthM/2+0.025;
+      const point=(u,y,offset)=>[e.p.x+ux*u+e.out.x*offset,y,e.p.z+uz*u+e.out.z*offset];
+      // Dark infill is intentionally placed over the uncut procedural wall to approximate
+      // recessed arched openings without implying a structural BIM-level opening.
+      for(let bayIndex=0;bayIndex<arcade.bayCount;bayIndex++){
+        const centerU=start+(bayIndex+0.5)*bay,basePoint=point(centerU,springY/2,wallOffset);
+        geo.box("glass",basePoint[0],basePoint[1],basePoint[2],Math.max(0.5,bay-arcade.columnWidthM*1.05),springY,0.08,e.yaw);
+        const center=point(centerU,springY,wallOffset+0.045);
+        const openingRadius=Math.max(0.3,innerRadius-0.08);
+        for(let segment=0;segment<16;segment++){
+          const a0=segment/16*Math.PI,a1=(segment+1)/16*Math.PI;
+          const p0=point(centerU+openingRadius*Math.cos(a0),springY+openingRadius*Math.sin(a0),wallOffset+0.045);
+          const p1=point(centerU+openingRadius*Math.cos(a1),springY+openingRadius*Math.sin(a1),wallOffset+0.045);
+          geo.triangle("glass",center,p0,p1,[e.out.x,0,e.out.z]);
+        }
+        for(let segment=0;segment<16;segment++){
+          const a0=segment/16*Math.PI,a1=(segment+1)/16*Math.PI;
+          const outer0=point(centerU+outerRadius*Math.cos(a0),springY+outerRadius*Math.sin(a0),archOffset);
+          const outer1=point(centerU+outerRadius*Math.cos(a1),springY+outerRadius*Math.sin(a1),archOffset);
+          const inner1=point(centerU+innerRadius*Math.cos(a1),springY+innerRadius*Math.sin(a1),archOffset);
+          const inner0=point(centerU+innerRadius*Math.cos(a0),springY+innerRadius*Math.sin(a0),archOffset);
+          geo.quad("frame",outer0,outer1,inner1,inner0,[e.out.x,0,e.out.z]);
+        }
+      }
+      for(let column=0;column<=arcade.bayCount;column++){
+        const u=start+column*bay,p=point(u,arcadeHeight/2,columnOffset);
+        geo.box("concrete",p[0],p[1],p[2],arcade.columnWidthM,arcadeHeight,arcade.columnDepthM,e.yaw);
+        const base=point(u,0.2,columnOffset),capital=point(u,arcadeHeight-0.18,columnOffset);
+        geo.box("concrete",base[0],base[1],base[2],arcade.columnWidthM*1.35,0.32,arcade.columnDepthM*1.35,e.yaw);
+        geo.box("concrete",capital[0],capital[1],capital[2],arcade.columnWidthM*1.5,0.28,arcade.columnDepthM*1.45,e.yaw);
+      }
+      const cornice=point(start+span/2,arcadeHeight+0.15,columnOffset);
+      geo.box("concrete",cornice[0],cornice[1],cornice[2],span+0.5,0.24,arcade.columnDepthM*1.4,e.yaw);
+    }
+  }
   const glb=encodeGlb(spec,geo);
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
