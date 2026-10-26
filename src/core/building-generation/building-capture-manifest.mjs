@@ -108,10 +108,32 @@ export function normalizeBuildingCaptureManifest(input = {}) {
     const cameraStatus = cameraRaw.status ?? "unknown";
     if (!ATTESTATION.has(cameraStatus)) throw new TypeError("sources[" + index + "].camera.status is unsupported");
     const camera = { status: cameraStatus };
-    for (const key of ["focalLengthMm", "headingDegrees", "pitchDegrees", "rollDegrees", "longitude", "latitude", "altitudeM"]) {
+    for (const key of ["focalLengthMm", "headingDegrees", "pitchDegrees", "rollDegrees", "longitude", "latitude", "altitudeM",
+      "horizontalFovDegrees", "verticalFovDegrees"]) {
       if (cameraRaw[key] !== undefined && cameraRaw[key] !== null) {
         if (!numberOk(cameraRaw[key])) throw new TypeError("sources[" + index + "].camera." + key + " must be finite");
         camera[key] = cameraRaw[key];
+      }
+    }
+    for (const key of ["imageWidth", "imageHeight"]) {
+      if (cameraRaw[key] !== undefined && cameraRaw[key] !== null) {
+        if (!Number.isSafeInteger(cameraRaw[key]) || cameraRaw[key] < 1 || cameraRaw[key] > 20000) {
+          throw new RangeError("sources[" + index + "].camera." + key + " must be an integer between 1 and 20000");
+        }
+        camera[key] = cameraRaw[key];
+      }
+    }
+    for (const key of ["make", "model", "lens"]) {
+      if (cameraRaw[key] !== undefined && cameraRaw[key] !== null && cameraRaw[key] !== "") {
+        if (!nonEmpty(cameraRaw[key]) || cameraRaw[key].trim().length > 200) {
+          throw new TypeError("sources[" + index + "].camera." + key + " must be a non-empty string of at most 200 characters");
+        }
+        camera[key] = cameraRaw[key].trim();
+      }
+    }
+    for (const key of ["horizontalFovDegrees", "verticalFovDegrees"]) {
+      if (camera[key] !== undefined && (camera[key] <= 0 || camera[key] >= 180)) {
+        throw new RangeError("camera " + key + " must be greater than 0 and less than 180");
       }
     }
     if (camera.longitude !== undefined && (camera.longitude < -180 || camera.longitude > 180)) throw new RangeError("camera longitude must be between -180 and 180");
@@ -228,6 +250,11 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const referenceCoverage = validReferences.length >= 4 && ["front", "back", "left", "right"].every((side) => referenceSides.has(side));
   add("independent-reference-coverage-and-rights", referenceCoverage,
     "At least four independent reference assets must cover front/back/left/right and retain rights/source provenance.");
+  const captureHashes = new Set(captured.filter((source) => hashOk(source.sha256)).map((source) => source.sha256.toLowerCase()));
+  const duplicateReferenceBytes = validReferences.some((source) => captureHashes.has(source.sha256));
+  add("reference-bytes-independent-from-captures", validReferences.length > 0 && !duplicateReferenceBytes,
+    "Reference images must not be byte-identical to the reconstruction capture images; shared bytes are not independent validation.",
+    duplicateReferenceBytes);
 
   const captureCameraOk = captured.length >= 1 && captured.every((source) =>
     ["verified", "estimated"].includes(source.camera.status) &&
