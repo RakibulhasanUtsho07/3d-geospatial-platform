@@ -578,6 +578,11 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   if (await layersToggle.getAttribute("aria-expanded") === "false") {
     await layersToggle.click();
   }
+  const cameraToggle = page.getByRole("button", { name: "Camera controls" });
+  await expect(cameraToggle).toBeVisible({ timeout: 45_000 });
+  if (await cameraToggle.getAttribute("aria-expanded") === "false") {
+    await cameraToggle.click();
+  }
   await expect(
     page.getByRole("checkbox", { name: "Detailed OSM roads" }),
   ).toBeEnabled({ timeout: 45_000 });
