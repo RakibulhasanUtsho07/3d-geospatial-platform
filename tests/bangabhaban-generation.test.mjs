@@ -22,6 +22,7 @@ test("engine emits a structurally parseable dome-and-arcade GLB candidate", () =
   const qa = analyzeGlbQuality(result.glb);
   assert.equal(qa.valid, true);
   assert.ok(qa.counts.triangleCount > 0);
+  assert.equal(qa.counts.degenerateTriangleCount, 0, "dome apex must not emit degenerate triangles");
   assert.ok(qa.counts.meshCount >= 4);
   assert.ok(qa.counts.vertexCount > 100);
   assert.ok(qa.bounds.dimensions.every((value) => Number.isFinite(value) && value > 0));
