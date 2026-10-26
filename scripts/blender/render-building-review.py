@@ -143,17 +143,14 @@ def main():
         obj.hide_render = True
     meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
     if not meshes:
-        raise RuntimeError("The imported GLB has no palace meshes after excluding Site_ context nodes")
+        raise RuntimeError("The imported GLB has no building meshes after excluding Site_ context nodes")
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
 
-    # Match the real-world river-facing reference: the canonical front image is
-    # a detail view of Rangmahal, not a full-footprint view with the rear-set
-    # Andarmahal extension shifting the dome away from the centre of the frame.
-    # RoofDeck is intentionally not in this allowlist: its flat plane is hidden
-    # only in the facade-detail render so it cannot blanket the facade or steps.
-    # Whole-model views restore it and retain the complete generated roof geometry.
+    # Keep the heritage-specific facade framing where its named meshes exist, but
+    # never make those names a prerequisite for reviewing an ordinary building GLB.
+    # Other buildings use the complete non-site mesh set for the canonical front view.
     rangmahal_review_names = {
         "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
         "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
@@ -161,10 +158,18 @@ def main():
     rangmahal_review_meshes = [
         obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
     ]
-    if not rangmahal_review_meshes:
-        raise RuntimeError("Could not find Rangmahal meshes for the focused front review view")
-    _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
-    rangmahal_camera_distance = max(rangmahal_dimensions) * 3.0
+    focus_rangmahal = bool(rangmahal_review_meshes)
+    if focus_rangmahal:
+        _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
+        front_review_meshes = rangmahal_review_meshes
+        front_review_center = rangmahal_center
+        front_camera_distance = max(rangmahal_dimensions) * 3.0
+        front_view_framing = "rangmahal-south-facade-focused"
+    else:
+        front_review_meshes = meshes
+        front_review_center = center
+        front_camera_distance = camera_distance
+        front_view_framing = "whole-model-generic-front"
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -224,13 +229,14 @@ def main():
         for obj, was_hidden in original_render_visibility:
             obj.hide_render = was_hidden
         if view_id == "front":
-            for obj in meshes:
-                if obj not in rangmahal_review_meshes:
-                    obj.hide_render = True
-            visible_meshes = rangmahal_review_meshes
-            view_center = rangmahal_center
-            view_distance = rangmahal_camera_distance
-            view_framing = "rangmahal-south-facade-focused"
+            if focus_rangmahal:
+                for obj in meshes:
+                    if obj not in front_review_meshes:
+                        obj.hide_render = True
+            visible_meshes = front_review_meshes
+            view_center = front_review_center
+            view_distance = front_camera_distance
+            view_framing = front_view_framing
         else:
             visible_meshes = meshes
             view_center = center
