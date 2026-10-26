@@ -32,6 +32,7 @@ on:
       - feat/blender-render-review-views
       - feat/brf-02-candidate-evidence-manifest
       - feat/brf-03-capture-quality-coverage
+      - feat/brf-04-baseline-defect-benchmarks
       - feat/brf-01-generic-renderer
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
@@ -83,6 +84,7 @@ on:
       - rakibul-hasan
       - fix/bangabhaban-front-dome-alignment
       - feat/brf-02-candidate-evidence-manifest
+      - feat/brf-03-capture-quality-coverage
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
@@ -337,6 +339,9 @@ jobs:
 
       - name: Test evidence-based building accuracy benchmark
         run: npm run test:building-accuracy-benchmark
+
+      - name: Test controlled building baseline and deliberate defect injection
+        run: npm run test:building-baseline-defect-injection
 
       - name: Test multi-building accuracy evidence pack integrity and fail-closed release policy
         run: npm run test:building-accuracy-evidence-pack
