@@ -291,7 +291,7 @@ Each golden fixture should include inputs, expected dimensions, camera matrices,
 These are proposed tasks, not code changes already completed.
 
 - [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
-- [ ] **BRF-02 (P0, IN PROGRESS):** Shared candidate evidence manifest is implemented in Draft PR #188; exact-head CI is running after fixing a confidence/evidence test-fixture contradiction. Do not mark complete until all CI checks pass.
+- [x] **BRF-02 (P0, COMPLETE):** Shared candidate evidence manifest implemented in Draft PR #188; exact-head CI #40347926520 passed with 132 successful workflow steps. Hash/path, camera provenance, confidence and publication-disabled gates are tested.
 - [ ] **BRF-03 (P0):** Capture manifest and input quality/coverage preflight.
 - [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
@@ -362,14 +362,15 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Next action:** begin **BRF-02 — shared candidate evidence manifest**, consolidating source/model/config/camera/reference/render hashes and confidence states into one versioned candidate evidence contract. Do not merge the stacked feature PR to `development`/`main` without review of the complete feature chain.
 
 
-### 2026-10-26 — BRF-02 Shared candidate evidence manifest (in progress)
+### 2026-10-26 — BRF-02 Shared candidate evidence manifest (complete)
 
 - **Branch:** `feat/brf-02-candidate-evidence-manifest`, stacked on `feat/brf-01-generic-renderer`.
-- **PR:** [#188 — shared building candidate evidence manifest](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/188) (Draft).
-- **Latest recorded head:** `21b0df2fc527f6e9adbe70f2918c9a690fa3cbd7`.
-- **Implemented:** shared schema normalizer + assessor in `src/core/building-generation/building-candidate-evidence-manifest.mjs`; 11 targeted tests; package script and full CI step; documentation at `docs/research/BUILDING-CANDIDATE-EVIDENCE-MANIFEST.md`.
+- **PR:** [#188 — shared building candidate evidence manifest](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/188) (Draft; not merged into development/main).
+- **Exact-head commit:** `21b0df2fc527f6e9adbe70f2918c9a690fa3cbd7`.
+- **Implemented:** `src/core/building-generation/building-candidate-evidence-manifest.mjs` provides normalization and assessment for a single candidate's evidence graph; `tests/building-candidate-evidence-manifest.test.mjs` has 11 regression tests; `package.json` and `.github/workflows/ci.yml` run them; contract documentation is at `docs/research/BUILDING-CANDIDATE-EVIDENCE-MANIFEST.md`.
 - **Contract coverage:** model/spec/config/report artifacts; capture/reference assets; camera calibration and frame alignment; independent dimensions with uncertainty and ground control; 13-view render set; QA/comparison/accuracy/release-report bindings to the exact candidate hash; confidence-to-artifact provenance; explicit missing evidence; safe paths and actual byte integrity.
-- **Hardening added:** evidence tier A/B now requires actual artifact-file path, SHA-256 and byte count to be checked. Declared metadata alone cannot earn the highest tier. Publication is always disabled.
-- **Failure found and fixed:** run `40345789120` surfaced an inconsistent fixture (estimated dimensions still labelled `measured`). The incomplete-state fixture is now consistent, and another test asserts that contradictory measured-confidence fails closed. The candidate-evidence test step passed in run `40346846654` before that run was cancelled after a later commit; latest test changes include the tier integrity guard.
-- **Current exact-head CI:** [run #40347926520](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40347926520) for `21b0df2fc527f6e9adbe70f2918c9a690fa3cbd7` is pending/queued at the latest check. **BRF-02 remains in progress** until this exact head receives a terminal successful CI result.
-- **Next action:** inspect run `40347926520`. Fix any failed test on the same feature branch, rerun exact-head CI and update this log with the terminal result. Only after green should BRF-02 be marked complete; next task is **BRF-03 — capture manifest and input quality/coverage preflight**.
+- **Hardening:** evidence tier A/B requires verification of the actual artifact path, SHA-256 and byte count. An unsupported measured-confidence claim fails; missing evidence stays incomplete; any report forces `publicationEligible: false`.
+- **Test correction:** run `40345789120` exposed an inconsistent fixture (estimated dimensions still labelled `measured`). The fixture was corrected and a regression test for contradictory confidence added.
+- **Exact-head CI:** [run #40347926520](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40347926520) — **success**, 132 successful workflow steps, zero failed steps.
+- **Scope caveat:** this is an evidence-linking contract. Hashes prove byte identity, not survey truth, photo identity, rights, or architectural accuracy. It does not create model geometry from photos or approve publication.
+- **Next action:** start **BRF-03 — capture manifest and input quality/coverage preflight**. Do not merge PR #188 through `development`/`main` until the full feature chain and review/evidence gates pass.
