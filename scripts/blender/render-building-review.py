@@ -25,8 +25,8 @@ def ensure_world(scene):
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is not None:
-        background.inputs["Color"].default_value = (0.38, 0.40, 0.43, 1.0)
-        background.inputs["Strength"].default_value = 0.7
+        background.inputs["Color"].default_value = (0.13, 0.15, 0.18, 1.0)
+        background.inputs["Strength"].default_value = 0.45
 
 def add_area_light(name, position, center, power, size):
     data = bpy.data.lights.new(name, type="AREA")
@@ -106,11 +106,38 @@ def main():
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+    # Keep site context in the source GLB, but hide it for model-detail review.
+    # Large Site_Ground / Site_River planes otherwise make the palace tiny.
+    site_context_meshes = [
+        obj for obj in imported_meshes
+        if obj.name.split(".")[0].startswith("Site_")
+    ]
+    for obj in site_context_meshes:
+        obj.hide_render = True
+    meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
+    if not meshes:
+        raise RuntimeError("The imported GLB has no palace meshes after excluding Site_ context nodes")
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
     ortho_scale = max_dimension * 1.45
+
+    # Match the real-world river-facing reference: the canonical front image is
+    # a detail view of Rangmahal, not a full-footprint view with the rear-set
+    # Andarmahal extension shifting the dome away from the centre of the frame.
+    rangmahal_review_names = {
+        "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+        "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
+    }
+    rangmahal_review_meshes = [
+        obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
+    ]
+    if not rangmahal_review_meshes:
+        raise RuntimeError("Could not find Rangmahal meshes for the focused front review view")
+    _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
+    rangmahal_camera_distance = max(rangmahal_dimensions) * 3.0
+    rangmahal_ortho_scale = max(rangmahal_dimensions) * 1.22
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -129,18 +156,25 @@ def main():
     scene.render.resolution_percentage = 100
     try:
         scene.view_settings.view_transform = "AgX"
+        scene.view_settings.look = "AgX - Medium High Contrast"
     except Exception:
         pass
     ensure_world(scene)
 
-    light_power = max(500.0, min(50000.0, max_dimension * max_dimension * 180.0))
-    light_size = max_dimension * 1.2
-    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * max_dimension, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * max_dimension, center, light_power * 0.45, light_size * 1.2)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * max_dimension, center, light_power * 0.65, light_size)
+    # Tune the inspection rig to retain the salmon facade, darker recesses and step shadows.
+    # Power remains dimension-scaled and clamped so render reviews stay deterministic.
+    light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
+    light_size = max_dimension * 0.68
+    light_offset = max_dimension * 0.65
+    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
     views = [
-        ("front", Vector((0.0, -1.0, 0.0)), "ORTHO"),
+        # Low-angle (~8 degree) south-elevation camera prioritizes the facade.
+        # The previous 20 degree view exposed too much flat roof deck and visually masked the upper arcade.
+        # The stair run itself slopes steeply enough for its tread rhythm to remain visible.
+        ("front", Vector((0.0, -0.990268, 0.139173)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
@@ -157,27 +191,39 @@ def main():
     raw_views = []
     for view_id, direction, camera_type in views:
         direction.normalize()
+        view_center = rangmahal_center if view_id == "front" else center
+        view_distance = rangmahal_camera_distance if view_id == "front" else camera_distance
+        view_scale = rangmahal_ortho_scale if view_id == "front" else ortho_scale
+        view_framing = "rangmahal-south-facade" if view_id == "front" else "whole-model"
         camera_data = bpy.data.cameras.new("ReviewCamera_" + view_id)
         camera = bpy.data.objects.new("ReviewCamera_" + view_id, camera_data)
         scene.collection.objects.link(camera)
         camera_data.type = camera_type
-        camera_data.ortho_scale = ortho_scale
-        camera.location = center + direction * camera_distance
-        camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        camera_data.ortho_scale = view_scale
+        camera.location = view_center + direction * view_distance
+        camera.rotation_euler = (view_center - camera.location).to_track_quat("-Z", "Y").to_euler()
         scene.camera = camera
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
         bpy.ops.render.render(write_still=True)
-        result = bpy.data.images.get("Render Result")
-        if result is None:
-            raise RuntimeError("Blender did not provide a render result for " + view_id)
-        stats = sample_pixel_statistics(result, resolution)
+        # Blender 4.x can release the headless Render Result pixel buffer
+        # after saving the PNG. Reload the saved file so statistics are based
+        # on the exact artifact whose SHA-256 is recorded by the Node runner.
+        rendered_path = os.path.join(output_dir, filename)
+        if not os.path.isfile(rendered_path):
+            raise RuntimeError("Blender reported success but the render file is missing: " + rendered_path)
+        result = bpy.data.images.load(rendered_path, check_existing=False)
+        try:
+            stats = sample_pixel_statistics(result, resolution)
+        finally:
+            bpy.data.images.remove(result)
         raw_views.append({
             "id": view_id,
             "filename": filename,
             "width": resolution,
             "height": resolution,
             "renderComplete": True,
+            "framing": view_framing,
             "pixelStatistics": stats,
         })
         bpy.data.objects.remove(camera, do_unlink=True)

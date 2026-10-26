@@ -82,6 +82,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       bytes: file.bytes,
       sha256: file.sha256.toLowerCase(),
       renderComplete: view.renderComplete === true,
+      framing: typeof view.framing === "string" ? view.framing : "whole-model",
       pixelStatistics: stats,
     });
   }

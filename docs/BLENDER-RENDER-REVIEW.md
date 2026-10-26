@@ -1,6 +1,6 @@
 # Multi-view Blender render review
 
-This stage renders a reviewed GLB to a repeatable set of inspection images. It creates five orthographic views (`front`, `back`, `left`, `right`, `top`) plus eight orthographic turntable views at 45-degree intervals. Because a GLB does not intrinsically label the real-world front facade or true north, the view names are Blender-world axes after import, not verified architectural directions.
+This stage renders a reviewed GLB to a repeatable set of inspection images. Imported mesh names beginning with Site_ are hidden only during these renders, so large contextual ground/river planes and nearby illustrative buildings do not shrink the palace in the review frame. Those nodes remain in the source GLB and are not deleted or modified. The `front` view is a slightly elevated, specially framed review of Rangmahal's river-facing facade (central dome, triple-arch portico, and visible stair tread surfaces); the other 12 views frame the whole architectural model, including Andarmahal. These are review-camera targets, not a claim that a rendered axis label proves true north or geographic orientation.
 
 ## Prerequisites
 
