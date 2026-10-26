@@ -231,6 +231,14 @@ jobs:
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
         run: npm run test:mask-guided-building-sketches
+      - name: Test labelled segmentation benchmark, held-out split and class metrics
+        run: npm run test:building-segmentation-benchmark
+      - name: Test source-bound semantic mask provider and reviewed fallback
+        run: npm run test:building-mask-provider
+      - name: Test evidence-linked architectural observation schema and review history
+        run: npm run test:architectural-observation-schema
+      - name: Test bounded per-view feature proposals and reviewed comparison
+        run: npm run test:architectural-feature-proposals
 
       - name: Test bounded wireframe QA and safe repair passes
         run: npm run test:wireframe-qa-repair-passes

@@ -4,7 +4,7 @@
 **Version:** 1.0  
 **Date:** 26 October 2026  
 **Branch target:** `rakibul-hasan` first; review through `development`; merge to `main` only after required checks and evidence pass  
-**Status:** Backlog decomposition only — no engine implementation is included in this commit  
+**Status:** M05–M08 implementation candidate is in `feat/m05-m08-segmentation-features`; contract, evaluator CLI, reviewed-mask gate, observation schema and proposal overlay are implemented with synthetic regression fixtures. Real labelled-building pilot acceptance remains incomplete.  
 **Parent plan:** [Building Accuracy Upgrade Plan](./BUILDING-ACCURACY-UPGRADE-PLAN.md)
 
 ## Purpose and sizing rule
@@ -12,6 +12,14 @@
 This document turns the approved building-accuracy plan into bounded engineering tasks. Each item is intended to be one reviewable PR with one main deliverable, specific tests, and inspectable evidence. “M” means medium scope; it is a planning size, not a verified duration estimate. If a task needs a new model-training project, broad refactor, or multiple independent deliverables, split it before implementation.
 
 **Do not rebuild existing tools by default.** The repository already has media intake, BuildingSpec validation, procedural GLB generation, COLMAP, image preflight, mask-guided sketches, calibrated wireframe triangulation, mesh and texture QA, 13-view rendering, render-reference review, correction-task handoff, dimension/GCP checks, an accuracy evidence pack, and release-readiness tooling. Each task must extend or connect those components where possible.
+
+## Current implementation boundary — Batch B (M05–M08)
+
+- M05 benchmark manifest/evaluator and the RGB class palette are implemented, including capture-group split-leakage rejection, actual file hash/dimension verification in the CLI, per-image/per-class metrics and held-out summaries. No candidate model was trained or automatically selected.
+- M06 source-bound binary-mask validation and reviewed manual fallback are implemented. Edge maps are rejected as semantic masks; pending/rejected masks cannot feed feature extraction.
+- M07 versioned source/view-bound observations, pixel-geometry checks, distinct visibility states and append-only review history are implemented.
+- M08 bounded, deterministic mask/edge heuristics, a per-category metric helper, and source-image overlay CLI are implemented. Proposals are explicitly not ground truth.
+- **Still required before the acceptance criteria can be checked off:** permissioned real Dhaka imagery, independently reviewed segmentation labels, held-out candidates, real per-class failure review, reviewed feature labels and human inspection of source-overlay artifacts. The current synthetic fixtures establish tooling behavior only; they do not establish model quality or architectural accuracy.
 
 ## Non-negotiable implementation rules
 
