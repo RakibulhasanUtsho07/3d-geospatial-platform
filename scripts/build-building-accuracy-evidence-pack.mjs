@@ -162,54 +162,61 @@ export function evaluateCaptureManifestBindings({ buildingId, manifest, captureR
 
   const bindAssets = (declared, purpose, checkId) => {
     const captured = Array.isArray(manifest.sources) ? manifest.sources.filter((item) => item?.purpose === purpose) : [];
-    let mismatch = false;
-    const compare = (asset) => {
+    let failed = false, incomplete = false;
+    for (const asset of declared) {
       const src = captured.find((item) => item.id === asset.id);
-      if (!src) return false;
+      if (!src) { failed = true; continue; }
+      const required = [src.path, src.sha256, src.bytes, src.side, src.sourceId, src.rights?.status,
+        src.rights?.evidenceId, src.rights?.reviewedBy, src.rights?.reviewedAt,
+        asset.path, asset.sha256, asset.bytes, asset.side, asset.sourceId, asset.rightsStatus,
+        asset.rightsEvidenceId, asset.verifiedBy, asset.verifiedAt];
+      if (required.some((value) => value === undefined || value === null || value === "")) {
+        incomplete = true; continue;
+      }
       const kindMatches = purpose !== "capture" || src.kind === asset.kind ||
         (src.kind === "video-frame" && ["photo", "video"].includes(asset.kind));
-      return kindMatches && normalizedPath(src.path) === normalizedPath(asset.path) &&
-        typeof src.sha256 === "string" && src.sha256.toLowerCase() === asset.sha256.toLowerCase() &&
-        src.bytes === asset.bytes && src.side === asset.side &&
-        src.sourceId === asset.sourceId && src.rights?.status === asset.rightsStatus &&
-        src.rights?.evidenceId === asset.rightsEvidenceId &&
-        src.rights?.reviewedBy === asset.verifiedBy &&
-        matchingDate(src.rights?.reviewedAt, asset.verifiedAt);
-    };
-    const rowsMatch = declared.every(compare);
+      const matches = kindMatches && normalizedPath(src.path) === normalizedPath(asset.path) &&
+        src.sha256.toLowerCase() === asset.sha256.toLowerCase() && src.bytes === asset.bytes && src.side === asset.side &&
+        src.sourceId === asset.sourceId && src.rights.status === asset.rightsStatus &&
+        src.rights.evidenceId === asset.rightsEvidenceId && src.rights.reviewedBy === asset.verifiedBy &&
+        matchingDate(src.rights.reviewedAt, asset.verifiedAt);
+      if (!matches) failed = true;
+    }
     const declaredIds = new Set(declared.map((item) => item.id));
     const manifestIds = new Set(captured.map((item) => item.id));
-    const sameCoverage = declaredIds.size === manifestIds.size &&
-      [...manifestIds].every((id) => declaredIds.has(id));
-    mismatch = !rowsMatch || !sameCoverage;
-    add(checkId, mismatch ? "failed" : "passed",
-      mismatch ? "A declared evidence-pack asset is missing from or differs from the capture manifest." :
-        "Every declared asset is bound by ID, path, hash, bytes, side and rights-review provenance.");
+    if ([...declaredIds].some((id) => !manifestIds.has(id))) failed = true;
+    if ([...manifestIds].some((id) => !declaredIds.has(id))) incomplete = true;
+    const status = failed ? "failed" : incomplete ? "warning" : "passed";
+    add(checkId, status,
+      failed ? "A declared evidence-pack asset conflicts with the capture manifest." :
+        incomplete ? "Some capture-manifest assets or required binding fields are absent from the evidence pack." :
+          "Every declared asset is bound by ID, path, hash, bytes, side and rights-review provenance.");
   };
   bindAssets(sourceMedia, "capture", "capture-assets-bound");
   bindAssets(referenceImages, "reference", "reference-assets-bound");
 
-  if (!dimensionReference || !manifest.measurements?.length) {
+  if (!dimensionReference || !Array.isArray(manifest.measurements) || !manifest.measurements.length) {
     add("dimension-measurements-bound", "warning", "Independent dimension records or benchmark dimension config are missing.");
   } else {
     const configured = dimensionReference.referenceDimensionsM ?? {};
     const evidence = dimensionReference.evidence ?? {};
     const byAxis = new Map(manifest.measurements.map((item) => [item.axis, item]));
-    let missing = false, mismatch = false;
+    let missing = !nonEmpty(evidence.basis) || !nonEmpty(evidence.referenceId), mismatch = false;
     for (const axis of ["x", "y", "z"]) {
       const item = byAxis.get(axis);
-      if (!item || !Number.isFinite(item.valueM) || !Number.isFinite(item.uncertaintyM)) {
+      if (!item || !Number.isFinite(item.valueM) || !Number.isFinite(item.uncertaintyM) ||
+          !nonEmpty(item.sourceId) || !nonEmpty(item.evidenceId) || !nonEmpty(item.basis)) {
         missing = true; continue;
       }
       if (!Number.isFinite(configured[axis])) { missing = true; continue; }
       if (Math.abs(configured[axis] - item.valueM) > item.uncertaintyM + 1e-3) mismatch = true;
       if (item.basis !== evidence.basis) mismatch = true;
-      if (!(item.sourceId === evidence.referenceId || item.evidenceId === evidence.referenceId)) mismatch = true;
+      if (nonEmpty(evidence.referenceId) && !(item.sourceId === evidence.referenceId || item.evidenceId === evidence.referenceId)) mismatch = true;
     }
     const status = mismatch ? "failed" : missing ? "warning" : "passed";
     add("dimension-measurements-bound", status,
       mismatch ? "Benchmark dimensions/basis/reference ID differ from the independent capture-manifest measurements." :
-        missing ? "One or more axis dimensions are missing and cannot be bound." :
+        missing ? "One or more axis dimensions or evidence references are missing and cannot be bound." :
           "Benchmark dimensions match the independently evidenced x/y/z measurements within recorded uncertainty.");
   }
 
@@ -218,18 +225,23 @@ export function evaluateCaptureManifestBindings({ buildingId, manifest, captureR
       manifest.controlPoints.length < 3) {
     add("ground-control-bound", "warning", "At least three configured and documented ground-control points are needed for binding.");
   } else {
-    const everyPointMatches = configuredControls.every((item) => {
+    let missing = false, mismatch = false;
+    for (const item of configuredControls) {
       const source = manifest.controlPoints.find((candidate) => candidate.id === item.id);
+      if (!source || source.status !== "verified" || !nonEmpty(source.sourceId) || !nonEmpty(source.evidenceId) ||
+          !nonEmpty(item.evidenceSourceId ?? item.sourceId) || !Number.isFinite(item.longitude) || !Number.isFinite(item.latitude)) {
+        missing = true; continue;
+      }
       const linkedSourceId = item.evidenceSourceId ?? item.sourceId;
-      return source && source.status === "verified" &&
-        Number.isFinite(item.longitude) && Number.isFinite(item.latitude) &&
-        Math.abs(source.longitude - item.longitude) <= 1e-8 &&
-        Math.abs(source.latitude - item.latitude) <= 1e-8 &&
-        (linkedSourceId === source.sourceId || linkedSourceId === source.evidenceId);
-    });
-    add("ground-control-bound", everyPointMatches ? "passed" : "failed",
-      everyPointMatches ? "Configured WGS84 control points match the verified capture-manifest IDs and evidence sources." :
-        "A configured control point has an ID, coordinate or evidence-source mismatch against the capture manifest.");
+      if (Math.abs(source.longitude - item.longitude) > 1e-8 ||
+          Math.abs(source.latitude - item.latitude) > 1e-8 ||
+          (linkedSourceId !== source.sourceId && linkedSourceId !== source.evidenceId)) mismatch = true;
+    }
+    const status = mismatch ? "failed" : missing ? "warning" : "passed";
+    add("ground-control-bound", status,
+      mismatch ? "A configured control point conflicts with the documented survey coordinates or evidence source." :
+        missing ? "One or more configured control points are incomplete or not fully verified." :
+          "Configured WGS84 control points match the verified capture-manifest IDs and evidence sources.");
   }
 
   const status = checks.some((item) => item.status === "failed") ? "failed" :
