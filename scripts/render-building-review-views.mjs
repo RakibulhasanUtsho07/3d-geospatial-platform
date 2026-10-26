@@ -217,6 +217,7 @@ async function main() {
           const dimensions = pngDimensions(bytes, "source-camera.png");
           renderFile = {
             filename: "source-camera.png", ...dimensions, bytes: bytes.length, sha256: sha256(bytes),
+            pixelStatistics: sourceCameraView.pixelStatistics,
           };
         }
       }
