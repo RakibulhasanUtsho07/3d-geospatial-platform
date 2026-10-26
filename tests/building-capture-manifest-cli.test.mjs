@@ -184,3 +184,18 @@ test("image-quality preflight fails when declared camera image dimensions contra
   assert.equal(report.status, "failed");
   assert.ok(report.inputQuality.results.find((item) => item.sourceId === "capture-front").warnings.includes("declared-camera-image-dimensions-mismatch"));
 });
+
+test("missing image path remains incomplete instead of a contradictory-evidence failure", async (t) => {
+  const data = await fixture(t);
+  data.manifest.sources.find((item) => item.id === "capture-front").path = null;
+  const manifestBytes = Buffer.from(JSON.stringify(data.manifest, null, 2) + "\n");
+  await writeFile(path.join(data.root, "capture-manifest.json"), manifestBytes);
+  const report = await validateBuildingCaptureManifestFile({
+    manifestPath: "capture-manifest.json", rootDir: data.root,
+    expectedSha256: sha256(manifestBytes), spawnImpl: mockFfmpegSpawn,
+  });
+  assert.equal(report.status, "incomplete");
+  assert.equal(report.readyForModelReview, false);
+  assert.ok(report.inputQuality.results.find((item) => item.sourceId === "capture-front").warnings.includes("quality-analysis-unavailable"));
+  assert.ok(report.checks.some((check) => check.id === "capture-image-quality-preflight" && check.status === "warning"));
+});
