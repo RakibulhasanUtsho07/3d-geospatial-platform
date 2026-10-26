@@ -131,7 +131,15 @@ def main():
     camera_data.shift_x = float(camera_plan["shiftX"])
     camera_data.shift_y = float(camera_plan["shiftY"])
     camera_data.clip_start = max(extent * 1e-6, 1e-4)
-    camera_data.clip_end = max(extent * 100.0, 100.0)
+    camera_location = Vector(camera_plan["location"])
+    bounds_corners = [
+        Vector((x, y, z))
+        for x in (minimum.x, maximum.x)
+        for y in (minimum.y, maximum.y)
+        for z in (minimum.z, maximum.z)
+    ]
+    farthest_model_corner = max((corner - camera_location).length for corner in bounds_corners)
+    camera_data.clip_end = max(extent * 100.0, farthest_model_corner * 1.1 + extent, 100.0)
     camera_obj = bpy.data.objects.new("CalibratedSourceCamera", camera_data)
     scene.collection.objects.link(camera_obj)
     camera_obj.location = Vector(camera_plan["location"])
