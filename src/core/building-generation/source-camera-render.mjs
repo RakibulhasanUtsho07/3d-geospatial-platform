@@ -96,6 +96,10 @@ export function prepareSourceCameraRender({ cameraEvidence, sourceImage, modelCo
 
   const { width, height } = imageSize;
   const { fx, fy, cx, cy } = camera.intrinsics;
+  let pixelAspectX = 1, pixelAspectY = 1;
+  if (fx > fy) pixelAspectY = fx / fy;
+  else if (fx < fy) pixelAspectX = fy / fx;
+  const pixelAspectRatio = pixelAspectY / pixelAspectX;
   const rotation = pose.rotation.map((row) => [row[0], -row[1], -row[2]]);
   const renderPlan = {
     schemaVersion: "1.0.0",
@@ -119,11 +123,11 @@ export function prepareSourceCameraRender({ cameraEvidence, sourceImage, modelCo
       lensMm: fx * 36 / width,
       sensorWidthMm: 36,
       sensorFit: "HORIZONTAL",
-      pixelAspectX: 1,
-      pixelAspectY: fx / fy,
-      // Blender shifts are normalized by image width; principal point is in pixel-centre coordinates.
-      shiftX: (width / 2 - cx) / width,
-      shiftY: (cy - height / 2) / width,
+      pixelAspectX,
+      pixelAspectY,
+      // Pixel-centre principal point to Blender shift; the view factor is image width for HORIZONTAL fit.
+      shiftX: ((width - 1) / 2 - cx) / width,
+      shiftY: ((cy - (height - 1) / 2) / width) * pixelAspectRatio,
       imageWidth: width,
       imageHeight: height,
     },
