@@ -245,12 +245,20 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const captureCoverage = validCaptures.length >= 4 && ["front", "back", "left", "right"].every((side) => captureSides.has(side));
   add("capture-source-coverage-and-rights", captureCoverage,
     "At least four hash-declared capture assets must cover front/back/left/right and have reviewed rights evidence.");
+  const validCaptureHashes = validCaptures.map((source) => source.sha256.toLowerCase());
+  const duplicateCaptureBytes = new Set(validCaptureHashes).size !== validCaptureHashes.length;
+  add("capture-source-byte-uniqueness", validCaptureHashes.length > 0 && !duplicateCaptureBytes,
+    "Byte-identical capture files cannot count as independent facade views.", duplicateCaptureBytes);
   const validReferences = references.filter((source) => sourceBytesOk(source) && rightsOk(source));
   const referenceSides = new Set(validReferences.map((source) => source.side));
   const referenceCoverage = validReferences.length >= 4 && ["front", "back", "left", "right"].every((side) => referenceSides.has(side));
   add("independent-reference-coverage-and-rights", referenceCoverage,
     "At least four independent reference assets must cover front/back/left/right and retain rights/source provenance.");
   const captureHashes = new Set(captured.filter((source) => hashOk(source.sha256)).map((source) => source.sha256.toLowerCase()));
+  const duplicateReferenceHashes = validReferences.map((source) => source.sha256);
+  const duplicateReferenceFiles = new Set(duplicateReferenceHashes).size !== duplicateReferenceHashes.length;
+  add("reference-source-byte-uniqueness", validReferences.length > 0 && !duplicateReferenceFiles,
+    "Byte-identical references cannot be counted as separate independent views.", duplicateReferenceFiles);
   const duplicateReferenceBytes = validReferences.some((source) => captureHashes.has(source.sha256));
   add("reference-bytes-independent-from-captures", validReferences.length > 0 && !duplicateReferenceBytes,
     "Reference images must not be byte-identical to the reconstruction capture images; shared bytes are not independent validation.",
