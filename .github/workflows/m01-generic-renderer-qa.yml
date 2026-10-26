@@ -70,7 +70,7 @@ jobs:
         run: |
           blender --background --factory-startup --python-exit-code 17 --python scripts/blender/test-source-camera-projection.py -- --camera-manifest tests/fixtures/source-camera-projection.json --tolerance-px 3
       - name: Prepare source-camera end-to-end fixture
-        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture
+        run: python3 scripts/blender/prepare-source-camera-fixture.py artifacts/m13-source-camera-fixture data/heritage/generated/bangabhaban-candidate.report.json
       - name: Prepare artifact output directory
         run: mkdir -p artifacts
       - name: Render fixed 13-view set with bounded execution
@@ -138,6 +138,12 @@ jobs:
           assert.equal(cameraReport.render.height, 480);
           assert.equal(cameraReport.render.sha256, hash(cameraPng), "source-camera render hash must match exact PNG bytes");
           assert.equal(cameraReport.render.bytes, cameraPng.length);
+          assert.ok(cameraReport.render.pixelStatistics.sampledPixels > 0,
+            "source-camera render must include sampled image content metrics");
+          assert.ok(cameraReport.render.pixelStatistics.luminanceStandardDeviation >= 0.01,
+            "source-camera render must contain visible geometry, not a uniform background");
+          assert.ok(cameraReport.render.pixelStatistics.transparentRatio <= 0.98,
+            "source-camera render must not be nearly entirely transparent");
           console.log(JSON.stringify({ status: manifest.status, valid: manifest.valid,
             modelSha256: manifest.modelSha256, renderManifestSha256: hash(manifestBytes),
             views: manifest.views.length, genericFront: true,
