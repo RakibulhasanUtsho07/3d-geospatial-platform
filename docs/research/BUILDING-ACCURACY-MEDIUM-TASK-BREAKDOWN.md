@@ -4,7 +4,7 @@
 **Version:** 1.0  
 **Date:** 26 October 2026  
 **Branch target:** `rakibul-hasan` first; review through `development`; merge to `main` only after required checks and evidence pass  
-**Status:** M05–M08 implementation candidate is in `feat/m05-m08-segmentation-features`; contract, evaluator CLI, reviewed-mask gate, observation schema and proposal overlay are implemented with synthetic regression fixtures. Real labelled-building pilot acceptance remains incomplete.  
+**Status (26 October 2026):** M12 wireframe-to-mesh readiness gate is present in `rakibul-hasan`; M13 calibrated source-camera rendering is integrated via PR #191. Full CI for the newly consolidated source head `fb449b6f2d15a85cb1f5b5435bfbc4bdf1b5885b` is still validating. Real permissioned imagery, independently verified camera calibration/control points, verified dimensions and human-inspected outputs remain required; synthetic tests are not a real-building accuracy pass.  
 **Parent plan:** [Building Accuracy Upgrade Plan](./BUILDING-ACCURACY-UPGRADE-PLAN.md)
 
 ## Purpose and sizing rule
@@ -283,6 +283,8 @@ This is a dependency guide, not a claim that all tasks are already implemented. 
 - A test fixture with known camera parameters reproduces the declared projection within a configured, documented tolerance.
 - Render manifests store the source image hash, camera evidence ID, output dimensions, GLB hash and render hash.
 - Missing or inconsistent camera metadata fails the same-camera claim.
+
+**Implementation status (26 October 2026):** A separate source-camera runner (`scripts/render-building-source-camera.mjs` + `scripts/blender/render-building-source-camera.py`) and isolated calibrated render-plan contract (`src/core/building-generation/source-camera-render-plan.mjs`) are integrated. The plan, provenance and renderer wiring suites run with `npm run test:source-camera-render`. CI verifies contracts; a permissioned real reference image, independently checked calibration/control points and human-inspected overlays are still required for real-building review.
 
 **Verification:** Add fixed-camera render tests and inspect generated reference overlays; run `npm run test:render-review-manifest`.
 
