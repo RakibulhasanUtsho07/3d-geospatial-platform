@@ -1,0 +1,268 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ahsan-manzil-dhaka-reference-pack",
+  "building": {
+    "name": "Ahsan Manzil (Pink Palace)",
+    "aliases": [
+      "Ahsan Manjil",
+      "আহসান মঞ্জিল"
+    ],
+    "city": "Dhaka",
+    "country": "Bangladesh",
+    "approximateCoordinates": {
+      "latitude": 23.7086,
+      "longitude": 90.40606,
+      "confidence": "[C]",
+      "basis": "Historic-building site vicinity supported by Wikimedia photo metadata; not an independently surveyed building-centroid measurement."
+    }
+  },
+  "purpose": "Reproducible, rights-documented reference intake for P3.3 Ahsan Manzil reconstruction review, including an unrectified aerial view for qualitative roof-plane context.",
+  "reconstructionStatus": "reference-intake-only",
+  "geometryPolicy": {
+    "dimensions": {
+      "status": "published-reference-only",
+      "basis": "Published footprint dimensions in the existing parameter register conflict and are not independent surveyed control measurements.",
+      "mustNotInferFrom": "image pixel dimensions, perspective photographs, file camera coordinates, or visual estimates"
+    },
+    "footprint": {
+      "status": "not-traced",
+      "requirement": "Trace the building's actual footprint and reconcile Rangmahal/Andarmahal orientation before accepting map placement or whole-model massing."
+    },
+    "model": {
+      "status": "provisional-parametric-model",
+      "publicationEligible": false,
+      "reason": "The reference photos are not a calibrated photogrammetry set; independent surveyed dimensions/control points and geometry/texture QA acceptance remain outstanding."
+    }
+  },
+  "licensePolicy": "These reference images are licensed CC BY-SA 4.0. Preserve creator attribution, link the license, disclose any changes, and comply with share-alike terms for redistributed/adapted material. This metadata file does not grant any rights beyond the individual source licenses.",
+  "sources": [
+    {
+      "id": "licensed-front-2018",
+      "kind": "image",
+      "viewRole": "south-front-elevation",
+      "title": "Front view of Ahsan Manzil.jpg",
+      "url": "https://commons.wikimedia.org/wiki/File:Front_view_of_Ahsan_Manzil.jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Front_view_of_Ahsan_Manzil.jpg",
+      "date": "2018-11-07",
+      "creator": "Sumonto.ck",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 4160,
+        "height": 3120
+      },
+      "expectedByteLength": 3223750,
+      "publishedSha1": "95d95db884582236a5c5298532dc155e8fbb9d67",
+      "sha256": null,
+      "downloaded": false,
+      "localFileName": "ahsan-manzil-front-2018.jpg",
+      "supports": [
+        "broad south-facing facade composition",
+        "central dome and upper pavilion silhouette",
+        "ceremonial stair and general arch rhythm"
+      ],
+      "notUsableFor": [
+        "independent dimension survey",
+        "survey-grade footprint",
+        "calibrated multi-view photogrammetry by itself",
+        "texture baking before projection and occlusion review"
+      ],
+      "viewAssessment": {
+        "viewpoint": "Nominal front elevation; perspective distortion and lens calibration are unknown.",
+        "reportedCameraCoordinates": {
+          "latitude": 23.708578,
+          "longitude": 90.406031,
+          "source": "Wikimedia Commons file-page metadata",
+          "confidence": "metadata-reported-not-surveyed"
+        },
+        "cameraCalibration": "unknown",
+        "occlusions": [
+          "landscaping and stair partly obscure lower facade details"
+        ],
+        "geometryUse": "Facade-proportion and broad massing comparison only.",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "multi-view photogrammetry",
+          "directly baking the full facade from this image"
+        ],
+        "assessedFrom": "Wikimedia Commons file-page metadata and preview; source bytes have not yet been downloaded or hashed locally."
+      }
+    },
+    {
+      "id": "licensed-side-2017",
+      "kind": "image",
+      "viewRole": "side-facade",
+      "title": "Ahsan Manzil (side).jpg",
+      "url": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_(side).jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Ahsan_Manzil_%28side%29.jpg",
+      "date": "2017-03-18",
+      "creator": "Mrpluto11",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 3096,
+        "height": 2322
+      },
+      "expectedByteLength": 1322192,
+      "publishedSha1": "82c310dd395aa0a595af523fd51ecbf66d926c46",
+      "sha256": null,
+      "downloaded": false,
+      "localFileName": "ahsan-manzil-side-2017.jpg",
+      "supports": [
+        "side facade bay repetition",
+        "facade depth and openings",
+        "roofline and corner transitions"
+      ],
+      "notUsableFor": [
+        "independent dimension survey",
+        "exact side elevation without rectification",
+        "calibrated multi-view photogrammetry by itself",
+        "texture baking without projection review"
+      ],
+      "viewAssessment": {
+        "viewpoint": "Side facade view; exact camera pose and lens parameters are unknown.",
+        "reportedCameraCoordinates": null,
+        "cameraCalibration": "unknown",
+        "occlusions": [
+          "perspective distortion and partial foreground/edge occlusion may affect apparent proportions"
+        ],
+        "geometryUse": "Side massing and facade rhythm comparison only.",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "exact orthographic elevation",
+          "multi-view photogrammetry"
+        ],
+        "assessedFrom": "Wikimedia Commons file-page metadata and preview; source bytes have not yet been downloaded or hashed locally."
+      }
+    },
+    {
+      "id": "licensed-oblique-2019",
+      "kind": "image",
+      "viewRole": "oblique-front-side",
+      "title": "Ahsan Manzil Side View.jpg",
+      "url": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_Side_View.jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Ahsan_Manzil_Side_View.jpg",
+      "date": "2019-11-01",
+      "creator": "Parvezahmed",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 4000,
+        "height": 3000
+      },
+      "expectedByteLength": 2808254,
+      "publishedSha1": "9b8ea70335c280a9dd4b9e9c3e87a03c20613711",
+      "sha256": null,
+      "downloaded": false,
+      "localFileName": "ahsan-manzil-oblique-2019.jpg",
+      "supports": [
+        "corner and side-to-front facade transition",
+        "dome and roofline relation",
+        "visible pilaster and louver detail"
+      ],
+      "notUsableFor": [
+        "independent dimension survey",
+        "single-view reconstruction of hidden facades",
+        "calibrated multi-view photogrammetry by itself",
+        "using occluded features as ground truth"
+      ],
+      "viewAssessment": {
+        "viewpoint": "Oblique front/side view; it shows architectural depth but is not rectified.",
+        "reportedCameraCoordinates": {
+          "latitude": 23.708196,
+          "longitude": 90.406732,
+          "source": "Wikimedia Commons file-page metadata",
+          "confidence": "metadata-reported-not-surveyed"
+        },
+        "cameraCalibration": "unknown",
+        "occlusions": [
+          "trees and landscaping occlude lower facade segments"
+        ],
+        "geometryUse": "Oblique massing and depth cues only.",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "camera-calibrated reconstruction",
+          "direct texture baking without view/occlusion masks"
+        ],
+        "assessedFrom": "Wikimedia Commons file-page metadata and preview; source bytes have not yet been downloaded or hashed locally."
+      }
+    },
+    {
+      "id": "licensed-aerial-2019",
+      "kind": "image",
+      "viewRole": "aerial-oblique-roof-plan",
+      "title": "Ahsan Manzil 01.jpg",
+      "url": "https://commons.wikimedia.org/wiki/File:Ahsan_Manzil_01.jpg",
+      "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Ahsan_Manzil_01.jpg",
+      "date": "2019-04-11",
+      "creator": "Azim Khan Ronnie",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "attributionRequired": true,
+      "modificationDisclosureRequired": true,
+      "dimensionsPixels": {
+        "width": 5464,
+        "height": 3640
+      },
+      "expectedByteLength": 7908613,
+      "publishedSha1": "6f2913594f7db0b04fc8b480442d0694c41dfb9f",
+      "sha256": null,
+      "downloaded": false,
+      "localFileName": "ahsan-manzil-aerial-2019-1280.jpg",
+      "supports": [
+        "qualitative roof-plane segmentation and roof tone",
+        "relative arrangement of front stair, central dome and side wings",
+        "broad stepped footprint and roof-section relationships"
+      ],
+      "notUsableFor": [
+        "independent dimension survey",
+        "survey-grade or orthographic footprint",
+        "true roof-plane dimensions without aerial-camera calibration and orthorectification",
+        "texture baking or facade projection without per-pixel camera calibration",
+        "exact facade heights or hidden surfaces"
+      ],
+      "viewAssessment": {
+        "viewpoint": "Oblique aerial/drone view with the building roof visible; it is not a nadir orthophoto.",
+        "reportedCameraCoordinates": {
+          "latitude": 23.707567,
+          "longitude": 90.405646,
+          "altitudeAboveSeaLevelM": 57,
+          "source": "Wikimedia Commons file-page metadata",
+          "confidence": "metadata-reported-not-surveyed"
+        },
+        "cameraCalibration": "unknown",
+        "occlusions": [
+          "surrounding trees, adjacent buildings and perspective distortion affect visible roof edges"
+        ],
+        "geometryUse": "Qualitative roof-plane segmentation and broad stepped-massing comparison only; no scale or angles are derived from the image.",
+        "notSufficientFor": [
+          "survey-grade dimensions",
+          "orthographic roof plan or traced footprint",
+          "camera-calibrated photogrammetry by itself",
+          "direct texture projection or atlas baking"
+        ],
+        "assessedFrom": "Wikimedia Commons file-page metadata and the unrectified aerial preview; original file metadata records the published SHA-1 and byte length, while the downloaded 1280×853 Wikimedia thumbnail is independently checked for JPEG format and dimensions and receives its own computed SHA-256."
+      },
+      "downloadMode": "thumbnail",
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/Ahsan_Manzil_01.jpg/1280px-Ahsan_Manzil_01.jpg",
+      "expectedDownloadDimensions": {
+        "width": 1280,
+        "height": 853
+      }
+    }
+  ],
+  "acceptanceGates": [
+    "For original-mode sources, bytes must match published byte length and SHA-1. The explicitly marked aerial thumbnail mode instead validates the fixed thumb.wikimedia.org URL, JPEG format and 1280×853 dimensions, computes a local SHA-256 for the downloaded derivative, and keeps original-file SHA-1/size metadata separate.",
+    "Compute and store SHA-256 locally for every downloaded source file and include the attribution/license metadata in the same artifact.",
+    "The source photo set supports manual facade/massing review only; camera calibration and independent surveyed dimensions remain unknown.",
+    "Any texture projection must record camera pose, visible-pixel mask, occlusion policy and source-image attribution.",
+    "Do not mark architectural fidelity or release readiness as passed from a successful CI run, a valid GLB, or a three-photo reference pack alone.",
+    "The 2019 aerial image is an unrectified oblique view: use it only for qualitative roof-plane and stepped-massing review; do not infer scale, surveyed dimensions, or UV projection from it."
+  ]
+}

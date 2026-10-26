@@ -32,7 +32,7 @@ import {
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
-const WORKFLOW_VERSION = "architectural-geometry-rasterized-texture-visibility-v5";
+const WORKFLOW_VERSION = "architectural-geometry-correspondence-consensus-v6";
 const ATLAS_SCRIPT = fileURLToPath(new URL("../../../scripts/build-texture-atlas.mjs", import.meta.url));
 const RENDER_SCRIPT = fileURLToPath(new URL("../../../scripts/render-building-review-views.mjs", import.meta.url));
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
@@ -431,6 +431,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
         },
         outputs: {
           status: wireframe.status,
+          qualityStatus: wireframe.qualityStatus ?? wireframe.status,
+          reviewRequiredFeatureCount: wireframe.reviewRequiredFeatureCount ?? 0,
           cameraCount: wireframe.cameraCount,
           inputFeatureCount: wireframe.inputFeatureCount,
           triangulatedVertexCount: wireframe.triangulatedVertexCount,
@@ -1027,7 +1029,13 @@ export async function runArchitecturalGeometryWorkflow(options) {
       const glbResult = glbExport.artifact.payload;
       const glbQa = glbValidationPayload.report;
       const blockers = [];
-      if (wireframe.status !== "candidate-wireframe" || wireframe.issues.length) blockers.push("multi-view-registration-needs-review");
+      const blockingRegistrationIssues = wireframe.issues.filter((issue) => !(
+        issue.type === "correspondence-review-required" &&
+        issue.reason === "insufficient-views-for-outlier-rejection"
+      ));
+      if (wireframe.status !== "candidate-wireframe" || blockingRegistrationIssues.length) {
+        blockers.push("multi-view-registration-needs-review");
+      }
       if (!wireframe.vertices.length) blockers.push("no-triangulated-vertices");
       if (qaReport.status !== "qa-clean") blockers.push("wireframe-qa-needs-review");
       if (qaReport.repairs.length) blockers.push("wireframe-safe-repairs-were-applied");
@@ -1083,6 +1091,8 @@ export async function runArchitecturalGeometryWorkflow(options) {
         },
         checks: {
           registrationStatus: wireframe.status,
+          registrationQualityStatus: wireframe.qualityStatus ?? wireframe.status,
+          registrationReviewRequiredFeatureCount: wireframe.reviewRequiredFeatureCount ?? 0,
           registrationIssueCount: wireframe.issues.length,
           triangulatedVertexCount: wireframe.triangulatedVertexCount,
           wireframeQaStatus: qaReport.status,

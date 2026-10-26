@@ -1,0 +1,53 @@
+name: P3.3 Ahsan Manzil licensed reference intake
+
+on:
+  push:
+    branches:
+      - rakibul-hasan
+    paths:
+      - 'data/heritage/ahsan-manzil-reference-sources.json'
+      - 'src/core/building-generation/heritage-reference-registry.mjs'
+      - 'scripts/prepare-ahsan-manzil-reference-bundle.mjs'
+      - 'tests/heritage-reference-registry.test.mjs'
+      - '.github/workflows/p3-3-ahsan-reference-intake.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-3-ahsan-reference-intake-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-reference-bundle:
+    name: Validate sources and capture licensed images
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out reference registry
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate reference source registry
+        run: node --test tests/heritage-reference-registry.test.mjs
+
+      - name: Download, hash and verify original reference files
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: node scripts/prepare-ahsan-manzil-reference-bundle.mjs data/heritage/ahsan-manzil-reference-sources.json artifacts/p3-3-reference-bundle
+
+      - name: Upload reference evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahsan-manzil-p3-3-licensed-reference-bundle
+          path: artifacts/p3-3-reference-bundle/
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,115 @@
+name: Bangabhaban model candidate
+on:
+  push:
+    branches:
+      - rakibul-hasan
+    paths:
+      - ".github/workflows/bangabhaban-model-candidate.yml"
+      - "src/core/building-generation/building-spec.mjs"
+      - "src/core/building-generation/procedural-glb.mjs"
+      - "scripts/build-bangabhaban-model-candidate.mjs"
+      - "data/heritage/bangabhaban-building-spec.json"
+      - "tests/bangabhaban-generation.test.mjs"
+permissions:
+  contents: write
+concurrency:
+  group: bangabhaban-model-candidate-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate model through the repository engine
+        run: node scripts/build-bangabhaban-model-candidate.mjs
+      - name: Validate model and candidate gates
+        run: node --test tests/bangabhaban-generation.test.mjs tests/glb-geometry-qa.test.mjs
+      - name: Install Blender and contact-sheet dependencies
+        run: |
+          sudo apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends blender python3-pil python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+      - name: Fetch and hash-check a licensed Bangabhaban exterior reference
+        run: node scripts/fetch-bangabhaban-reference.mjs artifacts/bangabhaban-reference
+      - name: Render 13 deterministic views of the exact candidate GLB
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/bangabhaban-render-review --resolution=1024 --blender=blender
+          cp data/heritage/generated/bangabhaban-candidate.report.json artifacts/bangabhaban-render-review/candidate-report.json
+          mkdir -p artifacts/bangabhaban-render-review/reference-pack
+          cp -R artifacts/bangabhaban-reference/. artifacts/bangabhaban-render-review/reference-pack/
+      - name: Build labeled 13-view contact sheet
+        run: |
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          root = Path("artifacts/bangabhaban-render-review")
+          views = ["front", "back", "left", "right", "top"] + ["turntable-" + str(a).zfill(3) for a in range(0, 360, 45)]
+          thumb, label_h, cols = 256, 28, 4
+          rows = (len(views) + cols - 1) // cols
+          sheet = Image.new("RGB", (cols * thumb, rows * (thumb + label_h)), (242, 238, 232))
+          draw = ImageDraw.Draw(sheet)
+          for i, view_id in enumerate(views):
+              with Image.open(root / (view_id + ".png")) as source:
+                  image = source.convert("RGB").resize((thumb, thumb), Image.Resampling.LANCZOS)
+              x, y = (i % cols) * thumb, (i // cols) * (thumb + label_h)
+              sheet.paste(image, (x, y))
+              draw.text((x + 8, y + thumb + 6), view_id, fill=(30, 30, 30))
+          sheet.save(root / "contact-sheet.png", optimize=True)
+          PY
+      - name: Verify the complete render-review manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const root = "artifacts/bangabhaban-render-review";
+          const manifest = JSON.parse(await readFile(root + "/render-review-manifest.json", "utf8"));
+          if (manifest.modelSha256 !== "a3d0c9c6dde5432c24efc95c2cf8035aefd6f285f72bc3e48f44681c03633cc6") {
+            // The model is regenerated after geometry fixes; compare the report and render hashes instead of trusting a stale pinned hash.
+            const report = JSON.parse(await readFile(root + "/candidate-report.json", "utf8"));
+            if (manifest.modelSha256 !== report.model.sha256) throw new Error("Rendered GLB hash does not match the candidate report.");
+          }
+          if (manifest.valid !== true || (manifest.views || []).length !== 13) {
+            throw new Error("13-view render manifest is invalid; status=" + manifest.status + ", views=" + (manifest.views || []).length);
+          }
+          const reference = JSON.parse(await readFile(root + "/reference-pack/bangabhaban-exterior-2017.manifest.json", "utf8"));
+          if (reference.verified !== true || !/^[a-f0-9]{64}$/.test(reference.computedSha256 || "")) {
+            throw new Error("Licensed exterior reference was not byte/hash verified.");
+          }
+          console.log(JSON.stringify({
+            modelSha256: manifest.modelSha256,
+            renderedViews: manifest.views.length,
+            renderValid: manifest.valid,
+            renderStatus: manifest.status,
+            referenceSha256: reference.computedSha256,
+            referenceVerified: reference.verified
+          }, null, 2));
+          NODE
+      - name: Upload generated model, reference, QA and 13-view evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bangabhaban-procedural-candidate-and-render-review
+          path: |
+            data/heritage/generated/bangabhaban-candidate.glb
+            data/heritage/generated/bangabhaban-candidate.report.json
+            artifacts/bangabhaban-render-review/**
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save generated candidate into this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/heritage/generated/bangabhaban-candidate.glb data/heritage/generated/bangabhaban-candidate.report.json
+          if git diff --cached --quiet; then
+            echo "Candidate assets are unchanged."
+            exit 0
+          fi
+          git commit -m "build: generate Bangabhaban candidate GLB"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -38,6 +38,10 @@ function building(buildingId, category, overrides = {}) {
       evidenceDescription: "Matched to a site record.", verifiedBy: "reviewer-a", verifiedAt: date },
     candidate: { path: "models/" + buildingId + ".glb", bytes: 40000, sha256: modelHash, expectedSha256: modelHash,
       geometryQa: { valid: true, status: "basic-geometry-check-passed", warnings: [] } },
+    captureManifestEvidence: { status: "ready-for-review", buildingId, manifestPath: "evidence/" + buildingId + "-capture.json",
+      manifestSha256: hash(91), expectedSha256Pinned: true, bindingsValid: true, bindingStatus: "passed",
+      checks: [{ id: "capture-assets-bound", status: "passed" }, { id: "dimension-measurements-bound", status: "passed" },
+        { id: "ground-control-bound", status: "passed" }] },
     sourceMedia, referenceImages, renderEvidence: { valid: true, modelSha256: modelHash,
       manifestSha256: manifestHash, expectedManifestSha256: manifestHash, views },
     renderReferenceReview: review, benchmarkReport,
@@ -93,6 +97,29 @@ test("stale render/model hashes and missing required views block the pack", () =
   assert.equal(result.status, "benchmark-failed");
   assert.ok(result.buildings[0].checks.some((entry) => entry.id === "fixed-camera-render-integrity"));
 });
+test("missing or unpinned capture-manifest evidence makes the pack incomplete", () => {
+  const missing = building("landmark", "complex-landmark");
+  delete missing.captureManifestEvidence;
+  const missingReport = assessBuildingAccuracyEvidencePack(pack([missing, building("house", "ordinary-low-rise")]));
+  assert.equal(missingReport.status, "benchmark-incomplete");
+  assert.ok(missingReport.buildings[0].checks.some((check) =>
+    check.id === "capture-manifest-and-independent-evidence-binding" && check.status === "warning"));
+
+  const unpinned = building("landmark", "complex-landmark");
+  unpinned.captureManifestEvidence.expectedSha256Pinned = false;
+  const unpinnedReport = assessBuildingAccuracyEvidencePack(pack([unpinned, building("house", "ordinary-low-rise")]));
+  assert.equal(unpinnedReport.status, "benchmark-incomplete");
+});
+
+test("capture-manifest identity or source-binding failures block the evidence pack", () => {
+  const item = building("landmark", "complex-landmark");
+  item.captureManifestEvidence.buildingId = "different-building";
+  const report = assessBuildingAccuracyEvidencePack(pack([item, building("house", "ordinary-low-rise")]));
+  assert.equal(report.status, "benchmark-failed");
+  assert.ok(report.buildings[0].checks.some((check) =>
+    check.id === "capture-manifest-and-independent-evidence-binding" && check.status === "failed"));
+});
+
 test("missing survey evidence is incomplete rather than a false accuracy pass", () => {
   const item = building("landmark", "complex-landmark");
   item.benchmarkReport.status = "benchmark-incomplete";
