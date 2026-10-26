@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Create synthetic-only source-camera inputs for the M13 renderer integration test."""
+"""Create synthetic-only source-camera inputs aligned to a candidate GLB for renderer QA."""
 import hashlib
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -16,13 +17,68 @@ def write_json(path, value):
     path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
+def camera_local_to_world(position, theta, x, y, depth):
+    """Transform a local point (x, y, -depth) by a camera rotated about world X."""
+    cosine = math.cos(theta)
+    sine = math.sin(theta)
+    return [
+        position[0] + x,
+        position[1] + cosine * y + sine * depth,
+        position[2] + sine * y - cosine * depth,
+    ]
+
+
 def main():
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: prepare-source-camera-fixture.py <new-output-directory>")
+    if len(sys.argv) != 3:
+        raise SystemExit(
+            "Usage: prepare-source-camera-fixture.py <new-output-directory> <candidate-report.json>"
+        )
     root = Path(sys.argv[1]).resolve()
+    report_path = Path(sys.argv[2]).resolve()
     root.mkdir(parents=True, exist_ok=False)
 
-    # A reproducible placeholder raster, not a real building photograph.
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    bounds = report.get("geometryQA", {}).get("bounds", {})
+    gltf_min = bounds.get("min")
+    gltf_max = bounds.get("max")
+    if not (
+        isinstance(gltf_min, list) and len(gltf_min) == 3
+        and isinstance(gltf_max, list) and len(gltf_max) == 3
+        and all(isinstance(v, (int, float)) and math.isfinite(v) for v in gltf_min + gltf_max)
+    ):
+        raise SystemExit("Candidate report is missing finite geometryQA.bounds min/max")
+
+    # The generated GLB is glTF Y-up; Blender imports it into Z-up:
+    # Blender X = glTF X, Blender Y = -glTF Z, Blender Z = glTF Y.
+    center = [
+        (gltf_min[0] + gltf_max[0]) / 2.0,
+        -(gltf_min[2] + gltf_max[2]) / 2.0,
+        (gltf_min[1] + gltf_max[1]) / 2.0,
+    ]
+    dimensions = [
+        gltf_max[0] - gltf_min[0],
+        gltf_max[2] - gltf_min[2],
+        gltf_max[1] - gltf_min[1],
+    ]
+    largest_dimension = max(dimensions)
+    if largest_dimension <= 0:
+        raise SystemExit("Candidate report has a zero-sized geometry bound")
+
+    # Point a synthetic camera from the model's south towards the measured bbox
+    # center. This is test-fixture setup only; it must not be used to calibrate
+    # or auto-fit a real source-photo camera.
+    camera_distance = largest_dimension * 1.6
+    camera_pitch = largest_dimension * 0.15
+    center_distance = math.hypot(camera_distance, camera_pitch)
+    theta = math.atan2(camera_distance, camera_pitch)
+    camera_position = [
+        center[0],
+        center[1] - camera_distance,
+        center[2] + camera_pitch,
+    ]
+    quaternion_wxyz = [math.cos(theta / 2.0), math.sin(theta / 2.0), 0.0, 0.0]
+
+    # A reproducible synthetic placeholder raster, not a real building photograph.
     image_path = root / "synthetic-source.png"
     image = Image.new("RGB", (640, 480), (225, 230, 236))
     draw = ImageDraw.Draw(image)
@@ -47,6 +103,9 @@ def main():
     })
 
     camera_path = root / "synthetic-source-camera.json"
+    fx, fy, cx, cy = 400.0, 500.0, 300.0, 220.0
+    control_dx = center_distance * (40.0 / fx)
+    control_dy = center_distance * (50.0 / fy)
     camera = {
         "schemaVersion": "1.0.0",
         "id": "m13-synthetic-source-camera",
@@ -67,27 +126,46 @@ def main():
             "crop": {"x": 0, "y": 0, "width": 640, "height": 480},
         },
         "pose": {
-            "position": [0, 0, 10],
-            "quaternionWxyz": [1, 0, 0, 0],
+            "position": camera_position,
+            "quaternionWxyz": quaternion_wxyz,
         },
         "intrinsics": {
-            "fx": 400,
-            "fy": 500,
-            "cx": 300,
-            "cy": 220,
+            "fx": fx,
+            "fy": fy,
+            "cx": cx,
+            "cy": cy,
             "distortionModel": "none",
         },
         "controlPoints": [
-            {"id": "p1", "worldPoint": [0, 0, 0], "imagePoint": {"x": 300, "y": 220}},
-            {"id": "p2", "worldPoint": [1, 0, 0], "imagePoint": {"x": 340, "y": 220}},
-            {"id": "p3", "worldPoint": [0, 1, 0], "imagePoint": {"x": 300, "y": 170}},
-            {"id": "p4", "worldPoint": [-1, -1, 0], "imagePoint": {"x": 260, "y": 270}},
+            {
+                "id": "p1",
+                "worldPoint": camera_local_to_world(camera_position, theta, 0.0, 0.0, center_distance),
+                "imagePoint": {"x": cx, "y": cy},
+            },
+            {
+                "id": "p2",
+                "worldPoint": camera_local_to_world(camera_position, theta, control_dx, 0.0, center_distance),
+                "imagePoint": {"x": cx + 40.0, "y": cy},
+            },
+            {
+                "id": "p3",
+                "worldPoint": camera_local_to_world(camera_position, theta, 0.0, control_dy, center_distance),
+                "imagePoint": {"x": cx, "y": cy - 50.0},
+            },
+            {
+                "id": "p4",
+                "worldPoint": camera_local_to_world(camera_position, theta, -control_dx, -control_dy, center_distance),
+                "imagePoint": {"x": cx - 40.0, "y": cy + 50.0},
+            },
         ],
     }
     write_json(camera_path, camera)
 
     print(json.dumps({
         "fixtureKind": "synthetic-only",
+        "candidateReport": str(report_path),
+        "candidateBoundsCenterBlender": center,
+        "cameraTargetDistance": center_distance,
         "sourceImage": str(image_path),
         "sourceImageSha256": sha256(image_path),
         "sourceImageSize": [640, 480],
