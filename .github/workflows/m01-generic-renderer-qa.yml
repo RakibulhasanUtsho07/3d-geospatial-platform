@@ -79,6 +79,30 @@ jobs:
           MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
         run: |
           npm run render:building-review -- data/heritage/generated/bangabhaban-candidate.glb artifacts/m01-generic-renderer --resolution=1024 --timeout-ms=600000 --blender=blender --source-camera=artifacts/m13-source-camera-fixture/synthetic-source-camera.json --source-image=artifacts/m13-source-camera-fixture/synthetic-source.png --calibration-evidence=artifacts/m13-source-camera-fixture/synthetic-calibration-evidence.json --frame-alignment-evidence=artifacts/m13-source-camera-fixture/synthetic-frame-alignment-evidence.json
+      - name: Independently verify calibrated source-camera frame has visible pixels
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          path = Path("artifacts/m01-generic-renderer/source-camera.png")
+          if not path.is_file():
+              raise SystemExit("source-camera.png is missing")
+          with Image.open(path) as source:
+              if source.size != (640, 480):
+                  raise SystemExit(f"unexpected source-camera dimensions: {source.size}")
+              gray = source.convert("L")
+              deviation = ImageStat.Stat(gray).stddev[0] / 255.0
+              extrema = gray.getextrema()
+              unique_colors = len(gray.getcolors(maxcolors=640 * 480) or [])
+          print({
+              "size": list(source.size),
+              "luminanceStandardDeviationSrgb": round(deviation, 6),
+              "luminanceExtrema": extrema,
+              "uniqueLuminanceValues": unique_colors,
+          })
+          if deviation < 0.01 or unique_colors < 8:
+              raise SystemExit("calibrated source-camera frame is blank or nearly uniform")
+          PY
       - name: Validate exact GLB, generic framing, all views and PNG hashes
         run: |
           node --input-type=module <<'NODE'
