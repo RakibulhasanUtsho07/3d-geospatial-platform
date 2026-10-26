@@ -167,7 +167,7 @@ function percentile(values, q) {
  * determines architectural accuracy or publication eligibility.
  */
 export function calculateBinarySilhouetteMetrics({
-  sourceImageSha256, sourceImageSize, referenceMask, candidateMask,
+  sourceImageSha256, sourceImageSize, sourceCameraRenderSha256, referenceMask, candidateMask,
 } = {}) {
   const incomplete = (reason) => ({ status: "incomplete", reason, metrics: null, acceptanceEligible: false });
   if (!hasHash(sourceImageSha256) || !isPositiveInt(sourceImageSize?.width) ||
@@ -184,7 +184,8 @@ export function calculateBinarySilhouetteMetrics({
   }
   if (!isRecord(candidateMask) ||
       candidateMask.sourceImageSha256?.toLowerCase() !== sourceImageSha256.toLowerCase() ||
-      !hasHash(candidateMask.sourceCameraRenderSha256) ||
+      !hasHash(sourceCameraRenderSha256) || !hasHash(candidateMask.sourceCameraRenderSha256) ||
+      candidateMask.sourceCameraRenderSha256.toLowerCase() !== sourceCameraRenderSha256.toLowerCase() ||
       !SAFE_ID.test(candidateMask.extractionVersion ?? "")) {
     return incomplete("render-silhouette-provenance-missing");
   }
@@ -551,6 +552,7 @@ export function buildBuildingVisualEvidencePackage(input = {}) {
     silhouetteMetrics = calculateBinarySilhouetteMetrics({
       sourceImageSha256: sourceSha256,
       sourceImageSize: { width: source.width, height: source.height },
+      sourceCameraRenderSha256: renderSha256,
       referenceMask: referenceSilhouette,
       candidateMask: candidateSilhouette,
     });
