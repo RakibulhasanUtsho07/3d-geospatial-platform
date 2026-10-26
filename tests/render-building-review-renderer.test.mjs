@@ -4,6 +4,7 @@ import test from "node:test";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
 
 const rendererSource = await readFile(new URL("../scripts/blender/render-building-review.py", import.meta.url), "utf8");
+const cameraSetupSource = await readFile(new URL("../scripts/blender/source_camera_camera.py", import.meta.url), "utf8");
 
 test("uses focused Rangmahal framing when its named facade meshes are available", () => {
   assert.match(rendererSource, /focus_rangmahal = bool\(rangmahal_review_meshes\)/);
@@ -44,14 +45,14 @@ test("rejects unbounded renderer timeouts, invalid resolutions, and unknown flag
 
 test("renders a calibrated source photo camera from its pose, focal lengths, principal point and image size", () => {
   assert.match(rendererSource, /def render_source_camera\(opts, meshes, scene, output_dir, dimensions, center\):/);
-  assert.match(rendererSource, /camera_data\.lens = fx \* camera_data\.sensor_width \/ width/);
-  assert.match(rendererSource, /camera_data\.shift_x = \(width \/ 2\.0 - cx\) \/ width/);
-  assert.match(rendererSource, /camera_data\.shift_y = \(cy - height \/ 2\.0\) \/ width/);
-  assert.match(rendererSource, /camera\.rotation_quaternion = Quaternion\(\(quaternion\[0\], quaternion\[1\], quaternion\[2\], quaternion\[3\]\)\)/);
-  assert.match(rendererSource, /scene\.render\.resolution_x = width/);
-  assert.match(rendererSource, /scene\.render\.resolution_y = height/);
+  assert.match(cameraSetupSource, /camera_data\.lens = fx \* camera_data\.sensor_width \/ width/);
+  assert.match(cameraSetupSource, /camera_data\.shift_x = \(width \/ 2\.0 - cx\) \/ width/);
+  assert.match(cameraSetupSource, /camera_data\.shift_y = \(cy - height \/ 2\.0\) \/ width/);
+  assert.match(cameraSetupSource, /camera\.rotation_quaternion = Quaternion\(\(quaternion\[0\], quaternion\[1\], quaternion\[2\], quaternion\[3\]\)\)/);
+  assert.match(cameraSetupSource, /scene\.render\.resolution_x = width/);
+  assert.match(cameraSetupSource, /scene\.render\.resolution_y = height/);
   assert.match(rendererSource, /sourceCameraView/);
-  assert.doesNotMatch(rendererSource, /source-camera.*projected_ortho_scale/);
+  assert.doesNotMatch(cameraSetupSource, /projected_ortho_scale/);
 });
 
 test("keeps source-camera evidence separate and blocks stale or unverified pairs", async () => {
