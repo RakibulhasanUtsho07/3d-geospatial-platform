@@ -147,6 +147,7 @@
     "publish:floor-plan-candidate": "node scripts/publish-floor-plan-candidate.mjs",
     "test:floor-plan-raster-line-proposals": "node --test tests/floor-plan-raster-line-proposals.test.mjs",
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
+    "test:floor-plan-raster-trace": "node --test tests/floor-plan-raster-trace.test.mjs tests/floor-plan-raster-trace-job.test.mjs tests/floor-plan-trace-to-vector.test.mjs tests/floor-plan-raster-generation.test.mjs",
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
     "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs",

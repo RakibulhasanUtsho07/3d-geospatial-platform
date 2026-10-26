@@ -363,3 +363,42 @@ The proposal report uses pixels in the normalized raster's coordinate frame. `ra
 This stage does **not** create room polygons, identify doors/windows, infer wall thickness in metres, calibrate scale, infer north/elevation, or assign WGS84 placement. It does not feed the generated-model catalog automatically. The report is always `review-required-not-scaled`, `mapReady=false`, and `publicationEligible=false`.
 
 PDF is not decoded by this stage. Rasterize the specific PDF page using a trusted local PDF renderer, record the rendering/page choice and upload the resulting PNG/JPEG/WebP as a separate source before analysis. The original PDF should remain attached as provenance. Unknown or unreviewed source-use status remains explicit; do not publish/share imagery without resolving reuse rights. A human must trace and verify candidate lines, supply measured metre geometry, and use the measured-vector engine and review/publish gate described in sections 12–14.
+
+
+
+## 16. Raster floor-plan trace candidates
+
+The backend can analyze an already-ingested JPEG, PNG or WebP floor-plan raster through `POST /api/building-generation/floor-plan-traces`, authenticated with `Authorization: Bearer <GENERATION_API_TOKEN>`. The route checks the uploaded source's identity and bytes, performs bounded raster normalization, and proposes long dark horizontal/vertical linework plus closed rectangular cells. It persists the trace privately and returns a `traceId` and summary. Retrieve it through `GET /api/building-generation/floor-plan-traces/<buildingId>/<traceId>`; retrieval rechecks the saved artifact hash and the current source hash.
+
+Example request shape:
+
+~~~json
+{
+  "buildingId": "dhaka-demo",
+  "sourceId": "floor-plan-raster-01",
+  "options": {
+    "maxEdge": 2048,
+    "threshold": 180,
+    "maxGapPx": 2,
+    "lineMergeTolerancePx": 4,
+    "minLineLengthPx": 60,
+    "minRoomSidePx": 32,
+    "maxLinesPerOrientation": 1200,
+    "maxRoomCandidates": 2500
+  }
+}
+~~~
+
+The trace is a pixel-space hypothesis document. `metresPerPixel` remains null, line/room records remain `unreviewed`, and `mapReady`/`publicationEligible` are false. The detector primarily targets orthogonal plans with dark strokes; it can confuse text, furniture, hatching and dimensions with walls, and it does not infer doors/windows, wall semantics, angled/curved geometry, north, floor elevations, or survey placement. The source file remains attached as provenance. This is not a substitute for the existing measured-vector workflow, and a PDF page must be rasterized and recorded as a distinct source before analysis.
+
+## 17. Reviewed raster trace to private GLB candidate
+
+After reviewing the trace, an operator can call:
+
+`POST /api/building-generation/floor-plan-traces/<buildingId>/<traceId>/generate`
+
+The authenticated JSON request must explicitly confirm trace review, provide only line and room IDs actually returned by that trace, define a known measured distance between two original-image pixel coordinates, and supply an independently surveyed WGS84 origin (longitude, latitude, height and heading). A room candidate can be selected only when its four boundary lines are selected. Coordinates refer to the original oriented source image, not the downsampled analysis raster.
+
+The service derives the metres-per-source-pixel ratio from the supplied measured segment, converts reviewed candidates to the measured-vector schema and invokes the existing source-hash-checked private GLB candidate builder. It stores `trace-review.json` and binds its SHA-256, trace ID/hash, selected IDs/counts, calibration details and review state into the candidate report. Retrieval verifies the transformation-evidence hash as well as the source, geometry and GLB hashes.
+
+The output is always a draft: `mapReady=false`, `publicationEligible=false`. This process does not independently prove the operator's measurements, source rights, survey control, structural correctness, or architectural fidelity; it also does not infer openings, stairs, furniture, curved/angled walls, or hidden geometry. Review geometry and rights independently and use the explicit review/publication gate in section 14 only after acceptance.
