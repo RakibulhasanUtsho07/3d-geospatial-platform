@@ -10,6 +10,7 @@ import {
 import { clampViewportBoundsToLocalWindow } from "./viewport-bounds-policy.mjs";
 import { shouldContinueMapInitialization } from "./map-initialization-policy.mjs";
 import { createMapPerformanceTelemetry } from "./performance-telemetry.mjs";
+import { appendImageryTileErrorDiagnostic } from "./imagery-tile-error-diagnostics.mjs";
 import type {
   MapPerformanceMetric,
   MapPerformanceOutcome,
@@ -77,6 +78,12 @@ type CesiumCartesian3 = import("cesium").Cartesian3;
 type MapPerformanceDiagnosticsHandle = {
   snapshot: () => MapPerformanceSnapshot;
   reset: () => void;
+  /** Development-only readiness probe for reproducible browser screenshots. */
+  renderReadiness: () => {
+    viewerAvailable: boolean;
+    imageryLayerCount: number;
+    imageryTilesLoaded: boolean;
+  };
 };
 
 type PerformanceDiagnosticsWindow = Window & {
@@ -198,6 +205,7 @@ export class CesiumAdapter implements MapEngine {
   private baseImageryLayer:
     | import("cesium").ImageryLayer
     | null = null;
+  private imageryErrorUnsubscribe: (() => void) | null = null;
 
   private readonly roadLayerManager = new RoadLayerManager();
   private readonly roadSelectionListeners = new Set<(road: RoadFeature | null) => void>();
@@ -420,6 +428,21 @@ export class CesiumAdapter implements MapEngine {
     const handle: MapPerformanceDiagnosticsHandle = {
       snapshot: () => this.performanceTelemetry.getSnapshot(),
       reset: () => this.performanceTelemetry.reset(),
+      renderReadiness: () => {
+        const viewer = this.viewer;
+        if (!viewer || viewer.isDestroyed()) {
+          return {
+            viewerAvailable: false,
+            imageryLayerCount: 0,
+            imageryTilesLoaded: false,
+          };
+        }
+        return {
+          viewerAvailable: true,
+          imageryLayerCount: viewer.imageryLayers.length,
+          imageryTilesLoaded: viewer.scene.globe.tilesLoaded,
+        };
+      },
     };
     target.__MAP_ENGINE_PERFORMANCE__ = handle;
     this.performanceDiagnosticsHandle = handle;
@@ -501,6 +524,22 @@ export class CesiumAdapter implements MapEngine {
           url: "https://tile.openstreetmap.org/",
           credit: "© OpenStreetMap contributors",
         });
+
+      // A red/partial raster patch appeared in one earlier real-Dhaka capture
+      // despite successful HTTP statuses. Record provider-level tile errors so
+      // future screenshots can distinguish imagery decode/load faults from
+      // building geometry and overlay behavior. Never persist source tile URLs.
+      this.imageryErrorUnsubscribe?.();
+      this.imageryErrorUnsubscribe = imageryProvider.errorEvent.addEventListener((error) => {
+        const diagnostic = appendImageryTileErrorDiagnostic(
+          window as unknown as Record<string, unknown>,
+          error,
+        );
+        window.dispatchEvent(new CustomEvent("map:imagery-tile-error", {
+          detail: diagnostic,
+        }));
+        console.warn("[Map] OSM imagery tile error.", diagnostic);
+      });
 
       this.baseImageryLayer =
         viewer.imageryLayers.addImageryProvider(
@@ -2308,6 +2347,8 @@ export class CesiumAdapter implements MapEngine {
     this.lastLodOrigin = null;
     this.lastLodBudget = null;
 
+    this.imageryErrorUnsubscribe?.();
+    this.imageryErrorUnsubscribe = null;
     this.baseImageryLayer = null;
     this.overtureBuildings = null;
     this.nearbyPlacesRevision += 1;
@@ -2424,6 +2465,7 @@ export class CesiumAdapter implements MapEngine {
   }
 
   resetOrientation(): void {
+    this.heritageCameraController.stopOrbitTour();
     if (
       !this.viewer ||
       !this.cesium ||
@@ -2445,6 +2487,10 @@ export class CesiumAdapter implements MapEngine {
         roll: 0,
       },
     });
+  }
+
+  resetHomeView(): void {
+    this.heritageCameraController.resetHomeView();
   }
 
   flyTo(target: CameraTarget): void {

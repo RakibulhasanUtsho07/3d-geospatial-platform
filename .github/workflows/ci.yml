@@ -59,6 +59,7 @@ on:
       - feat/p2-18-selected-geometry-lru-cache
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
+      - feat/map-viewport-ux-repair
       - development
   pull_request:
     branches:
@@ -375,8 +376,17 @@ jobs:
       - name: Benchmark map optimizations against reference implementations
         run: npm run benchmark:map-optimization
 
+      - name: Test map viewport UX regression contracts
+        run: node --test tests/map-viewport-ux.test.mjs
+
       - name: Test map initialization cancellation policy
         run: npm run test:map-initialization-policy
+
+      - name: Test privacy-safe imagery tile error diagnostics
+        run: npm run test:imagery-tile-error-diagnostics
+
+      - name: Test map canvas visual anomaly diagnostics
+        run: npm run test:canvas-red-pixel-diagnostics
 
       - name: Test building search index
         run: npm run test:building-search
