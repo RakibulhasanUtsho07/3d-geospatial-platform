@@ -284,6 +284,8 @@ This is a dependency guide, not a claim that all tasks are already implemented. 
 
 **Verification:** Add fixed-camera render tests and inspect generated reference overlays; run `npm run test:render-review-manifest`.
 
+**Implementation status (26 October 2026):** A separate source-camera runner, camera-frame/intrinsics contract, candidate/reference overlay and hash-bound manifest are implemented in the M13 feature branch. Synthetic projection/contract tests do not execute Blender or prove real camera calibration. A permissioned reference photo and independently checked calibration/control-point pack remain necessary for real-building review.
+
 **Depends on:** M01, M09, M11/M12 candidate geometry.
 
 ### M14 — Add building-mask silhouette and edge comparison
