@@ -93,7 +93,7 @@ function componentsOfMaskedEdges(maskPixels, edgePixels, width, height, bounds, 
     const relativeWidth = boxWidth / bounds.width, relativeHeight = boxHeight / bounds.height;
     if (pixels < 8 || boxWidth < Math.max(3, bounds.width * 0.025) ||
         boxHeight < Math.max(3, bounds.height * 0.015) ||
-        relativeWidth > 0.45 || relativeHeight > 0.35) continue;
+        relativeWidth > 0.45 || relativeHeight > 0.45) continue;
     components.push({ minX, minY, maxX, maxY, width: boxWidth, height: boxHeight, pixels });
   }
   return components.sort((a, b) => a.minY - b.minY || a.minX - b.minX);
