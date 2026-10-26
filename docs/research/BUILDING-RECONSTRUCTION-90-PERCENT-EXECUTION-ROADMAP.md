@@ -292,7 +292,7 @@ These are proposed tasks, not code changes already completed.
 
 - [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
 - [x] **BRF-02 (P0, COMPLETE):** Shared candidate evidence manifest implemented in Draft PR #188; exact-head CI #40347926520 passed with 132 successful workflow steps. Hash/path, camera provenance, confidence and publication-disabled gates are tested.
-- [ ] **BRF-03 (P0):** Capture manifest and input quality/coverage preflight.
+- [ ] **BRF-03 (P0, IN PROGRESS):** Draft PR #189 integrates actual JPEG/PNG quality screening, near-duplicate view hints, metadata-vs-file dimension consistency, and still/video-frame coverage. Exact-head CI is running; do not mark complete until it passes.
 - [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
@@ -374,3 +374,16 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Exact-head CI:** [run #40347926520](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40347926520) — **success**, 132 successful workflow steps, zero failed steps.
 - **Scope caveat:** this is an evidence-linking contract. Hashes prove byte identity, not survey truth, photo identity, rights, or architectural accuracy. It does not create model geometry from photos or approve publication.
 - **Next action:** start **BRF-03 — capture manifest and input quality/coverage preflight**. Do not merge PR #188 through `development`/`main` until the full feature chain and review/evidence gates pass.
+
+
+### 2026-10-26 — BRF-03 Capture quality and coverage preflight (in progress)
+
+- **Branch:** `feat/brf-03-capture-quality-coverage`, stacked on `feat/brf-02-candidate-evidence-manifest`.
+- **PR:** [#189 — validate capture image quality and coverage](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/189) (Draft).
+- **Latest code/documentation head:** `b964a53557fca8ca36385ebeb9a9544cb389ee92`.
+- **Implemented:** filesystem capture-manifest validator now analyzes photo/video-frame JPEG/PNG files after path, SHA-256 and byte-length integrity checks. Per-image dimensions, 64×64 luminance/contrast/sharpness heuristics and perceptual hashes are included under `inputQuality`. Near-duplicate pairs are flagged for review without deleting records. Declared camera imageWidth/imageHeight mismatch with actual decoded dimensions fails closed.
+- **Coverage correction:** only still images and extracted video-frame records count toward front/back/left/right coverage. Raw videos do not count as a side unless extracted-frame records are linked via source provenance.
+- **Regression coverage:** existing validator CLI fixtures now use PNG headers and deterministic mocked FFmpeg samples; new tests cover low-resolution warning, perceptual near-duplicate warning, image-dimension metadata mismatch, and raw-video not satisfying a missing side. Docs updated in `docs/research/BUILDING-CAPTURE-MANIFEST.md`.
+- **Current exact-head workflow runs:** [push run #40352084773](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40352084773) and [PR run #40352004881](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40352004881) are both `in_progress` at dependency installation at the latest observation. The capture-manifest test step has not yet started; no pass is claimed yet.
+- **Limitations:** the image quality metrics are heuristics and need human review; they cannot prove building identity, photo rights, calibrated camera pose, overlap or final 3D accuracy. Publication/map readiness remain disabled.
+- **Next action:** inspect exact-head runs `40352084773` / `40352004881`, fix any failure on the same branch, and repeat CI if the head changes. Mark BRF-03 complete only after a terminal green result; then begin **BRF-04 — baseline fixtures, expected measurements and deliberate defect injection**. Do not merge PR #189 into `feat/brf-02` until review gates pass.
