@@ -293,7 +293,7 @@ These are proposed tasks, not code changes already completed.
 - [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
 - [x] **BRF-02 (P0, COMPLETE):** Shared candidate evidence manifest implemented in Draft PR #188; exact-head CI #40347926520 passed with 132 successful workflow steps. Hash/path, camera provenance, confidence and publication-disabled gates are tested.
 - [x] **BRF-03 (P0, COMPLETE):** Draft PR #189 passed exact-head CI #40352859459 (132 successful workflow steps). JPEG/PNG quality screening, near-duplicate hints, dimension consistency, safe file integrity and still/video-frame coverage are regression-tested; publication remains disabled.
-- [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
+- [ ] **BRF-04 (P0, IN PROGRESS):** Controlled synthetic cuboid baseline (10×8×6 m), fixed dimension tolerance, repeatability check, and injected 20% Y-scale / degenerate-triangle defects are in Draft PR #190; exact-head CI is running. This fixture is synthetic regression truth only, not a real-building benchmark.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
 - [ ] **BRF-07 (P0):** Source-camera render comparison with silhouette/contour and facade-part metrics.
@@ -388,3 +388,15 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Exact-head CI:** [run #40352859459](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40352859459) — **success**, 132 successful workflow steps, zero failures.
 - **Limitations:** quality metrics are screening heuristics, not proof of correct building identity, licensing, calibrated camera poses, geometric overlap or architectural fidelity. Publication/map readiness remain disabled.
 - **Next action:** start **BRF-04 — baseline fixtures, expected measurements and deliberate defect injection**. Keep the stacked PR chain unmerged into `development`/`main` until review/evidence gates pass.
+
+
+### 2026-10-26 — BRF-04 Baseline fixtures and deliberate defect injection (in progress)
+
+- **Branch:** `feat/brf-04-baseline-defect-benchmarks`, stacked on `feat/brf-03-capture-quality-coverage`.
+- **PR:** pending creation after validating the first exact-head run; branch head is currently `b55cc858e04334860a34d8784c6d45fa44f940bc`.
+- **Fixture:** `benchmarks/building-reconstruction/brf-04-controlled-baseline-v1.json`; synthetic closed cuboid with known dimensions 10×8×6 model metres, 12 triangles, zero degenerate triangles and a 2% dimension screen tolerance.
+- **Defect injection:** `tests/fixtures/building-baseline-glb.mjs` generates a byte-repeatable GLB and injects (1) a +20% Y-axis scaling defect and (2) a degenerate triangle index. These verify dimension tolerance and topology QA detect controlled faults. The test explicitly demonstrates that `valid: true` structural GLB status does not mean geometry quality or real-world correctness.
+- **Tests/CI:** `tests/building-baseline-defect-injection.test.mjs` has five checks; `npm run test:building-baseline-defect-injection` is wired into `.github/workflows/ci.yml`. The new branch is included in push triggers and its parent `feat/brf-03-capture-quality-coverage` is included as a PR target.
+- **Current exact-head CI:** [run #40355894005](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40355894005) is `in_progress`; currently on step 20 and has 19 successful steps, no failures yet. The new BRF-04 test step (73) has not run at latest observation. Do not mark complete until the new test and full CI finish green.
+- **Critical limitation:** this cuboid is a controlled synthetic regression fixture. It validates bounds/tolerance/degenerate-triangle detection; it is not a measured building baseline, photo reconstruction score or survey evidence.
+- **Next action:** inspect run `40355894005` through step 73 and terminal conclusion. Fix defects on the same branch if the new suite fails, then update this log with the latest commit and run. After green, document the protocol in `docs/BUILDING-ACCURACY-BENCHMARK.md`, mark BRF-04 complete and begin BRF-05.
