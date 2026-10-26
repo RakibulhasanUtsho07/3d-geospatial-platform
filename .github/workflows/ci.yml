@@ -330,7 +330,7 @@ jobs:
         run: npm run test:building-accuracy-evidence-pack
 
       - name: Validate Blender render automation Python syntax
-        run: python3 -m py_compile scripts/blender/render-building-review.py
+        run: python3 -m py_compile scripts/blender/render-building-review.py scripts/blender/source_camera_camera.py scripts/blender/test-source-camera-projection.py
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker
