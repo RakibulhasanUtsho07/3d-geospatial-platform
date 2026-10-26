@@ -290,7 +290,7 @@ Each golden fixture should include inputs, expected dimensions, camera matrices,
 
 These are proposed tasks, not code changes already completed.
 
-- [ ] **BRF-01 (P0):** Generic renderer contract; remove building-name/node assumptions, stable fixed-view manifests and explicit comparison eligibility.
+- [x] **BRF-01 (P0, COMPLETE):** Generic renderer contract; exact-head CI and the dedicated Blender 13-view smoke test passed in PR #187. This establishes renderer/manifest integrity, not real-building architectural accuracy.
 - [ ] **BRF-02 (P0):** Shared candidate evidence manifest with source/model/config/report hashes, camera provenance and review state.
 - [ ] **BRF-03 (P0):** Capture manifest and input quality/coverage preflight.
 - [ ] **BRF-04 (P0):** Baseline fixtures, expected measurements and deliberate defect injection.
