@@ -208,7 +208,8 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   const references = sources.filter((source) => source.purpose === "reference" && ["photo", "video-frame"].includes(source.kind));
   const measurementSources = sources.filter((source) => source.purpose === "measurement-evidence");
   const rightsOk = (source) => ["verified", "operator-attested"].includes(source.rights.status) &&
-    nonEmpty(source.rights.evidenceId) && nonEmpty(source.rights.reviewedBy) && dateOk(source.rights.reviewedAt);
+    nonEmpty(source.sourceId) && nonEmpty(source.rights.evidenceId) &&
+    nonEmpty(source.rights.reviewedBy) && dateOk(source.rights.reviewedAt);
   const sourceBytesOk = (source) => nonEmpty(source.path) && hashOk(source.sha256) && Number.isSafeInteger(source.bytes) && source.bytes > 0;
   const fileIntegrity = options.fileIntegrity;
   const integrityById = new Map(Array.isArray(fileIntegrity) ? fileIntegrity.map((item) => [item.sourceId, item]) : []);
@@ -266,9 +267,8 @@ export function assessBuildingCaptureManifest(input = {}, options = {}) {
   add("building-identity-provenance", identityReady,
     "Building identity must link to a documented source, reviewer and timestamp; attestation is not independent authentication.");
 
-  const assetsWithHashes = sources.filter((source) => source.path);
-  const allIntegrity = fileIntegrity !== undefined && assetsWithHashes.length > 0 &&
-    assetsWithHashes.every((source) => assetIntegrityOk(source));
+  const allIntegrity = fileIntegrity !== undefined && sources.length > 0 &&
+    sources.every((source) => sourceBytesOk(source) && assetIntegrityOk(source));
   const badIntegrity = Array.isArray(fileIntegrity) && fileIntegrity.some((item) => item.status === "failed");
   add("on-disk-source-integrity", allIntegrity,
     "Declared asset paths, byte lengths and SHA-256 digests must match the actual files before using this pack.",
