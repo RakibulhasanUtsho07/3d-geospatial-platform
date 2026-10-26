@@ -18,7 +18,7 @@ function fixture(overrides = {}) {
     coordinateFrame: "building-local-enu-v1",
     imageSize: { width: 100, height: 80 },
     pose: { rotation: [[1,0,0],[0,1,0],[0,0,1]], translation: [0,0,0] },
-    intrinsics: { fx: 100, fy: 50, cx: 50, cy: 40 },
+    intrinsics: { fx: 100, fy: 50, cx: 49.5, cy: 39.5 },
     distortion: { model: "none", coefficients: [] },
   };
   const cameraEvidence = { schemaVersion: "1.0.0", camera, ...overrides.cameraEvidence };
@@ -41,7 +41,7 @@ test("prepares a same-camera render plan with explicit axis conversion and origi
   assert.equal(plan.blenderCamera.imageWidth, 100);
   assert.equal(plan.blenderCamera.imageHeight, 80);
   assert.equal(plan.blenderCamera.lensMm, 36);
-  assert.equal(plan.blenderCamera.pixelAspectY, 2);
+  assert.equal(plan.blenderCamera.pixelAspectX, 1);\n  assert.equal(plan.blenderCamera.pixelAspectY, 2);\n  assert.equal(plan.blenderCamera.shiftX, 0);\n  assert.equal(plan.blenderCamera.shiftY, 0);
   assert.equal(plan.publicationEligible, false);
 });
 
@@ -49,10 +49,10 @@ test("projects known world points into the calibrated source-image pixels", () =
   const { camera } = fixture().cameraEvidence;
   const centre = projectWorldPointToSourceImage(camera, [0,0,5]);
   assert.equal(centre.visible, true);
-  assert.deepEqual(centre.pixel, { x: 50, y: 40 });
+  assert.deepEqual(centre.pixel, { x: 49.5, y: 39.5 });
   const offset = projectWorldPointToSourceImage(camera, [1,1,5]);
-  assert.ok(Math.abs(offset.pixel.x - 70) < 1e-12);
-  assert.ok(Math.abs(offset.pixel.y - 50) < 1e-12);
+  assert.ok(Math.abs(offset.pixel.x - 69.5) < 1e-12);
+  assert.ok(Math.abs(offset.pixel.y - 49.5) < 1e-12);
 });
 
 test("marks a point at or behind the source camera as non-visible", () => {
