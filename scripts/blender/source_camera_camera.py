@@ -53,8 +53,17 @@ def configure_source_camera(scene, camera_evidence, max_dimension):
     scene.render.resolution_x = width
     scene.render.resolution_y = height
     scene.render.resolution_percentage = 100
-    scene.render.pixel_aspect_x = 1.0
-    scene.render.pixel_aspect_y = fx / fy
+    # Blender uses a relative pixel aspect ratio. Set only one axis away
+    # from 1.0, matching the camera-matrix convention for unequal fx and fy.
+    if fx > fy:
+        pixel_aspect_x, pixel_aspect_y = 1.0, fx / fy
+    elif fx < fy:
+        pixel_aspect_x, pixel_aspect_y = fy / fx, 1.0
+    else:
+        pixel_aspect_x, pixel_aspect_y = 1.0, 1.0
+    scene.render.pixel_aspect_x = pixel_aspect_x
+    scene.render.pixel_aspect_y = pixel_aspect_y
+    pixel_aspect_ratio = pixel_aspect_y / pixel_aspect_x
     camera_id = camera_evidence.get("id", "unknown")
     camera_data = bpy.data.cameras.new("SourcePhotoCamera_" + camera_id)
     camera = bpy.data.objects.new("SourcePhotoCamera_" + camera_id, camera_data)
@@ -65,8 +74,8 @@ def configure_source_camera(scene, camera_evidence, max_dimension):
     camera_data.lens = fx * camera_data.sensor_width / width
     # Blender shift is relative to image width. Keep the supplied, potentially
     # off-centre principal point; never auto-fit or recenter the camera.
-    camera_data.shift_x = (width / 2.0 - cx) / width
-    camera_data.shift_y = (cy - height / 2.0) / width
+    camera_data.shift_x = (cx - (width - 1.0) / 2.0) / -width
+    camera_data.shift_y = ((cy - (height - 1.0) / 2.0) / width) * pixel_aspect_ratio
     camera_data.clip_start = 0.001
     camera_data.clip_end = max(float(max_dimension) * 1000.0, 1000.0)
     camera.location = Vector(position)
