@@ -227,6 +227,9 @@ jobs:
       - name: Test calibrated geometry, wireframe QA, explicit mesh, baked atlas and textured GLB workflow
         run: npm run test:architectural-geometry-workflow
 
+      - name: Test camera calibration evidence and correspondence outlier QA
+        run: npm run test:camera-projection-validation && npm run test:correspondence-outlier-qa
+
       - name: Test per-view architectural sketch preparation
         run: npm run test:architectural-sketch-preparation
       - name: Test mask-guided building sketch preparation
