@@ -367,8 +367,8 @@ def main():
         pass
     ensure_world(scene)
 
-    # Tune the inspection rig to retain the salmon facade, darker recesses and step shadows.
-    # Power remains dimension-scaled and clamped so render reviews stay deterministic.
+    # Scale the inspection rig to the model bounds for repeatable geometry review.
+    # Power remains dimension-scaled and clamped across small and large building GLBs.
     light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
     light_size = max_dimension * 0.68
     light_offset = max_dimension * 0.65
