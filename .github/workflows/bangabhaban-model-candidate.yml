@@ -27,9 +27,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      - name: Install locked dependencies
-        run: npm ci
       - name: Generate model through the repository engine
         run: node scripts/build-bangabhaban-model-candidate.mjs
       - name: Validate model and candidate gates
