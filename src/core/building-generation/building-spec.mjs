@@ -116,9 +116,19 @@ export function normalizeBuildingSpec(raw) {
     if (typeof value !== "boolean") throw new TypeError(label + " must be boolean");
     return value;
   };
+  const domeAnchor = dome.anchor === undefined
+    ? "front-inset"
+    : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
+  if (!["front-inset", "footprint-bounds-center"].includes(domeAnchor)) {
+    throw new TypeError("unsupported centralDome.anchor");
+  }
+  const frontFacingAzimuthDegrees = a.frontFacingAzimuthDegrees === undefined || a.frontFacingAzimuthDegrees === null
+    ? null
+    : num(a.frontFacingAzimuthDegrees, "frontFacingAzimuthDegrees", 0, 360);
   const architecture = {
     style: a.style === undefined ? "dhaka-residential-modern" : str(a.style, "style", 80),
     roofType,
+    frontFacingAzimuthDegrees,
     wallColor: hex(a.wallColor, "#D8D2C8", "wallColor"),
     roofColor: hex(a.roofColor, "#B5B8BC", "roofColor"),
     glassColor: hex(a.glassColor, "#536D86", "glassColor"),
@@ -139,6 +149,7 @@ export function normalizeBuildingSpec(raw) {
     },
     centralDome: {
       enabled: bool(dome.enabled, false, "centralDome.enabled"),
+      anchor: domeAnchor,
       radiusM: dome.radiusM === undefined ? 3.5 : num(dome.radiusM, "centralDome.radiusM", 1, 15),
       riseM: dome.riseM === undefined ? 4.5 : num(dome.riseM, "centralDome.riseM", 1, 20),
       drumHeightM: dome.drumHeightM === undefined ? 1.5 : num(dome.drumHeightM, "centralDome.drumHeightM", 0.5, 8),

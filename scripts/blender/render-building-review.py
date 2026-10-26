@@ -39,6 +39,29 @@ def add_area_light(name, position, center, power, size):
     obj.rotation_euler = (center - obj.location).to_track_quat("-Z", "Y").to_euler()
     return obj
 
+def read_front_facing_azimuth(model_path):
+    """Read optional model-local facade bearing from the GLB JSON extras."""
+    with open(model_path, "rb") as stream:
+        data = stream.read()
+    if len(data) < 20 or data[0:4] != b"glTF" or int.from_bytes(data[4:8], "little") != 2:
+        raise RuntimeError("Input is not a valid GLB 2.0 container")
+    declared_length = int.from_bytes(data[8:12], "little")
+    json_length = int.from_bytes(data[12:16], "little")
+    if declared_length != len(data) or data[16:20] != b"JSON" or 20 + json_length > len(data):
+        raise RuntimeError("GLB JSON header or declared length is invalid")
+    try:
+        document = json.loads(data[20:20 + json_length].decode("utf-8").strip())
+    except Exception as error:
+        raise RuntimeError("GLB JSON chunk could not be read: " + str(error))
+    building = (document.get("extras") or {}).get("building") or {}
+    angle = building.get("frontFacingAzimuthDegrees")
+    if angle is None:
+        return None
+    if isinstance(angle, bool) or not isinstance(angle, (int, float)) or not math.isfinite(angle) or angle < 0 or angle > 360:
+        raise RuntimeError("GLB frontFacingAzimuthDegrees must be a finite bearing from 0 to 360")
+    return float(angle)
+
+
 def scene_bounds(mesh_objects):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     points = []
@@ -260,15 +283,36 @@ def main():
     add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
     add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
-    views = [
-        # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
-        # only from this facade-detail camera, while the other 12 views retain roof context.
-        ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
-        ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
-        ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
-        ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
-        ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
-    ]
+    # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
+    # only from this facade-detail camera, while the other 12 views retain roof context.
+    # Whole-model views restore it and retain the complete generated roof geometry.
+    # Legacy GLBs without a declared facade bearing keep the established camera convention.
+    # The BuildingSpec generator writes the actual facade bearing into GLB extras; use it
+    # to keep "front" on the intended facade instead of relying on polygon order.
+    front_azimuth = read_front_facing_azimuth(model_path)
+    if front_azimuth is None:
+        views = [
+            ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
+            ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
+            ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
+            ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
+        ]
+        front_axis_source = "renderer-default"
+    else:
+        bearing = math.radians(front_azimuth)
+        front_elevation = math.radians(5.0)
+        sin_bearing, cos_bearing = math.sin(bearing), math.cos(bearing)
+        views = [
+            ("front", Vector((sin_bearing * math.cos(front_elevation),
+                              -cos_bearing * math.cos(front_elevation),
+                              math.sin(front_elevation))), "ORTHO"),
+            ("back", Vector((-sin_bearing, cos_bearing, 0.0)), "ORTHO"),
+            ("left", Vector((cos_bearing, -sin_bearing, 0.0)), "ORTHO"),
+            ("right", Vector((-cos_bearing, sin_bearing, 0.0)), "ORTHO"),
+            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
+        ]
+        front_axis_source = "glb-extras.frontFacingAzimuthDegrees"
     elevation = math.radians(22.0)
     for angle in range(0, 360, 45):
         azimuth = math.radians(angle)
@@ -364,6 +408,8 @@ def main():
         "rendererVersion": bpy.app.version_string,
         "width": resolution,
         "height": resolution,
+        "frontFacingAzimuthDegrees": front_azimuth,
+        "frontAxisSource": front_axis_source,
         "sceneBounds": {
             "min": [round(float(value), 8) for value in minimum],
             "max": [round(float(value), 8) for value in maximum],
