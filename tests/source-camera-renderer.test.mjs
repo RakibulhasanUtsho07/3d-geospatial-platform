@@ -9,7 +9,7 @@ test("source-camera runner requires an explicit coordinate frame and hashes inpu
   assert.match(wrapper, /--coordinate-frame is required/);
   assert.match(wrapper, /sha256\(modelBytes\)/);
   assert.match(wrapper, /sha256\(sourceBytes\)/);
-  assert.match(wrapper, /No calibrated render was produced/);
+  assert.match(wrapper, /process\.exitCode = 2/);
 });
 
 test("Blender renderer uses source dimensions and the validated camera pose/intrinsics", () => {
