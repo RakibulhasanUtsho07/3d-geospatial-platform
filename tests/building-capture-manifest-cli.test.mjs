@@ -126,7 +126,7 @@ test("refuses path traversal and symlinked source files", async (t) => {
     /inside the project root|project-relative path/);
   const manifestPath = path.join(data.root, "capture-manifest.json");
   const raw = JSON.parse(await readFile(manifestPath, "utf8"));
-  const frontPath = path.join(data.root, "evidence", "capture-front.bin");
+  const frontPath = path.join(data.root, "evidence", "capture-front.png");
   await unlink(frontPath);
   await symlink("capture-back.bin", frontPath);
   const symlinkResult = await validateBuildingCaptureManifestFile({ manifestPath: "capture-manifest.json",
