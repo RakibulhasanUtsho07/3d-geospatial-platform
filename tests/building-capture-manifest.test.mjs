@@ -90,6 +90,15 @@ test("rejects unsafe paths, duplicate IDs, unsupported axes and unknown evidence
   assert.throws(() => normalizeBuildingCaptureManifest(unknownSource), /unknown sourceId/);
 });
 
+test("rejects byte-identical reference images reused from the capture input", () => {
+  const manifest = fixture();
+  manifest.sources.find((item) => item.id === "reference-front").sha256 =
+    manifest.sources.find((item) => item.id === "capture-front").sha256;
+  const report = assessBuildingCaptureManifest(manifest, { fileIntegrity: fileIntegrity(manifest) });
+  assert.equal(report.status, "failed");
+  assert.ok(report.checks.some((check) => check.id === "reference-bytes-independent-from-captures" && check.status === "failed"));
+});
+
 test("marks a declared asset hash mismatch as failed instead of accepting a good-looking manifest", () => {
   const manifest = fixture();
   const integrity = fileIntegrity(manifest);
