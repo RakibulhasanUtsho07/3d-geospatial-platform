@@ -195,6 +195,7 @@
     "benchmark:building-segmentation": "node scripts/evaluate-building-segmentation-benchmark.mjs",
     "test:building-mask-provider": "node --test tests/building-mask-provider.test.mjs",
     "test:building-visual-evidence-package": "node --test tests/building-visual-evidence-package.test.mjs",
+    "build:building-visual-evidence-package": "node scripts/build-building-visual-evidence-package.mjs",
     "test:architectural-observation-schema": "node --test tests/architectural-observation-schema.test.mjs",
     "test:architectural-feature-proposals": "node --test tests/architectural-feature-proposals.test.mjs tests/architectural-feature-proposals-cli.test.mjs",
     "propose:architectural-features": "node scripts/propose-architectural-features.mjs",
