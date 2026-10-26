@@ -42,7 +42,10 @@ test("prepares a same-camera render plan with explicit axis conversion and origi
   assert.equal(plan.blenderCamera.imageWidth, 100);
   assert.equal(plan.blenderCamera.imageHeight, 80);
   assert.equal(plan.blenderCamera.lensMm, 36);
-  assert.equal(plan.blenderCamera.pixelAspectX, 1);\n  assert.equal(plan.blenderCamera.pixelAspectY, 2);\n  assert.equal(plan.blenderCamera.shiftX, 0);\n  assert.equal(plan.blenderCamera.shiftY, 0);
+  assert.equal(plan.blenderCamera.pixelAspectX, 1);
+  assert.equal(plan.blenderCamera.pixelAspectY, 2);
+  assert.equal(plan.blenderCamera.shiftX, 0);
+  assert.equal(plan.blenderCamera.shiftY, 0);
   assert.equal(plan.publicationEligible, false);
 });
 
