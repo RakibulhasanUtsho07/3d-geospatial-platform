@@ -76,11 +76,14 @@ async function main() {
     throw new Error("Source, reviewed mask and edge-map dimensions must match exactly so pixel coordinates remain source-bound.");
   }
   if (metadata.mask.bytes !== maskFile.bytes.length) throw new Error("Encoded mask byte length does not match the source manifest.");
+  if (metadata.edgeMap.bytes !== undefined && metadata.edgeMap.bytes !== edgeFile.bytes.length) {
+    throw new Error("Edge-map byte length does not match the declared source evidence.");
+  }
   const source = { ...metadata.source, ...sourceDimensions };
   const providerResult = { schemaVersion: metadata.schemaVersion, sourceId: source.id,
     inputSha256: sourceSha256, provider: metadata.provider, mask: metadata.mask, assessment: metadata.assessment };
   const maskValidation = validateBuildingMaskArtifact({ source: { sourceId: source.id, sha256: sourceSha256, ...sourceDimensions },
-    result: providerResult, actualMaskSha256: maskSha256, decodedMask: maskPixels });
+    result: providerResult, actualMaskSha256: maskSha256, actualMaskBytes: maskFile.bytes.length, decodedMask: maskPixels });
   if (!maskValidation.validForFeatureExtraction) {
     throw new Error("Mask is not ready for feature extraction (" + maskValidation.status + "): " +
       [...maskValidation.errors, ...maskValidation.warnings].map((item) => item.detail).join(" "));
