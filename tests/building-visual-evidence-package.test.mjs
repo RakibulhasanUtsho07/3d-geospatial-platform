@@ -175,6 +175,7 @@ test("computes separate IoU and contour metrics only for reviewed, source/render
   const report = calculateBinarySilhouetteMetrics({
     sourceImageSha256: input.source.sha256,
     sourceImageSize: { width, height },
+    sourceCameraRenderSha256: renderSha256,
     referenceMask: input.referenceSilhouette,
     candidateMask: candidate,
   });
@@ -184,19 +185,19 @@ test("computes separate IoU and contour metrics only for reviewed, source/render
   assert.equal(candidate.sourceCameraRenderSha256, renderSha256);
 
   const unreviewed = calculateBinarySilhouetteMetrics({
-    sourceImageSha256: input.source.sha256, sourceImageSize: { width, height },
+    sourceImageSha256: input.source.sha256, sourceImageSize: { width, height }, sourceCameraRenderSha256: renderSha256,
     referenceMask: { ...input.referenceSilhouette, review: { status: "proposed" } }, candidateMask: candidate,
   });
   assert.equal(unreviewed.status, "incomplete");
   assert.equal(unreviewed.metrics, null);
 
   const wrongRender = calculateBinarySilhouetteMetrics({
-    sourceImageSha256: input.source.sha256, sourceImageSize: { width, height },
+    sourceImageSha256: input.source.sha256, sourceImageSize: { width, height }, sourceCameraRenderSha256: renderSha256,
     referenceMask: input.referenceSilhouette,
     candidateMask: { ...candidate, sourceCameraRenderSha256: hash(99) },
   });
-  assert.equal(wrongRender.status, "evaluated");
-  assert.equal(wrongRender.candidateMaskSha256, candidate.sha256);
+  assert.equal(wrongRender.status, "incomplete");
+  assert.equal(wrongRender.reason, "render-silhouette-provenance-missing");
 });
 
 test("integrates mask, feature, camera, render and silhouette evidence without promoting synthetic fixtures", () => {
