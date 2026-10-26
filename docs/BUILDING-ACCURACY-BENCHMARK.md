@@ -82,3 +82,40 @@ The JSON config uses `schemaVersion: "1.0.0"`, `buildingId`, and `dimensionRefer
 For dimensions, the accepted provenance labels are `surveyed` and `published-measurement`; a guess cannot pass as ground truth. Survey provenance and reviewer outcomes remain operator-attested. If control evidence or render/reference review is missing or pending, the status is `benchmark-incomplete`; mismatched measurements/references or stale hashes produce `benchmark-failed`; complete evidence can produce `benchmark-passed-review-required`. Geometry QA warnings remain visible and can also keep the result incomplete.
 
 The report contains no combined accuracy percentage. It always keeps `mapReady: false`, `publicationEligible: false`, and `automaticApproval: false`.
+
+
+## BRF-04 — Controlled baseline and deliberate-defect regression protocol
+
+A small synthetic GLB is now checked in at `benchmarks/building-reconstruction/brf-04-controlled-baseline-v1.json`. It is designed to validate the benchmark infrastructure against known geometry, not to estimate the accuracy of any actual building.
+
+### Controlled truth
+
+| Property | Expected value |
+|---|---:|
+| Model-space dimensions (X × Y × Z) | 10 × 8 × 6 m (synthetic units treated as metres only inside this controlled test) |
+| Mesh count | 1 |
+| Triangle count | 12 |
+| Degenerate triangles | 0 |
+| Axis-aligned dimension screening tolerance | 2% |
+| Publication/map readiness | Always false |
+
+Fixture provenance explicitly states the scope: GLB parser integrity, axis-aligned model-space bounds, dimension tolerance and degenerate-triangle detection. It is **not** authoritative for architectural similarity, real-world scale, georeferencing, photo reconstruction, or heritage fidelity.
+
+### Deliberate defect cases
+
+1. **Y-axis scale +20%.** The injected candidate remains a structurally valid GLB, but dimensions become 10 × 9.6 × 6 m. Against the 10 × 8 × 6 baseline, the Y-axis error is 20%; the dimension validation must return `dimension-mismatch-review-required`. Float32 position values are compared at four decimal places in the regression test; the independent 2% error tolerance remains unchanged.
+2. **Degenerate triangle.** A deliberate repeated index creates at least one zero-area triangle. Structural GLB parsing may still report `valid: true`, but geometry QA must include `degenerate-triangles-present` and the controlled baseline acceptance helper must reject the candidate.
+
+### Run the deterministic regression tests
+
+```bash
+npm run test:building-baseline-defect-injection
+```
+
+The suite tests baseline dimensions/counts, repeated-build SHA-256 determinism, both injected defects, and the no-publication policy. The test suite runs in the full CI workflow.
+
+### What a pass means—and does not mean
+
+A passing run demonstrates that the current parser/QA + dimensional-tolerance checks detect these specific synthetic defects. It does not demonstrate that a Bangabhaban, Parliament building, or arbitrary building matches photographs. Real-building validation still requires independently sourced dimensions, evidence-linked reference images, camera pose/calibration, a candidate-bound fixed-view render set, human facade review and separate ground-control evidence where georeferencing is claimed.
+
+Do not infer an overall accuracy percentage from these tests; do not turn on `mapReady`, `publicationEligible` or automatic approval because a synthetic baseline passes.
