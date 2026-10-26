@@ -33,8 +33,6 @@ on:
       - feat/brf-02-candidate-evidence-manifest
       - feat/brf-03-capture-quality-coverage
       - feat/brf-01-generic-renderer
-      - feat/brf-02-candidate-evidence-manifest
-      - feat/brf-03-capture-quality-coverage
       - feat/render-reference-comparison-review
       - feat/render-review-correction-tasks
       - feat/render-correction-verification
@@ -84,6 +82,7 @@ on:
       - refactor/p1-selection-event-dispatch
       - rakibul-hasan
       - fix/bangabhaban-front-dome-alignment
+      - feat/brf-02-candidate-evidence-manifest
       - feat/building-review-package-signatures
       - feat/building-accuracy-benchmark
       - feat/render-image-similarity-diagnostics
