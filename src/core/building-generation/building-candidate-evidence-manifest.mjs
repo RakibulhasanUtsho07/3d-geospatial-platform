@@ -394,6 +394,7 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
   const coversSides = (set) => requiredSides.every((side) => set.has(side));
 
   const actualArtifacts = options.actualArtifacts;
+  let actualArtifactBytesVerified = false;
   if (!Array.isArray(actualArtifacts)) {
     record("actual-artifact-bytes-verified", false,
       "Actual artifact bytes were not supplied; declared hashes alone are not a filesystem integrity check.");
@@ -439,6 +440,10 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
       }
       record("actual-artifact-coverage", complete,
         "Every present artifact declared by the manifest must have a corresponding actual-file hash.");
+      const integrityCheckIds = /^(actual-artifact-list-valid|actual-artifact-coverage|artifact-(path|hash|size)-matches:|artifact-independent-hash-pin:)/;
+      actualArtifactBytesVerified = complete && checks
+        .filter((item) => integrityCheckIds.test(item.id))
+        .every((item) => item.status === "passed");
     }
   }
 
@@ -576,7 +581,7 @@ export function assessBuildingCandidateEvidenceManifest(input = {}, options = {}
     dimensions.status === "verified" && ground.status === "verified";
   const frameAlignmentVerified = manifest.evidence.cameraEvidence.length > 0 &&
     manifest.evidence.cameraEvidence.every((camera) => camera.frameAlignmentStatus === "verified");
-  if (independentEvidenceReady) {
+  if (actualArtifactBytesVerified && independentEvidenceReady) {
     evidenceTier = cameraCalibrated && frameAlignmentVerified ? "A" : "B";
   } else if (referenceArtifacts.length > 0 && manifest.evidence.cameraEvidence.length > 0) evidenceTier = "C";
   const counts = {
