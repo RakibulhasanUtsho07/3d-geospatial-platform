@@ -73,6 +73,12 @@ test("two-view triangulation cannot claim outlier rejection",()=>{
  assert.equal(result.status,"review-required");
  assert.equal(result.reason,"insufficient-views-for-outlier-rejection");
  assert.equal(result.suspectedOutliers.length,0);
+ const wireframe=buildMultiViewWireframe({cameras,features:[{id:"two-view-feature",observations}],edges:[]});
+ assert.equal(wireframe.status,"candidate-wireframe");
+ assert.equal(wireframe.qualityStatus,"review-required");
+ assert.equal(wireframe.vertices[0].status,"review-required");
+ assert.equal(wireframe.reviewRequiredFeatureCount,1);
+ assert.equal(wireframe.publicationEligible,false);
  assert.equal(result.publicationEligible,false);
 });
 test("robust validation rejects invalid thresholds and duplicate camera observations",()=>{
