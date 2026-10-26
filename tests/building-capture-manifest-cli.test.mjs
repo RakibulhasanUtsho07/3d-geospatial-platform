@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -90,6 +90,14 @@ test("refuses path traversal and symlinked source files", async (t) => {
     /inside the project root|project-relative path/);
   const manifestPath = path.join(data.root, "capture-manifest.json");
   const raw = JSON.parse(await readFile(manifestPath, "utf8"));
+  const frontPath = path.join(data.root, "evidence", "capture-front.bin");
+  await unlink(frontPath);
+  await symlink("capture-back.bin", frontPath);
+  const symlinkResult = await validateBuildingCaptureManifestFile({ manifestPath: "capture-manifest.json",
+    rootDir: data.root, expectedSha256: data.expectedManifestSha256 });
+  assert.equal(symlinkResult.status, "failed");
+  assert.match(symlinkResult.fileIntegrity.find((item) => item.sourceId === "capture-front").detail, /symlink/);
+
   raw.sources[0].path = "../outside.jpg";
   await writeFile(manifestPath, JSON.stringify(raw));
   await assert.rejects(validateBuildingCaptureManifestFile({ manifestPath: "capture-manifest.json", rootDir: data.root }),
