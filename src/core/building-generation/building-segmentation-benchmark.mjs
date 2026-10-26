@@ -106,6 +106,12 @@ export function validateSegmentationBenchmarkManifest(manifest) {
     }
     validateAsset(sample?.source, "source-image", sampleId, issues, true);
     validateAsset(sample?.groundTruthMask, "label-mask", sampleId, issues, false);
+    if (sample?.source && sample?.groundTruthMask &&
+        finiteInt(sample.source.width) && finiteInt(sample.source.height) &&
+        (sample.source.width !== sample.groundTruthMask.width || sample.source.height !== sample.groundTruthMask.height)) {
+      addIssue(issues, "error", "ground-truth-dimensions-mismatch",
+        "Ground-truth mask dimensions must match source-image pixel dimensions.", sampleId);
+    }
     if (!validReview(sample?.groundTruthMask?.review)) {
       addIssue(issues, "warning", "ground-truth-mask-not-reviewed",
         "Ground-truth mask needs an annotation ID, reviewer, timestamp and reviewed status.", sampleId);
