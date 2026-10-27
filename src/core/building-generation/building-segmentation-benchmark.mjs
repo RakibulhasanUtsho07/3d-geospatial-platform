@@ -89,7 +89,7 @@ export function validateSegmentationBenchmarkManifest(manifest) {
     return { status: "failed", issues, sampleCount: 0 };
   }
   if (!manifest.samples.length) addIssue(issues, "warning", "benchmark-has-no-samples", "No labelled samples are available; this validates tooling only.");
-  const sampleIds = new Set(), groupSplit = new Map();
+  const sampleIds = new Set(), captureGroupSplit = new Map(), buildingGroupSplit = new Map();
   for (const sample of manifest.samples) {
     const sampleId = sample?.sampleId;
     if (!ID.test(sampleId ?? "")) addIssue(issues, "error", "sample-id-invalid", "Each sample needs a safe sampleId.", nonEmpty(sampleId) ? sampleId : null);
@@ -98,11 +98,22 @@ export function validateSegmentationBenchmarkManifest(manifest) {
     if (!nonEmpty(sample?.captureGroupId)) addIssue(issues, "error", "capture-group-missing", "Every sample needs captureGroupId to prevent burst leakage.", sampleId);
     if (!SPLITS.has(sample?.split)) addIssue(issues, "error", "split-invalid", "split must be development or held-out-evaluation.", sampleId);
     if (nonEmpty(sample?.captureGroupId) && SPLITS.has(sample?.split)) {
-      const oldSplit = groupSplit.get(sample.captureGroupId);
+      const oldSplit = captureGroupSplit.get(sample.captureGroupId);
       if (oldSplit && oldSplit !== sample.split) {
         addIssue(issues, "error", "capture-group-split-leakage",
           "Images from one captureGroupId appear in both development and held-out evaluation.", sampleId);
-      } else groupSplit.set(sample.captureGroupId, sample.split);
+      } else captureGroupSplit.set(sample.captureGroupId, sample.split);
+    }
+    if (!ID.test(sample?.buildingGroupId ?? "")) {
+      addIssue(issues, "error", "building-group-id-invalid",
+        "Every sample needs a stable buildingGroupId so different captures of the same physical building cannot cross splits.", sampleId);
+    }
+    if (ID.test(sample?.buildingGroupId ?? "") && SPLITS.has(sample?.split)) {
+      const oldBuildingSplit = buildingGroupSplit.get(sample.buildingGroupId);
+      if (oldBuildingSplit && oldBuildingSplit !== sample.split) {
+        addIssue(issues, "error", "building-group-split-leakage",
+          "A physical buildingGroupId appears in both development and held-out evaluation; hold out whole buildings, not only individual images.", sampleId);
+      } else buildingGroupSplit.set(sample.buildingGroupId, sample.split);
     }
     validateAsset(sample?.source, "source-image", sampleId, issues, true);
     validateAsset(sample?.groundTruthMask, "label-mask", sampleId, issues, false);
@@ -154,8 +165,15 @@ export function validateSegmentationBenchmarkManifest(manifest) {
   }
   const status = issues.some((item) => item.level === "error") ? "failed" :
     issues.some((item) => item.level === "warning") ? "incomplete" : "ready-for-evaluation";
-  return { status, issues, sampleCount: manifest.samples.length,
-    heldOutSamples: manifest.samples.filter((sample) => sample?.split === "held-out-evaluation").length };
+  const heldOutRows = manifest.samples.filter((sample) => sample?.split === "held-out-evaluation");
+  return {
+    status,
+    issues,
+    sampleCount: manifest.samples.length,
+    heldOutSamples: heldOutRows.length,
+    buildingCount: new Set(manifest.samples.map((sample) => sample?.buildingGroupId).filter((id) => ID.test(id ?? ""))).size,
+    heldOutBuildings: new Set(heldOutRows.map((sample) => sample?.buildingGroupId).filter((id) => ID.test(id ?? ""))).size,
+  };
 }
 
 export function decodeSegmentationPalette(rgbPixels) {
@@ -237,8 +255,9 @@ export function buildSegmentationBenchmarkReport({ manifest, evaluatedSamples = 
         addIssue(reportIssues, "error", "candidate-result-invalid",
           result.detail ?? "Candidate evaluation failed integrity or decoding checks.", sample.sampleId);
       }
-      perImage.push({ sampleId: sample.sampleId, captureGroupId: sample.captureGroupId,
-        split: sample.split, providerId: candidate.providerId, modelVersion: candidate.modelVersion,
+      perImage.push({ sampleId: sample.sampleId, buildingGroupId: sample.buildingGroupId,
+        captureGroupId: sample.captureGroupId, split: sample.split,
+        providerId: candidate.providerId, modelVersion: candidate.modelVersion,
         status: result.status, sourceSha256: sample.source?.sha256 ?? null,
         groundTruthSha256: sample.groundTruthMask?.sha256 ?? null,
         predictionSha256: candidate.mask?.sha256 ?? null,
@@ -254,10 +273,37 @@ export function buildSegmentationBenchmarkReport({ manifest, evaluatedSamples = 
       const values = selected.map((item) => item.metrics?.macroForegroundIoU).filter(Number.isFinite);
       return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(6)) : null;
     };
-    return { providerId, evaluatedImageCount: images.length, heldOutImageCount: heldOut.length,
-      meanPerImageMacroForegroundIoU: metricAverages(images), heldOutMeanMacroForegroundIoU: metricAverages(heldOut),
+    const metricAveragesPerBuilding = (selected) => {
+      const grouped = new Map();
+      for (const item of selected) {
+        const score = item.metrics?.macroForegroundIoU;
+        if (!nonEmpty(item.buildingGroupId) || !Number.isFinite(score)) continue;
+        const scores = grouped.get(item.buildingGroupId) ?? [];
+        scores.push(score);
+        grouped.set(item.buildingGroupId, scores);
+      }
+      const buildingMeans = [...grouped.values()].map((scores) =>
+        scores.reduce((sum, score) => sum + score, 0) / scores.length);
+      return buildingMeans.length
+        ? Number((buildingMeans.reduce((sum, score) => sum + score, 0) / buildingMeans.length).toFixed(6))
+        : null;
+    };
+    const buildingCount = (selected) => new Set(
+      selected.map((item) => item.buildingGroupId).filter(nonEmpty),
+    ).size;
+    return {
+      providerId,
+      evaluatedImageCount: images.length,
+      heldOutImageCount: heldOut.length,
+      developmentBuildingCount: buildingCount(images.filter((item) => item.split === "development")),
+      heldOutBuildingCount: buildingCount(heldOut),
+      meanPerImageMacroForegroundIoU: metricAverages(images),
+      heldOutMeanMacroForegroundIoU: metricAverages(heldOut),
+      meanPerBuildingMacroForegroundIoU: metricAveragesPerBuilding(images),
+      heldOutMeanPerBuildingMacroForegroundIoU: metricAveragesPerBuilding(heldOut),
       recommendation: "manual-review-required",
-      note: "Scores are descriptive; an approved threshold and human-reviewed held-out failures are required before selecting an automatic provider." };
+      note: "Scores are descriptive; report per-image failures, review the held-out buildings and freeze an approved threshold before selecting an automatic provider.",
+    };
   });
   const status = reportIssues.some((item) => item.level === "error") ? "benchmark-failed" :
     reportIssues.some((item) => item.level === "warning") || validation.status !== "ready-for-evaluation"
@@ -265,14 +311,22 @@ export function buildSegmentationBenchmarkReport({ manifest, evaluatedSamples = 
   return { schemaVersion: "1.0.0", engine: "building-segmentation-benchmark-v1",
     benchmarkId: manifest?.benchmarkId ?? null, generatedAt, status, acceptanceEligible: false,
     paletteId: SEGMENTATION_PALETTE_ID, classDefinitions: SEGMENTATION_CLASSES,
-    splitPolicy: "captureGroupId must remain within exactly one split; held-out-evaluation is not used to tune candidate configuration.",
-    counts: { samples: manifest?.samples?.length ?? 0, evaluatedPairs: perImage.filter((item) => item.status === "evaluated").length,
+    splitPolicy: "Both captureGroupId and buildingGroupId must remain within exactly one split. Whole physical buildings are held out; held-out-evaluation must not tune candidate configuration.",
+    counts: {
+      samples: manifest?.samples?.length ?? 0,
+      buildings: new Set((manifest?.samples ?? []).map((sample) => sample?.buildingGroupId).filter(nonEmpty)).size,
+      heldOutBuildings: new Set((manifest?.samples ?? [])
+        .filter((sample) => sample?.split === "held-out-evaluation")
+        .map((sample) => sample?.buildingGroupId).filter(nonEmpty)).size,
+      evaluatedPairs: perImage.filter((item) => item.status === "evaluated").length,
       errors: reportIssues.filter((item) => item.level === "error").length,
-      warnings: reportIssues.filter((item) => item.level === "warning").length },
+      warnings: reportIssues.filter((item) => item.level === "warning").length,
+    },
     candidateSummaries, perImage, issues: reportIssues,
     limitations: [
       "No segmentation model is trained or downloaded by this benchmark.",
       "Palette-labelled masks are only ground truth when their annotation provenance and permission records are genuine and independently reviewed.",
+      "buildingGroupId must represent the physical building across all captures; incorrect grouping metadata can still conceal dataset leakage.",
       "Image hashes establish byte identity, not building identity, license truth or annotation correctness.",
       "Macro IoU/precision/recall are segmentation diagnostics; they do not prove 3D architecture, hidden facade geometry or dimensions.",
       "No automatic model is selected, and acceptanceEligible remains false until thresholds are approved and held-out results receive human review."
