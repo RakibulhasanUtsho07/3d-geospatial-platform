@@ -35,7 +35,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install pinned geospatial and Overture dependencies
         run: python -m pip install --disable-pip-version-check "laspy[lazrs]" "pyproj==3.7.2" "numpy==2.3.3" "shapely==2.1.2" "overturemaps==1.0.2"
