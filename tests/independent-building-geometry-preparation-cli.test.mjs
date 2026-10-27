@@ -67,8 +67,9 @@ test("prepares a manifest from exact GLB bytes and independently supplied refere
   assert.equal(manifest.preparation.extractedHeldOutCheckPointCount,3);
   assert.equal(manifest.preparation.acceptanceEligible,false);
   const evaluated=run(evalSource,root,["prepared.json","report.json"]);
-  assert.equal(evaluated.status,2,evaluated.stderr);
+  assert.equal(evaluated.status,0,evaluated.stderr);
   const report=JSON.parse(await readFile(path.join(root,"report.json"),"utf8"));
+  assert.equal(report.status,"benchmark-review-required");
   assert.equal(report.geometryExtractionProvenance.candidate.status,"passed");
   assert.equal(report.geometryExtractionProvenance.reference.status,"passed");
   assert.equal(report.assetIntegrity.every(item=>item.status==="passed"),true);
