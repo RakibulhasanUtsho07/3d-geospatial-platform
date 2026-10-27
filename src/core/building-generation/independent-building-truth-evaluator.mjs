@@ -338,9 +338,12 @@ function nearestTriangleDistanceSquared(point, node, best = Infinity) {
 function vertexToSurface(vertices, targetBvh) {
   return vertices.map((point) => Math.sqrt(nearestTriangleDistanceSquared(point, targetBvh)));
 }
-function compareSurfaceMeshes(candidateRaw, referenceRaw, candidateGlbSha256) {
+function compareSurfaceMeshes(candidateRaw, referenceRaw, candidateGlbSha256, referenceSourceSha256) {
   const candidate = normalizeMesh(candidateRaw, "candidate.surfaceMesh", candidateGlbSha256);
   const reference = normalizeMesh(referenceRaw, "reference.surfaceMesh");
+  if (reference.sha256.toLowerCase() !== referenceSourceSha256.toLowerCase()) {
+    throw new TypeError("reference.surfaceMesh.sha256 must bind the reference mesh to the exact independent source SHA-256.");
+  }
   const candidateBvh = buildBvh(candidate.triangles), referenceBvh = buildBvh(reference.triangles);
   const candidateToReference = vertexToSurface(candidate.vertices, referenceBvh);
   const referenceToCandidate = vertexToSurface(reference.vertices, candidateBvh);
@@ -355,8 +358,8 @@ function compareSurfaceMeshes(candidateRaw, referenceRaw, candidateGlbSha256) {
       sampleCount: all.length,
       meanM: rounded(all.reduce((sum, value) => sum + value, 0) / all.length),
       rmsM: rounded(Math.sqrt(all.reduce((sum, value) => sum + value * value, 0) / all.length)),
-      p95M: rounded(Math.max(directionalCandidate.p95M, directionalReference.p95M)),
-      maxM: rounded(Math.max(directionalCandidate.maxM, directionalReference.maxM)),
+      p95M: rounded(percentile(all, 0.95)),
+      maxM: rounded(Math.max(...all)),
     },
     caveat: "This is vertex-sampled nearest-triangle distance, not continuous signed Hausdorff distance; triangle interiors are not uniformly sampled and surface completeness/topology require separate review.",
   };
@@ -488,7 +491,7 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       "A surface metric needs both candidate and independently sourced reference meshes.", "warning");
   } else if (hasCandidateSurface && hasReferenceSurface) {
     try {
-      surfaceDistance = compareSurfaceMeshes(candidate.surfaceMesh, reference.surfaceMesh, candidate.glbSha256);
+      surfaceDistance = compareSurfaceMeshes(candidate.surfaceMesh, reference.surfaceMesh, candidate.glbSha256, reference.sourceSha256);
       record("surface-distance-computed", true,
         "Computed symmetric vertex-sampled nearest-triangle distances with exact source-hash bindings.");
       addMetricThreshold(record, toleranceConfiguration, "surfaceDistanceP95M",
