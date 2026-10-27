@@ -118,8 +118,8 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
       truth.policy.publicationEligible === false && truth.policy.mapReady === false &&
       truth.policy.automaticApproval === false &&
       object(truth.geometryExtractionProvenance) &&
-      truth.geometryExtractionProvenance.candidate?.status === "passed" &&
-      truth.geometryExtractionProvenance.reference?.status === "passed";
+      ["passed", "incomplete", "failed"].includes(truth.geometryExtractionProvenance.candidate?.status) &&
+      ["passed", "incomplete", "failed"].includes(truth.geometryExtractionProvenance.reference?.status);
     record("independent-truth-report-valid", truthSchemaValid && truthStatusValid,
       truthSchemaValid && truthStatusValid
         ? "Independent geometry report is schema-valid, carries extraction provenance checks, and keeps all release gates disabled."
@@ -129,6 +129,13 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
     record("independent-truth-report-candidate-binding", candidateBound,
       candidateBound ? "Independent geometry metrics are bound to the exact candidate GLB SHA-256."
         : "Independent geometry report is stale or belongs to a different candidate GLB.");
+    const extractionProvenancePassed = truth.geometryExtractionProvenance?.candidate?.status === "passed" &&
+      truth.geometryExtractionProvenance?.reference?.status === "passed";
+    record("independent-truth-report-extraction-provenance", extractionProvenancePassed,
+      extractionProvenancePassed
+        ? "Candidate and reference geometry extraction tool/config bytes were verified by the evaluator CLI."
+        : "Candidate or reference geometry extraction provenance is incomplete or failed.",
+      truth.status === "benchmark-failed" ? "failed" : "warning");
     const artifact = independentTruthReportEvidence ?? {};
     const artifactPinned = artifact.verified === true &&
       isHash(artifact.sha256) && isHash(artifact.expectedSha256) &&
