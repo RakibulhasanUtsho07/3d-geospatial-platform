@@ -532,6 +532,13 @@ def inspect_ept_reference(
 
     node_reports: list[dict[str, Any]] = []
     whole_classes: Counter[int] = Counter()
+    ground_padding_m = float(config.get("groundComparisonPaddingMeters", 15.0))
+    max_ground_neighbour_m = float(config.get("maxGroundNeighbourDistanceM", 12.0))
+    high_return_grid_cell_m = float(config.get("highReturnGridCellSizeM", 2.0))
+    if not (1 <= ground_padding_m <= 100 and 1 <= max_ground_neighbour_m <= 50 and 0.5 <= high_return_grid_cell_m <= 10):
+        fail("Ground comparison limits fall outside the allowed safety bounds.")
+    validation_class1_points: list[tuple[float, float, float]] = []
+    validation_ground_points: list[tuple[float, float, float]] = []
     radius_point_counts: dict[float, int] = {value: 0 for value in diagnostic_radii}
     radius_class_counts: dict[float, Counter[int]] = {value: Counter() for value in diagnostic_radii}
     nearest_class6: dict[str, Any] | None = None
@@ -572,6 +579,20 @@ def inspect_ept_reference(
                     dx = xs - target_x
                     dy = ys - target_y
                     distance_sq = dx * dx + dy * dy
+                    validation_mask = distance_sq <= validation_radius * validation_radius
+                    class1_mask = validation_mask & (class_values == 1)
+                    class2_ground_mask = (
+                        (distance_sq <= (validation_radius + ground_padding_m) ** 2)
+                        & (class_values == 2)
+                    )
+                    for point_index in np.flatnonzero(class1_mask):
+                        validation_class1_points.append((
+                            float(xs[point_index]), float(ys[point_index]), float(points.z[point_index])
+                        ))
+                    for point_index in np.flatnonzero(class2_ground_mask):
+                        validation_ground_points.append((
+                            float(xs[point_index]), float(ys[point_index]), float(points.z[point_index])
+                        ))
                     class6_indices = np.flatnonzero(class_values == 6)
                     if class6_indices.size:
                         candidate_distances_sq = distance_sq[class6_indices]
@@ -621,8 +642,18 @@ def inspect_ept_reference(
     local_point_count = radius_point_counts[validation_radius]
     local_classes = radius_class_counts[validation_radius]
     class6 = local_classes.get(6, 0)
+    elevated_unclassified_summary = summarize_unclassified_elevations_above_ground(
+        validation_class1_points,
+        validation_ground_points,
+        max_ground_distance_m=max_ground_neighbour_m,
+        grid_cell_size_m=high_return_grid_cell_m,
+    )
     coverage_blockers, coverage_warnings = assess_sample_building_coverage(
-        local_point_count, local_classes, len(node_reports), len(candidate_nodes)
+        local_point_count,
+        local_classes,
+        len(node_reports),
+        len(candidate_nodes),
+        elevated_unclassified_summary,
     )
     blockers.extend(coverage_blockers)
     warnings.extend(coverage_warnings)
@@ -685,6 +716,7 @@ def inspect_ept_reference(
                 for value in diagnostic_radii
             },
             "nearestClass6PointInInspectedNodes": nearest_class6,
+            "unclassifiedElevatedSurfaceDiagnostics": elevated_unclassified_summary,
         },
         "classificationCountsWithinValidationRadius": {str(k): v for k, v in sorted(local_classes.items())},
         "classificationCountsAcrossInspectedNodes": {str(k): v for k, v in sorted(whole_classes.items())},
