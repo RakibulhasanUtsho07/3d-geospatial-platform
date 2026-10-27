@@ -451,7 +451,7 @@ Do not blindly merge the entire rakibul-hasan branch into development: branch co
 
 
 
-### 2026-10-27 — BRF-08: independent-truth evaluator and accuracy-pack integration (validation pending)
+### 2026-10-27 — BRF-08: independent-truth evaluator and accuracy-pack integration (code merged to development; real-data validation pending)
 
 - **Branch / PR:** `feat/brf-08-independent-truth-evaluator` → [PR #206](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/206), base `development`. This scoped package is not the completion of all BRF-08 release gates.
 - **Whole-building segmentation holdout:** require stable `buildingGroupId` across capture sessions; report per-building macro IoU and explicit missing/failed held-out sample results.
@@ -463,15 +463,23 @@ Do not blindly merge the entire rakibul-hasan branch into development: branch co
 - **Release policy:** keep `acceptanceEligible`, `publicationEligible`, `mapReady` and automatic approval false. BRF-08 stays in progress until an actual extraction adapter/replay path, independently reviewed geometry, a genuine held-out building and documented human sign-off are exercised.
 - **Exact-head validation:** pending after the latest code, tests and documentation updates; do not merge PR #206 to `development` or promote to `main` before exact-head CI succeeds.
 
-**Next task:** implement a reproducible extraction adapter that derives candidate mesh bounds/vertices from the actual GLB and imports independently sourced reference geometry into the same declared frame, then run the evaluator on a real survey-backed building. Keep CI contract evidence distinct from real-world acceptance.
+**Implementation follow-up:** BRF-09 added the actual GLB extraction and independent reference-frame adapter and is now merged into `development`. Real survey-backed validation remains open; see the BRF-10 source-readiness work below.
 
 
-### 2026-10-27 — BRF-09: actual GLB geometry extraction adapter (implementation in review)
+### 2026-10-27 — BRF-09: actual GLB geometry extraction adapter (merged to development; post-merge CI in progress)
 
 - Scope: add a deterministic GLB 2.0 byte parser for embedded POSITION/index accessors, accumulated scene-node transforms and an explicitly supplied source-to-evaluation affine transform; derive provisional metric bounds and X/Z convex-hull footprint; create a bounded, deterministic triangle-sampled surface for the independent-truth evaluator.
 - Reference intake: import a reviewed survey/CAD/BIM/LiDAR geometry JSON payload already registered in the same metre-based coordinate frame. Bind candidate GLB, reference source, extractor implementation, configuration and geometry payloads by SHA-256. Existing fail-closed path, symlink and output-file rules remain in force.
 - Safety/limits: reject external buffers, sparse accessors, meshopt/Draco compression, morph/skinned/animated inputs, bad offsets/indices, degenerate triangles, invalid transforms and mismatched coordinate frames. Non-triangle primitives are reported as skipped. Provisional mesh-derived footprint/bounds are not a substitute for independently surveyed wall outline/dimensions.
 - Test policy: synthetic GLB fixtures prove parser/transform/hash plumbing only; they do not count as a real building accuracy result. Held-out candidate checkpoints remain mandatory for completeness and absent checkpoints must keep the report incomplete. Publication/map readiness/automatic approval remain false.
-- Validation state: initial scoped feature branch is being checked by regression tests and full CI. No real survey-backed building result is claimed by this commit.
+- Exact-head validation: [full CI run #40472128740](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40472128740) passed on the exact PR head `58444ed37e46aeeb25c56e2eee1e1cc4f8337359`; [reference-intake run #40472128606](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40472128606) also passed. PR [#207](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/207) was squash-merged to `development` at `5587c98b36bced96e1f07acd7a7a365c40cdac49`. Post-merge development CI [run #40473478338](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40473478338) is still running at this update. No real survey-backed building result is claimed.
 
-**Next task:** run the adapter on a genuinely survey-backed building with independently reviewed frame registration and held-out check points, inspect all geometry residuals and GLB/hash evidence, and only then evaluate whether any human release gate can be advanced.
+**Next task:** BRF-10 surveys the feasibility of a real independent building benchmark and specifies the exact intake evidence. The real geometry run remains blocked until a matched building, rights-reviewed assets, verified frame registration, an engine-generated candidate GLB and independently held-out controls are available.
+
+### 2026-10-27 — BRF-10: survey-backed benchmark source readiness (source triage complete; real run blocked)
+
+- **Tracking:** [Issue #208](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/208); detailed audit: [BRF-10 Survey-backed Benchmark Readiness](./BRF-10-SURVEY-BACKED-BENCHMARK-READINESS.md).
+- **Candidate source family:** GT-LOD3 (32 LOD3 reference-building instances with imagery/photogrammetric data and manually authored ground-truth models; repository documents CC BY 4.0). TUM2TWIN UAS laser scanning is a possible separate sensor modality: documentation describes Zenmuse L2 UAS laser scans georeferenced with RTK.
+- **Critical limits discovered:** a specific TUM building has not yet been confirmed in all image/CityGML/laser-scan assets. Photogrammetric cloud derived from the same images is not independent control. The separately hosted UAS laser-scanning asset's licence and exact record version must be verified independently; do not inherit the GT-LOD3 repository licence by assumption. Exact CRS, vertical datum, frame transform, selected file hashes and held-out control provenance are not yet established.
+- **Current status:** source triage only. No actual dataset sample was downloaded/verified in this execution, no candidate GLB was generated, and no real-building metric report is claimed. Keep the sample BLOCKED or NOT_COMPARABLE until those requirements are met.
+- **Validation guardrails:** do not commit the large raw dataset to Git history; only create a narrowly scoped sample packet after rights/licensing and data size are checked. Keep `acceptanceEligible`, `publicationEligible`, `mapReady`, and automatic approval false. Do not promote this work to `main` on source research alone.
