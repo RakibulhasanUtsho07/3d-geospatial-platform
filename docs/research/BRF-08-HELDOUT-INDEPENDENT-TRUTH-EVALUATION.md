@@ -23,6 +23,46 @@ The evaluator reports separate metric groups:
 
 Candidate and reference geometry must declare the same metric coordinate-frame ID and metre units. Geometry evidence must bind to the candidate GLB and reference-source SHA-256 values. The CLI reads both source paths, verifies actual bytes against the declared hashes, rejects traversal/symlink paths, writes a new hash-pinned report and exits non-zero on failure.
 
+## 2.1 Reproducible geometry-extraction provenance
+
+Each `candidate` and `reference` record supplied to the CLI must include `geometryExtractionProvenance`. The contract records:
+
+- `schemaVersion`, `extractionRunId`, `method` and `extractedAt`;
+- the exact source-artifact SHA-256 as `inputArtifactSha256` (candidate GLB bytes for the candidate, survey/reference source bytes for the reference);
+- a deterministic `outputGeometrySha256` calculated from the evaluated coordinate frame, units, footprint, dimensions, check points and optional surface mesh;
+- an extractor ID/version/commit plus project-relative paths and SHA-256 values for the extractor source artifact and extraction configuration;
+- the same `coordinateFrameId` and metre units used by the evaluator.
+
+The CLI recomputes the geometry payload digest and reads the extractor/config files from disk to verify their actual bytes match the declared hashes. Missing provenance yields an incomplete report; mismatched input, output digest, frame, extractor source or config bytes fails closed. The report records each tool/config artifact hash and per-role provenance status. The helper in `src/core/building-generation/geometry-extraction-provenance.mjs` uses canonical JSON key ordering so property-order changes do not change the payload digest.
+
+Example shape (use actual SHA-256 values for the project’s files; these placeholders are deliberately not runnable):
+
+```json
+{
+  "geometryExtractionProvenance": {
+    "schemaVersion": "1.0.0",
+    "extractionRunId": "candidate-extraction-2026-01",
+    "method": "glb-position-accessor-and-reviewed-geometry-adapter-v1",
+    "extractedAt": "2026-10-27T08:00:00Z",
+    "inputArtifactSha256": "<exact-candidate-or-reference-source-sha256>",
+    "outputGeometrySha256": "<canonical-geometry-payload-sha256>",
+    "coordinateFrameId": "survey-local-enu-v1",
+    "units": "m",
+    "extractor": {
+      "id": "building-geometry-extractor",
+      "version": "1.0.0",
+      "commitSha": "<extractor-source-commit>",
+      "artifactPath": "tools/geometry-extractor.mjs",
+      "artifactSha256": "<sha256-of-extractor-source-file>",
+      "configurationPath": "configs/geometry-extractor.json",
+      "configurationSha256": "<sha256-of-extractor-config-file>"
+    }
+  }
+}
+```
+
+This contract binds declarations to the bytes used for the evaluation and makes the extraction recipe traceable. It does **not** execute/replay the extractor, independently prove that the extractor produced the supplied coordinates, or authenticate survey truth; the extractor’s replay, code review and source-to-geometry inspection remain separate tasks. In this slice, footprint/measurement/check-point geometry is still supplied by an upstream preparation step rather than inferred automatically from raw photos/video.
+
 ### Run it
 
 ```bash
@@ -122,6 +162,20 @@ New tests live in:
 Coverage includes equal candidate/reference geometry, shifted footprints and dimensions, shifted mesh geometry, missing or malformed geometry, self-intersection, stale hashes, mismatched frames, declared-untrusted truth, held-out points incorrectly reused for fitting, missing thresholds and on-disk byte mismatch. The package script `test:independent-building-truth` runs both suites and CI runs the same script.
 
 Synthetic fixtures prove the contracts of the evaluator only. They are not measurements of a Dhaka or heritage building.
+
+## 3.1 Integration with the building-accuracy evidence pack
+
+The evaluator JSON report can now be consumed by `buildBuildingAccuracyBenchmark` and the existing evidence-pack CLI. In each relevant top-level `buildings[]` entry of the pack manifest, configure:
+
+```json
+{
+  "requireIndependentTruthEvaluation": true,
+  "independentTruthReportPath": "artifacts/independent-building-truth/site-a-report.json",
+  "expectedIndependentTruthReportSha256": "<reviewed-report-file-sha256>"
+}
+```
+
+The pack builder verifies the report file’s actual bytes against the expected digest, requires the report to identify the exact candidate GLB SHA-256, verifies the evaluator result and extraction-provenance status, includes the independent geometry metrics summary in the report, and exposes a separate `independent-truth-geometry-evaluation` gate. If `requireIndependentTruthEvaluation` is true and the path/report/hash is missing, the pack is incomplete; mismatched candidate hashes or failed geometry evidence fail. An input report is not considered trusted merely because it exists or has a JSON schema.
 
 ## 4. Limits and remaining BRF-08 gates
 
