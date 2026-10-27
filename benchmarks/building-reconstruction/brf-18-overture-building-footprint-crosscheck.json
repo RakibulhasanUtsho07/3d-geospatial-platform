@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf-18-central-mississippi-footprint-crosscheck",
+  "evaluationStage": "independent-footprint-cross-reference-only",
+  "componentInput": {
+    "eptManifest": "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json",
+    "multiviewManifest": "benchmarks/building-reconstruction/brf-14-multiview-source.json",
+    "expectedReportField": "cameraClusterSpatialProximity.components",
+    "componentCrs": "EPSG:3857"
+  },
+  "footprintSource": {
+    "dataset": "Overture Maps Buildings",
+    "homepage": "https://overturemaps.org/",
+    "documentation": "https://docs.overturemaps.org/guides/buildings/",
+    "downloadDocumentation": "https://docs.overturemaps.org/getting-data/overturemaps-py/",
+    "release": "2026-10-21.0",
+    "theme": "buildings",
+    "featureType": "building",
+    "sourceCrs": "EPSG:4326",
+    "license": "Open Database License 1.0 (ODbL) for Overture Buildings",
+    "attribution": "Overture Maps Foundation; includes OpenStreetMap and other conflated sources. See Overture Maps attribution and licensing documentation.",
+    "independenceNote": "This is an external footprint cross-reference for spatial triage, not survey-grade independent truth and not proof that an elevated point cluster belongs to the photographed building."
+  },
+  "query": {
+    "bboxWgs84": [-93.3918, 45.0508, -93.3902, 45.0528],
+    "coordinateOrder": "west,south,east,north",
+    "maximumFeatures": 5000,
+    "maxCandidateDistanceM": 50.0,
+    "metricCrs": "EPSG:26915",
+    "metricCrsRationale": "NAD83 / UTM zone 15N, suitable for local distance and area comparisons near the source sample in Minnesota."
+  },
+  "outputPolicy": {
+    "commitRawFootprints": false,
+    "uploadRawFootprints": false,
+    "uploadOnlyDerivedReport": true,
+    "purpose": "Short-lived, release-pinned footprint match candidates around the EPT elevated-return components."
+  },
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false,
+  "limitations": [
+    "The EPT elevated-return components are represented by axis-aligned bounding boxes, not actual roof or building footprint polygons.",
+    "Overture footprints can be roofprints and are conflated from multiple sources; they are not asserted to be survey geometry.",
+    "EPSG:26915 distances are local projected map distances, not a geodetic survey accuracy claim.",
+    "A candidate footprint spatially close to an EPT component does not establish visual identity or image-to-object correspondence.",
+    "The camera GPS coordinate is the camera centre, not a surveyed building control point; source camera altitude is excluded due to unknown vertical datum.",
+    "No engine-generated candidate GLB, independent held-out checkpoints or building accuracy metrics are created by this task."
+  ]
+}
