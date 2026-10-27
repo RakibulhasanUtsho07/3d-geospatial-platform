@@ -77,6 +77,7 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
     def test_rejects_malformed_ept_metadata(self):
         invalid = ept_metadata()
         invalid["bounds"] = [0, 0, 0, 10, 10]
+        invalid["boundsConforming"] = [0, 0, 0, 10, 10]
         with self.assertRaisesRegex(ValueError, "six-dimensional bounds"):
             MODULE.parse_ept_metadata(json.dumps(invalid).encode("utf-8"))
 
