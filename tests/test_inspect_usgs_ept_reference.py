@@ -138,23 +138,51 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
         self.assertIn("no-class6-building-points-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
-    def test_building_coverage_requires_class6_returns_inside_validation_radius(self):
-        blockers, warnings = MODULE.assess_sample_building_coverage(
-            3371, {1: 1283, 2: 2084, 7: 2, 18: 2}, 3, 3
+    def test_unclassified_returns_can_be_detected_above_class2_ground(self):
+        ground = [
+            (0.0, 0.0, 10.0), (5.0, 0.0, 10.0), (10.0, 0.0, 10.0),
+            (0.0, 5.0, 10.0), (5.0, 5.0, 10.0), (10.0, 5.0, 10.0),
+            (0.0, 10.0, 10.0), (5.0, 10.0, 10.0), (10.0, 10.0, 10.0),
+        ]
+        elevated = []
+        for x in (1.0, 3.0, 5.0, 7.0, 9.0, 11.0):
+            for y in (1.0, 1.4, 1.8, 2.2, 2.6):
+                elevated.append((x, y, 15.0))
+        summary = MODULE.summarize_unclassified_elevations_above_ground(
+            elevated, ground, max_ground_distance_m=12.0, grid_cell_size_m=2.0
         )
-        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
-        self.assertTrue(any("No class-6 building points" in warning for warning in warnings))
+        self.assertEqual(summary["unclassifiedPointsInsideValidationRadius"], 30)
+        self.assertEqual(summary["pointsComparedToGround"], 30)
+        self.assertGreaterEqual(summary["elevatedReturnThresholds"]["2"]["pointCount"], 25)
+        self.assertGreaterEqual(summary["elevatedReturnThresholds"]["2"]["occupiedGridCells"], 6)
+        self.assertTrue(summary["potentialElevatedUnclassifiedSurfaceDetected"])
+
+    def test_building_coverage_does_not_require_class6_if_elevated_unclassified_surface_is_supported(self):
+        elevated_summary = {
+            "potentialElevatedUnclassifiedSurfaceDetected": True,
+            "elevatedReturnThresholds": {"2": {"pointCount": 30, "occupiedGridCells": 6}},
+        }
+        blockers, warnings = MODULE.assess_sample_building_coverage(
+            3371, {1: 1283, 2: 2084, 7: 2, 18: 2}, 3, 3, elevated_summary
+        )
+        self.assertNotIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
+        self.assertTrue(any("may be a building or vegetation" in warning for warning in warnings))
 
         blockers, warnings = MODULE.assess_sample_building_coverage(
-            3371, {1: 1280, 2: 2088, 6: 3}, 3, 3
+            3371, {1: 1283, 2: 2084, 7: 2, 18: 2}, 3, 3,
+            {"potentialElevatedUnclassifiedSurfaceDetected": False},
         )
-        self.assertNotIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
+
+    def test_building_coverage_accepts_explicit_class6_and_blocks_incomplete_reads(self):
+        blockers, warnings = MODULE.assess_sample_building_coverage(3371, {1: 100, 2: 100, 6: 3}, 3, 3)
+        self.assertEqual(blockers, [])
         self.assertEqual(warnings, [])
-
-    def test_building_coverage_blocks_incomplete_node_reads_and_empty_neighbourhood(self):
-        blockers, _ = MODULE.assess_sample_building_coverage(0, {}, 2, 3)
+        blockers, _ = MODULE.assess_sample_building_coverage(
+            0, {}, 2, 3, {"potentialElevatedUnclassifiedSurfaceDetected": False}
+        )
         self.assertIn("no-point-returns-fall-within-the-sample-radius", blockers)
-        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
     def test_manifest_rejects_accidentally_enabled_publication_flags(self):
