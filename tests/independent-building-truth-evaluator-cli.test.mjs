@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
@@ -84,6 +84,17 @@ test("rejects Windows backslash paths before reading evidence", async (t) => {
   const execution = run(root, "unsafe-path-report.json");
   assert.equal(execution.status, 1);
   assert.match(execution.stderr, /safe project-relative path/);
+});
+
+test("rejects a symlinked report directory instead of writing outside the project root", async (t) => {
+  const { root } = await setup(t);
+  const external = await mkdtemp(path.join(os.tmpdir(), "independent-building-truth-external-"));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  await symlink(external, path.join(root, "escape"), "dir");
+  const execution = run(root, "escape/report.json");
+  assert.equal(execution.status, 1);
+  assert.match(execution.stderr, /Report output must not traverse symbolic links/);
+  await assert.rejects(readFile(path.join(external, "report.json")), { code: "ENOENT" });
 });
 
 test("reports an exact-byte mismatch as failed instead of trusting stale reference metrics", async (t) => {
