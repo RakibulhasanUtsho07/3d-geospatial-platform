@@ -254,6 +254,11 @@ jobs:
         run: npm run test:building-benchmark-readiness
       - name: Validate BRF-10 benchmark readiness CLI
         run: npm run assess:building-benchmark-readiness -- --help
+      - name: Test BRF-10 actual benchmark asset byte verification and CLI
+        run: npm run test:building-benchmark-asset-verification
+
+      - name: Validate BRF-10 asset byte verifier CLI
+        run: npm run verify:building-benchmark-asset-bytes -- --help
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
