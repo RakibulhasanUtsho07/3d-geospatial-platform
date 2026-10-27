@@ -75,6 +75,17 @@ test("verifies exact candidate/reference bytes and writes a review-required repo
   assert.equal(report.policy.mapReady, false);
 });
 
+
+test("rejects Windows backslash paths before reading evidence", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  manifest.candidate.glbPath = "evidence\\\\candidate.glb";
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "unsafe-path-report.json");
+  assert.equal(execution.status, 1);
+  assert.match(execution.stderr, /safe project-relative path/);
+});
+
 test("reports an exact-byte mismatch as failed instead of trusting stale reference metrics", async (t) => {
   const { root } = await setup(t);
   await writeFile(path.join(root, "evidence/survey.json"), "changed after measurement review");
