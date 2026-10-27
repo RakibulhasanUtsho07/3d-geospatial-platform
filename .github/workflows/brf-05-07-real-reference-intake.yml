@@ -37,8 +37,8 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Install locked dependencies
-        run: npm ci
+      - name: Install dependencies and reconcile the repository lockfile
+        run: npm install --no-audit --no-fund
 
       - name: Test review-packet hash and provenance guards
         run: npm run test:building-visual-review-packet
