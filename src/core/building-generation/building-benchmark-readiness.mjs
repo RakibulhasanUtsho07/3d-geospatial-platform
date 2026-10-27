@@ -179,8 +179,8 @@ export function assessBuildingBenchmarkReadiness(manifest) {
       !candidateAssetIds.some((id) => referenceAssetIds.includes(id))
       ? "Candidate image assets and independent reference assets are disjoint."
       : "Candidate input asset IDs must not overlap reference asset IDs.");
-  const referenceFramePassed = referenceObject && nonEmpty(reference.coordinateFrameId) &&
-    reference.coordinateFrameId === evaluationFrame && reference.units === "m" &&
+  const referenceFramePassed = referenceObject && nonEmpty(reference.sourceCoordinateFrameId) &&
+    nonEmpty(reference.coordinateFrameId) && reference.coordinateFrameId === evaluationFrame && reference.units === "m" &&
     nonEmpty(reference.crs) && nonEmpty(reference.verticalDatum) && nonEmpty(reference.frameRegistrationEvidence) &&
     Array.isArray(reference.sourceToEvaluationFrameMatrix4x4) &&
     (() => { try { validateSurveyFrameTransformMatrix4x4(reference.sourceToEvaluationFrameMatrix4x4); return true; } catch { return false; } })();
