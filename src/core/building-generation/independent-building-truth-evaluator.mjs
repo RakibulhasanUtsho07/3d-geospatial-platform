@@ -369,14 +369,12 @@ function thresholdValue(tolerances, key, label, record) {
   }
   return value;
 }
-function addMetricThreshold(checks, tolerances, key, label, value, unit) {
-  const limit = thresholdValue(tolerances, key, label, (id, passed, detail, severity) => {
-    checks.push({ id, status: passed ? "passed" : severity === "warning" ? "warning" : "failed", detail });
-  });
+function addMetricThreshold(record, tolerances, key, label, value, unit) {
+  const limit = thresholdValue(tolerances, key, label, record);
   if (limit === null) return null;
   const passed = value <= limit;
-  checks.push({ id: label + "-within-tolerance", status: passed ? "passed" : "failed",
-    detail: label + " = " + value + unit + "; configured tolerance = " + limit + unit + "." });
+  record(label + "-within-tolerance", passed,
+    label + " = " + value + unit + "; configured tolerance = " + limit + unit + ".");
   return { limit, passed };
 }
 
@@ -435,11 +433,11 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       footprint = compareFootprints(candidate.footprint, reference.footprint, input.footprintSamplesPerEdge ?? 8);
       record("footprint-geometry-computed", true,
         "Compared simple footprint rings using area, perimeter, centroid offset and symmetric sampled boundary distance.");
-      addMetricThreshold(checks, toleranceConfiguration, "footprintAreaRelativeErrorPercent",
+      addMetricThreshold(record, toleranceConfiguration, "footprintAreaRelativeErrorPercent",
         "footprint-area-relative-error", footprint.areaRelativeErrorPercent, "%");
-      addMetricThreshold(checks, toleranceConfiguration, "footprintBoundaryP95M",
+      addMetricThreshold(record, toleranceConfiguration, "footprintBoundaryP95M",
         "footprint-boundary-p95", footprint.boundaryDistance.symmetric.p95M, " m");
-      addMetricThreshold(checks, toleranceConfiguration, "footprintBoundaryMaxM",
+      addMetricThreshold(record, toleranceConfiguration, "footprintBoundaryMaxM",
         "footprint-boundary-max", footprint.boundaryDistance.symmetric.maxM, " m");
     } catch (error) {
       record("footprint-geometry-valid", false, error instanceof Error ? error.message : String(error));
@@ -452,7 +450,7 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       dimensions = compareDimensions(candidate.dimensionsM, reference.dimensionsM);
       record("independent-dimensions-computed", true,
         "Width, depth and height are compared individually in metres; axis convention must match the declared frame.");
-      addMetricThreshold(checks, toleranceConfiguration, "dimensionRelativeErrorPercent",
+      addMetricThreshold(record, toleranceConfiguration, "dimensionRelativeErrorPercent",
         "dimension-relative-error-max", rounded(dimensions.maxRelativeErrorPercent, 3), "%");
     } catch (error) {
       record("independent-dimensions-valid", false, error instanceof Error ? error.message : String(error));
@@ -475,9 +473,9 @@ export function evaluateIndependentBuildingTruth(input = {}) {
         record("candidate-check-point-ids-match", false,
           "Candidate contains unmatched checkpoint IDs: " + checkPoints.extraCandidatePointIds.join(", ") + ".");
       }
-      addMetricThreshold(checks, toleranceConfiguration, "checkPointRmseM",
+      addMetricThreshold(record, toleranceConfiguration, "checkPointRmseM",
         "check-point-rmse", checkPoints.residuals.rmsM, " m");
-      addMetricThreshold(checks, toleranceConfiguration, "checkPointMaxM",
+      addMetricThreshold(record, toleranceConfiguration, "checkPointMaxM",
         "check-point-max", checkPoints.residuals.maxM, " m");
     } catch (error) {
       record("check-points-valid", false, error instanceof Error ? error.message : String(error));
@@ -493,9 +491,9 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       surfaceDistance = compareSurfaceMeshes(candidate.surfaceMesh, reference.surfaceMesh, candidate.glbSha256);
       record("surface-distance-computed", true,
         "Computed symmetric vertex-sampled nearest-triangle distances with exact source-hash bindings.");
-      addMetricThreshold(checks, toleranceConfiguration, "surfaceDistanceP95M",
+      addMetricThreshold(record, toleranceConfiguration, "surfaceDistanceP95M",
         "surface-distance-p95", surfaceDistance.symmetric.p95M, " m");
-      addMetricThreshold(checks, toleranceConfiguration, "surfaceDistanceMaxM",
+      addMetricThreshold(record, toleranceConfiguration, "surfaceDistanceMaxM",
         "surface-distance-max", surfaceDistance.symmetric.maxM, " m");
     } catch (error) {
       record("surface-distance-valid", false, error instanceof Error ? error.message : String(error));
