@@ -236,6 +236,8 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
                               "overallDisposition": decision.get("overallDisposition") if isinstance(decision, dict) else None,
                               "reviewer": human_review_result.get("reviewer") if human_review_result else None,
                               "reviewedAtUtc": human_review_result.get("reviewedAtUtc") if human_review_result else None},
+            "reviewCounts": human_review_result.get("reviewCounts") if human_review_result else None,
+            "humanReview": human_review_result.get("humanReview") if human_review_result else None,
             "profile": {"filename": profile_path.name, "byteSize": len(profile_bytes),
                         "sha256": hashlib.sha256(profile_bytes).hexdigest()},
             "sourceImages": {"verifiedCount": len(image_records),
@@ -248,6 +250,10 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
             "registrationToGps": frame["registrationToGps"],
             "reviewedSourceUpAxis": (
                 decision.get("sourceUpAxis", {}).get("axis")
+                if isinstance(decision, dict) and isinstance(decision.get("sourceUpAxis"), dict) else None
+            ),
+            "reviewedSourceUpAxisPositiveDirection": (
+                decision.get("sourceUpAxis", {}).get("positiveDirection")
                 if isinstance(decision, dict) and isinstance(decision.get("sourceUpAxis"), dict) else None
             ),
             "note": "No GPS/CRS transform is inferred, estimated or applied by this preflight.",
