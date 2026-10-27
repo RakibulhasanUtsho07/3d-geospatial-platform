@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "brf-14-colmap-4.2.1-local-only-v1",
+  "toolchain": {
+    "name": "COLMAP",
+    "executable": "colmap",
+    "expectedVersion": "4.2.1",
+    "versionCommand": [
+      "version"
+    ],
+    "versionSource": "https://github.com/colmap/colmap/releases/tag/4.2.1",
+    "note": "Exact executable output must report this pin; the workflow does not install or upgrade COLMAP."
+  },
+  "coordinateFrame": {
+    "policy": "local-only-no-georeference",
+    "frameId": "brf-14-pending-reconstruction-local-frame",
+    "units": "unscaled-local",
+    "registrationToGps": "not-established"
+  },
+  "execution": {
+    "preflightOnly": true,
+    "runReconstruction": false,
+    "generateCandidateGlb": false
+  }
+}
