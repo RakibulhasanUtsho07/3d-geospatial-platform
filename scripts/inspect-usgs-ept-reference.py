@@ -365,6 +365,207 @@ def summarize_unclassified_elevations_above_ground(
     }
 
 
+def summarize_camera_cluster_proximity(
+    camera_points: list[dict[str, Any]],
+    components: list[dict[str, Any]],
+    proximity_threshold_m: float = 10.0,
+) -> dict[str, Any]:
+    """Compare projected camera GPS positions with coarse component AABBs, never treating proximity as identity."""
+    if not math.isfinite(proximity_threshold_m) or not 0 < proximity_threshold_m <= 100:
+        raise ValueError("Camera/component proximity threshold must be finite and in (0, 100] metres.")
+    normalized_components: list[dict[str, Any]] = []
+    for index, component in enumerate(components):
+        bounds = component.get("xyBounds")
+        centroid = component.get("centroidXY")
+        if not isinstance(bounds, dict) or not isinstance(bounds.get("min"), dict) or not isinstance(bounds.get("max"), dict):
+            raise ValueError("Every elevated component must include xyBounds.min/max.")
+        if not isinstance(centroid, dict):
+            raise ValueError("Every elevated component must include centroidXY.")
+        try:
+            min_x, min_y = float(bounds["min"]["x"]), float(bounds["min"]["y"])
+            max_x, max_y = float(bounds["max"]["x"]), float(bounds["max"]["y"])
+            cx, cy = float(centroid["x"]), float(centroid["y"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Elevated component bounds/centroid must contain numeric coordinates.") from error
+        if not all(math.isfinite(v) for v in (min_x, min_y, max_x, max_y, cx, cy)) or min_x > max_x or min_y > max_y:
+            raise ValueError("Elevated component contains invalid/non-finite XY coordinates.")
+        normalized_components.append({
+            "componentId": str(component.get("componentId") or f"elevated-2m-component-{index + 1:02d}"),
+            "pointCount": component.get("pointCount"),
+            "occupiedGridCells": component.get("occupiedGridCells"),
+            "centroidXY": {"x": cx, "y": cy},
+            "xyBounds": {"min": {"x": min_x, "y": min_y}, "max": {"x": max_x, "y": max_y},
+                         "widthM": max_x - min_x, "heightM": max_y - min_y},
+            "heightAboveGroundM": component.get("heightAboveGroundM"),
+        })
+
+    views_out: list[dict[str, Any]] = []
+    for point in camera_points:
+        try:
+            x, y = float(point["projectedX"]), float(point["projectedY"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Projected camera points require numeric projectedX/projectedY.") from error
+        if not math.isfinite(x) or not math.isfinite(y):
+            raise ValueError("Projected camera coordinates must be finite.")
+        distances: list[dict[str, Any]] = []
+        for component in normalized_components:
+            b = component["xyBounds"]
+            dx = max(b["min"]["x"] - x, 0.0, x - b["max"]["x"])
+            dy = max(b["min"]["y"] - y, 0.0, y - b["max"]["y"])
+            bbox_distance = math.hypot(dx, dy)
+            centre = component["centroidXY"]
+            distances.append({
+                "componentId": component["componentId"],
+                "distanceToAabbM": bbox_distance,
+                "distanceToComponentCentroidM": math.hypot(x - centre["x"], y - centre["y"]),
+                "insideAxisAlignedBoundingBox": bbox_distance == 0,
+            })
+        distances.sort(key=lambda item: (item["distanceToAabbM"], item["distanceToComponentCentroidM"], item["componentId"]))
+        nearest = distances[0] if distances else None
+        views_out.append({
+            "viewId": point.get("viewId"),
+            "filename": point.get("filename"),
+            "projectedX": x,
+            "projectedY": y,
+            "nearestComponent": nearest,
+            "distancesToComponents": distances,
+        })
+
+    component_summaries: list[dict[str, Any]] = []
+    for component in normalized_components:
+        cid = component["componentId"]
+        relevant = [view for view in views_out if any(
+            distance["componentId"] == cid and distance["insideAxisAlignedBoundingBox"]
+            for distance in view["distancesToComponents"]
+        )]
+        distance_rows = [next(
+            distance for distance in view["distancesToComponents"] if distance["componentId"] == cid
+        ) for view in views_out]
+        near = [distance for distance in distance_rows if distance["distanceToAabbM"] <= proximity_threshold_m]
+        component_summaries.append({
+            **component,
+            "cameraViewsInsideAabb": [view["viewId"] for view in relevant],
+            "cameraViewCountInsideAabb": len(relevant),
+            "cameraViewsWithinThresholdM": [view["viewId"] for view, distance in zip(views_out, distance_rows)
+                                           if distance["distanceToAabbM"] <= proximity_threshold_m],
+            "cameraViewCountWithinThresholdM": len(near),
+            "nearestCameraViews": [
+                {"viewId": view["viewId"], "distanceToAabbM": distance["distanceToAabbM"]}
+                for view, distance in sorted(zip(views_out, distance_rows), key=lambda pair: (pair[1]["distanceToAabbM"], str(pair[0]["viewId"])))[:5]
+            ],
+        })
+    all_nearest = [view["nearestComponent"]["distanceToAabbM"] for view in views_out if view["nearestComponent"]]
+    inside_any = sum(1 for view in views_out if any(
+        distance["insideAxisAlignedBoundingBox"] for distance in view["distancesToComponents"]
+    ))
+    within_threshold = sum(1 for view in views_out if view["nearestComponent"] and
+                           view["nearestComponent"]["distanceToAabbM"] <= proximity_threshold_m)
+    return {
+        "status": "spatial-proximity-only-needs-visual-footprint-review",
+        "coordinateCrs": "same projected metric CRS as the inspected point cloud",
+        "viewCount": len(views_out),
+        "componentCount": len(normalized_components),
+        "proximityThresholdM": proximity_threshold_m,
+        "cameraViewsInsideAnyComponentAabb": inside_any,
+        "cameraViewsWithinThresholdOfNearestComponentAabb": within_threshold,
+        "nearestAabbDistanceM": {
+            "min": min(all_nearest) if all_nearest else None,
+            "median": float(sorted(all_nearest)[(len(all_nearest) - 1) // 2]) if all_nearest else None,
+            "max": max(all_nearest) if all_nearest else None,
+        },
+        "components": component_summaries,
+        "views": views_out,
+        "limitations": [
+            "Component extents are axis-aligned bounding boxes around elevated returns, not building-footprint polygons.",
+            "Camera GPS coordinates locate camera centres, not the photographed object; cameras may fly over roofs or beside façades.",
+            "GPS horizontal accuracy and image-to-surface visibility are not independently established in this report.",
+            "GPS altitude is deliberately excluded because its vertical datum is undeclared in the source image manifest.",
+            "Proximity cannot establish that a component is the same building shown in the images; a human must review actual views and a footprint/survey identifier.",
+        ],
+        "sameBuildingIdentityVerified": False,
+        "candidateGlbGenerated": False,
+        "independentReferenceVerified": False,
+        "acceptanceEligible": False,
+        "publicationEligible": False,
+        "mapReady": False,
+        "automaticApproval": False,
+    }
+
+
+def load_multiview_camera_points(
+    manifest_path: Path,
+    target_crs: str,
+) -> dict[str, Any]:
+    """Read a pinned multi-view intake manifest and project each GPS point into the EPT's horizontal CRS."""
+    raw_bytes = manifest_path.read_bytes()
+    digest = sha256_bytes(raw_bytes)
+    try:
+        manifest = json.loads(raw_bytes)
+    except Exception as error:
+        raise ValueError("Multi-view source manifest is not valid JSON: " + str(error)) from error
+    if not isinstance(manifest, dict) or manifest.get("schemaVersion") != "1.0.0":
+        fail("Multi-view source manifest must have schemaVersion 1.0.0.")
+    views = manifest.get("views")
+    if not isinstance(views, list) or not views:
+        fail("Multi-view source manifest must include a non-empty views list.")
+    selection = manifest.get("selectionMethod")
+    expected_count = selection.get("expectedViewCount") if isinstance(selection, dict) else len(views)
+    if not isinstance(expected_count, int) or expected_count != len(views):
+        fail("Multi-view source manifest's expectedViewCount must match the actual views list.")
+    seen_ids: set[str] = set()
+    try:
+        from pyproj import Transformer
+    except ImportError as error:
+        fail("Install pyproj to project camera GPS points (" + str(error) + ").")
+    transformer = Transformer.from_crs("EPSG:4326", target_crs, always_xy=True)
+    projected: list[dict[str, Any]] = []
+    for index, view in enumerate(views):
+        if not isinstance(view, dict):
+            fail(f"Multi-view source manifest views[{index}] must be an object.")
+        view_id, filename = view.get("id"), view.get("filename")
+        if not isinstance(view_id, str) or not view_id.strip() or view_id in seen_ids:
+            fail(f"Multi-view source manifest views[{index}] has a missing or duplicate id.")
+        seen_ids.add(view_id)
+        if not isinstance(filename, str) or not filename.strip():
+            fail(f"Multi-view source manifest views[{index}] is missing filename.")
+        gps = view.get("gps")
+        if not isinstance(gps, dict):
+            fail(f"Multi-view source manifest view {view_id} has no gps object.")
+        lon, lat = gps.get("longitude"), gps.get("latitude")
+        if not isinstance(lon, (int, float)) or not math.isfinite(lon) or not -180 <= lon <= 180:
+            fail(f"Multi-view source manifest view {view_id} has invalid longitude.")
+        if not isinstance(lat, (int, float)) or not math.isfinite(lat) or not -85 <= lat <= 85:
+            fail(f"Multi-view source manifest view {view_id} has invalid latitude.")
+        x, y = transformer.transform(float(lon), float(lat))
+        if not math.isfinite(x) or not math.isfinite(y):
+            fail(f"Multi-view source manifest view {view_id} could not be projected.")
+        projected.append({
+            "viewId": view_id,
+            "filename": filename,
+            "longitude": float(lon),
+            "latitude": float(lat),
+            "projectedX": float(x),
+            "projectedY": float(y),
+            "gpsAltitudeM": gps.get("altitudeM"),
+            "gpsVerticalDatum": gps.get("verticalDatum") or "not declared",
+        })
+    dataset = manifest.get("dataset", {})
+    building = manifest.get("building", {})
+    return {
+        "sourceManifestPath": manifest_path.as_posix(),
+        "sourceManifestSha256": digest,
+        "sourceManifestSampleId": manifest.get("sampleId"),
+        "datasetTitle": dataset.get("title") if isinstance(dataset, dict) else None,
+        "buildingId": building.get("buildingId") if isinstance(building, dict) else None,
+        "declaredExpectedViewCount": expected_count,
+        "observedViewCount": len(projected),
+        "inputCrs": "EPSG:4326",
+        "outputCrs": target_crs,
+        "gpsAltitudeUsed": False,
+        "views": projected,
+    }
+
+
 def assess_sample_building_coverage(
     points_within_radius: int,
     classification_counts: dict[int, int] | Counter[int],
