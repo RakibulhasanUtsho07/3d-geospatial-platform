@@ -134,10 +134,14 @@ async function main() {
     const provenance = assessment.provenance;
     const fileResults = [];
     if (provenance && provenance.extractor) {
-      for (const [kind, relativePath, expectedHash] of [
+      const pinnedFiles = [
         ["extractor-artifact", provenance.extractor.artifactPath, provenance.extractor.artifactSha256],
         ["extractor-configuration", provenance.extractor.configurationPath, provenance.extractor.configurationSha256],
-      ]) {
+        ...(provenance.auxiliaryArtifacts ?? []).map((artifact) => [
+          "auxiliary-artifact-" + artifact.id, artifact.artifactPath, artifact.artifactSha256,
+        ]),
+      ];
+      for (const [kind, relativePath, expectedHash] of pinnedFiles) {
         try {
           const asset = await safeRead(root, relativePath, role + " " + kind);
           const actualHash = sha256(asset.bytes);
@@ -159,7 +163,7 @@ async function main() {
         }
       }
     }
-    const extractorFilesMatch = fileResults.length === 2 &&
+    const extractorFilesMatch = fileResults.length === 2 + (provenance?.auxiliaryArtifacts?.length ?? 0) &&
       fileResults.every((file) => file.status === "passed");
     const finalExtractionStatus = assessment.status === "failed" || fileResults.some((file) => file.status === "failed")
       ? "failed"
