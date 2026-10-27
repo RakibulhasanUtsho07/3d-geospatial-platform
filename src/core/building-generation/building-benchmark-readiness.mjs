@@ -234,7 +234,7 @@ export function assessBuildingBenchmarkReadiness(manifest) {
 
   const validChecks = checks.filter((check) => check.status === "passed").length;
   const blockers = checks.filter((check) => check.status !== "passed").map((check) => check.id);
-  const status = blockers.length ? "blocked" : "ready-for-evaluation";
+  const status = blockers.length ? "blocked" : "manifest-complete";
   return {
     schemaVersion: "1.0.0",
     evaluationId: nonEmpty(manifest.evaluationId) ? manifest.evaluationId : null,
