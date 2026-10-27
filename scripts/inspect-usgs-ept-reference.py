@@ -210,6 +210,68 @@ def node_key_depth(key: str) -> int:
     return parse_node_key(key)[0]
 
 
+def summarize_spatial_components(points: list[tuple[float, float, float, float]], grid_cell_size_m: float) -> dict[str, Any]:
+    """Summarize 8-connected spatial components of candidate elevated returns on a bounded XY grid."""
+    if grid_cell_size_m <= 0 or not math.isfinite(grid_cell_size_m):
+        raise ValueError("Grid cell size must be finite and positive.")
+    cells: dict[tuple[int, int], list[tuple[float, float, float, float]]] = {}
+    for point in points:
+        key = (math.floor(point[0] / grid_cell_size_m), math.floor(point[1] / grid_cell_size_m))
+        cells.setdefault(key, []).append(point)
+
+    unseen = set(cells)
+    components: list[dict[str, Any]] = []
+    while unseen:
+        seed = unseen.pop()
+        component_cells = [seed]
+        queue = [seed]
+        while queue:
+            cell_x, cell_y = queue.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    neighbour = (cell_x + dx, cell_y + dy)
+                    if neighbour in unseen:
+                        unseen.remove(neighbour)
+                        component_cells.append(neighbour)
+                        queue.append(neighbour)
+        component_points = [point for key in component_cells for point in cells[key]]
+        xs = [point[0] for point in component_points]
+        ys = [point[1] for point in component_points]
+        zs = [point[2] for point in component_points]
+        heights = sorted(point[3] for point in component_points)
+        count = len(component_points)
+        components.append({
+            "pointCount": count,
+            "occupiedGridCells": len(component_cells),
+            "centroidXY": {
+                "x": sum(xs) / count,
+                "y": sum(ys) / count,
+            },
+            "xyBounds": {
+                "min": {"x": min(xs), "y": min(ys)},
+                "max": {"x": max(xs), "y": max(ys)},
+                "widthM": max(xs) - min(xs),
+                "heightM": max(ys) - min(ys),
+            },
+            "zBoundsM": {"min": min(zs), "max": max(zs)},
+            "heightAboveGroundM": {
+                "median": heights[(len(heights) - 1) // 2],
+                "p95": heights[min(len(heights) - 1, round((len(heights) - 1) * 0.95))],
+                "max": max(heights),
+            },
+        })
+    components.sort(key=lambda component: (-component["pointCount"], -component["occupiedGridCells"], component["centroidXY"]["x"], component["centroidXY"]["y"]))
+    return {
+        "connectivity": "8-neighbour",
+        "gridCellSizeM": grid_cell_size_m,
+        "componentCount": len(components),
+        "largestComponents": components[:10],
+        "interpretation": "Connected components are spatial groupings only. A cluster may be a roof, vegetation, vehicle or another above-ground object; it is not a building identity label.",
+    }
+
+
 def summarize_unclassified_elevations_above_ground(
     unclassified_xyz: list[tuple[float, float, float]],
     ground_xyz: list[tuple[float, float, float]],
@@ -277,6 +339,7 @@ def summarize_unclassified_elevations_above_ground(
                     "z": max((point[2] for point in elevated), default=None),
                 },
             },
+            "spatialComponents": summarize_spatial_components(elevated, grid_cell_size_m),
         }
     above_two = thresholds["2"]
     candidate_surface = above_two["pointCount"] >= 25 and above_two["occupiedGridCells"] >= 6
