@@ -15,6 +15,20 @@ function safeRelative(value) {
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
+function validAuxiliaryArtifacts(raw) {
+  if (raw === undefined) return true;
+  if (!Array.isArray(raw) || raw.length > 20) return false;
+  const seenIds = new Set();
+  const seenPaths = new Set();
+  for (const item of raw) {
+    if (!object(item) || typeof item.id !== "string" || !ID.test(item.id) ||
+        !safeRelative(item.artifactPath) || !HASH.test(item.artifactSha256 ?? "")) return false;
+    if (seenIds.has(item.id) || seenPaths.has(item.artifactPath)) return false;
+    seenIds.add(item.id);
+    seenPaths.add(item.artifactPath);
+  }
+  return true;
+}
 function canonicalize(value) {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") {
@@ -79,7 +93,8 @@ export function validateGeometryExtractionProvenance({
     HASH.test(provenance.inputArtifactSha256 ?? "") &&
     HASH.test(provenance.outputGeometrySha256 ?? "") &&
     typeof provenance.coordinateFrameId === "string" && provenance.coordinateFrameId.trim().length > 0 &&
-    provenance.units === "m";
+    provenance.units === "m" &&
+    validAuxiliaryArtifacts(provenance.auxiliaryArtifacts);
   add(label + "-extraction-provenance-schema", structureValid,
     structureValid ? "Versioned extractor, exact extractor/config digests, run ID and geometry payload digest are declared." :
       "Extraction provenance has a missing or invalid schema field, extractor identity, path, SHA-256, run ID, timestamp or units.");
