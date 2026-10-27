@@ -39,7 +39,7 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
             validated["dataset"]["url"],
             "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MN_CentralMissRiver_4_B22/ept.json",
         )
-        self.assertEqual(manifest["expectedMetadataSha256"], None)
+        self.assertEqual(manifest["expectedMetadataSha256"], "ac14abdc2600e8af08f59569eb1b873ebda03e46fe59b8ee188a197ce1cd4d3f")
         self.assertFalse(manifest["acceptanceEligible"])
         self.assertFalse(manifest["publicationEligible"])
         self.assertFalse(manifest["mapReady"])
@@ -106,6 +106,37 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
             MODULE.node_bounds("../../secret", root)
         with self.assertRaisesRegex(ValueError, "outside its tree depth"):
             MODULE.node_bounds("1-2-0-0", root)
+
+    def test_building_coverage_requires_class6_returns(self):
+        blockers, warnings = MODULE.assess_sample_building_coverage(
+            points_within_radius=3371,
+            classification_counts={1: 1283, 2: 2084, 7: 2, 18: 2},
+            inspected_node_count=3,
+            selected_node_count=3,
+        )
+        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertTrue(any("No class-6 building points" in warning for warning in warnings))
+
+    def test_building_coverage_passes_only_when_class6_returns_are_present(self):
+        blockers, warnings = MODULE.assess_sample_building_coverage(
+            points_within_radius=10,
+            classification_counts={2: 7, 6: 3},
+            inspected_node_count=3,
+            selected_node_count=3,
+        )
+        self.assertEqual(blockers, [])
+        self.assertEqual(warnings, [])
+
+    def test_building_coverage_blocks_empty_or_partial_node_samples(self):
+        blockers, _ = MODULE.assess_sample_building_coverage(
+            points_within_radius=0,
+            classification_counts={},
+            inspected_node_count=2,
+            selected_node_count=3,
+        )
+        self.assertIn("no-point-returns-fall-within-the-sample-radius", blockers)
+        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
     def test_manifest_rejects_accidentally_enabled_publication_flags(self):
         with MANIFEST.open("r", encoding="utf-8") as handle:
