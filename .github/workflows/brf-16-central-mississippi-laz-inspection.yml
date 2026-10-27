@@ -1,14 +1,6 @@
-name: BRF-16 Central Mississippi LAZ header inspection
+name: BRF-16 Raw LAZ full-tile fallback (manual)
 
 on:
-  pull_request:
-    branches:
-      - development
-    paths:
-      - ".github/workflows/brf-16-central-mississippi-laz-inspection.yml"
-      - "benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json"
-      - "scripts/inspect-usgs-laz-tile.py"
-      - "tests/test_inspect_usgs_laz_tile.py"
   workflow_dispatch:
 
 permissions:
