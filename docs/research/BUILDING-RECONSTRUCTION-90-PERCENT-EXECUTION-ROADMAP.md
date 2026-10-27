@@ -297,7 +297,7 @@ These are proposed tasks, not code changes already completed.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
 - [ ] **BRF-07 (P0):** Source-camera render comparison with silhouette/contour and facade-part metrics.
-- [ ] **BRF-08 (P0):** Independent-truth evaluator for footprint/dimensions, surface distance when reference geometry exists, and check points.
+- [ ] **BRF-08 (P0, IN PROGRESS):** Independent-truth evaluator for footprint/dimensions, surface distance when reference geometry exists, and check points. First scoped slice adds physical-building-level holdout split protection, equal-weight per-building segmentation summaries, and explicit held-out failure cases; independent metric-geometry/surface-distance evaluation and real-world acceptance remain open.
 - [ ] **BRF-09 (P0):** Confidence-aware multi-view fusion and observed/inferred/unknown surface coverage.
 - [ ] **BRF-10 (P0):** Defect registry plus bounded correction/re-test.
 - [ ] **BRF-11 (P1):** Parametric grammar for roof, arches, domes, columns, openings and cornices fitted to evidence.
@@ -449,3 +449,16 @@ acceptanceEligible, publicationEligible and mapReady remain false. Synthetic tes
 
 Do not blindly merge the entire rakibul-hasan branch into development: branch comparison shows divergence and unrelated floor-plan/road changes outside BRF-05–07. Promote through a scoped, tested PR after post-merge CI is complete. main is not updated by this package. Promotion/publication remains blocked until the independent real-building acceptance boxes above are satisfied.
 
+
+
+### 2026-10-27 — BRF-08 first slice: whole-building holdout integrity
+
+- **Branch:** `feat/brf-08-independent-truth-evaluator`, created from current `development`.
+- **Scope:** segmentation benchmark split integrity and reporting; this is a partial BRF-08 task, not completion of the independent-truth evaluator.
+- **Changed:** `src/core/building-generation/building-segmentation-benchmark.mjs`; segmentation benchmark unit and CLI fixtures now include stable `buildingGroupId` values.
+- **Contracts:** fail closed when `buildingGroupId` is missing/malformed or the same physical building is split between `development` and `held-out-evaluation`; retain capture-burst leakage checks; report held-out and total building counts; report equal-weight per-building macro foreground IoU alongside per-image averages; surface unevaluated/failed held-out sample cases; keep `acceptanceEligible: false`.
+- **Regression cases:** same building across two different capture groups must fail split validation; missing/unsafe building IDs fail; unequal image counts prove per-building aggregation is not dominated by a building with more photographs; missing held-out evaluations appear as explicit failure cases; CLI test fixtures cover the new required ID.
+- **Limitations / remaining BRF-08 work:** the physical identity in `buildingGroupId` still depends on curated correct metadata; no automatic identity resolver is claimed. This change does not compute independent footprint error, surface-to-surface distance or dimensional truth from real survey geometry. No real-building accuracy score, threshold pass, or publication approval is claimed. Human-reviewed truth, appropriate holdout size, survey controls, credible source-camera alignment, held-out failure review and the BRF-13 release gate remain open.
+- **Validation:** pending exact-head CI on this feature branch; do not merge to `development` or promote to `main` until CI is green and the code/manifest migration is reviewed.
+
+**Next task after this slice:** add independent-truth geometry evidence checks (footprint/dimensions and optional surface-distance inputs) without relaxing the separate human-review and publication gates.
