@@ -108,10 +108,36 @@ test("benchmark report exposes per-image and held-out metrics but never auto-app
   assert.equal(report.candidateSummaries[0].recommendation, "manual-review-required");
 });
 
+test("weights held-out segmentation performance by physical building, not by photo count", () => {
+  const input = manifest([
+    sample("dev-01", "development", "dev-capture", "dev-building"),
+    sample("heldout-a-front", "held-out-evaluation", "building-a-front", "building-a"),
+    sample("heldout-a-side", "held-out-evaluation", "building-a-side", "building-a"),
+    sample("heldout-b-front", "held-out-evaluation", "building-b-front", "building-b"),
+  ]);
+  const report = buildSegmentationBenchmarkReport({
+    manifest: input,
+    generatedAt: reviewedAt,
+    evaluatedSamples: [
+      { sampleId: "dev-01", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.8 } },
+      { sampleId: "heldout-a-front", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.2 } },
+      { sampleId: "heldout-a-side", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.2 } },
+      { sampleId: "heldout-b-front", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 1.0 } },
+    ],
+  });
+  const summary = report.candidateSummaries[0];
+  assert.equal(summary.heldOutImageCount, 3);
+  assert.equal(summary.heldOutBuildingCount, 2);
+  assert.equal(summary.heldOutMeanMacroForegroundIoU, 0.466667);
+  assert.equal(summary.heldOutMeanPerBuildingMacroForegroundIoU, 0.6);
+  assert.equal(report.acceptanceEligible, false);
+});
+
 test("does not call an unevaluated mask or malformed palette a pass", () => {
   const input = manifest();
   const report = buildSegmentationBenchmarkReport({ manifest: input, evaluatedSamples: [] });
   assert.equal(report.status, "benchmark-incomplete");
+  assert.ok(report.candidateSummaries[0].failureCases.some((item) => item.sampleId === "heldout-01"));
   assert.ok(report.issues.some((x) => x.code === "candidate-result-not-evaluated"));
   const malformed = manifest();
   malformed.samples[0].predictions[0].mask.encoding = "binary-mask";
