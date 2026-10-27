@@ -61,6 +61,9 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
             by_id[view["id"]] = {"sha256": digest, "byteSize": len(payload)}
             view["expectedSha256"] = digest
             view["expectedByteSize"] = len(payload)
+        source["maximumImageBytes"] = 1024
+        source["maximumTotalBytes"] = 4096
+        source["expectedTotalBytes"] = sum(item["byteSize"] for item in by_id.values())
         for view in verification["views"]:
             data = by_id[view["id"]]
             view["expectedSha256"] = data["sha256"]
