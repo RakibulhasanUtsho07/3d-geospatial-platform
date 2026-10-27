@@ -113,15 +113,23 @@ test("requires held-out check points to be explicitly marked independent of fit"
   assert.ok(report.failures.some((check) => check.id === "check-points-valid"));
 });
 
-test("reports missing geometry and missing tolerances as incomplete instead of inventing a pass", () => {
+test("reports missing geometry as incomplete instead of inventing a pass", () => {
   const data = input();
   delete data.candidate.footprint;
   delete data.reference.footprint;
-  delete data.tolerances.footprintBoundaryP95M;
   const report = evaluateIndependentBuildingTruth(data);
   assert.equal(report.status, "benchmark-incomplete");
   assert.equal(report.metrics.footprint, null);
   assert.ok(report.warnings.some((check) => check.id === "footprint-evidence-present"));
+});
+
+test("requires an explicit threshold even when independent geometry metrics can be computed", () => {
+  const data = input();
+  delete data.tolerances.footprintBoundaryP95M;
+  const report = evaluateIndependentBuildingTruth(data);
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.equal(report.metrics.footprint.areaRelativeErrorPercent, 0);
+  assert.ok(report.warnings.some((check) => check.id === "footprint-boundary-p95-threshold-configured"));
 });
 
 test("self-intersecting footprint is reported as a failed geometry check", () => {
