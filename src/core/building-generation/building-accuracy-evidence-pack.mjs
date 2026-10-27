@@ -152,6 +152,7 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       const truthCheckIds = [
         "independent-truth-report-valid",
         "independent-truth-report-candidate-binding",
+        "independent-truth-report-extraction-provenance",
         "independent-truth-report-byte-integrity",
         "independent-truth-report-status",
       ];
