@@ -265,6 +265,7 @@ def build_report(
             "eptComponentAabbEpsg3857": [minx, miny, maxx, maxy],
             "eptAabbAreaM2": round(component_box.area, 3),
             "candidatesRankedByAabbOverlapThenCentroidDistance": candidates[:5],
+            "componentCentroidInsideAnyFootprint": any(item["componentCentroidInsideFootprint"] for item in candidates),
             "bestCandidateOverlapFraction": candidates[0]["componentAabbOverlapFraction"] if candidates else 0.0,
             "candidateFootprintIntersectsComponentAabb": bool(candidates and candidates[0]["intersectionAreaM2"] > 0),
         })
@@ -334,9 +335,8 @@ def build_report(
             "validPolygonFootprints": len(footprints),
             "componentsWithAnyFootprintAabbOverlap": sum(1 for item in component_reports
                 if item["candidateFootprintIntersectsComponentAabb"]),
-            "componentsWithCentroidInsideFootprint": sum(1 for item in component_reports
-                if item["candidatesRankedByAabbOverlapThenCentroidDistance"]
-                and item["candidatesRankedByAabbOverlapThenCentroidDistance"][0]["componentCentroidInsideFootprint"]),
+            "componentsWithCentroidInsideAnyFootprint": sum(1 for item in component_reports
+                if item["componentCentroidInsideAnyFootprint"]),
         },
         "components": component_reports,
         "cameraViews": camera_reports,
