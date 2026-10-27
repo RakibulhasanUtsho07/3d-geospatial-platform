@@ -82,3 +82,31 @@ For each proposed asset record, capture:
 - The software's sampled surface-distance metric is not a continuous Hausdorff-distance proof. The convex-hull footprint is not a surveyed wall outline and loses courtyard/concavity detail.
 - Keep `acceptanceEligible`, `publicationEligible`, `mapReady` and automatic approval false until real-data metrics and a human sign-off actually justify a later change.
 - This audit is a source-readiness result, not an accuracy benchmark or a release approval.
+
+
+## Updated source triage — 27 October 2026: TwinWorld alternative
+
+A third source family was checked after the BRF-11 local-byte verifier merged. The [TwinWorld 2026 dataset card](https://huggingface.co/datasets/Zqlin/TwinWorld_Datasets) reports **CC BY-NC 4.0** and a total dataset size of about **1.5 GB**. It packages selected scenes from TUM2TWIN and GT-LOD3 with images, COLMAP camera records, initialization point clouds, and scene point-cloud geometry for some development scenes.
+
+This is not an admissible source for validating a workflow intended for commercial product use unless the rights holder grants appropriate additional permission. The non-commercial dataset terms are explicit; the data's convenience does not make it commercially cleared.
+
+There is also a methodological limitation: the dataset card says train and test images in a scene share one joint COLMAP world frame, and its triangulated `points3D` includes all images. Therefore a folder called `test` is not itself an independent survey holdout. Where available, `3d_gt/point_cloud.ply` is scene-level point-cloud geometry, not a fully surveyed, per-building LOD3 mesh with independently surveyed held-out checkpoints. It could support a separately rights-approved, non-commercial pipeline smoke test, but cannot by itself discharge BRF-10's whole-building metric acceptance gate.
+
+Official source pages reviewed:
+- [TwinWorld 2026 dataset card and declared license](https://huggingface.co/datasets/Zqlin/TwinWorld_Datasets)
+- [GT-LOD3 benchmark repository and CC BY 4.0 statement](https://github.com/gdslab/GT-LOD3-Benchmark); its linked Gold Coast STAC collection did not provide a working exact sample URL during this audit.
+- [TUM2TWIN UAS laser-scanning record, version 1.2.0](https://zenodo.org/records/15282970); the visible record-level licence field is blank, so the asset is not treated as rights-cleared.
+- [TUM2TWIN UAS photo acquisition documentation](https://tum2t.win/datasets/im-uas) and [UAS laser-scanning documentation](https://tum2t.win/datasets/pc-uas), which describe co-campaign acquisition and RTK georeferencing but do not, on these pages, resolve the per-asset licence question.
+
+### Decision
+
+**No source is admitted to the real-building acceptance run yet.** A working URL alone is insufficient: the same physical building must be paired across image and reference assets; every exact file/version needs a suitable rights decision, verified bytes, coordinate-frame/vertical-datum metadata, and independently held-out metric controls. Do not download or commit a large archive while licence and intended-use compatibility remain unresolved.
+
+**Next action:** obtain a rights-cleared source with a working exact asset link and a defensible same-building independent-survey pairing; then use the BRF-10 manifest preflight and BRF-11 local byte verifier before candidate reconstruction.
+
+
+### Correction from direct STAC collection metadata inspection — 27 October 2026
+
+The direct STAC collection metadata endpoint is readable at [the collection JSON URL](https://stac.d2s.org/api/v1/collections/ee10a5c0-2554-44e5-b59f-81eedfe02eb6). Its current response identifies the collection as **Gold Coast** and declares `license: CC-BY-NC-4.0`, with contact `jinha@purdue.edu`. This conflicts with the broader repository README's CC BY 4.0 statement. The collection's `items` link did not resolve through this audit tool, and no exact file-level asset URL/checksum was recovered.
+
+For intake decisions, do **not** normalize this discrepancy in favour of the more permissive licence. Treat the collection and derivative source files as **commercial-use blocked** until the data owner clarifies the applicable terms in writing and provides a working exact item/file URL. The source-selection result remains blocked, even though the collection metadata endpoint itself is accessible.
