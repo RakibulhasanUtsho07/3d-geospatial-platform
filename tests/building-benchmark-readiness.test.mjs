@@ -53,6 +53,7 @@ function validManifest() {
     reference: {
       buildingId: "sample-building-01",
       sourceAssetIds: ["reference-model", "independent-surface"],
+      sourceCoordinateFrameId: "sample-survey-enu-v1",
       coordinateFrameId: "sample-site-enu-v1",
       units: "m",
       crs: "EPSG:32632",
