@@ -39,6 +39,7 @@ jobs:
         run: python -m unittest discover -s tests -p "test_inspect_usgs_laz_tile.py"
 
       - name: Download only the pinned LAZ tile to ephemeral runner storage
+        timeout-minutes: 7
         shell: bash
         run: |
           set -euo pipefail
@@ -48,9 +49,15 @@ jobs:
           expected_url="https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/MN_CentralMissRiver_B22/MN_CentralMissRiver_4_B22/LAZ/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
           [[ "$actual_url" == "$expected_url" ]] || { echo "Manifest URL does not match the allowlisted pinned product."; exit 1; }
           [[ "$expected_bytes" == "83659396" ]] || { echo "Manifest size differs from the pinned TNM product record."; exit 1; }
-          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
-            --connect-timeout 20 --max-time 600 --max-filesize 100000000 \
+          echo "Requesting pinned LAZ tile with bounded retries and transfer timeout."
+          curl --fail --location --show-error --silent \
+            --retry 2 --retry-delay 3 \
+            --connect-timeout 15 --max-time 300 --speed-limit 1024 --speed-time 30 \
+            --max-filesize 100000000 \
+            --write-out "\\nHTTP %{http_code}; downloaded=%{size_download} bytes; total=%{time_total}s\\n" \
             "$actual_url" --output "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
+          echo "Download completed; validating exact byte count before parsing."
+          sha256sum "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
           actual_bytes="$(wc -c < "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz" | tr -d ' ')"
           [[ "$actual_bytes" == "$expected_bytes" ]] || { echo "Downloaded size $actual_bytes differs from $expected_bytes."; exit 1; }
 
