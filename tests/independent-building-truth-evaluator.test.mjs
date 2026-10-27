@@ -82,6 +82,18 @@ test("fails when the candidate footprint boundary and dimensions exceed configur
   assert.ok(report.failures.some((check) => check.id === "dimension-relative-error-max-within-tolerance"));
 });
 
+test("compares thresholds before display rounding hides small violations", () => {
+  const data = input();
+  data.candidate.footprint = data.candidate.footprint.map((point) => ({ ...point, x: point.x + 0.20004 }));
+  data.candidate.dimensionsM.widthM = 2.100001;
+  const report = evaluateIndependentBuildingTruth(data);
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.metrics.footprint.boundaryDistance.symmetric.maxM, 0.2);
+  assert.equal(report.metrics.dimensions.maxRelativeErrorPercent, 5);
+  assert.ok(report.failures.some((check) => check.id === "footprint-boundary-max-within-tolerance"));
+  assert.ok(report.failures.some((check) => check.id === "dimension-relative-error-max-within-tolerance"));
+});
+
 test("fails when mesh vertices depart from the independent reference surface", () => {
   const data = input();
   data.candidate.surfaceMesh.vertices = data.candidate.surfaceMesh.vertices.map(([x, y, z]) => [x + 0.25, y, z]);
