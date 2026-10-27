@@ -49,6 +49,7 @@
     "test:building-media": "node --test tests/media-pipeline.test.mjs",
     "ingest:building-media": "node scripts/ingest-building-media.mjs",
     "test:brf24-colmap-authorization": "node --test tests/brf23-reconstruction-executor.test.mjs",
+    "test:brf25-geometry-validation": "node --test tests/brf25-geometry-validation.test.mjs tests/brf25-geometry-validation-cli.test.mjs",
     "test:colmap-worker": "node --test tests/colmap-reconstruction.test.mjs tests/colmap-diagnostics.test.mjs tests/colmap-view-coverage.test.mjs tests/model-review-summary.test.mjs",
     "test:colmap-view-coverage": "node --test tests/colmap-view-coverage.test.mjs",
     "test:model-review-summary": "node --test tests/model-review-summary.test.mjs",
