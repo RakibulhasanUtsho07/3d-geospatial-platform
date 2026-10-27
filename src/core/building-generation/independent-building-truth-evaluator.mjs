@@ -75,8 +75,8 @@ function segmentsIntersect(a, b, c, d) {
     (Math.abs(o4) <= EPSILON && onSegment(c, d, b));
 }
 function normalizeFootprint(raw, label) {
-  if (!Array.isArray(raw) || raw.length < 3 || raw.length > 2000) {
-    throw new RangeError(label + " must contain 3 to 2000 ordered {x,z} vertices.");
+  if (!Array.isArray(raw) || raw.length < 3 || raw.length > 500) {
+    throw new RangeError(label + " must contain 3 to 500 ordered {x,z} vertices.");
   }
   const points = raw.map((point, index) => {
     if (!object(point)) throw new TypeError(label + "[" + index + "] must be an object.");
@@ -140,8 +140,8 @@ function boundaryDistances(sourceSamples, target) {
   });
 }
 function compareFootprints(candidateRaw, referenceRaw, samplesPerEdge = 8) {
-  if (!Number.isSafeInteger(samplesPerEdge) || samplesPerEdge < 1 || samplesPerEdge > 64) {
-    throw new RangeError("footprintSamplesPerEdge must be an integer from 1 to 64.");
+  if (!Number.isSafeInteger(samplesPerEdge) || samplesPerEdge < 1 || samplesPerEdge > 16) {
+    throw new RangeError("footprintSamplesPerEdge must be an integer from 1 to 16.");
   }
   const candidate = normalizeFootprint(candidateRaw, "candidate.footprint");
   const reference = normalizeFootprint(referenceRaw, "reference.footprint");
