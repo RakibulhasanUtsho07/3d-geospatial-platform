@@ -8,7 +8,6 @@ test("extracts actual GLB accessors and applies scene-node plus registration tra
   const result=extractGlbGeometry(createBuildingGlb(),options);
   assert.deepEqual(result.dimensionsM,{widthM:2,heightM:3,depthM:4});
   assert.deepEqual(result.footprint,TARGET_FOOTPRINT);
-  assert.deepEqual(result.surfaceMesh.vertices,TARGET_VERTICES);
   assert.equal(result.surfaceMesh.triangles.length,BOX_TRIANGLES.length);
   assert.deepEqual(result.surfaceMesh.vertices,BOX_TRIANGLES.flatMap(face=>face.map(index=>TARGET_VERTICES[index])));
   assert.equal(result.extractionSummary.sourceVertexCount,8);
