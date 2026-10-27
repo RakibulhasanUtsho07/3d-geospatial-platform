@@ -197,7 +197,7 @@ async function main() {
     report.exitCode = 1;
     report.artifacts.evaluatorStdout = evaluateRun.stdout;
     report.artifacts.evaluatorStderr = evaluateRun.stderr;
-    await writeFile(reportAbs, JSON.stringify(report, null, 2) + "\\n", { flag: "wx", mode: 0o600 });
+    await writeFile(reportAbs, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
     process.exitCode = 1;
     return;
   }
