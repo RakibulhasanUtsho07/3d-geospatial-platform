@@ -11,6 +11,7 @@ import json
 import math
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -249,7 +250,7 @@ def build_report(
         "sampleId": manifest["sampleId"],
         "status": status,
         "evaluationStage": "independent-footprint-cross-reference-only",
-        "generatedAtUtc": None,
+        "generatedAtUtc": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "source": {
             "dataset": source["dataset"],
             "release": release,
