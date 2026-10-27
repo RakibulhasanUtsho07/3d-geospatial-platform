@@ -266,6 +266,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p "test_brf21_human_review.py"
       - name: Validate BRF-22 human-review CLI syntax
         run: python3 scripts/brf21_human_review.py --help
+      - name: Test BRF-23 reconstruction preflight and fail-closed gate
+        run: python3 -m unittest discover -s tests -p "test_brf23_reconstruction_preflight.py"
+      - name: Validate BRF-23 reconstruction preflight CLI
+        run: python3 scripts/brf23_reconstruction_preflight.py --help
       - name: Test BRF-15 MnGeo flight-swath work-unit discovery
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
