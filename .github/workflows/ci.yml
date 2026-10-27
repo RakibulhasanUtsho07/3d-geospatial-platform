@@ -270,6 +270,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p "test_brf23_reconstruction_preflight.py"
       - name: Validate BRF-23 reconstruction preflight CLI
         run: python3 scripts/brf23_reconstruction_preflight.py --help
+      - name: Test BRF-24 hash-bound preflight authorization for COLMAP execution
+        run: npm run test:brf24-colmap-authorization
+      - name: Validate BRF-24 reviewed reconstruction CLI
+        run: node scripts/reconstruct-brf23-reviewed-source.mjs --help
       - name: Test BRF-15 MnGeo flight-swath work-unit discovery
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
