@@ -114,8 +114,8 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
             inspected_node_count=3,
             selected_node_count=3,
         )
-        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
-        self.assertTrue(any("No class-6 building points" in warning for warning in warnings))
+        self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
+        self.assertTrue(any("No class-6 points" in warning for warning in warnings))
 
     def test_building_coverage_passes_only_when_class6_returns_are_present(self):
         blockers, warnings = MODULE.assess_sample_building_coverage(
@@ -135,7 +135,7 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
             selected_node_count=3,
         )
         self.assertIn("no-point-returns-fall-within-the-sample-radius", blockers)
-        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
     def test_unclassified_returns_can_be_detected_above_class2_ground(self):
