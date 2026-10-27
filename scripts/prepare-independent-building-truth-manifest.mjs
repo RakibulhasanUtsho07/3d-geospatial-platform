@@ -8,6 +8,7 @@ import { adaptIndependentReferenceGeometry } from "../src/core/building-generati
 
 const SHA256=/^[a-f0-9]{64}$/i, ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const IMPLEMENTATION="src/core/building-generation/glb-geometry-extraction.mjs";
+const REFERENCE_IMPLEMENTATION="src/core/building-generation/independent-reference-geometry-adapter.mjs";
 function object(v){return v!==null&&typeof v==="object"&&!Array.isArray(v);}
 function sha256(bytes){return createHash("sha256").update(bytes).digest("hex");}
 function safeRelative(value,label){
@@ -57,13 +58,13 @@ function validateReference(truth,sourceFrameId){
   for(const [i,p] of truth.surfaceMesh.vertices.entries())if(!Array.isArray(p)||p.length!==3||p.some(v=>typeof v!=="number"||!Number.isFinite(v)))
     throw new TypeError("Reference surface vertex "+i+" must be a finite [x,y,z] tuple.");
 }
-function provenance(role,sourceHash,geometry,configPath,configHash,implementationHash,commitSha,generatedAt){
-  return {schemaVersion:"1.0.0",extractionRunId:"extract-"+sha256(Buffer.from(role+"|"+sourceHash+"|"+configHash)).slice(0,24),
+function provenance(role,sourceHash,geometry,configPath,configHash,artifactPath,artifactHash,commitSha,generatedAt){
+  return {schemaVersion:"1.0.0",extractionRunId:"extract-"+sha256(Buffer.from(role+"|"+sourceHash+"|"+configHash+"|"+artifactHash)).slice(0,24),
     method:role==="candidate"?"glb-2.0-position-index-and-node-transform-v1":"reviewed-independent-reference-json-import-v1",
     extractedAt:generatedAt,inputArtifactSha256:sourceHash,outputGeometrySha256:geometryPayloadSha256(geometry),
     coordinateFrameId:geometry.coordinateFrameId,units:"m",
-    extractor:{id:"brf-09-glb-reference-geometry-adapter",version:"1.0.0",commitSha,
-      artifactPath:IMPLEMENTATION,artifactSha256:implementationHash,
+    extractor:{id:role==="candidate"?"brf-09-glb-geometry-extractor":"brf-09-independent-reference-frame-adapter",version:"1.0.0",commitSha,
+      artifactPath,artifactSha256:artifactHash,
       configurationPath:configPath,configurationSha256:configHash}};
 }
 async function main(){
@@ -97,6 +98,8 @@ async function main(){
     sourceToEvaluationFrameMatrix4x4:config.reference.sourceToEvaluationFrameMatrix4x4,
   });
   const implementation=await safeRead(root,IMPLEMENTATION,"geometry extractor implementation"),implementationHash=sha256(implementation.bytes);
+  const referenceImplementation=await safeRead(root,REFERENCE_IMPLEMENTATION,"independent reference frame adapter");
+  const referenceImplementationHash=sha256(referenceImplementation.bytes);
   const extracted=extractGlbGeometry(candidateFile.bytes,{coordinateFrameId:frameId,units:"m",
     modelToEvaluationFrameMatrix4x4:registration,checkPointBindings:config.candidate.checkPointBindings??[]});
   const candidate={glbPath:candidateFile.relative,glbSha256:candidateSha,geometrySourceGlbSha256:candidateSha,
@@ -116,8 +119,10 @@ async function main(){
       frameTransform:adaptedReference.frameTransform,
       note:"Geometry coordinates are transformed from the declared independent source frame. Source identity, survey quality, reviewer independence and the correctness of frame registration still need independent human verification."}};
   const configHash=sha256(configFile.bytes);
-  candidate.geometryExtractionProvenance=provenance("candidate",candidateSha,candidate,configFile.relative,configHash,implementationHash,commitSha,generatedAt);
-  reference.geometryExtractionProvenance=provenance("reference",referenceSha,reference,configFile.relative,configHash,implementationHash,commitSha,generatedAt);
+  candidate.geometryExtractionProvenance=provenance("candidate",candidateSha,candidate,configFile.relative,configHash,
+    implementation.relative,implementationHash,commitSha,generatedAt);
+  reference.geometryExtractionProvenance=provenance("reference",referenceSha,reference,configFile.relative,configHash,
+    referenceImplementation.relative,referenceImplementationHash,commitSha,generatedAt);
   const manifest={schemaVersion:"1.0.0",evaluationId,buildingId,generatedAt,candidate,reference,tolerances:config.tolerances,
     preparation:{method:"brf-09-actual-glb-and-independent-reference-adapter-v1",configPath:configFile.relative,configSha256:configHash,
       exactCandidateGlbSha256:candidateSha,candidateHashPinnedBeforeRun:candidatePinned,
