@@ -185,7 +185,7 @@ test("records authorization only after validated inputs and keeps all release ga
         reportPath: path.join(args.workspaceRoot, "mock-report.json"),
         report: { status: "completed-requires-review", outputs: { glb: {
           sha256: "d".repeat(64), relativePath: "model.glb", bytes: 2048,
-        } } } };
+        } } };
     },
   }));
   assert.equal(seen.matchConfirmed, true);

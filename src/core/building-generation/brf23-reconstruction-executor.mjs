@@ -268,7 +268,7 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
     selected.push({ id: sourceId, filename: pinned.filename, sha256: record.sha256,
       byteSize: assetFile.byteSize, licence: record.licence, usageStatus: record.usageStatus });
   }
-  requireValue(selected.length >= 3 && isWithin(workspaceRoot, mediaRoot),
+  requireValue(selected.length >= 3 && within(workspaceRoot, mediaRoot),
     "Insufficient or unsafe selected media.");
   return selected;
 }
