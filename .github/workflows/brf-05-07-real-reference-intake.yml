@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: brf-real-reference-intake-\${{ github.event.pull_request.number || github.ref }}
+  group: brf-real-reference-intake-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
