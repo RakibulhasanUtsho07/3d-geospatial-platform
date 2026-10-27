@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf-16-central-mississippi-ept-reference",
+  "evaluationStage": "independent-point-cloud-intake-only",
+  "dataset": {
+    "title": "USGS 3DEP LiDAR Point Cloud — MN Central Mississippi River Work Unit 4",
+    "sourceName": "U.S. Geological Survey 3D Elevation Program",
+    "sourceProductId": "MN_CentralMissRiver_4_B22",
+    "format": "EPT 1.x over LASzip/LAZ-encoded node files",
+    "url": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MN_CentralMissRiver_4_B22/ept.json",
+    "publicAssetBaseUrl": "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MN_CentralMissRiver_4_B22/",
+    "citation": "Woolpert (2022). MN Central Mississippi River 4 2022 Lidar; Project ID: 230951 - WU300158; Classified Point Cloud. U.S. Geological Survey 3D Elevation Program. USGS Contract No. 140G0221D0013, Task Order No. 140G0222F0098.",
+    "metadataAuthority": "NOAA InPort 73145 identifies this exact EPT URL and states the EPT points were reprojected horizontally to Web Mercator EPSG:3857 while NAVD88 Geoid18 vertical metres were retained.",
+    "license": "U.S. Government public-domain USGS 3DEP point-cloud source. Cite USGS and dataset lineage when using derived material.",
+    "publicDataReference": "https://registry.opendata.aws/usgs-lidar/"
+  },
+  "coverage": {
+    "sourceCatalogBoundsWgs84": [
+      -93.3936931281,
+      45.0492784113,
+      -93.3873130068,
+      45.0538008501
+    ],
+    "samplePoint": {
+      "longitude": -93.391,
+      "latitude": 45.0518,
+      "inputSpatialReference": "EPSG:4326"
+    },
+    "samplePointRole": "camera GPS-derived search centre; not a surveyed control point",
+    "sampleRadiusMeters": 50
+  },
+  "processing": {
+    "maxHierarchyDocuments": 300,
+    "maxPointNodes": 96,
+    "maxHierarchyBytes": 12000000,
+    "maxNodeBytes": 10000000,
+    "maxTotalNodeBytes": 100000000,
+    "targetNodeDepth": 8,
+    "httpTimeoutSeconds": 25
+  },
+  "expectedFrame": {
+    "horizontalCrs": "EPSG:3857",
+    "horizontalUnits": "metre",
+    "verticalDatum": "NAVD88 Geoid18",
+    "verticalUnits": "metre",
+    "basis": "NOAA InPort 73145 process step 2: EPT source was reprojected horizontally to EPSG:3857; NAVD88 GEOID18 vertical meters retained. Confirm the actual ept.json SRS fields before use."
+  },
+  "expectedMetadataSha256": null,
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false,
+  "limitations": [
+    "The EPT is derived from the same classified USGS 3DEP point-cloud project as the raw LAZ product, not a separate independent sensing campaign from that LAZ.",
+    "A camera GPS coordinate and EPT footprint intersection do not prove the photographed structure is the same building.",
+    "No image-derived candidate GLB, registered control points or held-out accuracy metrics have been produced.",
+    "EPT node point files will be sampled in an ephemeral directory and are not committed or uploaded as artifacts."
+  ]
+}
