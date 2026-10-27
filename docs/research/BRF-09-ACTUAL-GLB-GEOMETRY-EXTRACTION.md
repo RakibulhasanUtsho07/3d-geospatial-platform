@@ -14,7 +14,9 @@ The adapter currently reads GLB 2.0 with a single embedded BIN buffer and a JSON
 - Footprint is the convex hull of projected X/Z mesh vertices, not a surveyed wall footprint. It cannot preserve courtyards, holes, concavities, setbacks or internal voids.
 - The sampled surface is an evenly spaced, deterministic sample of source triangle order (at most 8,333 triangles / 24,999 vertex positions). It is intended for bounded comparison, not full topology certification.
 - GLB node transforms are applied before the configured model-to-evaluation-frame matrix. The explicit matrix is column-major, affine and invertible; the operator must document how it was derived. The adapter does not estimate georeferencing, orientation, scale or survey registration.
-- The reference input must provide footprint, dimensionsM, checkPoints, and surfaceMesh.vertices as finite [x,y,z] tuples with triangle indices. Every independent reference check point must explicitly declare independentOfFit: true. Frame registration and source truth still require a human review.
+- The independent reference JSON declares its own source coordinateFrameId and a finite footprintElevationM, metric footprint/dimensions, independently surveyed checkpoints, and surface mesh. The adapter transforms footprint, mesh vertices and checkpoints with a separately declared source-to-evaluation matrix.
+- Reference transforms are deliberately restricted to metre-preserving horizontal 0/90/180/270-degree axis alignment plus translation (Y-up with no tilt). Arbitrary yaw, scale, shear and tilt are rejected rather than silently distorting width/depth interpretation. Confirm the source frame and transform against survey metadata before use.
+- Candidate held-out check points must use reviewed `checkPointBindings` (ID + active GLB scene node index + primitive index + POSITION accessor vertex index). Coordinates are extracted from the actual rendered GLB vertex after node and evaluation transforms; arbitrary caller-provided checkpoint coordinates are rejected. The bound reference point with the same ID must be held out from fitting (`independentOfFit: true`).
 
 ## Config shape
 
@@ -34,11 +36,16 @@ The JSON config schema is 1.0.0, and contains evaluationId, buildingId, generate
     "units": "m",
     "modelCoordinateFrameId": "candidate-local-frame-v1",
     "modelToEvaluationFrameMatrix4x4": [1,0,0,0, 0,1,0,0, 0,0,1,0, 10,0,20,1],
-    "checkPoints": []
+    "checkPointBindings": [
+      {"id": "survey-check-01", "nodeIndex": 1, "primitiveIndex": 0, "vertexIndex": 42},
+      {"id": "survey-check-02", "nodeIndex": 1, "primitiveIndex": 0, "vertexIndex": 89}
+    ]
   },
   "reference": {
     "sourcePath": "evidence/independent-survey-geometry.json",
-    "expectedSourceSha256": "<optional-known-reference-sha256>"
+    "expectedSourceSha256": "<optional-known-reference-sha256>",
+    "sourceCoordinateFrameId": "survey-local-enu-v1",
+    "sourceToEvaluationFrameMatrix4x4": [1,0,0,0, 0,1,0,0, 0,0,1,0, 10,0,20,1]
   },
   "tolerances": {
     "footprintAreaRelativeErrorPercent": 5,
@@ -53,7 +60,7 @@ The JSON config schema is 1.0.0, and contains evaluationId, buildingId, generate
 }
 ~~~
 
-Before use, replace placeholders with exact project-relative files, actual frame ID and reviewed transform. If a previously known hash is supplied and the bytes differ, preparation fails. If no expected input hash is known, the adapter records that the source hash was observed during preparation rather than pinned before the run.
+Before use, replace placeholders with exact project-relative files, actual source/evaluation frame IDs, source transform, GLB vertex bindings, survey-derived check points and known hashes. The reference JSON's `coordinateFrameId` must equal `reference.sourceCoordinateFrameId`; it must include a numeric `footprintElevationM` for the X/Z outline. The adapter transforms all reference coordinates into the candidate's declared evaluation frame and swaps width/depth when the horizontal axes are swapped. If a previously known hash is supplied and the bytes differ, preparation fails. If no expected input hash is known, the adapter records the observed source hash rather than claiming it was pinned before the run.
 
 ## Commands
 
@@ -68,3 +75,8 @@ The preparation CLI reads exact candidate/reference bytes and the extractor impl
 ## Release policy
 
 The adapter never turns its output into automatic acceptance. acceptanceEligible, publicationEligible, mapReady, and automaticApproval stay false. Source-byte integrity does not authenticate the physical identity of the building, rights to use the source, survey quality, reviewer independence, or frame-registration correctness. The synthetic test fixture is software regression evidence only and is not a real-building accuracy benchmark.
+
+
+## Real-building execution status — not yet an accuracy result
+
+The repository test fixture is synthetic and explicitly identifies itself as such. No independent, survey-backed metric geometry packet for an actual building was available to this implementation run; the Ahsan Manzil photo references do not substitute for a measured footprint, independent checkpoint coordinates and registered reference mesh. Do not run the fixture as a real-building benchmark. Before any accuracy claim, supply rights-reviewed survey/CAD/BIM/LiDAR geometry and held-out survey controls, verify the frame transform and checkpoint independence, and have a reviewer inspect the resulting metrics and reference provenance. `acceptanceEligible`, `publicationEligible`, `mapReady`, and automatic approval remain false.
