@@ -138,6 +138,25 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
         self.assertIn("no-class6-building-points-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
+    def test_building_coverage_requires_class6_returns_inside_validation_radius(self):
+        blockers, warnings = MODULE.assess_sample_building_coverage(
+            3371, {1: 1283, 2: 2084, 7: 2, 18: 2}, 3, 3
+        )
+        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertTrue(any("No class-6 building points" in warning for warning in warnings))
+
+        blockers, warnings = MODULE.assess_sample_building_coverage(
+            3371, {1: 1280, 2: 2088, 6: 3}, 3, 3
+        )
+        self.assertNotIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertEqual(warnings, [])
+
+    def test_building_coverage_blocks_incomplete_node_reads_and_empty_neighbourhood(self):
+        blockers, _ = MODULE.assess_sample_building_coverage(0, {}, 2, 3)
+        self.assertIn("no-point-returns-fall-within-the-sample-radius", blockers)
+        self.assertIn("no-class6-building-points-within-sample-radius", blockers)
+        self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
+
     def test_manifest_rejects_accidentally_enabled_publication_flags(self):
         with MANIFEST.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
