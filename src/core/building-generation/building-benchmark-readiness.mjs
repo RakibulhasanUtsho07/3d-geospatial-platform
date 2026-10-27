@@ -134,6 +134,9 @@ export function assessBuildingBenchmarkReadiness(manifest) {
   const candidateAssets = candidateAssetIds.map((id) => assetsById.get(id)).filter(Boolean);
   const candidateImagesOnly = candidateAssets.length > 0 && candidateAssets.length === candidateAssetIds.length &&
     candidateAssets.every((asset) => asset.role === "candidate-image");
+  add("candidate-building-identity", candidateObject && candidate.buildingId === buildingId,
+    candidateObject && candidate.buildingId === buildingId ? "Candidate is explicitly assigned to the evaluated building." :
+      "candidate.buildingId must match building.id.");
   add("candidate-image-inputs", candidateImagesOnly,
     candidateImagesOnly ? "Candidate references only declared candidate image/video-frame inputs." :
       "candidate.sourceAssetIds must reference one or more declared candidate-image assets; a benchmark truth model must never be used as the candidate input.");
@@ -163,6 +166,9 @@ export function assessBuildingBenchmarkReadiness(manifest) {
   const referenceRolesValid = referenceAssets.length > 0 && referenceAssets.length === referenceAssetIds.length &&
     referenceAssets.every((asset) => asset.role === "reference-model" || asset.role === "independent-surface");
   const hasIndependentSurface = referenceAssets.some((asset) => asset.role === "independent-surface");
+  add("reference-building-identity", referenceObject && reference.buildingId === buildingId,
+    referenceObject && reference.buildingId === buildingId ? "Reference is explicitly assigned to the evaluated building." :
+      "reference.buildingId must match building.id.");
   add("reference-assets-present", referenceRolesValid && hasIndependentSurface,
     referenceRolesValid && hasIndependentSurface
       ? "Reference includes a declared independent surface/measurement asset."
