@@ -229,8 +229,8 @@ export function assessBuildingBenchmarkReadiness(manifest) {
   add("held-out-checkpoints", checkpointBindingsValid && checkpoints.every((point) =>
       object(point) && point.independentOfFit === true) && noFitLeakage,
     checkpointBindingsValid && checkpoints.every((point) => object(point) && point.independentOfFit === true) && noFitLeakage
-      ? "At least six unique held-out points have independent source IDs, finite metric coordinates/uncertainty, and exact candidate GLB vertex bindings."
-      : "At least six unique, finite, independently sourced held-out points are required; each must set independentOfFit=true, avoid fit-control IDs, declare positive uncertainty and frame, and bind to an actual GLB node/primitive/POSITION vertex.");
+      ? "At least six unique held-out point records declare independent source IDs, finite metric coordinates/uncertainty and candidate GLB vertex bindings."
+      : "At least six unique, finite, independently sourced held-out points are required; each must set independentOfFit=true, avoid fit-control IDs, declare positive uncertainty and frame, and declare a candidate GLB node/primitive/POSITION vertex binding. The BRF-09 extractor must still verify that each binding exists and is active.");
 
   const validChecks = checks.filter((check) => check.status === "passed").length;
   const blockers = checks.filter((check) => check.status !== "passed").map((check) => check.id);
