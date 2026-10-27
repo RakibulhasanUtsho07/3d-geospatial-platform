@@ -69,9 +69,15 @@ jobs:
             --report artifacts/brf-16/central-mississippi-laz-header-report.json
 
       - name: Upload inspection report only (not the LAZ)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: brf-16-central-mississippi-laz-header-report
           path: artifacts/brf-16/central-mississippi-laz-header-report.json
           if-no-files-found: error
           retention-days: 7
+
+      - name: Remove temporary LAZ bytes
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
