@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import stat
 import sys
 from pathlib import Path
 from typing import Any
@@ -135,7 +136,7 @@ def verify_source_images(image_root_arg: Path, source_manifest: dict[str, Any]) 
         path = root / filename
         try:
             info = path.lstat()
-            require(not path.is_symlink() and path.parent == root and info.is_file(),
+            require(not path.is_symlink() and path.parent == root and stat.S_ISREG(info.st_mode),
                     "must be a regular non-symlink file directly under the image root")
             require(info.st_size == expected_size, "byte-size mismatch (expected " + str(expected_size) +
                     ", got " + str(info.st_size) + ")")
