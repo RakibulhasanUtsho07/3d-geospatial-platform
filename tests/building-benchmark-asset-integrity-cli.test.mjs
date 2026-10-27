@@ -83,7 +83,7 @@ test("CLI exits zero only when all local bytes verify", async (t) => {
 
 test("CLI exits two when a source file differs from declared hash", async (t) => {
   const { root, manifestPath } = await withFixture(t);
-  await writeFile(path.join(root, "images/front.jpg"), "corrupt-image-bytes");
+  await writeFile(path.join(root, "images/front.jpg"), "wrong-image-bytes");
   const result = run([manifestPath], root);
   assert.equal(result.status, 2, result.stderr);
   const report = JSON.parse(result.stdout);
