@@ -228,7 +228,7 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
         try:
             with file_path.open("rb") as source_stream:
                 signature = source_stream.read(3)
-            require(signature == b"\\xff\\xd8\\xff",
+            require(signature == b"\xff\xd8\xff",
                     "Image bytes do not have a JPEG SOI signature: " + view["id"])
             with Image.open(file_path) as check:
                 require(check.format in {"JPEG", "MPO"},
