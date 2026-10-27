@@ -22,12 +22,19 @@ export function createBuildingGlb(mutate=null){
   const bh=Buffer.alloc(8);bh.writeUInt32LE(b.length,0);bh.writeUInt32LE(0x004e4942,4);
   return Buffer.concat([h,jh,j,bh,b]);
 }
-export function surveyGeometryDocument(){
+export function surveyGeometryDocument({coordinateFrameId="test-building-frame-y-up-v1",localCoordinates=false}={}){
+  const footprint=localCoordinates
+    ? [{x:0,z:0},{x:2,z:0},{x:2,z:4},{x:0,z:4}]
+    : TARGET_FOOTPRINT;
+  const vertices=localCoordinates?BOX_POSITIONS:TARGET_VERTICES;
+  const points=localCoordinates
+    ? [{id:"survey-check-01",x:0,y:0,z:0},{id:"survey-check-02",x:2,y:0,z:0},{id:"survey-check-03",x:2,y:3,z:4}]
+    : TARGET_CHECK_POINTS;
   return {schemaVersion:"1.0.0",sourceId:"surveyed-test-building-01",evidenceBasis:"surveyed",
     sourceDescription:"Synthetic fixture used only for parser regression tests, not real-world evidence.",
     reviewedBy:"test-reviewer",reviewedAt:"2026-10-27T08:00:00.000Z",
-    coordinateFrameId:"test-building-frame-y-up-v1",units:"m",footprint:TARGET_FOOTPRINT,
+    coordinateFrameId,units:"m",footprintElevationM:localCoordinates?0:1,footprint,
     dimensionsM:{widthM:2,depthM:4,heightM:3},
-    checkPoints:TARGET_CHECK_POINTS.map(p=>({...p,independentOfFit:true})),
-    surfaceMesh:{vertices:TARGET_VERTICES,triangles:BOX_TRIANGLES}};
+    checkPoints:points.map(p=>({...p,independentOfFit:true})),
+    surfaceMesh:{vertices,triangles:BOX_TRIANGLES}};
 }
