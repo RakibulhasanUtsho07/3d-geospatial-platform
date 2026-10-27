@@ -151,6 +151,7 @@ test("required independent-truth evaluation stays incomplete until a report is p
   pinned.benchmarkReport.checks.push(
     { id: "independent-truth-report-valid", status: "passed" },
     { id: "independent-truth-report-candidate-binding", status: "passed" },
+    { id: "independent-truth-report-extraction-provenance", status: "passed" },
     { id: "independent-truth-report-byte-integrity", status: "passed" },
     { id: "independent-truth-report-status", status: "passed" },
   );
