@@ -274,6 +274,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p "test_inspect_usgs_laz_tile.py"
       - name: Validate BRF-16 LAZ header inspector syntax
         run: python3 -m py_compile scripts/inspect-usgs-laz-tile.py
+      - name: Test BRF-16 public EPT metadata, URL trust and node bounds
+        run: python3 -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
+      - name: Validate BRF-16 EPT inspector syntax
+        run: python3 -m py_compile scripts/inspect-usgs-ept-reference.py
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
