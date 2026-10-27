@@ -10,10 +10,10 @@ const reviewedAt = "2026-10-26T10:00:00Z";
 function asset(path, seed, width = 4, height = 3) {
   return { path, sha256: hash(seed), bytes: 100 + seed, width, height };
 }
-function sample(sampleId, split, group = sampleId) {
+function sample(sampleId, split, group = sampleId, buildingGroupId = "building-" + sampleId) {
   const source = { ...asset("evidence/" + sampleId + ".png", 1), sourceId: "source-" + sampleId,
     rights: { status: "verified", evidenceId: "rights-" + sampleId, reviewedBy: "reviewer-a", reviewedAt } };
-  return { sampleId, captureGroupId: group, split, source,
+  return { sampleId, buildingGroupId, captureGroupId: group, split, source,
     groundTruthMask: { ...asset("labels/" + sampleId + ".png", 2), encoding: SEGMENTATION_PALETTE_ID,
       review: { status: "reviewed", annotationId: "annotation-" + sampleId, reviewerId: "reviewer-a", reviewedAt } },
     predictions: [{ providerId: "local-seg-v1", modelVersion: "1.0.0", configSha256: hash(3),
@@ -30,6 +30,8 @@ test("validates versioned source/label provenance and a held-out capture-group s
   assert.equal(report.status, "ready-for-evaluation");
   assert.equal(report.sampleCount, 2);
   assert.equal(report.heldOutSamples, 1);
+  assert.equal(report.buildingCount, 2);
+  assert.equal(report.heldOutBuildings, 1);
   assert.equal(report.issues.length, 0);
 });
 
@@ -37,6 +39,14 @@ test("rejects capture-burst leakage, unsafe paths and stale model input hashes",
   const leaked = manifest([sample("dev-01", "development", "burst-a"), sample("test-01", "held-out-evaluation", "burst-a")]);
   assert.equal(validateSegmentationBenchmarkManifest(leaked).status, "failed");
   assert.ok(validateSegmentationBenchmarkManifest(leaked).issues.some((x) => x.code === "capture-group-split-leakage"));
+
+  const sameBuildingAcrossCaptures = manifest([
+    sample("dev-01", "development", "capture-front", "ahsan-manzil"),
+    sample("heldout-01", "held-out-evaluation", "capture-oblique", "ahsan-manzil"),
+  ]);
+  const buildingLeak = validateSegmentationBenchmarkManifest(sameBuildingAcrossCaptures);
+  assert.equal(buildingLeak.status, "failed");
+  assert.ok(buildingLeak.issues.some((x) => x.code === "building-group-split-leakage"));
 
   const unsafe = manifest();
   unsafe.samples[0].groundTruthMask.path = "../not-a-label.png";
@@ -90,6 +100,10 @@ test("benchmark report exposes per-image and held-out metrics but never auto-app
   assert.equal(report.status, "benchmark-review-required");
   assert.equal(report.acceptanceEligible, false);
   assert.equal(report.candidateSummaries[0].heldOutImageCount, 1);
+  assert.equal(report.candidateSummaries[0].heldOutBuildingCount, 1);
+  assert.equal(report.candidateSummaries[0].heldOutMeanPerBuildingMacroForegroundIoU, 1);
+  assert.equal(report.counts.buildings, 2);
+  assert.equal(report.counts.heldOutBuildings, 1);
   assert.equal(report.perImage.length, 2);
   assert.equal(report.candidateSummaries[0].recommendation, "manual-review-required");
 });
