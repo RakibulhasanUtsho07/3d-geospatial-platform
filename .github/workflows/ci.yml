@@ -250,7 +250,7 @@ jobs:
         run: npm run test:building-segmentation-benchmark
       - name: Test independent building truth footprint, dimensions, checkpoints and optional mesh metrics
         run: npm run test:independent-building-truth
-      - name: Test BRF-10 survey-backed benchmark intake metadata preflight
+      - name: Test BRF-10 benchmark intake metadata and CLI fail-closed behavior
         run: npm run test:building-benchmark-readiness
       - name: Validate BRF-10 benchmark readiness CLI
         run: npm run assess:building-benchmark-readiness -- --help
