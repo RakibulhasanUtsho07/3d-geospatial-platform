@@ -10,10 +10,10 @@ const reviewedAt = "2026-10-26T10:00:00Z";
 function asset(path, seed, width = 4, height = 3) {
   return { path, sha256: hash(seed), bytes: 100 + seed, width, height };
 }
-function sample(sampleId, split, group = sampleId) {
+function sample(sampleId, split, group = sampleId, buildingGroupId = "building-" + sampleId) {
   const source = { ...asset("evidence/" + sampleId + ".png", 1), sourceId: "source-" + sampleId,
     rights: { status: "verified", evidenceId: "rights-" + sampleId, reviewedBy: "reviewer-a", reviewedAt } };
-  return { sampleId, captureGroupId: group, split, source,
+  return { sampleId, buildingGroupId, captureGroupId: group, split, source,
     groundTruthMask: { ...asset("labels/" + sampleId + ".png", 2), encoding: SEGMENTATION_PALETTE_ID,
       review: { status: "reviewed", annotationId: "annotation-" + sampleId, reviewerId: "reviewer-a", reviewedAt } },
     predictions: [{ providerId: "local-seg-v1", modelVersion: "1.0.0", configSha256: hash(3),
@@ -30,13 +30,37 @@ test("validates versioned source/label provenance and a held-out capture-group s
   assert.equal(report.status, "ready-for-evaluation");
   assert.equal(report.sampleCount, 2);
   assert.equal(report.heldOutSamples, 1);
+  assert.equal(report.buildingCount, 2);
+  assert.equal(report.heldOutBuildings, 1);
   assert.equal(report.issues.length, 0);
+});
+
+test("requires a stable physical-building ID for independent holdout evaluation", () => {
+  const missing = manifest();
+  delete missing.samples[1].buildingGroupId;
+  const missingReport = validateSegmentationBenchmarkManifest(missing);
+  assert.equal(missingReport.status, "failed");
+  assert.ok(missingReport.issues.some((item) => item.code === "building-group-id-invalid"));
+
+  const malformed = manifest();
+  malformed.samples[1].buildingGroupId = "../same-building";
+  const malformedReport = validateSegmentationBenchmarkManifest(malformed);
+  assert.equal(malformedReport.status, "failed");
+  assert.ok(malformedReport.issues.some((item) => item.code === "building-group-id-invalid"));
 });
 
 test("rejects capture-burst leakage, unsafe paths and stale model input hashes", () => {
   const leaked = manifest([sample("dev-01", "development", "burst-a"), sample("test-01", "held-out-evaluation", "burst-a")]);
   assert.equal(validateSegmentationBenchmarkManifest(leaked).status, "failed");
   assert.ok(validateSegmentationBenchmarkManifest(leaked).issues.some((x) => x.code === "capture-group-split-leakage"));
+
+  const sameBuildingAcrossCaptures = manifest([
+    sample("dev-01", "development", "capture-front", "Ahsan-Manzil"),
+    sample("heldout-01", "held-out-evaluation", "capture-oblique", "ahsan-manzil"),
+  ]);
+  const buildingLeak = validateSegmentationBenchmarkManifest(sameBuildingAcrossCaptures);
+  assert.equal(buildingLeak.status, "failed");
+  assert.ok(buildingLeak.issues.some((x) => x.code === "building-group-split-leakage"));
 
   const unsafe = manifest();
   unsafe.samples[0].groundTruthMask.path = "../not-a-label.png";
@@ -90,14 +114,44 @@ test("benchmark report exposes per-image and held-out metrics but never auto-app
   assert.equal(report.status, "benchmark-review-required");
   assert.equal(report.acceptanceEligible, false);
   assert.equal(report.candidateSummaries[0].heldOutImageCount, 1);
+  assert.equal(report.candidateSummaries[0].heldOutBuildingCount, 1);
+  assert.equal(report.candidateSummaries[0].heldOutMeanPerBuildingMacroForegroundIoU, 1);
+  assert.equal(report.counts.buildings, 2);
+  assert.equal(report.counts.heldOutBuildings, 1);
   assert.equal(report.perImage.length, 2);
   assert.equal(report.candidateSummaries[0].recommendation, "manual-review-required");
+});
+
+test("weights held-out segmentation performance by physical building, not by photo count", () => {
+  const input = manifest([
+    sample("dev-01", "development", "dev-capture", "dev-building"),
+    sample("heldout-a-front", "held-out-evaluation", "building-a-front", "building-a"),
+    sample("heldout-a-side", "held-out-evaluation", "building-a-side", "building-a"),
+    sample("heldout-b-front", "held-out-evaluation", "building-b-front", "building-b"),
+  ]);
+  const report = buildSegmentationBenchmarkReport({
+    manifest: input,
+    generatedAt: reviewedAt,
+    evaluatedSamples: [
+      { sampleId: "dev-01", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.8 } },
+      { sampleId: "heldout-a-front", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.2 } },
+      { sampleId: "heldout-a-side", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 0.2 } },
+      { sampleId: "heldout-b-front", providerId: "local-seg-v1", status: "evaluated", metrics: { macroForegroundIoU: 1.0 } },
+    ],
+  });
+  const summary = report.candidateSummaries[0];
+  assert.equal(summary.heldOutImageCount, 3);
+  assert.equal(summary.heldOutBuildingCount, 2);
+  assert.equal(summary.heldOutMeanMacroForegroundIoU, 0.466667);
+  assert.equal(summary.heldOutMeanPerBuildingMacroForegroundIoU, 0.6);
+  assert.equal(report.acceptanceEligible, false);
 });
 
 test("does not call an unevaluated mask or malformed palette a pass", () => {
   const input = manifest();
   const report = buildSegmentationBenchmarkReport({ manifest: input, evaluatedSamples: [] });
   assert.equal(report.status, "benchmark-incomplete");
+  assert.ok(report.candidateSummaries[0].failureCases.some((item) => item.sampleId === "heldout-01"));
   assert.ok(report.issues.some((x) => x.code === "candidate-result-not-evaluated"));
   const malformed = manifest();
   malformed.samples[0].predictions[0].mask.encoding = "binary-mask";

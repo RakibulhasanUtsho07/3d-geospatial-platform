@@ -297,7 +297,7 @@ These are proposed tasks, not code changes already completed.
 - [ ] **BRF-05 (P0):** Building/occluder masks with review overlays and human correction.
 - [ ] **BRF-06 (P0):** Per-view architectural-feature schema with confidence and provenance.
 - [ ] **BRF-07 (P0):** Source-camera render comparison with silhouette/contour and facade-part metrics.
-- [ ] **BRF-08 (P0):** Independent-truth evaluator for footprint/dimensions, surface distance when reference geometry exists, and check points.
+- [ ] **BRF-08 (P0, IN PROGRESS):** Whole-building holdout protection and a first independent-truth geometry evaluator are implemented on the scoped feature branch. The evaluator reports footprint area/boundary metrics, width/depth/height error, held-out check-point residuals and optional vertex-sampled bidirectional surface distances, with source-hash checks, explicit tolerances and fail-closed reporting. Real geometry extraction/provenance, reviewed survey truth, actual held-out-building evaluation and separate release acceptance remain open.
 - [ ] **BRF-09 (P0):** Confidence-aware multi-view fusion and observed/inferred/unknown surface coverage.
 - [ ] **BRF-10 (P0):** Defect registry plus bounded correction/re-test.
 - [ ] **BRF-11 (P1):** Parametric grammar for roof, arches, domes, columns, openings and cornices fitted to evidence.
@@ -449,3 +449,18 @@ acceptanceEligible, publicationEligible and mapReady remain false. Synthetic tes
 
 Do not blindly merge the entire rakibul-hasan branch into development: branch comparison shows divergence and unrelated floor-plan/road changes outside BRF-05–07. Promote through a scoped, tested PR after post-merge CI is complete. main is not updated by this package. Promotion/publication remains blocked until the independent real-building acceptance boxes above are satisfied.
 
+
+
+### 2026-10-27 — BRF-08: independent-truth evaluator and accuracy-pack integration (validation pending)
+
+- **Branch / PR:** `feat/brf-08-independent-truth-evaluator` → [PR #206](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/206), base `development`. This scoped package is not the completion of all BRF-08 release gates.
+- **Whole-building segmentation holdout:** require stable `buildingGroupId` across capture sessions; report per-building macro IoU and explicit missing/failed held-out sample results.
+- **Geometry evaluator:** `src/core/building-generation/independent-building-truth-evaluator.mjs` reports footprint area/boundary errors, width/depth/height errors, held-out 3D check-point residuals and optional symmetric vertex-sampled nearest-triangle distances.
+- **Extraction provenance contract:** `src/core/building-generation/geometry-extraction-provenance.mjs` defines canonical geometry-payload hashing and versioned provenance fields: exact input-artifact SHA-256, output payload SHA-256, extractor ID/version/commit, extractor source/config paths and hashes, run ID, method, frame and units. The CLI verifies the actual candidate GLB/reference-source bytes and actual extractor/config file bytes, then records each artifact and provenance result.
+- **Accuracy-flow integration:** `building-accuracy-benchmark.mjs` checks the independent-truth report against the exact candidate GLB and report-file digest; `build-building-accuracy-evidence-pack.mjs` can load a path-pinned report. Set `requireIndependentTruthEvaluation: true`, `independentTruthReportPath` and `expectedIndependentTruthReportSha256` in the relevant top-level pack-manifest building entry to make the report a required evidence-pack gate.
+- **Regression coverage:** geometry digest ordering, stale input/output hashes, wrong frame, extractor/config byte mismatch, missing provenance, threshold precision, CLI path/symlink protection, stale report binding, benchmark integration and evidence-pack required-report behavior. `npm run test:independent-building-truth` now includes provenance tests; full CI already includes building-accuracy benchmark/evidence-pack suites.
+- **Scope limits:** the current CLI verifies declarations and byte bindings; it does not execute/replay an extractor or infer footprint/check points from photos/video. Candidate/reference coordinates are still prepared upstream. Source hashes and operator metadata cannot authenticate survey truth, licensing, physical building identity or measurement correctness. Surface distances remain vertex-sampled rather than a continuous Hausdorff proof.
+- **Release policy:** keep `acceptanceEligible`, `publicationEligible`, `mapReady` and automatic approval false. BRF-08 stays in progress until an actual extraction adapter/replay path, independently reviewed geometry, a genuine held-out building and documented human sign-off are exercised.
+- **Exact-head validation:** pending after the latest code, tests and documentation updates; do not merge PR #206 to `development` or promote to `main` before exact-head CI succeeds.
+
+**Next task:** implement a reproducible extraction adapter that derives candidate mesh bounds/vertices from the actual GLB and imports independently sourced reference geometry into the same declared frame, then run the evaluator on a real survey-backed building. Keep CI contract evidence distinct from real-world acceptance.
