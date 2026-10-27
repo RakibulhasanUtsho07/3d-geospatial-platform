@@ -162,7 +162,7 @@ function validateReport(report) {
   requireValue(["X", "Y", "Z"].includes(frame.reviewedSourceUpAxis) &&
     frame.reviewedSourceUpAxisPositiveDirection === "positive",
     "The exporter supports only a reviewer-confirmed positive X/Y/Z up-axis.");
-  return { inputs, bindings, decision, imageSet, profile, tool, frame };
+  return { inputs, bindings, decision, imageSet, profile, profileId: report.profileId, tool, frame };
 }
 
 async function verifyEvidence(artifactRoot, bindings) {
@@ -202,7 +202,7 @@ async function verifyDecisionAndProfile(artifactRoot, profilePath, validated) {
     profileFile.sha256 === validated.profile.sha256 && profileFile.byteSize === validated.profile.byteSize,
     "COLMAP profile changed after preflight.");
   const profile = parseJson(profileFile.bytes, "COLMAP profile");
-  requireValue(profile.schemaVersion === "1.0.0" && profile.profileId === validated.inputs.profileId &&
+  requireValue(profile.schemaVersion === "1.0.0" && profile.profileId === validated.profileId &&
     profile.toolchain?.name === "COLMAP" && profile.toolchain?.executable === validated.tool.executable &&
     profile.toolchain?.expectedVersion === validated.tool.expectedVersion &&
     profile.coordinateFrame?.policy === "local-only-no-georeference" &&
