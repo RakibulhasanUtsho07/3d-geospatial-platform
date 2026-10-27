@@ -60,7 +60,7 @@ test("prepares a manifest from exact GLB bytes and independently supplied refere
 });
 
 test("rejects hash-pinned GLB/reference changes and coordinate-frame disagreement",async t=>{
-  const {root,config}=await setup(t);
+  const {root}=await setup(t);
   await writeFile(path.join(root,"evidence/candidate.glb"),Buffer.from("modified"));
   const stale=run(prepSource,root,["configs/evaluation.json","stale.json"]);
   assert.equal(stale.status,1);assert.match(stale.stderr,/differs from actual source bytes/);
