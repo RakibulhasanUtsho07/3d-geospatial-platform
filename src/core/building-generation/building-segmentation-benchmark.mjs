@@ -109,11 +109,13 @@ export function validateSegmentationBenchmarkManifest(manifest) {
         "Every sample needs a stable buildingGroupId so different captures of the same physical building cannot cross splits.", sampleId);
     }
     if (ID.test(sample?.buildingGroupId ?? "") && SPLITS.has(sample?.split)) {
-      const oldBuildingSplit = buildingGroupSplit.get(sample.buildingGroupId);
+      // IDs are treated case-insensitively so capitalization drift cannot split one building across folds.
+      const buildingKey = sample.buildingGroupId.toLowerCase();
+      const oldBuildingSplit = buildingGroupSplit.get(buildingKey);
       if (oldBuildingSplit && oldBuildingSplit !== sample.split) {
         addIssue(issues, "error", "building-group-split-leakage",
           "A physical buildingGroupId appears in both development and held-out evaluation; hold out whole buildings, not only individual images.", sampleId);
-      } else buildingGroupSplit.set(sample.buildingGroupId, sample.split);
+      } else buildingGroupSplit.set(buildingKey, sample.split);
     }
     validateAsset(sample?.source, "source-image", sampleId, issues, true);
     validateAsset(sample?.groundTruthMask, "label-mask", sampleId, issues, false);
