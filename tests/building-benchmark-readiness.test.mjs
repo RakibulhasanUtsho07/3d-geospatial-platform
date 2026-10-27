@@ -81,9 +81,9 @@ function validManifest() {
   };
 }
 
-test("marks a complete, separated, rights-reviewed real-data manifest ready for evaluation only", () => {
+test("marks a complete, separated, rights-reviewed manifest complete for further byte-level review only", () => {
   const report = assessBuildingBenchmarkReadiness(validManifest());
-  assert.equal(report.status, "ready-for-evaluation");
+  assert.equal(report.status, "manifest-complete");
   assert.equal(report.blockers.length, 0);
   assert.equal(report.acceptanceEligible, false);
   assert.equal(report.publicationEligible, false);
