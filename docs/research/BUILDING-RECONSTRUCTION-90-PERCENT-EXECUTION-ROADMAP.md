@@ -403,3 +403,49 @@ A model that looks good is not automatically accurate. The roadmap makes indepen
 - **Latest docs-updated head:** `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13`, [run #40360853267](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40360853267) — **success**; exact-head full CI completed successfully.
 - **Limitation:** this synthetic fixture verifies the baseline/QA harness only. It is not a measured building, image-based reconstruction or real-world accuracy test. `mapReady`, `publicationEligible`, and automatic approval remain false.
 - **Next action:** start **BRF-05 — image-to-geometry correspondence and per-view semantic evidence**. Keep PR #190 and the stacked chain out of `development`/`main` until their human visual and evidence gates pass.
+
+
+## 12. Consolidated implementation package — BRF-05 through BRF-07
+
+**Tracking issue:** [#199 — Building visual evidence and source-camera validation](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/199)  
+**Detailed plan:** [BRF-05–07 Visual Evidence Plan](./BRF-05-07-VISUAL-EVIDENCE-PLAN.md)  
+**Implementation report:** [BRF-05–07 implementation/evidence report](./BRF-05-07-IMPLEMENTATION-AND-EVIDENCE-REPORT.md)  
+**Real-building pilot report:** [Ahsan Manzil real-reference observations (2026-10-27)](./AHSAN-MANZIL-REAL-REFERENCE-PILOT-OBSERVATIONS-2026-10-27.md)  
+**Model/framing follow-up:** [Issue #203](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/203)
+
+### Implementation status — code merged into rakibul-hasan
+
+- [x] **BRF-05 integration:** existing source-bound mask validation is integrated into an evidence package; encoded image/mask bytes and dimensions are checked; bounded source-embedded SVG mask review overlays are emitted; occluder classes are explicit; missing occlusion evidence stays incomplete.
+- [x] **BRF-06 integration:** source-bound feature proposals and reviewed annotation comparison are integrated; reviewed feature categories include roofline, floor bands, windows, doors, balconies, arches, columns, domes, cornices, pediments, staircases, parapets and ornaments. Proposal output is not ground truth.
+- [x] **BRF-07 integration:** exact source/GLB/camera/calibration/alignment/render hashes are tied into the evidence graph; source-camera comparability is required; silhouette IoU/precision/recall/F1 and contour-distance diagnostics are separate from semantic-feature and metric-geometry evidence.
+- [x] **Runnable tooling:** **npm run build:building-visual-evidence-package -- path/to/evidence-bundle.json** validates the input bundle and produces an evidence report plus overlays; **npm run prepare:building-visual-review-packet -- path/to/verified-manifest.json** creates a hash-pinned real-photo review packet with pending annotation templates.
+- [x] **Regression/CI coverage:** synthetic fail-closed integration tests and packet-builder regression tests are wired into CI. They test software contracts, not actual building accuracy.
+- [x] **Roadmap planning baseline:** [PR #200](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/200) merged to rakibul-hasan.
+- [x] **BRF implementation:** [PR #201](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/201) merged to rakibul-hasan at c5b13b75058dc4c0fb55cb93bac589db79a7f424. Its exact-head full CI passed: [run #40381892198](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40381892198).
+- [x] **Real-reference intake tooling:** [PR #202](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/202) merged to rakibul-hasan at 848802c44e5849a60008cd7aea056f26f26e3168. On the PR's exact head, full CI [run #40446153586](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40446153586) and reference intake [run #40446153578](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40446153578) passed.
+- [x] **Actual source bytes obtained:** four Ahsan Manzil views—front, side, oblique and a clearly identified Wikimedia-generated 1280×853 aerial derivative—were downloaded through the allowlisted workflow, verified, locally SHA-256 hashed and uploaded with attribution/licence metadata and a contact sheet. Latest packet artifact: brf-05-07-ahsan-manzil-reference-review-packet, ID 12708581364, 30-day retention.
+- [x] **Visual framing audit recorded:** the front photograph is cropped at both facade boundaries, so image-width ratios cannot be compared directly with full-plinth model coordinates. The candidate remains NOT_COMPARABLE; no geometry correction or accuracy pass is inferred. See pilot report and [Issue #203](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/203).
+
+### Real-building acceptance status — OPEN / release-blocking
+
+- [ ] Independent rights review for the exact downloaded/derivative assets.
+- [ ] Human-reviewed building masks and separate occluder masks for every evaluation view; colour-threshold proposals are not accepted labels.
+- [ ] Independent review/history for architecture features and occlusion/visibility states.
+- [ ] Building-level held-out evaluation split/report with verified source/ground-truth/prediction hashes, per-class metrics, failure cases and reviewer sign-off.
+- [ ] Credible camera calibration and model-frame alignment, independently grounded control points, and same-camera renders. Every unsuitable view stays NOT_COMPARABLE.
+- [ ] Independent surveyed dimensions/footprint or other accepted metric control before claiming physical 3D accuracy.
+- [ ] Human visual inspection of the exact candidate render/overlay and recorded decision before release eligibility.
+
+acceptanceEligible, publicationEligible and mapReady remain false. Synthetic tests, successful CI, file hashes and published dimensions do not independently establish licence truth, annotation correctness, camera calibration or architectural accuracy. No automatic provider is selected by this package.
+
+### Exact-head and post-merge validation
+
+- **BRF integration full CI:** [run #40381892198](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40381892198) — success on PR #201's exact head.
+- **Reference-intake workflow:** [run #40446153578](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40446153578) — success; source manifest/hash validation, packet build and artifact upload succeeded.
+- **PR #202 exact-head CI:** [run #40446153586](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40446153586) — success.
+- **Post-merge rakibul-hasan validation at 848802c44e5849a60008cd7aea056f26f26e3168:** [CI #40449769937](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40449769937), [offline-road baseline #40449769945](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40449769945) and [real-Dhaka browser baseline #40449769974](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40449769974) were still running at the time of this update. Re-check before claiming post-merge validation is complete.
+
+### Branch promotion policy
+
+Do not blindly merge the entire rakibul-hasan branch into development: branch comparison shows divergence and unrelated floor-plan/road changes outside BRF-05–07. Promote through a scoped, tested PR after post-merge CI is complete. main is not updated by this package. Promotion/publication remains blocked until the independent real-building acceptance boxes above are satisfied.
+
