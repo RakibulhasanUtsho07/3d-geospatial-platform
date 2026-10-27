@@ -41,3 +41,34 @@ After a point-cloud tile is identified, download only the smallest LAZ file whos
 The source images' GPS altitude has no declared vertical datum, and no valid transform between the source COLMAP frame and the LiDAR frame has been established. Do not fit candidate geometry to all available LiDAR points and then reuse the same points as "held-out" validation. Fit controls and held-out checks must be distinct; target at least six independently measured held-out checkpoints, with an independent reference source hash and documented transform.
 
 **Decision:** no candidate GLB or real-building accuracy score is produced by BRF-16. All `acceptanceEligible`, `publicationEligible`, `mapReady`, and `automaticApproval` flags remain false. This branch must not be promoted to `main` just because a product URL was discovered.
+
+## Exact tile header-inspection extension
+
+The live TNM query returned two LAZ products. The selected project-consistent tile candidate is:
+
+- Title: `USGS Lidar Point Cloud MN_CentralMissRiver_B22 4690_49885`
+- TNM/ScienceBase source ID: `65078ad9d34eb6693be8c524`
+- Direct LAZ: `https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/MN_CentralMissRiver_B22/MN_CentralMissRiver_4_B22/LAZ/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz`
+- Catalog-declared size: `83,659,396` bytes
+- TNM catalog bounds: `[-93.3936931281, 45.0492784113, -93.3873130068, 45.0538008501]`, which include the sample GPS point.
+- Metadata: https://www.sciencebase.gov/catalog/item/65078ad9d34eb6693be8c524
+
+Manifest: `benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json`.
+
+`scripts/inspect-usgs-laz-tile.py` downloads no data by itself; the dedicated workflow fetches the single allowlisted 83.7 MB LAZ file into ephemeral runner storage, checks its declared size, computes SHA-256, parses the LAS header/CRS, verifies the sample GPS point transforms into the actual header bounds, and records classification counts for the whole tile and a 50 m neighbourhood around the sample point. It uploads only the small JSON report, never the point-cloud file.
+
+The TNM catalogue did not supply a SHA-256. On the first run the inspector therefore records the observed hash as `tile-inspected-hash-needs-pinning`. After reviewing that report, pin the observed digest in the source manifest and rerun the workflow so the downloaded bytes can be verified against the committed hash. This makes retrieval repeatable but is not an upstream publisher signature.
+
+The 50 m sample-radius classification counts are a location/return-density diagnostic only. They do not independently confirm that the exact photographed building is the one being measured. If the header lacks a vertical CRS, if the expected EPSG differs from the exact tile header, or if no class-6 building returns exist near the capture point, the report records those as warnings/blockers for later review.
+
+Run manually against a downloaded local copy:
+
+```sh
+python -m pip install "laspy[lazrs]" pyproj
+python scripts/inspect-usgs-laz-tile.py \
+  --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json \
+  --file path/to/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz \
+  --report artifacts/brf-16/central-mississippi-laz-header-report.json
+```
+
+The output remains intake evidence only. Even with a pinned hash, valid header CRS and nearby building returns, the GPS↔COLMAP registration, source building identity, separate fit-vs-held-out measurements, engine-generated candidate GLB, and independent held-out metric report must still be completed before acceptance/publication/map readiness is allowed.
