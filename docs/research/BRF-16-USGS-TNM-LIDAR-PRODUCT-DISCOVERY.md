@@ -112,3 +112,19 @@ The manifest now expands the diagnostic neighbourhood to 50, 100, 250 and 500 m 
 Live EPT inspection: [workflow run #40506476743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40506476743) completed successfully as a **bounded data-read**, but it recorded zero class-6 returns inside 50 m and kept `acceptanceEligible`, `publicationEligible`, `mapReady`, and `automaticApproval` false. The widened rerun must be reviewed before choosing whether to continue on this location or abandon this LiDAR sample as an identity mismatch.
 
 If no suitable class-6 points appear within the camera-position/possible-building vicinity, do not force a transform or use neighbouring structures as the building reference. Move to a different capture with a validated building-level correspondence. The raw LAZ source still receives HTTP 429 from the staging host, so this preflight uses only small, selected LASzip/EPT nodes; it is not proof of the raw LAZ full-file hash.
+
+## Relative-height diagnostic result — live EPT run
+
+Run [#40508168955](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40508168955) succeeded for the bounded EPT neighbourhood inspection and uploaded report artifact [#12735893424](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40508168955/artifacts/12735893424). The raw point nodes were kept in ephemeral runner storage.
+
+The pinned EPT metadata digest matched: `ac14abdc2600e8af08f59569eb1b873ebda03e46fe59b8ee188a197ce1cd4d3f`. The inspector read 106 selected point nodes (3,816,326 point records; 32,480,997 node-data bytes) across a 1 km diagnostic neighbourhood. It still found no class-6 building labels, but class-1 unclassified points can encode non-ground returns in this source's classification workflow.
+
+For the 50 m validation radius, the report compared all 1,283 class-1 points to class-2 ground returns within 12 m:
+- 1,172 points were at least 2 m above the nearest class-2 ground return, occupying 657 cells on a 2 m XY grid.
+- 362 points were at least 5 m above ground, occupying 163 such cells.
+- Relative height: median 4.72 m, 90th percentile 8.89 m, 95th percentile 9.16 m, maximum 10.05 m.
+- The class-1 elevated-return bounding box was approximately 99.5 m × 93.1 m in EPSG:3857 XY.
+
+This demonstrates a spatially extended elevated surface in the inspected neighbourhood; it may be building roofs, trees or other objects. It is **not** an identified building and not a survey-accuracy result. The EPT file's current metadata does not declare a vertical CRS code in its `srs` object; the source project reports NAVD88 Geoid18 in the associated metadata. Relative height differences within the same EPT are used here, and no absolute elevation registration is inferred.
+
+**Still required:** match one coherent elevated cluster to the actual photographed commercial building via a reviewed building footprint plus image views or documented survey/asset identifiers; then use a validated source-frame transform, separate fitting controls from held-out checkpoints, generate the engine's candidate GLB from the pinned images and evaluate the candidate against independent held-out geometry. If no cluster can be identified as the pictured structure, reject this source pairing and select a better-matched survey—not a neighbouring structure. All release flags remain false.
