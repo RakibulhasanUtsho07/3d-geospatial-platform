@@ -100,6 +100,10 @@ test("verifies exact candidate/reference bytes and writes a review-required repo
   const report = JSON.parse(await readFile(path.join(root, "report.json"), "utf8"));
   assert.equal(report.status, "benchmark-review-required");
   assert.equal(report.assetIntegrity.every((item) => item.status === "passed"), true);
+  assert.equal(report.geometryExtractionProvenance.candidate.status, "passed");
+  assert.equal(report.geometryExtractionProvenance.reference.status, "passed");
+  assert.ok(report.checks.some((check) => check.id === "candidate-extractor-artifact-byte-integrity" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.id === "reference-extractor-configuration-byte-integrity" && check.status === "passed"));
   assert.equal(report.policy.acceptanceEligible, false);
   assert.equal(report.policy.publicationEligible, false);
   assert.equal(report.policy.mapReady, false);
@@ -125,6 +129,40 @@ test("rejects a symlinked report directory instead of writing outside the projec
   assert.equal(execution.status, 1);
   assert.match(execution.stderr, /Report output must not traverse symbolic links/);
   await assert.rejects(readFile(path.join(external, "report.json")), { code: "ENOENT" });
+});
+
+test("fails when extractor source bytes no longer match the pinned provenance digest", async (t) => {
+  const { root } = await setup(t);
+  await writeFile(path.join(root, "tools/geometry-extractor.mjs"), "changed extractor source");
+  const execution = run(root, "extractor-stale-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "extractor-stale-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.ok(report.failures.some((check) => check.id === "candidate-extractor-artifact-byte-integrity"));
+});
+
+test("detects changed inline geometry when the pinned extraction output digest is stale", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  manifest.candidate.footprint[1].x = 2.25;
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "geometry-stale-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "geometry-stale-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.ok(report.failures.some((check) => check.id === "candidate-extraction-output-binding"));
+});
+
+test("keeps an unprovenanced geometry source incomplete rather than silently passing", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  delete manifest.reference.geometryExtractionProvenance;
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "missing-provenance-report.json");
+  assert.equal(execution.status, 2, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "missing-provenance-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.ok(report.warnings.some((check) => check.id === "reference-extraction-provenance-present"));
 });
 
 test("reports an exact-byte mismatch as failed instead of trusting stale reference metrics", async (t) => {
