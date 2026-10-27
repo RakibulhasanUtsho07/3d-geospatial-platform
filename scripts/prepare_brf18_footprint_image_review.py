@@ -414,7 +414,7 @@ def build_review_artifacts(
     selected_candidates: list[dict[str, Any]] = []
     candidate_colors = [(220, 45, 55), (0, 150, 210), (205, 145, 0)]
     component_color = (170, 0, 185)
-    seen_candidate_keys: set[tuple[str, int]] = set()
+    seen_candidate_keys: set[int] = set()
     # A source feature can rank for more than one component. Draw each unique
     # polygon once using its best observed rank; preserve every component/rank
     # relationship in candidateReview below.
