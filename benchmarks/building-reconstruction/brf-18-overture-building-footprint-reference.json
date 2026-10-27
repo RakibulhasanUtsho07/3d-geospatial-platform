@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf-18-flat-roof-overture-footprint-crosscheck",
+  "evaluationStage": "independent-footprint-spatial-crosscheck-only",
+  "source": {
+    "name": "Overture Maps Buildings",
+    "documentationUrl": "https://docs.overturemaps.org/guides/buildings/",
+    "dataAccessUrl": "https://docs.overturemaps.org/getting-data/",
+    "release": "2026-10-21.0",
+    "schemaVersion": "2.0.0",
+    "featureType": "building",
+    "format": "GeoJSON",
+    "coordinateReferenceSystem": "OGC:CRS84 longitude/latitude coordinates, reprojected to EPSG:3857 for metre-based comparisons",
+    "license": "ODbL-1.0 for Overture data; individual source attribution/provenance may carry additional terms",
+    "attribution": "© Overture Maps Foundation and its contributors; inspect each feature's source/provenance metadata before downstream reuse",
+    "limitations": [
+      "Overture footprints are a secondary map source, not a survey-grade reference.",
+      "Footprint coverage, currency, geometric accuracy and provenance may differ by source and place.",
+      "This sample is in Minnesota and is not evidence of Dhaka building accuracy."
+    ]
+  },
+  "query": {
+    "bboxWgs84": [
+      -93.397,
+      45.0478,
+      -93.385,
+      45.0558
+    ],
+    "bboxRole": "bounded neighbourhood around GPS-derived camera positions, not a surveyed building extent",
+    "maximumFeatures": 5000,
+    "overturemapsPyVersion": "0.20.0"
+  },
+  "inputs": {
+    "eptManifest": "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json",
+    "cameraManifest": "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+  },
+  "processing": {
+    "outputCrs": "EPSG:3857",
+    "overlapMeasure": "intersection area between the elevated-component axis-aligned bounding box and the Overture building polygon",
+    "cameraDistanceMeasure": "distance from camera GPS point to building polygon; camera location is not the photographed object's location",
+    "nearestCandidatesPerComponent": 5,
+    "nearestFootprintsPerCamera": 3,
+    "failOnEmptyFootprintSet": true
+  },
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false
+}
