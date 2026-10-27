@@ -642,6 +642,7 @@ def inspect_ept_reference(
     manifest_path: Path,
     report_path: Path | None = None,
     fetch_bytes=bounded_get,
+    multiview_manifest_path: Path | None = None,
 ) -> dict[str, Any]:
     manifest = read_manifest(manifest_path)
     dataset = manifest["dataset"]
@@ -924,6 +925,19 @@ def inspect_ept_reference(
     warnings.extend(coverage_warnings)
 
     horizontal = str(metadata["horizontalCrs"])
+    camera_cluster_proximity: dict[str, Any] | None = None
+    if multiview_manifest_path is not None:
+        camera_manifest = load_multiview_camera_points(multiview_manifest_path, horizontal)
+        components = elevated_unclassified_summary.get("elevatedReturnThresholds", {}).get("2", {}).get(
+            "spatialComponents", {}
+        ).get("largestComponents", [])
+        camera_cluster_proximity = summarize_camera_cluster_proximity(camera_manifest["views"], components)
+        camera_cluster_proximity["sourceManifest"] = {
+            key: value for key, value in camera_manifest.items() if key != "views"
+        }
+        warnings.append(
+            "Camera GPS-to-cluster proximity is only a spatial triage signal using component bounding boxes; review actual imagery and the independent building footprint before assigning same-building identity."
+        )
     vertical_code = metadata["srs"].get("vertical")
     source_report = {
         "url": metadata_url,
@@ -961,6 +975,7 @@ def inspect_ept_reference(
             "samplePointWithinEptRootBounds": True,
             "sourcePointRole": "GPS-derived location query, not an independent surveyed control",
         },
+        "cameraClusterSpatialProximity": camera_cluster_proximity,
         "counts": {
             "hierarchyDocumentsRead": hierarchy_doc_count,
             "hierarchyBytesRead": hierarchy_download_bytes,
@@ -1008,6 +1023,7 @@ def inspect_ept_reference(
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Inspect a bounded neighbourhood of the USGS Central Mississippi EPT point cloud.")
     parser.add_argument("--manifest", required=True)
+    parser.add_argument("--multiview-manifest", help="Optional pinned multi-view source manifest with per-image GPS coordinates.")
     parser.add_argument("--report")
     return parser.parse_args(argv)
 
@@ -1015,7 +1031,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv if argv is not None else sys.argv[1:])
     try:
-        report = inspect_ept_reference(Path(args.manifest), Path(args.report) if args.report else None)
+        report = inspect_ept_reference(
+            Path(args.manifest),
+            Path(args.report) if args.report else None,
+            multiview_manifest_path=Path(args.multiview_manifest) if args.multiview_manifest else None,
+        )
     except Exception as error:
         print(str(error), file=sys.stderr)
         return 2
@@ -1023,6 +1043,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": report["status"],
         "source": report.get("source"),
         "samplePoint": report.get("samplePoint"),
+        "cameraClusterSpatialProximity": report.get("cameraClusterSpatialProximity"),
         "counts": report.get("counts"),
         "classificationCountsWithinSampleRadius": report.get("classificationCountsWithinSampleRadius"),
         "blockers": report.get("blockers", []),
