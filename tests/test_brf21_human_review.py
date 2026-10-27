@@ -218,7 +218,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
     def test_changed_image_graph_invalidates_evidence_binding(self):
         decision = self.complete_record()
         (self.root / "pairwise-overlap-graph.png").write_bytes(b"changed-after-review")
-        with self.assertRaisesRegex(ValueError, "graph bytes|Evidence binding mismatch"):
+        with self.assertRaisesRegex(ValueError, "PNG signature|graph bytes|Evidence binding mismatch"):
             MODULE.validate_decision(self.root, decision)
 
     def test_unknown_view_id_is_rejected(self):
