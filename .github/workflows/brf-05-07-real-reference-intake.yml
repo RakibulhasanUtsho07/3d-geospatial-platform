@@ -1,0 +1,89 @@
+name: BRF-05–07 Real-Building Reference Intake
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - rakibul-hasan
+      - development
+      - main
+    paths:
+      - ".github/workflows/brf-05-07-real-reference-intake.yml"
+      - "data/heritage/ahsan-manzil-reference-pack.json"
+      - "scripts/fetch-ahsan-manzil-reference-pack.mjs"
+      - "scripts/prepare-building-visual-review-packet.mjs"
+      - "tests/building-visual-review-packet.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-real-reference-intake-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collect-and-prepare-review-packet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies and reconcile the repository lockfile
+        run: npm install --no-audit --no-fund
+
+      - name: Test review-packet hash and provenance guards
+        run: npm run test:building-visual-review-packet
+
+      - name: Download and verify permitted Ahsan Manzil references
+        run: npm run fetch:ahsan-manzil-reference-pack -- artifacts/ahsan-manzil-reference-pack
+
+      - name: Prepare exact-source review packet and pending annotation templates
+        run: npm run prepare:building-visual-review-packet -- artifacts/ahsan-manzil-reference-pack/reference-pack.manifest.json artifacts/ahsan-manzil-review-packet
+
+      - name: Assert evidence remains non-accepted before independent review
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const packet = JSON.parse(await readFile("artifacts/ahsan-manzil-review-packet/review-packet.json", "utf8"));
+          if (packet.sourceCount < 3) throw new Error("At least three verified views are required.");
+          if (packet.policy.acceptanceEligible || packet.policy.publicationEligible || packet.policy.mapReady) {
+            throw new Error("Reference intake must never promote real-building acceptance.");
+          }
+          if (packet.policy.independentlyReviewedMasksAvailable || packet.policy.heldOutEvaluationAvailable) {
+            throw new Error("Downloaded images must not be represented as independently reviewed masks/evaluation.");
+          }
+          for (const template of packet.annotationTemplates) {
+            const value = JSON.parse(await readFile("artifacts/ahsan-manzil-review-packet/" + template.path, "utf8"));
+            if (value.rightsReview.status !== "pending-independent-review" ||
+                value.masks.status !== "pending-annotation" || value.acceptance.groundTruth) {
+              throw new Error("Review template was incorrectly marked as accepted: " + template.sourceId);
+            }
+          }
+          console.log(JSON.stringify({
+            sourceCount: packet.sourceCount,
+            hashPinned: packet.sourceImages.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)),
+            independentMaskReview: "pending",
+            surveyedDimensions: "not-provided",
+            acceptanceEligible: packet.policy.acceptanceEligible,
+          }, null, 2));
+          NODE
+
+      - name: Upload real reference review packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-05-07-ahsan-manzil-reference-review-packet
+          path: |
+            artifacts/ahsan-manzil-reference-pack/
+            artifacts/ahsan-manzil-review-packet/
+          if-no-files-found: error
+          retention-days: 30

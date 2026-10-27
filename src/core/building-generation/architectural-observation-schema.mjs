@@ -3,6 +3,8 @@ const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const CATEGORIES = new Set([
   "silhouette-bounds", "roofline-segment", "outer-corner", "floor-band",
   "facade-region", "window-candidate", "door-candidate", "balcony-candidate", "visible-occluder",
+  "arch-candidate", "column-candidate", "dome-candidate", "cornice-candidate",
+  "pediment-candidate", "staircase-candidate", "parapet-candidate", "ornament-candidate",
 ]);
 const STATUSES = new Set(["proposed", "reviewed", "rejected"]);
 const VISIBILITY = new Set(["visible", "partially-occluded", "occluded", "not-visible", "not-detected"]);
