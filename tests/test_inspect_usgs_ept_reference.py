@@ -138,6 +138,24 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
         self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
+    def test_elevated_returns_are_reported_as_separate_connected_components(self):
+        points = [
+            (0.1, 0.1, 8.0, 4.0),
+            (0.2, 0.2, 8.5, 4.5),
+            (2.1, 0.2, 9.0, 5.0),
+            (10.1, 10.1, 12.0, 7.0),
+            (10.2, 10.2, 12.5, 7.5),
+        ]
+        result = MODULE.summarize_spatial_components(points, 2.0)
+        self.assertEqual(result["connectivity"], "8-neighbour")
+        self.assertEqual(result["componentCount"], 2)
+        largest, second = result["largestComponents"]
+        self.assertEqual(largest["pointCount"], 3)
+        self.assertEqual(largest["occupiedGridCells"], 2)
+        self.assertEqual(second["pointCount"], 2)
+        self.assertGreater(largest["xyBounds"]["widthM"], 1.9)
+        self.assertIn("not a building identity label", result["interpretation"])
+
     def test_unclassified_returns_can_be_detected_above_class2_ground(self):
         ground = [
             (0.0, 0.0, 10.0), (5.0, 0.0, 10.0), (10.0, 0.0, 10.0),
