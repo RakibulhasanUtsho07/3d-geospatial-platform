@@ -193,6 +193,8 @@
     "test:building-segmentation-benchmark": "node --test tests/building-segmentation-benchmark.test.mjs tests/building-segmentation-benchmark-cli.test.mjs",
     "benchmark:building-segmentation": "node scripts/evaluate-building-segmentation-benchmark.mjs",
     "test:independent-building-truth": "node --test tests/geometry-extraction-provenance.test.mjs tests/independent-building-truth-evaluator.test.mjs tests/independent-building-truth-evaluator-cli.test.mjs tests/glb-geometry-extraction.test.mjs tests/independent-building-geometry-preparation-cli.test.mjs tests/independent-reference-geometry-frame-adapter.test.mjs",
+    "test:building-benchmark-asset-integrity": "node --test tests/building-benchmark-asset-integrity.test.mjs",
+    "verify:building-benchmark-assets": "node scripts/verify-building-benchmark-assets.mjs",
     "test:building-benchmark-readiness": "node --test tests/building-benchmark-readiness.test.mjs tests/building-benchmark-readiness-cli.test.mjs",
     "assess:building-benchmark-readiness": "node scripts/validate-building-benchmark-readiness.mjs",
     "evaluate:independent-building-truth": "node scripts/evaluate-independent-building-truth.mjs",
