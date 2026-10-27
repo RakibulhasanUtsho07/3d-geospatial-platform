@@ -16,6 +16,9 @@ on:
       - "scripts/analyze_brf14_multiview_overlap.py"
       - "tests/test_analyze_brf14_multiview_overlap.py"
       - "docs/research/BRF-21-PAIRWISE-IMAGE-OVERLAP.md"
+      - "scripts/brf21_human_review.py"
+      - "tests/test_brf21_human_review.py"
+      - "docs/research/BRF-22-HUMAN-REVIEW-DECISION-CONTRACT.md"
   workflow_dispatch:
 
 permissions:
@@ -61,6 +64,12 @@ jobs:
 
       - name: Validate overlap analyzer CLI
         run: python scripts/analyze_brf14_multiview_overlap.py --help
+
+      - name: Test BRF-22 hash-bound human review decision contract
+        run: python -m unittest discover -s tests -p "test_brf21_human_review.py"
+
+      - name: Validate BRF-22 human-review CLI
+        run: python scripts/brf21_human_review.py --help
 
       - name: Download selected images to ephemeral runner storage
         shell: bash

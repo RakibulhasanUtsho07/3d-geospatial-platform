@@ -262,6 +262,10 @@ jobs:
         run: node --test tests/brf14-multiview-source-intake.test.mjs
       - name: Validate BRF-14 multi-view source verifier CLI
         run: node scripts/verify-brf14-multiview-source.mjs --help
+      - name: Test BRF-22 hash-bound multi-view human review contract
+        run: python3 -m unittest discover -s tests -p "test_brf21_human_review.py"
+      - name: Validate BRF-22 human-review CLI syntax
+        run: python3 scripts/brf21_human_review.py --help
       - name: Test BRF-15 MnGeo flight-swath work-unit discovery
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
