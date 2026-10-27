@@ -21,6 +21,8 @@ MAX_JSON_BYTES = 20 * 1024 * 1024
 MAX_ARTIFACT_BYTES = 100 * 1024 * 1024
 RELEASE_FLAGS = ("acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval")
 ARTIFACT_FILENAMES = {
+    "sourceManifest": "brf-14-multiview-source.json",
+    "byteVerificationReport": "multiview-source-byte-verification.json",
     "reviewManifest": "multiview-review-manifest.json",
     "overlapReport": "pairwise-overlap-report.json",
     "contactSheet": "multiview-contact-sheet.png",
@@ -80,19 +82,41 @@ def load_json_file(path: Path) -> Any:
         raise ValueError("Invalid UTF-8 JSON in " + path.name + ": " + str(error)) from error
 
 
+def canonical_json_sha256(value: Any) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def _artifact_binding(root: Path, role: str) -> dict[str, Any]:
     filename = ARTIFACT_FILENAMES[role]
     max_bytes = MAX_JSON_BYTES if filename.endswith(".json") else MAX_ARTIFACT_BYTES
     path = safe_file(root, filename, max_bytes=max_bytes)
+    if filename.endswith(".png"):
+        with path.open("rb") as stream:
+            require(stream.read(8) == b"\x89PNG\r\n\x1a\n", "Artifact does not have a PNG signature: " + filename)
     return {"filename": filename, "byteSize": path.stat().st_size, "sha256": sha256_file(path)}
 
 
-def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[dict[str, Any]]]:
+def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[dict[str, Any]]]:
     root = safe_root(root_arg)
     bindings = {role: _artifact_binding(root, role) for role in ARTIFACT_FILENAMES}
+    source_manifest = load_json_file(root / ARTIFACT_FILENAMES["sourceManifest"])
+    verification = load_json_file(root / ARTIFACT_FILENAMES["byteVerificationReport"])
     review_packet = load_json_file(root / ARTIFACT_FILENAMES["reviewManifest"])
     overlap_report = load_json_file(root / ARTIFACT_FILENAMES["overlapReport"])
 
+    require(isinstance(source_manifest, dict), "BRF-14 source manifest must be a JSON object.")
+    require(source_manifest.get("schemaVersion") == SCHEMA_VERSION and
+            source_manifest.get("evaluationStage") == "multiview-source-byte-intake-only",
+            "Unsupported BRF-14 source manifest schema or evaluation stage.")
+    require(isinstance(verification, dict) and verification.get("schemaVersion") == SCHEMA_VERSION and
+            verification.get("status") == "views-byte-verified",
+            "BRF-14 byte-verification report must be passing and use the supported schema.")
+    require(verification.get("sampleId") == source_manifest.get("sampleId"),
+            "BRF-14 byte-verification report sampleId does not match source manifest.")
+    require(verification.get("blockers") == [], "BRF-14 byte-verification report contains blockers.")
+    require(verification.get("candidateGlbGenerated") is False and
+            verification.get("independentReferenceVerified") is False,
+            "BRF-14 byte-verification report must not claim a candidate GLB or independent reference.")
     require(isinstance(review_packet, dict), "BRF-20 review manifest must be a JSON object.")
     require(review_packet.get("schemaVersion") == SCHEMA_VERSION,
             "Unsupported BRF-20 review-manifest schema.")
@@ -111,11 +135,80 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
             review_packet.get("sampleId") == overlap_report.get("sampleId"),
             "BRF-20 packet and BRF-21 report sampleId values must match.")
 
-    for source_name, source in (("BRF-20 review manifest", review_packet),
-                                ("BRF-21 overlap report", overlap_report)):
-        for flag in RELEASE_FLAGS:
-            require(source.get(flag) is False,
-                    source_name + " must explicitly keep " + flag + " false.")
+    require(source_manifest.get("sampleId") == review_packet.get("sampleId") == overlap_report.get("sampleId"),
+            "BRF-14/20/21 sampleId values must all match.")
+    source_dataset = source_manifest.get("dataset")
+    verification_dataset = verification.get("dataset")
+    packet_dataset = review_packet.get("dataset")
+    overlap_source_binding = overlap_report.get("sourceManifest")
+    require(isinstance(source_dataset, dict) and isinstance(verification_dataset, dict) and
+            isinstance(packet_dataset, dict) and isinstance(overlap_source_binding, dict),
+            "BRF-14/20/21 evidence is missing source dataset or provenance objects.")
+    require(source_dataset.get("sourceRepositoryCommit") ==
+            verification_dataset.get("sourceRepositoryCommit") ==
+            packet_dataset.get("sourceRepositoryCommit") == overlap_source_binding.get("metadataCommit"),
+            "BRF-14/20/21 source metadata commit declarations do not match.")
+    manifest_views = source_manifest.get("views")
+    verification_views = verification.get("views")
+    source_views = review_packet.get("sourceViews")
+    require(isinstance(manifest_views, list) and isinstance(verification_views, list) and
+            isinstance(source_views, list) and len(manifest_views) == len(verification_views) == len(source_views),
+            "BRF-14 source manifest, byte verification and BRF-20 views must have identical counts.")
+    manifest_by_id: dict[str, dict[str, Any]] = {}
+    verification_by_id: dict[str, dict[str, Any]] = {}
+    for item in manifest_views:
+        require(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"] not in manifest_by_id,
+                "BRF-14 source manifest contains an invalid or duplicate view ID.")
+        require(isinstance(item.get("expectedSha256"), str) and SHA256_RE.fullmatch(item["expectedSha256"]) is not None,
+                "BRF-14 source manifest contains an invalid source-image SHA-256.")
+        require(isinstance(item.get("expectedByteSize"), int) and not isinstance(item.get("expectedByteSize"), bool) and item["expectedByteSize"] > 0,
+                "BRF-14 source manifest contains an invalid byte-size declaration.")
+        manifest_by_id[item["id"]] = item
+    for item in verification_views:
+        require(isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"] not in verification_by_id,
+                "BRF-14 byte report contains an invalid or duplicate view ID.")
+        verification_by_id[item["id"]] = item
+    packet_ids = [v.get("id") for v in source_views if isinstance(v, dict)]
+    require(len(packet_ids) == len(source_views) and set(manifest_by_id) == set(verification_by_id) == set(packet_ids),
+            "BRF-14 manifest, byte report and BRF-20 packet contain different or invalid view IDs.")
+    for packet_view in source_views:
+        view_id = packet_view["id"]
+        manifest_view = manifest_by_id[view_id]
+        verified_view = verification_by_id[view_id]
+        expected_hash = manifest_view["expectedSha256"]
+        expected_size = manifest_view["expectedByteSize"]
+        require(manifest_view.get("filename") == packet_view.get("filename") == verified_view.get("filename"),
+                "Filename mismatch across BRF-14/20 evidence for " + view_id + ".")
+        require(packet_view.get("expectedSha256") == packet_view.get("actualSha256") == expected_hash and
+                packet_view.get("expectedByteSize") == packet_view.get("actualByteSize") == expected_size,
+                "BRF-20 source image hash/size disagrees with the BRF-14 manifest for " + view_id + ".")
+        require(verified_view.get("status") == "passed" and
+                verified_view.get("expectedSha256") == verified_view.get("actualSha256") == expected_hash and
+                verified_view.get("expectedByteSize") == verified_view.get("actualByteSize") == expected_size,
+                "BRF-14 source image failed exact byte verification for " + view_id + ".")
+    total_bytes = sum(item["expectedByteSize"] for item in manifest_by_id.values())
+    require(source_manifest.get("selectionMethod", {}).get("expectedViewCount") == len(manifest_views) and
+            source_manifest.get("expectedTotalBytes") == total_bytes and
+            verification.get("selectedViewCount") == len(manifest_views) and
+            verification.get("declaredTotalBytes") == verification.get("actualTotalBytes") == total_bytes,
+            "BRF-14 view-count/byte totals disagree across source manifest and byte-verification report.")
+    verification_sha = canonical_json_sha256(verification)
+    packet_binding = review_packet.get("sourceManifest")
+    overlap_binding = overlap_report.get("sourceManifest")
+    require(isinstance(packet_binding, dict) and isinstance(overlap_binding, dict),
+            "BRF-20/21 source verification binding objects are missing.")
+    require(packet_binding.get("byteVerificationReportSha256") == verification_sha and
+            overlap_binding.get("byteVerificationReportCanonicalJsonSha256") == verification_sha,
+            "BRF-20/21 provenance does not bind the exact BRF-14 byte-verification report.")
+    require(packet_binding.get("selectedViewCount") == overlap_binding.get("selectedViewCount") == len(manifest_views) and
+            packet_binding.get("declaredTotalBytes") == overlap_binding.get("declaredTotalBytes") == total_bytes and
+            packet_binding.get("actualTotalBytes") == overlap_binding.get("actualTotalBytes") == total_bytes and
+            packet_binding.get("byteVerificationStatus") == overlap_binding.get("byteVerificationStatus") == "views-byte-verified",
+            "BRF-20/21 verification summary does not match the exact BRF-14 report.")
+
+    require(source_manifest.get("acceptanceEligible") is False and source_manifest.get("publicationEligible") is False and
+            source_manifest.get("mapReady") is False and source_manifest.get("automaticApproval") is False,
+            "BRF-14 source manifest must keep all release flags false.")
     require(review_packet.get("rawImageBytesIncluded") is False,
             "BRF-20 review packet must not contain raw image bytes.")
     require(overlap_report.get("rawImageBytesIncluded") is False,
@@ -143,6 +236,7 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
     require(isinstance(source_views, list) and 3 <= len(source_views) <= 32,
             "BRF-20 packet must contain between 3 and 32 source views.")
     view_ids: list[str] = []
+    packet_view_by_id: dict[str, dict[str, Any]] = {}
     for index, view in enumerate(source_views):
         require(isinstance(view, dict), "Each source view must be a JSON object.")
         view_id = view.get("id")
@@ -154,6 +248,23 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
                 view.get("actualSha256") == view.get("expectedSha256"),
                 "Source view has a missing or inconsistent pinned image SHA-256: " + view_id)
         view_ids.append(view_id)
+        packet_view_by_id[view_id] = view
+
+    feature_views = overlap_report.get("views")
+    require(isinstance(feature_views, list) and len(feature_views) == len(view_ids),
+            "BRF-21 feature-view table must contain exactly one row for each source image.")
+    feature_ids: set[str] = set()
+    for feature_view in feature_views:
+        require(isinstance(feature_view, dict) and feature_view.get("id") in packet_view_by_id,
+                "BRF-21 feature-view table references an unknown view ID.")
+        view_id = feature_view["id"]
+        require(view_id not in feature_ids, "BRF-21 feature-view table contains duplicate IDs.")
+        feature_ids.add(view_id)
+        packet_view = packet_view_by_id[view_id]
+        require(feature_view.get("filename") == packet_view.get("filename") and
+                feature_view.get("sha256") == packet_view.get("actualSha256") and
+                feature_view.get("byteSize") == packet_view.get("actualByteSize"),
+                "BRF-21 feature-view source hash/size does not match BRF-20/14 for " + view_id + ".")
 
     pairs = overlap_report.get("pairs")
     require(isinstance(pairs, list), "BRF-21 report has no pair table.")
@@ -173,6 +284,11 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
         actual_pairs.add(key)
         require(isinstance(pair.get("candidateOverlapEdge"), bool),
                 "BRF-21 pair record must explicitly state candidateOverlapEdge.")
+        for side, view_id in (("A", a), ("B", b)):
+            source_view = packet_view_by_id[view_id]
+            require(pair.get("filename" + side) == source_view.get("filename") and
+                    pair.get("sha256" + side) == source_view.get("actualSha256"),
+                    "BRF-21 pair-side hash/filename does not match the exact source image for " + view_id + ".")
         normalized_pairs.append({"viewA": a, "viewB": b, "candidateOverlapEdge": pair["candidateOverlapEdge"]})
     require(actual_pairs == expected_pairs,
             "BRF-21 pair table omits or adds source-view combinations.")
@@ -180,11 +296,11 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
     if isinstance(counts, dict) and "evaluatedPairs" in counts:
         require(counts["evaluatedPairs"] == len(pairs),
                 "BRF-21 counts.evaluatedPairs disagrees with its pair table.")
-    return root, review_packet, overlap_report, bindings, view_ids, normalized_pairs
+    return root, source_manifest, verification, review_packet, overlap_report, bindings, view_ids, normalized_pairs
 
 
 def prepare_template(root_arg: Path) -> dict[str, Any]:
-    _, packet, report, bindings, view_ids, pairs = load_evidence(root_arg)
+    _, _, _, packet, report, bindings, view_ids, pairs = load_evidence(root_arg)
     source_by_id = {view["id"]: view for view in packet["sourceViews"]}
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -285,7 +401,7 @@ def _is_connected(included_ids: set[str], reviews: list[dict[str, Any]]) -> bool
 
 
 def validate_decision(root_arg: Path, decision: Any) -> dict[str, Any]:
-    root, packet, overlap_report, bindings, view_ids, expected_pairs = load_evidence(root_arg)
+    root, source_manifest, verification, packet, overlap_report, bindings, view_ids, expected_pairs = load_evidence(root_arg)
     require(isinstance(decision, dict), "Decision record must be a JSON object.")
     require(decision.get("schemaVersion") == SCHEMA_VERSION and decision.get("recordType") == RECORD_TYPE,
             "Unsupported human-review decision schema or recordType.")
@@ -466,6 +582,7 @@ def main(argv: list[str] | None = None) -> int:
             decision_name = safe_basename(args.decision, "Decision filename")
             decision_path = safe_file(root, decision_name, max_bytes=MAX_JSON_BYTES)
             decision = load_json_file(decision_path)
+            require(args.output != decision_name, "Output filename must not overwrite the reviewer-authored decision.")
             result = validate_decision(root, decision)
             output = write_json_safely(root, args.output, result)
             print(json.dumps({"status": result["status"], "sampleId": result["sampleId"],

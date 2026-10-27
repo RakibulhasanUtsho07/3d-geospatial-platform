@@ -108,7 +108,7 @@ The workflow uploads the derived review PNG/JSON and byte-verification JSON only
 
 ## BRF-22 — Recording the multi-view review decision
 
-Tracking: [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/226). After downloading the six derived BRF-20/21 files from the CI artifact into a dedicated directory, use the hash-bound decision template generator:
+Tracking: [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/226). After downloading the seven BRF-14/20/21 evidence files from the CI artifact into a dedicated directory, use the hash-bound decision template generator:
 
     python3 scripts/brf21_human_review.py template --artifact-root path/to/brf-14-artifacts
 
@@ -116,4 +116,4 @@ Edit the generated multiview-human-review-decision-template.json only after insp
 
     python3 scripts/brf21_human_review.py validate --artifact-root path/to/brf-14-artifacts --decision review-decision.json
 
-The artifact root must contain the unchanged multiview-review-manifest.json, pairwise-overlap-report.json, multiview-contact-sheet.png, camera-angle-coverage.png and pairwise-overlap-graph.png. The commands reject modified/stale inputs, unknown views/pairs, path traversal, symlink inputs, missing review fields and attempts to enable release flags. A pending template is not a valid completed review. A complete record only confirms schema and evidence binding; it does not authenticate the reviewer, legal rights or accuracy, and it does not execute COLMAP or publish a GLB. The real sample remains pending human review and independent survey/checkpoint evidence.
+The artifact root must contain the unchanged brf-14-multiview-source.json, multiview-source-byte-verification.json, multiview-review-manifest.json, pairwise-overlap-report.json, multiview-contact-sheet.png, camera-angle-coverage.png and pairwise-overlap-graph.png. The commands reject modified/stale inputs, unknown views/pairs, path traversal, symlink inputs, missing review fields and attempts to enable release flags. A pending template is not a valid completed review. A complete record only confirms schema and evidence binding; it does not authenticate the reviewer, legal rights or accuracy, and it does not execute COLMAP or publish a GLB. The real sample remains pending human review and independent survey/checkpoint evidence.

@@ -41,3 +41,6 @@ Tracking: [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-plat
 The BRF-21 source run produced 16 views and evaluated all 120 unordered pairs. Fourteen pairs were proposed as candidate edges; four views had no candidate edge. The [derived CI artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40534364849/artifacts/12747786071) contains review materials only, not source images. These counts are image-feature triage, not confirmed overlap, building identity or accuracy evidence.
 
 No real-building human decision has been entered. BRF-22 templates remain pending until an authorized reviewer fills them in. The validator cannot authenticate the reviewer or legal rights, does not run COLMAP, produces no candidate GLB or survey result, and always keeps acceptance/publication/map/automatic-approval flags false.
+
+
+**BRF-22 provenance hardening:** the decision contract binds the exact BRF-14 source manifest and byte-verification report in addition to all five BRF-20/21 derived evidence artifacts. It checks the canonical verification-report hash in both downstream JSON reports, source commit, per-view source hash/size and each pair-side hash/filename before creating a review form.

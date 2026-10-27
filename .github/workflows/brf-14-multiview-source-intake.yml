@@ -111,11 +111,15 @@ jobs:
             --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
             --output-dir artifacts/brf-14
 
+      - name: Stage the exact pinned BRF-14 manifest beside derived review artifacts
+        run: cp benchmarks/building-reconstruction/brf-14-multiview-source.json artifacts/brf-14/brf-14-multiview-source.json
+
       - name: Upload derived review artifacts only (never raw images)
         uses: actions/upload-artifact@v4
         with:
           name: brf-20-multiview-human-review-packet
           path: |
+            artifacts/brf-14/brf-14-multiview-source.json
             artifacts/brf-14/multiview-source-byte-verification.json
             artifacts/brf-14/multiview-contact-sheet.png
             artifacts/brf-14/camera-angle-coverage.png

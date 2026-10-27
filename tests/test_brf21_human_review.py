@@ -35,9 +35,10 @@ class Brf21HumanReviewTests(unittest.TestCase):
 
     def create_evidence(self):
         # These are synthetic test fixtures, not a review of the real BRF-14 building.
-        (self.root / "multiview-contact-sheet.png").write_bytes(b"synthetic-contact-sheet")
-        (self.root / "camera-angle-coverage.png").write_bytes(b"synthetic-camera-coverage")
-        (self.root / "pairwise-overlap-graph.png").write_bytes(b"synthetic-overlap-graph")
+        png_header = b"\x89PNG\r\n\x1a\n"
+        (self.root / "multiview-contact-sheet.png").write_bytes(png_header + b"synthetic-contact-sheet")
+        (self.root / "camera-angle-coverage.png").write_bytes(png_header + b"synthetic-camera-coverage")
+        (self.root / "pairwise-overlap-graph.png").write_bytes(png_header + b"synthetic-overlap-graph")
         view_ids = ["view-a", "view-b", "view-c"]
         views = []
         for view_id in view_ids:
@@ -46,11 +47,39 @@ class Brf21HumanReviewTests(unittest.TestCase):
                           "expectedSha256": image_hash, "actualSha256": image_hash,
                           "expectedByteSize": 128, "actualByteSize": 128,
                           "review": {"sameBuildingIdentity": "pending"}})
+        source_manifest = {
+            "schemaVersion": "1.0.0", "sampleId": "synthetic-test-only",
+            "evaluationStage": "multiview-source-byte-intake-only",
+            "dataset": {"sourceRepositoryCommit": "test-commit"},
+            "selectionMethod": {"expectedViewCount": 3}, "expectedTotalBytes": 384,
+            "views": [{"id": view["id"], "filename": view["filename"],
+                       "expectedSha256": view["expectedSha256"], "expectedByteSize": 128} for view in views],
+            "acceptanceEligible": False, "publicationEligible": False, "mapReady": False, "automaticApproval": False,
+        }
+        verification_views = [{"id": view["id"], "filename": view["filename"], "status": "passed",
+                               "expectedSha256": view["expectedSha256"], "actualSha256": view["actualSha256"],
+                               "expectedByteSize": 128, "actualByteSize": 128} for view in views]
+        verification = {
+            "schemaVersion": "1.0.0", "sampleId": "synthetic-test-only", "status": "views-byte-verified",
+            "checkedAt": "2026-10-27T00:00:00Z", "dataset": {"sourceRepositoryCommit": "test-commit"},
+            "selectedViewCount": 3, "declaredTotalBytes": 384, "actualTotalBytes": 384,
+            "views": verification_views, "blockers": [], "candidateGlbGenerated": False,
+            "independentReferenceVerified": False, "acceptanceEligible": False,
+            "publicationEligible": False, "mapReady": False, "automaticApproval": False,
+        }
+        self.write_json("brf-14-multiview-source.json", source_manifest)
+        self.write_json("multiview-source-byte-verification.json", verification)
+        verification_sha = MODULE.canonical_json_sha256(verification)
         packet = {
             "schemaVersion": "1.0.0",
             "sampleId": "synthetic-test-only",
             "evaluationStage": "multiview-human-review-packet-only",
             "status": "review-packet-generated-pending-human-review",
+            "dataset": {"sourceRepositoryCommit": "test-commit"},
+            "sourceManifest": {"metadataCommit": "test-commit", "selectedViewCount": 3,
+                               "declaredTotalBytes": 384, "actualTotalBytes": 384,
+                               "byteVerificationStatus": "views-byte-verified",
+                               "byteVerificationReportSha256": verification_sha},
             "sourceViews": views,
             "outputArtifacts": {
                 "contactSheet": self.artifact_record("multiview-contact-sheet.png"),
@@ -64,11 +93,14 @@ class Brf21HumanReviewTests(unittest.TestCase):
         }
         self.write_json("multiview-review-manifest.json", packet)
         pairs = [
-            {"viewA": "view-a", "viewB": "view-b", "candidateOverlapEdge": True,
+            {"viewA": "view-a", "viewB": "view-b", "filenameA": "view-a.jpg", "filenameB": "view-b.jpg",
+             "sha256A": views[0]["expectedSha256"], "sha256B": views[1]["expectedSha256"], "candidateOverlapEdge": True,
              "ratioFilteredMatchCount": 40, "geometricInlierCount": 32},
-            {"viewA": "view-a", "viewB": "view-c", "candidateOverlapEdge": False,
+            {"viewA": "view-a", "viewB": "view-c", "filenameA": "view-a.jpg", "filenameB": "view-c.jpg",
+             "sha256A": views[0]["expectedSha256"], "sha256B": views[2]["expectedSha256"], "candidateOverlapEdge": False,
              "ratioFilteredMatchCount": 2, "geometricInlierCount": 0},
-            {"viewA": "view-b", "viewB": "view-c", "candidateOverlapEdge": True,
+            {"viewA": "view-b", "viewB": "view-c", "filenameA": "view-b.jpg", "filenameB": "view-c.jpg",
+             "sha256A": views[1]["expectedSha256"], "sha256B": views[2]["expectedSha256"], "candidateOverlapEdge": True,
              "ratioFilteredMatchCount": 21, "geometricInlierCount": 18},
         ]
         report = {
@@ -76,6 +108,12 @@ class Brf21HumanReviewTests(unittest.TestCase):
             "sampleId": "synthetic-test-only",
             "evaluationStage": "pairwise-image-feature-overlap-triage-only",
             "status": "pairwise-analysis-complete-needs-human-review",
+            "sourceManifest": {"metadataCommit": "test-commit", "selectedViewCount": 3,
+                               "declaredTotalBytes": 384, "actualTotalBytes": 384,
+                               "byteVerificationStatus": "views-byte-verified",
+                               "byteVerificationReportCanonicalJsonSha256": verification_sha},
+            "views": [{"id": view["id"], "filename": view["filename"], "sha256": view["actualSha256"], "byteSize": 128}
+                      for view in views],
             "pairs": pairs,
             "counts": {"views": 3, "evaluatedPairs": 3},
             "graphArtifact": self.artifact_record("pairwise-overlap-graph.png"),
@@ -125,7 +163,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
 
     def test_template_is_hash_bound_and_all_review_fields_pending(self):
         self.assertEqual(self.template["status"], "pending-human-review")
-        self.assertEqual(len(self.template["evidenceBindings"]), 5)
+        self.assertEqual(len(self.template["evidenceBindings"]), 7)
         self.assertEqual(len(self.template["sourceViews"]), 3)
         self.assertEqual(len(self.template["pairReviews"]), 3)
         for item in self.template["sourceViews"]:
@@ -223,6 +261,33 @@ class Brf21HumanReviewTests(unittest.TestCase):
         target.symlink_to(moved.name)
         with self.assertRaisesRegex(ValueError, "symlink"):
             MODULE.prepare_template(self.root)
+
+    def test_source_manifest_hash_mismatch_is_rejected(self):
+        decision = self.complete_record()
+        manifest_path = self.root / "brf-14-multiview-source.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["views"][0]["expectedSha256"] = "0" * 64
+        self.write_json(manifest_path.name, manifest)
+        with self.assertRaisesRegex(ValueError, "BRF-20 source image hash/size disagrees"):
+            MODULE.validate_decision(self.root, decision)
+
+    def test_byte_verification_report_provenance_mismatch_is_rejected(self):
+        decision = self.complete_record()
+        verification_path = self.root / "multiview-source-byte-verification.json"
+        verification = json.loads(verification_path.read_text(encoding="utf-8"))
+        verification["views"][0]["actualSha256"] = "0" * 64
+        self.write_json(verification_path.name, verification)
+        with self.assertRaisesRegex(ValueError, "failed exact byte verification"):
+            MODULE.validate_decision(self.root, decision)
+
+    def test_pair_side_source_hash_mismatch_is_rejected(self):
+        decision = self.complete_record()
+        report_path = self.root / "pairwise-overlap-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["pairs"][0]["sha256A"] = "0" * 64
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "pair-side hash/filename"):
+            MODULE.validate_decision(self.root, decision)
 
     def test_review_decision_cannot_change_candidate_edge_evidence(self):
         decision = self.complete_record()
