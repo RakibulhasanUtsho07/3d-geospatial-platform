@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {extractGlbGeometry,validateAffineMatrix4x4} from "../src/core/building-generation/glb-geometry-extraction.mjs";
-import {BOX_TRIANGLES,MODEL_TO_EVALUATION,TARGET_FOOTPRINT,TARGET_VERTICES,createBuildingGlb} from "./fixtures/glb-geometry-fixture.mjs";
+import {BOX_TRIANGLES,MODEL_TO_EVALUATION,TARGET_CHECK_POINTS,TARGET_FOOTPRINT,TARGET_VERTICES,createBuildingGlb} from "./fixtures/glb-geometry-fixture.mjs";
 const options={coordinateFrameId:"test-building-frame-y-up-v1",units:"m",modelToEvaluationFrameMatrix4x4:MODEL_TO_EVALUATION};
 
 test("extracts actual GLB accessors and applies scene-node plus registration transforms",()=>{
