@@ -83,6 +83,100 @@ def projected_extent(bbox_wgs84: tuple[float, float, float, float]) -> tuple[flo
     return extent
 
 
+def review_extent_3857(
+    bbox_wgs84: tuple[float, float, float, float],
+    ept_report: dict[str, Any],
+    crosscheck_report: dict[str, Any],
+    footprint_payload: dict[str, Any],
+    width: int,
+    height: int,
+) -> tuple[float, float, float, float]:
+    """Fit a north-up review extent around the query, AABBs and displayed candidates."""
+    base = projected_extent(bbox_wgs84)
+    min_x, min_y, max_x, max_y = base
+    ept_components = ept_report.get("cameraClusterSpatialProximity", {}).get("components")
+    report_components = crosscheck_report.get("components")
+    features = footprint_payload.get("features")
+    if not isinstance(ept_components, list) or not isinstance(report_components, list):
+        raise ValueError("EPT/cross-check component lists are missing.")
+    if not isinstance(features, list) or len(features) > MAX_FEATURES:
+        raise ValueError("Footprints must be a bounded FeatureCollection.")
+    ept_by_id = {}
+    for component in ept_components:
+        if not isinstance(component, dict) or component.get("componentId") is None:
+            raise ValueError("Every EPT component needs a stable componentId.")
+        component_id = str(component["componentId"])
+        if component_id in ept_by_id:
+            raise ValueError("EPT component IDs must be unique.")
+        ept_by_id[component_id] = component
+
+    # Include each corresponding elevated-return AABB so none is cut off by the crop.
+    for component_report in report_components:
+        if not isinstance(component_report, dict):
+            raise ValueError("Cross-check component entries must be objects.")
+        component_id = str(component_report.get("componentId") or "")
+        component = ept_by_id.get(component_id)
+        if component is None:
+            raise ValueError("Cross-check component does not match the EPT input: " + component_id)
+        bounds = component.get("xyBounds")
+        if not isinstance(bounds, dict):
+            raise ValueError("EPT component AABB must contain xyBounds min/max.")
+        low, high = bounds.get("min"), bounds.get("max")
+        if not isinstance(low, dict) or not isinstance(high, dict):
+            raise ValueError("EPT component AABB must contain xyBounds min/max.")
+        aabb = tuple(float(v) for v in (low.get("x"), low.get("y"), high.get("x"), high.get("y")))
+        if not all(math.isfinite(v) for v in aabb) or aabb[0] >= aabb[2] or aabb[1] >= aabb[3]:
+            raise ValueError("EPT component AABB is invalid.")
+        min_x, min_y = min(min_x, aabb[0]), min(min_y, aabb[1])
+        max_x, max_y = max(max_x, aabb[2]), max(max_y, aabb[3])
+
+        candidates = component_report.get("candidates")
+        if not isinstance(candidates, list):
+            raise ValueError("Cross-check candidates must be an array.")
+        for candidate in candidates[:3]:
+            if not isinstance(candidate, dict):
+                raise ValueError("Candidate entries must be objects.")
+            index = candidate.get("sourceFeatureIndex")
+            if not isinstance(index, int) or index < 0 or index >= len(features):
+                raise ValueError("Candidate sourceFeatureIndex does not map to an input footprint feature.")
+            feature = features[index]
+            if not isinstance(feature, dict) or not isinstance(feature.get("geometry"), dict):
+                raise ValueError("Candidate source feature must have a geometry object.")
+            actual_id = _feature_id(feature)
+            if candidate.get("featureId") is not None and actual_id != str(candidate.get("featureId")):
+                raise ValueError("Candidate feature ID does not match sourceFeatureIndex.")
+            geometry = shape(feature["geometry"])
+            if geometry.geom_type not in ("Polygon", "MultiPolygon") or geometry.is_empty or not geometry.is_valid:
+                raise ValueError("Candidate footprint must be a valid Polygon or MultiPolygon.")
+            projected = transform_geometry(
+                lambda x, y, z=None: EPSG_4326_TO_3857.transform(x, y), geometry
+            )
+            min_x, min_y = min(min_x, projected.bounds[0]), min(min_y, projected.bounds[1])
+            max_x, max_y = max(max_x, projected.bounds[2]), max(max_y, projected.bounds[3])
+
+    dx, dy = max_x - min_x, max_y - min_y
+    if dx <= 0 or dy <= 0:
+        raise ValueError("Expanded review extent must have positive width and height.")
+    padding_x, padding_y = max(8.0, dx * 0.12), max(8.0, dy * 0.12)
+    min_x, max_x = min_x - padding_x, max_x + padding_x
+    min_y, max_y = min_y - padding_y, max_y + padding_y
+
+    # Fit, never crop, to the requested pixel aspect ratio.
+    target_ratio = width / height
+    dx, dy = max_x - min_x, max_y - min_y
+    current_ratio = dx / dy
+    center_x, center_y = (min_x + max_x) / 2, (min_y + max_y) / 2
+    if current_ratio < target_ratio:
+        dx = dy * target_ratio
+        min_x, max_x = center_x - dx / 2, center_x + dx / 2
+    else:
+        dy = dx / target_ratio
+        min_y, max_y = center_y - dy / 2, center_y + dy / 2
+    if max_x - min_x > 2000 or max_y - min_y > 2000:
+        raise ValueError("Expanded visual-review extent exceeds the 2 km safety bound.")
+    return (float(min_x), float(min_y), float(max_x), float(max_y))
+
+
 def image_request_url(extent_3857: tuple[float, float, float, float], width: int, height: int) -> str:
     if not (128 <= width <= 2048 and 128 <= height <= 2048):
         raise ValueError("Image width and height must be between 128 and 2048 pixels.")
@@ -244,10 +338,17 @@ def _draw_dashed_box(
 
 def _label(draw: ImageDraw.ImageDraw, xy: tuple[int, int], text: str, color: tuple[int, int, int]) -> None:
     font = ImageFont.load_default()
+    canvas_width, canvas_height = draw._image.size
     x, y = xy
-    x = max(2, x)
-    y = max(HEADER_PX + 2, y)
+    x = max(2, min(x, canvas_width - 8))
+    y = max(HEADER_PX + 2, min(y, canvas_height - 14))
     box_rect = draw.textbbox((x, y), text, font=font)
+    if box_rect[2] + 3 > canvas_width:
+        x = max(2, canvas_width - (box_rect[2] - box_rect[0]) - 5)
+        box_rect = draw.textbbox((x, y), text, font=font)
+    if box_rect[3] + 2 > canvas_height:
+        y = max(HEADER_PX + 2, canvas_height - (box_rect[3] - box_rect[1]) - 3)
+        box_rect = draw.textbbox((x, y), text, font=font)
     draw.rectangle((box_rect[0] - 2, box_rect[1] - 1, box_rect[2] + 3, box_rect[3] + 2), fill=color)
     draw.text((x, y), text, font=font, fill=(255, 255, 255))
 
@@ -284,7 +385,7 @@ def build_review_artifacts(
         raise ValueError("Visual review raster dimensions exceed the safety bounds.")
     raw_bbox = manifest.get("query", {}).get("bboxWgs84")
     bbox_wgs84 = validate_bbox_wgs84(raw_bbox)
-    extent = projected_extent(bbox_wgs84)
+    extent = review_extent_3857(bbox_wgs84, ept_report, crosscheck_report, footprint_payload, width, height)
     base_image = load_png(imagery_bytes, (width, height))
     canvas = Image.new("RGB", (width, height + HEADER_PX + FOOTER_PX), (255, 255, 255))
     canvas.paste(base_image, (0, HEADER_PX))
@@ -314,6 +415,25 @@ def build_review_artifacts(
     candidate_colors = [(220, 45, 55), (0, 150, 210), (205, 145, 0)]
     component_color = (170, 0, 185)
     seen_candidate_keys: set[tuple[str, int]] = set()
+    # A source feature can rank for more than one component. Draw each unique
+    # polygon once using its best observed rank; preserve every component/rank
+    # relationship in candidateReview below.
+    candidate_best_rank: dict[int, int] = {}
+    candidate_ids: dict[int, str | None] = {}
+    for report in report_components:
+        for rank, candidate in enumerate(report.get("candidates", [])[:3], start=1):
+            index = candidate.get("sourceFeatureIndex")
+            if not isinstance(index, int) or index < 0 or index >= len(features):
+                raise ValueError("Candidate sourceFeatureIndex does not map to an input footprint feature.")
+            feature = features[index]
+            actual_id = _feature_id(feature) if isinstance(feature, dict) else None
+            if candidate.get("featureId") is not None and actual_id != str(candidate.get("featureId")):
+                raise ValueError("Candidate feature ID does not match sourceFeatureIndex.")
+            candidate_ids[index] = actual_id
+            candidate_best_rank[index] = min(rank, candidate_best_rank.get(index, rank))
+    feature_labels = {index: "F" + str(position) for position, index in enumerate(sorted(candidate_best_rank), start=1)}
+    component_labels = {str(report.get("componentId")): "E" + str(position)
+                        for position, report in enumerate(report_components, start=1)}
 
     for component_report in report_components:
         if not isinstance(component_report, dict):
@@ -336,9 +456,10 @@ def build_review_artifacts(
         component_box = box(*aabb)
         if component_box.intersects(viewport):
             label_xy = _draw_dashed_box(draw, aabb, extent, width_px, height_px, component_color)
-            _label(draw, label_xy, "EPT AABB " + component_id[:22], component_color)
+            _label(draw, label_xy, component_labels.get(component_id, "E?"), component_color)
         source_components.append({
             "componentId": component_id,
+            "reviewLabel": component_labels.get(component_id),
             "aabbCrs": "EPSG:3857",
             "aabbBounds": list(aabb),
             "aabbIsRoofFootprint": False,
@@ -361,22 +482,23 @@ def build_review_artifacts(
             if declared_id is not None and actual_id != str(declared_id):
                 raise ValueError("Candidate feature ID does not match sourceFeatureIndex.")
             projected = _project_polygon(feature, viewport)
-            key = (component_id, index)
-            if key not in seen_candidate_keys:
+            if index not in seen_candidate_keys:
+                best_rank = candidate_best_rank[index]
                 _draw_polygon_outline(
                     draw, projected, extent, width_px, height_px,
-                    candidate_colors[rank - 1], line_width=max(2, 5 - rank),
+                    candidate_colors[best_rank - 1], line_width=max(2, 5 - best_rank),
                 )
                 label_point = map_point_to_pixel(
                     float(projected.centroid.x), float(projected.centroid.y),
                     extent, width_px, height_px,
                 )
-                label = "R" + str(rank) + " " + (actual_id or ("feature-" + str(index)))[:20]
-                _label(draw, label_point, label, candidate_colors[rank - 1])
-                seen_candidate_keys.add(key)
+                _label(draw, label_point, feature_labels[index] + " R" + str(best_rank), candidate_colors[best_rank - 1])
+                seen_candidate_keys.add(index)
             selected_candidates.append({
                 "componentId": component_id,
                 "rank": rank,
+                "featureLabel": feature_labels[index],
+                "bestObservedRank": candidate_best_rank[index],
                 "featureId": actual_id,
                 "sourceFeatureIndex": index,
                 "distanceToComponentAabbM": candidate.get("distanceToComponentAabbM"),
@@ -388,13 +510,11 @@ def build_review_artifacts(
     # A compact legend and attribution are rendered into the review image.
     footer_y = HEADER_PX + height_px + 7
     draw.line((10, footer_y + 4, 35, footer_y + 4), fill=candidate_colors[0], width=4)
-    draw.text((40, footer_y), "R1 candidate footprint", fill=(20, 20, 20), font=font)
-    draw.line((190, footer_y + 4, 215, footer_y + 4), fill=candidate_colors[1], width=4)
-    draw.text((220, footer_y), "R2", fill=(20, 20, 20), font=font)
-    draw.line((260, footer_y + 4, 285, footer_y + 4), fill=candidate_colors[2], width=4)
-    draw.text((290, footer_y), "R3", fill=(20, 20, 20), font=font)
-    draw.line((340, footer_y + 4, 365, footer_y + 4), fill=component_color, width=3)
-    draw.text((370, footer_y), "EPT component AABB (not roof outline)", fill=(20, 20, 20), font=font)
+    draw.text((40, footer_y), "F# = candidate; red = best observed rank 1", fill=(20, 20, 20), font=font)
+    draw.line((365, footer_y + 4, 390, footer_y + 4), fill=candidate_colors[1], width=4)
+    draw.text((395, footer_y), "cyan / amber = ranks 2 / 3", fill=(20, 20, 20), font=font)
+    draw.line((10, footer_y + 19, 35, footer_y + 19), fill=component_color, width=3)
+    draw.text((40, footer_y + 15), "E# = EPT AABB (not roof outline)", fill=(20, 20, 20), font=font)
     draw.text((10, footer_y + 21), ATTRIBUTION, fill=(40, 40, 40), font=font)
 
     output = BytesIO()
@@ -416,6 +536,8 @@ def build_review_artifacts(
             "sourceCrs": "EPSG:3857",
             "extentCrs": "EPSG:3857",
             "extentBounds": list(extent),
+            "extentExpansion": "Expanded to include all displayed candidate polygon bounds and matching EPT AABBs, padded, then aspect-fitted without cropping.",
+            "inputQueryExtentBounds": list(projected_extent(bbox_wgs84)),
             "inputBboxWgs84": list(bbox_wgs84),
             "widthPx": width,
             "heightPx": height,
@@ -431,8 +553,12 @@ def build_review_artifacts(
         },
         "overlay": {
             "eptAabbCount": len(source_components),
-            "candidatePolygonCount": len(selected_candidates),
+            "candidatePolygonCount": len(seen_candidate_keys),
+            "candidatePairCount": len(selected_candidates),
+            "candidateLabels": {feature_labels[index]: {"sourceFeatureIndex": index, "featureId": candidate_ids.get(index), "bestObservedRank": candidate_best_rank[index]} for index in sorted(candidate_best_rank)},
+            "componentLabels": {item["reviewLabel"]: item["componentId"] for item in source_components},
             "candidateRankColors": {"1": "#DC2D37", "2": "#0096D2", "3": "#CD9100"},
+            "candidateColorInterpretation": "Each unique source polygon is drawn once using its best observed rank across all EPT components; candidateReview preserves per-component ranks.",
             "componentAabbColor": "#AA00B9",
             "componentAabbInterpretation": "EPSG:3857 projected axis-aligned component bounds; not roof polygons.",
         },
@@ -488,7 +614,7 @@ def main(argv: list[str] | None = None) -> int:
         footprints, footprint_bytes = read_json(Path(args.footprints), "Overture footprints")
         crosscheck, crosscheck_bytes = read_json(Path(args.crosscheck_report), "BRF-18 cross-check report")
         bbox = validate_bbox_wgs84(manifest.get("query", {}).get("bboxWgs84"))
-        extent = projected_extent(bbox)
+        extent = review_extent_3857(bbox, ept_report, crosscheck, footprints, args.width, args.height)
         image_url = image_request_url(extent, args.width, args.height)
         imagery_bytes = download_imagery(image_url)
         input_hashes = {
