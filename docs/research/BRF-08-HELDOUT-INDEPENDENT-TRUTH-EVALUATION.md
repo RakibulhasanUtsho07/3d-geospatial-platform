@@ -1,41 +1,41 @@
 # BRF-08 — Whole-building holdout and independent geometry truth evaluation
 
 **Status:** Scoped evaluator implementation added; BRF-08 remains in progress.  
-**Branch:** \`feat/brf-08-independent-truth-evaluator\`  
+**Branch:** `feat/brf-08-independent-truth-evaluator`  
 **Purpose:** protect held-out segmentation evaluation at the physical-building level, and compare candidate geometry with traceable independent references without turning a software report into an architectural-accuracy or publication claim.
 
 ## 1. Whole-building held-out split integrity
 
-The segmentation benchmark requires a stable, safe \`buildingGroupId\` for every sample. All views, dates and capture sessions for one physical building must share the same ID and stay in one split. The validator rejects the same ID crossing \`development\` and \`held-out-evaluation\`, case-insensitively, even when \`captureGroupId\` values differ. Existing capture-burst split protection remains.
+The segmentation benchmark requires a stable, safe `buildingGroupId` for every sample. All views, dates and capture sessions for one physical building must share the same ID and stay in one split. The validator rejects the same ID crossing `development` and `held-out-evaluation`, case-insensitively, even when `captureGroupId` values differ. Existing capture-burst split protection remains.
 
 Reports include total and held-out building counts, equal-weight per-building macro foreground IoU alongside per-image averages, and explicit failed/missing held-out result cases. Correct physical-building identity still depends on curator-verified metadata; hashes alone cannot identify a building.
 
 ## 2. Independent geometry evaluator
 
-The exported API is \`evaluateIndependentBuildingTruth(input)\` in \`src/core/building-generation/independent-building-truth-evaluator.mjs\`. The CLI is \`scripts/evaluate-independent-building-truth.mjs\`.
+The exported API is `evaluateIndependentBuildingTruth(input)` in `src/core/building-generation/independent-building-truth-evaluator.mjs`. The CLI is `scripts/evaluate-independent-building-truth.mjs`.
 
 The evaluator reports separate metric groups:
 
 - **Footprint:** area and relative area error, perimeter, centroid offset, bounding dimensions and bidirectional sampled boundary-to-segment distances (mean, RMS, p95 and max).
 - **Metric dimensions:** width, depth and height in metres, each with absolute/relative error, plus maximum and RMS relative error.
-- **Independent check points:** point-by-point \`dx/dy/dz\` and 3D Euclidean residuals; summary statistics; missing and extra IDs. Each reference checkpoint must explicitly declare \`independentOfFit: true\`.
+- **Independent check points:** point-by-point `dx/dy/dz` and 3D Euclidean residuals; summary statistics; missing and extra IDs. Each reference checkpoint must explicitly declare `independentOfFit: true`.
 - **Optional surface reference:** bidirectional nearest-triangle distances from each mesh's vertices using a bounding-volume hierarchy, summarised independently and symmetrically. Both candidate and reference mesh inputs are required together; a one-sided mesh is incomplete, not a pass.
 
 Candidate and reference geometry must declare the same metric coordinate-frame ID and metre units. Geometry evidence must bind to the candidate GLB and reference-source SHA-256 values. The CLI reads both source paths, verifies actual bytes against the declared hashes, rejects traversal/symlink paths, writes a new hash-pinned report and exits non-zero on failure.
 
 ### Run it
 
-\`\`\`bash
+```bash
 npm run test:independent-building-truth
 npm run evaluate:independent-building-truth -- --help
 npm run evaluate:independent-building-truth -- evaluation-manifest.json artifacts/evaluation-report.json --root=.
-\`\`\`
+```
 
 The report path must not already exist because output creation uses exclusive file creation. Supply the manifest and evidence assets under the selected root.
 
 ### Manifest contract (illustrative, not real survey data)
 
-\`\`\`json
+```json
 {
   "schemaVersion": "1.0.0",
   "evaluationId": "site-a-eval-01",
@@ -97,29 +97,29 @@ The report path must not already exist because output creation uses exclusive fi
     "surfaceDistanceMaxM": 0.5
   }
 }
-\`\`\`
+```
 
-For a reference surface, add \`reference.surfaceMesh\` with \`sha256\` equal to the exact reference source SHA-256 and a reviewed mesh \`vertices\` array plus triangle index arrays. Add \`candidate.surfaceMesh\` with \`sourceGlbSha256\` equal to the candidate GLB SHA-256 and the candidate mesh vertices/triangles. The adapter currently bounds surface inputs to 25,000 vertices and 50,000 triangles to keep benchmark cost bounded.
+For a reference surface, add `reference.surfaceMesh` with `sha256` equal to the exact reference source SHA-256 and a reviewed mesh `vertices` array plus triangle index arrays. Add `candidate.surfaceMesh` with `sourceGlbSha256` equal to the candidate GLB SHA-256 and the candidate mesh vertices/triangles. The adapter currently caps footprint rings at 500 vertices and 16 samples per edge; it caps surface inputs at 25,000 vertices and 50,000 triangles to bound work.
 
 ### Threshold behavior and outcomes
 
 Metric thresholds are explicit inputs; they are not silently invented by the evaluator. Missing/invalid thresholds produce a warning and an incomplete report. Exceeding a configured threshold is a failure. Missing footprint, dimension or held-out check-point evidence is incomplete. Invalid/self-intersecting footprints, stale hashes, unsupported reference basis, differing coordinate frames, non-finite values and mesh integrity problems fail closed.
 
 Every report preserves:
-- \`acceptanceEligible: false\`
-- \`publicationEligible: false\`
-- \`mapReady: false\`
-- \`automaticApproval: false\`
+- `acceptanceEligible: false`
+- `publicationEligible: false`
+- `mapReady: false`
+- `automaticApproval: false`
 
-A report with all supplied metrics inside thresholds is still \`benchmark-review-required\`, never automatic PASS or a universal “90% accurate” score.
+A report with all supplied metrics inside thresholds is still `benchmark-review-required`, never automatic PASS or a universal “90% accurate” score.
 
 ## 3. Automated coverage
 
 New tests live in:
-- \`tests/independent-building-truth-evaluator.test.mjs\`
-- \`tests/independent-building-truth-evaluator-cli.test.mjs\`
+- `tests/independent-building-truth-evaluator.test.mjs`
+- `tests/independent-building-truth-evaluator-cli.test.mjs`
 
-Coverage includes equal candidate/reference geometry, shifted footprints and dimensions, shifted mesh geometry, missing or malformed geometry, self-intersection, stale hashes, mismatched frames, declared-untrusted truth, held-out points incorrectly reused for fitting, missing thresholds and on-disk byte mismatch. The package script \`test:independent-building-truth\` runs both suites and CI runs the same script.
+Coverage includes equal candidate/reference geometry, shifted footprints and dimensions, shifted mesh geometry, missing or malformed geometry, self-intersection, stale hashes, mismatched frames, declared-untrusted truth, held-out points incorrectly reused for fitting, missing thresholds and on-disk byte mismatch. The package script `test:independent-building-truth` runs both suites and CI runs the same script.
 
 Synthetic fixtures prove the contracts of the evaluator only. They are not measurements of a Dhaka or heritage building.
 
@@ -128,9 +128,9 @@ Synthetic fixtures prove the contracts of the evaluator only. They are not measu
 This is an evaluator for supplied, already-extracted geometry evidence; it **does not yet parse the candidate GLB to extract its footprint/check points or ingest and independently reconstruct reference geometry from the survey source**. The geometry arrays are provided by an upstream evidence-preparation step. The source hash binds the declared files, but does not independently authenticate survey identity, accuracy, rights, measurement provenance or that the supplied coordinates were correctly extracted from those bytes. Curator review and a reproducible extraction adapter are still required.
 
 Other metric limits:
-- Footprint comparison assumes both polygon rings are already registered in the same coordinate frame, models one simple outer ring only, and estimates boundary distances using deterministic edge samples. It does not compute polygon IoU or continuous Hausdorff distance.
+- Footprint comparison assumes both polygon rings are already registered in the same coordinate frame, models one simple outer ring only (3–500 ordered vertices), and estimates boundary distances using deterministic edge samples (1–16 samples per edge). It does not compute polygon IoU or continuous Hausdorff distance.
 - Surface comparison measures distances from vertices to opposing triangle surfaces; it is not continuous signed Hausdorff distance, uniform surface sampling or a surface completeness/topology proof. Use a trusted independently reviewed mesh in the same coordinate frame.
-- \`independentOfFit\` is a manifest assertion. The reviewer must ensure checkpoint coordinates were not used for fitting scale, camera pose, alignment or geometry.
+- `independentOfFit` is a manifest assertion. The reviewer must ensure checkpoint coordinates were not used for fitting scale, camera pose, alignment or geometry.
 - Width/depth/height are compared in a declared axis convention. Axis permutations or frame mistakes must be resolved before interpreting errors.
 - SHA-256 proves exact byte identity only, not physical building identity or survey truth.
 
