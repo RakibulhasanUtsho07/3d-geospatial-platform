@@ -1,7 +1,7 @@
 # BRF-21 — Pairwise image-overlap evidence graph
 
 **Date:** 27 October 2026  
-**Status:** implementation and CI validation pending on the BRF-21 branch.  
+**Status (27 October 2026):** merged into development at SHA 5f7f9ecf93bb43107be5f650b07ea059becaf4fe (PR #225). Exact-head full CI [run #40534364915](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40534364915) and dedicated intake/overlap workflow [run #40534364849](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40534364849) succeeded. Post-merge development CI is tracked separately in [run #40535822648](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40535822648).  
 **Tracking:** [Issue #224](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/224).  
 **Parent:** [BRF-10 survey-backed building benchmark](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/208).
 
@@ -32,3 +32,15 @@ A strong edge is a proposal for visual review, not evidence of identity by itsel
 Human-review fields remain pending until an authorized review records identity, useful overlap/coverage, occlusion, source-axis interpretation, reviewer and UTC timestamp. The analyzer does not set those values. It does not run COLMAP, create a candidate GLB, establish a GPS/COLMAP transform, produce independent survey truth, or calculate accuracy.
 
 All `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` flags remain false.
+
+
+## BRF-22 — Hash-bound human-review decision contract
+
+Tracking: [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/226). The next stage provides a template and validator that bind the BRF-20 review manifest, BRF-21 pair report, contact sheet, camera-angle plot and overlap graph to their exact SHA-256 and byte sizes. It records explicit reviewer identity and UTC time, same-building identity, per-view quality/occlusion/surface notes, per-pair overlap decisions, source up-axis interpretation, and separate asset-rights status.
+
+The BRF-21 source run produced 16 views and evaluated all 120 unordered pairs. Fourteen pairs were proposed as candidate edges; four views had no candidate edge. The [derived CI artifact](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40534364849/artifacts/12747786071) contains review materials only, not source images. These counts are image-feature triage, not confirmed overlap, building identity or accuracy evidence.
+
+No real-building human decision has been entered. BRF-22 templates remain pending until an authorized reviewer fills them in. The validator cannot authenticate the reviewer or legal rights, does not run COLMAP, produces no candidate GLB or survey result, and always keeps acceptance/publication/map/automatic-approval flags false.
+
+
+**BRF-22 provenance hardening:** the decision contract binds the exact BRF-14 source manifest and byte-verification report in addition to all five BRF-20/21 derived evidence artifacts. It checks the canonical verification-report hash in both downstream JSON reports, source commit, per-view source hash/size and each pair-side hash/filename before creating a review form.

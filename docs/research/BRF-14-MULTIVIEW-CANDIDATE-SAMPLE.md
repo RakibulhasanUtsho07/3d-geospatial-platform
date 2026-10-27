@@ -104,3 +104,16 @@ python scripts/analyze_brf14_multiview_overlap.py \
 A highlighted edge means only that local descriptors and a geometric model found enough consistent correspondences for a reviewer to inspect. It may match roof texture, pavement, grass, repeated façade panels, or occluders. A weak/no edge is also ambiguous because viewpoint changes, blur, lighting or occlusion can suppress matches. The graph does not establish building identity, calibrated camera poses, metric frame registration, or model accuracy.
 
 The workflow uploads the derived review PNG/JSON and byte-verification JSON only; selected raw images remain in ephemeral runner storage. The output explicitly stays `pending-human-review`, and all acceptance/publication/map/automatic-approval flags remain false. It is a triage aid, not a substitute for reviewer confirmation of identity, overlap and source up-axis.
+
+
+## BRF-22 — Recording the multi-view review decision
+
+Tracking: [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/226). After downloading the seven BRF-14/20/21 evidence files from the CI artifact into a dedicated directory, use the hash-bound decision template generator:
+
+    python3 scripts/brf21_human_review.py template --artifact-root path/to/brf-14-artifacts
+
+Edit the generated multiview-human-review-decision-template.json only after inspecting the contact sheet, coverage plot and pairwise graph. Record the reviewer identifier, timestamp ending in UTC Z, same-building identity, each view, all unordered pairs, occlusion/coverage, source up-axis and asset rights. Then save the completed record as review-decision.json and validate it:
+
+    python3 scripts/brf21_human_review.py validate --artifact-root path/to/brf-14-artifacts --decision review-decision.json
+
+The artifact root must contain the unchanged brf-14-multiview-source.json, multiview-source-byte-verification.json, multiview-review-manifest.json, pairwise-overlap-report.json, multiview-contact-sheet.png, camera-angle-coverage.png and pairwise-overlap-graph.png. The commands reject modified/stale inputs, unknown views/pairs, path traversal, symlink inputs, missing review fields and attempts to enable release flags. A pending template is not a valid completed review. A complete record only confirms schema and evidence binding; it does not authenticate the reviewer, legal rights or accuracy, and it does not execute COLMAP or publish a GLB. The real sample remains pending human review and independent survey/checkpoint evidence.
