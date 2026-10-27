@@ -16,6 +16,7 @@ const copyMap = [
   ["src/core/building-generation/glb-geometry-extraction.mjs", "../src/core/building-generation/glb-geometry-extraction.mjs"],
   ["src/core/building-generation/independent-reference-geometry-adapter.mjs", "../src/core/building-generation/independent-reference-geometry-adapter.mjs"],
   ["src/core/building-generation/geometry-extraction-provenance.mjs", "../src/core/building-generation/geometry-extraction-provenance.mjs"],
+  ["src/core/building-generation/independent-building-truth-evaluator.mjs", "../src/core/building-generation/independent-building-truth-evaluator.mjs"],
 ];
 
 async function setup(t, { staleConfigHash = false } = {}) {
