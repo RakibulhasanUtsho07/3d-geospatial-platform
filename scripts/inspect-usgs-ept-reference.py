@@ -210,21 +210,123 @@ def node_key_depth(key: str) -> int:
     return parse_node_key(key)[0]
 
 
+def summarize_unclassified_elevations_above_ground(
+    unclassified_xyz: list[tuple[float, float, float]],
+    ground_xyz: list[tuple[float, float, float]],
+    max_ground_distance_m: float = 12.0,
+    grid_cell_size_m: float = 2.0,
+) -> dict[str, Any]:
+    """Compare LAS class-1 points to nearby class-2 ground returns, without assuming class 1 means buildings."""
+    if max_ground_distance_m <= 0 or grid_cell_size_m <= 0:
+        raise ValueError("Ground-comparison distance and grid cell size must be positive.")
+    cell_size = 5.0
+    cells: dict[tuple[int, int], list[tuple[float, float, float]]] = {}
+    for x, y, z in ground_xyz:
+        key = (math.floor(x / cell_size), math.floor(y / cell_size))
+        cells.setdefault(key, []).append((x, y, z))
+
+    search_cells = math.ceil(max_ground_distance_m / cell_size)
+    compared: list[tuple[float, float, float, float]] = []
+    unmatched = 0
+    max_distance_sq = max_ground_distance_m * max_ground_distance_m
+    for x, y, z in unclassified_xyz:
+        cell_x = math.floor(x / cell_size)
+        cell_y = math.floor(y / cell_size)
+        nearest: tuple[float, float, float] | None = None
+        nearest_distance_sq = max_distance_sq
+        for offset_x in range(-search_cells, search_cells + 1):
+            for offset_y in range(-search_cells, search_cells + 1):
+                for gx, gy, gz in cells.get((cell_x + offset_x, cell_y + offset_y), ()):
+                    distance_sq = (gx - x) ** 2 + (gy - y) ** 2
+                    if distance_sq <= nearest_distance_sq:
+                        nearest_distance_sq = distance_sq
+                        nearest = (gx, gy, gz)
+        if nearest is None:
+            unmatched += 1
+            continue
+        height_above_ground = z - nearest[2]
+        compared.append((x, y, z, height_above_ground))
+
+    heights = sorted(point[3] for point in compared)
+    def percentile(values: list[float], fraction: float) -> float | None:
+        if not values:
+            return None
+        return float(values[min(len(values) - 1, max(0, round((len(values) - 1) * fraction)))])
+
+    thresholds: dict[str, Any] = {}
+    for threshold in (2.0, 3.0, 5.0, 10.0):
+        elevated = [point for point in compared if point[3] >= threshold]
+        occupied_cells = {
+            (math.floor(point[0] / grid_cell_size_m), math.floor(point[1] / grid_cell_size_m))
+            for point in elevated
+        }
+        thresholds[str(int(threshold))] = {
+            "heightThresholdM": threshold,
+            "pointCount": len(elevated),
+            "occupiedGridCells": len(occupied_cells),
+            "gridCellSizeM": grid_cell_size_m,
+            "xyzBounds": {
+                "min": {
+                    "x": min((point[0] for point in elevated), default=None),
+                    "y": min((point[1] for point in elevated), default=None),
+                    "z": min((point[2] for point in elevated), default=None),
+                },
+                "max": {
+                    "x": max((point[0] for point in elevated), default=None),
+                    "y": max((point[1] for point in elevated), default=None),
+                    "z": max((point[2] for point in elevated), default=None),
+                },
+            },
+        }
+    above_two = thresholds["2"]
+    candidate_surface = above_two["pointCount"] >= 25 and above_two["occupiedGridCells"] >= 6
+    return {
+        "method": "nearest-class2-ground-return-within-radius",
+        "groundClass": 2,
+        "testedUnclassifiedClass": 1,
+        "unclassifiedPointsInsideValidationRadius": len(unclassified_xyz),
+        "groundPointsInsideValidationRadiusPlusPadding": len(ground_xyz),
+        "pointsComparedToGround": len(compared),
+        "pointsWithoutNearbyGround": unmatched,
+        "maximumGroundNeighbourDistanceM": max_ground_distance_m,
+        "heightAboveNearestGroundM": {
+            "min": min(heights) if heights else None,
+            "median": percentile(heights, 0.5),
+            "p90": percentile(heights, 0.9),
+            "p95": percentile(heights, 0.95),
+            "max": max(heights) if heights else None,
+        },
+        "elevatedReturnThresholds": thresholds,
+        "potentialElevatedUnclassifiedSurfaceDetected": candidate_surface,
+        "interpretation": "Elevated class-1 points may be buildings, trees, vehicles or other above-ground objects. This metric alone cannot identify a building or validate image-to-building correspondence.",
+    }
+
+
 def assess_sample_building_coverage(
     points_within_radius: int,
     classification_counts: dict[int, int] | Counter[int],
     inspected_node_count: int,
     selected_node_count: int,
+    elevated_unclassified_summary: dict[str, Any] | None = None,
 ) -> tuple[list[str], list[str]]:
-    """Apply a fail-closed gate for whether the sample neighbourhood contains building returns."""
+    """Fail closed only if neither building labels nor a spatially supported elevated surface is present."""
     blockers: list[str] = []
     warnings: list[str] = []
     if points_within_radius <= 0:
         blockers.append("no-point-returns-fall-within-the-sample-radius")
-    if int(classification_counts.get(6, 0)) <= 0:
-        blockers.append("no-class6-building-points-within-sample-radius")
+    has_class6 = int(classification_counts.get(6, 0)) > 0
+    has_elevated_unclassified = bool(
+        elevated_unclassified_summary
+        and elevated_unclassified_summary.get("potentialElevatedUnclassifiedSurfaceDetected") is True
+    )
+    if not has_class6 and not has_elevated_unclassified:
+        blockers.append("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius")
         warnings.append(
-            "No class-6 building points were observed within the sample radius; this work unit cannot be accepted as a building-surface reference for this sample without separate identity/classification evidence."
+            "No class-6 points or spatially supported elevated class-1 surface were detected within the validation radius; this point-cloud neighbourhood is not yet a usable building-surface reference."
+        )
+    elif not has_class6 and has_elevated_unclassified:
+        warnings.append(
+            "The source has no class-6 building labels in the checked neighbourhood, but class-1 returns form a spatially supported elevated surface above nearby class-2 ground. It may be a building or vegetation and requires building-footprint/image identity review before it can be accepted."
         )
     if inspected_node_count < selected_node_count:
         blockers.append("one-or-more-selected-ept-nodes-were-not-completely-inspected")
