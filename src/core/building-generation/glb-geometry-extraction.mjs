@@ -298,10 +298,8 @@ export function extractGlbGeometry(input, options={}) {
           if (!referenced.has(binding.vertexIndex)) {
             throw new TypeError("Checkpoint " + binding.id + " must bind a vertex referenced by a rendered triangle.");
           }
-          checkPointsById.set(binding.id, {
-            id: binding.id,
-            ...transformPoint(frame, positions[binding.vertexIndex], label + " checkpoint " + binding.id),
-          });
+          const position = transformPoint(frame, positions[binding.vertexIndex], label + " checkpoint " + binding.id);
+          checkPointsById.set(binding.id, { id: binding.id, x: position[0], y: position[1], z: position[2] });
         }
         const needed=[...referenced].sort((a,b)=>a-b), remap=new Map();
         for(const index of needed){
