@@ -239,6 +239,7 @@ export async function verifyBuildingBenchmarkAssetBytes(manifest, assetRoot) {
   const referenceAssets = referenceIds.map((id) => assetsById.get(id)).filter(Boolean);
   const referenceResults = referenceIds.map((id) => assetResults.get(id)).filter(Boolean);
   const referenceIntegrityValid = referenceIds.length > 0 &&
+    new Set(referenceIds).size === referenceIds.length &&
     referenceIds.length === referenceAssets.length &&
     referenceIds.length === referenceResults.length &&
     referenceAssets.every((asset) => asset.role === "reference-model" || asset.role === "independent-surface") &&
