@@ -72,3 +72,31 @@ python scripts/inspect-usgs-laz-tile.py \
 ```
 
 The output remains intake evidence only. Even with a pinned hash, valid header CRS and nearby building returns, the GPS↔COLMAP registration, source building identity, separate fit-vs-held-out measurements, engine-generated candidate GLB, and independent held-out metric report must still be completed before acceptance/publication/map readiness is allowed.
+
+## Public EPT fallback after HTTP 429
+
+The raw LAZ staging download returned HTTP 429 on the GitHub Actions runner. This is an access/rate-limit response, not evidence that the LAZ object is missing or invalid. The raw LAZ full-tile workflow is therefore manual-only and has bounded retries/timeouts; its report is retained even when inspection fails.
+
+A better bounded option is the official USGS public Entwine Point Tile dataset for the same work unit:
+
+- EPT metadata: https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MN_CentralMissRiver_4_B22/ept.json
+- Dataset citation: Woolpert (2022), “MN Central Mississippi River 4 2022 Lidar; Project ID: 230951 - WU300158; Classified Point Cloud”, U.S. Geological Survey 3DEP.
+- NOAA InPort 73145 lists the exact EPT URL and says the original classified point cloud was restructured as EPT and reprojected horizontally to Web Mercator (EPSG:3857), retaining vertical units of metres NAVD88 Geoid18.
+- USGS' [3DEP LiDAR Point Clouds public AWS registry](https://registry.opendata.aws/usgs-lidar/) identifies the public `usgs-lidar-public` EPT bucket and states the USGS 3DEP source licence is U.S. Government public domain. The original full-resolution LAZ is a separate requester-pays bucket; this PR uses only the public EPT version, not the requester-pays bucket.
+
+Manifest: `benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json`.
+
+`scripts/inspect-usgs-ept-reference.py` fetches the small EPT metadata and only the hierarchy pages / LASzip point nodes that intersect a bounded 50 m XY neighbourhood around the camera GPS-derived sample point. It checks the EPT SRS, transforms the point to EPSG:3857, hashes each fetched hierarchy/node byte payload, reads LASzip classification counts, and records how many class-6 (building) returns exist inside the sample radius. It caps HTTP response sizes, number of hierarchy documents, node count and total point-node bytes, validates S3 paths/redirects, and never commits or uploads raw point-node bytes. CI uploads the small JSON report only, even when the inspection is blocked, so reviewers can see the reason.
+
+This EPT sample is an efficient point-cloud preflight; it is not yet a proof of the exact photographed building. The root and selected node hashes are captured in the report; the EPT root metadata digest can subsequently be pinned in the manifest for repeatable source-version checking. EPT node hashes refer to the restructured source nodes, not the raw `.laz` product previously returned by TNM.
+
+Manual invocation:
+
+```sh
+python -m pip install "laspy[lazrs]" pyproj numpy
+python scripts/inspect-usgs-ept-reference.py \
+  --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json \
+  --report artifacts/brf-16/central-mississippi-ept-reference-report.json
+```
+
+**Interpretation gate:** if the EPT says EPSG:3857 and the observed neighbourhood contains class-6 returns, that supports presence of building-class point returns near the GPS location; it still does not prove image-to-building identity, metric transform accuracy, independent fit/checkpoint separation, or candidate GLB accuracy. Those checks remain required before any accuracy claim or release flag can be enabled.
