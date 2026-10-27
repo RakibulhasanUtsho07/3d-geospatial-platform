@@ -116,14 +116,24 @@ def parse_ept_metadata(payload: bytes, expected_horizontal: str = "EPSG:3857") -
         raise ValueError("EPT metadata is not valid JSON: " + str(error)) from error
     if not isinstance(value, dict):
         fail("EPT metadata must be a JSON object.")
-    raw_bounds = value.get("boundsConforming") or value.get("bounds")
-    if not isinstance(raw_bounds, list) or len(raw_bounds) != 6:
-        fail("EPT metadata must include six-dimensional bounds/boundsConforming.")
-    bounds = [float(item) for item in raw_bounds]
-    if not all(math.isfinite(item) for item in bounds):
-        fail("EPT metadata bounds contain a non-finite value.")
-    if not (bounds[0] < bounds[3] and bounds[1] < bounds[4] and bounds[2] < bounds[5]):
-        fail("EPT bounds must have positive extent in X, Y and Z.")
+    # EPT node indices are partitioned against the octree root "bounds";
+    # boundsConforming is a tighter data extent and must only be used to test
+    # whether a point is within the actual source extent, never for node math.
+    raw_tree_bounds = value.get("bounds")
+    raw_conforming_bounds = value.get("boundsConforming") or raw_tree_bounds
+    if not isinstance(raw_tree_bounds, list) or len(raw_tree_bounds) != 6:
+        fail("EPT metadata must include six-dimensional tree bounds.")
+    if not isinstance(raw_conforming_bounds, list) or len(raw_conforming_bounds) != 6:
+        fail("EPT metadata must include six-dimensional boundsConforming.")
+    bounds = [float(item) for item in raw_tree_bounds]
+    conforming_bounds = [float(item) for item in raw_conforming_bounds]
+    for label, candidate in (("tree bounds", bounds), ("conforming bounds", conforming_bounds)):
+        if not all(math.isfinite(item) for item in candidate):
+            fail("EPT metadata " + label + " contain a non-finite value.")
+        if not (candidate[0] < candidate[3] and candidate[1] < candidate[4] and candidate[2] < candidate[5]):
+            fail("EPT " + label + " must have positive extent in X, Y and Z.")
+    if not all(bounds[axis] <= conforming_bounds[axis] <= bounds[axis + 3] for axis in range(3)):
+        fail("EPT boundsConforming must be contained within tree bounds.")
     points = value.get("points")
     span = value.get("span")
     if not isinstance(points, int) or points <= 0:
@@ -153,6 +163,7 @@ def parse_ept_metadata(payload: bytes, expected_horizontal: str = "EPSG:3857") -
     return {
         "raw": value,
         "bounds": bounds,
+        "boundsConforming": conforming_bounds,
         "points": points,
         "span": span,
         "dataType": data_type,
@@ -268,7 +279,8 @@ def inspect_ept_reference(
         fail("EPT metadata SHA-256 does not match the pinned manifest.")
     metadata = parse_ept_metadata(metadata_payload)
     ept = metadata["raw"]
-    bounds = metadata["bounds"]
+    bounds = metadata["bounds"]  # EPT octree node math uses tree bounds.
+    conforming_bounds = metadata["boundsConforming"]  # Actual data extent only.
 
     try:
         from pyproj import Transformer
@@ -280,14 +292,14 @@ def inspect_ept_reference(
     transformer = Transformer.from_crs("EPSG:4326", metadata["horizontalCrs"], always_xy=True)
     sample = coverage["samplePoint"]
     target_x, target_y = transformer.transform(float(sample["longitude"]), float(sample["latitude"]))
-    if not (bounds[0] <= target_x <= bounds[3] and bounds[1] <= target_y <= bounds[4]):
+    if not (conforming_bounds[0] <= target_x <= conforming_bounds[3] and conforming_bounds[1] <= target_y <= conforming_bounds[4]):
         out_of_bounds_report = {
             "schemaVersion": "1.0.0",
             "sampleId": manifest["sampleId"],
             "status": "sample-outside-ept-bounds",
             "inspectedAt": datetime.now(timezone.utc).isoformat(),
             "source": {"url": metadata_url, "metadataSha256": metadata_hash, "metadataPinned": bool(expected_metadata_hash)},
-            "ept": {"points": metadata["points"], "dataType": metadata["dataType"], "span": metadata["span"], "bounds": bounds, "srs": metadata["srs"]},
+            "ept": {"points": metadata["points"], "dataType": metadata["dataType"], "span": metadata["span"], "bounds": bounds, "boundsConforming": conforming_bounds, "srs": metadata["srs"]},
             "samplePoint3857": {"x": target_x, "y": target_y},
             "blockers": ["sample-gps-point-outside-ept-bounds"],
             "warnings": [],
@@ -465,6 +477,7 @@ def inspect_ept_reference(
         "schemaDimensions": metadata["dimensions"],
         "totalPointCountInEpt": metadata["points"],
         "rootBounds": bounds,
+        "rootBoundsConforming": conforming_bounds,
     }
     status = "sample-neighbourhood-inspected" if not blockers else "blocked"
     report = {
