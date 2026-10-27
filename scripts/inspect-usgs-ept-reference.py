@@ -576,6 +576,7 @@ def inspect_ept_reference(
                         whole_classes[int(cls)] += int(n)
                     xs = np.asarray(points.x)
                     ys = np.asarray(points.y)
+                    zs = np.asarray(points.z)
                     dx = xs - target_x
                     dy = ys - target_y
                     distance_sq = dx * dx + dy * dy
@@ -587,7 +588,7 @@ def inspect_ept_reference(
                     )
                     for point_index in np.flatnonzero(class1_mask):
                         validation_class1_points.append((
-                            float(xs[point_index]), float(ys[point_index]), float(points.z[point_index])
+                            float(xs[point_index]), float(ys[point_index]), float(zs[point_index])
                         ))
                     for point_index in np.flatnonzero(class2_ground_mask):
                         validation_ground_points.append((
