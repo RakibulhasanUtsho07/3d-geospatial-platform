@@ -266,6 +266,10 @@ jobs:
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
         run: node scripts/resolve-mngeo-lidar-work-units.mjs --help
+      - name: Test BRF-16 USGS TNM point-cloud product discovery
+        run: node --test tests/discover-usgs-tnm-lidar-products.test.mjs
+      - name: Validate BRF-16 TNM product discovery CLI
+        run: node scripts/discover-usgs-tnm-lidar-products.mjs --help
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
