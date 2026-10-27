@@ -9,12 +9,10 @@ const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_METADATA_HOSTS = [
   "gis.data.mn.gov",
   "gisdata.mn.gov",
-  "gis.mn.gov",
 ];
 const ALLOWED_METADATA_SUFFIXES = [
   ".gis.data.mn.gov",
   ".gisdata.mn.gov",
-  ".mn.gov",
 ];
 
 function fail(message) {
@@ -58,11 +56,13 @@ function normalizedFeature(feature, index) {
   const workUnit = typeof attributes.work_unit === "string" ? attributes.work_unit.trim() : "";
   const metadata = metadataUrl(attributes.metadata);
   const rawDate = attributes.date;
-  const date = typeof rawDate === "number" && Number.isFinite(rawDate)
-    ? new Date(rawDate).toISOString()
-    : typeof rawDate === "string" && rawDate.trim()
-      ? rawDate.trim()
-      : null;
+  let date = null;
+  if (typeof rawDate === "number" && Number.isFinite(rawDate)) {
+    const parsedDate = new Date(rawDate);
+    if (Number.isFinite(parsedDate.getTime())) date = parsedDate.toISOString();
+  } else if (typeof rawDate === "string" && rawDate.trim()) {
+    date = rawDate.trim();
+  }
   return {
     id,
     valid: Boolean(name || workUnit),
