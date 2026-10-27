@@ -28,6 +28,29 @@ async function safeRead(root, relative, label) {
   }
   return { path: resolved, bytes: await readFile(resolved) };
 }
+
+async function safeOutputPath(root, relative) {
+  const safe = safeRelative(relative, "report output");
+  const parts = safe.split("/");
+  let current = root;
+  for (const part of parts.slice(0, -1)) {
+    current = path.join(current, part);
+    let info;
+    try {
+      info = await lstat(current);
+    } catch (error) {
+      if (!error || error.code !== "ENOENT") throw error;
+      await mkdir(current);
+      info = await lstat(current);
+    }
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new TypeError("Report output must not traverse symbolic links or non-directories.");
+    }
+  }
+  const resolved = path.resolve(root, ...parts);
+  if (!resolved.startsWith(root + path.sep)) throw new TypeError("Report output resolves outside the project root.");
+  return resolved;
+}
 function addArtifactCheck(report, id, passed, detail) {
   const check = { id, status: passed ? "passed" : "failed", detail };
   report.checks.push(check);
@@ -85,10 +108,9 @@ async function main() {
 
   report.assetIntegrity = artifactIntegrity;
   refreshStatus(report);
-  const reportPath = path.resolve(root, positional[1] ??
-    path.join("artifacts", "independent-building-truth", manifest.evaluationId + "-report.json"));
-  if (!reportPath.startsWith(root + path.sep)) throw new TypeError("Report output must resolve inside the project root.");
-  await mkdir(path.dirname(reportPath), { recursive: true });
+  const reportRelative = positional[1] ??
+    path.join("artifacts", "independent-building-truth", manifest.evaluationId + "-report.json").split(path.sep).join("/");
+  const reportPath = await safeOutputPath(root, reportRelative);
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
   console.log(JSON.stringify({
     reportPath: path.relative(root, reportPath).split(path.sep).join("/"),
