@@ -13,6 +13,9 @@ on:
       - "tests/test_prepare_brf14_multiview_review.py"
       - "docs/research/BRF-14-MULTIVIEW-CANDIDATE-SAMPLE.md"
       - "docs/research/BRF-10-SURVEY-BACKED-BENCHMARK-READINESS.md"
+      - "scripts/analyze_brf14_multiview_overlap.py"
+      - "tests/test_analyze_brf14_multiview_overlap.py"
+      - "docs/research/BRF-21-PAIRWISE-IMAGE-OVERLAP.md"
   workflow_dispatch:
 
 permissions:
@@ -42,7 +45,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install pinned image-review dependency
-        run: python -m pip install --disable-pip-version-check "Pillow==11.3.0"
+        run: python -m pip install --disable-pip-version-check "numpy==2.2.6" "opencv-python-headless==4.11.0.86" "Pillow==11.3.0"
 
       - name: Test fail-closed multi-view byte verifier
         run: node --test tests/brf14-multiview-source-intake.test.mjs
@@ -52,6 +55,12 @@ jobs:
 
       - name: Test human-review packet and fail-closed gates
         run: python -m unittest discover -s tests -p "test_prepare_brf14_multiview_review.py"
+
+      - name: Test pairwise image-overlap triage and fail-closed gates
+        run: python -m unittest discover -s tests -p "test_analyze_brf14_multiview_overlap.py"
+
+      - name: Validate overlap analyzer CLI
+        run: python scripts/analyze_brf14_multiview_overlap.py --help
 
       - name: Download selected images to ephemeral runner storage
         shell: bash
@@ -85,6 +94,14 @@ jobs:
             --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
             --output-dir artifacts/brf-14
 
+      - name: Analyze pairwise feature overlap for human triage
+        run: |
+          python scripts/analyze_brf14_multiview_overlap.py \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+            --output-dir artifacts/brf-14
+
       - name: Upload derived review artifacts only (never raw images)
         uses: actions/upload-artifact@v4
         with:
@@ -94,5 +111,7 @@ jobs:
             artifacts/brf-14/multiview-contact-sheet.png
             artifacts/brf-14/camera-angle-coverage.png
             artifacts/brf-14/multiview-review-manifest.json
+            artifacts/brf-14/pairwise-overlap-graph.png
+            artifacts/brf-14/pairwise-overlap-report.json
           if-no-files-found: error
           retention-days: 7
