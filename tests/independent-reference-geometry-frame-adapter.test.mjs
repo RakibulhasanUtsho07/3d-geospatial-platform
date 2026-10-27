@@ -40,11 +40,11 @@ test("rejects source-frame lies, non-metric scaling, arbitrary yaw and missing g
     sourceToEvaluationFrameMatrix4x4: translated,
   }), /coordinateFrameId must match/);
   const scaled = [...translated]; scaled[0] = 2;
-  assert.throws(() => validateSurveyFrameTransformMatrix4x4(scaled), /0\\/90\\/180\\/270-degree/);
+  assert.throws(() => validateSurveyFrameTransformMatrix4x4(scaled), /scale-preserving/);
   const arbitraryYaw = [...translated];
   const angle = Math.PI / 6; arbitraryYaw[0]=Math.cos(angle); arbitraryYaw[2]=-Math.sin(angle);
   arbitraryYaw[8]=Math.sin(angle); arbitraryYaw[10]=Math.cos(angle);
-  assert.throws(() => validateSurveyFrameTransformMatrix4x4(arbitraryYaw), /0\\/90\\/180\\/270-degree/);
+  assert.throws(() => validateSurveyFrameTransformMatrix4x4(arbitraryYaw), /scale-preserving/);
   delete source.footprintElevationM;
   assert.throws(() => adaptIndependentReferenceGeometry(source, {
     sourceCoordinateFrameId: "survey-local-frame-v1", evaluationCoordinateFrameId: "site-building-frame-v1",
