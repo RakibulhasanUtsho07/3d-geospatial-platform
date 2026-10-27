@@ -187,5 +187,70 @@ class FootprintImageReviewTests(unittest.TestCase):
             )
 
 
+    def test_expands_extent_to_include_candidate_and_draws_duplicate_polygon_once(self):
+        manifest, ept, crosscheck, footprints = inputs()
+        forward = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        inverse = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+        center_x, center_y = forward.transform(-93.3910, 45.0518)
+        west, south = inverse.transform(center_x - 10, center_y - 10)
+        east, north = inverse.transform(center_x + 10, center_y + 10)
+        manifest["query"]["bboxWgs84"] = [west, south, east, north]
+
+        # Move the synthetic candidate east of the original query window.
+        ring = [
+            inverse.transform(center_x + 46, center_y - 4),
+            inverse.transform(center_x + 54, center_y - 4),
+            inverse.transform(center_x + 54, center_y + 4),
+            inverse.transform(center_x + 46, center_y + 4),
+            inverse.transform(center_x + 46, center_y - 4),
+        ]
+        footprints["features"][0]["geometry"]["coordinates"] = [ring]
+        for component in ept["cameraClusterSpatialProximity"]["components"]:
+            component["xyBounds"]["min"]["x"] = center_x + 43
+            component["xyBounds"]["max"]["x"] = center_x + 49
+            component["xyBounds"]["min"]["y"] = center_y - 5
+            component["xyBounds"]["max"]["y"] = center_y + 5
+        second_ept = {
+            "componentId": "cluster-2",
+            "xyBounds": {
+                "min": {"x": center_x + 50, "y": center_y - 5},
+                "max": {"x": center_x + 56, "y": center_y + 5},
+            },
+        }
+        ept["cameraClusterSpatialProximity"]["components"].append(second_ept)
+        second_report = {
+            "componentId": "cluster-2",
+            "candidates": [{
+                "sourceFeatureIndex": 0,
+                "featureId": "overture-building-1",
+                "distanceToComponentAabbM": 0.0,
+                "intersectionAreaM2": 20.0,
+                "intersectsComponentAabb": True,
+            }],
+        }
+        crosscheck["components"].append(second_report)
+
+        original_extent = MODULE.projected_extent((west, south, east, north))
+        expanded_extent = MODULE.review_extent_3857(
+            (west, south, east, north), ept, crosscheck, footprints, 800, 1400
+        )
+        self.assertGreater(expanded_extent[2], original_extent[2] + 25)
+
+        overlay, report = MODULE.build_review_artifacts(
+            manifest, ept, crosscheck, footprints, png_bytes(),
+            imagery_url="https://imagery.nationalmap.gov/example",
+            input_hashes={"manifestSha256": "b" * 64},
+            retrieved_at_utc="2026-10-27T14:00:00Z",
+        )
+        self.assertEqual(report["overlay"]["candidatePolygonCount"], 1)
+        self.assertEqual(report["overlay"]["candidatePairCount"], 2)
+        self.assertGreater(
+            report["imagery"]["extentBounds"][2],
+            report["imagery"]["inputQueryExtentBounds"][2] + 25,
+        )
+        self.assertEqual(len(report["overlay"]["candidateLabels"]), 1)
+        self.assertEqual(report["overlay"]["candidateLabels"]["F1"]["featureId"], "overture-building-1")
+
+
 if __name__ == "__main__":
     unittest.main()
