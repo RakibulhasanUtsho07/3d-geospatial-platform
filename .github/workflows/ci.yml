@@ -262,6 +262,10 @@ jobs:
         run: node --test tests/brf14-multiview-source-intake.test.mjs
       - name: Validate BRF-14 multi-view source verifier CLI
         run: node scripts/verify-brf14-multiview-source.mjs --help
+      - name: Test BRF-15 MnGeo flight-swath work-unit discovery
+        run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
+      - name: Validate BRF-15 work-unit resolver CLI
+        run: node scripts/resolve-mngeo-lidar-work-units.mjs --help
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output

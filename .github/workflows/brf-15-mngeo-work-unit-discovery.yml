@@ -1,0 +1,82 @@
+name: BRF-15 MnGeo lidar work-unit discovery
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-15-mngeo-work-unit-discovery.yml"
+      - "scripts/resolve-mngeo-lidar-work-units.mjs"
+      - "tests/resolve-mngeo-lidar-work-units.test.mjs"
+      - "docs/research/BRF-15-MNGEO-LIDAR-WORK-UNIT-DISCOVERY.md"
+  workflow_dispatch:
+    inputs:
+      latitude:
+        description: "Source sample GPS latitude (decimal degrees)"
+        required: true
+        default: "45.0518"
+        type: string
+      longitude:
+        description: "Source sample GPS longitude (decimal degrees)"
+        required: true
+        default: "-93.391"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-15-mngeo-work-unit-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover-work-units:
+    name: Query official MnGeo flight-swath metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test fail-closed MnGeo work-unit resolver
+        run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
+
+      - name: Validate resolver CLI
+        run: node scripts/resolve-mngeo-lidar-work-units.mjs --help
+
+      - name: Query sample point against the official flight-swath service
+        id: discovery
+        shell: bash
+        env:
+          SAMPLE_LATITUDE: ${{ inputs.latitude || '45.0518' }}
+          SAMPLE_LONGITUDE: ${{ inputs.longitude || '-93.391' }}
+        run: |
+          set +e
+          mkdir -p artifacts/brf-15
+          node scripts/resolve-mngeo-lidar-work-units.mjs \
+            --latitude "$SAMPLE_LATITUDE" \
+            --longitude "$SAMPLE_LONGITUDE" \
+            --report artifacts/brf-15/mngeo-work-unit-discovery.json
+          status=$?
+          echo "resolver_exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload work-unit discovery report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-15-mngeo-work-unit-discovery
+          path: artifacts/brf-15/mngeo-work-unit-discovery.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce discovery result
+        if: steps.discovery.outputs.resolver_exit_code != '0'
+        run: |
+          echo "Work-unit discovery did not pass its fail-closed checks. Inspect the uploaded JSON report."
+          exit 1
