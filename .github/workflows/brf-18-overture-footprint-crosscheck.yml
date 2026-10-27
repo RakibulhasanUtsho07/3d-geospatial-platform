@@ -1,0 +1,97 @@
+name: BRF-18 Overture building-footprint cross-check
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-18-overture-footprint-crosscheck.yml"
+      - "benchmarks/building-reconstruction/brf-18-overture-building-footprint-crosscheck.json"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json"
+      - "scripts/crosscheck-ept-components-with-building-footprints.py"
+      - "scripts/inspect-usgs-ept-reference.py"
+      - "tests/test_crosscheck_ept_components_with_building_footprints.py"
+      - "tests/test_inspect_usgs_ept_reference.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-18-overture-footprint-crosscheck
+  cancel-in-progress: true
+
+jobs:
+  crosscheck:
+    name: Cross-reference public footprints with EPT components
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pinned geospatial and Overture dependencies
+        run: python -m pip install --disable-pip-version-check "laspy[lazrs]" "pyproj==3.7.2" "numpy==2.3.3" "shapely==2.1.2" "overturemaps==1.0.2"
+
+      - name: Test EPT source and geometry inspection
+        run: python -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
+
+      - name: Test EPT-to-footprint cross-reference and fail-closed policy
+        run: python -m unittest discover -s tests -p "test_crosscheck_ept_components_with_building_footprints.py"
+
+      - name: Inspect bounded public EPT neighbourhood
+        id: ept
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/brf-18
+          python scripts/inspect-usgs-ept-reference.py \
+            --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json \
+            --multiview-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --report artifacts/brf-18/ept-report.json
+
+      - name: Download release-pinned Overture building footprints
+        id: download
+        if: steps.ept.outcome == 'success'
+        continue-on-error: true
+        run: |
+          overturemaps download \
+            --bbox=-93.3918,45.0508,-93.3902,45.0528 \
+            -f geojson \
+            --type=building \
+            --release=2026-10-21.0 \
+            -o artifacts/brf-18/overture-footprints.geojson
+          test -s artifacts/brf-18/overture-footprints.geojson
+
+      - name: Cross-reference footprint polygons with elevated-return components
+        id: crosscheck
+        if: steps.ept.outcome == 'success' && steps.download.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python scripts/crosscheck-ept-components-with-building-footprints.py \
+            --manifest benchmarks/building-reconstruction/brf-18-overture-building-footprint-crosscheck.json \
+            --ept-report artifacts/brf-18/ept-report.json \
+            --footprints artifacts/brf-18/overture-footprints.geojson \
+            --release 2026-10-21.0 \
+            --output artifacts/brf-18/footprint-crosscheck-report.json
+
+      - name: Upload derived cross-check report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-18-overture-footprint-crosscheck-report
+          path: artifacts/brf-18/footprint-crosscheck-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce source cross-check execution
+        if: always() && (steps.ept.outcome != 'success' || steps.download.outcome != 'success' || steps.crosscheck.outcome != 'success')
+        run: |
+          echo "BRF-18 cross-check did not complete. Inspect the job logs and derived report artifact when available."
+          exit 1
