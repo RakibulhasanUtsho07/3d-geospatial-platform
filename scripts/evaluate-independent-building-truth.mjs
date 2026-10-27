@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { evaluateIndependentBuildingTruth } from "../src/core/building-generation/independent-building-truth-evaluator.mjs";
+import { geometryPayloadSha256, validateGeometryExtractionProvenance } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/i;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -51,10 +52,11 @@ async function safeOutputPath(root, relative) {
   if (!resolved.startsWith(root + path.sep)) throw new TypeError("Report output resolves outside the project root.");
   return resolved;
 }
-function addArtifactCheck(report, id, passed, detail) {
-  const check = { id, status: passed ? "passed" : "failed", detail };
+function addArtifactCheck(report, id, passed, detail, failureStatus = "failed") {
+  const check = { id, status: passed ? "passed" : failureStatus, detail };
   report.checks.push(check);
-  if (!passed) report.failures.push(check);
+  if (!passed && failureStatus === "warning") report.warnings.push(check);
+  if (!passed && failureStatus === "failed") report.failures.push(check);
 }
 function refreshStatus(report) {
   report.counts = {
@@ -106,6 +108,65 @@ async function main() {
     referenceHashMatches ? "Independent reference-source bytes match the declared SHA-256." :
       "Reference-source bytes do not match the declared SHA-256; independent truth provenance is stale.");
 
+  const extractionReports = {};
+  for (const role of ["candidate", "reference"]) {
+    const item = role === "candidate" ? manifest.candidate : manifest.reference;
+    const sourceHash = role === "candidate" ? actualCandidateSha256 : actualReferenceSha256;
+    let payloadSha256 = null;
+    try {
+      payloadSha256 = geometryPayloadSha256(item);
+    } catch (error) {
+      addArtifactCheck(report, role + "-geometry-payload-hash", false,
+        error instanceof Error ? error.message : String(error));
+    }
+    const assessment = validateGeometryExtractionProvenance({
+      provenance: item.geometryExtractionProvenance,
+      sourceSha256: sourceHash,
+      geometrySha256: payloadSha256,
+      coordinateFrameId: item.coordinateFrameId,
+      units: item.units,
+      label: role,
+    });
+    for (const check of assessment.checks) {
+      addArtifactCheck(report, check.id, check.status === "passed", check.detail,
+        check.status === "warning" ? "warning" : "failed");
+    }
+    const provenance = assessment.provenance;
+    const fileResults = [];
+    if (provenance && provenance.extractor) {
+      for (const [kind, relativePath, expectedHash] of [
+        ["extractor-artifact", provenance.extractor.artifactPath, provenance.extractor.artifactSha256],
+        ["extractor-configuration", provenance.extractor.configurationPath, provenance.extractor.configurationSha256],
+      ]) {
+        try {
+          const asset = await safeRead(root, relativePath, role + " " + kind);
+          const actualHash = sha256(asset.bytes);
+          const matches = SHA256.test(expectedHash ?? "") && actualHash.toLowerCase() === expectedHash.toLowerCase();
+          const record = { kind, path: relativePath, expectedSha256: expectedHash ?? null,
+            actualSha256: actualHash, status: matches ? "passed" : "failed" };
+          fileResults.push(record);
+          artifactIntegrity.push(record);
+          addArtifactCheck(report, role + "-" + kind + "-byte-integrity", matches,
+            matches ? role + " " + kind + " bytes match the pinned SHA-256." :
+              role + " " + kind + " bytes do not match the declared extraction provenance.");
+        } catch (error) {
+          const record = { kind, path: relativePath ?? null, expectedSha256: expectedHash ?? null,
+            actualSha256: null, status: "failed", error: error instanceof Error ? error.message : String(error) };
+          fileResults.push(record);
+          artifactIntegrity.push(record);
+          addArtifactCheck(report, role + "-" + kind + "-byte-integrity", false,
+            record.error);
+        }
+      }
+    }
+    extractionReports[role] = {
+      status: assessment.status,
+      geometryPayloadSha256: payloadSha256,
+      provenance: provenance ?? null,
+      extractorFiles: fileResults,
+    };
+  }
+  report.geometryExtractionProvenance = extractionReports;
   report.assetIntegrity = artifactIntegrity;
   refreshStatus(report);
   const reportRelative = positional[1] ??
