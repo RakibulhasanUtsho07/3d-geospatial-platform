@@ -197,7 +197,11 @@
     "test:architectural-feature-proposals": "node --test tests/architectural-feature-proposals.test.mjs tests/architectural-feature-proposals-cli.test.mjs",
     "propose:architectural-features": "node scripts/propose-architectural-features.mjs",
     "test:confidence-aware-wireframe-fusion": "node --test tests/confidence-aware-wireframe-fusion.test.mjs",
-    "test:wireframe-mesh-readiness": "node --test tests/wireframe-mesh-readiness.test.mjs"
+    "test:wireframe-mesh-readiness": "node --test tests/wireframe-mesh-readiness.test.mjs",
+    "test:building-visual-evidence-package": "node --test tests/building-visual-evidence-package.test.mjs",
+    "build:building-visual-evidence-package": "node scripts/build-building-visual-evidence-package.mjs",
+    "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
+    "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

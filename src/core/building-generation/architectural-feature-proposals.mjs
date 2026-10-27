@@ -248,7 +248,10 @@ export function buildArchitecturalFeatureOverlaySvg(report) {
       !Array.isArray(report.observations)) throw new TypeError("A feature proposal report is required.");
   const colors = { "silhouette-bounds": "#ffcc00", "roofline-segment": "#ff3b30",
     "outer-corner": "#00e5ff", "floor-band": "#a855f7", "window-candidate": "#22c55e",
-    "door-candidate": "#f97316", "balcony-candidate": "#ec4899", "facade-region": "#fbbf24" };
+    "door-candidate": "#f97316", "balcony-candidate": "#ec4899", "facade-region": "#fbbf24",
+    "arch-candidate": "#38bdf8", "column-candidate": "#c084fc", "dome-candidate": "#fb7185",
+    "cornice-candidate": "#facc15", "pediment-candidate": "#a3e635",
+    "staircase-candidate": "#fb923c", "parapet-candidate": "#94a3b8", "ornament-candidate": "#f472b6" };
   const shapes = report.observations.map((item) => {
     if (!item.geometry) return "";
     const color = colors[item.category] ?? "#ffffff", geometry = item.geometry, bounds = geometryBounds(geometry);
