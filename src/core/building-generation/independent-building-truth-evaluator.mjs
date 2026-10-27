@@ -3,6 +3,7 @@ const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const TRUTH_BASES = new Set(["surveyed", "official-survey", "lidar", "cad-bim", "published-measurement", "independent-reference-mesh"]);
 const DIMENSIONS = ["widthM", "depthM", "heightM"];
 const EPSILON = 1e-9;
+const RAW_METRICS = Symbol("unrounded comparison metrics");
 
 function object(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -36,16 +37,29 @@ function percentile(values, p) {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
 }
-function statistics(values) {
+function rawStatistics(values) {
   if (!values.length) return null;
   const sum = values.reduce((total, value) => total + value, 0);
   return {
     sampleCount: values.length,
-    meanM: rounded(sum / values.length),
-    rmsM: rounded(Math.sqrt(values.reduce((total, value) => total + value * value, 0) / values.length)),
-    p95M: rounded(percentile(values, 0.95)),
-    maxM: rounded(Math.max(...values)),
+    meanM: sum / values.length,
+    rmsM: Math.sqrt(values.reduce((total, value) => total + value * value, 0) / values.length),
+    p95M: percentile(values, 0.95),
+    maxM: Math.max(...values),
   };
+}
+function statistics(values) {
+  const raw = rawStatistics(values);
+  if (!raw) return null;
+  const result = {
+    sampleCount: raw.sampleCount,
+    meanM: rounded(raw.meanM),
+    rmsM: rounded(raw.rmsM),
+    p95M: rounded(raw.p95M),
+    maxM: rounded(raw.maxM),
+  };
+  Object.defineProperty(result, RAW_METRICS, { value: raw });
+  return result;
 }
 function distance2(a, b) {
   return Math.hypot(a.x - b.x, a.z - b.z);
@@ -148,12 +162,15 @@ function compareFootprints(candidateRaw, referenceRaw, samplesPerEdge = 8) {
   const candidateToReference = boundaryDistances(sampleBoundary(candidate, samplesPerEdge), reference);
   const referenceToCandidate = boundaryDistances(sampleBoundary(reference, samplesPerEdge), candidate);
   const allDistances = [...candidateToReference, ...referenceToCandidate];
-  return {
+  const symmetricBoundary = statistics(allDistances);
+  const areaAbsoluteErrorM2 = Math.abs(candidate.areaM2 - reference.areaM2);
+  const areaRelativeErrorPercentRaw = areaAbsoluteErrorM2 / reference.areaM2 * 100;
+  const result = {
     method: "symmetric sampled boundary-to-segment distance; each edge sampled at fixed fractions",
     candidateAreaM2: rounded(candidate.areaM2),
     referenceAreaM2: rounded(reference.areaM2),
-    areaAbsoluteErrorM2: rounded(Math.abs(candidate.areaM2 - reference.areaM2)),
-    areaRelativeErrorPercent: rounded(Math.abs(candidate.areaM2 - reference.areaM2) / reference.areaM2 * 100, 3),
+    areaAbsoluteErrorM2: rounded(areaAbsoluteErrorM2),
+    areaRelativeErrorPercent: rounded(areaRelativeErrorPercentRaw, 3),
     candidatePerimeterM: rounded(candidate.perimeterM),
     referencePerimeterM: rounded(reference.perimeterM),
     centroidOffsetM: rounded(distance2(candidate.centroid, reference.centroid)),
@@ -163,11 +180,19 @@ function compareFootprints(candidateRaw, referenceRaw, samplesPerEdge = 8) {
       method: "two directed boundary samples measured to the nearest reference polygon segment",
       candidateToReference: statistics(candidateToReference),
       referenceToCandidate: statistics(referenceToCandidate),
-      symmetric: statistics(allDistances),
+      symmetric: symmetricBoundary,
     },
     sampleCount: allDistances.length,
     caveat: "Boundary distances are deterministic samples, not polygon IoU and not a continuous Hausdorff-distance proof. One simple outer ring is supported; holes are not represented.",
   };
+  Object.defineProperty(result, RAW_METRICS, {
+    value: {
+      areaRelativeErrorPercent: areaRelativeErrorPercentRaw,
+      boundaryP95M: symmetricBoundary[RAW_METRICS].p95M,
+      boundaryMaxM: symmetricBoundary[RAW_METRICS].maxM,
+    },
+  });
+  return result;
 }
 function normalizeDimensions(raw, label) {
   if (!object(raw)) throw new TypeError(label + " must be an object.");
@@ -176,19 +201,25 @@ function normalizeDimensions(raw, label) {
 function compareDimensions(candidateRaw, referenceRaw) {
   const candidate = normalizeDimensions(candidateRaw, "candidate.dimensionsM");
   const reference = normalizeDimensions(referenceRaw, "reference.dimensionsM");
-  const axes = DIMENSIONS.map((key) => {
+  const relativeErrorsRaw = DIMENSIONS.map((key) => Math.abs(candidate[key] - reference[key]) / reference[key] * 100);
+  const axes = DIMENSIONS.map((key, index) => {
     const absoluteErrorM = Math.abs(candidate[key] - reference[key]);
-    const relativeErrorPercent = absoluteErrorM / reference[key] * 100;
     return {
       dimension: key,
       candidateM: rounded(candidate[key]),
       referenceM: rounded(reference[key]),
       absoluteErrorM: rounded(absoluteErrorM),
-      relativeErrorPercent: rounded(relativeErrorPercent, 3),
+      relativeErrorPercent: rounded(relativeErrorsRaw[index], 3),
     };
   });
-  return { axes, maxRelativeErrorPercent: Math.max(...axes.map((axis) => axis.relativeErrorPercent)),
-    rmsRelativeErrorPercent: rounded(Math.sqrt(axes.reduce((sum, axis) => sum + axis.relativeErrorPercent ** 2, 0) / axes.length), 3) };
+  const maxRelativeErrorPercentRaw = Math.max(...relativeErrorsRaw);
+  const result = {
+    axes,
+    maxRelativeErrorPercent: rounded(maxRelativeErrorPercentRaw, 3),
+    rmsRelativeErrorPercent: rounded(Math.sqrt(relativeErrorsRaw.reduce((sum, value) => sum + value ** 2, 0) / relativeErrorsRaw.length), 3),
+  };
+  Object.defineProperty(result, RAW_METRICS, { value: { maxRelativeErrorPercent: maxRelativeErrorPercentRaw } });
+  return result;
 }
 function normalizeCheckPoints(raw, label, reference = false) {
   if (!Array.isArray(raw) || raw.length > 1000) throw new TypeError(label + " must be an array of at most 1000 checkpoints.");
@@ -211,24 +242,28 @@ function compareCheckPoints(candidateRaw, referenceRaw) {
   if (!reference.length) throw new TypeError("At least one independently surveyed check point is required.");
   const candidateById = new Map(candidate.map((point) => [point.id, point]));
   const referenceIds = new Set(reference.map((point) => point.id));
-  const matched = [], missingCandidatePointIds = [];
+  const matched = [], rawDistances = [], missingCandidatePointIds = [];
   for (const referencePoint of reference) {
     const modelPoint = candidateById.get(referencePoint.id);
     if (!modelPoint) { missingCandidatePointIds.push(referencePoint.id); continue; }
+    const dxM = modelPoint.x - referencePoint.x;
+    const dyM = modelPoint.y - referencePoint.y;
+    const dzM = modelPoint.z - referencePoint.z;
+    const errorM = Math.hypot(dxM, dyM, dzM);
+    rawDistances.push(errorM);
     matched.push({
       id: referencePoint.id,
-      dxM: rounded(modelPoint.x - referencePoint.x),
-      dyM: rounded(modelPoint.y - referencePoint.y),
-      dzM: rounded(modelPoint.z - referencePoint.z),
-      errorM: rounded(Math.hypot(modelPoint.x - referencePoint.x, modelPoint.y - referencePoint.y, modelPoint.z - referencePoint.z)),
+      dxM: rounded(dxM),
+      dyM: rounded(dyM),
+      dzM: rounded(dzM),
+      errorM: rounded(errorM),
     });
   }
   const extraCandidatePointIds = candidate.filter((point) => !referenceIds.has(point.id)).map((point) => point.id);
-  const distances = matched.map((point) => point.errorM);
   if (!matched.length) throw new TypeError("No candidate checkpoint IDs match independent reference checkpoints.");
   return { method: "3D Euclidean residual at held-out check points; check points must not be used for fitting",
     matchedPointCount: matched.length, referencePointCount: reference.length, candidatePointCount: candidate.length,
-    missingCandidatePointIds, extraCandidatePointIds, points: matched, residuals: statistics(distances) };
+    missingCandidatePointIds, extraCandidatePointIds, points: matched, residuals: statistics(rawDistances) };
 }
 function vec3(raw, label) {
   if (!Array.isArray(raw) || raw.length !== 3) throw new TypeError(label + " must be a [x,y,z] tuple.");
@@ -349,18 +384,21 @@ function compareSurfaceMeshes(candidateRaw, referenceRaw, candidateGlbSha256, re
   const referenceToCandidate = vertexToSurface(reference.vertices, candidateBvh);
   const all = [...candidateToReference, ...referenceToCandidate];
   const directionalCandidate = statistics(candidateToReference), directionalReference = statistics(referenceToCandidate);
+  const symmetricRaw = rawStatistics(all);
+  const symmetric = {
+    sampleCount: all.length,
+    meanM: rounded(symmetricRaw.meanM),
+    rmsM: rounded(symmetricRaw.rmsM),
+    p95M: rounded(symmetricRaw.p95M),
+    maxM: rounded(symmetricRaw.maxM),
+  };
+  Object.defineProperty(symmetric, RAW_METRICS, { value: symmetricRaw });
   return {
     method: "symmetric nearest-triangle distance sampled at vertices of both meshes using a bounding-volume hierarchy",
     candidateVertexCount: candidate.vertices.length, candidateTriangleCount: candidate.triangles.length,
     referenceVertexCount: reference.vertices.length, referenceTriangleCount: reference.triangles.length,
     candidateToReference: directionalCandidate, referenceToCandidate: directionalReference,
-    symmetric: {
-      sampleCount: all.length,
-      meanM: rounded(all.reduce((sum, value) => sum + value, 0) / all.length),
-      rmsM: rounded(Math.sqrt(all.reduce((sum, value) => sum + value * value, 0) / all.length)),
-      p95M: rounded(percentile(all, 0.95)),
-      maxM: rounded(Math.max(...all)),
-    },
+    symmetric,
     caveat: "This is vertex-sampled nearest-triangle distance, not continuous signed Hausdorff distance; triangle interiors are not uniformly sampled and surface completeness/topology require separate review.",
   };
 }
@@ -372,12 +410,12 @@ function thresholdValue(tolerances, key, label, record) {
   }
   return value;
 }
-function addMetricThreshold(record, tolerances, key, label, value, unit) {
+function addMetricThreshold(record, tolerances, key, label, displayValue, unit, comparisonValue = displayValue) {
   const limit = thresholdValue(tolerances, key, label, record);
   if (limit === null) return null;
-  const passed = value <= limit;
+  const passed = comparisonValue <= limit;
   record(label + "-within-tolerance", passed,
-    label + " = " + value + unit + "; configured tolerance = " + limit + unit + ".");
+    label + " = " + displayValue + unit + "; configured tolerance = " + limit + unit + ".");
   return { limit, passed };
 }
 
@@ -437,11 +475,11 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       record("footprint-geometry-computed", true,
         "Compared simple footprint rings using area, perimeter, centroid offset and symmetric sampled boundary distance.");
       addMetricThreshold(record, toleranceConfiguration, "footprintAreaRelativeErrorPercent",
-        "footprint-area-relative-error", footprint.areaRelativeErrorPercent, "%");
+        "footprint-area-relative-error", footprint.areaRelativeErrorPercent, "%", footprint[RAW_METRICS].areaRelativeErrorPercent);
       addMetricThreshold(record, toleranceConfiguration, "footprintBoundaryP95M",
-        "footprint-boundary-p95", footprint.boundaryDistance.symmetric.p95M, " m");
+        "footprint-boundary-p95", footprint.boundaryDistance.symmetric.p95M, " m", footprint[RAW_METRICS].boundaryP95M);
       addMetricThreshold(record, toleranceConfiguration, "footprintBoundaryMaxM",
-        "footprint-boundary-max", footprint.boundaryDistance.symmetric.maxM, " m");
+        "footprint-boundary-max", footprint.boundaryDistance.symmetric.maxM, " m", footprint[RAW_METRICS].boundaryMaxM);
     } catch (error) {
       record("footprint-geometry-valid", false, error instanceof Error ? error.message : String(error));
     }
@@ -454,7 +492,7 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       record("independent-dimensions-computed", true,
         "Width, depth and height are compared individually in metres; axis convention must match the declared frame.");
       addMetricThreshold(record, toleranceConfiguration, "dimensionRelativeErrorPercent",
-        "dimension-relative-error-max", rounded(dimensions.maxRelativeErrorPercent, 3), "%");
+        "dimension-relative-error-max", dimensions.maxRelativeErrorPercent, "%", dimensions[RAW_METRICS].maxRelativeErrorPercent);
     } catch (error) {
       record("independent-dimensions-valid", false, error instanceof Error ? error.message : String(error));
     }
@@ -477,9 +515,9 @@ export function evaluateIndependentBuildingTruth(input = {}) {
           "Candidate contains unmatched checkpoint IDs: " + checkPoints.extraCandidatePointIds.join(", ") + ".");
       }
       addMetricThreshold(record, toleranceConfiguration, "checkPointRmseM",
-        "check-point-rmse", checkPoints.residuals.rmsM, " m");
+        "check-point-rmse", checkPoints.residuals.rmsM, " m", checkPoints.residuals[RAW_METRICS].rmsM);
       addMetricThreshold(record, toleranceConfiguration, "checkPointMaxM",
-        "check-point-max", checkPoints.residuals.maxM, " m");
+        "check-point-max", checkPoints.residuals.maxM, " m", checkPoints.residuals[RAW_METRICS].maxM);
     } catch (error) {
       record("check-points-valid", false, error instanceof Error ? error.message : String(error));
     }
@@ -495,9 +533,9 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       record("surface-distance-computed", true,
         "Computed symmetric vertex-sampled nearest-triangle distances with exact source-hash bindings.");
       addMetricThreshold(record, toleranceConfiguration, "surfaceDistanceP95M",
-        "surface-distance-p95", surfaceDistance.symmetric.p95M, " m");
+        "surface-distance-p95", surfaceDistance.symmetric.p95M, " m", surfaceDistance.symmetric[RAW_METRICS].p95M);
       addMetricThreshold(record, toleranceConfiguration, "surfaceDistanceMaxM",
-        "surface-distance-max", surfaceDistance.symmetric.maxM, " m");
+        "surface-distance-max", surfaceDistance.symmetric.maxM, " m", surfaceDistance.symmetric[RAW_METRICS].maxM);
     } catch (error) {
       record("surface-distance-valid", false, error instanceof Error ? error.message : String(error));
     }
