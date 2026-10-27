@@ -127,6 +127,41 @@ test("missing survey evidence is incomplete rather than a false accuracy pass", 
   const result = assessBuildingAccuracyEvidencePack(pack([item, building("house", "ordinary-low-rise")]));
   assert.equal(result.status, "benchmark-incomplete");
 });
+test("required independent-truth evaluation stays incomplete until a report is pinned and bound", () => {
+  const missing = building("landmark", "complex-landmark", {
+    requireIndependentTruthEvaluation: true,
+    independentTruthEvidence: { supplied: false, required: true, status: "missing" },
+  });
+  const missingResult = assessBuildingAccuracyEvidencePack(pack([
+    missing, building("house", "ordinary-low-rise"),
+  ]));
+  assert.equal(missingResult.status, "benchmark-incomplete");
+  assert.ok(missingResult.buildings[0].checks.some((check) =>
+    check.id === "independent-truth-geometry-evaluation" && check.status === "warning"));
+
+  const reportHash = hash(12345);
+  const pinned = building("landmark", "complex-landmark", {
+    requireIndependentTruthEvaluation: true,
+    independentTruthEvidence: {
+      supplied: true, required: true, verified: true,
+      path: "reports/landmark-independent-truth.json",
+      sha256: reportHash, expectedSha256: reportHash,
+    },
+  });
+  pinned.benchmarkReport.checks.push(
+    { id: "independent-truth-report-valid", status: "passed" },
+    { id: "independent-truth-report-candidate-binding", status: "passed" },
+    { id: "independent-truth-report-byte-integrity", status: "passed" },
+    { id: "independent-truth-report-status", status: "passed" },
+  );
+  const pinnedResult = assessBuildingAccuracyEvidencePack(pack([
+    pinned, building("house", "ordinary-low-rise"),
+  ]));
+  assert.equal(pinnedResult.status, "benchmark-passed-review-required");
+  assert.ok(pinnedResult.buildings[0].checks.some((check) =>
+    check.id === "independent-truth-geometry-evaluation" && check.status === "passed"));
+});
+
 test("rejects wrong pilot size, duplicate ids and invalid timestamps", () => {
   assert.throws(() => assessBuildingAccuracyEvidencePack({ packId: "x", generatedAt: date, buildings: [] }), /2 or 3 buildings/);
   assert.throws(() => assessBuildingAccuracyEvidencePack(pack([building("same", "complex-landmark"), building("same", "ordinary-low-rise")])), /duplicate buildingId/);
