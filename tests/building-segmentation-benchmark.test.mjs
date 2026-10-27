@@ -55,7 +55,7 @@ test("rejects capture-burst leakage, unsafe paths and stale model input hashes",
   assert.ok(validateSegmentationBenchmarkManifest(leaked).issues.some((x) => x.code === "capture-group-split-leakage"));
 
   const sameBuildingAcrossCaptures = manifest([
-    sample("dev-01", "development", "capture-front", "ahsan-manzil"),
+    sample("dev-01", "development", "capture-front", "Ahsan-Manzil"),
     sample("heldout-01", "held-out-evaluation", "capture-oblique", "ahsan-manzil"),
   ]);
   const buildingLeak = validateSegmentationBenchmarkManifest(sameBuildingAcrossCaptures);
