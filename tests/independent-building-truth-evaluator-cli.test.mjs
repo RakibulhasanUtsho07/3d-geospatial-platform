@@ -79,7 +79,7 @@ test("verifies exact candidate/reference bytes and writes a review-required repo
 test("rejects Windows backslash paths before reading evidence", async (t) => {
   const { root } = await setup(t);
   const manifest = makeManifest();
-  manifest.candidate.glbPath = "evidence\\\\candidate.glb";
+  manifest.candidate.glbPath = "evidence\\candidate.glb";
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
   const execution = run(root, "unsafe-path-report.json");
   assert.equal(execution.status, 1);
