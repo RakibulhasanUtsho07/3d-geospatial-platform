@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/brf-16-central-mississippi-ept-inspection.yml"
       - "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
       - "scripts/inspect-usgs-ept-reference.py"
       - "tests/test_inspect_usgs_ept_reference.py"
       - "docs/research/BRF-16-USGS-TNM-LIDAR-PRODUCT-DISCOVERY.md"
@@ -46,6 +47,7 @@ jobs:
           mkdir -p artifacts/brf-16
           python scripts/inspect-usgs-ept-reference.py \
             --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json \
+            --multiview-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
             --report artifacts/brf-16/central-mississippi-ept-reference-report.json
 
       - name: Upload report only (never upload point-node bytes)

@@ -138,6 +138,60 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
         self.assertIn("no-building-label-or-supported-elevated-unclassified-surface-within-sample-radius", blockers)
         self.assertIn("one-or-more-selected-ept-nodes-were-not-completely-inspected", blockers)
 
+    def test_camera_gps_proximity_is_reported_against_component_aabbs(self):
+        camera_points = [
+            {"viewId": "view-inside", "filename": "a.jpg", "projectedX": 5.0, "projectedY": 5.0},
+            {"viewId": "view-near", "filename": "b.jpg", "projectedX": 12.0, "projectedY": 5.0},
+            {"viewId": "view-second", "filename": "c.jpg", "projectedX": 25.0, "projectedY": 25.0},
+        ]
+        components = [
+            {
+                "componentId": "roof-like-a",
+                "pointCount": 80,
+                "occupiedGridCells": 20,
+                "centroidXY": {"x": 5.0, "y": 5.0},
+                "xyBounds": {
+                    "min": {"x": 0.0, "y": 0.0},
+                    "max": {"x": 10.0, "y": 10.0},
+                },
+            },
+            {
+                "componentId": "roof-like-b",
+                "pointCount": 40,
+                "occupiedGridCells": 10,
+                "centroidXY": {"x": 25.0, "y": 25.0},
+                "xyBounds": {
+                    "min": {"x": 20.0, "y": 20.0},
+                    "max": {"x": 30.0, "y": 30.0},
+                },
+            },
+        ]
+        report = MODULE.summarize_camera_cluster_proximity(camera_points, components, 10.0)
+        self.assertEqual(report["viewCount"], 3)
+        self.assertEqual(report["componentCount"], 2)
+        self.assertEqual(report["cameraViewsInsideAnyComponentAabb"], 2)
+        self.assertEqual(report["cameraViewsWithinThresholdOfNearestComponentAabb"], 3)
+        self.assertEqual(report["views"][0]["nearestComponent"]["componentId"], "roof-like-a")
+        self.assertEqual(report["views"][0]["nearestComponent"]["distanceToAabbM"], 0.0)
+        self.assertTrue(report["views"][0]["nearestComponent"]["insideAxisAlignedBoundingBox"])
+        self.assertAlmostEqual(report["views"][1]["nearestComponent"]["distanceToAabbM"], 2.0)
+        self.assertEqual(report["views"][2]["nearestComponent"]["componentId"], "roof-like-b")
+        self.assertEqual(report["components"][0]["cameraViewCountInsideAabb"], 1)
+        self.assertEqual(report["components"][0]["cameraViewsInsideAabb"], ["view-inside"])
+        self.assertFalse(report["sameBuildingIdentityVerified"])
+        self.assertFalse(report["acceptanceEligible"])
+        self.assertTrue(any("not building-footprint polygons" in item for item in report["limitations"]))
+
+    def test_camera_gps_proximity_rejects_invalid_component_bounds(self):
+        camera_points = [{"viewId": "v1", "projectedX": 1.0, "projectedY": 1.0}]
+        bad_components = [{
+            "componentId": "invalid",
+            "centroidXY": {"x": 0.0, "y": 0.0},
+            "xyBounds": {"min": {"x": 5.0, "y": 1.0}, "max": {"x": 2.0, "y": 4.0}},
+        }]
+        with self.assertRaisesRegex(ValueError, "invalid/non-finite XY"):
+            MODULE.summarize_camera_cluster_proximity(camera_points, bad_components)
+
     def test_elevated_returns_are_reported_as_separate_connected_components(self):
         points = [
             (0.1, 0.1, 8.0, 4.0),
