@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { geometryPayloadSha256 } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,8 @@ const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const reviewedAt = "2026-10-26T10:00:00Z";
 const candidateBytes = Buffer.from("candidate GLB byte-integrity fixture; structural QA is a separate check");
 const referenceBytes = Buffer.from("independent survey source byte-integrity fixture");
+const extractorBytes = Buffer.from("reproducible geometry extractor source fixture");
+const extractorConfigBytes = Buffer.from(JSON.stringify({ units: "m", frame: "site-local-enu-01" }));
 
 function polygon() {
   return [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }, { x: 0, z: 2 }];
@@ -25,7 +28,7 @@ function checkPoints() {
 function makeManifest() {
   const glbSha256 = hash(candidateBytes);
   const sourceSha256 = hash(referenceBytes);
-  return {
+  const manifest = {
     schemaVersion: "1.0.0", evaluationId: "cli-site-eval-01", buildingId: "cli-site-building",
     generatedAt: "2026-10-27T08:00:00Z",
     candidate: {
@@ -46,13 +49,40 @@ function makeManifest() {
       dimensionRelativeErrorPercent: 5, checkPointRmseM: 0.1, checkPointMaxM: 0.2,
     },
   };
+  for (const [role, sourceHash] of [["candidate", glbSha256], ["reference", sourceSha256]]) {
+    const geometry = manifest[role];
+    geometry.geometryExtractionProvenance = {
+      schemaVersion: "1.0.0",
+      extractionRunId: role + "-extract-run-01",
+      method: "fixture-extractor-v1",
+      extractedAt: reviewedAt,
+      inputArtifactSha256: sourceHash,
+      outputGeometrySha256: geometryPayloadSha256(geometry),
+      coordinateFrameId: geometry.coordinateFrameId,
+      units: geometry.units,
+      extractor: {
+        id: "fixture-geometry-extractor",
+        version: "1.0.0",
+        commitSha: "1234567890abcdef1234567890abcdef12345678",
+        artifactPath: "tools/geometry-extractor.mjs",
+        artifactSha256: hash(extractorBytes),
+        configurationPath: "configs/geometry-extractor.json",
+        configurationSha256: hash(extractorConfigBytes),
+      },
+    };
+  }
+  return manifest;
 }
 async function setup(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "independent-building-truth-cli-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, "evidence"));
+  await mkdir(path.join(root, "tools"));
+  await mkdir(path.join(root, "configs"));
   await writeFile(path.join(root, "evidence/candidate.glb"), candidateBytes);
   await writeFile(path.join(root, "evidence/survey.json"), referenceBytes);
+  await writeFile(path.join(root, "tools/geometry-extractor.mjs"), extractorBytes);
+  await writeFile(path.join(root, "configs/geometry-extractor.json"), extractorConfigBytes);
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(makeManifest(), null, 2));
   return { root };
 }
