@@ -5,8 +5,6 @@ import unittest
 from pathlib import Path
 
 from pyproj import Transformer
-from shapely.geometry import Polygon
-from shapely.ops import transform as transform_geometry
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "crosscheck-ept-components-with-building-footprints.py"
@@ -98,7 +96,7 @@ class CrosscheckEptFootprintsTests(unittest.TestCase):
     def test_empty_footprint_result_is_a_fail_closed_status(self):
         report = MODULE.build_report(manifest_data(), ept_report(), footprints(), "2026-10-21.0")
         self.assertEqual(report["status"], "no-footprints-returned")
-        self.assertFalse(report["sameBuildingIdentityVerified"] if "sameBuildingIdentityVerified" in report else report["identityReview"]["sameBuildingIdentityVerified"])
+        self.assertFalse(report["identityReview"]["sameBuildingIdentityVerified"])
         self.assertFalse(report["acceptanceEligible"])
 
     def test_invalid_and_unsupported_footprints_are_counted_not_repaired(self):
