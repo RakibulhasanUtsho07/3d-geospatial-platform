@@ -35,6 +35,20 @@ test("validates versioned source/label provenance and a held-out capture-group s
   assert.equal(report.issues.length, 0);
 });
 
+test("requires a stable physical-building ID for independent holdout evaluation", () => {
+  const missing = manifest();
+  delete missing.samples[1].buildingGroupId;
+  const missingReport = validateSegmentationBenchmarkManifest(missing);
+  assert.equal(missingReport.status, "failed");
+  assert.ok(missingReport.issues.some((item) => item.code === "building-group-id-invalid"));
+
+  const malformed = manifest();
+  malformed.samples[1].buildingGroupId = "../same-building";
+  const malformedReport = validateSegmentationBenchmarkManifest(malformed);
+  assert.equal(malformedReport.status, "failed");
+  assert.ok(malformedReport.issues.some((item) => item.code === "building-group-id-invalid"));
+});
+
 test("rejects capture-burst leakage, unsafe paths and stale model input hashes", () => {
   const leaked = manifest([sample("dev-01", "development", "burst-a"), sample("test-01", "held-out-evaluation", "burst-a")]);
   assert.equal(validateSegmentationBenchmarkManifest(leaked).status, "failed");
