@@ -266,6 +266,18 @@ jobs:
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
         run: node scripts/resolve-mngeo-lidar-work-units.mjs --help
+      - name: Test BRF-16 USGS TNM point-cloud product discovery
+        run: node --test tests/discover-usgs-tnm-lidar-products.test.mjs
+      - name: Validate BRF-16 TNM product discovery CLI
+        run: node scripts/discover-usgs-tnm-lidar-products.mjs --help
+      - name: Test BRF-16 exact LAZ tile manifest and path integrity
+        run: python3 -m unittest discover -s tests -p "test_inspect_usgs_laz_tile.py"
+      - name: Validate BRF-16 LAZ header inspector syntax
+        run: python3 -m py_compile scripts/inspect-usgs-laz-tile.py
+      - name: Test BRF-16 public EPT metadata, URL trust and node bounds
+        run: python3 -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
+      - name: Validate BRF-16 EPT inspector syntax
+        run: python3 -m py_compile scripts/inspect-usgs-ept-reference.py
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output

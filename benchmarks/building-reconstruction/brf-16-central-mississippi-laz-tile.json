@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf-16-central-mississippi-block4-tile-4690-49885",
+  "evaluationStage": "candidate-independent-reference-laz-intake-only",
+  "dataset": {
+    "title": "USGS Lidar Point Cloud MN_CentralMissRiver_B22 4690_49885",
+    "datasetName": "Lidar Point Cloud (LPC)",
+    "sourceService": "https://tnmaccess.nationalmap.gov/api/v1/products",
+    "sourceId": "65078ad9d34eb6693be8c524",
+    "sourceName": "ScienceBase",
+    "publicationDate": "2023-09-14",
+    "lastUpdated": "2023-09-17T19:40:57.627-06:00",
+    "sourceProject": "MN_CentralMissRiver_B22",
+    "workUnit": "MN_CentralMissRiver_4_B22",
+    "tileId": "4690_49885",
+    "format": "LAZ",
+    "downloadUrl": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/MN_CentralMissRiver_B22/MN_CentralMissRiver_4_B22/LAZ/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz",
+    "metadataUrl": "https://www.sciencebase.gov/catalog/item/65078ad9d34eb6693be8c524",
+    "vendorMetadataUrl": "https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/metadata/MN_CentralMissRiver_B22/MN_CentralMissRiver_4_B22",
+    "declaredLicense": "USGS 3DEP data product; public-domain U.S. Government data terms. Confirm the linked product metadata terms before publication of derivative deliverables.",
+    "licenseScope": "Data-source terms for the downloaded USGS LAZ; does not authorize branding/trademarks or establish survey independence.",
+    "expectedByteSize": 83659396,
+    "expectedSha256": null,
+    "expectedSha256Status": "not-yet-captured",
+    "fileName": "USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
+  },
+  "coverage": {
+    "sourceCatalogBoundsWgs84": [
+      -93.3936931281,
+      45.0492784113,
+      -93.3873130068,
+      45.0538008501
+    ],
+    "boundsSource": "USGS TNM Access API product boundingBox",
+    "sourceCatalogBoundsIntersectSearchBbox": true,
+    "samplePoint": {
+      "longitude": -93.391,
+      "latitude": 45.0518,
+      "inputSpatialReference": "EPSG:4326"
+    },
+    "samplePointRole": "source-capture GPS location proxy for checking the tile frame; not a surveyed building control point"
+  },
+  "coordinateFrameExpectation": {
+    "inheritedWorkUnitHorizontalCrs": "NAD83(2011) / UTM zone 15N",
+    "inheritedWorkUnitHorizontalEpsg": 6344,
+    "inheritedWorkUnitLinearUnits": "metre",
+    "inheritedWorkUnitVerticalDatum": "NAVD88 Geoid18",
+    "inheritedWorkUnitVerticalUnits": "metre",
+    "basis": "Linked Central Mississippi Work Unit 4 bare-earth DEM metadata describes these project settings. This is a hypothesis for the LAZ header, not proof of the exact tile header.",
+    "headerMustBeIndependentlyInspected": true
+  },
+  "maximumDownloadBytes": 100000000,
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false,
+  "limitations": [
+    "A source-catalog bounding box intersecting the capture point does not prove the specific building has sufficient point returns.",
+    "No point-cloud file SHA-256 is supplied by the TNM catalog; the first verified download will capture an observed hash, then the source manifest will pin it for repeatability.",
+    "The linked work-unit DEM is bare-earth, so it is not a building roof/facade reference. This manifest targets the separate LAZ tile.",
+    "No candidate GLB, GPS-to-COLMAP transform, survey control points or held-out geometry metrics have been produced.",
+    "A header that declares a compatible CRS still requires an explicit metric frame registration and independent held-out checks before any accuracy claim."
+  ]
+}
