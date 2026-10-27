@@ -281,7 +281,7 @@ def inspect_ept_reference(
     sample = coverage["samplePoint"]
     target_x, target_y = transformer.transform(float(sample["longitude"]), float(sample["latitude"]))
     if not (bounds[0] <= target_x <= bounds[3] and bounds[1] <= target_y <= bounds[4]):
-        return {
+        out_of_bounds_report = {
             "schemaVersion": "1.0.0",
             "sampleId": manifest["sampleId"],
             "status": "sample-outside-ept-bounds",
@@ -299,6 +299,12 @@ def inspect_ept_reference(
             "mapReady": False,
             "automaticApproval": False,
         }
+        if report_path:
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            with report_path.open("x", encoding="utf-8") as handle:
+                json.dump(out_of_bounds_report, handle, indent=2)
+                handle.write("\\n")
+        return out_of_bounds_report
 
     query_bounds = [target_x - radius, target_y - radius, target_x + radius, target_y + radius]
     hierarchy_hashes: dict[str, str] = {}
