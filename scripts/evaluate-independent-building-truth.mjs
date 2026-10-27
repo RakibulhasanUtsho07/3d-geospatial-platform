@@ -8,7 +8,7 @@ const SHA256 = /^[a-f0-9]{64}$/i;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function safeRelative(value, label) {
-  if (typeof value !== "string" || !value.trim() || value.includes("\\\\") ||
+  if (typeof value !== "string" || !value.trim() || value.includes("\\") ||
       value.startsWith("/") || /^[a-z]:/i.test(value) ||
       value.split("/").some((part) => !part || part === "." || part === "..")) {
     throw new TypeError(label + " must be a safe project-relative path.");
