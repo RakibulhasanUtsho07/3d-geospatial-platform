@@ -188,6 +188,8 @@
     "test:bangabhaban-reference-pack": "node --test tests/bangabhaban-reference-pack.test.mjs",
     "fetch:bangabhaban-reference": "node scripts/fetch-bangabhaban-reference.mjs",
     "fetch:ahsan-manzil-reference-pack": "node scripts/fetch-ahsan-manzil-reference-pack.mjs",
+    "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
+    "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs",
     "test:ahsan-manzil-reference-pack": "node --test tests/ahsan-manzil-reference-pack.test.mjs",
     "audit:ahsan-manzil-topology": "node scripts/build-ahsan-manzil-topology-audit.mjs",
     "test:ahsan-manzil-topology-audit": "node --test tests/ahsan-manzil-topology-audit.test.mjs",
