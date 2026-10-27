@@ -59,6 +59,7 @@ test("prepares a manifest from exact GLB bytes and independently supplied refere
     {id:"survey-check-03",x:13,y:4,z:26}
   ]);
   assert.equal(manifest.candidate.geometryExtractionProvenance.extractor.artifactPath,"src/core/building-generation/glb-geometry-extraction.mjs");
+  assert.equal(manifest.reference.geometryExtractionProvenance.extractor.artifactPath,"src/core/building-generation/independent-reference-geometry-adapter.mjs");
   assert.equal(manifest.reference.coordinateFrameId,"test-building-frame-y-up-v1");
   assert.deepEqual(manifest.reference.footprint,[{x:11,z:22},{x:13,z:22},{x:13,z:26},{x:11,z:26}]);
   assert.deepEqual(manifest.reference.surfaceMesh.vertices[6],[13,4,26]);
@@ -71,6 +72,7 @@ test("prepares a manifest from exact GLB bytes and independently supplied refere
   assert.equal(report.geometryExtractionProvenance.candidate.status,"passed");
   assert.equal(report.geometryExtractionProvenance.reference.status,"passed");
   assert.equal(report.assetIntegrity.every(item=>item.status==="passed"),true);
+  assert.ok(report.checks.some(check=>check.id==="reference-extractor-artifact-byte-integrity"&&check.status==="passed"));
   assert.equal(report.policy.acceptanceEligible,false);
   assert.equal(report.policy.publicationEligible,false);
   assert.equal(report.policy.mapReady,false);
