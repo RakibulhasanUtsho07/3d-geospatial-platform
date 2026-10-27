@@ -82,3 +82,25 @@ After downloading the sixteen manifest-listed JPEGs to ephemeral runner storage 
 Only the verifier report, PNG contact sheet, PNG angle plot and JSON review manifest are eligible for upload. Raw images remain in runner temporary storage and are not uploaded.
 
 The packet is deliberately **not** a COLMAP run. A reviewer must record same-building identity, visual overlap, occlusion/coverage and the source up-axis before the current reconstruction CLI's explicit confirmation flags can be supplied. The imagery licence remains source-declared and has not been independently authenticated; the packet does not approve rights or survey accuracy.
+
+
+## BRF-21 — Pairwise image-feature overlap triage
+
+Tracking: [Issue #224](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/224). The BRF-14 workflow now additionally computes a pairwise local-feature matching graph after the exact-byte verifier and BRF-20 review-packet generator have succeeded.
+
+The analyzer downsizes images to a fixed maximum dimension and uses pinned OpenCV ORB features, ratio-filtered Hamming matches, and homography/fundamental-matrix RANSAC support. Every unordered pair appears once in `pairwise-overlap-report.json`; each pair records both source IDs and hashes, keypoint/match counts, the selected geometric model, inlier count/ratio, whether it crosses the configured **triage** threshold, and the reason if it does not. `pairwise-overlap-graph.png` shows all views and the candidate/weak-edge graph.
+
+Run it on the same temporary image directory and exact BRF-14 verification report:
+
+```sh
+python -m pip install "numpy==2.2.6" "opencv-python-headless==4.11.0.86" "Pillow==11.3.0"
+python scripts/analyze_brf14_multiview_overlap.py \
+  --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+  --asset-root path/to/downloaded-images \
+  --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+  --output-dir artifacts/brf-14
+```
+
+A highlighted edge means only that local descriptors and a geometric model found enough consistent correspondences for a reviewer to inspect. It may match roof texture, pavement, grass, repeated façade panels, or occluders. A weak/no edge is also ambiguous because viewpoint changes, blur, lighting or occlusion can suppress matches. The graph does not establish building identity, calibrated camera poses, metric frame registration, or model accuracy.
+
+The workflow uploads the derived review PNG/JSON and byte-verification JSON only; selected raw images remain in ephemeral runner storage. The output explicitly stays `pending-human-review`, and all acceptance/publication/map/automatic-approval flags remain false. It is a triage aid, not a substitute for reviewer confirmation of identity, overlap and source up-axis.
