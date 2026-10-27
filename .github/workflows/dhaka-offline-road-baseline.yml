@@ -209,15 +209,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          branch="rakibul-hasan"
+          target="public/data/roads/dhaka-road-network-v1.json"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/data/roads/dhaka-road-network-v1.json
+          git add "$target"
           if git diff --cached --quiet; then
             echo "Bundled Dhaka road extract is unchanged; no data commit required."
             exit 0
           fi
           git commit -m "chore(data): refresh bundled Dhaka road extract"
-          git push origin HEAD:refs/heads/rakibul-hasan
+          if git push origin HEAD:"refs/heads/$branch"; then
+            exit 0
+          fi
+
+          # A different workflow/commit may advance the source branch while this
+          # expensive render benchmark is running. Rebase our single-file snapshot
+          # commit on the current remote head, then retry a normal fast-forward push.
+          # Never force-push: a same-file conflict must fail visibly for review.
+          echo "Source branch advanced during validation; fetching and rebasing the snapshot commit."
+          git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+          if ! git rebase "refs/remotes/origin/$branch"; then
+            git rebase --abort || true
+            echo "Road snapshot conflicts with new branch content; validated artifact is still uploaded for review."
+            exit 1
+          fi
+          git push origin HEAD:"refs/heads/$branch"
 
       - name: Upload the offline extract and browser evidence
         if: always()
