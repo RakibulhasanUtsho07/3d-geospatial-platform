@@ -39,7 +39,8 @@ The utility caps input and imagery sizes, validates the PNG signature and dimens
 
 ## Interpretation and boundaries
 
-- Red, cyan and amber outlines indicate ranks 1–3 from the BRF-18 cross-reference. Purple dashed boxes are EPT component AABBs; they are not roof footprints.
+- The crop extent expands to include every displayed candidate footprint and its matching EPT component AABB, then adds padding and fits the requested aspect ratio without cropping polygon edges. The original query extent remains recorded in the JSON for comparison.
+- Candidate polygons are drawn once per unique source feature. `F1`, `F2`, etc. map to source feature IDs in the review manifest; red, cyan and amber show each feature’s best observed candidate rank across components. Per-component rank pairings remain separately recorded. Purple dashed `E1`, `E2`, etc. boxes are EPT component AABBs, not roof footprints.
 - This is a map-view visual cross-reference. It does not project the footprint into the 16 oblique drone frames because a validated GPS-to-COLMAP transform and calibrated per-image projection are still absent.
 - The NAIP mosaic may not share the drone capture date. A building/roof may have changed between captures, and the service crop may not have enough resolution for small details.
 - Human review must record whether a candidate is visibly the same physical building, any ambiguity/occlusion, the reviewer, and timestamp. An image overlay alone cannot validate independent survey geometry.
