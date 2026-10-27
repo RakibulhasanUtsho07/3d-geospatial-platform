@@ -6,6 +6,7 @@ const MAX_VERTICES = 2_000_000;
 const MAX_TRIANGLES = 4_000_000;
 const MAX_REVIEW_VERTICES = 25_000;
 const MAX_REVIEW_TRIANGLES = 8_333;
+const CHECK_POINT_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 function isObject(value) {
@@ -227,6 +228,33 @@ export function extractGlbGeometry(input, options={}) {
   if(typeof options.coordinateFrameId!=="string"||!options.coordinateFrameId.trim())throw new TypeError("coordinateFrameId is required.");
   if(options.units!=="m")throw new TypeError("GLB geometry must be evaluated in metres.");
   const registration=validateAffineMatrix4x4(options.modelToEvaluationFrameMatrix4x4);
+  const rawBindings = options.checkPointBindings ?? [];
+  if (!Array.isArray(rawBindings) || rawBindings.length > 1000) throw new TypeError("checkPointBindings must contain at most 1000 entries.");
+  const bindingIds = new Set(), bindingLocators = new Set();
+  const bindings = rawBindings.map((binding, index) => {
+    if (!isObject(binding) || typeof binding.id !== "string" || !CHECK_POINT_ID.test(binding.id)) {
+      throw new TypeError("checkPointBindings[" + index + "] needs a safe ID.");
+    }
+    if (bindingIds.has(binding.id)) throw new TypeError("checkPointBindings contains a duplicate ID: " + binding.id);
+    bindingIds.add(binding.id);
+    const item = {
+      id: binding.id,
+      nodeIndex: integer(binding.nodeIndex, "checkPointBindings[" + index + "].nodeIndex"),
+      primitiveIndex: integer(binding.primitiveIndex, "checkPointBindings[" + index + "].primitiveIndex"),
+      vertexIndex: integer(binding.vertexIndex, "checkPointBindings[" + index + "].vertexIndex"),
+    };
+    const locator = item.nodeIndex + ":" + item.primitiveIndex + ":" + item.vertexIndex;
+    if (bindingLocators.has(locator)) throw new TypeError("checkPointBindings contains a duplicate GLB vertex locator: " + locator);
+    bindingLocators.add(locator);
+    return item;
+  });
+  const bindingsByPrimitive = new Map();
+  for (const binding of bindings) {
+    const key = binding.nodeIndex + ":" + binding.primitiveIndex;
+    const list = bindingsByPrimitive.get(key) ?? [];
+    list.push(binding);
+    bindingsByPrimitive.set(key, list);
+  }
   const parsed=parseGlb(input), {doc}=parsed, reader=makeReader(parsed);
   if(!Array.isArray(doc.nodes)||!doc.nodes.length||!Array.isArray(doc.meshes)||!doc.meshes.length)throw new TypeError("GLB scene nodes and meshes are required.");
   for(const node of doc.nodes)if(node?.skin!==undefined||node?.weights!==undefined)throw new TypeError("Skinned/morph animated geometry is unsupported.");
@@ -242,6 +270,7 @@ export function extractGlbGeometry(input, options={}) {
   }
   if(!roots.length)throw new TypeError("GLB scene contains no root nodes.");
   const vertices=[],triangles=[],skippedNonTrianglePrimitives=[],active=new Set(),visited=new Set();
+  const checkPointsById = new Map();
   function visit(nodeIndex,parent){
     nodeIndex=integer(nodeIndex,"scene node index");const node=doc.nodes[nodeIndex];
     if(!isObject(node))throw new TypeError("GLB scene references a missing node.");
@@ -261,7 +290,20 @@ export function extractGlbGeometry(input, options={}) {
         const positions=reader.positions(primitive.attributes.POSITION,label),ids=reader.indices(primitive.indices,positions.length,label);
         const localTriangles=triangulate(ids,mode,label);
         if(localTriangles.length>MAX_TRIANGLES)throw new RangeError(label+" exceeds triangle safety limit.");
-        const needed=[...new Set(localTriangles.flat())].sort((a,b)=>a-b), remap=new Map();
+        const referenced = new Set(localTriangles.flat());
+        for (const binding of bindingsByPrimitive.get(nodeIndex + ":" + pi) ?? []) {
+          if (binding.vertexIndex >= positions.length) {
+            throw new RangeError("Checkpoint " + binding.id + " is outside the primitive POSITION accessor.");
+          }
+          if (!referenced.has(binding.vertexIndex)) {
+            throw new TypeError("Checkpoint " + binding.id + " must bind a vertex referenced by a rendered triangle.");
+          }
+          checkPointsById.set(binding.id, {
+            id: binding.id,
+            ...transformPoint(frame, positions[binding.vertexIndex], label + " checkpoint " + binding.id),
+          });
+        }
+        const needed=[...referenced].sort((a,b)=>a-b), remap=new Map();
         for(const index of needed){
           remap.set(index,vertices.length);vertices.push(transformPoint(frame,positions[index],label));
           if(vertices.length>MAX_VERTICES)throw new RangeError("GLB exceeds total source vertex safety limit.");
@@ -276,6 +318,11 @@ export function extractGlbGeometry(input, options={}) {
     active.delete(nodeIndex);
   }
   for(const root of roots)visit(root,IDENTITY);
+  for (const binding of bindings) {
+    if (!checkPointsById.has(binding.id)) {
+      throw new TypeError("Checkpoint " + binding.id + " does not identify a vertex in the active GLB scene.");
+    }
+  }
   if(vertices.length<3||triangles.length<1)throw new TypeError("GLB contains no supported triangle geometry.");
   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
   for(const p of vertices)for(let axis=0;axis<3;axis++){min[axis]=Math.min(min[axis],p[axis]);max[axis]=Math.max(max[axis],p[axis]);}
@@ -283,7 +330,8 @@ export function extractGlbGeometry(input, options={}) {
   if(Object.values(dimensionsM).some(v=>v<=EPSILON))throw new TypeError("Transformed GLB bounds must have positive width, height and depth.");
   const surface=sampleSurface(vertices,triangles);
   return {
-    coordinateFrameId:options.coordinateFrameId,units:"m",footprint:hullXZ(vertices),dimensionsM,checkPoints:[],
+    coordinateFrameId:options.coordinateFrameId,units:"m",footprint:hullXZ(vertices),dimensionsM,
+    checkPoints:bindings.map((binding)=>checkPointsById.get(binding.id)),
     surfaceMesh:{vertices:surface.vertices,triangles:surface.triangles},
     extractionSummary:{
       glbVersion:"2.0",coordinateFrameId:options.coordinateFrameId,units:"m",
@@ -291,6 +339,9 @@ export function extractGlbGeometry(input, options={}) {
       transformConvention:"modelToEvaluationFrameMatrix4x4 * accumulated GLB scene-node transforms",
       modelToEvaluationFrameMatrix4x4:registration,
       sourceVertexCount:vertices.length,sourceTriangleCount:triangles.length,
+      checkPointCount:bindings.length,
+      checkPointMethod:"reviewed binding to an actual GLB primitive POSITION vertex; scene and evaluation transforms applied",
+      checkPointBindings:bindings,
       surfaceSampling:surface.sampling,skippedNonTrianglePrimitives,
       footprintMethod:"convex-hull of mesh triangle vertices projected to X/Z; provisional envelope, not a surveyed wall footprint",
       dimensionsMethod:"axis-aligned extents of transformed triangle-referenced vertices in the registered frame",
