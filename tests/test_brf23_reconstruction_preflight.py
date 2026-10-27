@@ -130,7 +130,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
 
     def test_reviewed_hash_pinned_local_inputs_can_only_pass_preflight(self):
         report = self._assess()
-        self.assertEqual(report["status"], "preflight-ready-for-local-reconstruction-attempt")
+        self.assertEqual(report["status"], "preflight-ready-for-local-reconstruction-attempt", report["blockers"])
         self.assertEqual(report["assessedInputs"]["sourceImages"]["verifiedCount"], 3)
         self.assertEqual(report["toolchain"]["actualVersion"], "4.2.1")
         self.assertEqual(report["coordinateFrame"]["registrationToGps"], "not-established")
@@ -155,7 +155,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         target.write_bytes(b"\xff\xd8\xff" + b"tampered".ljust(125, b"z"))
         report = self._assess()
         self.assertEqual(report["status"], "blocked")
-        self.assertTrue(any("SHA-256 mismatch" in item for item in report["blockers"]))
+        self.assertTrue(any("SHA-256 mismatch" in item for item in report["blockers"]), repr(report["blockers"]))
 
     def test_source_image_symlink_is_rejected(self):
         target = self.images / "view-a.jpg"
@@ -163,7 +163,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         target.symlink_to(self.images / "view-b.jpg")
         report = self._assess()
         self.assertEqual(report["status"], "blocked")
-        self.assertTrue(any("non-symlink" in item for item in report["blockers"]))
+        self.assertTrue(any("non-symlink" in item for item in report["blockers"]), repr(report["blockers"]))
 
     def test_missing_colmap_executable_blocks_preflight(self):
         profile = self._write_profile()
