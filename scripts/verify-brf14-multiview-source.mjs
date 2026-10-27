@@ -196,10 +196,15 @@ async function inspectFile(root, relativePath, expectedSize, expectedSha256, max
 /** Check actual local bytes for a bounded, manifest-pinned multi-view source sample. */
 export async function verifyBrf14MultiviewSource(manifest, assetRoot) {
   const validated = validateManifest(manifest);
-  const root = await realpath(assetRoot);
-  const rootInfo = await lstat(root);
-  if (rootInfo.isSymbolicLink() || !rootInfo.isDirectory()) {
+  const requestedRoot = path.resolve(assetRoot);
+  const requestedRootInfo = await lstat(requestedRoot);
+  if (requestedRootInfo.isSymbolicLink() || !requestedRootInfo.isDirectory()) {
     fail("Asset root must be a real directory and must not be a symlink.");
+  }
+  const root = await realpath(requestedRoot);
+  const rootInfo = await lstat(root);
+  if (!rootInfo.isDirectory()) {
+    fail("Resolved asset root must be a directory.");
   }
 
   const views = [];
