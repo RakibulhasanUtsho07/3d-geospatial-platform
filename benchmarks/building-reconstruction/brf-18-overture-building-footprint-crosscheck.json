@@ -22,10 +22,15 @@
     "independenceNote": "This is an external footprint cross-reference for spatial triage, not survey-grade independent truth and not proof that an elevated point cluster belongs to the photographed building."
   },
   "query": {
-    "bboxWgs84": [-93.3918, 45.0508, -93.3902, 45.0528],
+    "bboxWgs84": [
+      -93.3918,
+      45.0508,
+      -93.3902,
+      45.0528
+    ],
     "coordinateOrder": "west,south,east,north",
     "maximumFeatures": 5000,
-    "maxCandidateDistanceM": 50.0,
+    "maxCandidateDistanceM": 50,
     "metricCrs": "EPSG:26915",
     "metricCrsRationale": "NAD83 / UTM zone 15N, suitable for local distance and area comparisons near the source sample in Minnesota."
   },
@@ -33,7 +38,10 @@
     "commitRawFootprints": false,
     "uploadRawFootprints": false,
     "uploadOnlyDerivedReport": true,
-    "purpose": "Short-lived, release-pinned footprint match candidates around the EPT elevated-return components."
+    "purpose": "Candidate review overlay from bounded USGS NAIP imagery plus ranked Overture footprints and EPT component AABBs; the visual packet is derived evidence only.",
+    "uploadRenderedImageOverlay": true,
+    "uploadReviewManifest": true,
+    "uploadRawAerialImagery": false
   },
   "acceptanceEligible": false,
   "publicationEligible": false,
@@ -45,6 +53,9 @@
     "EPSG:26915 distances are local projected map distances, not a geodetic survey accuracy claim.",
     "A candidate footprint spatially close to an EPT component does not establish visual identity or image-to-object correspondence.",
     "The camera GPS coordinate is the camera centre, not a surveyed building control point; source camera altitude is excluded due to unknown vertical datum.",
-    "No engine-generated candidate GLB, independent held-out checkpoints or building accuracy metrics are created by this task."
+    "No engine-generated candidate GLB, independent held-out checkpoints or building accuracy metrics are created by this task.",
+    "BRF-19 can render a bounded orthophoto overlay for human review, but it does not establish same-building identity or validate a candidate GLB.",
+    "USGS NAIP mosaic acquisition date is not resolved for the returned crop and may differ from drone-image capture dates.",
+    "The overlay is map-view only; no calibrated camera projection from footprint coordinates into the oblique drone frames is claimed."
   ]
 }

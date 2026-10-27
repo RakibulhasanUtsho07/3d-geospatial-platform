@@ -6,6 +6,9 @@ on:
       - development
     paths:
       - ".github/workflows/brf-18-overture-footprint-crosscheck.yml"
+      - "docs/research/BRF-19-AERIAL-FOOTPRINT-IMAGE-REVIEW.md"
+      - "scripts/prepare_brf18_footprint_image_review.py"
+      - "tests/test_prepare_brf18_footprint_image_review.py"
       - "benchmarks/building-reconstruction/brf-18-overture-building-footprint-crosscheck.json"
       - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
       - "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json"
@@ -37,13 +40,16 @@ jobs:
           python-version: "3.12"
 
       - name: Install pinned geospatial and Overture dependencies
-        run: python -m pip install --disable-pip-version-check "laspy[lazrs]" "pyproj==3.7.2" "numpy==2.3.3" "shapely==2.1.2" "overturemaps==1.0.2"
+        run: python -m pip install --disable-pip-version-check "laspy[lazrs]" "pyproj==3.7.2" "numpy==2.3.3" "shapely==2.1.2" "overturemaps==1.0.2" "Pillow==11.3.0"
 
       - name: Test EPT source and geometry inspection
         run: python -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
 
       - name: Test EPT-to-footprint cross-reference and fail-closed policy
         run: python -m unittest discover -s tests -p "test_crosscheck_ept_components_with_building_footprints.py"
+
+      - name: Test aerial-image footprint review packet
+        run: python -m unittest discover -s tests -p "test_prepare_brf18_footprint_image_review.py"
 
       - name: Inspect bounded public EPT neighbourhood
         id: ept
@@ -80,17 +86,32 @@ jobs:
             --release 2026-10-21.0 \
             --output artifacts/brf-18/footprint-crosscheck-report.json
 
-      - name: Upload derived cross-check report only
+      - name: Prepare USGS aerial-image footprint review packet
+        id: image_review
+        if: steps.ept.outcome == 'success' && steps.download.outcome == 'success' && steps.crosscheck.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python scripts/prepare_brf18_footprint_image_review.py \
+            --manifest benchmarks/building-reconstruction/brf-18-overture-building-footprint-crosscheck.json \
+            --ept-report artifacts/brf-18/ept-report.json \
+            --footprints artifacts/brf-18/overture-footprints.geojson \
+            --crosscheck-report artifacts/brf-18/footprint-crosscheck-report.json \
+            --output-image artifacts/brf-18/footprint-image-review.png \
+            --output-report artifacts/brf-18/footprint-image-review.json
+      - name: Upload derived cross-check and image-review artifacts only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: brf-18-overture-footprint-crosscheck-report
-          path: artifacts/brf-18/footprint-crosscheck-report.json
+          name: brf-19-footprint-image-review-packet
+          path: |
+            artifacts/brf-18/footprint-crosscheck-report.json
+            artifacts/brf-18/footprint-image-review.png
+            artifacts/brf-18/footprint-image-review.json
           if-no-files-found: warn
           retention-days: 7
 
       - name: Enforce source cross-check execution
-        if: always() && (steps.ept.outcome != 'success' || steps.download.outcome != 'success' || steps.crosscheck.outcome != 'success')
+        if: always() && (steps.ept.outcome != 'success' || steps.download.outcome != 'success' || steps.crosscheck.outcome != 'success' || steps.image_review.outcome != 'success')
         run: |
-          echo "BRF-18 cross-check did not complete. Inspect the job logs and derived report artifact when available."
+          echo "BRF-18/19 cross-check or aerial-image review did not complete. Inspect job logs and derived artifacts when available."
           exit 1
