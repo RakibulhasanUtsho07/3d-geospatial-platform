@@ -61,7 +61,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
                                "expectedByteSize": 128, "actualByteSize": 128} for view in views]
         verification = {
             "schemaVersion": "1.0.0", "sampleId": "synthetic-test-only", "status": "views-byte-verified",
-            "checkedAt": "2026-10-27T00:00:00Z", "dataset": {"sourceRepositoryCommit": "test-commit"},
+            "checkedAt": "2026-10-27T00:00:00Z", "dataset": {"sourceRepositoryCommit": "test-commit", "attribution": "Synthetic — test only"},
             "selectedViewCount": 3, "declaredTotalBytes": 384, "actualTotalBytes": 384,
             "views": verification_views, "blockers": [], "candidateGlbGenerated": False,
             "independentReferenceVerified": False, "acceptanceEligible": False,
@@ -69,7 +69,9 @@ class Brf21HumanReviewTests(unittest.TestCase):
         }
         self.write_json("brf-14-multiview-source.json", source_manifest)
         self.write_json("multiview-source-byte-verification.json", verification)
-        verification_sha = MODULE.canonical_json_sha256(verification)
+        verification_sha_brief20 = MODULE.canonical_json_sha256(verification)
+        verification_sha_brf21 = MODULE.canonical_json_sha256(verification, ensure_ascii=False)
+        self.assertNotEqual(verification_sha_brief20, verification_sha_brf21)
         packet = {
             "schemaVersion": "1.0.0",
             "sampleId": "synthetic-test-only",
@@ -79,7 +81,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
             "sourceManifest": {"metadataCommit": "test-commit", "selectedViewCount": 3,
                                "declaredTotalBytes": 384, "actualTotalBytes": 384,
                                "byteVerificationStatus": "views-byte-verified",
-                               "byteVerificationReportSha256": verification_sha},
+                               "byteVerificationReportSha256": verification_sha_brief20},
             "sourceViews": views,
             "outputArtifacts": {
                 "contactSheet": self.artifact_record("multiview-contact-sheet.png"),
@@ -111,7 +113,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
             "sourceManifest": {"metadataCommit": "test-commit", "selectedViewCount": 3,
                                "declaredTotalBytes": 384, "actualTotalBytes": 384,
                                "byteVerificationStatus": "views-byte-verified",
-                               "byteVerificationReportCanonicalJsonSha256": verification_sha},
+                               "byteVerificationReportCanonicalJsonSha256": verification_sha_brf21},
             "views": [{"id": view["id"], "filename": view["filename"], "sha256": view["actualSha256"], "byteSize": 128}
                       for view in views],
             "pairs": pairs,

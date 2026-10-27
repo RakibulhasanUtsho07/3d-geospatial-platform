@@ -82,8 +82,9 @@ def load_json_file(path: Path) -> Any:
         raise ValueError("Invalid UTF-8 JSON in " + path.name + ": " + str(error)) from error
 
 
-def canonical_json_sha256(value: Any) -> str:
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+def canonical_json_sha256(value: Any, *, ensure_ascii: bool = True) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=ensure_ascii).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _artifact_binding(root: Path, role: str) -> dict[str, Any]:
@@ -192,13 +193,14 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
             verification.get("selectedViewCount") == len(manifest_views) and
             verification.get("declaredTotalBytes") == verification.get("actualTotalBytes") == total_bytes,
             "BRF-14 view-count/byte totals disagree across source manifest and byte-verification report.")
-    verification_sha = canonical_json_sha256(verification)
+    verification_sha_brief20 = canonical_json_sha256(verification)
+    verification_sha_brf21 = canonical_json_sha256(verification, ensure_ascii=False)
     packet_binding = review_packet.get("sourceManifest")
     overlap_binding = overlap_report.get("sourceManifest")
     require(isinstance(packet_binding, dict) and isinstance(overlap_binding, dict),
             "BRF-20/21 source verification binding objects are missing.")
-    require(packet_binding.get("byteVerificationReportSha256") == verification_sha and
-            overlap_binding.get("byteVerificationReportCanonicalJsonSha256") == verification_sha,
+    require(packet_binding.get("byteVerificationReportSha256") == verification_sha_brief20 and
+            overlap_binding.get("byteVerificationReportCanonicalJsonSha256") == verification_sha_brf21,
             "BRF-20/21 provenance does not bind the exact BRF-14 byte-verification report.")
     require(packet_binding.get("selectedViewCount") == overlap_binding.get("selectedViewCount") == len(manifest_views) and
             packet_binding.get("declaredTotalBytes") == overlap_binding.get("declaredTotalBytes") == total_bytes and
