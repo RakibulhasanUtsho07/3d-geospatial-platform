@@ -235,8 +235,8 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
                         "Decoded image exceeds maximum pixel count: " + view["id"])
                 check.verify()
             with Image.open(file_path) as decoded:
-                thumb = decoded.convert("RGB")
-                thumb.load()
+                decoded.thumbnail((CELL_WIDTH - 36, 284), Image.Resampling.LANCZOS)
+                thumb = decoded.convert("RGB").copy()
         except Exception as error:
             if isinstance(error, ValueError):
                 raise
@@ -244,7 +244,7 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
         actual_total_bytes += size
         actual_total_pixels += width * height
         require(actual_total_pixels <= MAX_TOTAL_PIXELS, "Image set exceeds total decoded pixel budget.")
-        items.append({"view": view, "actualSha256": actual_hash, "image": thumb})
+        items.append({"view": view, "actualSha256": actual_hash, "actualByteSize": size, "image": thumb})
     require(actual_total_bytes == manifest["expectedTotalBytes"],
             "Actual total image bytes disagree with the manifest.")
 
@@ -272,7 +272,7 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
             "actualTotalBytes": actual_total_bytes,
             "byteVerificationStatus": verification["status"],
             "byteVerificationCheckedAt": verification.get("checkedAt"),
-            "byteVerificationReportSha256": None,
+            "byteVerificationReportCanonicalJsonSha256": None,
         },
         "dataset": manifest["dataset"],
         "coordinateFrameMetadata": manifest["coordinateFrameMetadata"],
@@ -283,7 +283,7 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
                 "sourceUrl": item["view"]["sourceUrl"],
                 "capturedAt": item["view"]["capturedAt"],
                 "expectedByteSize": item["view"]["expectedByteSize"],
-                "actualByteSize": item["image"] and next(v["actualByteSize"] for v in verification["views"] if v["id"] == item["view"]["id"]),
+                "actualByteSize": item["actualByteSize"],
                 "expectedSha256": item["view"]["expectedSha256"],
                 "actualSha256": item["actualSha256"],
                 "declaredDimensions": [item["view"]["declaredWidth"], item["view"]["declaredHeight"]],
