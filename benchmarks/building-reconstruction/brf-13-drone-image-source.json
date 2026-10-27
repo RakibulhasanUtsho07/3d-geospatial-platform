@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf13-flat-roof-image-0005",
+  "evaluationStage": "source-byte-intake-only",
+  "dataset": {
+    "title": "Drone Building Scans — Two Commercial Buildings",
+    "version": "1.0.0",
+    "released": "2026-08-22",
+    "datasetUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans",
+    "sourceRepository": "https://github.com/Matt1Up/drone-building-scans-dataset",
+    "sourceRepositoryCommit": "19b3ce9cccf3e8fd414ff705f75d0f2105846fc1",
+    "license": "CC-BY-4.0",
+    "licenseScope": "Dataset card declares CC BY 4.0; source README specifically says this licence covers imagery. Do not assume it licenses the separate reference GLB or third-party signage/trademarks.",
+    "attribution": "Drone Building Scans — Matthew Guertin, 2026. CC BY 4.0. https://github.com/Matt1Up/drone-building-scans-dataset",
+    "rightsStatus": "declared-by-source-not-independently-authenticated"
+  },
+  "asset": {
+    "role": "candidate-image",
+    "buildingId": "flat-roof-commercial-building",
+    "filename": "DJI_20260822183442_0005_D.JPG",
+    "mediaType": "image/jpeg",
+    "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822183442_0005_D.JPG",
+    "expectedByteSize": 8343552,
+    "expectedSha256": "ba7e497c124267242aec031d77f42eab3225e073ca26bf58dd61089017e2798a",
+    "width": 4096,
+    "height": 3072,
+    "capturedAt": "2026-08-22T18:34:42",
+    "gps": {
+      "latitude": 45.0516675277778,
+      "longitude": -93.3914331111111,
+      "altitudeM": 253.854
+    },
+    "upstreamManifestUrl": "https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/images.csv",
+    "upstreamChecksumUrl": "https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/checksums.sha256"
+  },
+  "calibrationContext": {
+    "declaredBarLengthM": 1.997,
+    "markerFamily": "AprilTag 36h11",
+    "sourceUrl": "https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/README.md",
+    "status": "source-declared-control-only-not-an-independent-held-out-building-checkpoint",
+    "note": "The dataset README says the metric reference scan used this bar as control. Reusing that same bar as an independent hold-out would be leakage."
+  },
+  "knownLimitations": [
+    "This intake verifies one image's downloaded bytes only; it does not establish that a full multi-view capture was acquired.",
+    "The published flat-roof GLB is a textured photogrammetry model from the same capture imagery, not independent surveyed ground truth; its licence scope was not independently established.",
+    "The 1.997 m AprilTag bar is described as having been used as control to scale the reference scan, so it is not automatically an independent held-out checkpoint.",
+    "No independent full-building survey, independently measured footprint/dimensions, vertical datum or held-out check point set is supplied by this manifest.",
+    "Image-source licence declaration and source-owner authority have not been independently authenticated."
+  ],
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false
+}
