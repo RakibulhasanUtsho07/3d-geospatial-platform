@@ -73,7 +73,7 @@ async function main() {
   const rootFlag = argv.find((arg) => arg.startsWith("--root="));
   const positional = argv.filter((arg) => !arg.startsWith("--root="));
   if (process.argv.includes("--help") || !positional[0] || positional.length > 2) {
-    console.log("Usage: node scripts/evaluate-independent-building-truth.mjs <evaluation-manifest.json> [report.json] [--root=project-root]\nChecks byte hashes for a candidate GLB and independent truth source, then computes separately reported footprint, dimension, checkpoint and optional mesh-distance metrics. This does not approve a model.");
+    console.log("Usage: node scripts/evaluate-independent-building-truth.mjs <evaluation-manifest.json> [report.json] [--root=project-root]\nChecks candidate GLB, independent truth source, extractor source/configuration bytes, and deterministic geometry-payload provenance before computing footprint, dimension, checkpoint and optional mesh-distance metrics. This does not approve a model.");
     process.exitCode = process.argv.includes("--help") ? 0 : 2;
     return;
   }
