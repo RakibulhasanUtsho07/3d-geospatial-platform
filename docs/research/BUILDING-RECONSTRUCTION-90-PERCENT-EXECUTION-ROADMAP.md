@@ -464,3 +464,14 @@ Do not blindly merge the entire rakibul-hasan branch into development: branch co
 - **Exact-head validation:** pending after the latest code, tests and documentation updates; do not merge PR #206 to `development` or promote to `main` before exact-head CI succeeds.
 
 **Next task:** implement a reproducible extraction adapter that derives candidate mesh bounds/vertices from the actual GLB and imports independently sourced reference geometry into the same declared frame, then run the evaluator on a real survey-backed building. Keep CI contract evidence distinct from real-world acceptance.
+
+
+### 2026-10-27 — BRF-09: actual GLB geometry extraction adapter (implementation in review)
+
+- Scope: add a deterministic GLB 2.0 byte parser for embedded POSITION/index accessors, accumulated scene-node transforms and an explicitly supplied source-to-evaluation affine transform; derive provisional metric bounds and X/Z convex-hull footprint; create a bounded, deterministic triangle-sampled surface for the independent-truth evaluator.
+- Reference intake: import a reviewed survey/CAD/BIM/LiDAR geometry JSON payload already registered in the same metre-based coordinate frame. Bind candidate GLB, reference source, extractor implementation, configuration and geometry payloads by SHA-256. Existing fail-closed path, symlink and output-file rules remain in force.
+- Safety/limits: reject external buffers, sparse accessors, meshopt/Draco compression, morph/skinned/animated inputs, bad offsets/indices, degenerate triangles, invalid transforms and mismatched coordinate frames. Non-triangle primitives are reported as skipped. Provisional mesh-derived footprint/bounds are not a substitute for independently surveyed wall outline/dimensions.
+- Test policy: synthetic GLB fixtures prove parser/transform/hash plumbing only; they do not count as a real building accuracy result. Held-out candidate checkpoints remain mandatory for completeness and absent checkpoints must keep the report incomplete. Publication/map readiness/automatic approval remain false.
+- Validation state: initial scoped feature branch is being checked by regression tests and full CI. No real survey-backed building result is claimed by this commit.
+
+**Next task:** run the adapter on a genuinely survey-backed building with independently reviewed frame registration and held-out check points, inspect all geometry residuals and GLB/hash evidence, and only then evaluate whether any human release gate can be advanced.

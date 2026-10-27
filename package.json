@@ -192,7 +192,7 @@
     "test:ahsan-manzil-topology-audit": "node --test tests/ahsan-manzil-topology-audit.test.mjs",
     "test:building-segmentation-benchmark": "node --test tests/building-segmentation-benchmark.test.mjs tests/building-segmentation-benchmark-cli.test.mjs",
     "benchmark:building-segmentation": "node scripts/evaluate-building-segmentation-benchmark.mjs",
-    "test:independent-building-truth": "node --test tests/geometry-extraction-provenance.test.mjs tests/independent-building-truth-evaluator.test.mjs tests/independent-building-truth-evaluator-cli.test.mjs",
+    "test:independent-building-truth": "node --test tests/geometry-extraction-provenance.test.mjs tests/independent-building-truth-evaluator.test.mjs tests/independent-building-truth-evaluator-cli.test.mjs tests/glb-geometry-extraction.test.mjs tests/independent-building-geometry-preparation-cli.test.mjs tests/independent-reference-geometry-frame-adapter.test.mjs",
     "evaluate:independent-building-truth": "node scripts/evaluate-independent-building-truth.mjs",
     "test:building-mask-provider": "node --test tests/building-mask-provider.test.mjs",
     "test:architectural-observation-schema": "node --test tests/architectural-observation-schema.test.mjs",
@@ -203,7 +203,8 @@
     "test:building-visual-evidence-package": "node --test tests/building-visual-evidence-package.test.mjs",
     "build:building-visual-evidence-package": "node scripts/build-building-visual-evidence-package.mjs",
     "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
-    "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs"
+    "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs",
+    "prepare:independent-building-truth": "node scripts/prepare-independent-building-truth-manifest.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

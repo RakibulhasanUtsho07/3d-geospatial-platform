@@ -88,3 +88,29 @@ test("keeps missing provenance incomplete and rejects malformed or mismatched co
   assert.equal(validate(provenance({ coordinateFrameId: "other-frame" })).status, "failed");
   assert.equal(validate(provenance({ extractor: { id: "bad/path" } })).status, "failed");
 });
+
+test("validates optional auxiliary adapter artifacts and rejects duplicate or unsafe declarations", () => {
+  const valid = provenance({
+    auxiliaryArtifacts: [{
+      id: "reference-frame-adapter",
+      artifactPath: "src/core/building-generation/independent-reference-geometry-adapter.mjs",
+      artifactSha256: "d".repeat(64),
+    }],
+  });
+  assert.equal(validate(valid).status, "passed");
+
+  const duplicateId = provenance({
+    auxiliaryArtifacts: [
+      { id: "adapter", artifactPath: "tools/adapter-a.mjs", artifactSha256: "d".repeat(64) },
+      { id: "adapter", artifactPath: "tools/adapter-b.mjs", artifactSha256: "e".repeat(64) },
+    ],
+  });
+  assert.equal(validate(duplicateId).status, "failed");
+
+  const unsafePath = provenance({
+    auxiliaryArtifacts: [{
+      id: "adapter", artifactPath: "../outside.mjs", artifactSha256: "d".repeat(64),
+    }],
+  });
+  assert.equal(validate(unsafePath).status, "failed");
+});

@@ -252,6 +252,12 @@ jobs:
         run: npm run test:independent-building-truth
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
+      - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
+        run: node --test tests/glb-geometry-extraction.test.mjs
+      - name: Test independent geometry manifest preparation and fail-closed evaluation integration
+        run: node --test tests/independent-building-geometry-preparation-cli.test.mjs
+      - name: Validate independent geometry preparation CLI
+        run: npm run prepare:independent-building-truth -- --help
       - name: Test source-bound semantic mask provider and reviewed fallback
         run: npm run test:building-mask-provider
       - name: Test evidence-linked architectural observation schema and review history
