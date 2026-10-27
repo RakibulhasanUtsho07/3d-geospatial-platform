@@ -103,3 +103,10 @@ Official source pages reviewed:
 **No source is admitted to the real-building acceptance run yet.** A working URL alone is insufficient: the same physical building must be paired across image and reference assets; every exact file/version needs a suitable rights decision, verified bytes, coordinate-frame/vertical-datum metadata, and independently held-out metric controls. Do not download or commit a large archive while licence and intended-use compatibility remain unresolved.
 
 **Next action:** obtain a rights-cleared source with a working exact asset link and a defensible same-building independent-survey pairing; then use the BRF-10 manifest preflight and BRF-11 local byte verifier before candidate reconstruction.
+
+
+### Correction from direct STAC collection metadata inspection — 27 October 2026
+
+The direct STAC collection metadata endpoint is readable at [the collection JSON URL](https://stac.d2s.org/api/v1/collections/ee10a5c0-2554-44e5-b59f-81eedfe02eb6). Its current response identifies the collection as **Gold Coast** and declares `license: CC-BY-NC-4.0`, with contact `jinha@purdue.edu`. This conflicts with the broader repository README's CC BY 4.0 statement. The collection's `items` link did not resolve through this audit tool, and no exact file-level asset URL/checksum was recovered.
+
+For intake decisions, do **not** normalize this discrepancy in favour of the more permissive licence. Treat the collection and derivative source files as **commercial-use blocked** until the data owner clarifies the applicable terms in writing and provides a working exact item/file URL. The source-selection result remains blocked, even though the collection metadata endpoint itself is accessible.
