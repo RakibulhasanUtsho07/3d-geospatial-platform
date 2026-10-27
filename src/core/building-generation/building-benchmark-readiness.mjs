@@ -154,9 +154,7 @@ export function assessBuildingBenchmarkReadiness(manifest) {
       nonEmpty(candidate.evaluationCoordinateFrameId) && candidate.evaluationCoordinateFrameId === evaluationFrame &&
       Array.isArray(candidate.modelToEvaluationFrameMatrix4x4) &&
       (() => { try { validateAffineMatrix4x4(candidate.modelToEvaluationFrameMatrix4x4); return true; } catch { return false; } })()),
-    candidateObject && nonEmpty(candidate.modelCoordinateFrameId) && nonEmpty(candidate.evaluationFrameId) === false
-      ? "Candidate model frame and a valid affine model-to-evaluation transform are required."
-      : "Candidate must declare modelCoordinateFrameId, evaluationCoordinateFrameId matching evaluation.coordinateFrameId, and a valid invertible affine transform.");
+    "Candidate must declare modelCoordinateFrameId, evaluationCoordinateFrameId matching evaluation.coordinateFrameId, and a valid invertible affine transform.");
 
   const reference = manifest.reference;
   const referenceObject = object(reference);
@@ -185,10 +183,21 @@ export function assessBuildingBenchmarkReadiness(manifest) {
       ? "Reference declares CRS, vertical datum, registration evidence and a metric-preserving frame transform."
       : "Reference needs CRS, vertical datum, frame-registration evidence and a valid metre-preserving horizontal axis-alignment transform into the evaluation frame.");
 
-  const checkpoints = object(manifest.controls) && Array.isArray(manifest.controls.heldOutCheckpoints)
-    ? manifest.controls.heldOutCheckpoints : [];
-  const fitControlIds = object(manifest.controls) && uniqueStrings(manifest.controls.fitControlIds)
-    ? manifest.controls.fitControlIds : [];
+  const controls = manifest.controls;
+  const fitControls = object(controls) && Array.isArray(controls.fitControls) ? controls.fitControls : [];
+  const fitControlIds = fitControls.map((point) => object(point) ? point.id : null);
+  const fitIdsValid = fitControlIds.length >= 3 && uniqueStrings(fitControlIds) &&
+    fitControls.every((point) => object(point) && ID.test(point.id ?? "") &&
+      finite(point.x) && finite(point.y) && finite(point.z) &&
+      finite(point.uncertaintyM) && point.uncertaintyM > 0 &&
+      point.coordinateFrameId === evaluationFrame &&
+      assetsById.has(point.sourceAssetId) &&
+      assetsById.get(point.sourceAssetId)?.role === "independent-control");
+  add("fit-controls", fitIdsValid,
+    fitIdsValid ? "At least three unique metric fit controls are backed by independent-control assets." :
+      "At least three unique fit controls with finite metric coordinates, positive uncertainty and an independent-control source asset are required.");
+  const checkpoints = object(controls) && Array.isArray(controls.heldOutCheckpoints)
+    ? controls.heldOutCheckpoints : [];
   const checkpointIds = new Set();
   let checkpointBindingsValid = checkpoints.length >= MIN_HELD_OUT_CHECKPOINTS;
   for (const checkpoint of checkpoints) {
