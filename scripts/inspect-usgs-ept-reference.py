@@ -592,7 +592,7 @@ def inspect_ept_reference(
                         ))
                     for point_index in np.flatnonzero(class2_ground_mask):
                         validation_ground_points.append((
-                            float(xs[point_index]), float(ys[point_index]), float(points.z[point_index])
+                            float(xs[point_index]), float(ys[point_index]), float(zs[point_index])
                         ))
                     class6_indices = np.flatnonzero(class_values == 6)
                     if class6_indices.size:
@@ -604,7 +604,7 @@ def inspect_ept_reference(
                                 "distanceM": nearest_distance,
                                 "x": float(xs[nearest_index]),
                                 "y": float(ys[nearest_index]),
-                                "z": float(points.z[nearest_index]),
+                                "z": float(zs[nearest_index]),
                                 "classification": 6,
                                 "nodeKey": key,
                             }
