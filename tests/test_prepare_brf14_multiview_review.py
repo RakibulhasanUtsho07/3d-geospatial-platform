@@ -179,6 +179,24 @@ class Brf14MultiviewReviewPacketTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "all acceptance/publication flags false"):
             self.run_packet()
 
+    def test_rejects_png_payload_under_jpeg_declaration(self):
+        path = self.assets / self.manifest["views"][0]["filename"]
+        Image.new("RGB", (64, 48), (1, 2, 3)).save(path, format="PNG")
+        payload = path.read_bytes()
+        digest = hashlib.sha256(payload).hexdigest()
+        size = len(payload)
+        view = self.manifest["views"][0]
+        view["expectedByteSize"] = size
+        view["expectedSha256"] = digest
+        self.manifest["expectedTotalBytes"] += size - self.verification["views"][0]["expectedByteSize"]
+        result = self.verification["views"][0]
+        result["expectedByteSize"] = size
+        result["actualByteSize"] = size
+        result["expectedSha256"] = digest
+        result["actualSha256"] = digest
+        with self.assertRaisesRegex(ValueError, "JPEG SOI signature"):
+            self.run_packet()
+
     def test_rejects_unverified_source_status(self):
         self.verification["status"] = "blocked"
         with self.assertRaisesRegex(ValueError, "must pass"):
