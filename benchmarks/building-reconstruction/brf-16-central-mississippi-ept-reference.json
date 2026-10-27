@@ -27,7 +27,14 @@
       "inputSpatialReference": "EPSG:4326"
     },
     "samplePointRole": "camera GPS-derived search centre; not a surveyed control point",
-    "sampleRadiusMeters": 50
+    "sampleRadiusMeters": 500,
+    "validationRadiusMeters": 50,
+    "diagnosticRadiiMeters": [
+      50,
+      100,
+      250,
+      500
+    ]
   },
   "processing": {
     "maxHierarchyDocuments": 300,
@@ -54,6 +61,7 @@
     "The EPT is derived from the same classified USGS 3DEP point-cloud project as the raw LAZ product, not a separate independent sensing campaign from that LAZ.",
     "A camera GPS coordinate and EPT footprint intersection do not prove the photographed structure is the same building.",
     "No image-derived candidate GLB, registered control points or held-out accuracy metrics have been produced.",
-    "EPT node point files will be sampled in an ephemeral directory and are not committed or uploaded as artifacts."
+    "EPT node point files will be sampled in an ephemeral directory and are not committed or uploaded as artifacts.",
+    "The 50/100/250/500 m concentric search is a spatial-neighbourhood diagnostic. A class-6 point within a larger radius is not proof that the photographed building is that point cloud object."
   ]
 }
