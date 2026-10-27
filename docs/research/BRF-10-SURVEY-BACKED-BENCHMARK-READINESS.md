@@ -2,7 +2,7 @@
 
 **Status (27 October 2026): SOURCE TRIAGE COMPLETE; REAL-BUILDING RUN BLOCKED.**  
 Tracking: [Issue #208](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/208).  
-Implementation dependency: [BRF-09 PR #207](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/207), merged into `development` at `5587c98b36bced96e1f07acd7a7a365c40cdac49`. Post-merge CI must still finish successfully.
+Implementation dependency: [BRF-09 PR #207](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/207), merged into `development` at `5587c98b36bced96e1f07acd7a7a365c40cdac49`. Exact-head CI and post-merge development CI passed: [run #40472128740](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40472128740) and [run #40473478338](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40473478338).
 
 ## Decision summary
 
@@ -22,9 +22,9 @@ The repository describes 32 ground-truth LOD3 building instances across Gold Coa
 ### 2. TUM2TWIN UAS laser-scanning data
 
 Dataset documentation: https://tum2t.win/datasets/pc-uas  
-Zenodo record (version shown on the page): https://zenodo.org/records/14548134
+Zenodo latest record viewed during this task (Version 1.2.0, published 25 April 2025): https://zenodo.org/records/15282970
 
-The TUM2TWIN page describes point clouds captured by a DJI Matrice 350 RTK UAS with a Zenmuse L2 laser scanner, georeferenced using integrated RTK GNSS; it also describes oblique flights for façades. This is a promising *different sensing modality* from the photogrammetric images. The linked Zenodo record lists about 16.6 GB of data in its displayed version, including image archives, photogrammetric data and UAS laser-scanning products. A newer version is indicated on the record, so file identity/version must be pinned before intake.
+The TUM2TWIN page describes point clouds captured by a DJI Matrice 350 RTK UAS with a Zenmuse L2 laser scanner, georeferenced using integrated RTK GNSS; it also describes oblique flights for façades. This is a promising *different sensing modality* from the photogrammetric images. The Version 1.2.0 Zenodo record lists 20.0 GB of files (displayed data volume 21.9 TB across all downloads). The proposed survey input `TUM_Downtown_ULS_20241217_manual.laz` is listed as 2.8 GB with page MD5 `37ce114fb348fb28066cc967cde9771d`; `TUM_Downtown_ULS_20241217_manual_5mm_fillparts.laz` is 687 MB with MD5 `ed46079bee78f4dc939dbfa5dc2c61e8`. These MD5 values are catalog hints only, not SHA-256 and not proof that a local download has been verified. The page has a newer version label than the older record previously reviewed, but its visible License field is blank; therefore this audit does not approve reuse of the ULS files. Pin the exact version and verify asset-specific rights before download/reuse.
 
 **Rights gate:** the GT-LOD3 README's CC BY 4.0 statement must not automatically be applied to every separate TUM2TWIN/Zenodo asset. The viewed Zenodo record did not expose a clear asset-level licence in the retrieved metadata. Before using or redistributing any selected raw image/point-cloud asset, verify the exact record version, file-level licence/attribution and any additional dataset terms. If rights cannot be established, use that asset only as an unapproved research lead and do not place it in CI artefacts.
 
@@ -36,6 +36,10 @@ The TUM2TWIN page describes point clouds captured by a DJI Matrice 350 RTK UAS w
 - The platform has not yet produced and pinned an engine-generated candidate GLB from the chosen image inputs for this sample.
 - A reference JSON, surveyed footprint/dimensions and genuinely held-out control/check points have not yet been prepared for a real sample.
 - Dataset ground-truth model files must never be passed off as candidate output from this platform. The independent truth and candidate GLB must have separate provenance/hashes and separate source paths.
+
+## New code gate
+
+The new `assess:building-benchmark-readiness` CLI and `test:building-benchmark-readiness` suite in PR #209 validate the declared source manifest's building identity, asset hashes/metadata, per-asset rights review, candidate/reference separation, coordinate transforms, fit controls and held-out point bindings. A `manifest-complete` report is **metadata preflight only**: the CLI does not download assets or independently verify file bytes, licence terms, survey truth or registration. Real file checksums and the existing BRF-09 prepare/evaluate CLIs are still required.
 
 ## Required intake record
 
