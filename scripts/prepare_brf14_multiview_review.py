@@ -226,8 +226,14 @@ def prepare_review_packet(manifest: Any, asset_root: Path, verification: Any,
         require(actual_hash == view["expectedSha256"], "SHA-256 changed after BRF-14 verification: " + view["id"])
         require(size <= MAX_IMAGE_BYTES, "Image exceeds maximum byte size: " + view["id"])
         try:
+            with file_path.open("rb") as source_stream:
+                signature = source_stream.read(3)
+            require(signature == b"\\xff\\xd8\\xff",
+                    "Image bytes do not have a JPEG SOI signature: " + view["id"])
             with Image.open(file_path) as check:
-                require(check.format == "JPEG", "Image bytes are not a valid JPEG: " + view["id"])
+                require(check.format in {"JPEG", "MPO"},
+                        "Decoder reported an unsupported JPEG-family format for " + view["id"] +
+                        ": " + str(check.format))
                 width, height = check.size
                 require(width == view["declaredWidth"] and height == view["declaredHeight"],
                         "Decoded image dimensions disagree with manifest: " + view["id"])
