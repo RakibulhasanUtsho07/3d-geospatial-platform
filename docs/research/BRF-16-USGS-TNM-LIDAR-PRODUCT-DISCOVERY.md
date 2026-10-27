@@ -100,3 +100,15 @@ python scripts/inspect-usgs-ept-reference.py \
 ```
 
 **Interpretation gate:** if the EPT says EPSG:3857 and the observed neighbourhood contains class-6 returns, that supports presence of building-class point returns near the GPS location; it still does not prove image-to-building identity, metric transform accuracy, independent fit/checkpoint separation, or candidate GLB accuracy. Those checks remain required before any accuracy claim or release flag can be enabled.
+
+## EPT point-return finding and widened diagnostic — 27 October 2026
+
+The first successful bounded inspection pinned the EPT metadata SHA-256 to `ac14abdc2600e8af08f59569eb1b873ebda03e46fe59b8ee188a197ce1cd4d3f` and verified the actual horizontal CRS in the public EPT metadata as EPSG:3857. The inspector initially used the tighter `boundsConforming` extent for octree subdivision; this was corrected to use EPT tree `bounds` for node partitioning and `boundsConforming` only for source-extent containment.
+
+On the correctly partitioned 50 m neighbourhood, 3 actual EPT point nodes contained 83,955 point records, with 3,371 points falling within 50 m. The nearby classification totals were class 1 = 1,283, class 2 = 2,084, class 7 = 2, and class 18 = 2; **there were zero class-6 building returns inside the 50 m validation radius**. This is an important negative source-match finding, not a geometry score.
+
+The manifest now expands the diagnostic neighbourhood to 50, 100, 250 and 500 m while retaining 50 m as the strict initial same-building-return gate. The inspector reports class counts for each concentric radius and the nearest class-6 point found in all inspected nodes. This helps decide whether the selected GPS point is offset from a building or whether this same-work-unit point cloud is simply not a valid reference for the photographed structure. Any class-6 points found only at a wider radius are not automatically accepted as the same building.
+
+Live EPT inspection: [workflow run #40506476743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40506476743) completed successfully as a **bounded data-read**, but it recorded zero class-6 returns inside 50 m and kept `acceptanceEligible`, `publicationEligible`, `mapReady`, and `automaticApproval` false. The widened rerun must be reviewed before choosing whether to continue on this location or abandon this LiDAR sample as an identity mismatch.
+
+If no suitable class-6 points appear within the camera-position/possible-building vicinity, do not force a transform or use neighbouring structures as the building reference. Move to a different capture with a validated building-level correspondence. The raw LAZ source still receives HTTP 429 from the staging host, so this preflight uses only small, selected LASzip/EPT nodes; it is not proof of the raw LAZ full-file hash.
