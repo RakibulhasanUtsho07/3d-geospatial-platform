@@ -44,7 +44,10 @@
     "maxNodeBytes": 10000000,
     "maxTotalNodeBytes": 200000000,
     "targetNodeDepth": 8,
-    "httpTimeoutSeconds": 25
+    "httpTimeoutSeconds": 25,
+    "groundComparisonPaddingMeters": 15,
+    "maxGroundNeighbourDistanceM": 12,
+    "highReturnGridCellSizeM": 2
   },
   "expectedFrame": {
     "horizontalCrs": "EPSG:3857",
