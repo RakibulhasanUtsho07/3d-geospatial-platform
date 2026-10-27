@@ -48,6 +48,12 @@ def validate_public_ept_url(value: str, base_url: str = EXPECTED_BASE) -> str:
         fail("EPT URL must be a string.")
     parsed = urlparse(value)
     base = urlparse(base_url)
+    if parsed.hostname == base.hostname:
+        expected_prefix = base.path
+    elif parsed.hostname == "usgs-lidar-public.s3.us-west-2.amazonaws.com":
+        expected_prefix = "/MN_CentralMissRiver_4_B22/"
+    else:
+        expected_prefix = base.path
     if (
         parsed.scheme != "https"
         or parsed.hostname not in ALLOWED_HOSTS
@@ -58,7 +64,7 @@ def validate_public_ept_url(value: str, base_url: str = EXPECTED_BASE) -> str:
         or parsed.fragment
         or base.scheme != "https"
         or base.hostname not in ALLOWED_HOSTS
-        or not parsed.path.startswith(base.path)
+        or not parsed.path.startswith(expected_prefix)
         or ".." in parsed.path.split("/")
     ):
         fail("EPT URL is outside the allowlisted public USGS EPT asset path.")
