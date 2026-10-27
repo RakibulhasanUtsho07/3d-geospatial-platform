@@ -86,6 +86,16 @@ class InspectUsgsEptReferenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing coordinate dimensions"):
             MODULE.parse_ept_metadata(json.dumps(invalid).encode("utf-8"))
 
+    def test_tree_bounds_are_kept_distinct_from_tighter_conforming_bounds(self):
+        meta = ept_metadata()
+        meta["bounds"] = [-1024, -512, 0, 1024, 512, 128]
+        meta["boundsConforming"] = [-900, -400, 5, 900, 400, 100]
+        parsed = MODULE.parse_ept_metadata(json.dumps(meta).encode("utf-8"))
+        self.assertEqual(parsed["bounds"], [-1024.0, -512.0, 0.0, 1024.0, 512.0, 128.0])
+        self.assertEqual(parsed["boundsConforming"], [-900.0, -400.0, 5.0, 900.0, 400.0, 100.0])
+        node = MODULE.node_bounds("1-1-0-1", parsed["bounds"])
+        self.assertEqual(node, [0.0, -512.0, 64.0, 1024.0, 0.0, 128.0])
+
     def test_node_bounds_and_xy_intersection_are_deterministic(self):
         root = [0.0, 0.0, 0.0, 1024.0, 512.0, 128.0]
         bounds = MODULE.node_bounds("1-1-0-1", root)
