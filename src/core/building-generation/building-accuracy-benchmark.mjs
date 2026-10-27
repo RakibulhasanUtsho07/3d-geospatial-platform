@@ -162,6 +162,7 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
       warnings: Array.isArray(truth.warnings) ? truth.warnings.length : null,
       failures: Array.isArray(truth.failures) ? truth.failures.length : null,
       metricGroups: Object.keys(truth.metrics),
+      metrics: truth.metrics,
     };
   }
 
