@@ -132,7 +132,10 @@ def parse_ept_metadata(payload: bytes, expected_horizontal: str = "EPSG:3857") -
             fail("EPT metadata " + label + " contain a non-finite value.")
         if not (candidate[0] < candidate[3] and candidate[1] < candidate[4] and candidate[2] < candidate[5]):
             fail("EPT " + label + " must have positive extent in X, Y and Z.")
-    if not all(bounds[axis] <= conforming_bounds[axis] <= bounds[axis + 3] for axis in range(3)):
+    if not all(
+        bounds[axis] <= conforming_bounds[axis] < conforming_bounds[axis + 3] <= bounds[axis + 3]
+        for axis in range(3)
+    ):
         fail("EPT boundsConforming must be contained within tree bounds.")
     points = value.get("points")
     span = value.get("span")
