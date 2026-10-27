@@ -187,6 +187,20 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  try {
+    await lstat(path.resolve(root, evalRel));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    report.status = "independent-evaluation-failed";
+    report.blockers.push({ id: "independent-evaluation-report-missing",
+      detail: "The evaluator exited without writing a report. Inspect the captured subprocess output." });
+    report.exitCode = 1;
+    report.artifacts.evaluatorStdout = evaluateRun.stdout;
+    report.artifacts.evaluatorStderr = evaluateRun.stderr;
+    await writeFile(reportAbs, JSON.stringify(report, null, 2) + "\\n", { flag: "wx", mode: 0o600 });
+    process.exitCode = 1;
+    return;
+  }
   const evaluation = await readJson(root, evalRel, "Independent-truth evaluation report");
   report.artifacts.evaluationReport = { path: evalRel, sha256: evaluation.sha256 };
   const evalValue = evaluation.value;
