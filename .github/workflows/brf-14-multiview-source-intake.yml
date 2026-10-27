@@ -19,6 +19,10 @@ on:
       - "scripts/brf21_human_review.py"
       - "tests/test_brf21_human_review.py"
       - "docs/research/BRF-22-HUMAN-REVIEW-DECISION-CONTRACT.md"
+      - "scripts/brf23_reconstruction_preflight.py"
+      - "tests/test_brf23_reconstruction_preflight.py"
+      - "benchmarks/building-reconstruction/brf-23-reconstruction-preflight-profile.json"
+      - "docs/research/BRF-23-RECONSTRUCTION-PREFLIGHT.md"
   workflow_dispatch:
 
 permissions:
@@ -70,6 +74,12 @@ jobs:
 
       - name: Validate BRF-22 human-review CLI
         run: python scripts/brf21_human_review.py --help
+      
+      - name: Test BRF-23 reconstruction preflight and fail-closed behaviour
+        run: python -m unittest discover -s tests -p "test_brf23_reconstruction_preflight.py"
+
+      - name: Validate BRF-23 reconstruction preflight CLI
+        run: python scripts/brf23_reconstruction_preflight.py --help
 
       - name: Download selected images to ephemeral runner storage
         shell: bash
@@ -117,6 +127,16 @@ jobs:
       - name: Generate a blank human-review decision form from verified evidence
         run: python scripts/brf21_human_review.py template --artifact-root artifacts/brf-14 --output multiview-human-review-decision-template.json
 
+      - name: Assess current real sample and assert it stays blocked
+        run: |
+          python scripts/brf23_reconstruction_preflight.py assess \
+            --artifact-root artifacts/brf-14 \
+            --image-root "$RUNNER_TEMP/brf14/images" \
+            --decision multiview-human-review-decision-template.json \
+            --profile benchmarks/building-reconstruction/brf-23-reconstruction-preflight-profile.json \
+            --output reconstruction-preflight-report.json
+          python -c 'import json; from pathlib import Path; r=json.loads(Path("artifacts/brf-14/reconstruction-preflight-report.json").read_text()); assert r["status"] == "blocked", r["status"]; assert r["assessedInputs"]["sourceImages"]["verifiedCount"] == 16, r["assessedInputs"]["sourceImages"]; assert r["assessedInputs"]["humanDecision"]["validationStatus"] == "invalid-or-pending"; assert r["candidateGlbGenerated"] is False; assert r["reconstructionExecuted"] is False; assert all(r[k] is False for k in ("acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval")); assert any("Human review decision failed validation" in x for x in r["blockers"]); print(json.dumps({"sampleStatus": r["status"], "verifiedImages": r["assessedInputs"]["sourceImages"]["verifiedCount"], "blockerCount": len(r["blockers"]), "candidateGlbGenerated": False}, indent=2))'
+
       - name: Upload derived review artifacts and blank template only (never raw images)
         uses: actions/upload-artifact@v4
         with:
@@ -130,5 +150,6 @@ jobs:
             artifacts/brf-14/pairwise-overlap-graph.png
             artifacts/brf-14/pairwise-overlap-report.json
             artifacts/brf-14/multiview-human-review-decision-template.json
+            artifacts/brf-14/reconstruction-preflight-report.json
           if-no-files-found: error
           retention-days: 7
