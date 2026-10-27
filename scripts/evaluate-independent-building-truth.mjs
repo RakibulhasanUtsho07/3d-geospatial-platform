@@ -159,8 +159,13 @@ async function main() {
         }
       }
     }
+    const extractorFilesMatch = fileResults.length === 2 &&
+      fileResults.every((file) => file.status === "passed");
+    const finalExtractionStatus = assessment.status === "failed" || fileResults.some((file) => file.status === "failed")
+      ? "failed"
+      : assessment.status === "incomplete" || !extractorFilesMatch ? "incomplete" : "passed";
     extractionReports[role] = {
-      status: assessment.status,
+      status: finalExtractionStatus,
       geometryPayloadSha256: payloadSha256,
       provenance: provenance ?? null,
       extractorFiles: fileResults,
