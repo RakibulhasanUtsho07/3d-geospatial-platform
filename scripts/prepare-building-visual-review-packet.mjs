@@ -55,7 +55,7 @@ async function makeTile(asset, width = 800, height = 600) {
   const sidePadding = 16;
   const metadata = [
     asset.viewRole ?? "unclassified view",
-    asset.source?.downloadMode === "thumbnail" ? "Wikimedia derivative • original metadata kept separately" : "original file",
+    asset.downloadMode === "thumbnail" ? "Wikimedia derivative • original metadata kept separately" : "original file",
     (asset.downloadedDimensions?.width ?? asset.dimensionsPixels?.width ?? "?") + " × " +
       (asset.downloadedDimensions?.height ?? asset.dimensionsPixels?.height ?? "?") + " px",
     (asset.computedSha256 ?? asset.sha256).slice(0, 16),
@@ -245,7 +245,10 @@ async function main() {
     };
     const templatePath = path.join(annotationDir, item.id + ".annotation-template.json");
     await writeNewFile(templatePath, Buffer.from(JSON.stringify(annotationTemplate, null, 2) + "\n"));
-    const tile = await makeTile({ ...item, bytes: imageFile.bytes, computedSha256: record.sha256 });
+    const tile = await makeTile({
+      ...item, bytes: imageFile.bytes, computedSha256: record.sha256,
+      downloadedDimensions: { width: metadata.decodedWidth, height: metadata.decodedHeight },
+    });
     tiles.push(tile);
     processed.push(record);
   }
