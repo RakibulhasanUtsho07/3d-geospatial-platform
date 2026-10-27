@@ -302,6 +302,25 @@ export function buildSegmentationBenchmarkReport({ manifest, evaluatedSamples = 
       meanPerBuildingMacroForegroundIoU: metricAveragesPerBuilding(images),
       heldOutMeanPerBuildingMacroForegroundIoU: metricAveragesPerBuilding(heldOut),
       recommendation: "manual-review-required",
+      failureCases: (manifest?.samples ?? [])
+        .filter((sample) => sample?.split === "held-out-evaluation")
+        .flatMap((sample) => (sample?.predictions ?? [])
+          .filter((candidate) => candidate?.providerId === providerId)
+          .map((candidate) => {
+            const result = resultsByKey.get(sample.sampleId + "::" + providerId);
+            const missingMetrics = result?.status === "evaluated"
+              && !Number.isFinite(result.metrics?.macroForegroundIoU);
+            return (!result || result.status !== "evaluated" || !result.metrics || missingMetrics)
+              ? {
+                  sampleId: sample.sampleId,
+                  buildingGroupId: sample.buildingGroupId ?? null,
+                  status: result?.status ?? "not-evaluated",
+                  reason: result?.detail ?? (missingMetrics
+                    ? "Evaluated result did not include a finite macroForegroundIoU."
+                    : "Held-out sample has no successful evaluation result."),
+                }
+              : [];
+          })),
       note: "Scores are descriptive; report per-image failures, review the held-out buildings and freeze an approved threshold before selecting an automatic provider.",
     };
   });
