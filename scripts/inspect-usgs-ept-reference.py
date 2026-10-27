@@ -210,6 +210,27 @@ def node_key_depth(key: str) -> int:
     return parse_node_key(key)[0]
 
 
+def assess_sample_building_coverage(
+    points_within_radius: int,
+    classification_counts: dict[int, int] | Counter[int],
+    inspected_node_count: int,
+    selected_node_count: int,
+) -> tuple[list[str], list[str]]:
+    """Apply a fail-closed gate for whether the sample neighbourhood contains building returns."""
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if points_within_radius <= 0:
+        blockers.append("no-point-returns-fall-within-the-sample-radius")
+    if int(classification_counts.get(6, 0)) <= 0:
+        blockers.append("no-class6-building-points-within-sample-radius")
+        warnings.append(
+            "No class-6 building points were observed within the sample radius; this work unit cannot be accepted as a building-surface reference for this sample without separate identity/classification evidence."
+        )
+    if inspected_node_count < selected_node_count:
+        blockers.append("one-or-more-selected-ept-nodes-were-not-completely-inspected")
+    return sorted(set(blockers)), warnings
+
+
 def read_manifest(manifest_path: Path) -> dict[str, Any]:
     with manifest_path.open("r", encoding="utf-8") as handle:
         manifest = json.load(handle)
@@ -456,12 +477,11 @@ def inspect_ept_reference(
             })
 
     class6 = local_classes.get(6, 0)
-    if class6 == 0:
-        warnings.append("No class-6 building points were observed within the sample radius. The same-building reference link remains unverified.")
-    if local_point_count == 0:
-        blockers.append("no-point-returns-fall-within-the-sample-radius")
-    if len(node_reports) < len(candidate_nodes):
-        blockers.append("one-or-more-selected-ept-nodes-were-not-completely-inspected")
+    coverage_blockers, coverage_warnings = assess_sample_building_coverage(
+        local_point_count, local_classes, len(node_reports), len(candidate_nodes)
+    )
+    blockers.extend(coverage_blockers)
+    warnings.extend(coverage_warnings)
 
     horizontal = str(metadata["horizontalCrs"])
     vertical_code = metadata["srs"].get("vertical")
