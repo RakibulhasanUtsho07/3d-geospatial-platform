@@ -290,8 +290,21 @@ def inspect_ept_reference(
     max_nodes = int(config.get("maxPointNodes", MAX_DEFAULT_NODES))
     target_depth = int(config.get("targetNodeDepth", 8))
     radius = float(coverage.get("sampleRadiusMeters", 50))
-    if not (1 <= max_hier_docs <= 1000 and 1 <= max_nodes <= 1000 and 1 <= target_depth <= 20 and 1 <= radius <= 500):
+    validation_radius = float(coverage.get("validationRadiusMeters", 50))
+    raw_radii = coverage.get("diagnosticRadiiMeters", [validation_radius, radius])
+    if not isinstance(raw_radii, list) or not raw_radii:
+        fail("coverage.diagnosticRadiiMeters must be a non-empty list.")
+    diagnostic_radii = sorted({float(value) for value in raw_radii})
+    if validation_radius not in diagnostic_radii:
+        diagnostic_radii.append(validation_radius)
+        diagnostic_radii.sort()
+    if not (1 <= max_hier_docs <= 1000 and 1 <= max_nodes <= 1000 and 1 <= target_depth <= 20 and 1 <= radius <= 1000):
         fail("EPT processing bounds fall outside the allowed safety limits.")
+    if (
+        not (1 <= validation_radius <= radius <= 1000)
+        or any(not math.isfinite(value) or value < 1 or value > radius for value in diagnostic_radii)
+    ):
+        fail("EPT diagnostic radii must be finite, >= 1 metre and no larger than sampleRadiusMeters.")
     expected_metadata_hash = manifest.get("expectedMetadataSha256")
     if expected_metadata_hash is not None and (not isinstance(expected_metadata_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_metadata_hash)):
         fail("expectedMetadataSha256 must be null or 64 lowercase hexadecimal characters.")
@@ -417,8 +430,9 @@ def inspect_ept_reference(
 
     node_reports: list[dict[str, Any]] = []
     whole_classes: Counter[int] = Counter()
-    local_classes: Counter[int] = Counter()
-    local_point_count = 0
+    radius_point_counts: dict[float, int] = {value: 0 for value in diagnostic_radii}
+    radius_class_counts: dict[float, Counter[int]] = {value: Counter() for value in diagnostic_radii}
+    nearest_class6: dict[str, Any] | None = None
     total_points_read = 0
     node_bytes_downloaded = 0
     point_data_suffix = {"laszip": ".laz", "binary": ".bin"}[metadata["dataType"]]
@@ -442,8 +456,8 @@ def inspect_ept_reference(
             with laspy.open(str(file_path), mode="r") as reader:
                 point_count = int(reader.header.point_count)
                 node_total_classes: Counter[int] = Counter()
-                node_local_classes: Counter[int] = Counter()
-                node_local_points = 0
+                node_radius_counts: dict[float, int] = {value: 0 for value in diagnostic_radii}
+                node_radius_classes: dict[float, Counter[int]] = {value: Counter() for value in diagnostic_radii}
                 read_points = 0
                 for points in reader.chunk_iterator(1_000_000):
                     read_points += len(points)
@@ -451,16 +465,34 @@ def inspect_ept_reference(
                     for cls, n in zip(*np.unique(class_values, return_counts=True)):
                         node_total_classes[int(cls)] += int(n)
                         whole_classes[int(cls)] += int(n)
-                    dx = np.asarray(points.x) - target_x
-                    dy = np.asarray(points.y) - target_y
-                    local = (dx * dx + dy * dy) <= radius * radius
-                    count_here = int(local.sum())
-                    node_local_points += count_here
-                    local_point_count += count_here
-                    if count_here:
-                        for cls, n in zip(*np.unique(class_values[local], return_counts=True)):
-                            node_local_classes[int(cls)] += int(n)
-                            local_classes[int(cls)] += int(n)
+                    xs = np.asarray(points.x)
+                    ys = np.asarray(points.y)
+                    dx = xs - target_x
+                    dy = ys - target_y
+                    distance_sq = dx * dx + dy * dy
+                    class6_indices = np.flatnonzero(class_values == 6)
+                    if class6_indices.size:
+                        candidate_distances_sq = distance_sq[class6_indices]
+                        nearest_index = int(class6_indices[int(np.argmin(candidate_distances_sq))])
+                        nearest_distance = float(math.sqrt(float(distance_sq[nearest_index])))
+                        if nearest_class6 is None or nearest_distance < nearest_class6["distanceM"]:
+                            nearest_class6 = {
+                                "distanceM": nearest_distance,
+                                "x": float(xs[nearest_index]),
+                                "y": float(ys[nearest_index]),
+                                "z": float(points.z[nearest_index]),
+                                "classification": 6,
+                                "nodeKey": key,
+                            }
+                    for diagnostic_radius in diagnostic_radii:
+                        within = distance_sq <= diagnostic_radius * diagnostic_radius
+                        count_here = int(within.sum())
+                        node_radius_counts[diagnostic_radius] += count_here
+                        radius_point_counts[diagnostic_radius] += count_here
+                        if count_here:
+                            for cls, n in zip(*np.unique(class_values[within], return_counts=True)):
+                                node_radius_classes[diagnostic_radius][int(cls)] += int(n)
+                                radius_class_counts[diagnostic_radius][int(cls)] += int(n)
                 total_points_read += read_points
             node_box = node_bounds(key, bounds)
             node_reports.append({
@@ -471,11 +503,21 @@ def inspect_ept_reference(
                 "byteSize": len(node_payload),
                 "sha256": digest,
                 "bounds": node_box,
-                "pointsWithinSampleRadius": node_local_points,
+                "pointsWithinDiagnosticRadii": {
+                    str(int(value) if value.is_integer() else value): node_radius_counts[value]
+                    for value in diagnostic_radii
+                },
                 "classificationCounts": {str(k): v for k, v in sorted(node_total_classes.items())},
-                "classificationCountsWithinSampleRadius": {str(k): v for k, v in sorted(node_local_classes.items())},
+                "classificationCountsByDiagnosticRadius": {
+                    str(int(value) if value.is_integer() else value): {
+                        str(k): v for k, v in sorted(node_radius_classes[value].items())
+                    }
+                    for value in diagnostic_radii
+                },
             })
 
+    local_point_count = radius_point_counts[validation_radius]
+    local_classes = radius_class_counts[validation_radius]
     class6 = local_classes.get(6, 0)
     coverage_blockers, coverage_warnings = assess_sample_building_coverage(
         local_point_count, local_classes, len(node_reports), len(candidate_nodes)
@@ -515,7 +557,9 @@ def inspect_ept_reference(
             "inputCrs": "EPSG:4326",
             "projectedX": target_x,
             "projectedY": target_y,
-            "pointRadiusMeters": radius,
+            "validationRadiusMeters": validation_radius,
+            "maximumInspectionRadiusMeters": radius,
+            "diagnosticRadiiMeters": diagnostic_radii,
             "samplePointWithinEptRootBounds": True,
             "sourcePointRole": "GPS-derived location query, not an independent surveyed control",
         },
@@ -527,11 +571,20 @@ def inspect_ept_reference(
             "inspectedPointNodes": len(node_reports),
             "nodeDataBytesDownloaded": node_bytes_downloaded,
             "totalPointsReadFromSelectedNodes": total_points_read,
-            "pointsWithinSampleRadius": local_point_count,
-            "class6BuildingPointsWithinSampleRadius": class6,
-            "class6BuildingPointShareWithinSampleRadius": class6 / local_point_count if local_point_count else None,
+            "pointsWithinValidationRadius": local_point_count,
+            "class6BuildingPointsWithinValidationRadius": class6,
+            "class6BuildingPointShareWithinValidationRadius": class6 / local_point_count if local_point_count else None,
+            "pointsAndClassificationsByDiagnosticRadius": {
+                str(int(value) if value.is_integer() else value): {
+                    "points": radius_point_counts[value],
+                    "classificationCounts": {str(k): v for k, v in sorted(radius_class_counts[value].items())},
+                    "class6BuildingPoints": radius_class_counts[value].get(6, 0),
+                }
+                for value in diagnostic_radii
+            },
+            "nearestClass6PointInInspectedNodes": nearest_class6,
         },
-        "classificationCountsWithinSampleRadius": {str(k): v for k, v in sorted(local_classes.items())},
+        "classificationCountsWithinValidationRadius": {str(k): v for k, v in sorted(local_classes.items())},
         "classificationCountsAcrossInspectedNodes": {str(k): v for k, v in sorted(whole_classes.items())},
         "hierarchyDocumentSha256": hierarchy_hashes,
         "nodeReports": node_reports,
