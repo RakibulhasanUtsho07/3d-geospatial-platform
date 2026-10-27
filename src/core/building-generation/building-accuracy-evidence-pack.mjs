@@ -225,6 +225,23 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
         views: views.map((view) => ({ id: view.id ?? null, filename: view.filename ?? null, sha256: view.sha256 ?? null,
           bytes: view.bytes ?? null, width: view.width ?? null, height: view.height ?? null, verified: view.verified === true })) },
       dimensionAndGeoreferenceStatus: benchmark.status ?? "missing",
+      independentTruthGeometry: benchmark.metrics?.independentTruthGeometry ?? {
+        supplied: truthEvidence.supplied === true,
+        required: building.requireIndependentTruthEvaluation === true,
+        status: truthEvidence.status ?? "missing",
+        reportSha256: truthEvidence.sha256 ?? null,
+        reportPath: truthEvidence.path ?? null,
+        reportArtifactPinned: truthEvidence.verified === true &&
+          sameHash(truthEvidence.sha256, truthEvidence.expectedSha256),
+      },
+      independentTruthReportEvidence: {
+        required: building.requireIndependentTruthEvaluation === true,
+        supplied: truthEvidence.supplied === true,
+        path: truthEvidence.path ?? null,
+        sha256: truthEvidence.sha256 ?? null,
+        expectedSha256Pinned: truthEvidence.verified === true &&
+          sameHash(truthEvidence.sha256, truthEvidence.expectedSha256),
+      },
       verticalDatumStatus: vertical.status ?? "not-solved",
       checks,
       policy: { mapReady: false, publicationEligible: false, automaticApproval: false },
