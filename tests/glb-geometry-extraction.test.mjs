@@ -35,6 +35,28 @@ test("validates transform shape, finiteness, affine row and invertibility",()=>{
   assert.throws(()=>validateAffineMatrix4x4([1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,1]),/must be affine/);
   assert.throws(()=>extractGlbGeometry(createBuildingGlb(),{...options,units:"ft"}),/metres/);
 });
+
+test("extracts held-out candidate checkpoints from exact GLB POSITION vertices",()=>{
+  const result=extractGlbGeometry(createBuildingGlb(),{
+    ...options,
+    checkPointBindings:[
+      {id:"survey-check-01",nodeIndex:1,primitiveIndex:0,vertexIndex:0},
+      {id:"survey-check-02",nodeIndex:1,primitiveIndex:0,vertexIndex:1},
+      {id:"survey-check-03",nodeIndex:1,primitiveIndex:0,vertexIndex:6},
+    ],
+  });
+  assert.deepEqual(result.checkPoints,TARGET_CHECK_POINTS);
+  assert.equal(result.extractionSummary.checkPointCount,3);
+  assert.match(result.extractionSummary.checkPointMethod,/actual GLB/);
+});
+test("rejects candidate checkpoint bindings that do not identify rendered vertices",()=>{
+  assert.throws(()=>extractGlbGeometry(createBuildingGlb(),{
+    ...options,checkPointBindings:[{id:"missing-point",nodeIndex:1,primitiveIndex:0,vertexIndex:999}],
+  }),/outside the primitive POSITION accessor/);
+  assert.throws(()=>extractGlbGeometry(createBuildingGlb(),{
+    ...options,checkPointBindings:[{id:"x",nodeIndex:1,primitiveIndex:0,vertexIndex:0},{id:"x",nodeIndex:1,primitiveIndex:0,vertexIndex:1}],
+  }),/duplicate ID/);
+});
 test("rejects line-only or degenerate mesh geometry",()=>{
   assert.throws(()=>extractGlbGeometry(createBuildingGlb(j=>{j.meshes[0].primitives[0].mode=1;}),options),/no supported triangle geometry/);
   assert.throws(()=>extractGlbGeometry(createBuildingGlb(j=>{j.accessors[1].count=2;}),options),/multiple of three/);
