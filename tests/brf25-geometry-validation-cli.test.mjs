@@ -128,7 +128,8 @@ test("runs actual-GLB extraction then independent truth evaluation, and stays re
   const metrics = JSON.parse(await readFile(path.join(root, "artifacts/brf25/run-01/evaluation-report.json"), "utf8"));
   assert.equal(metrics.candidate.glbSha256, candidateHash);
   assert.equal(metrics.metrics.checkPoints.matchedPointCount, 3);
-  assert.match(metrics.reference.sourceDescription, /Synthetic fixture/);
+  const prepared = JSON.parse(await readFile(path.join(root, "artifacts/brf25/run-01/prepared-manifest.json"), "utf8"));
+  assert.match(prepared.reference.sourceDescription, /Synthetic fixture/);
 });
 
 test("blocks stale truth-config candidate hashes before extraction (synthetic fixture)", async (t) => {
