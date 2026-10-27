@@ -217,7 +217,7 @@ export function assessBuildingBenchmarkReadiness(manifest) {
         !finite(checkpoint.z) || !finite(checkpoint.uncertaintyM) || checkpoint.uncertaintyM <= 0 ||
         !assetsById.has(checkpoint.sourceAssetId) ||
         assetsById.get(checkpoint.sourceAssetId)?.role !== "independent-control" ||
-        checkpoint.coordinateFrameId !== (referenceObject?.sourceCoordinateFrameId ?? reference?.coordinateFrameId) ||
+        checkpoint.coordinateFrameId !== evaluationFrame ||
         !object(binding) || !Number.isSafeInteger(binding.nodeIndex) || binding.nodeIndex < 0 ||
         !Number.isSafeInteger(binding.primitiveIndex) || binding.primitiveIndex < 0 ||
         !Number.isSafeInteger(binding.vertexIndex) || binding.vertexIndex < 0) {
