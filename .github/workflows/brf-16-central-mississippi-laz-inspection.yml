@@ -1,0 +1,71 @@
+name: BRF-16 Central Mississippi LAZ header inspection
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-16-central-mississippi-laz-inspection.yml"
+      - "benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json"
+      - "scripts/inspect-usgs-laz-tile.py"
+      - "tests/test_inspect_usgs_laz_tile.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-16-central-mississippi-laz-inspection-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-tile:
+    name: Download exact LAZ tile and inspect header
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install LAZ reader dependencies
+        run: python -m pip install --disable-pip-version-check "laspy[lazrs]" pyproj
+
+      - name: Test fail-closed LAZ intake manifest and path checks
+        run: python -m unittest tests/test_inspect_usgs_laz_tile.py
+
+      - name: Download only the pinned LAZ tile to ephemeral runner storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/brf16" artifacts/brf-16
+          expected_bytes="$(python -c 'import json; print(json.load(open("benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json"))["dataset"]["expectedByteSize"])')"
+          actual_url="$(python -c 'import json; print(json.load(open("benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json"))["dataset"]["downloadUrl"])')"
+          expected_url="https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/MN_CentralMissRiver_B22/MN_CentralMissRiver_4_B22/LAZ/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
+          [[ "$actual_url" == "$expected_url" ]] || { echo "Manifest URL does not match the allowlisted pinned product."; exit 1; }
+          [[ "$expected_bytes" == "83659396" ]] || { echo "Manifest size differs from the pinned TNM product record."; exit 1; }
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 600 --max-filesize 100000000 \
+            "$actual_url" --output "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz"
+          actual_bytes="$(wc -c < "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz" | tr -d ' ')"
+          [[ "$actual_bytes" == "$expected_bytes" ]] || { echo "Downloaded size $actual_bytes differs from $expected_bytes."; exit 1; }
+
+      - name: Inspect actual LAZ bytes, header, CRS, coverage and classification
+        run: |
+          python scripts/inspect-usgs-laz-tile.py \
+            --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-laz-tile.json \
+            --file "$RUNNER_TEMP/brf16/USGS_LPC_MN_CentralMissRiver_B22_4690_49885.laz" \
+            --report artifacts/brf-16/central-mississippi-laz-header-report.json
+
+      - name: Upload inspection report only (not the LAZ)
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-16-central-mississippi-laz-header-report
+          path: artifacts/brf-16/central-mississippi-laz-header-report.json
+          if-no-files-found: error
+          retention-days: 7
