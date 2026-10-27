@@ -1,7 +1,7 @@
 # BRF-14 — Pinned multi-view candidate-image intake
 
 **Date:** 27 October 2026  
-**Status:** source manifest and fail-closed local-byte verifier implemented on `feat/brf-14-multiview-source-intake`; exact downloaded-byte workflow and full CI must pass before this intake is called verified. **Real-building accuracy remains BLOCKED.**  
+**Status (27 October 2026):** source manifest and fail-closed verifier are merged into `development`; the BRF-20 branch adds a hash-bound visual review packet after exact-byte verification. Human overlap/identity review and real-building accuracy remain **BLOCKED** until the packet is generated and signed off.  
 **Tracking:** [Issue #208](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/208).
 
 ## Why this stage exists
@@ -67,3 +67,18 @@ A successful report means only that the selected local files match the pinned si
 - A source-frame registration, vertical datum, held-out controls, actual engine candidate, geometry evaluation report and independent human sign-off remain outstanding.
 
 **Decision:** BRF-14 is an image-source byte-intake step only. Keep the real-building sample `BLOCKED` for accuracy and keep `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. Do not promote this work to `main` on source-byte validation alone.
+
+
+## BRF-20 — Human-review packet before COLMAP
+
+Tracking: [Issue #222](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/222).
+
+After downloading the sixteen manifest-listed JPEGs to ephemeral runner storage and passing the existing byte verifier, the BRF-20 workflow creates:
+
+- `multiview-contact-sheet.png`: four-column contact sheet with stable view ID, filename, capture timestamp, source-reported camera-angle metadata, local camera-centre fields, and abbreviated exact SHA-256.
+- `camera-angle-coverage.png`: source-reported azimuth/elevation scatter plot. It is not a georeferenced camera plan and does not establish visual overlap.
+- `multiview-review-manifest.json`: per-view exact hashes and metadata, reviewer/UTC-time fields, explicit pending review categories, output hashes, limitations and fail-closed release flags.
+
+Only the verifier report, PNG contact sheet, PNG angle plot and JSON review manifest are eligible for upload. Raw images remain in runner temporary storage and are not uploaded.
+
+The packet is deliberately **not** a COLMAP run. A reviewer must record same-building identity, visual overlap, occlusion/coverage and the source up-axis before the current reconstruction CLI's explicit confirmation flags can be supplied. The imagery licence remains source-declared and has not been independently authenticated; the packet does not approve rights or survey accuracy.
