@@ -142,6 +142,23 @@ test("self-intersecting footprint is reported as a failed geometry check", () =>
   assert.ok(report.failures.some((check) => check.id === "footprint-geometry-valid"));
 });
 
+test("bounds footprint ring size and sampling work", () => {
+  const tooManyVertices = input();
+  tooManyVertices.candidate.footprint = Array.from({ length: 501 }, (_, index) => ({
+    x: Math.cos(index * 2 * Math.PI / 501),
+    z: Math.sin(index * 2 * Math.PI / 501),
+  }));
+  const oversized = evaluateIndependentBuildingTruth(tooManyVertices);
+  assert.equal(oversized.status, "benchmark-failed");
+  assert.ok(oversized.failures.some((check) => check.id === "footprint-geometry-valid"));
+
+  const tooManySamples = input();
+  tooManySamples.footprintSamplesPerEdge = 17;
+  const oversampled = evaluateIndependentBuildingTruth(tooManySamples);
+  assert.equal(oversampled.status, "benchmark-failed");
+  assert.ok(oversampled.failures.some((check) => check.id === "footprint-geometry-valid"));
+});
+
 test("surface comparison is optional unless only one mesh is supplied", () => {
   const data = input();
   delete data.candidate.surfaceMesh;
