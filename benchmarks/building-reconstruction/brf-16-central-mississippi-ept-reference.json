@@ -45,7 +45,7 @@
     "verticalUnits": "metre",
     "basis": "NOAA InPort 73145 process step 2: EPT source was reprojected horizontally to EPSG:3857; NAVD88 GEOID18 vertical meters retained. Confirm the actual ept.json SRS fields before use."
   },
-  "expectedMetadataSha256": null,
+  "expectedMetadataSha256": "ac14abdc2600e8af08f59569eb1b873ebda03e46fe59b8ee188a197ce1cd4d3f",
   "acceptanceEligible": false,
   "publicationEligible": false,
   "mapReady": false,
