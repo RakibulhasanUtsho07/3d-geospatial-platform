@@ -114,7 +114,13 @@ jobs:
       - name: Stage the exact pinned BRF-14 manifest beside derived review artifacts
         run: cp benchmarks/building-reconstruction/brf-14-multiview-source.json artifacts/brf-14/brf-14-multiview-source.json
 
-      - name: Upload derived review artifacts only (never raw images)
+      - name: Generate a blank human-review decision form from verified evidence
+        run: |
+          python scripts/brf21_human_review.py template \\
+            --artifact-root artifacts/brf-14 \\
+            --output multiview-human-review-decision-template.json
+
+      - name: Upload derived review artifacts and blank template only (never raw images)
         uses: actions/upload-artifact@v4
         with:
           name: brf-20-multiview-human-review-packet
@@ -126,5 +132,6 @@ jobs:
             artifacts/brf-14/multiview-review-manifest.json
             artifacts/brf-14/pairwise-overlap-graph.png
             artifacts/brf-14/pairwise-overlap-report.json
+            artifacts/brf-14/multiview-human-review-decision-template.json
           if-no-files-found: error
           retention-days: 7
