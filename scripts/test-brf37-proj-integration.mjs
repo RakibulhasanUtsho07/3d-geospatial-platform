@@ -93,6 +93,14 @@ try {
       automaticApproval: false,
     },
   };
+  const directProbe = spawnSync("cct", ["-d", "15", "@" + path.join(temporaryRoot, "identity-test.pipeline")], {
+    input: "389813 5330000 0 0\n",
+    encoding: "utf8",
+    env: { ...process.env, PROJ_DATA: dataDirectory, PROJ_LIB: dataDirectory, PROJ_NETWORK: "OFF" },
+  });
+  if (directProbe.status !== 0) {
+    throw new Error("Direct cct probe failed: " + String(directProbe.stderr || "").slice(0, 500));
+  }
   const first = await executeBrf37PinnedProjOperation(manifest, { assetRoot: temporaryRoot });
   const second = await executeBrf37PinnedProjOperation(manifest, { assetRoot: temporaryRoot });
   assert.equal(first.status, "executed-within-tolerance", JSON.stringify(first.blockers));

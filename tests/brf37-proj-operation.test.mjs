@@ -122,7 +122,7 @@ test("approved pinned operation produces deterministic provenance while release 
       automaticApproval: false,
     });
     assert.equal(fake.calls.filter((call) => call.args.includes("--version")).length, 2);
-    const execution = fake.calls.find((call) => call.args.includes("-c"));
+    const execution = fake.calls.find((call) => call.args.some((arg) => arg.startsWith("@")));
     assert.ok(execution.args.at(-1).startsWith("@"));
     assert.equal(execution.env.PROJ_NETWORK, "OFF");
     assert.equal(execution.env.PROJ_DATA, path.join(fixture.root, "proj-data"));

@@ -638,11 +638,11 @@ export async function executeBrf37PinnedProjOperation(manifest, options = {}) {
     return finalizeReport(manifest, checks, blockers, details);
   }
 
-  const verticalPattern = /\+proj=(?:vgridshift|vertcon)\b|\+geoidgrids=/i;
-  const horizontalDefinition = !verticalPattern.test(definitionText);
+  const nonHorizontalPattern = /\+proj=(?:vgridshift|vertcon|cart|helmert)\b|\+geoidgrids=|\+(?:zoff|z_in|z_out|zshift|zscale)=/i;
+  const horizontalDefinition = !nonHorizontalPattern.test(definitionText);
   addCheck(checks, blockers, "definition-horizontal-only", horizontalDefinition,
-    horizontalDefinition ? "No explicit vertical grid-shift operation was found in the pinned definition."
-      : "The definition appears to include vertical transformation semantics and is refused by the horizontal-only executor.");
+    horizontalDefinition ? "No explicit vertical, geocentric or Helmert operation was found in the pinned definition."
+      : "The definition includes vertical or 3D geocentric/Helmert semantics and is refused by the horizontal-only executor.");
 
   const requiredGridReferences = operationGridReferences(definitionText);
   const verifiedGridPaths = new Set(gridFiles.map((grid) =>
@@ -683,12 +683,12 @@ export async function executeBrf37PinnedProjOperation(manifest, options = {}) {
       : "The installed cct version is unavailable or differs from the required PROJ version.");
   if (!versionMatches) return finalizeReport(manifest, checks, blockers, details);
 
-  const inputText = manifest.controlVectors.map((vector) => vector.input.join(" ")).join("\n") + "\n";
+  const inputText = manifest.controlVectors.map((vector) => vector.input.join(" ") + " 0 0").join("\n") + "\n";
   let execution;
   try {
     execution = await runCct({
       executable,
-      args: ["-c", "1,2", "-d", "15", "@" + definitionFile.absolutePath],
+      args: ["-d", "15", "@" + definitionFile.absolutePath],
       input: inputText,
       env,
       timeoutMs,
