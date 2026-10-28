@@ -5,7 +5,7 @@
 
 ## Command
 
-Keep the seven derived BRF-14/20/21 evidence files and reviewer-authored decision in an artifact directory. Keep the original JPEGs in a separate local directory; do not commit or upload them.
+Keep the eight derived BRF-14/20/21/42 evidence files, including `private-multiview-media-intake-report.json`, and the reviewer-authored decision in an artifact directory. Keep the original JPEGs and private content-addressed media copies in temporary/local storage; do not commit or upload raw media.
 
 ~~~sh
 python3 scripts/brf23_reconstruction_preflight.py assess \
@@ -16,7 +16,7 @@ python3 scripts/brf23_reconstruction_preflight.py assess \
   --output reconstruction-preflight-report.json
 ~~~
 
-The command revalidates BRF-14/20/21 evidence hashes and the complete BRF-22 decision, then hashes every pinned JPEG and compares its filename, byte size and SHA-256 to the source manifest. Symlinks, path components, missing inputs, byte changes, and oversized files are rejected. It probes only the configured executable with the safe COLMAP version command and requires the exact version in the checked-in profile (COLMAP 4.2.1); it never installs tools or invokes a reconstruction subcommand.
+The command revalidates the BRF-14/20/21 evidence, the BRF-42 quality-preflight report and its hash binding to the exact BRF-14 source manifest/byte-verification report, and the complete BRF-22 decision, then hashes every pinned JPEG and compares its filename, byte size and SHA-256 to the source manifest. It blocks when the quality report is missing/stale, any image row does not bind to the source hash/size, image analysis is incomplete, or rights/COLMAP flags are elevated. Quality metrics do not replace human visual-overlap, same-building, source-up-axis or rights decisions. Symlinks, path components, missing inputs, byte changes, and oversized files are rejected. It probes only the configured executable with the safe COLMAP version command and requires the exact version in the checked-in profile (COLMAP 4.2.1); it never installs tools or invokes a reconstruction subcommand.
 
 ## Coordinate handling
 

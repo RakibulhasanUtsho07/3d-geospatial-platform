@@ -202,7 +202,7 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
     profile, profile_bytes = load_json_regular_file(profile_path, MAX_PROFILE_BYTES)
     profile = validate_profile(profile)
 
-    _, source_manifest, _, _, _, evidence_bindings, _, _ = brf21.load_evidence(root)
+    _, source_manifest, _, _, _, _, evidence_bindings, _, _ = brf21.load_evidence(root)
     decision_path = brf21.safe_file(root, decision_name, max_bytes=brf21.MAX_JSON_BYTES)
     decision, decision_bytes = load_json_regular_file(decision_path, brf21.MAX_JSON_BYTES)
     blockers: list[str] = []
@@ -238,6 +238,9 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
                               "reviewedAtUtc": human_review_result.get("reviewedAtUtc") if human_review_result else None},
             "reviewCounts": human_review_result.get("reviewCounts") if human_review_result else None,
             "humanReview": human_review_result.get("humanReview") if human_review_result else None,
+            "imageQualityPreflight": (
+                human_review_result.get("imageQualityPreflight") if human_review_result else None
+            ),
             "profile": {"filename": profile_path.name, "byteSize": len(profile_bytes),
                         "sha256": hashlib.sha256(profile_bytes).hexdigest()},
             "sourceImages": {"verifiedCount": len(image_records),
