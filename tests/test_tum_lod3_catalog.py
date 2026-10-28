@@ -83,5 +83,24 @@ class TestTumLod3CatalogInventory(unittest.TestCase):
         self.assertFalse(report["releaseFlags"]["acceptanceEligible"])
 
 
+class TestPinnedCatalogSnapshot(unittest.TestCase):
+    def test_snapshot_is_exact_revision_and_stays_fail_closed(self):
+        snapshot_path = Path(__file__).resolve().parents[1] / "benchmarks" / "building-reconstruction" / "brf-30-tum-lod3-catalog-snapshot.json"
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        self.assertEqual(snapshot["schemaVersion"], "1.0.0")
+        self.assertEqual(snapshot["source"]["resolvedCommitSha"], "e032a71fc9b3c9c3d4869e3aca9677d1234086aa")
+        self.assertEqual(snapshot["source"]["licenseFileSha256"], "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411")
+        self.assertEqual(snapshot["inventory"]["gmlFileCount"], 27)
+        self.assertEqual(snapshot["inventory"]["filenamePrefixCounts"], {"DEBY": 27})
+        files = snapshot["inventory"]["files"]
+        self.assertEqual(len(files), 27)
+        self.assertEqual(len({item["path"] for item in files}), 27)
+        self.assertTrue(all(item["payloadDownloaded"] is False for item in files))
+        self.assertTrue(all(item["buildingIdentityVerified"] is False for item in files))
+        self.assertTrue(all(item["assetRightsReviewed"] is False for item in files))
+        self.assertEqual(snapshot["buildingSelection"]["status"], "not-selected")
+        self.assertFalse(any(snapshot["releaseFlags"].values()))
+
+
 if __name__ == "__main__":
     unittest.main()
