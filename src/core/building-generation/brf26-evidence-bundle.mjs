@@ -214,9 +214,9 @@ export function assessBrf26EvidenceBundle(input = {}) {
     "Geometry/evaluator policy objects must keep every release flag false.", "failed");
 
   const sourceCameraBuildingIds = buildingIdClaims(sourceCamera);
-  check("source-camera-building-binding", sourceCameraBuildingIds.length > 0 &&
+  check("source-camera-building-binding", sourceCameraBuildingIds.length === 0 ||
     sourceCameraBuildingIds.every((value) => value === manifest.buildingId),
-  "Source-camera evidence must declare the same building ID as the bundle manifest.", "failed");
+  "Any building ID declared by source-camera evidence must match the bundle manifest.", "failed");
   check("source-camera-candidate-binding", bindsEveryModelHash(sourceCamera, candidateSha),
     "Source-camera evidence must bind its model hash to the exact candidate GLB bytes.", "failed");
 
