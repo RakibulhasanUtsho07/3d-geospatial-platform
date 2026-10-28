@@ -8,7 +8,7 @@ import { toBuildingSpecSource } from "./media-intake.mjs";
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 
 export const SOURCE_OPERATION_SCOPES = Object.freeze([
-  "private-image-ingestion",
+  "private-media-ingestion",
   "private-image-quality-preflight",
   "video-frame-extraction",
   "procedural-model-derivation",
