@@ -6,7 +6,7 @@
 
 The [TUM2TWIN UAS photo page](https://tum2t.win/datasets/im-uas), [UAS laser-scan page](https://tum2t.win/datasets/pc-uas), and [UAS photogrammetry page](https://tum2t.win/datasets/pc-uasp) describe their datasets as openly available, but those pages do not display per-asset licence terms or the full set of downstream uses requested for this platform. The current [Zenodo record version 1.2.0](https://zenodo.org/records/15282970) was published 25 April 2025 and lists the source files below; its visible Rights area shows a “License” heading without a licence value. Zenodo's [permission guidance](https://support.zenodo.org/help/en-gb/2-content/21-can-i-get-permission-to-use-a-specific-record) states that reuse depends on the record's licence and that Zenodo does not own uploader-submitted content.
 
-The project homepage publishes benedikt.schwab@tum.de and olaf.wysocki@tum.de under “Contribute”; the TUM Remote Sensing Applications dataset page publishes info.rsa@ed.tum.de. These are contact routes only; the recipient's authority over every listed asset must be confirmed. Do not infer permission from public accessibility, a “Dataset Open” label, or a publication licence for a related paper.
+The project homepage publishes benedikt.schwab@tum.de and olaf.wysocki@tum.de under “Contribute”; the TUM Remote Sensing Applications dataset page publishes info.rsa@ed.tum.de. These are contact routes only; the recipient's authority over every listed asset must be confirmed. Do not infer permission from public accessibility, a “Dataset Open” label, or a publication licence for a related paper. Do not assume that openly available means the requested commercial, public-display, or redistribution uses are permitted.
 
 ## Ready-to-send email
 
