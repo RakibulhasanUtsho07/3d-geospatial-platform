@@ -17,6 +17,10 @@ function createReport() {
         index,
         status: "ok",
         readiness: { canvasCount: 1, viewportStageSuccessCount: 1, stagedFeatureCount: 120 },
+        imageryReadiness: { viewerAvailable: true, imageryLayerCount: 1, imageryTilesLoaded: true, stableForMs: 750 },
+        imageryTileErrors: { total: 0, recent: [] },
+        visualRedPixelSignal: { width: 1280, height: 800, sampledPixels: 150000, redPixelSamples: 240, redPixelRatio: 0.0016 },
+        visualAnomalyReview: { flagged: false, threshold: 0.005, peerMedianRatio: 0.0016, reason: "no-red-pixel-outlier-detected" },
         roadReadiness: { status: "rendered", renderedFeatureCount: 28 },
         network: {
           roadApi: {
@@ -98,6 +102,46 @@ test("rejects a fetch success without an actual rendered road layer", () => {
   assert.ok(errors.some((error) => /non-empty road layer rendered/.test(error)));
   assert.ok(errors.some((error) => /pending road requests/.test(error)));
   assert.ok(errors.some((error) => /upstream Overpass request/.test(error)));
+});
+
+test("requires stable imagery readiness, privacy-safe tile errors, and a canvas anomaly assessment", () => {
+  const report = createReport();
+  report.runs[0].imageryReadiness.imageryTilesLoaded = false;
+  report.runs[1].imageryTileErrors = {
+    total: 1,
+    recent: [{
+      message: "Failed to load https://tile.example/12/123/456.png?token=secret",
+      x: 123, y: 456, level: 12, timesRetried: 0, retryWasRequested: false,
+    }],
+  };
+  report.runs[2].visualRedPixelSignal.redPixelRatio = 0.9;
+  report.runs[3].visualAnomalyReview = { flagged: "yes", threshold: 0.005, peerMedianRatio: 0.0016, reason: "no-red-pixel-outlier-detected" };
+
+  const errors = validateRealDhakaBaselineReport(report, {
+    expectedCommitSha: commitSha,
+    screenshotShaByPath: screenshotDigests(report),
+  });
+  assert.ok(errors.some((error) => /stable Cesium base-imagery readiness/.test(error)));
+  assert.ok(errors.some((error) => /non-redacted imagery tile-error details/.test(error)));
+  assert.ok(errors.some((error) => /invalid Cesium-canvas red-pixel signal/.test(error)));
+  assert.ok(errors.some((error) => /visual-anomaly review assessment/.test(error)));
+});
+
+test("preserves flagged red-pixel outliers as review-required rather than declaring them fixed", () => {
+  const report = createReport();
+  report.runs[0].visualAnomalyReview = {
+    flagged: true,
+    threshold: 0.005,
+    peerMedianRatio: 0.0016,
+    reason: "red-pixel-signal-outlier-review-required",
+  };
+  assert.deepEqual(
+    validateRealDhakaBaselineReport(report, {
+      expectedCommitSha: commitSha,
+      screenshotShaByPath: screenshotDigests(report),
+    }),
+    [],
+  );
 });
 
 test("rejects unavailable offline road data and invalid source hashes", () => {

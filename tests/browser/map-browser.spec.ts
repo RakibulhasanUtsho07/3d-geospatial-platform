@@ -140,6 +140,17 @@ async function stubMapNetwork(page: Page): Promise<ObservedRequests> {
 
 async function openReadyMap(page: Page): Promise<void> {
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+  // Layer controls are collapsed on initial load to protect map viewport space.
+  const layersToggle = page.getByRole("button", { name: /Map layers/i });
+  await expect(layersToggle).toBeVisible({ timeout: 45_000 });
+  if (await layersToggle.getAttribute("aria-expanded") === "false") {
+    await layersToggle.click();
+  }
+  const cameraToggle = page.getByRole("button", { name: "Camera controls" });
+  await expect(cameraToggle).toBeVisible({ timeout: 45_000 });
+  if (await cameraToggle.getAttribute("aria-expanded") === "false") {
+    await cameraToggle.click();
+  }
   await expect(
     page.getByRole("checkbox", { name: "Detailed OSM roads" }),
   ).toBeEnabled({ timeout: 45_000 });

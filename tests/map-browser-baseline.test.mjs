@@ -63,6 +63,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 0,
     stagedFeatureCount: 120,
@@ -70,6 +74,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 0,
@@ -80,16 +88,42 @@ test("accepts a map readiness record only when a viewport staged real building f
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 2,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 157,
   }), true);
 });
 
+test("requires hidden loading overlay and settled visible base imagery", () => {
+  const valid = {
+    hasError: false,
+    telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 12,
+  };
+  assert.equal(validateMapReadyState({ ...valid, loadingOverlayVisible: true }), false);
+  assert.equal(validateMapReadyState({ ...valid, viewerAvailable: false }), false);
+  assert.equal(validateMapReadyState({ ...valid, imageryLayerCount: 0 }), false);
+  assert.equal(validateMapReadyState({ ...valid, imageryTilesLoaded: false }), false);
+});
+
 test("rejects map readiness when initialization fails or telemetry is unavailable", () => {
   const valid = {
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 12,

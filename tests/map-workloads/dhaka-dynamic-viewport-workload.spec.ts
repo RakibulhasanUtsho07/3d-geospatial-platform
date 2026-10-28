@@ -330,6 +330,16 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   await page.setViewportSize({ width: 1600, height: 950 });
   await page.goto("/map", { waitUntil: "domcontentloaded", timeout: 60_000 });
+
+  // Both map-layer and camera-control panels are collapsed by default to
+  // preserve the viewport. Expand them before interacting with their controls.
+  const layersToggle = page.getByRole("button", { name: /Map layers/i });
+  await expect(layersToggle).toBeVisible({ timeout: 45_000 });
+  if (await layersToggle.getAttribute("aria-expanded") === "false") await layersToggle.click();
+  const cameraToggle = page.getByRole("button", { name: "Camera controls" });
+  await expect(cameraToggle).toBeVisible({ timeout: 45_000 });
+  if (await cameraToggle.getAttribute("aria-expanded") === "false") await cameraToggle.click();
+
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
