@@ -469,9 +469,10 @@ def inspect_candidate(snapshot_path: Path, envelope_report_path: Path, opener: C
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--snapshot", default=SNAPSHOT_PATH)
+    parser.add_argument("--envelope-report", default=ENVELOPE_REPORT_PATH)
     parser.add_argument("--output", default="-")
     args = parser.parse_args()
-    report = inspect_candidate(Path(args.snapshot))
+    report = inspect_candidate(Path(args.snapshot), Path(args.envelope_report))
     output = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.output == "-":
         print(output, end="")
@@ -485,6 +486,7 @@ def main() -> int:
             "candidateStatus": report.get("candidateStatus"),
             "actualBytes": (report.get("byteVerification") or {}).get("actualBytes"),
             "coordinateTupleCount": ((report.get("geometry") or {}).get("coordinateTupleCount")),
+            "coordinateTupleCount3D": ((report.get("geometry") or {}).get("coordinateTupleCount3D")),
             "output": str(destination),
         }, indent=2))
     return 0 if report.get("status") == "full-object-hash-verified-xml-valid-geometry-extracted" else 2
