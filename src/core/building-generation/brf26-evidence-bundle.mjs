@@ -141,6 +141,13 @@ export function assessBrf26EvidenceBundle(input = {}) {
     "Source review must keep all release gates false.", "failed");
   check("source-review-sample-bound", !nonempty(manifest.sampleId) || review.sampleId === manifest.sampleId,
     "Manifest sampleId must match the reviewed source sample when supplied.", "failed");
+  const includedReviewedSourceViews = Array.isArray(review.sourceViews)
+    ? review.sourceViews.filter((view) => object(view) && view.decision === "include" && hash(view.sourceImageSha256))
+    : [];
+  check("source-camera-source-image-reviewed", hash(sourceCamera.sourceImageSha256) &&
+    includedReviewedSourceViews.filter((view) =>
+      view.sourceImageSha256.toLowerCase() === sourceCamera.sourceImageSha256.toLowerCase()).length === 1,
+  "The exact source image used for camera comparison must be hash-bound to one human-reviewed, included BRF-21 source view.", "blocked");
 
   const reviewHash = artifacts.sourceReviewDecision.actualSha256?.toLowerCase();
   check("authorization-schema", authorization.recordType === "brf-24-colmap-execution-authorization" &&
