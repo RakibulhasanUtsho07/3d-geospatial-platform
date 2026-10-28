@@ -51,6 +51,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         verification = self._read_json("multiview-source-byte-verification.json")
         packet = self._read_json("multiview-review-manifest.json")
         overlap = self._read_json("pairwise-overlap-report.json")
+        quality_report = self._read_json("private-multiview-media-intake-report.json")
         by_id = {}
         for view in source["views"]:
             # Exact 128-byte synthetic JPEG-like fixture. Not real imagery.
@@ -91,6 +92,22 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
             pair["sha256A"] = by_id[pair["viewA"]]["sha256"]
             pair["sha256B"] = by_id[pair["viewB"]]["sha256"]
         self._write_json(self.root / "pairwise-overlap-report.json", overlap)
+
+        quality_report["sourceManifest"]["manifestSha256"] = hashlib.sha256(
+            (self.root / "brf-14-multiview-source.json").read_bytes()
+        ).hexdigest()
+        quality_report["sourceManifest"]["priorVerificationReportSha256"] = hashlib.sha256(
+            (self.root / "multiview-source-byte-verification.json").read_bytes()
+        ).hexdigest()
+        for record in quality_report["privateMediaIntake"]["records"]:
+            data = by_id[record["sourceId"]]
+            record["sha256"] = data["sha256"]
+            record["byteSize"] = data["byteSize"]
+        for row in quality_report["imageQualityPreflight"]["sources"]:
+            data = by_id[row["sourceId"]]
+            row["sha256"] = data["sha256"]
+            row["byteSize"] = data["byteSize"]
+        self._write_json(self.root / "private-multiview-media-intake-report.json", quality_report)
 
     def _write_decision(self, decision):
         self._write_json(self.root / "review-decision.json", decision)
