@@ -77,3 +77,45 @@ test("no asset-level rights review is falsely recorded as approved", () => {
     assert.equal(item.exactAssetSelectionStatus, "not-selected");
   }
 });
+
+test("BRF-30 records a traceable candidate shortlist without selecting or approving a building", () => {
+  const candidates = registry.buildingSelection.candidates;
+  assert.equal(registry.buildingSelection.status, "not-selected");
+  assert.equal(registry.buildingSelection.candidateShortlistStatus, "research-only-unverified");
+  assert.equal(registry.buildingSelection.buildingId, "");
+  assert.equal(registry.buildingSelection.gmlId, "");
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.gmlId),
+    ["DEBY_LOD3_4959323", "DEBY_LOD3_4959457", "DEBY_LOD3_4959460"],
+  );
+  assert.equal(candidates[0].priorityForInspection, "inspect-first");
+  assert.ok(candidates[0].relatedBenchmarkSourceUrl.includes("GT-LOD3-Benchmark"));
+  for (const candidate of candidates) {
+    assert.equal(candidate.selectionStatus, "candidate-not-selected");
+    assert.equal(candidate.exactFileLicenseStatus, "unverified-for-this-external-file");
+    assert.equal(candidate.fileBytesVerified, false);
+    assert.equal(candidate.sha256, null);
+    assert.equal(candidate.footprintCoordinatesVerified, false);
+    assert.equal(candidate.sourceCrsVerified, false);
+    assert.equal(candidate.verticalReferenceVerified, false);
+    assert.equal(candidate.intersectsUlsCropVerified, false);
+    assert.equal(candidate.sameBuildingImageMappingVerified, false);
+  }
+  assert.ok(registry.blockers.includes("candidate-gml-footprint-not-extracted"));
+  assert.ok(registry.blockers.includes("candidate-gml-exact-file-rights-unverified"));
+  assert.ok(registry.blockers.includes("candidate-uls-image-intersection-not-proven"));
+  assert.ok(registry.blockers.includes("epsg-32632-to-candidate-crs-operation-unverified"));
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.epsgCode, 7837);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.name, "DHHN2016 height");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.status, "candidate-only-not-verified-for-selected-files");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedUlsLaz, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedGml, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.transformationVerified, false);
+  assert.ok(registry.blockers.includes("named-vertical-datum-unresolved"));
+  assert.deepEqual(registry.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});

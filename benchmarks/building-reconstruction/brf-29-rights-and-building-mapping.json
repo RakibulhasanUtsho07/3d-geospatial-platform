@@ -14,7 +14,83 @@
     "referenceModelAssetIds": [],
     "sameBuildingEvidenceUrl": "",
     "reviewer": "",
-    "reviewedAt": ""
+    "reviewedAt": "",
+    "candidateShortlistStatus": "research-only-unverified",
+    "candidates": [
+      {
+        "candidateId": "tum-lod3-4959323",
+        "gmlId": "DEBY_LOD3_4959323",
+        "filename": "DEBY_LOD3_4959323.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "inspect-first",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "relatedBenchmarkSourceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark/blob/main/pc2lod_predictor.ipynb",
+        "evidence": [
+          "GT-LOD3's public notebook contains a commented TUM GML input path ending in DEBY_LOD3_4959323.gml.",
+          "TUM2TWIN's public LOD3 model directory lists this GML filename."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "It is explicitly referenced by the benchmark notebook and listed in the TUM2TWIN model catalogue, making it a traceable candidate to inspect first; neither source proves identity with the ULS crop or selected images."
+      },
+      {
+        "candidateId": "tum-lod3-4959457",
+        "gmlId": "DEBY_LOD3_4959457",
+        "filename": "DEBY_LOD3_4959457.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "alternate",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959457.gml",
+        "relatedAppearanceFolderUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/tree/main/citygml/lod3-building-datasets/DEBY_LOD3_4959457_appearance",
+        "evidence": [
+          "TUM2TWIN's public LOD3 directory lists this GML file and a related appearance folder.",
+          "The folder history shows a commit message referring to the main entrance building; this is a triage hint, not direct identity evidence for the GML file."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "Potential visually distinctive candidate only; no building-footprint or image-to-ULS match has been proven."
+      },
+      {
+        "candidateId": "tum-lod3-4959460",
+        "gmlId": "DEBY_LOD3_4959460",
+        "filename": "DEBY_LOD3_4959460.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "alternate",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+        "relatedTutorialUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+        "evidence": [
+          "TUM2TWIN's public LOD3 directory lists the GML file.",
+          "The public 3D City Database tutorial names this model as an example of a detailed LOD3 import; its sample query point is generic and is not stated to be this model's centroid."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "The tutorial gives a traceable model ID worth checking, but it does not establish a match to the selected ULS crop or imagery."
+      }
+    ],
+    "notes": [
+      "Candidate identifiers are a shortlist only. buildingId and gmlId remain empty and status remains not-selected.",
+      "The LAZ header bounds are campus-wide/source-file bounds, not evidence that any listed GML footprint intersects the relevant crop.",
+      "One tutorial example point lies inside the LAZ header XY envelope, but the source does not identify that point as the centroid of a shortlisted building.",
+      "TUM2TWIN's tutorial uses EPSG:25832 in its example database configuration; the ULS header declares EPSG:32632. The exact candidate GML srsName must be inspected and an explicit coordinate operation documented before comparing geometry.",
+      "A possible vertical-reference lead was added: TUM2TWIN's example database configuration uses EPSG:7837 (DHHN2016 height). It is explicitly only a candidate until the selected ULS/GML metadata confirms it; the vertical-datum release blocker remains."
+    ]
   },
   "licenseEvidence": [
     {
@@ -104,7 +180,19 @@
     "ulsProjectedCrsCodeCandidate": 32632,
     "namedVerticalDatumVerified": false,
     "localToProjectedTransformVerified": false,
-    "sourceToEvaluationTransformVerified": false
+    "sourceToEvaluationTransformVerified": false,
+    "candidateVerticalReference": {
+      "epsgCode": 7837,
+      "name": "DHHN2016 height",
+      "sourceUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+      "epsgDefinitionUrl": "https://epsg.io/7837",
+      "evidence": "The TUM2TWIN tutorial's example database configuration sets HEIGHT_EPSG=7837; EPSG defines 7837 as DHHN2016 height.",
+      "status": "candidate-only-not-verified-for-selected-files",
+      "appliesToSelectedUlsLaz": false,
+      "appliesToSelectedGml": false,
+      "transformationVerified": false,
+      "caution": "This is a lead for checking vertical coordinates, not evidence that the specific LAZ or a particular GML file uses DHHN2016 height. The metadata PDF only says elevation above mean sea level."
+    }
   },
   "releaseFlags": {
     "acceptanceEligible": false,
@@ -123,7 +211,12 @@
     "named-vertical-datum-unresolved",
     "local-coordinate-frame-semantics-unresolved",
     "platform-generated-candidate-glb-missing",
-    "independent-held-out-controls-missing"
+    "independent-held-out-controls-missing",
+    "candidate-gml-footprint-not-extracted",
+    "candidate-gml-exact-file-rights-unverified",
+    "candidate-uls-image-intersection-not-proven",
+    "candidate-gml-source-crs-not-read",
+    "epsg-32632-to-candidate-crs-operation-unverified"
   ],
   "catalogInventory": {
     "source": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
