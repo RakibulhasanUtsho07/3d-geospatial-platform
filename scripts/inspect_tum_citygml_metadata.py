@@ -285,6 +285,60 @@ def bounded_range_get(
         }
 
 
+def read_small_lfs_pointer_blob(
+    blob_sha: str,
+    opener: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
+    """Read the Git blob object for the LFS pointer, never a full CityGML payload.
+
+    The catalog's Git blob ID names the tiny pointer file in the repository tree.
+    The hard cap prevents this endpoint from returning an unbounded model body.
+    """
+    if not re.fullmatch(r"[0-9a-f]{40}", blob_sha):
+        return {"status": "blocked", "reason": "invalid-git-blob-sha"}
+    url = f"{API_BASE}/projects/{PROJECT_ID}/repository/blobs/{blob_sha}/raw"
+    request = urllib.request.Request(url, headers={
+        "Accept-Encoding": "identity",
+        "User-Agent": USER_AGENT,
+    })
+    open_fn = opener or urllib.request.urlopen
+    try:
+        response = open_fn(request, timeout=REQUEST_TIMEOUT_SECONDS)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        return {"status": "blocked", "reason": "lfs-pointer-blob-request-failed", "error": str(exc)[:300]}
+    with response:
+        status_code = getattr(response, "status", None) or response.getcode()
+        if status_code != 200:
+            return {"status": "blocked", "reason": "lfs-pointer-blob-non-200", "httpStatus": status_code}
+        headers = {str(k).lower(): str(v) for k, v in response.headers.items()}
+        declared_length = headers.get("content-length")
+        if declared_length:
+            try:
+                if int(declared_length) > MAX_API_RESPONSE_BYTES:
+                    return {"status": "blocked", "reason": "blob-exceeds-small-pointer-cap", "contentLength": declared_length}
+            except ValueError:
+                return {"status": "blocked", "reason": "blob-content-length-invalid"}
+        # Bounded read only; if this is not a small pointer file, do not keep it.
+        payload = response.read(MAX_API_RESPONSE_BYTES + 1)
+        if len(payload) > MAX_API_RESPONSE_BYTES:
+            return {"status": "blocked", "reason": "blob-exceeds-small-pointer-cap"}
+        pointer = parse_lfs_pointer(payload)
+        if not pointer or pointer.get("status") != "lfs-pointer":
+            return {
+                "status": "blocked",
+                "reason": "git-blob-is-not-an-lfs-pointer",
+                "blobBytes": len(payload),
+                "prefixSha256": hashlib.sha256(payload).hexdigest(),
+            }
+        return {
+            "status": "pointer-read",
+            "body": payload,
+            "pointer": pointer,
+            "pointerBytes": len(payload),
+            "pointerSha256": hashlib.sha256(payload).hexdigest(),
+        }
+
+
 def small_api_request(
     url: str,
     method: str,
@@ -315,30 +369,26 @@ def small_api_request(
         return {"status": "ok", "body": payload}
 
 
-def get_model_prefix(path: str, opener: Callable[..., Any] | None = None) -> dict[str, Any]:
-    quoted_path = urllib.parse.quote(path, safe="")
+def get_model_prefix(file_record: dict[str, Any], opener: Callable[..., Any] | None = None) -> dict[str, Any]:
+    path = str(file_record.get("path", ""))
+    blob_sha = str(file_record.get("repositoryBlobId", ""))
     raw_url = (
-        f"{API_BASE}/projects/{PROJECT_ID}/repository/files/{quoted_path}/raw"
+        f"{API_BASE}/projects/{PROJECT_ID}/repository/files/{urllib.parse.quote(path, safe='')}/raw"
         f"?ref={EXPECTED_SOURCE_COMMIT}"
     )
-    first = bounded_range_get(raw_url, opener=opener)
-    if first.get("status") != "range-read":
+    # GitLab's file-raw route may ignore Range and redirect to the actual LFS
+    # object with HTTP 200. Do not read that response. Resolve the Git tree blob
+    # instead; it is the small LFS pointer object whose blob ID is pinned.
+    pointer_blob = read_small_lfs_pointer_blob(blob_sha, opener=opener)
+    if pointer_blob.get("status") != "pointer-read":
         return {
             "status": "blocked",
-            "reason": first.get("reason", "raw-prefix-read-failed"),
-            "httpStatus": first.get("httpStatus"),
+            "reason": pointer_blob.get("reason", "lfs-pointer-lookup-failed"),
+            "httpStatus": pointer_blob.get("httpStatus"),
             "sourceUrl": raw_url,
         }
-    pointer = parse_lfs_pointer(first["body"])
-    if not pointer or pointer.get("status") != "lfs-pointer":
-        return {
-            **first,
-            "sourceMethod": "gitlab-repository-files-raw",
-            "lfsObject": None,
-            "sourceUrl": raw_url,
-        }
+    pointer = pointer_blob["pointer"]
 
-    # Resolve only the signed LFS download URL; raw model bytes remain bounded.
     batch_headers = {
         "Accept": "application/vnd.git-lfs+json",
         "Content-Type": "application/vnd.git-lfs+json",
@@ -392,6 +442,8 @@ def get_model_prefix(path: str, opener: Callable[..., Any] | None = None) -> dic
     result["lfsObject"] = {
         "oidSha256Declared": pointer["oidSha256"],
         "declaredObjectBytes": pointer["declaredObjectBytes"],
+        "pointerSha256": pointer_blob["pointerSha256"],
+        "pointerBytes": pointer_blob["pointerBytes"],
         "fullObjectHashVerified": False,
     }
     result["sourceUrl"] = raw_url
@@ -401,7 +453,7 @@ def get_model_prefix(path: str, opener: Callable[..., Any] | None = None) -> dic
 def inspect_one_model(file_record: dict[str, Any], opener: Callable[..., Any] | None = None) -> dict[str, Any]:
     path = file_record["path"]
     filename = file_record["filename"]
-    fetched = get_model_prefix(path, opener=opener)
+    fetched = get_model_prefix(file_record, opener=opener)
     base: dict[str, Any] = {
         "filename": filename,
         "path": path,
