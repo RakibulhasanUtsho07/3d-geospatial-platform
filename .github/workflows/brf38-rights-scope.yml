@@ -1,0 +1,76 @@
+name: BRF-38 exact-asset rights-scope gate
+
+on:
+  push:
+    branches:
+      - development
+      - feat/brf38-asset-rights-scope-gate
+    paths:
+      - "src/core/building-generation/brf38-rights-scope-gate.mjs"
+      - "scripts/validate-brf38-rights-scope.mjs"
+      - "tests/brf38-rights-scope.test.mjs"
+      - "tests/brf38-rights-scope-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-38-rights-scope.json"
+      - "docs/research/BRF-38-RIGHTS-SCOPE-GATE.md"
+      - ".github/workflows/brf38-rights-scope.yml"
+      - "package.json"
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "src/core/building-generation/brf38-rights-scope-gate.mjs"
+      - "scripts/validate-brf38-rights-scope.mjs"
+      - "tests/brf38-rights-scope.test.mjs"
+      - "tests/brf38-rights-scope-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-38-rights-scope.json"
+      - "docs/research/BRF-38-RIGHTS-SCOPE-GATE.md"
+      - ".github/workflows/brf38-rights-scope.yml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf38-rights-scope
+  cancel-in-progress: true
+
+jobs:
+  rights-scope-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test exact-asset rights scope, evidence-byte binding and fail-closed behavior
+        run: npm run test:brf38-rights-scope
+      - name: Confirm the real TUM2TWIN rights manifest remains blocked
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/validate-brf38-rights-scope.mjs benchmarks/building-reconstruction/brf-38-rights-scope.json --asset-root . --report artifacts/brf38-rights-scope-report.json > artifacts/brf38-rights-scope-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const summary = JSON.parse(fs.readFileSync("artifacts/brf38-rights-scope-summary.json", "utf8"));
+          const report = JSON.parse(fs.readFileSync("artifacts/brf38-rights-scope-report.json", "utf8"));
+          if (summary.status !== "blocked" || report.status !== "blocked") {
+            throw new Error("The real TUM2TWIN rights manifest must remain blocked.");
+          }
+          if (report.rightsScope.rightsApprovedAssetCount !== 0) {
+            throw new Error("No exact-file rights grants have been verified.");
+          }
+          if (!report.rightsScope.blockers.includes("rights-evidence-assets-present")) {
+            throw new Error("The missing local rights evidence snapshots must be reported.");
+          }
+          if (Object.values(report.rightsScope.releaseFlags).some(Boolean)) {
+            throw new Error("Release flags must remain false.");
+          }
+          console.log("Real TUM2TWIN assets remain rights-blocked; no asset-level permissions were inferred.");
+          NODE

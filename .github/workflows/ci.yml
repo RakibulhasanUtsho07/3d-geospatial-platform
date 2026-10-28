@@ -324,6 +324,26 @@ jobs:
           console.log("Production operation and release flags remain blocked pending reviewed evidence.");
           NODE
 
+      - name: Test BRF-38 exact-asset rights-scope evidence gate
+        run: npm run test:brf38-rights-scope
+      - name: Validate the real TUM2TWIN rights manifest remains blocked
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/validate-brf38-rights-scope.mjs benchmarks/building-reconstruction/brf-38-rights-scope.json --asset-root . --report artifacts/brf38-rights-scope-report.json > artifacts/brf38-rights-scope-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf38-rights-scope-report.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The real rights manifest must remain blocked.");
+          if (report.rightsScope.rightsApprovedAssetCount !== 0) throw new Error("No real asset rights grants were approved.");
+          if (!report.rightsScope.blockers.includes("rights-evidence-assets-present")) throw new Error("Missing evidence-snapshot blocker.");
+          if (Object.values(report.rightsScope.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          console.log("Real source rights remain blocked pending exact-asset evidence.");
+          NODE
+
       - name: Validate BRF-35 real candidate remains blocked
         run: |
           mkdir -p artifacts
