@@ -13,7 +13,7 @@ output_dir="$(cd "$output_arg" && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-for command_name in curl md5sum sha256sum pdfinfo pdftotext python3; do
+for command_name in curl md5sum sha256sum pdfinfo pdftotext pdftoppm python3; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command is missing: $command_name" >&2
     exit 2
@@ -43,6 +43,13 @@ actual_sha256="$(sha256sum "$pdf_path" | awk '{print $1}')"
 
 pdfinfo "$pdf_path" > "$pdfinfo_path"
 pdftotext -layout -enc UTF-8 "$pdf_path" "$text_path"
+# Render a small set of source pages for human verification of tables/figures
+# that text extraction may not preserve. The original PDF stays ephemeral.
+for page_number in 2 4 7; do
+  page_label="$(printf '%02d' "$page_number")"
+  pdftoppm -f "$page_number" -l "$page_number" -png -r 90 -singlefile \
+    "$pdf_path" "$output_dir/page-preview-$page_label" >/dev/null 2>&1
+done
 if [[ ! -s "$text_path" ]]; then
   echo "PDF text extraction produced an empty file; do not infer missing metadata from an empty extraction." >&2
   exit 1
@@ -135,6 +142,7 @@ report = {
     "extractedLineCount": len(lines),
     "keywordHits": {name: len(values) for name, values in hits.items()},
     "keywordEvidence": hits,
+    "reviewPreviews": ["page-preview-02.png", "page-preview-04.png", "page-preview-07.png"],
     "reviewStatus": "pending-human-review",
     "limitations": [
         "Keyword matches are navigation hints, not an interpretation or validation of a CRS/vertical datum.",
