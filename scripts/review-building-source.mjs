@@ -8,7 +8,7 @@ const {values,positionals}=parseArgs({
   licence:{type:"string"},"permitted-operation":{type:"string",multiple:true},author:{type:"string"},attribution:{type:"string"},title:{type:"string"},
   "source-url":{type:"string"},"captured-at":{type:"string"},description:{type:"string"},
   "capture-lon":{type:"string"},"capture-lat":{type:"string"},"heading-degrees":{type:"string"},
-  "confirm-rights":{type:"boolean",default:false},
+  "confirm-rights":{type:"boolean",default:false},help:{type:"boolean",short:"h"},
  }
 });
 if(positionals.length!==3||!values.licence||process.argv.includes("--help")){
