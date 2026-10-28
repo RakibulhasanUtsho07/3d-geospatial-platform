@@ -162,6 +162,12 @@ export async function runMediaToModelWorkflow(options){
  if(strategy==="single-image-ai"&&options.confirmSingleViewInference!==true)throw new TypeError("single-image-ai requires confirmSingleViewInference=true because unseen geometry is inferred");
  const effectiveStrategy = strategy === "auto" ? (options.enablePhotogrammetry === true ? "photogrammetry" : "procedural") : strategy;
  const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[effectiveStrategy];
+ for (const source of sourceInputs) {
+  const missingScopes = requiredOperationScopes.filter(scope => !source.permittedOperations.includes(scope));
+  if (missingScopes.length) {
+   throw new TypeError("source " + source.sourceId + " lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
+  }
+ }
  if(strategy==="photogrammetry"){
   if(options.confirmSameBuilding!==true||options.confirmOverlapReviewed!==true||options.confirmUpAxisReviewed!==true)throw new TypeError("photogrammetry requires same-building, overlap and source-axis confirmations");
   if(!["X","Y","Z"].includes(options.upAxis))throw new TypeError("photogrammetry requires upAxis X, Y or Z");
