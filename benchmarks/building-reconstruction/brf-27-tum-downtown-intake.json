@@ -37,12 +37,97 @@
       }
     },
     "metadataLimitations": [
-      "Published display sizes and MD5 values are source-record metadata only; they are not local byte verification and are not SHA-256 pins.",
-      "The Zenodo record page rendered in this audit did not show a specific rights licence in its Rights section; exact asset/version licence and permitted use remain unreviewed.",
-      "The metadata PDF has not yet been inspected for horizontal CRS, coordinate units, vertical datum, local offsets or transformations.",
-      "The campus dataset does not by itself map a selected image subset, ULS point-cloud crop and individual LOD3 model to one identified building.",
-      "RTK-georeferenced imagery and ULS are promising separate sensing modalities, but this manifest does not assert independent held-out survey controls or candidate accuracy."
-    ]
+      "The metadata PDF was downloaded in CI and its publisher MD5 was verified; an actual SHA-256 was computed and pinned in verifiedMetadata.document.",
+      "The PDF declares WGS 84 / UTM 32N (EPSG:32632) for point clouds and meters/degrees, but its text also describes XYZ coordinates as local. The exact selected LAS/LAZ header/VLR and any local-to-georeferenced transform must be checked before using coordinates.",
+      "Elevation is described as above mean sea level, but no named vertical datum or geoid model was found in the extracted text. Vertical registration remains blocked.",
+      "The reported ICP transform is only for aligning ULS point-cloud part 3 to part 1; it must not be assumed to transform a candidate GLB or an arbitrary source frame.",
+      "The photogrammetry-vs-ULS M3C2 mean (1.7 cm) and standard deviation (22.8 cm) compare related source products from the same campaign, not a platform candidate against independent held-out truth.",
+      "The exact asset/version licence and use-specific rights still need a human review; the metadata PDF does not by itself approve licence terms.",
+      "The campus dataset does not yet map a selected image subset, ULS crop and individual LOD3 model to one identified building.",
+      "No selected source images/point-cloud crops have been downloaded and SHA-256 verified locally for the intended building, and no platform-generated candidate GLB or held-out controls exist."
+    ],
+    "verifiedMetadata": {
+      "document": {
+        "filename": "TUM_Downtown_ULS_Photogrammetry_20241217_docu.pdf",
+        "downloadedBytes": 1256889,
+        "publisherMd5": "3427e70196d1db6a126acb6f041da04a",
+        "publisherMd5MatchesDownloadedBytes": true,
+        "actualSha256": "54f646b757e03d1797c66b1811273b830592143ff868466077e456fac51db2a3",
+        "extractedTextSha256": "3fa9bdf71110c7a1f07adfeae3c9228cf09d58314883ab015994106b7c634d45",
+        "pageCount": 9,
+        "inspectionWorkflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40634521973",
+        "reviewStatus": "text-extracted-pending-visual-human-review"
+      },
+      "horizontalReference": {
+        "declaredCrs": "WGS 84 / UTM 32N",
+        "epsg": 32632,
+        "citation": "Metadata PDF page 2: Coordinate reference system of point clouds",
+        "confidence": "source-declared; exact LAS/LAZ header/VLR still must be inspected for each selected file"
+      },
+      "coordinateUnits": {
+        "declared": [
+          "meters",
+          "degrees"
+        ],
+        "xyz": "XYZ [m]; metadata says coordinates are in the local coordinate system and separately states that georeferenced data is WGS 84 / UTM 32N (EPSG:32632)",
+        "caution": "Do not infer an unprovided local-to-georeferenced transform from the prose alone; inspect exact LAS/LAZ header and source tables/figures."
+      },
+      "verticalReference": {
+        "sourceStatement": "Elevation is given above mean sea level",
+        "namedVerticalCrsOrDatum": null,
+        "status": "blocked; the document excerpt does not name a vertical datum or geoid model"
+      },
+      "georeferencing": {
+        "method": "DJI Matrice 350 RTK with Zenmuse L2; RTK correction via SAPOS Bayern NTRIP service; DJI Terra processing includes UAV position and IMU trajectory correction",
+        "citation": "Metadata PDF page 4",
+        "doesNotEstablish": "independent held-out checkpoints for a platform-generated candidate"
+      },
+      "withinUlsAlignment": {
+        "purpose": "Rigid ICP alignment applied to ULS point-cloud part 3 to align it to part 1",
+        "citation": "Metadata PDF page 4",
+        "matrixRows": [
+          [
+            0.999999821186,
+            0.000590263808,
+            -0.000256100146,
+            690974.2876945734
+          ],
+          [
+            -0.000590334646,
+            0.999999761581,
+            -0.000276683859,
+            5336106.825885445
+          ],
+          [
+            0.000255936757,
+            0.000276834995,
+            0.999999940395,
+            -0.858797907829
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        "reportedPostAlignmentDistances": {
+          "part3ToPart1MeanM": 0.036,
+          "part3ToPart1StandardDeviationM": 0.045,
+          "part3ToPart2MeanM": 0.058,
+          "part3ToPart2StandardDeviationM": 0.057
+        },
+        "caution": "This transform is documented for the within-acquisition ULS part-alignment problem, not a generic candidate-to-reference transform. Verify its source coordinate conventions before reuse."
+      },
+      "sourcePhotogrammetryCrossComparison": {
+        "comparison": "Source photogrammetric point cloud versus ULS point cloud (nadir acquisition only)",
+        "method": "M3C2 point-cloud comparison; ULS samples used as core points",
+        "reportedMeanDifferenceM": 0.017,
+        "reportedStandardDeviationM": 0.228,
+        "citation": "Metadata PDF page 7",
+        "caution": "These are source-dataset cross-comparison statistics, not an engine-generated GLB result, and not genuinely held-out checkpoint accuracy for this platform."
+      }
+    }
   },
   "building": {
     "id": "tum-downtown-unselected-building",
