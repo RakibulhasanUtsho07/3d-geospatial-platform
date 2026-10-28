@@ -33,7 +33,7 @@ Each `candidate` and `reference` record supplied to the CLI must include `geomet
 - an extractor ID/version/commit plus project-relative paths and SHA-256 values for the extractor source artifact and extraction configuration;
 - the same `coordinateFrameId` and metre units used by the evaluator.
 
-The CLI recomputes the geometry payload digest and reads the extractor/config files from disk to verify their actual bytes match the declared hashes. Missing provenance yields an incomplete report; mismatched input, output digest, frame, extractor source or config bytes fails closed. The report records each tool/config artifact hash and per-role provenance status. The helper in `src/core/building-generation/geometry-extraction-provenance.mjs` uses canonical JSON key ordering so property-order changes do not change the payload digest.
+The CLI recomputes the geometry payload digest, reads the extractor/config files from disk to verify their actual bytes match the declared hashes, replays the candidate GLB extractor and reference frame adapter from the actual source bytes using the hash-pinned preparation config, and fails if replayed geometry differs from the manifest. Missing provenance yields an incomplete report; mismatched input, output digest, frame, extractor source or config bytes fails closed. The report records each tool/config artifact hash and per-role provenance status. The helper in `src/core/building-generation/geometry-extraction-provenance.mjs` uses canonical JSON key ordering so property-order changes do not change the payload digest.
 
 Example shape (use actual SHA-256 values for the project’s files; these placeholders are deliberately not runnable):
 
@@ -61,7 +61,7 @@ Example shape (use actual SHA-256 values for the project’s files; these placeh
 }
 ```
 
-This contract binds declarations to the bytes used for the evaluation and makes the extraction recipe traceable. It does **not** execute/replay the extractor, independently prove that the extractor produced the supplied coordinates, or authenticate survey truth; the extractor’s replay, code review and source-to-geometry inspection remain separate tasks. In this slice, footprint/measurement/check-point geometry is still supplied by an upstream preparation step rather than inferred automatically from raw photos/video.
+This contract binds declarations to the bytes used for the evaluation and makes the extraction recipe traceable. The preparation CLI extracts candidate geometry from the raw GLB POSITION/index data and imports the independently reviewed reference JSON into the evaluation frame. The evaluation CLI now replays both operations again from the hash-verified source bytes and the hash-pinned preparation configuration, then compares the resulting geometry payload hashes against the stored candidate/reference payloads before the report can be considered reviewable. Candidate checkpoint coordinates are re-extracted from the exact stored GLB vertex bindings. Altering inline geometry and simply refreshing its declared digest cannot bypass the replay check. This still does **not** authenticate physical-building identity, source rights, survey quality, reviewer independence, or the correctness of the human-approved registration transform. The source-to-geometry mapping and the truth source remain separate evidence obligations; geometry is not inferred automatically from raw photos/video.
 
 ### Run it
 
