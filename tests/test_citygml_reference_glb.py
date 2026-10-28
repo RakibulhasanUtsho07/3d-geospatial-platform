@@ -49,9 +49,14 @@ class TestCityGmlReferenceGlb(unittest.TestCase):
             convert(payload,local_review_only=False)
         with self.assertRaisesRegex(MODULE.ConversionError,"rejected"):
             convert(payload,rights_review_status="rejected")
-        glb,report=convert(payload,rights_review_status="approved",local_review_only=False)
+        glb,report=convert(payload,rights_review_status="approved",local_review_only=False,rights_evidence_url="https://example.test/rights-evidence",attribution_text="Fixture attribution",rights_reviewed_by="reviewer-fixture")
         self.assertTrue(glb.startswith(b"glTF")); self.assertEqual(report["status"],"reference-glb-built-review-required")
         self.assertFalse(any(report["releaseFlags"].values()))
+        self.assertEqual(report["rightsEvidenceUrl"],"https://example.test/rights-evidence")
+        self.assertEqual(report["requiredAttribution"],"Fixture attribution")
+        self.assertEqual(report["rightsReviewedBy"],"reviewer-fixture")
+        with self.assertRaisesRegex(MODULE.ConversionError,"approved rights require an HTTPS rights_evidence_url"):
+            convert(payload,rights_review_status="approved",local_review_only=False,attribution_text="fixture",rights_reviewed_by="reviewer")
 
     def test_rejects_hash_size_commit_crs_and_path_mismatches(self):
         payload=fixture()
