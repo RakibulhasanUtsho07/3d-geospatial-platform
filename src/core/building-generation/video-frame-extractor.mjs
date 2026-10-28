@@ -57,7 +57,7 @@ export async function extractVideoFrames(options) {
       let ingested;
       try{
         const existing=await loadVerifiedSource(root,buildingId,frameSourceId);
-        if(existing.sha256!==imageSha256||existing.record.parentSourceId!==sourceId||existing.record.kind!=="video-frame"){
+        if(existing.sha256!==imageSha256||existing.record.parentSourceId!==sourceId||existing.record.kind!=="video-frame"||JSON.stringify(existing.record.permittedOperations??[])!==JSON.stringify(videoRecord?.permittedOperations??[])){
           throw new TypeError("existing video-frame ID '"+frameSourceId+"' does not match the sampled source frame");
         }
         ingested={record:existing.record};
