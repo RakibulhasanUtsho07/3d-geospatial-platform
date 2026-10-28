@@ -1,0 +1,39 @@
+name: BRF-34 CityGML reference GLB adapter
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf34-citygml-reference-glb.yml"
+      - "scripts/convert_citygml_to_reference_glb.py"
+      - "tests/test_citygml_reference_glb.py"
+      - "docs/research/BRF-34-CITYGML-REFERENCE-GLB-ADAPTER.md"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf34-citygml-reference-glb.yml"
+      - "scripts/convert_citygml_to_reference_glb.py"
+      - "tests/test_citygml_reference_glb.py"
+      - "docs/research/BRF-34-CITYGML-REFERENCE-GLB-ADAPTER.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf34-citygml-reference-glb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-reference-adapter-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/convert_citygml_to_reference_glb.py tests/test_citygml_reference_glb.py
+      - name: Run synthetic CityGML-to-GLB round-trip and fail-closed tests
+        run: python -m unittest discover -s tests -p 'test_citygml_reference_glb.py' -v
+      - name: Confirm no raw source asset or generated GLB was added
+        run: git diff --exit-code -- '*.gml' '*.glb'
