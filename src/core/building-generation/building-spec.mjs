@@ -1,6 +1,6 @@
 const SOURCE_KINDS = new Set(["text", "image", "video", "video-frame", "floor-plan", "cad", "bim", "survey", "map", "other"]);
 const SOURCE_OPERATION_SCOPES = new Set([
-  "private-image-ingestion", "private-image-quality-preflight", "video-frame-extraction",
+  "private-media-ingestion", "private-image-quality-preflight", "video-frame-extraction",
   "procedural-model-derivation", "single-image-ai-reconstruction", "photogrammetry-reconstruction", "texture-baking",
 ]);
 const CONFIDENCE = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown"]);
