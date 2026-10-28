@@ -56,6 +56,7 @@
     "test:model-review-summary": "node --test tests/model-review-summary.test.mjs",
     "reconstruct:building-media": "node scripts/reconstruct-building-from-media.mjs",
     "test:single-image-3d": "node --test tests/single-image-3d-worker.test.mjs",
+    "test:video-frame-operation-scopes": "node --test tests/video-frame-extractor-operation-scopes.test.mjs",
     "generate:building-from-image": "node scripts/generate-building-from-image.mjs",
     "review:building-source": "node scripts/review-building-source.mjs",
     "prepare:building-spec": "node scripts/prepare-building-spec.mjs",
