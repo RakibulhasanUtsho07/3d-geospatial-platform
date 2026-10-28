@@ -238,6 +238,9 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
                               "reviewedAtUtc": human_review_result.get("reviewedAtUtc") if human_review_result else None},
             "reviewCounts": human_review_result.get("reviewCounts") if human_review_result else None,
             "humanReview": human_review_result.get("humanReview") if human_review_result else None,
+            "imageQualityPreflight": (
+                human_review_result.get("imageQualityPreflight") if human_review_result else None
+            ),
             "profile": {"filename": profile_path.name, "byteSize": len(profile_bytes),
                         "sha256": hashlib.sha256(profile_bytes).hexdigest()},
             "sourceImages": {"verifiedCount": len(image_records),
