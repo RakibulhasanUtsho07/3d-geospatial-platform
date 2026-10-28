@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 import { ingestMediaFile, toBuildingSpecSource } from "../src/core/building-generation/media-intake.mjs";
+import { reviewBuildingSource } from "../src/core/building-generation/source-workflow.mjs";
 import { buildFfmpegArgs, extractVideoFrames } from "../src/core/building-generation/video-frame-extractor.mjs";
 
 async function workspace(t){const root=await mkdtemp(path.join(os.tmpdir(),"building-media-"));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
@@ -45,16 +46,18 @@ test("builds bounded FFmpeg argv without shell evaluation",()=>{
 });
 test("extracts bounded frames as distinct source records and avoids reconstruction claims",async t=>{
  const root=await workspace(t);await mkdir(path.join(root,"input"));await writeFile(path.join(root,"input","site.mp4"),mp4);
- const video=await ingestMediaFile({workspaceRoot:root,sourcePath:"input/site.mp4",buildingId:"demo",sourceId:"site-video",kind:"auto",licence:"CC BY 4.0",usageStatus:"approved"});
- const result=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:video.record,spawnImpl:fakeSpawn});
+ const video=await ingestMediaFile({workspaceRoot:root,sourcePath:"input/site.mp4",buildingId:"demo",sourceId:"site-video",kind:"auto"});
+ const reviewed=await reviewBuildingSource({workspaceRoot:root,buildingId:"demo",sourceId:"site-video",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","video-frame-extraction"],confirmRights:true,attribution:"Synthetic test fixture"});
+ const result=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:reviewed.record,spawnImpl:fakeSpawn});
  assert.equal(result.extractedFrames,2);assert.equal(result.frames[0].kind,"video-frame");assert.equal(result.frames[0].parentSourceId,"site-video");
  assert.equal(result.frames[1].nominalTimeSeconds,2);assert.match(result.warning,/does not identify the building/);
- const resumed=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:video.record,spawnImpl:fakeSpawn});
+ const resumed=await extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"site-video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:reviewed.record,spawnImpl:fakeSpawn});
  assert.equal(resumed.extractedFrames,2);
  assert.deepEqual(resumed.frames.map(frame=>frame.sha256),result.frames.map(frame=>frame.sha256));
 });
 test("reports missing FFmpeg clearly",async t=>{
  const root=await workspace(t);await writeFile(path.join(root,"video.mp4"),mp4);
  const video=await ingestMediaFile({workspaceRoot:root,sourcePath:"video.mp4",buildingId:"demo",sourceId:"video",kind:"auto"});
- await assert.rejects(extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,ffmpegPath:"no-such-ffmpeg-binary"}),/Could not start FFmpeg/);
+ const reviewed=await reviewBuildingSource({workspaceRoot:root,buildingId:"demo",sourceId:"video",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","video-frame-extraction"],confirmRights:true,attribution:"Synthetic test fixture"});
+ await assert.rejects(extractVideoFrames({workspaceRoot:root,videoRelativePath:video.record.relativePath,buildingId:"demo",sourceId:"video",fps:0.5,maxFrames:10,maxWidth:1600,timeoutMs:600000,videoRecord:reviewed.record,ffmpegPath:"no-such-ffmpeg-binary"}),/Could not start FFmpeg/);
 });

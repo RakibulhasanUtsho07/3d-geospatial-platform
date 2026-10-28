@@ -4,6 +4,7 @@ import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promi
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { normalizeSourceOperationScopes } from "./source-workflow.mjs";
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const MAX_MODEL_BYTES=500*1024*1024;
@@ -65,6 +66,10 @@ export async function runSingleImage3D(options){
  if(record.id!==sourceId||record.buildingId!==buildingId)throw new TypeError("source metadata identity mismatch");
  if(!["image","video-frame"].includes(record.kind)||!["image/jpeg","image/png"].includes(record.mimeType))throw new TypeError("single-image AI route only accepts approved JPEG/PNG images or extracted video frames");
  if(record.usageStatus!=="approved"||typeof record.licence!=="string"||!record.licence.trim()||record.licence.toLowerCase()==="unknown")throw new TypeError("source must have a reviewed licence and usageStatus=approved");
+ const recordedScopes=normalizeSourceOperationScopes(record.permittedOperations, "source " + sourceId + " permittedOperations");
+ const declaredScopes=normalizeSourceOperationScopes(declared.permittedOperations, "BuildingSpec source " + sourceId + " permittedOperations");
+ if(JSON.stringify(recordedScopes)!==JSON.stringify(declaredScopes))throw new TypeError("BuildingSpec source must match the source record permitted operation scopes");
+ if(!recordedScopes.includes("single-image-ai-reconstruction"))throw new TypeError("source " + sourceId + " lacks explicit single-image-ai-reconstruction permission");
  if(declared.usageStatus!=="approved"||declared.licence!==record.licence||declared.assetId!==record.assetId)throw new TypeError("BuildingSpec source must match the approved source licence, usage status and assetId");
  if(typeof record.relativePath!=="string"||record.relativePath.includes("\\"))throw new TypeError("source asset relativePath is invalid");
  const assetPath=path.resolve(root,record.relativePath);
@@ -91,7 +96,7 @@ export async function runSingleImage3D(options){
  const report={
   schemaVersion:"1.0.0",engine:"single-image-ai-triposr-v1",modelImplementation:"VAST-AI-Research/TripoSR",
   modelLicense:"MIT (verify installed revision and notices)",buildingId,jobId,sourceId,status:"running",startedAt,
-  source:{sha256:inputHash,licence:record.licence,usageStatus:record.usageStatus,mimeType:record.mimeType},
+  source:{sha256:inputHash,licence:record.licence,usageStatus:record.usageStatus,permittedOperations:record.permittedOperations,mimeType:record.mimeType},
   modelParameters:{modelId,device,mcResolution:resolution,modelSaveFormat:"glb",backgroundRemoval:true},
   confidence:"ai-proposed",scaleCalibration:{status:"not-calibrated"},georeference:{status:"not-solved"},
   warnings:["Single-image AI inferred unseen surfaces; this is not measured or survey-accurate architecture.","Output scale, front-facing direction and georeference are not established by the input image.","Human review is mandatory before any use as a building model."],
