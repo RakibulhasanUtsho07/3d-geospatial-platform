@@ -211,7 +211,8 @@
     "build:building-visual-evidence-package": "node scripts/build-building-visual-evidence-package.mjs",
     "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
     "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs",
-    "prepare:independent-building-truth": "node scripts/prepare-independent-building-truth-manifest.mjs"
+    "prepare:independent-building-truth": "node scripts/prepare-independent-building-truth-manifest.mjs",
+    "test:brf35-building-linkage": "node --test tests/brf35-building-linkage.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
