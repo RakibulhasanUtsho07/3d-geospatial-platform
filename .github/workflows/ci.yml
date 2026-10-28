@@ -60,6 +60,7 @@ on:
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
+      - feat/brf46-source-operation-scope-gate
   pull_request:
     branches:
       - main
@@ -100,6 +101,7 @@ on:
       - feat/p2-18-selected-geometry-lru-cache
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
+      - feat/brf46-source-operation-scope-gate
       - development
 
 permissions:
@@ -523,6 +525,9 @@ jobs:
 
       - name: Test single-image AI-to-GLB preview worker
         run: npm run test:single-image-3d
+
+      - name: Test video-frame operation-scope inheritance and cache invalidation
+        run: npm run test:video-frame-operation-scopes
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget
