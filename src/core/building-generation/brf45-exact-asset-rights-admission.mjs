@@ -191,7 +191,14 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
     if (decision !== "approved") {
       add(checks, blockers, rowPrefix + "-decision-approved", false,
         "Exact-asset rights decision is pending or denied; a dataset label cannot imply permission.");
-      perAsset.push({ sourceId: id, status: "blocked", missingEvidence: ["explicit-approved-rights-decision"] });
+      perAsset.push({
+        sourceId: id,
+        filename: row?.filename ?? null,
+        sha256: row?.sha256 ?? null,
+        byteSize: row?.byteSize ?? null,
+        status: "blocked",
+        missingEvidence: ["explicit-approved-rights-decision"],
+      });
       continue;
     }
     const rights = isRecord(row.rights) ? row.rights : {};
@@ -261,6 +268,9 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
     }
     perAsset.push({
       sourceId: id,
+      filename: row?.filename ?? null,
+      sha256: row?.sha256 ?? null,
+      byteSize: row?.byteSize ?? null,
       status: approved ? "evidence-complete-human-review-required" : "blocked",
       grantor: rights.rightsHolderOrGrantor ?? null,
       grantedScopes: granted,
