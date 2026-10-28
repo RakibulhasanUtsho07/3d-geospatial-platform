@@ -53,11 +53,13 @@ export function assessBrf25CandidateBinding(input = {}) {
   check("candidate-generated", record.status === "candidate-generated-requires-review" &&
     record.candidateGlbGenerated === true && object(record.candidateGlb),
   "Only an actual worker-generated candidate marked for review can enter geometry evaluation.");
+  const reviewer = record.humanDecision?.reviewer;
+  const reviewerValid = (typeof reviewer === "string" && reviewer.trim().length > 0) ||
+    (object(reviewer) && typeof reviewer.name === "string" && reviewer.name.trim().length > 0 &&
+      typeof reviewer.identifier === "string" && reviewer.identifier.trim().length > 0);
   check("reviewer-disposition", record.humanDecision?.overallDisposition === "continue-to-reconstruction-preflight" &&
-    typeof record.humanDecision?.reviewer === "string" &&
-    record.humanDecision.reviewer.trim().length > 0 &&
-    SHA256.test(record.humanDecision?.sha256 ?? ""),
-  "A hash-bound human decision with the permitted continuation disposition is required.");
+    reviewerValid && SHA256.test(record.humanDecision?.sha256 ?? ""),
+  "A hash-bound human decision with reviewer name/identifier and the permitted continuation disposition is required.");
   check("preflight-hash-pinned", SHA256.test(record.preflightReport?.sha256 ?? ""),
     "Authorization must pin the hash of its BRF-23 preflight report.");
   check("profile-hash-pinned", SHA256.test(record.profile?.sha256 ?? ""),

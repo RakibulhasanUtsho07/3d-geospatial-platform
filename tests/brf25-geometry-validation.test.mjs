@@ -10,7 +10,8 @@ function authorization(overrides = {}) {
     status: "candidate-generated-requires-review",
     candidateGlbGenerated: true,
     candidateGlb: { sha256: hash("a"), relativePath: "outputs/candidate.glb", byteSize: 1024 },
-    humanDecision: { overallDisposition: "continue-to-reconstruction-preflight", reviewer: "reviewer-1", sha256: hash("b") },
+    humanDecision: { overallDisposition: "continue-to-reconstruction-preflight",
+      reviewer: { name: "Reviewer One", identifier: "reviewer-1" }, sha256: hash("b") },
     preflightReport: { sha256: hash("c") },
     profile: { sha256: hash("d") },
     toolchain: { name: "COLMAP", version: "4.2.1", versionRecheckedImmediatelyBeforeRun: true },
@@ -91,4 +92,29 @@ test("blocks if COLMAP was not rechecked directly before execution or GPS regist
   assert.ok(version.blockers.some((item) => item.id === "toolchain-rechecked"));
   const gps = assess(authorization({ coordinateFrame: { policy: "local", registrationToGps: true } }));
   assert.ok(gps.blockers.some((item) => item.id === "local-frame-policy"));
+});
+
+test("accepts the actual BRF-24 reviewer object shape (name and identifier)", () => {
+  const record = authorization({
+    humanDecision: {
+      overallDisposition: "continue-to-reconstruction-preflight",
+      reviewer: { name: "Actual BRF-24 Reviewer", identifier: "reviewer-id-actual" },
+      sha256: hash("b"),
+    },
+  });
+  const result = assess(record);
+  assert.equal(result.ready, true);
+  assert.equal(result.status, "candidate-bound-review-only");
+});
+
+test("rejects malformed reviewer objects even when the decision hash is present", () => {
+  const result = assess(authorization({
+    humanDecision: {
+      overallDisposition: "continue-to-reconstruction-preflight",
+      reviewer: { name: "", identifier: "reviewer-id" },
+      sha256: hash("b"),
+    },
+  }));
+  assert.equal(result.ready, false);
+  assert.ok(result.blockers.some((item) => item.id === "reviewer-disposition"));
 });
