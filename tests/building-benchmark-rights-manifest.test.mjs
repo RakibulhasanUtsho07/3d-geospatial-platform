@@ -32,9 +32,14 @@ test("BRF-29 source-rights matrix separates repository licence claims from selec
   const tum2twin = registry.licenseEvidence.find((item) => item.id === "tum2twin-github-project-license");
   assert.ok(tum2twin);
   assert.equal(tum2twin.licenseName, "CC BY 4.0");
-  assert.equal(tum2twin.status, "repository-license-file-verified-scope-review-pending");
-  assert.equal(tum2twin.repositoryCommitSha, "e032a71fc9b3c9c3d4869e3aca9677d1234086aa");
-  assert.equal(tum2twin.licenseFileSha256, "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411");
+  assert.equal(tum2twin.status, "external-dataset-license-unverified");
+
+  const gitlabData = registry.licenseEvidence.find((item) => item.id === "tum2twin-dataset-gitlab-license");
+  assert.ok(gitlabData);
+  assert.equal(gitlabData.licenseName, "CC BY 4.0");
+  assert.equal(gitlabData.status, "repository-license-file-verified-scope-review-pending");
+  assert.equal(gitlabData.repositoryCommitSha, "e032a71fc9b3c9c3d4869e3aca9677d1234086aa");
+  assert.equal(gitlabData.licenseFileSha256, "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411");
   assert.equal(registry.catalogInventory.gmlFileCount, 27);
   assert.equal(registry.catalogInventory.snapshotPath, "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json");
   assert.equal(registry.catalogInventory.snapshotCommit, "648f9fb3571ea21cd3f665f03a8f8b309a7fe8be");
