@@ -77,6 +77,15 @@ The codebase still needs real-data validation and product-level completion. The 
 
 **Acceptance gates:** schema/integrity tests; fixed-camera footprint/placement comparison; non-empty selective viewport fetch; failure/fallback and cancellation behavior; model/data hashes; no claims that fixture validation equals production tile rendering.
 
+#### P3.6 implementation record — multi-building package pilot (review-only)
+
+- Added `scripts/build-dhaka-3d-tiles-package.mjs`: emits an OGC 3D Tiles 1.1 parent/child hierarchy with individually hashed GLB content for a bounded set of source Polygon/MultiPolygon exterior footprints; uses per-feature ENU-to-WGS84-ECEF transforms and counts rejected/unsupported features.
+- Added `src/core/geospatial/tileset-package-integrity.mjs` and a repeatable verifier CLI. The integrity gate checks manifest/content URI safety, symlinks, package containment, source hash shape/optional expected hash, tile/file manifest agreement, file byte sizes and SHA-256. It no longer treats valid `tileset.json` alone as sufficient package evidence.
+- Added deterministic tests for convex/concave footprints, MultiPolygon content, output hashes, unsupported geometries/holes/out-of-bounds/oversize/duplicate inputs, corrupt or missing assets, traversal attempts, and symlinks.
+- Added a dedicated workflow to build and verify a maximum-32-feature package from the repository's Dhaka pilot extract, while retaining artifact evidence for review.
+- **Limitations remain explicit:** pilot height is a constant synthetic value; polygons containing holes are excluded; facades, roofs, textures, survey accuracy, source rights and Cesium selective viewport rendering are not established by the package test. All release flags remain false.
+- **Still required for P3.6 production acceptance:** human review of fixed-camera renders, independent footprint/placement evidence, a live Cesium multi-tile viewport/selective-fetch test, cancellation/fallback/resource-cleanup checks, and sourced height/elevation provenance. Do not promote this pilot to default map loading before those gates pass.
+
 ### Phase 7 — P3.7: Floor-plan to interior model review pipeline
 
 **Scope:** audit PR #80 and current raster-line proposals. Keep detected lines as suggestions until reviewed; add explicit scale calibration, vector review, room/wall/door/window semantics, measured-vector GLB validation, and floor-plan source-to-candidate hash linkage.
