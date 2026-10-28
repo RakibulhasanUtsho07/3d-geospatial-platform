@@ -270,6 +270,29 @@ function optionsFor(f, overrides = {}) {
     ...overrides,
   };
 }
+
+async function refreshBoundQualityAndReview(f, qualityReport, qualitySummary = qualityReport.imageQualityPreflight) {
+  const qualityBytes = Buffer.from(JSON.stringify(qualityReport, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, artifacts.privateMediaQualityReport), qualityBytes);
+  f.report.assessedInputs.evidenceBindings.privateMediaQualityReport = {
+    filename: artifacts.privateMediaQualityReport,
+    byteSize: qualityBytes.length,
+    sha256: sha(qualityBytes),
+  };
+  f.report.assessedInputs.imageQualityPreflight = qualitySummary;
+
+  const decisionPath = path.join(f.artifactRoot, "decision.json");
+  const decision = JSON.parse(await readFile(decisionPath, "utf8"));
+  decision.evidenceBindings = f.report.assessedInputs.evidenceBindings;
+  const decisionBytes = Buffer.from(JSON.stringify(decision, null, 2) + "\n");
+  await writeFile(decisionPath, decisionBytes);
+  f.report.assessedInputs.humanDecision.byteSize = decisionBytes.length;
+  f.report.assessedInputs.humanDecision.sha256 = sha(decisionBytes);
+
+  f.reportBytes = Buffer.from(JSON.stringify(f.report, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, "preflight.json"), f.reportBytes);
+}
+
 test("accepts only a complete pinned local-only preflight structure", async t => {
   const f = await setup(t);
   const result = validateBrf23ExecutionReport(f.report);
@@ -304,6 +327,30 @@ test("rejects modified report-bound evidence, decision, profile, and source byte
     await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f)), /changed|differ|hash|SHA-256/i);
   }
 });
+test("BRF-23 cannot promote BRF-42 rights flags or per-image usage status", async t => {
+  const f = await setup(t);
+  for (const mutate of [
+    quality => { quality.rightsApproved = true; },
+    quality => { quality.safeToSubmitToColmap = true; },
+    quality => { quality.sources[0].usageStatus = "approved"; },
+  ]) {
+    const modified = structuredClone(f.report);
+    mutate(modified.assessedInputs.imageQualityPreflight);
+    assert.throws(() => validateBrf23ExecutionReport(modified), /BRF-42 quality summary/);
+  }
+});
+
+test("rejects a changed per-view quality hash even when outer report bindings are refreshed", async t => {
+  const f = await setup(t);
+  const changed = structuredClone(f.qualityReport);
+  changed.imageQualityPreflight.sources[0].sha256 = "e".repeat(64);
+  await refreshBoundQualityAndReview(f, changed);
+  await assert.rejects(
+    runBrf23AuthorizedColmapReconstruction(optionsFor(f)),
+    /BRF-42 per-view media\/quality record differs from the pinned BRF-14 source/,
+  );
+});
+
 test("rejects selected media not in the reviewed source hashes", async t => {
   const f = await setup(t);
   const sourcePath = path.join(f.workspaceRoot, ".building-engine", "media", "building-one", "sources", "view-1.json");
