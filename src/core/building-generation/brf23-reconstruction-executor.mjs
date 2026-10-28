@@ -4,6 +4,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runColmapReconstruction } from "./colmap-worker.mjs";
+import { validateBrf45ExactAssetRightsAdmission } from "./brf45-exact-asset-rights-admission.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const BASENAME = /^[A-Za-z0-9_.-]{1,160}$/;
@@ -178,6 +179,15 @@ function validateReport(report) {
     filenames.add(image.filename); hashes.add(image.sha256);
   }
   const imageQualityPreflight = validateImageQualitySummary(inputs.imageQualityPreflight, imageSet);
+  const rightsAdmission = inputs.rightsAdmission;
+  requireValue(rightsAdmission && rightsAdmission.filename === "brf-45-exact-asset-rights-admission.json" &&
+    Number.isSafeInteger(rightsAdmission.byteSize) && rightsAdmission.byteSize > 0 &&
+    typeof rightsAdmission.sha256 === "string" && SHA256.test(rightsAdmission.sha256) &&
+    rightsAdmission.evaluationId === "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION" &&
+    rightsAdmission.assetCount === imageSet.expectedCount &&
+    Number.isSafeInteger(rightsAdmission.pendingDecisionCount) &&
+    rightsAdmission.pendingDecisionCount >= 0 && rightsAdmission.pendingDecisionCount <= rightsAdmission.assetCount,
+    "BRF-45 exact-asset rights admission must be separately hash-bound to the preflight.");
   const profile = inputs.profile;
   requireValue(profile && typeof profile.filename === "string" && BASENAME.test(profile.filename) &&
     Number.isSafeInteger(profile.byteSize) && profile.byteSize > 0 &&
@@ -197,7 +207,7 @@ function validateReport(report) {
   requireValue(["X", "Y", "Z"].includes(frame.reviewedSourceUpAxis) &&
     frame.reviewedSourceUpAxisPositiveDirection === "positive",
     "The exporter supports only a reviewer-confirmed positive X/Y/Z up-axis.");
-  return { inputs, bindings, decision, imageSet, imageQualityPreflight, profile, profileId: report.profileId, tool, frame };
+  return { inputs, bindings, decision, imageSet, imageQualityPreflight, rightsAdmission, profile, profileId: report.profileId, tool, frame };
 }
 
 async function verifyEvidence(artifactRoot, bindings, validated) {
@@ -216,6 +226,13 @@ async function verifyEvidence(artifactRoot, bindings, validated) {
   const sourceManifest = parseJson(files.sourceManifest.bytes, "BRF-14 source manifest");
   const byteReport = parseJson(files.byteVerificationReport.bytes, "BRF-14 byte-verification report");
   const qualityReport = parseJson(files.privateMediaQualityReport.bytes, "BRF-42 private multi-view quality report");
+  const rightsAdmissionFile = await readRegularFile(
+    path.join(artifactRoot, safeBasename(validated.rightsAdmission.filename, "BRF-45 rights-admission filename")),
+    "BRF-45 rights-admission register", 20 * 1024 * 1024);
+  requireValue(rightsAdmissionFile.byteSize === validated.rightsAdmission.byteSize &&
+    rightsAdmissionFile.sha256 === validated.rightsAdmission.sha256,
+    "BRF-45 rights-admission register changed after BRF-23 preflight.");
+  const rightsAdmission = parseJson(rightsAdmissionFile.bytes, "BRF-45 exact-asset rights admission");
   requireValue(sourceManifest?.schemaVersion === "1.0.0" &&
     sourceManifest?.evaluationStage === "multiview-source-byte-intake-only" &&
     Array.isArray(sourceManifest.views) && sourceManifest.views.length === validated.imageSet.expectedCount &&
@@ -352,7 +369,12 @@ async function verifyEvidence(artifactRoot, bindings, validated) {
     flags && RELEASE_FLAGS.every(flag => flags[flag] === false) &&
     RELEASE_FLAGS.every(flag => sourceManifest[flag] === false),
     "BRF-42 report must keep rights/identity/reconstruction pending and every release flag false.");
-  return qualityReport;
+  const rightsAdmissionReport = await validateBrf45ExactAssetRightsAdmission(rightsAdmission, {
+    sourceManifest,
+    evidenceRoot: artifactRoot,
+    sourceManifestSha256: files.sourceManifest.sha256,
+  });
+  return { sourceManifest, qualityReport, rightsAdmission, rightsAdmissionReport };
 }
 async function verifyDecisionAndProfile(artifactRoot, profilePath, validated) {
   const reportDecision = validated.decision;
@@ -505,7 +527,7 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     "BRF-23 report SHA-256 differs from the explicitly pinned value.");
   const report = parseJson(reportFile.bytes, "BRF-23 report");
   const validated = validateReport(report);
-  const brf42QualityReport = await verifyEvidence(artifactRoot, validated.bindings, validated);
+  const verifiedEvidence = await verifyEvidence(artifactRoot, validated.bindings, validated);
   requireValue(decisionName === validated.decision.filename, "Decision name differs from BRF-23's exact binding.");
   await verifyDecisionAndProfile(artifactRoot, options.profilePath, validated);
   await verifyRawImages(imageRoot, validated.imageSet);
@@ -526,21 +548,20 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
 
   const selected = await verifySelectedMedia(workspaceRoot, buildingId, options.sourceIds,
     options.buildingSpec, validated.imageSet);
+
+  // BRF-42 remains an immutable history of the original unreviewed intake.
+  // Only the separately hash-bound BRF-45 per-asset grant evidence can satisfy the
+  // source-use gate; human-review continuation or mutable media metadata cannot.
+  const rightsAdmissionReport = verifiedEvidence.rightsAdmissionReport;
+  requireValue(rightsAdmissionReport.status === "rights-admission-complete-human-review-required",
+    "BRF-45 exact-asset rights admission is blocked: " +
+    rightsAdmissionReport.blockers.slice(0, 12).join(", ") +
+    ". The COLMAP worker was not started; acquire and review exact-source rights evidence first.");
+
   const version = await (options.colmapVersionProbe || probeVersion)(
     validated.tool.resolvedExecutable, options.colmapSpawnImpl || nodeSpawn);
   requireValue(version === validated.tool.expectedVersion,
     "COLMAP version changed after preflight; expected " + validated.tool.expectedVersion + ", got " + String(version) + ".");
-
-  // BRF-42 is an engineering-only intake report, not a rights grant. Do not let a
-  // separate human decision or a mutable media registry override its unreviewed state.
-  const brf42Quality = brf42QualityReport.imageQualityPreflight;
-  const brf42IntakeRecords = brf42QualityReport.privateMediaIntake.records;
-  requireValue(brf42Quality.rightsApproved === true &&
-    brf42Quality.safeToSubmitToColmap === true &&
-    brf42IntakeRecords.every(row => row.usageStatus === "approved") &&
-    brf42Quality.sources.every(row => row.usageStatus === "approved") &&
-    brf42QualityReport.reviewAndRelease.rightsReview === "approved-for-this-use",
-    "BRF-42 evidence cannot authorize COLMAP: source rights remain unreviewed and safeToSubmitToColmap=false. Obtain exact-asset rights-cleared admission evidence before reconstruction; worker was not started.");
 
   const authorization = {
     schemaVersion: "1.0.0",
