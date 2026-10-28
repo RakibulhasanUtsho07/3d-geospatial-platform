@@ -38,7 +38,7 @@ test("verifies exact local bytes while keeping rights and release approval separ
 test("blocks hash changes after source bytes are mutated", async (t) => {
   const root = await withRoot(t);
   const a = await writeAsset(root, "images/front.jpg", "original");
-  await writeFile(path.join(root, a.localPath), "changed bytes");
+  await writeFile(path.join(root, a.localPath), "mutated!");
   const report = await verifyBrf36SourceAssetBytes(manifest([a]), root);
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.includes("asset-front-sha256"));
