@@ -163,6 +163,9 @@ export async function runMediaToModelWorkflow(options){
  const effectiveStrategy = strategy === "auto" ? (options.enablePhotogrammetry === true ? "photogrammetry" : "procedural") : strategy;
  const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[effectiveStrategy];
  for (const source of sourceInputs) {
+  if (source.kind === "video" && !source.permittedOperations.includes("video-frame-extraction")) {
+   throw new TypeError("video source " + source.sourceId + " must explicitly permit video-frame-extraction before media intake");
+  }
   const missingScopes = requiredOperationScopes.filter(scope => !source.permittedOperations.includes(scope));
   if (missingScopes.length) {
    throw new TypeError("source " + source.sourceId + " lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
