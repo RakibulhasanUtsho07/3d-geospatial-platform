@@ -7,7 +7,7 @@ import { runMediaToModelWorkflow } from "../src/core/building-generation/media-t
 const {values,positionals}=parseArgs({
  args:process.argv.slice(2),allowPositionals:true,
  options:{
-  source:{type:"string",multiple:true}, licence:{type:"string",multiple:true},
+  source:{type:"string",multiple:true}, licence:{type:"string",multiple:true},"permitted-operation":{type:"string",multiple:true},
   author:{type:"string",multiple:true}, attribution:{type:"string",multiple:true},
   "source-url":{type:"string",multiple:true}, "captured-at":{type:"string",multiple:true},
   description:{type:"string",multiple:true}, kind:{type:"string",multiple:true},
@@ -33,7 +33,7 @@ const {values,positionals}=parseArgs({
  }
 });
 function usage(){
- console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --control-points <gcp.json> --max-gcp-rms-m 0.5 --max-gcp-residual-m 1.0\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable>\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
+ console.log("Usage: node scripts/build-building-from-media.mjs <workspaceRoot> <base-spec.json> <jobId> [options]\\n\\nSources (repeat as needed):\\n  --source <sourceId=workspace-relative-path>\\n  --licence <sourceId=known licence/permission basis>\\n  --permitted-operation <sourceId=scope> (repeat for each allowed operation)\\n  --author <sourceId=name> --attribution <sourceId=credit>\\n  --source-url <sourceId=https://...> --captured-at <sourceId=timestamp>\\n  --description <sourceId=text> --kind <sourceId=auto|image|video|floor-plan>\\n  --confirm-rights\\n  --views <comma-separated image/video-frame source IDs>\\n\\nStrategies:\\n  --strategy procedural\\n  --strategy single-image-ai --views <one image ID> --runner-script <TripoSR/run.py> --confirm-single-view-inference\\n  --strategy photogrammetry --views <3+ image IDs> --up-axis X|Y|Z --confirm-same-building --confirm-overlap-reviewed --confirm-up-axis-reviewed\\n\\nOptional:\\n  --model-distance <model units> --real-distance-m <metres>\\n  --control-points <gcp.json> --max-gcp-rms-m 0.5 --max-gcp-residual-m 1.0\\n  --fps 0.5 --max-frames 60 --frame-width 1600 --ffmpeg <executable>\\n  --quality LOW|MEDIUM|HIGH|EXTREME --colmap-path <executable>\\n  --python <executable> --device cuda:0|cpu --resolution 256 --model stabilityai/TripoSR\\n\\nInput files must exist inside workspaceRoot. Video input requires FFmpeg; COLMAP and TripoSR/PyTorch must be installed separately. Source rights must be checked by you. This command writes review candidates only and never publishes to /map.");
 }
 function asList(value){return value===undefined?[]:Array.isArray(value)?value:[value];}
 function parsePairs(raw,label){
@@ -47,6 +47,19 @@ function parsePairs(raw,label){
  }
  return result;
 }
+function parseMultiPairs(raw,label){
+ const result=new Map();
+ for(const item of asList(raw)){
+  const equals=item.indexOf("=");
+  if(equals<=0||equals===item.length-1)throw new TypeError("--"+label+" entries must be sourceId=value");
+  const id=item.slice(0,equals).trim(),value=item.slice(equals+1).trim();
+  if(!id||!value)throw new TypeError("--"+label+" entries must be sourceId=value");
+  const existing=result.get(id)??[];
+  if(existing.includes(value))throw new TypeError("duplicate --"+label+" value '"+value+"' for source '"+id+"'");
+  result.set(id,[...existing,value]);
+ }
+ return result;
+}
 function numeric(value,label){const out=Number(value);if(!Number.isFinite(out))throw new TypeError(label+" must be numeric");return out;}
 if(process.argv.includes("--help")||positionals.length!==3){usage();process.exit(process.argv.includes("--help")?0:2);}
 const [workspaceRootArg,baseSpecArg,jobId]=positionals;
@@ -56,19 +69,19 @@ try{
   if(equals<=0||equals===item.length-1)throw new TypeError("--source entries must be sourceId=relative/path");
   return {sourceId:item.slice(0,equals).trim(),relativePath:item.slice(equals+1).trim()};
  });
- const licences=parsePairs(values.licence,"licence"),authors=parsePairs(values.author,"author"),credits=parsePairs(values.attribution,"attribution");
+ const licences=parsePairs(values.licence,"licence"),operationScopes=parseMultiPairs(values["permitted-operation"],"permitted-operation"),authors=parsePairs(values.author,"author"),credits=parsePairs(values.attribution,"attribution");
  const urls=parsePairs(values["source-url"],"source-url"),captured=parsePairs(values["captured-at"],"captured-at");
  const descriptions=parsePairs(values.description,"description"),kinds=parsePairs(values.kind,"kind");
  const sourceIds=new Set(sourceSpecs.map(source=>source.sourceId));
  if(sourceIds.size!==sourceSpecs.length)throw new TypeError("each --source ID must be unique");
  const get=(map,id)=>map.has(id)?map.get(id):undefined;
  const sources=sourceSpecs.map(source=>({
-  ...source,licence:get(licences,source.sourceId),author:get(authors,source.sourceId),
+  ...source,licence:get(licences,source.sourceId),permittedOperations:operationScopes.get(source.sourceId)??[],author:get(authors,source.sourceId),
   attribution:get(credits,source.sourceId),sourceUrl:get(urls,source.sourceId),
   capturedAt:get(captured,source.sourceId),description:get(descriptions,source.sourceId),
   kind:get(kinds,source.sourceId)??"auto",
  }));
- const allMetadata=[licences,authors,credits,urls,captured,descriptions,kinds];
+ const allMetadata=[licences,operationScopes,authors,credits,urls,captured,descriptions,kinds];
  const unknownMeta=allMetadata.flatMap(map=>[...map.keys()]).filter(id=>!sourceIds.has(id));
  if(unknownMeta.length)throw new TypeError("metadata supplied for source IDs not present in --source: "+[...new Set(unknownMeta)].join(", "));
  const viewSourceIds=values.views===undefined?undefined:values.views.split(",").map(v=>v.trim()).filter(Boolean);
