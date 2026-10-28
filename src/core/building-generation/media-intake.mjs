@@ -59,6 +59,20 @@ function buildMetadata(options, detectedMime, hash, byteSize, relativePath) {
     usageStatus: optionalText(options.usageStatus, "usageStatus", 40) ?? "unreviewed",
     licence: optionalText(options.licence, "licence", 500) ?? "unknown",
   };
+  if (options.permittedOperations !== undefined) {
+    const knownScopes = new Set([
+      "private-media-ingestion", "private-image-quality-preflight", "video-frame-extraction",
+      "procedural-model-derivation", "single-image-ai-reconstruction", "photogrammetry-reconstruction", "texture-baking",
+    ]);
+    if (!Array.isArray(options.permittedOperations) || options.permittedOperations.length < 1 ||
+        options.permittedOperations.length > knownScopes.size ||
+        options.permittedOperations.some(scope => typeof scope !== "string" || !knownScopes.has(scope)) ||
+        new Set(options.permittedOperations).size !== options.permittedOperations.length) {
+      throw new TypeError("permittedOperations must contain unique recognized source operation scopes");
+    }
+    record.permittedOperations = [...options.permittedOperations].sort();
+    if (options.parentSourceId) record.operationScopesInheritedFrom = options.parentSourceId;
+  }
   for (const key of ["title", "author", "attribution", "capturedAt", "description", "providerId", "parentSourceId"]) {
     const value = optionalText(options[key], key, key === "description" ? 2000 : 500);
     if (value !== undefined) record[key] = value;
