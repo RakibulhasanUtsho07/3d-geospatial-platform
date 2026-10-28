@@ -459,7 +459,8 @@ test("rejects selected media not in the reviewed source hashes", async t => {
   const record = JSON.parse(await readFile(sourcePath, "utf8"));
   record.sha256 = "c".repeat(64); record.assetId = record.sha256;
   await writeFile(sourcePath, JSON.stringify(record, null, 2) + "\n");
-  await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f)), /not in the BRF-23|different from pinned|BuildingSpec/i);
+  await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f)),
+    /not covered by BRF-45 exact-asset rights admission|not in the BRF-23|different from pinned|BuildingSpec/i);
 });
 test("rejects unsupported frame, negative up-axis, and COLMAP version drift", async t => {
   const f = await setup(t);
