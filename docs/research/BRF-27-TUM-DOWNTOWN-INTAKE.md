@@ -16,10 +16,22 @@
 
 The source discovery is promising, but these are not yet verified facts for a specific building:
 1. The exact asset/version's applicable license, attribution, and use terms have not been reviewed. The rendered Zenodo record inspected here did not expose a specific license value.
-2. The metadata PDF is listed on the record but has not yet been inspected for horizontal CRS, units, vertical datum, coordinate offsets, camera/point-cloud frames, and the exact transformations needed for metric comparison.
+2. The metadata PDF is now checksum-verified and text-extracted. It declares WGS 84 / UTM 32N (EPSG:32632), meters/degrees, and elevation above mean sea level; however, it does not name a vertical datum/geoid model. Its XYZ description also says "local coordinate system" separately from the georeferenced CRS, so the exact selected LAS/LAZ header/VLR and source-to-evaluation mapping still require review. The page previews for relevant tables/figures are being added to the revised workflow artifact.
 3. No single building has yet been demonstrated to match a selected UAS image subset, a crop of the independent-sensor ULS cloud, and an individual model/footprint.
-4. No selected source files have been downloaded and byte-verified locally. Publisher MD5 values and human-readable sizes are recorded only as discovery metadata; they are **not** local SHA-256 pins.
+4. No selected source images or point-cloud crop have been downloaded and byte-verified for a chosen building. The small metadata PDF alone was verified: 1,256,889 bytes; publisher MD5 matched; actual PDF SHA-256 `54f646b757e03d1797c66b1811273b830592143ff868466077e456fac51db2a3`; extracted-text SHA-256 `3fa9bdf71110c7a1f07adfeae3c9228cf09d58314883ab015994106b7c634d45`. These hashes identify the metadata evidence, not the actual imagery/point-cloud files.
 5. No platform-generated candidate GLB exists for this sample, and no independently held-out checkpoints have been sampled, pinned, and withheld from model fitting.
+
+## Findings from the checksum-verified metadata PDF
+
+The first exact-byte inspection succeeded in [workflow run #40634521973](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40634521973). The publisher MD5 matched the downloaded PDF; the PDF is 9 pages. Extracted text identifies these items:
+
+- **Horizontal CRS declared by the PDF:** WGS 84 / UTM 32N, EPSG:32632 (PDF page 2).
+- **Units:** meters and degrees. The same page says the XYZ coordinates are in a local coordinate system while separately identifying georeferenced data as EPSG:32632. Treat the target LAS/LAZ header/VLR and any local-to-georeferenced transformation as unverified until inspected.
+- **Vertical reference:** the PDF states elevation is above mean sea level but does not name a vertical CRS, datum or geoid model in the extracted text. This remains **BLOCKED** for metric 3D comparison.
+- **Within-ULS alignment:** the PDF lists a 4×4 rigid ICP transform for aligning point-cloud part 3 to part 1, with post-alignment mean/std distances of 3.6/4.5 cm and 5.8/5.7 cm for comparisons to parts 1/2 (page 4). This is a source-acquisition-internal alignment, not a generic candidate-to-reference transform.
+- **Source-product cross-comparison:** photogrammetry versus ULS (nadir-only) is reported with M3C2 mean difference 1.7 cm and standard deviation 22.8 cm (page 7). It is a comparison between related products of the same acquisition campaign—not accuracy for this platform's candidate GLB and not held-out checkpoint validation.
+
+These are metadata-document declarations, not yet independent verification of a chosen building or exact asset bytes. The current workflow revision also renders pages 2, 4 and 7 as PNG previews so an operator can visually inspect the CRS statement, transformation table and accuracy chart rather than relying solely on text extraction. The readiness state stays blocked.
 
 ## The blocked intake fixture
 
@@ -36,13 +48,13 @@ The assessment command exits with code `2` because blockers are intentional. It 
 
 ## Metadata-document inspection automation
 
-The [BRF-27 metadata workflow](../../.github/workflows/brf27-tum-metadata-intake.yml) fetches only the 1.3 MB PDF (never the multi-GB source archives), enforces a 10 MiB byte ceiling, verifies the publisher's recorded MD5 against the downloaded bytes, computes SHA-256, runs `pdfinfo` / `pdftotext`, and produces a keyword-evidence JSON plus extracted text. It uploads only the derived audit files; the raw PDF stays in ephemeral runner storage.
+The [BRF-27 metadata workflow](../../.github/workflows/brf27-tum-metadata-intake.yml) fetches only the 1.3 MB PDF (never the multi-GB source archives), enforces a 10 MiB byte ceiling, verifies the publisher's recorded MD5 against the downloaded bytes, computes SHA-256, runs `pdfinfo` / `pdftotext`, and produces a keyword-evidence JSON plus extracted text. The revised workflow also renders pages 2, 4 and 7 to PNG for visual checks. It uploads only derived audit files and these page previews; the raw PDF stays in ephemeral runner storage.
 
 The report is a navigation aid, not a CRS decision. Human review must trace any CRS, horizontal units, vertical datum, offset and transformation values back to the relevant page and figure/table. A missing keyword is not proof that a field is absent if the document uses a different name or image-only table. The readiness manifest remains blocked until those source facts are explicitly recorded and checked.
 
 ## Required order to unblock
 
-1. Download the Zenodo metadata PDF and inspect its pages and embedded tables. Record the exact CRS/units/vertical datum/offsets and pin the document bytes.
+1. Visually review the checksum-bound page previews (especially the page-4 transformation/accuracy table) and inspect the selected source LAS/LAZ headers/VLRs. Establish the named vertical datum/geoid and confirm how local XYZ coordinates map to EPSG:32632; pin every chosen source file's actual bytes.
 2. Obtain and record the exact asset-level license/terms and attribution review. Do not convert the site's generic “open data” wording into a guessed CC license.
 3. Select one real building by matching imagery coverage to the ULS cloud and a stable LOD2/LOD3 building ID. Save a small, deterministic image subset plus an explicit same-building evidence record.
 4. Download only the chosen source files/crops, verify byte sizes and SHA-256, and retain the publisher MD5 only as a secondary cross-check.
