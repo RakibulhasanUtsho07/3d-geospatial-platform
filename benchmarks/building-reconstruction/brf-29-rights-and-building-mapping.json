@@ -123,6 +123,6 @@
     "artifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479/artifacts/12795532392",
     "status": "metadata-only-inventory; exact model identity and rights scope pending",
     "snapshotPath": "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json",
-    "snapshotCommit": "ceef9a6d9b27733de6ccea6f52ffdd05f6d8b1d1"
+    "snapshotCommit": "648f9fb3571ea21cd3f665f03a8f8b309a7fe8be"
   }
 }
