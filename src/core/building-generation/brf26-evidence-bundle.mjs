@@ -148,6 +148,12 @@ export function assessBrf26EvidenceBundle(input = {}) {
     includedReviewedSourceViews.filter((view) =>
       view.sourceImageSha256.toLowerCase() === sourceCamera.sourceImageSha256.toLowerCase()).length === 1,
   "The exact source image used for camera comparison must be hash-bound to one human-reviewed, included BRF-21 source view.", "blocked");
+  check("source-camera-source-image-consistency", object(sourceCamera.sourceImage) &&
+    hash(sourceCamera.sourceImage?.sha256) &&
+    sourceCamera.sourceImage.sha256.toLowerCase() === sourceCamera.sourceImageSha256?.toLowerCase() &&
+    sourceCamera.sourceImage.width === sourceCamera.sourceImageSize?.width &&
+    sourceCamera.sourceImage.height === sourceCamera.sourceImageSize?.height,
+  "The source-camera report's nested sourceImage hash/dimensions must match its verified top-level source-image identity.", "failed");
 
   const reviewHash = artifacts.sourceReviewDecision.actualSha256?.toLowerCase();
   check("authorization-schema", authorization.recordType === "brf-24-colmap-execution-authorization" &&
