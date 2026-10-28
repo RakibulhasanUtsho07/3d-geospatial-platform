@@ -121,6 +121,8 @@
     "reportSha256": "d2398630dc00175e40310fc567dd18cd3d4f2e72f8b0e955cdb72cd5b8baf64a",
     "workflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479",
     "artifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479/artifacts/12795532392",
-    "status": "metadata-only-inventory; exact model identity and rights scope pending"
+    "status": "metadata-only-inventory; exact model identity and rights scope pending",
+    "snapshotPath": "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json",
+    "snapshotCommit": "ceef9a6d9b27733de6ccea6f52ffdd05f6d8b1d1"
   }
 }
