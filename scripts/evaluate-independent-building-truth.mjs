@@ -204,6 +204,45 @@ function refreshStatus(report) {
     report.counts.warnings ? "benchmark-incomplete" : "benchmark-review-required";
 }
 
+function createMetricWithheldReport(manifest, prerequisites, reason) {
+  const candidate = manifest?.candidate ?? {};
+  const reference = manifest?.reference ?? {};
+  return {
+    schemaVersion: "1.0.0",
+    engine: "independent-building-truth-evaluator-v1",
+    evaluationId: manifest?.evaluationId ?? "invalid-evaluation",
+    buildingId: manifest?.buildingId ?? null,
+    generatedAt: manifest?.generatedAt ?? null,
+    status: "benchmark-incomplete",
+    candidate: {
+      glbSha256: typeof candidate.glbSha256 === "string" ? candidate.glbSha256.toLowerCase() : null,
+      coordinateFrameId: candidate.coordinateFrameId ?? null,
+      units: candidate.units ?? null,
+    },
+    reference: {
+      sourceId: reference.sourceId ?? null,
+      sourceSha256: typeof reference.sourceSha256 === "string" ? reference.sourceSha256.toLowerCase() : null,
+      evidenceBasis: reference.evidenceBasis ?? "unknown",
+      reviewedBy: reference.reviewedBy ?? null,
+      reviewedAt: reference.reviewedAt ?? null,
+      independentlyAuthenticated: false,
+    },
+    metrics: null,
+    metricComputation: { status: "withheld", reason, prerequisites },
+    checks: [],
+    warnings: [],
+    failures: [],
+    counts: { passed: 0, warnings: 0, failures: 0 },
+    policy: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+    limitations: [
+      "No geometry comparison metrics were computed because one or more exact-source byte/replay prerequisites did not pass.",
+      "A withheld report is not evidence that the candidate geometry is accurate or inaccurate.",
+      "Source hashes and deterministic replay do not authenticate the physical building identity, survey accuracy, reviewer independence or source usage rights.",
+      "No automatic model selection, publication approval or map-ready decision is produced.",
+    ],
+  };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const rootFlag = argv.find((arg) => arg.startsWith("--root="));
@@ -278,10 +317,33 @@ async function main() {
   const candidateReplay = replayCandidateGeometry(manifest, preparationConfig, candidateAsset.bytes, actualCandidateSha256);
   const referenceAsset = await safeRead(root, manifest.reference?.sourcePath, "independent reference source");
   const actualReferenceSha256 = sha256(referenceAsset.bytes);
+  const referenceHashMatches = SHA256.test(manifest.reference?.sourceSha256 ?? "") &&
+    actualReferenceSha256.toLowerCase() === manifest.reference.sourceSha256.toLowerCase();
   const referenceReplay = replayReferenceGeometry(manifest, preparationConfig, referenceAsset.bytes, actualReferenceSha256);
-  const report = evaluateIndependentBuildingTruth(manifest);
+
+  const metricPrerequisites = [
+    { id: "preparation-config-byte-integrity", status: preparationConfigResult.status },
+    { id: "candidate-glb-byte-integrity", status: candidateHashMatches ? "passed" : "failed" },
+    { id: "reference-source-byte-integrity", status: referenceHashMatches ? "passed" : "failed" },
+    { id: "candidate-geometry-replay-from-source-bytes", status: candidateReplay.status },
+    { id: "reference-geometry-replay-from-source-bytes", status: referenceReplay.status },
+  ];
+  const metricGatePassed = metricPrerequisites.every((item) => item.status === "passed");
+  const metricGateHardFailure = metricPrerequisites.some((item) => item.status === "failed");
+  const metricGateReason = "Geometric metrics were withheld because these exact-source prerequisites did not pass: " +
+    metricPrerequisites.filter((item) => item.status !== "passed").map((item) => item.id + "=" + item.status).join(", ") + ".";
+  const report = metricGatePassed
+    ? evaluateIndependentBuildingTruth(manifest)
+    : createMetricWithheldReport(manifest, metricPrerequisites, metricGateReason);
+  report.metricComputation = metricGatePassed
+    ? { status: "computed-after-source-replay", reason: "Candidate and reference source bytes and both deterministic geometry replays passed before metric computation.", prerequisites: metricPrerequisites }
+    : report.metricComputation;
   report.evaluationManifestSha256 = manifestSha256;
   const artifactIntegrity = [];
+  if (!metricGatePassed) {
+    addArtifactCheck(report, "geometry-metrics-withheld-until-source-replay-passes", false,
+      metricGateReason, metricGateHardFailure ? "failed" : "warning");
+  }
   artifactIntegrity.push({
     kind: "preparation-config",
     path: preparationConfigResult.path,
@@ -301,8 +363,6 @@ async function main() {
     candidateHashMatches ? "Candidate GLB bytes match the declared SHA-256." :
       "Candidate GLB bytes do not match the declared SHA-256; metrics must not be trusted for this artifact.");
 
-  const referenceHashMatches = SHA256.test(manifest.reference?.sourceSha256 ?? "") &&
-    actualReferenceSha256.toLowerCase() === manifest.reference.sourceSha256.toLowerCase();
   artifactIntegrity.push({ kind: "independent-reference-source", path: manifest.reference.sourcePath,
     expectedSha256: manifest.reference.sourceSha256 ?? null, actualSha256: actualReferenceSha256,
     status: referenceHashMatches ? "passed" : "failed" });
