@@ -324,3 +324,31 @@ test("a changed source-review decision cannot reuse the stale hash chain", async
   assert.ok(report.failures.some((item) => item.id === "artifact-hash-pinned-sourceReviewDecision"));
   assert.equal(report.policy.acceptanceEligible, false);
 });
+
+
+test("rehashes the actual source-camera PNG and every fixed-camera render PNG", async (t) => {
+  const { root } = await setup(t, { mode: "synthetic-test" });
+  const result = run(root);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
+  assert.equal(report.visualReview.sourceCameraRender.verified, true);
+  assert.equal(report.visualReview.renderedViews.length, 1);
+  assert.equal(report.visualReview.renderedViews[0].verified, true);
+  assert.equal(report.visualReview.renderedViews[0].actualSha256, report.visualReview.renderedViews[0].expectedSha256);
+});
+
+test("source-camera and fixed-camera PNG byte changes block sign-off readiness", async (t) => {
+  const camera = await setup(t, { mode: "real-evidence", corruptSourceCameraPng: true });
+  const cameraResult = run(camera.root);
+  const cameraReport = JSON.parse(await readFile(path.join(camera.root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(cameraResult.status, 2, cameraResult.stderr + "\\n" + cameraResult.stdout);
+  assert.ok(cameraReport.blockers.some((item) => item.id === "source-camera-render-bytes-binding"));
+  assert.equal(cameraReport.visualReview.sourceCameraRender.verified, false);
+
+  const fixed = await setup(t, { mode: "real-evidence", corruptRenderPng: true });
+  const fixedResult = run(fixed.root);
+  const fixedReport = JSON.parse(await readFile(path.join(fixed.root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(fixedResult.status, 2, fixedResult.stderr + "\\n" + fixedResult.stdout);
+  assert.ok(fixedReport.blockers.some((item) => item.id === "render-manifest-render-bytes-binding"));
+  assert.equal(fixedReport.visualReview.renderedViews[0].verified, false);
+});
