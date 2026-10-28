@@ -224,5 +224,38 @@ class TestPinnedCandidateLoader(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MODULE.load_candidate_pins(snapshot_path, report_path)
 
+
+
+class TestPersistedCandidateGeometryEvidence(unittest.TestCase):
+    def test_persisted_full_source_result_is_hash_pinned_and_remains_fail_closed(self):
+        report_path = Path(__file__).resolve().parents[1] / "benchmarks" / "building-reconstruction" / "brf-33-citygml-candidate-geometry.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["status"], "full-object-hash-verified-xml-valid-geometry-extracted")
+        self.assertEqual(report["source"]["commit"], MODULE.SOURCE_COMMIT)
+        self.assertEqual(report["source"]["path"], f"{MODULE.CATALOG_PATH}/{MODULE.CANDIDATE_FILENAME}")
+        self.assertEqual(report["source"]["lfsExpectedBytes"], MODULE.CANDIDATE_BYTES)
+        self.assertEqual(report["source"]["lfsExpectedSha256"], MODULE.CANDIDATE_LFS_SHA256)
+        self.assertEqual(report["byteVerification"]["actualBytes"], MODULE.CANDIDATE_BYTES)
+        self.assertEqual(report["byteVerification"]["actualSha256"], MODULE.CANDIDATE_LFS_SHA256)
+        self.assertTrue(report["geometry"]["fullXmlDocumentValidated"])
+        self.assertTrue(report["geometry"]["fullGeometryPayloadParsed"])
+        self.assertEqual(report["geometry"]["coordinateTupleCount3D"], 389813)
+        self.assertEqual(report["geometry"]["coordinateTextErrors"], 0)
+        self.assertEqual(report["geometry"]["srsNamesObserved"], ["EPSG:25832"])
+        self.assertEqual(report["geometry"]["buildingGmlIds"], ["DEBY_LOD2_4959323"])
+        self.assertEqual(report["geometry"]["geometryCounts"]["Polygon"], 62576)
+        self.assertEqual(report["geometry"]["geometryCounts"]["LinearRing"], 63160)
+        self.assertEqual(report["candidateStatus"], "inspection-only-not-selected")
+        self.assertFalse(report["sameBuildingVerified"])
+        self.assertFalse(report["platformGeneratedCandidateGlbExists"])
+        self.assertFalse(report["independentHeldOutCheckpointsExist"])
+        self.assertEqual(report["releaseFlags"], {
+            "acceptanceEligible": False,
+            "publicationEligible": False,
+            "mapReady": False,
+            "automaticApproval": False,
+        })
+        self.assertRegex(report["evidence"]["originalArtifactReportSha256"], r"^[0-9a-f]{64}$")
+
 if __name__ == "__main__":
     unittest.main()
