@@ -16,6 +16,7 @@ const EVIDENCE = Object.freeze({
   contactSheet: "multiview-contact-sheet.png",
   cameraCoveragePlot: "camera-angle-coverage.png",
   overlapGraph: "pairwise-overlap-graph.png",
+  privateMediaQualityReport: "private-multiview-media-intake-report.json",
 });
 const RELEASE_FLAGS = ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"];
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -84,6 +85,39 @@ async function checkDirectoryTree(root, pieces, create = false) {
   }
   return current;
 }
+function validateImageQualitySummary(quality, imageSet) {
+  requireValue(quality && typeof quality === "object" && !Array.isArray(quality),
+    "BRF-42 image-quality preflight summary is missing.");
+  const expectedCount = imageSet.expectedCount;
+  requireValue(quality.status === "all-images-decoded-and-measured" &&
+    quality.qualityAnalysisComplete === true &&
+    quality.sourceCount === expectedCount &&
+    quality.uniqueContentCount === expectedCount &&
+    quality.rightsApproved === false &&
+    quality.safeToSubmitToColmap === false &&
+    Array.isArray(quality.sources) && quality.sources.length === expectedCount,
+    "BRF-42 quality summary must cover every unique source while withholding rights/COLMAP approval.");
+  const ids = new Set();
+  const hashes = new Set();
+  for (const row of quality.sources) {
+    requireValue(row && typeof row.sourceId === "string" && SAFE_ID.test(row.sourceId) &&
+      !ids.has(row.sourceId) &&
+      typeof row.sha256 === "string" && SHA256.test(row.sha256) &&
+      !hashes.has(row.sha256) &&
+      Number.isSafeInteger(row.byteSize) && row.byteSize > 0 &&
+      Number.isSafeInteger(row.width) && row.width > 0 &&
+      Number.isSafeInteger(row.height) && row.height > 0 &&
+      row.usageStatus === "unreviewed" &&
+      typeof row.licence === "string" && row.licence.trim().length > 0 &&
+      row.quality && typeof row.quality === "object" && !Array.isArray(row.quality) &&
+      row.error === null,
+      "BRF-42 quality summary contains missing/duplicate view evidence, invalid dimensions, or an unexpected rights status.");
+    ids.add(row.sourceId);
+    hashes.add(row.sha256);
+  }
+  return quality;
+}
+
 function validateReport(report) {
   requireValue(report && typeof report === "object" && !Array.isArray(report),
     "BRF-23 report must be a JSON object.");
@@ -106,7 +140,7 @@ function validateReport(report) {
       typeof item.sha256 === "string" && SHA256.test(item.sha256), "Invalid evidence binding: " + role);
   }
   requireValue(Object.keys(bindings).length === Object.keys(EVIDENCE).length,
-    "Report must bind exactly the seven BRF-14/20/21 artifacts.");
+    "Report must bind exactly the eight BRF-14/20/21/42 artifacts.");
 
   const decision = inputs.humanDecision;
   requireValue(decision && decision.validationStatus === "valid" &&
@@ -143,6 +177,7 @@ function validateReport(report) {
     requireValue(!hashes.has(image.sha256), "Duplicate source image content is not allowed.");
     filenames.add(image.filename); hashes.add(image.sha256);
   }
+  const imageQualityPreflight = validateImageQualitySummary(inputs.imageQualityPreflight, imageSet);
   const profile = inputs.profile;
   requireValue(profile && typeof profile.filename === "string" && BASENAME.test(profile.filename) &&
     Number.isSafeInteger(profile.byteSize) && profile.byteSize > 0 &&
@@ -162,10 +197,11 @@ function validateReport(report) {
   requireValue(["X", "Y", "Z"].includes(frame.reviewedSourceUpAxis) &&
     frame.reviewedSourceUpAxisPositiveDirection === "positive",
     "The exporter supports only a reviewer-confirmed positive X/Y/Z up-axis.");
-  return { inputs, bindings, decision, imageSet, profile, profileId: report.profileId, tool, frame };
+  return { inputs, bindings, decision, imageSet, imageQualityPreflight, profile, profileId: report.profileId, tool, frame };
 }
 
-async function verifyEvidence(artifactRoot, bindings) {
+async function verifyEvidence(artifactRoot, bindings, validated) {
+  const files = {};
   for (const [role, binding] of Object.entries(bindings)) {
     const file = await readRegularFile(path.join(artifactRoot, safeBasename(binding.filename, "Evidence filename")),
       "Evidence " + role, 100 * 1024 * 1024);
@@ -174,7 +210,149 @@ async function verifyEvidence(artifactRoot, bindings) {
     if (binding.filename.endsWith(".png")) {
       requireValue(file.bytes.subarray(0, 8).equals(PNG_SIGNATURE), "Evidence PNG signature invalid: " + role);
     }
+    files[role] = file;
   }
+
+  const sourceManifest = parseJson(files.sourceManifest.bytes, "BRF-14 source manifest");
+  const byteReport = parseJson(files.byteVerificationReport.bytes, "BRF-14 byte-verification report");
+  const qualityReport = parseJson(files.privateMediaQualityReport.bytes, "BRF-42 private multi-view quality report");
+  requireValue(sourceManifest?.schemaVersion === "1.0.0" &&
+    sourceManifest?.evaluationStage === "multiview-source-byte-intake-only" &&
+    Array.isArray(sourceManifest.views) && sourceManifest.views.length === validated.imageSet.expectedCount &&
+    sourceManifest?.dataset && typeof sourceManifest.dataset.sourceRepositoryCommit === "string",
+    "BRF-42 source manifest is missing or does not match the pinned BRF-14 evidence contract.");
+  requireValue(byteReport?.schemaVersion === "1.0.0" &&
+    byteReport?.status === "views-byte-verified" &&
+    byteReport.sampleId === sourceManifest.sampleId &&
+    byteReport?.dataset?.sourceRepositoryCommit === sourceManifest.dataset.sourceRepositoryCommit &&
+    Array.isArray(byteReport.views) && byteReport.views.length === sourceManifest.views.length &&
+    Array.isArray(byteReport.blockers) && byteReport.blockers.length === 0,
+    "BRF-42 byte-verification report is absent, blocked, or bound to another source set.");
+
+  const dataset = sourceManifest.dataset;
+  const sourceBinding = qualityReport?.sourceManifest;
+  requireValue(qualityReport?.schemaVersion === "1.0.0" &&
+    qualityReport?.evaluationId === "BRF-42-PRIVATE-MULTIVIEW-INTAKE" &&
+    qualityReport?.status === "private-multiview-preflight-complete-not-reconstruction-approved" &&
+    sourceBinding && sourceBinding.sourceCommit === dataset.sourceRepositoryCommit &&
+    sourceBinding.declaredLicense === dataset.license &&
+    sourceBinding.licenseScope === dataset.licenseScope &&
+    sourceBinding.rightsStatus === dataset.rightsStatus &&
+    sourceBinding.attribution === dataset.attribution &&
+    sourceBinding.manifestSha256 === files.sourceManifest.sha256 &&
+    sourceBinding.priorVerificationReportSha256 === files.byteVerificationReport.sha256 &&
+    typeof sourceBinding.freshVerificationReportSha256 === "string" &&
+    SHA256.test(sourceBinding.freshVerificationReportSha256),
+    "BRF-42 quality report does not bind the exact BRF-14 manifest and byte-verification report.");
+  
+  const manifestById = new Map();
+  const imageByFilename = new Map(validated.imageSet.records.map(row => [row.filename, row]));
+  let expectedTotalBytes = 0;
+  for (const view of sourceManifest.views) {
+    requireValue(view && typeof view.id === "string" && SAFE_ID.test(view.id) &&
+      !manifestById.has(view.id) &&
+      typeof view.filename === "string" && BASENAME.test(view.filename) &&
+      typeof view.expectedSha256 === "string" && SHA256.test(view.expectedSha256) &&
+      Number.isSafeInteger(view.expectedByteSize) && view.expectedByteSize > 0,
+      "BRF-14 source manifest contains an invalid or duplicate view binding.");
+    const pinnedImage = imageByFilename.get(view.filename);
+    requireValue(pinnedImage && pinnedImage.sha256 === view.expectedSha256 &&
+      pinnedImage.byteSize === view.expectedByteSize,
+      "BRF-14 source view does not match the exact image hash/size bound into BRF-23: " + view.id);
+    manifestById.set(view.id, view);
+    expectedTotalBytes += view.expectedByteSize;
+  }
+  requireValue(sourceManifest.selectionMethod?.expectedViewCount === sourceManifest.views.length &&
+    sourceManifest.expectedTotalBytes === expectedTotalBytes &&
+    byteReport.selectedViewCount === sourceManifest.views.length &&
+    byteReport.declaredTotalBytes === expectedTotalBytes &&
+    byteReport.actualTotalBytes === expectedTotalBytes,
+    "BRF-14 source and byte-verification view counts or byte totals do not reconcile.");
+
+  const byteById = new Map();
+  for (const row of byteReport.views) {
+    requireValue(row && typeof row.id === "string" && !byteById.has(row.id),
+      "BRF-14 byte-verification report has a missing or duplicate view ID.");
+    byteById.set(row.id, row);
+  }
+  requireValue(byteById.size === manifestById.size, "BRF-14 manifest and byte-verification report have different view IDs.");
+  for (const [id, view] of manifestById) {
+    const row = byteById.get(id);
+    requireValue(row && row.status === "passed" &&
+      row.filename === view.filename &&
+      row.expectedSha256 === view.expectedSha256 &&
+      row.actualSha256 === view.expectedSha256 &&
+      row.expectedByteSize === view.expectedByteSize &&
+      row.actualByteSize === view.expectedByteSize,
+      "BRF-14 byte-verification does not prove the exact pinned bytes for view " + id + ".");
+  }
+
+  const byteSummary = qualityReport.byteVerification;
+  requireValue(byteSummary && byteSummary.status === "views-byte-verified" &&
+    byteSummary.selectedViewCount === manifestById.size &&
+    byteSummary.verifiedViewCount === manifestById.size &&
+    byteSummary.declaredTotalBytes === expectedTotalBytes &&
+    byteSummary.actualTotalBytes === expectedTotalBytes &&
+    Array.isArray(byteSummary.blockers) && byteSummary.blockers.length === 0,
+    "BRF-42 report does not confirm complete exact-byte verification for every view.");
+
+  const intake = qualityReport.privateMediaIntake;
+  requireValue(intake && intake.status === "all-views-ingested-private" &&
+    Number.isSafeInteger(intake.selectedViewCount) && intake.selectedViewCount === manifestById.size &&
+    intake.ingestedCount === manifestById.size &&
+    Array.isArray(intake.records) && intake.records.length === manifestById.size,
+    "BRF-42 private intake is incomplete or contains an unexpected source count.");
+  const privateById = new Map();
+  for (const row of intake.records) {
+    requireValue(row && typeof row.sourceId === "string" && !privateById.has(row.sourceId),
+      "BRF-42 private intake contains a missing or duplicate source ID.");
+    privateById.set(row.sourceId, row);
+  }
+  requireValue(privateById.size === manifestById.size, "BRF-42 private intake has missing or unknown view IDs.");
+
+  const quality = validateImageQualitySummary(qualityReport.imageQualityPreflight, validated.imageSet);
+  requireValue(canonical(quality) === canonical(validated.imageQualityPreflight),
+    "BRF-23 image-quality summary differs from the exact hash-bound BRF-42 report.");
+  for (const [id, view] of manifestById) {
+    const intakeRow = privateById.get(id);
+    const qualityRow = quality.sources.find(row => row.sourceId === id);
+    requireValue(intakeRow &&
+      intakeRow.sha256 === view.expectedSha256 && intakeRow.byteSize === view.expectedByteSize &&
+      intakeRow.usageStatus === "unreviewed" &&
+      typeof intakeRow.licence === "string" && intakeRow.licence.trim() &&
+      intakeRow.sourceUrl === view.sourceUrl &&
+      qualityRow && qualityRow.sha256 === view.expectedSha256 &&
+      qualityRow.byteSize === view.expectedByteSize &&
+      qualityRow.usageStatus === "unreviewed" &&
+      (!Number.isSafeInteger(view.declaredWidth) || qualityRow.width === view.declaredWidth) &&
+      (!Number.isSafeInteger(view.declaredHeight) || qualityRow.height === view.declaredHeight),
+      "BRF-42 per-view media/quality record differs from the pinned BRF-14 source: " + id);
+    if (typeof view.capturedAt === "string") {
+      requireValue(intakeRow.capturedAt === view.capturedAt,
+        "BRF-42 capture timestamp differs from the source manifest for view " + id);
+    }
+    if (view.gps && typeof view.gps === "object") {
+      requireValue(intakeRow.location?.latitude === view.gps.latitude &&
+        intakeRow.location?.longitude === view.gps.longitude,
+        "BRF-42 source location differs from the source manifest for view " + id);
+    }
+  }
+
+  const review = qualityReport.reviewAndRelease;
+  const flags = qualityReport.releaseFlags;
+  requireValue(review && review.rightsReview === "pending-human-review" &&
+    review.sameBuildingIdentity === "source-declared-not-independently-confirmed" &&
+    review.visualOverlap === "pending-human-review" &&
+    review.facadeRoofCoverage === "pending-human-review" &&
+    review.sourceUpAxis === "pending-human-review" &&
+    review.independentReferenceVerified === false &&
+    review.candidateGlbGenerated === false &&
+    review.reconstructionExecuted === false &&
+    review.realWorldAccuracyValidated === false &&
+    flags && RELEASE_FLAGS.every(flag => flags[flag] === false) &&
+    RELEASE_FLAGS.every(flag => sourceManifest[flag] === false),
+    "BRF-42 report must keep rights/identity/reconstruction pending and every release flag false.");
+  return qualityReport;
 }
 async function verifyDecisionAndProfile(artifactRoot, profilePath, validated) {
   const reportDecision = validated.decision;
@@ -327,7 +505,7 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     "BRF-23 report SHA-256 differs from the explicitly pinned value.");
   const report = parseJson(reportFile.bytes, "BRF-23 report");
   const validated = validateReport(report);
-  await verifyEvidence(artifactRoot, validated.bindings);
+  const brf42QualityReport = await verifyEvidence(artifactRoot, validated.bindings, validated);
   requireValue(decisionName === validated.decision.filename, "Decision name differs from BRF-23's exact binding.");
   await verifyDecisionAndProfile(artifactRoot, options.profilePath, validated);
   await verifyRawImages(imageRoot, validated.imageSet);
@@ -352,6 +530,17 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     validated.tool.resolvedExecutable, options.colmapSpawnImpl || nodeSpawn);
   requireValue(version === validated.tool.expectedVersion,
     "COLMAP version changed after preflight; expected " + validated.tool.expectedVersion + ", got " + String(version) + ".");
+
+  // BRF-42 is an engineering-only intake report, not a rights grant. Do not let a
+  // separate human decision or a mutable media registry override its unreviewed state.
+  const brf42Quality = brf42QualityReport.imageQualityPreflight;
+  const brf42IntakeRecords = brf42QualityReport.privateMediaIntake.records;
+  requireValue(brf42Quality.rightsApproved === true &&
+    brf42Quality.safeToSubmitToColmap === true &&
+    brf42IntakeRecords.every(row => row.usageStatus === "approved") &&
+    brf42Quality.sources.every(row => row.usageStatus === "approved") &&
+    brf42QualityReport.reviewAndRelease.rightsReview === "approved-for-this-use",
+    "BRF-42 evidence cannot authorize COLMAP: source rights remain unreviewed and safeToSubmitToColmap=false. Obtain exact-asset rights-cleared admission evidence before reconstruction; worker was not started.");
 
   const authorization = {
     schemaVersion: "1.0.0",

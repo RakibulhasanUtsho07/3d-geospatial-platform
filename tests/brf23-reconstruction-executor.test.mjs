@@ -15,6 +15,7 @@ const artifacts = {
   contactSheet: "multiview-contact-sheet.png",
   cameraCoveragePlot: "camera-angle-coverage.png",
   overlapGraph: "pairwise-overlap-graph.png",
+  privateMediaQualityReport: "private-multiview-media-intake-report.json",
 };
 async function setup(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf24-"));
@@ -25,12 +26,177 @@ async function setup(t) {
   await Promise.all([mkdir(workspaceRoot), mkdir(artifactRoot), mkdir(imageRoot)]);
   const evidenceBindings = {};
   for (const [role, filename] of Object.entries(artifacts)) {
-    const bytes = filename.endsWith(".png")
-      ? Buffer.from([137,80,78,71,13,10,26,10,0,1,2])
-      : Buffer.from("synthetic-evidence-" + role);
+    let bytes;
+    if (filename.endsWith(".png")) {
+      bytes = Buffer.from([137,80,78,71,13,10,26,10,0,1,2]);
+    } else if (["sourceManifest", "byteVerificationReport", "privateMediaQualityReport"].includes(role)) {
+      bytes = Buffer.from("{}\n");
+    } else {
+      bytes = Buffer.from("synthetic-evidence-" + role);
+    }
     await writeFile(path.join(artifactRoot, filename), bytes);
     evidenceBindings[role] = { filename, byteSize: bytes.length, sha256: sha(bytes) };
   }
+
+  const mediaRoot = path.join(workspaceRoot, ".building-engine", "media", "building-one");
+  const sourceRoot = path.join(mediaRoot, "sources");
+  const assetRoot = path.join(mediaRoot, "assets");
+  await Promise.all([mkdir(sourceRoot, { recursive: true }), mkdir(assetRoot, { recursive: true })]);
+  const sourceRecords = [];
+  const sourceImages = [];
+  const sourceViews = [];
+  for (let i=1; i<=3; i++) {
+    const bytes = Buffer.concat([Buffer.from([255,216,255]), Buffer.from("test-jpeg-" + i)]);
+    const hash = sha(bytes);
+    const filename = "candidate-" + i + ".jpg";
+    await writeFile(path.join(imageRoot, filename), bytes);
+    sourceImages.push({ filename, byteSize: bytes.length, sha256: hash, status: "verified" });
+    sourceViews.push({
+      id: "view-" + i,
+      filename,
+      expectedSha256: hash,
+      expectedByteSize: bytes.length,
+      sourceUrl: "https://example.test/synthetic/" + filename,
+      declaredWidth: 100,
+      declaredHeight: 100,
+    });
+    const relativePath = ".building-engine/media/building-one/assets/" + hash + ".jpg";
+    await writeFile(path.join(workspaceRoot, relativePath), bytes);
+    const record = { id: "view-" + i, buildingId: "building-one", kind: "image", mimeType: "image/jpeg",
+      usageStatus: "approved", licence: "Synthetic test rights; not real permission", sha256: hash, assetId: hash, relativePath };
+    await writeFile(path.join(sourceRoot, record.id + ".json"), JSON.stringify(record, null, 2) + "\n");
+    sourceRecords.push(record);
+  }
+
+  const totalBytes = sourceViews.reduce((sum, view) => sum + view.expectedByteSize, 0);
+  const dataset = {
+    sourceRepositoryCommit: "synthetic-source-commit",
+    license: "CC BY 4.0",
+    licenseScope: "Synthetic fixtures only; not a real rights decision.",
+    rightsStatus: "source-declared-not-independently-authenticated",
+    attribution: "Synthetic test attribution only.",
+  };
+  const sourceManifest = {
+    schemaVersion: "1.0.0",
+    evaluationStage: "multiview-source-byte-intake-only",
+    sampleId: "test-sample",
+    dataset,
+    selectionMethod: { expectedViewCount: sourceViews.length },
+    expectedTotalBytes: totalBytes,
+    views: sourceViews,
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  };
+  const sourceManifestBytes = Buffer.from(JSON.stringify(sourceManifest, null, 2) + "\n");
+  await writeFile(path.join(artifactRoot, artifacts.sourceManifest), sourceManifestBytes);
+  evidenceBindings.sourceManifest = { filename: artifacts.sourceManifest, byteSize: sourceManifestBytes.length,
+    sha256: sha(sourceManifestBytes) };
+
+  const byteReport = {
+    schemaVersion: "1.0.0",
+    status: "views-byte-verified",
+    sampleId: "test-sample",
+    dataset: { sourceRepositoryCommit: dataset.sourceRepositoryCommit },
+    selectedViewCount: sourceViews.length,
+    declaredTotalBytes: totalBytes,
+    actualTotalBytes: totalBytes,
+    blockers: [],
+    views: sourceViews.map(view => ({
+      id: view.id, filename: view.filename, status: "passed",
+      expectedSha256: view.expectedSha256, actualSha256: view.expectedSha256,
+      expectedByteSize: view.expectedByteSize, actualByteSize: view.expectedByteSize,
+      sizeMatches: true, hashMatches: true,
+    })),
+  };
+  const byteReportBytes = Buffer.from(JSON.stringify(byteReport, null, 2) + "\n");
+  await writeFile(path.join(artifactRoot, artifacts.byteVerificationReport), byteReportBytes);
+  evidenceBindings.byteVerificationReport = { filename: artifacts.byteVerificationReport, byteSize: byteReportBytes.length,
+    sha256: sha(byteReportBytes) };
+
+  const qualitySummary = {
+    status: "all-images-decoded-and-measured",
+    qualityAnalysisComplete: true,
+    sourceCount: sourceViews.length,
+    uniqueContentCount: sourceViews.length,
+    rightsApproved: false,
+    safeToSubmitToColmap: false,
+    sources: sourceViews.map(view => ({
+      sourceId: view.id,
+      sha256: view.expectedSha256,
+      byteSize: view.expectedByteSize,
+      width: view.declaredWidth,
+      height: view.declaredHeight,
+      usageStatus: "unreviewed",
+      licence: "CC BY 4.0 (source-declared only; rights not independently authenticated)",
+      quality: { decodeStatus: "decoded", fixtureOnly: true },
+      error: null,
+    })),
+    limitations: ["Synthetic fixture only; no actual rights or accuracy decision."],
+  };
+  const qualityReport = {
+    schemaVersion: "1.0.0",
+    evaluationId: "BRF-42-PRIVATE-MULTIVIEW-INTAKE",
+    status: "private-multiview-preflight-complete-not-reconstruction-approved",
+    workspaceMode: "ephemeral-private",
+    sourceManifest: {
+      sourceCommit: dataset.sourceRepositoryCommit,
+      declaredLicense: dataset.license,
+      licenseScope: dataset.licenseScope,
+      rightsStatus: dataset.rightsStatus,
+      attribution: dataset.attribution,
+      manifestSha256: sha(sourceManifestBytes),
+      priorVerificationReportSha256: sha(byteReportBytes),
+      freshVerificationReportSha256: sha(Buffer.from("synthetic-fresh-verification")),
+    },
+    byteVerification: {
+      status: "views-byte-verified",
+      selectedViewCount: sourceViews.length,
+      verifiedViewCount: sourceViews.length,
+      declaredTotalBytes: totalBytes,
+      actualTotalBytes: totalBytes,
+      blockers: [],
+    },
+    privateMediaIntake: {
+      status: "all-views-ingested-private",
+      buildingId: "brf42-synthetic-test",
+      selectedViewCount: sourceViews.length,
+      ingestedCount: sourceViews.length,
+      records: sourceViews.map(view => ({
+        sourceId: view.id,
+        sha256: view.expectedSha256,
+        byteSize: view.expectedByteSize,
+        sourceUrl: view.sourceUrl,
+        usageStatus: "unreviewed",
+        licence: "CC BY 4.0 (source-declared only; rights not independently authenticated)",
+      })),
+    },
+    imageQualityPreflight: qualitySummary,
+    reviewAndRelease: {
+      rightsReview: "pending-human-review",
+      sameBuildingIdentity: "source-declared-not-independently-confirmed",
+      visualOverlap: "pending-human-review",
+      facadeRoofCoverage: "pending-human-review",
+      sourceUpAxis: "pending-human-review",
+      independentReferenceVerified: false,
+      candidateGlbGenerated: false,
+      reconstructionExecuted: false,
+      realWorldAccuracyValidated: false,
+      publicSourceRedistributionPermittedByThisGate: false,
+      derivedModelPublicationPermittedByThisGate: false,
+      productionMapPublicationPermitted: false,
+    },
+    releaseFlags: {
+      acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false,
+    },
+    note: "Synthetic test evidence only; this report never authorizes reconstruction.",
+  };
+  const qualityReportBytes = Buffer.from(JSON.stringify(qualityReport, null, 2) + "\n");
+  await writeFile(path.join(artifactRoot, artifacts.privateMediaQualityReport), qualityReportBytes);
+  evidenceBindings.privateMediaQualityReport = { filename: artifacts.privateMediaQualityReport,
+    byteSize: qualityReportBytes.length, sha256: sha(qualityReportBytes) };
+
   const decision = {
     schemaVersion: "1.0.0", recordType: "brf-21-human-review-decision", sampleId: "test-sample",
     evidenceBindings, reviewer: { name: "Synthetic Reviewer", identifier: "synthetic-reviewer" },
@@ -40,7 +206,7 @@ async function setup(t) {
     sourceUpAxis: { decision: "confirmed", axis: "Z", positiveDirection: "positive",
       interpretation: "Synthetic Z-up axis.", rationale: "Synthetic test decision only." },
     assetRights: { decision: "approved-for-this-use", termsSourceUrl: "https://example.org/terms",
-      rationale: "Synthetic test decision only." },
+      rationale: "Synthetic test decision only; BRF-42 status must still be respected." },
   };
   const decisionBytes = Buffer.from(JSON.stringify(decision, null, 2) + "\n");
   await writeFile(path.join(artifactRoot, "decision.json"), decisionBytes);
@@ -54,30 +220,12 @@ async function setup(t) {
   const profileBytes = Buffer.from(JSON.stringify(profile, null, 2) + "\n");
   await writeFile(path.join(artifactRoot, "profile.json"), profileBytes);
 
-  const mediaRoot = path.join(workspaceRoot, ".building-engine", "media", "building-one");
-  const sourceRoot = path.join(mediaRoot, "sources");
-  const assetRoot = path.join(mediaRoot, "assets");
-  await Promise.all([mkdir(sourceRoot, { recursive: true }), mkdir(assetRoot, { recursive: true })]);
-  const sourceRecords = [];
-  const sourceImages = [];
-  for (let i=1; i<=3; i++) {
-    const bytes = Buffer.concat([Buffer.from([255,216,255]), Buffer.from("test-jpeg-" + i)]);
-    const hash = sha(bytes);
-    const filename = "candidate-" + i + ".jpg";
-    await writeFile(path.join(imageRoot, filename), bytes);
-    sourceImages.push({ filename, byteSize: bytes.length, sha256: hash, status: "verified" });
-    const relativePath = ".building-engine/media/building-one/assets/" + hash + ".jpg";
-    await writeFile(path.join(workspaceRoot, relativePath), bytes);
-    const record = { id: "view-" + i, buildingId: "building-one", kind: "image", mimeType: "image/jpeg",
-      usageStatus: "approved", licence: "CC BY 4.0", sha256: hash, assetId: hash, relativePath };
-    await writeFile(path.join(sourceRoot, record.id + ".json"), JSON.stringify(record, null, 2) + "\n");
-    sourceRecords.push(record);
-  }
   const report = {
     schemaVersion: "1.0.0", recordType: "brf-23-reconstruction-preflight-report", sampleId: "test-sample",
     profileId: profile.profileId, status: "preflight-ready-for-local-reconstruction-attempt",
     assessedInputs: {
       evidenceBindings,
+      imageQualityPreflight: qualitySummary,
       humanDecision: { filename: "decision.json", byteSize: decisionBytes.length, sha256: sha(decisionBytes),
         validationStatus: "valid", overallDisposition: decision.overallDisposition,
         reviewer: decision.reviewer, reviewedAtUtc: decision.reviewedAtUtc },
@@ -98,7 +246,7 @@ async function setup(t) {
   };
   const reportBytes = Buffer.from(JSON.stringify(report, null, 2) + "\n");
   await writeFile(path.join(artifactRoot, "preflight.json"), reportBytes);
-  return { workspaceRoot, artifactRoot, imageRoot, report, reportBytes, sourceRecords };
+  return { workspaceRoot, artifactRoot, imageRoot, report, reportBytes, sourceRecords, qualityReport };
 }
 function optionsFor(f, overrides = {}) {
   return {
@@ -122,6 +270,29 @@ function optionsFor(f, overrides = {}) {
     ...overrides,
   };
 }
+
+async function refreshBoundQualityAndReview(f, qualityReport, qualitySummary = qualityReport.imageQualityPreflight) {
+  const qualityBytes = Buffer.from(JSON.stringify(qualityReport, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, artifacts.privateMediaQualityReport), qualityBytes);
+  f.report.assessedInputs.evidenceBindings.privateMediaQualityReport = {
+    filename: artifacts.privateMediaQualityReport,
+    byteSize: qualityBytes.length,
+    sha256: sha(qualityBytes),
+  };
+  f.report.assessedInputs.imageQualityPreflight = qualitySummary;
+
+  const decisionPath = path.join(f.artifactRoot, "decision.json");
+  const decision = JSON.parse(await readFile(decisionPath, "utf8"));
+  decision.evidenceBindings = f.report.assessedInputs.evidenceBindings;
+  const decisionBytes = Buffer.from(JSON.stringify(decision, null, 2) + "\n");
+  await writeFile(decisionPath, decisionBytes);
+  f.report.assessedInputs.humanDecision.byteSize = decisionBytes.length;
+  f.report.assessedInputs.humanDecision.sha256 = sha(decisionBytes);
+
+  f.reportBytes = Buffer.from(JSON.stringify(f.report, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, "preflight.json"), f.reportBytes);
+}
+
 test("accepts only a complete pinned local-only preflight structure", async t => {
   const f = await setup(t);
   const result = validateBrf23ExecutionReport(f.report);
@@ -145,9 +316,10 @@ test("blocks pending review, stale report hashes, or absent operator confirmatio
   })), /Explicit operator confirmation/);
 });
 test("rejects modified report-bound evidence, decision, profile, and source bytes", async t => {
-  for (const type of ["evidence", "decision", "profile", "image"]) {
+  for (const type of ["evidence", "quality", "decision", "profile", "image"]) {
     const f = await setup(t);
     const target = type === "evidence" ? path.join(f.artifactRoot, artifacts.overlapGraph)
+      : type === "quality" ? path.join(f.artifactRoot, artifacts.privateMediaQualityReport)
       : type === "decision" ? path.join(f.artifactRoot, "decision.json")
       : type === "profile" ? path.join(f.artifactRoot, "profile.json")
       : path.join(f.imageRoot, f.report.assessedInputs.sourceImages.records[0].filename);
@@ -155,6 +327,30 @@ test("rejects modified report-bound evidence, decision, profile, and source byte
     await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f)), /changed|differ|hash|SHA-256/i);
   }
 });
+test("BRF-23 cannot promote BRF-42 rights flags or per-image usage status", async t => {
+  const f = await setup(t);
+  for (const mutate of [
+    quality => { quality.rightsApproved = true; },
+    quality => { quality.safeToSubmitToColmap = true; },
+    quality => { quality.sources[0].usageStatus = "approved"; },
+  ]) {
+    const modified = structuredClone(f.report);
+    mutate(modified.assessedInputs.imageQualityPreflight);
+    assert.throws(() => validateBrf23ExecutionReport(modified), /BRF-42 quality summary/);
+  }
+});
+
+test("rejects a changed per-view quality hash even when outer report bindings are refreshed", async t => {
+  const f = await setup(t);
+  const changed = structuredClone(f.qualityReport);
+  changed.imageQualityPreflight.sources[0].sha256 = "e".repeat(64);
+  await refreshBoundQualityAndReview(f, changed);
+  await assert.rejects(
+    runBrf23AuthorizedColmapReconstruction(optionsFor(f)),
+    /BRF-42 per-view media\/quality record differs from the pinned BRF-14 source/,
+  );
+});
+
 test("rejects selected media not in the reviewed source hashes", async t => {
   const f = await setup(t);
   const sourcePath = path.join(f.workspaceRoot, ".building-engine", "media", "building-one", "sources", "view-1.json");
@@ -175,32 +371,16 @@ test("rejects unsupported frame, negative up-axis, and COLMAP version drift", as
     colmapVersionProbe: async () => "4.2.0",
   })), /COLMAP version changed/);
 });
-test("records authorization only after validated inputs and keeps all release gates closed", async t => {
+test("blocks COLMAP before authorization when BRF-42 rights remain unreviewed", async t => {
   const f = await setup(t);
-  let seen;
-  const result = await runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
-    workerImpl: async args => {
-      seen = args;
-      return { jobDir: args.workspaceRoot, modelPath: "mock.glb",
-        reportPath: path.join(args.workspaceRoot, "mock-report.json"),
-        report: { status: "completed-requires-review", outputs: { glb: {
-          sha256: "d".repeat(64), relativePath: "model.glb", bytes: 2048,
-        } } } };
-    },
-  }));
-  assert.equal(seen.matchConfirmed, true);
-  assert.equal(seen.overlapReviewed, true);
-  assert.equal(seen.upAxisReviewed, true);
-  assert.equal(seen.upAxis, "Z");
-  assert.deepEqual(seen.scaleCalibration, {});
-  assert.equal(result.authorization.candidateGlbGenerated, true);
-  assert.equal(result.report.candidateGeometryValidated, false);
-  assert.equal(result.report.independentReferenceVerified, false);
-  assert.equal(result.report.heldOutCheckpointAccuracyVerified, false);
-  assert.equal(result.report.acceptanceEligible, false);
-  assert.equal(result.report.publicationEligible, false);
-  assert.equal(result.report.mapReady, false);
-  assert.equal(result.report.automaticApproval, false);
-  const saved = JSON.parse(await readFile(result.authorizationPath, "utf8"));
-  assert.equal(saved.preflightReport.sha256, sha(f.reportBytes));
+  let workerCalls = 0;
+  await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
+    workerImpl: async () => { workerCalls += 1; throw new Error("worker must not run"); },
+  })), /BRF-42 evidence cannot authorize COLMAP.*rights remain unreviewed.*worker was not started/);
+  assert.equal(workerCalls, 0);
+  await assert.rejects(
+    readFile(path.join(f.workspaceRoot, ".building-engine", "authorizations", "building-one", "unit-test-job.json")),
+    { code: "ENOENT" },
+    "No authorization record should be created for unreviewed source rights.",
+  );
 });
