@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { assessBuildingBenchmarkReadiness } from "../src/core/building-generation/building-benchmark-readiness.mjs";
 
@@ -149,7 +150,7 @@ test("returns a fail-closed invalid result for a non-object manifest", () => {
 
 test("keeps the real TUM Downtown intake blocked until the exact building, rights, bytes, frame and candidate are verified", async () => {
   const manifestUrl = new URL("../benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json", import.meta.url);
-  const manifest = JSON.parse(await (await import("node:fs/promises")).readFile(manifestUrl, "utf8"));
+  const manifest = JSON.parse(await readFile(manifestUrl, "utf8"));
   const report = assessBuildingBenchmarkReadiness(manifest);
 
   assert.equal(report.status, "blocked");
