@@ -337,3 +337,20 @@ test("attempted release flag promotion is rejected and output flags remain false
     await rm(fixture.root, { recursive: true, force: true });
   }
 });
+
+
+test("future-dated rights review, grant effectiveness or evidence retrieval cannot approve the asset", async () => {
+  const fixture = await createCompleteFixture();
+  try {
+    const image = fixture.manifest.assets.find((asset) => asset.id === "matched-images");
+    image.rights.reviewedAt = "2027-01-01T00:00:00.000Z";
+    image.rights.effectiveAt = "2027-01-01T00:00:00.000Z";
+    image.rights.evidenceRetrievedAt = "2027-01-01T00:00:00.000Z";
+    const report = await evaluate(fixture);
+    assert.equal(report.status, "blocked");
+    assert.ok(report.rightsScope.blockers.includes("asset-matched-images-human-rights-review"));
+    assert.ok(report.rightsScope.blockers.includes("asset-matched-images-rights-evidence-bytes"));
+  } finally {
+    await rm(fixture.root, { recursive: true, force: true });
+  }
+});

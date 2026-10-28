@@ -161,6 +161,7 @@ function validateRights(asset, allAssets, byteReport, evaluatedAt, checks, block
     evidenceAsset.source.recordUrl === rights.evidenceUrl
   ) && https(rights.evidenceUrl) &&
     timestamp(rights.evidenceRetrievedAt) &&
+    Date.parse(rights.evidenceRetrievedAt) <= Date.parse(evaluatedAt) &&
     hash(rights.evidenceContentSha256) &&
     evidenceAssets.some((evidenceAsset) =>
       evidenceAsset.sha256.toLowerCase() === rights.evidenceContentSha256.toLowerCase()
@@ -196,9 +197,11 @@ function validateRights(asset, allAssets, byteReport, evaluatedAt, checks, block
 
   const reviewOk = rights.status === "approved" &&
     textValue(rights.reviewedBy) && timestamp(rights.reviewedAt) &&
+    Date.parse(rights.reviewedAt) <= Date.parse(evaluatedAt) &&
     textValue(rights.decisionId) && timestamp(rights.effectiveAt) &&
-    (!rights.expiresAt || timestamp(rights.expiresAt)) &&
-    (!rights.expiresAt || Date.parse(rights.expiresAt) >= Date.parse(evaluatedAt)) &&
+    Date.parse(rights.effectiveAt) <= Date.parse(evaluatedAt) &&
+    (rights.expiresAt === null || (timestamp(rights.expiresAt) &&
+      Date.parse(rights.expiresAt) >= Date.parse(evaluatedAt))) &&
     rights.revoked !== true &&
     rights.explicitGrantConfirmed === true;
   add(checks, blockers, "asset-" + id + "-human-rights-review", reviewOk,
