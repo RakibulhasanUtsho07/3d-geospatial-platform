@@ -26,6 +26,68 @@ PUBLISHER_MD5 = "37ce114fb348fb28066cc967cde9771d"
 MAX_PREFIX_BYTES = 8 * 1024 * 1024
 USER_AGENT = "3d-geospatial-platform-BRF28/1.0"
 
+GEO_KEY_NAMES = {
+    1024: "GTModelTypeGeoKey",
+    1025: "GTRasterTypeGeoKey",
+    1026: "GTCitationGeoKey",
+    2048: "GeographicTypeGeoKey",
+    2049: "GeogCitationGeoKey",
+    2054: "GeogAngularUnitsGeoKey",
+    3072: "ProjectedCSTypeGeoKey",
+    3073: "PCSCitationGeoKey",
+    3076: "ProjLinearUnitsGeoKey",
+    4096: "VerticalCSTypeGeoKey",
+    4099: "VerticalUnitsGeoKey",
+}
+
+
+def parse_geokey_directory(payload: bytes) -> dict[str, Any]:
+    """Decode GeoTIFF GeoKeyDirectoryTag into explicit key/value records."""
+    if len(payload) < 8 or len(payload) % 2:
+        return {"parseStatus": "invalid-geokey-payload-length", "payloadLengthBytes": len(payload)}
+    words = struct.unpack("<" + "H" * (len(payload) // 2), payload)
+    version, revision, minor_revision, key_count = words[:4]
+    if 4 + key_count * 4 > len(words):
+        return {
+            "parseStatus": "truncated-geokey-directory",
+            "version": version,
+            "revision": revision,
+            "minorRevision": minor_revision,
+            "declaredKeyCount": key_count,
+            "availableWords": len(words),
+        }
+    keys = []
+    for index in range(key_count):
+        key_id, tiff_tag_location, count, value_offset = words[4 + 4 * index:8 + 4 * index]
+        item = {
+            "keyId": key_id,
+            "keyName": GEO_KEY_NAMES.get(key_id, "UnknownGeoKey"),
+            "tiffTagLocation": tiff_tag_location,
+            "count": count,
+            "valueOffset": value_offset,
+        }
+        if tiff_tag_location == 0:
+            item["inlineValue"] = value_offset
+            if key_id in (2048, 3072, 4096):
+                item["epsgCodeCandidate"] = value_offset
+        keys.append(item)
+    return {
+        "parseStatus": "parsed",
+        "version": version,
+        "revision": revision,
+        "minorRevision": minor_revision,
+        "declaredKeyCount": key_count,
+        "keys": keys,
+        "projectedCrsCodeCandidates": [
+            item["inlineValue"] for item in keys
+            if item["keyId"] == 3072 and "inlineValue" in item
+        ],
+        "verticalCrsCodeCandidates": [
+            item["inlineValue"] for item in keys
+            if item["keyId"] == 4096 and "inlineValue" in item
+        ],
+    }
+
 
 def blocked_report(reason: str, **fields: Any) -> dict[str, Any]:
     report: dict[str, Any] = {
@@ -136,36 +198,41 @@ def parse_las_prefix(prefix: bytes) -> dict[str, Any]:
             break
 
         payload = prefix[payload_start:payload_end]
-        if user_id.casefold() == "lasf_projection":
-            if record_id in (2111, 2112):
-                wkt = payload.rstrip(b"\0").decode("utf-8", "replace").strip()
-                crs_entry = {
-                    "userId": user_id,
-                    "recordId": record_id,
-                    "recordType": "WKT math transform" if record_id == 2111 else "WKT coordinate system",
-                    "text": wkt[:5000],
-                    "textTruncated": len(wkt) > 5000,
-                }
-                epsg_codes = sorted(set(re.findall(
-                    r"(?:EPSG\s*[:=]\s*|ID\s*\[\s*[\"']EPSG[\"']\s*,\s*|AUTHORITY\s*\[\s*[\"']EPSG[\"']\s*,\s*[\"'])(\d+)",
-                    wkt,
-                    flags=re.IGNORECASE,
-                )))
-                crs_entry["epsgCodesFound"] = epsg_codes
-                result["crsEvidence"].append(crs_entry)
-            elif record_id in (34735, 34736, 34737):
-                result["crsEvidence"].append({
-                    "userId": user_id,
-                    "recordId": record_id,
-                    "recordType": {
-                        34735: "GeoKeyDirectoryTag",
-                        34736: "GeoDoubleParamsTag",
-                        34737: "GeoAsciiParamsTag",
-                    }[record_id],
-                    "payloadLengthBytes": payload_len,
-                    "payloadCaptured": True,
-                    "payloadPreview": payload[:300].decode("ascii", "replace"),
-                })
+        if record_id in (2111, 2112) and user_id.casefold() in {"lasf_projection", "liblas"}:
+            # Some otherwise valid legacy files store the OGC WKT VLR under
+            # user ID "liblas", rather than "LASF_Projection".
+            wkt = payload.rstrip(b"\\0").decode("utf-8", "replace").strip()
+            crs_entry = {
+                "userId": user_id,
+                "recordId": record_id,
+                "recordType": "WKT math transform" if record_id == 2111 else "WKT coordinate system",
+                "text": wkt[:5000],
+                "textTruncated": len(wkt) > 5000,
+            }
+            epsg_codes = sorted(set(re.findall(
+                r"(?:EPSG\\s*[:=]\\s*|ID\\s*\\[\\s*[\"']EPSG[\"']\\s*,\\s*|AUTHORITY\\s*\\[\\s*[\"']EPSG[\"']\\s*,\\s*[\"'])(\\d+)",
+                wkt,
+                flags=re.IGNORECASE,
+            )))
+            crs_entry["epsgCodesFound"] = epsg_codes
+            result["crsEvidence"].append(crs_entry)
+        elif user_id.casefold() == "lasf_projection" and record_id in (34735, 34736, 34737):
+            record_type = {
+                34735: "GeoKeyDirectoryTag",
+                34736: "GeoDoubleParamsTag",
+                34737: "GeoAsciiParamsTag",
+            }[record_id]
+            crs_entry = {
+                "userId": user_id,
+                "recordId": record_id,
+                "recordType": record_type,
+                "payloadLengthBytes": payload_len,
+                "payloadCaptured": True,
+                "payloadPreview": payload[:300].decode("ascii", "replace"),
+            }
+            if record_id == 34735:
+                crs_entry["geoKeyDirectory"] = parse_geokey_directory(payload)
+            result["crsEvidence"].append(crs_entry)
         cursor = payload_end
 
     return result
