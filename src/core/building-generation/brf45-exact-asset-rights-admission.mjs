@@ -175,7 +175,8 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
       isHttps(row.sourceUrl) && isSha(row.sha256) &&
       Number.isSafeInteger(row.byteSize) && row.byteSize > 0 &&
       Array.isArray(row.requestedScopes) &&
-      manifest.requiredScopes.every(scope => row.requestedScopes.includes(scope)) &&
+      row.requestedScopes.length === manifest.requiredScopes.length &&
+      manifest.requiredScopes.every((scope, index) => row.requestedScopes[index] === scope) &&
       row.requestedScopes.every(scope => ALLOWED_SCOPES.has(scope)) &&
       unique(row.requestedScopes).length === row.requestedScopes.length;
     add(checks, blockers, rowPrefix + "-exact-source-binding", exactSourceMatch,
