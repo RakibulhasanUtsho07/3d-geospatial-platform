@@ -206,7 +206,7 @@ def build_reference_glb(payload: bytes, *, source_commit: str, source_path: str,
     if rights_review_status=="rejected": raise ConversionError("source asset rights are rejected; conversion is blocked")
     if rights_review_status!="approved" and not local_review_only: raise ConversionError("exact-file rights are not approved; local_review_only is required for private diagnostics")
     if rights_review_status=="approved":
-        if not isinstance(rights_evidence_url,str) or not re.fullmatch(r"https://[^\\s]+",rights_evidence_url):
+        if not isinstance(rights_evidence_url,str) or not re.fullmatch(r"https://[^\s]+",rights_evidence_url):
             raise ConversionError("approved rights require an HTTPS rights_evidence_url")
         if not isinstance(attribution_text,str) or not attribution_text.strip():
             raise ConversionError("approved rights require non-empty attribution_text")
