@@ -1,7 +1,8 @@
 const SHA256 = /^[a-f0-9]{64}$/i;
 const RELEASE_FLAGS = ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"];
 const ARTIFACT_KEYS = [
-  "sourceReviewDecision", "authorizationRecord", "candidateGlb", "geometryValidationReport",
+  "sourceReviewDecision", "rightsAdmissionRegister", "rightsSourceManifest",
+  "authorizationRecord", "candidateGlb", "geometryValidationReport",
   "preparedManifest", "evaluationReport", "independentReference", "sourceCameraReport",
   "renderManifest", "visualReviewDecision",
 ];
@@ -112,11 +113,72 @@ export function assessBrf26EvidenceBundle(input = {}) {
   const sourceCamera = artifacts.sourceCameraReport.value;
   const renderManifest = artifacts.renderManifest.value;
   const visual = artifacts.visualReviewDecision.value;
+  const rightsRegister = artifacts.rightsAdmissionRegister.value;
+  const rightsSourceManifest = artifacts.rightsSourceManifest.value;
+  const rightsAdmission = input.rightsAdmissionReport;
   const candidateSha = artifacts.candidateGlb.actualSha256?.toLowerCase();
   const candidateSize = artifacts.candidateGlb.byteSize;
 
   check("real-evidence-mode", manifest.evidenceMode === "real-evidence",
     "Synthetic test fixtures can never produce a real-evidence sign-off-ready disposition.", "blocked");
+
+  const requiredRightsScopes = ["inspect-source", "use-for-validation", "derive-model"];
+  const rightsSourceViews = Array.isArray(rightsSourceManifest?.views) ? rightsSourceManifest.views : [];
+  const rightsRegisterAssets = Array.isArray(rightsRegister?.assets) ? rightsRegister.assets : [];
+  const rightsReportAssets = Array.isArray(rightsAdmission?.assets) ? rightsAdmission.assets : [];
+  check("rights-admission-schema", object(rightsRegister) &&
+    rightsRegister.schemaVersion === "1.0.0" &&
+    rightsRegister.recordType === "brf-45-exact-asset-rights-admission" &&
+    rightsRegister.evaluationId === "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION" &&
+    rightsRegister.requestedPurpose === "private-local-reconstruction-and-validation" &&
+    Array.isArray(rightsRegister.requiredScopes) &&
+    requiredRightsScopes.every((scope) => rightsRegister.requiredScopes.includes(scope)),
+  "A versioned BRF-45 exact-asset rights register with the private reconstruction scopes is required.", "failed");
+  check("rights-source-manifest-binding", object(rightsSourceManifest) &&
+    rightsSourceManifest.schemaVersion === "1.0.0" &&
+    rightsSourceManifest.evaluationStage === "multiview-source-byte-intake-only" &&
+    rightsSourceViews.length >= 3 &&
+    rightsRegister.sourceBinding?.sourceManifestFilename === "brf-14-multiview-source.json" &&
+    rightsRegister.sourceBinding?.sampleId === rightsSourceManifest.sampleId &&
+    rightsRegister.sourceBinding?.sourceRepositoryCommit === rightsSourceManifest.dataset?.sourceRepositoryCommit &&
+    rightsRegister.sourceBinding?.declaredLicense === rightsSourceManifest.dataset?.license &&
+    rightsRegister.sourceBinding?.licenseScope === rightsSourceManifest.dataset?.licenseScope &&
+    rightsRegister.sourceBinding?.rightsStatus === rightsSourceManifest.dataset?.rightsStatus &&
+    rightsAdmission?.sourceManifestSha256?.toLowerCase() === artifacts.rightsSourceManifest.actualSha256?.toLowerCase() &&
+    rightsAdmission?.sourceRepositoryCommit === rightsSourceManifest.dataset?.sourceRepositoryCommit,
+  "BRF-45 must be evaluated against the exact pinned BRF-14 manifest and matching source commit.", "failed");
+  check("rights-admission-register-release-flags-false", flagsFalse(rightsRegister.releaseFlags) &&
+    flagsFalse(rightsAdmission?.releaseFlags),
+  "Neither the rights register nor its evaluation may set model release flags.", "failed");
+  check("rights-admission-status", rightsAdmission?.status === "rights-admission-complete-human-review-required" &&
+    rightsAdmission?.sourceRightsStatus === "evidence-complete-human-review-required" &&
+    Array.isArray(rightsAdmission.blockers) && rightsAdmission.blockers.length === 0,
+  "BRF-45 exact-asset evidence must be complete; pending or denied source rights block the evidence bundle.", "blocked");
+  check("rights-admission-asset-coverage", rightsRegisterAssets.length === rightsSourceViews.length &&
+    rightsAdmission?.sourceViewCount === rightsSourceViews.length &&
+    rightsAdmission?.rightsApprovedAssetCount === rightsSourceViews.length &&
+    rightsAdmission?.assets?.length === rightsSourceViews.length,
+  "Every selected BRF-14 source image must have one rights decision and a complete evidence evaluation.", "blocked");
+  const includedForRights = Array.isArray(review.sourceViews)
+    ? review.sourceViews.filter((view) => object(view) && view.decision === "include" && hash(view.sourceImageSha256))
+    : [];
+  const everyIncludedViewHasRights = includedForRights.length > 0 && includedForRights.every((view) => {
+    const expectedHash = view.sourceImageSha256.toLowerCase();
+    const declared = rightsRegisterAssets.filter((asset) =>
+      hash(asset?.sha256) && asset.sha256.toLowerCase() === expectedHash);
+    const evaluated = rightsReportAssets.filter((asset) =>
+      hash(asset?.sha256) && asset.sha256.toLowerCase() === expectedHash);
+    return declared.length === 1 && declared[0].decision === "approved" &&
+      Array.isArray(declared[0].rights?.grantedScopes) &&
+      requiredRightsScopes.every((scope) => declared[0].rights.grantedScopes.includes(scope)) &&
+      evaluated.length === 1 && evaluated[0].sourceId === declared[0].sourceId &&
+      evaluated[0].status === "evidence-complete-human-review-required" &&
+      Array.isArray(evaluated[0].grantedScopes) &&
+      requiredRightsScopes.every((scope) => evaluated[0].grantedScopes.includes(scope));
+  });
+  check("rights-admission-covers-included-source-views", everyIncludedViewHasRights,
+    "Every BRF-21 included source view must map by exact SHA-256 to a complete BRF-45 grant for all required scopes.", "blocked");
+
   check("candidate-path-bound-to-workspace", input.candidatePathBindingValid === true,
     "The actual candidate path must equal the authorization-relative path inside the reviewed workspace.", "failed");
 
@@ -403,5 +465,16 @@ function buildOutput(input, checks, failures, blockers, result) {
     result.finalDisposition = result.status;
   }
   result.policy = { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false };
+  const rights = input.rightsAdmissionReport;
+  result.rightsAdmission = {
+    status: rights?.status ?? "unavailable",
+    sourceRightsStatus: rights?.sourceRightsStatus ?? "incomplete-or-invalid",
+    sourceManifestSha256: rights?.sourceManifestSha256 ?? null,
+    sourceRepositoryCommit: rights?.sourceRepositoryCommit ?? null,
+    sourceViewCount: rights?.sourceViewCount ?? 0,
+    rightsApprovedAssetCount: rights?.rightsApprovedAssetCount ?? 0,
+    blockers: Array.isArray(rights?.blockers) ? rights.blockers : ["BRF-45 rights validation was not available."],
+    releaseFlags: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+  };
   return result;
 }
