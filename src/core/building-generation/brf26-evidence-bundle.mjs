@@ -219,6 +219,16 @@ export function assessBrf26EvidenceBundle(input = {}) {
   "Any building ID declared by source-camera evidence must match the bundle manifest.", "failed");
   check("source-camera-candidate-binding", bindsEveryModelHash(sourceCamera, candidateSha),
     "Source-camera evidence must bind its model hash to the exact candidate GLB bytes.", "failed");
+  check("source-camera-comparable", sourceCamera.status === "same-camera-comparable" &&
+    sourceCamera.sameCameraComparable === true && object(sourceCamera.render) &&
+    sourceCamera.render.filename === "source-camera.png" &&
+    Number.isSafeInteger(sourceCamera.render.bytes) && sourceCamera.render.bytes > 0 &&
+    hash(sourceCamera.render.sha256) &&
+    Number.isSafeInteger(sourceCamera.render.width) && sourceCamera.render.width > 0 &&
+    Number.isSafeInteger(sourceCamera.render.height) && sourceCamera.render.height > 0 &&
+    sourceCamera.sourceImageSize?.width === sourceCamera.render.width &&
+    sourceCamera.sourceImageSize?.height === sourceCamera.render.height,
+  "Source-camera report must declare a comparable projection and complete, hash-pinned render with source-matching dimensions.", "blocked");
 
   const renderManifestBuildingIds = buildingIdClaims(renderManifest);
   check("render-manifest-building-binding", renderManifestBuildingIds.length === 0 ||
