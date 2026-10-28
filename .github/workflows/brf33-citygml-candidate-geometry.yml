@@ -9,6 +9,7 @@ on:
       - "tests/test_tum_citygml_candidate.py"
       - "docs/research/BRF-33-CITYGML-CANDIDATE-GEOMETRY.md"
       - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+      - "benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json"
   pull_request:
     branches: [development]
     paths:
@@ -41,7 +42,7 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_tum_citygml_candidate.py' -v
 
       - name: Download, verify, and inspect only the pinned 51 MB candidate
-        run: python scripts/inspect_tum_citygml_candidate.py --output artifacts/brf33-citygml-candidate/report.json
+        run: python scripts/inspect_tum_citygml_candidate.py --snapshot benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json --envelope-report benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json --output artifacts/brf33-citygml-candidate/report.json
 
       - name: Require verified whole-object hash and parsed geometry while keeping release blocked
         run: |
@@ -56,7 +57,7 @@ jobs:
           if report["byteVerification"]["actualBytes"] != report["source"]["lfsExpectedBytes"]:
               raise SystemExit("Whole-object byte size does not match the pinned LFS object.")
           geometry = report.get("geometry", {})
-          if not geometry.get("fullXmlDocumentValidated") or geometry.get("coordinateTupleCount", 0) < 1:
+          if not geometry.get("fullXmlDocumentValidated") or geometry.get("coordinateTupleCount3D", 0) < 1:
               raise SystemExit("Full CityGML XML or geometry extraction was not validated.")
           if report.get("sameBuildingVerified") is not False:
               raise SystemExit("Candidate must remain unselected until cross-modal evidence is reviewed.")
