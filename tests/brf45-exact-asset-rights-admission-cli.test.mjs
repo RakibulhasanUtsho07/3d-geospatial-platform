@@ -24,7 +24,7 @@ test("the real 16-view sample remains blocked with absent exact-asset evidence",
   const result = spawnSync(process.execPath, [
     cli, manifestPath, "--source-manifest", sourceManifestPath,
     "--evidence-root", evidenceRoot, "--report", "rights-report.json",
-  ], { encoding: "utf8" });
+  ], { encoding: "utf8", cwd: root });
   assert.equal(result.status, 2, result.stderr || result.stdout);
   const summary = JSON.parse(result.stdout);
   assert.equal(summary.status, "blocked");
