@@ -21,6 +21,30 @@ on:
       - ".github/workflows/real-dhaka-baseline.yml"
       - "package.json"
       - "package-lock.json"
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "src/app/**"
+      - "src/core/map-engine/**"
+      - "src/core/geospatial/**"
+      - "src/features/map/**"
+      - "data/overture/**"
+      - "public/data/roads/**"
+      - "scripts/benchmark-map-browser.mjs"
+      - "scripts/validate-real-dhaka-baseline.mjs"
+      - "scripts/prepare-dhaka-road-extract.mjs"
+      - "tests/browser/**"
+      - "tests/map-browser-baseline.test.mjs"
+      - "tests/real-dhaka-baseline-validation.test.mjs"
+      - "tests/map-viewport-ux.test.mjs"
+      - "tests/canvas-red-pixel-diagnostics.test.mjs"
+      - "tests/imagery-tile-error-diagnostics.test.mjs"
+      - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
+      - ".github/workflows/real-dhaka-baseline.yml"
+      - "package.json"
+      - "package-lock.json"
+
   workflow_dispatch:
 
 permissions:
