@@ -454,6 +454,7 @@ test("rejects a changed per-view quality hash even when outer report bindings ar
 
 test("rejects selected media not in the reviewed source hashes", async t => {
   const f = await setup(t);
+  await approveAllRights(f);
   const sourcePath = path.join(f.workspaceRoot, ".building-engine", "media", "building-one", "sources", "view-1.json");
   const record = JSON.parse(await readFile(sourcePath, "utf8"));
   record.sha256 = "c".repeat(64); record.assetId = record.sha256;
