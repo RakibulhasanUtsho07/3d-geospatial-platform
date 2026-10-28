@@ -18,6 +18,7 @@ on:
       - "tests/test_tum_citygml_candidate.py"
       - "docs/research/BRF-33-CITYGML-CANDIDATE-GEOMETRY.md"
       - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+      - "benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json"
   workflow_dispatch:
 
 permissions:
