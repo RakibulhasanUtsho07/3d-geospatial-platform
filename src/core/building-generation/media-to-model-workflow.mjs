@@ -5,7 +5,7 @@ import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { ingestMediaFile } from "./media-intake.mjs";
 import { extractVideoFrames } from "./video-frame-extractor.mjs";
-import { reviewBuildingSource, prepareBuildingSpecSources, loadVerifiedSource } from "./source-workflow.mjs";
+import { reviewBuildingSource, prepareBuildingSpecSources, loadVerifiedSource, normalizeSourceOperationScopes } from "./source-workflow.mjs";
 import { generateBuildingAsset } from "./generation-pipeline.mjs";
 import { registerModelToWgs84 } from "./ground-control-registration.mjs";
 import {
@@ -19,6 +19,11 @@ import {
 
 const ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const KNOWN_LICENCE=value=>typeof value==="string"&&value.trim().length>0&&!["unknown","n/a","none"].includes(value.trim().toLowerCase());
+const OPERATION_SCOPES_BY_STRATEGY = Object.freeze({
+ procedural: ["procedural-model-derivation"],
+ "single-image-ai": ["single-image-ai-reconstruction"],
+ photogrammetry: ["photogrammetry-reconstruction", "texture-baking"],
+});
 function safeId(value,label,max=80){
  if(typeof value!=="string"||value.length>max||!ID.test(value))throw new TypeError(label+" must be a valid identifier of at most "+max+" characters");
  return value;
@@ -120,7 +125,9 @@ function parseSource(source){
  if(typeof source.relativePath!=="string"||!source.relativePath.trim())throw new TypeError("source "+sourceId+" needs a workspace-relative file path");
  if(path.isAbsolute(source.relativePath)||path.win32.isAbsolute(source.relativePath))throw new TypeError("source paths must be relative to workspaceRoot");
  if(!KNOWN_LICENCE(source.licence))throw new TypeError("source "+sourceId+" needs a known licence/permission basis; unknown is not accepted for this media-to-3D workflow");
- return {sourceId,relativePath:source.relativePath,licence:source.licence.trim(),author:source.author,attribution:source.attribution,sourceUrl:source.sourceUrl,capturedAt:source.capturedAt,description:source.description,kind:source.kind??"auto",captureLocation:source.captureLocation};
+ const permittedOperations = normalizeSourceOperationScopes(source.permittedOperations, "source " + sourceId + " permittedOperations");
+ if (!permittedOperations.includes("private-image-ingestion")) throw new TypeError("source " + sourceId + " must explicitly permit private-image-ingestion before local media intake");
+ return {sourceId,relativePath:source.relativePath,licence:source.licence.trim(),permittedOperations,author:source.author,attribution:source.attribution,sourceUrl:source.sourceUrl,capturedAt:source.capturedAt,description:source.description,kind:source.kind??"auto",captureLocation:source.captureLocation};
 }
 function hashBytes(buffer){return createHash("sha256").update(buffer).digest("hex");}
 function sourceIdsFromViewOption(value,available){
@@ -153,6 +160,8 @@ export async function runMediaToModelWorkflow(options){
  if(new Set(sourceInputs.map(s=>s.sourceId)).size!==sourceInputs.length)throw new TypeError("source IDs must be unique");
  if(sourceInputs.length&&options.confirmRights!==true)throw new TypeError("confirmRights must be true after checking rights for every provided media source");
  if(strategy==="single-image-ai"&&options.confirmSingleViewInference!==true)throw new TypeError("single-image-ai requires confirmSingleViewInference=true because unseen geometry is inferred");
+ const effectiveStrategy = strategy === "auto" ? (options.enablePhotogrammetry === true ? "photogrammetry" : "procedural") : strategy;
+ const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[effectiveStrategy];
  if(strategy==="photogrammetry"){
   if(options.confirmSameBuilding!==true||options.confirmOverlapReviewed!==true||options.confirmUpAxisReviewed!==true)throw new TypeError("photogrammetry requires same-building, overlap and source-axis confirmations");
   if(!["X","Y","Z"].includes(options.upAxis))throw new TypeError("photogrammetry requires upAxis X, Y or Z");
@@ -253,6 +262,7 @@ export async function runMediaToModelWorkflow(options){
      if(loaded.sha256!==saved.sha256||loaded.record.kind!==saved.kind||
         loaded.record.mimeType!==saved.mimeType||loaded.record.licence!==saved.licence||
         loaded.record.usageStatus!==saved.usageStatus||loaded.record.relativePath!==saved.relativePath||
+        JSON.stringify(loaded.record.permittedOperations ?? [])!==JSON.stringify(saved.permittedOperations ?? [])||
         (saved.parentSourceId!==undefined&&loaded.record.parentSourceId!==saved.parentSourceId)){
       throw new TypeError("cached media source no longer matches its ingestion artifact: "+saved.id);
      }
@@ -280,14 +290,19 @@ export async function runMediaToModelWorkflow(options){
       workspaceRoot:root,buildingId,sourceId:input.sourceId,licence:input.licence,confirmRights:true,
       author:input.author,attribution:input.attribution,sourceUrl:input.sourceUrl,capturedAt:input.capturedAt,
       description:input.description,captureLocation:input.captureLocation,
+      permittedOperations:input.permittedOperations,
      });
      mediaRecords.push({
       id:reviewed.record.id,kind:reviewed.record.kind,mimeType:reviewed.record.mimeType,
       sha256:reviewed.assetSha256,licence:reviewed.record.licence,usageStatus:reviewed.record.usageStatus,
+      permittedOperations:reviewed.record.permittedOperations ?? [],
       relativePath:reviewed.record.relativePath,
      });
      if(reviewed.record.kind==="image")visualIds.push(reviewed.record.id);
      if(reviewed.record.kind==="video"){
+      if (!reviewed.record.permittedOperations?.includes("video-frame-extraction")) {
+       throw new TypeError("video source " + reviewed.record.id + " must explicitly permit video-frame-extraction before frame extraction");
+      }
       const extracted=await extractVideoFrames({
        workspaceRoot:root,videoRelativePath:reviewed.record.relativePath,buildingId,sourceId:reviewed.record.id,
        fps:config.fps,maxFrames:config.maxFrames,maxWidth:config.maxWidth,
@@ -297,7 +312,7 @@ export async function runMediaToModelWorkflow(options){
        visualIds.push(frame.id);
        mediaRecords.push({
         id:frame.id,kind:frame.kind,mimeType:frame.mimeType,sha256:frame.sha256,
-        licence:frame.licence,usageStatus:frame.usageStatus,relativePath:frame.relativePath,
+        licence:frame.licence,usageStatus:frame.usageStatus,permittedOperations:frame.permittedOperations ?? [],relativePath:frame.relativePath,
         parentSourceId:frame.parentSourceId,frameNumber:frame.frameNumber,nominalTimeSeconds:frame.nominalTimeSeconds,
        });
       }
@@ -323,6 +338,7 @@ export async function runMediaToModelWorkflow(options){
     selectedSourceManifest.push({
      id:sourceId,sha256:ingestedRecord.sha256,kind:ingestedRecord.kind,
      licence:ingestedRecord.licence,usageStatus:ingestedRecord.usageStatus,
+     permittedOperations:ingestedRecord.permittedOperations ?? [],
     });
     continue;
    }
@@ -330,6 +346,7 @@ export async function runMediaToModelWorkflow(options){
    selectedSourceManifest.push({
     id:sourceId,sha256:selected.sha256,kind:selected.record.kind,
     licence:selected.record.licence,usageStatus:selected.record.usageStatus,
+    permittedOperations:selected.record.permittedOperations ?? [],
     parentSourceId:selected.record.parentSourceId??null,
    });
   }
@@ -369,6 +386,20 @@ export async function runMediaToModelWorkflow(options){
   runReport.inputs.mediaRecords=mediaRecords;
   runReport.inputs.selectedViewIds=viewIds;
   runReport.selectedSourceManifest=specSync.artifact.payload.selectedSourceManifest;
+
+  const effectiveScopeIds = effectiveStrategy === "single-image-ai" || effectiveStrategy === "photogrammetry"
+    ? viewIds
+    : [...new Set([...mediaRecords.map(item => item.id), ...explicitlySelected])];
+  const scopedSources = new Map((syncedSpec.sources ?? []).map(source => [source.id, source]));
+  for (const sourceId of effectiveScopeIds) {
+    const source = scopedSources.get(sourceId);
+    if (!source) throw new TypeError("operation-scope gate could not resolve selected source " + sourceId + " in the normalized BuildingSpec");
+    const actualScopes = normalizeSourceOperationScopes(source.permittedOperations, "source " + sourceId + " permittedOperations");
+    const missingScopes = requiredOperationScopes.filter(scope => !actualScopes.includes(scope));
+    if (missingScopes.length) {
+      throw new TypeError("source " + sourceId + " lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
+    }
+  }
 
   // Stage 3: build the selected model candidate and record the actual worker report.
   const modelFingerprint=fingerprintStageInput({
