@@ -24,7 +24,7 @@ async function setup(t, {
   extraRenderView = false, wrongSourceCameraBinding = false, wrongSourceCameraBuilding = false,
   wrongRenderCandidateBinding = false, wrongVisualBuilding = false, visualReleaseFlag = false,
   corruptSourceCameraPng = false, corruptRenderPng = false, wrongSourceImageBinding = false,
-  inconsistentNestedSourceImage = false,
+  inconsistentNestedSourceImage = false, pendingRights = false, wrongRightsAssetBinding = false,
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf26-bundle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -60,6 +60,96 @@ async function setup(t, {
   const sourceReviewBytes = Buffer.from(JSON.stringify(sourceReview, null, 2) + "\n");
   await writeFile(path.join(root, "evidence/source-review.json"), sourceReviewBytes);
   const reviewSha = sha(sourceReviewBytes);
+
+  const rightsSourceRows = [
+    { id: "source-view-01", filename: "source-view-01.jpg", sha256: sourceImageSha },
+    { id: "source-view-02", filename: "source-view-02.jpg", sha256: sha(Buffer.from("synthetic-source-view-02")) },
+    { id: "source-view-03", filename: "source-view-03.jpg", sha256: sha(Buffer.from("synthetic-source-view-03")) },
+  ].map((view) => ({
+    id: view.id, filename: view.filename, expectedSha256: view.sha256,
+    expectedByteSize: 1024, sourceUrl: "https://example.invalid/source/" + view.filename,
+  }));
+  const rightsSourceManifest = {
+    schemaVersion: "1.0.0",
+    evaluationStage: "multiview-source-byte-intake-only",
+    sampleId: "sample-01",
+    dataset: {
+      sourceRepositoryCommit: "synthetic-source-commit-01",
+      license: "SYNTHETIC-TEST",
+      licenseScope: "Synthetic fixtures only; not a real rights grant.",
+      rightsStatus: "synthetic-test-only; no real source permission asserted.",
+    },
+    views: rightsSourceRows,
+  };
+  const rightsSourceManifestBytes = Buffer.from(JSON.stringify(rightsSourceManifest, null, 2) + "\n");
+  await writeFile(path.join(root, "evidence/brf-14-multiview-source.json"), rightsSourceManifestBytes);
+  await mkdir(path.join(root, "rights-evidence"), { recursive: true });
+  const rightsAssets = [];
+  for (const view of rightsSourceRows) {
+    const evidenceName = "rights-evidence/" + view.id + ".txt";
+    const evidenceBytes = Buffer.from("Synthetic rights evidence for " + view.id + "; fixture only.\n");
+    await writeFile(path.join(root, evidenceName), evidenceBytes);
+    const rights = {
+      status: "approved",
+      rightsHolderOrGrantor: "Synthetic test grantor; not a real rights holder.",
+      authorityBasis: "Synthetic fixture only.",
+      license: { identifier: "SYNTHETIC-TEST", name: "Synthetic test license", url: "https://example.invalid/license" },
+      scopeDescription: "Synthetic fixture testing only; no real asset reuse is authorized.",
+      attributionText: "Synthetic fixture attribution only.",
+      restrictionsText: "No real-world permission is asserted; no redistribution or public display.",
+      grantedScopes: ["inspect-source", "use-for-validation", "derive-model"],
+      evidenceSnapshots: [{
+        filename: evidenceName, sourceUrl: "https://example.invalid/rights/" + view.id,
+        retrievedAt: "2026-10-28T00:00:00.000Z",
+        byteSize: evidenceBytes.byteLength, sha256: sha(evidenceBytes),
+        evidenceType: "synthetic-test-grant-record",
+      }],
+      reviewedBy: "synthetic-reviewer",
+      reviewedAt: "2026-10-28T00:00:00.000Z",
+      decisionId: "synthetic-rights-decision-" + view.id,
+      effectiveAt: "2026-10-28T00:00:00.000Z",
+      expiresAt: null,
+      revoked: false,
+      explicitGrantConfirmed: true,
+    };
+    rightsAssets.push({
+      sourceId: view.id, filename: view.filename, sourceUrl: view.sourceUrl,
+      sourceRepositoryCommit: rightsSourceManifest.dataset.sourceRepositoryCommit,
+      byteSize: view.expectedByteSize, sha256: view.expectedSha256,
+      requestedScopes: ["inspect-source", "use-for-validation", "derive-model"],
+      decision: pendingRights ? "pending" : "approved",
+      rights: pendingRights ? null : rights,
+    });
+  }
+  const rightsRegister = {
+    schemaVersion: "1.0.0",
+    recordType: "brf-45-exact-asset-rights-admission",
+    evaluationId: "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION",
+    evaluatedAt: "2026-10-28T00:00:00.000Z",
+    requestedPurpose: "private-local-reconstruction-and-validation",
+    sourceBinding: {
+      sourceManifestFilename: "brf-14-multiview-source.json",
+      sampleId: rightsSourceManifest.sampleId,
+      sourceRepositoryCommit: rightsSourceManifest.dataset.sourceRepositoryCommit,
+      declaredLicense: rightsSourceManifest.dataset.license,
+      licenseScope: rightsSourceManifest.dataset.licenseScope,
+      rightsStatus: rightsSourceManifest.dataset.rightsStatus,
+    },
+    requiredScopes: ["inspect-source", "use-for-validation", "derive-model"],
+    policy: {
+      inferPermissionFromPublicAvailability: false,
+      repositoryLicenseAloneSufficient: false,
+      requireExactAssetByteBinding: true,
+      requireHumanReview: true,
+      sourceRedistributionRequested: false,
+      publicDerivedModelDisplayRequested: false,
+    },
+    assets: rightsAssets,
+    releaseFlags: { ...flags },
+  };
+  if (wrongRightsAssetBinding) rightsRegister.assets[0].sha256 = sha(Buffer.from("wrong exact source bytes"));
+  const rightsRegisterBytes = Buffer.from(JSON.stringify(rightsRegister, null, 2) + "\n");
+  await writeFile(path.join(root, "evidence/brf-45-rights-register.json"), rightsRegisterBytes);
 
   const authorization = {
     schemaVersion: "1.0.0", recordType: "brf-24-colmap-execution-authorization",
@@ -167,6 +257,8 @@ async function setup(t, {
 
   const entries = {
     sourceReviewDecision: ["evidence/source-review.json", sha(sourceReviewBytes)],
+    rightsAdmissionRegister: ["evidence/brf-45-rights-register.json", sha(rightsRegisterBytes)],
+    rightsSourceManifest: ["evidence/brf-14-multiview-source.json", sha(rightsSourceManifestBytes)],
     authorizationRecord: ["evidence/authorization.json", sha(authorizationBytes)],
     candidateGlb: ["workspace/output/candidate.glb", staleCandidatePin ? sha(Buffer.from("stale")) : candidateSha],
     geometryValidationReport: ["artifacts/brf25/geometry-validation.json", null],
@@ -219,6 +311,30 @@ test("a fully cross-linked synthetic chain remains BLOCKED and never grants appr
   assert.equal(report.policy.mapReady, false);
   assert.equal(report.policy.automaticApproval, false);
   assert.equal(report.artifacts.candidateGlb.integrity, "verified");
+});
+
+test("BRF-45 pending rights rows block a complete BRF-21/BRF-24 evidence chain", async (t) => {
+  const { root } = await setup(t, { mode: "real-evidence", pendingRights: true });
+  const result = run(root);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
+  assert.equal(report.status, "BLOCKED");
+  assert.equal(report.rightsAdmission.status, "blocked");
+  assert.equal(report.rightsAdmission.rightsApprovedAssetCount, 0);
+  assert.ok(report.blockers.some((item) => item.id === "rights-admission-status"));
+  assert.ok(report.blockers.some((item) => item.id === "rights-admission-covers-included-source-views"));
+  assert.equal(report.policy.acceptanceEligible, false);
+  assert.equal(report.policy.publicationEligible, false);
+});
+
+test("BRF-45 exact source-byte drift blocks the bundle even with a freshly pinned register file", async (t) => {
+  const { root } = await setup(t, { mode: "real-evidence", wrongRightsAssetBinding: true });
+  const result = run(root);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
+  assert.equal(report.status, "BLOCKED");
+  assert.equal(report.rightsAdmission.status, "blocked");
+  assert.ok(report.rightsAdmission.blockers.length > 0);
 });
 
 test("pending visual review blocks a real-evidence manifest even when file hashes agree", async (t) => {
