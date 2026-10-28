@@ -216,7 +216,9 @@
     "test:brf36-source-byte-verifier": "node --test tests/brf36-source-byte-verifier.test.mjs tests/brf36-source-byte-verifier-cli.test.mjs",
     "test:brf37-proj-operation": "node --test tests/brf37-proj-operation.test.mjs tests/brf37-proj-operation-cli.test.mjs",
     "test:brf37-proj-operation:integration": "node scripts/test-brf37-proj-integration.mjs",
-    "test:brf38-rights-scope": "node --test tests/brf38-rights-scope.test.mjs tests/brf38-rights-scope-cli.test.mjs"
+    "test:brf38-rights-scope": "node --test tests/brf38-rights-scope.test.mjs tests/brf38-rights-scope-cli.test.mjs",
+    "test:brf41-interim-dataset-policy": "node --test tests/brf41-interim-dataset-policy.test.mjs",
+    "validate:brf41-interim-dataset-policy": "node scripts/validate-brf41-interim-dataset-policy.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
