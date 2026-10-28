@@ -212,7 +212,8 @@
     "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
     "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs",
     "prepare:independent-building-truth": "node scripts/prepare-independent-building-truth-manifest.mjs",
-    "test:brf35-building-linkage": "node --test tests/brf35-building-linkage.test.mjs"
+    "test:brf35-building-linkage": "node --test tests/brf35-building-linkage.test.mjs",
+    "test:brf36-source-byte-verifier": "node --test tests/brf36-source-byte-verifier.test.mjs tests/brf36-source-byte-verifier-cli.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
