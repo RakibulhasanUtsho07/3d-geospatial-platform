@@ -94,6 +94,13 @@ test("BRF-30 records a traceable candidate shortlist without selecting or approv
   assert.ok(registry.blockers.includes("candidate-gml-exact-file-rights-unverified"));
   assert.ok(registry.blockers.includes("candidate-uls-image-intersection-not-proven"));
   assert.ok(registry.blockers.includes("epsg-32632-to-candidate-crs-operation-unverified"));
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.epsgCode, 7837);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.name, "DHHN2016 height");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.status, "candidate-only-not-verified-for-selected-files");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedUlsLaz, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedGml, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.transformationVerified, false);
+  assert.ok(registry.blockers.includes("named-vertical-datum-unresolved"));
   assert.deepEqual(registry.releaseFlags, {
     acceptanceEligible: false,
     publicationEligible: false,
