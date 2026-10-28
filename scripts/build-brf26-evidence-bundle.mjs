@@ -76,12 +76,12 @@ async function verifySiblingPng(root, reportPath, filename, expectedSha256, expe
     const image = await readSafe(root, relative, label + " PNG", false);
     const dimensions = pngDimensions(image.bytes, label);
     Object.assign(verification, {
-      path: image.path, actualSha256: image.sha256, actualByteSize: image.byteSize,
+      path: image.path, actualSha256: image.actualSha256, actualByteSize: image.byteSize,
       actualWidth: dimensions.width, actualHeight: dimensions.height,
     });
     verification.verified =
       typeof expectedSha256 === "string" && /^[a-f0-9]{64}$/i.test(expectedSha256) &&
-      expectedSha256.toLowerCase() === image.sha256.toLowerCase() &&
+      expectedSha256.toLowerCase() === image.actualSha256.toLowerCase() &&
       Number.isSafeInteger(expectedBytes) && expectedBytes === image.byteSize &&
       Number.isSafeInteger(expectedWidth) && expectedWidth === dimensions.width &&
       Number.isSafeInteger(expectedHeight) && expectedHeight === dimensions.height;
