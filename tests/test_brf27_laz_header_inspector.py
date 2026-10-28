@@ -14,6 +14,7 @@ class FakeResponse:
     def __init__(self, body, status=206, headers=None, final_url="https://example.test/data.laz"):
         self._body = body
         self._read_count = 0
+        self._requested_sizes = []
         self.status = status
         self.headers = headers or {}
         self._final_url = final_url
@@ -32,6 +33,7 @@ class FakeResponse:
 
     def read(self, size=-1):
         self._read_count += 1
+        self._requested_sizes.append(size)
         if size < 0:
             raise AssertionError("unbounded read is forbidden")
         return self._body[:size]
@@ -116,6 +118,17 @@ class TestBoundedLazHeaderInspector(unittest.TestCase):
         self.assertEqual(result["reason"], "content-range-outside-bounded-prefix")
         self.assertEqual(fake._read_count, 0)
 
+    def test_content_length_mismatch_is_rejected_without_read(self):
+        fake = FakeResponse(
+            b"x" * 100,
+            status=206,
+            headers={"Content-Range": "bytes 0-9/100", "Content-Length": "11"},
+        )
+        result = MODULE.inspect_urlopen("https://example.test/data.laz", opener=lambda *_a, **_k: fake)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "content-length-does-not-match-content-range")
+        self.assertEqual(fake._read_count, 0)
+
     def test_range_body_is_bounded_and_digest_is_only_for_prefix(self):
         body = make_minimal_las_prefix()
         fake = FakeResponse(
@@ -130,6 +143,7 @@ class TestBoundedLazHeaderInspector(unittest.TestCase):
         self.assertFalse(result["fullArchiveDownloaded"])
         self.assertFalse(result["publisherMd5Verified"])
         self.assertEqual(fake._read_count, 1)
+        self.assertEqual(fake._requested_sizes, [len(body)])
 
 
 if __name__ == "__main__":
