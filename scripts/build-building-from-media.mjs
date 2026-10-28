@@ -29,7 +29,7 @@ const {values,positionals}=parseArgs({
   "heading-degrees":{type:"string",default:"0"},
   "control-points":{type:"string"},
   "max-gcp-rms-m":{type:"string",default:"0.5"},
-  "max-gcp-residual-m":{type:"string",default:"1.0"},
+  "max-gcp-residual-m":{type:"string",default:"1.0"},help:{type:"boolean",short:"h"},
  }
 });
 function usage(){
