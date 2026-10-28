@@ -10,11 +10,20 @@ import test from "node:test";
 const runner = fileURLToPath(new URL("../scripts/build-brf26-evidence-bundle.mjs", import.meta.url));
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const flags = { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false };
+function pngHeader(width, height) {
+  const bytes = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(bytes, 0);
+  bytes.write("IHDR", 12, "ascii");
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  return bytes;
+}
 
 async function setup(t, {
   mode = "synthetic-test", pendingVisual = false, staleCandidatePin = false,
   extraRenderView = false, wrongSourceCameraBinding = false, wrongSourceCameraBuilding = false,
   wrongRenderCandidateBinding = false, wrongVisualBuilding = false, visualReleaseFlag = false,
+  corruptSourceCameraPng = false, corruptRenderPng = false,
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf26-bundle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -91,20 +100,39 @@ async function setup(t, {
   };
   await writeFile(path.join(root, "artifacts/brf25/geometry-validation.json"), JSON.stringify(geometry, null, 2) + "\n");
 
+  const sourceCameraPng = pngHeader(512, 512);
+  await writeFile(path.join(root, "artifacts/visual/source-camera.png"),
+    corruptSourceCameraPng ? Buffer.concat([sourceCameraPng, Buffer.from("tampered")]) : sourceCameraPng);
   const sourceCamera = {
     schemaVersion: "1.0.0", recordType: "synthetic-source-camera-evidence",
     buildingId: wrongSourceCameraBuilding ? "building-other" : "building-01",
     candidateGlbSha256: wrongSourceCameraBinding ? sha(Buffer.from("different-camera-model")) : candidateSha,
+    status: "same-camera-comparable", sameCameraComparable: true,
+    sourceImageSize: { width: 512, height: 512 },
+    render: { filename: "source-camera.png", width: 512, height: 512,
+      bytes: sourceCameraPng.byteLength, sha256: sha(sourceCameraPng) },
   };
   const sourceCameraBytes = Buffer.from(JSON.stringify(sourceCamera, null, 2) + "\n");
   await writeFile(path.join(root, "artifacts/visual/source-camera-report.json"), sourceCameraBytes);
+
+  const fixedViewBytes = [
+    { id: "view-01", filename: "view-01.png", bytes: pngHeader(512, 512) },
+    ...(extraRenderView ? [{ id: "view-02", filename: "view-02.png", bytes: pngHeader(512, 512) }] : []),
+  ];
+  for (const [index, view] of fixedViewBytes.entries()) {
+    const bytes = corruptRenderPng && index === 0
+      ? Buffer.concat([view.bytes, Buffer.from("tampered")]) : view.bytes;
+    await writeFile(path.join(root, "artifacts/visual", view.filename), bytes);
+  }
   const renderManifest = {
-    schemaVersion: "1.0.0", recordType: "synthetic-render-manifest", buildingId: "building-01",
-    candidateGlbSha256: wrongRenderCandidateBinding ? sha(Buffer.from("different-render-model")) : candidateSha,
-    views: [
-      { id: "view-01", filename: "view-01.png", renderComplete: true },
-      ...(extraRenderView ? [{ id: "view-02", filename: "view-02.png", renderComplete: true }] : []),
-    ],
+    schemaVersion: "1.0.0", recordType: "synthetic-render-manifest",
+    status: "render-set-ready-for-human-review", valid: true, errors: [],
+    buildingId: "building-01",
+    modelSha256: wrongRenderCandidateBinding ? sha(Buffer.from("different-render-model")) : candidateSha,
+    views: fixedViewBytes.map((view) => ({
+      id: view.id, filename: view.filename, width: 512, height: 512,
+      bytes: view.bytes.byteLength, sha256: sha(view.bytes), renderComplete: true,
+    })),
   };
   const renderBytes = Buffer.from(JSON.stringify(renderManifest, null, 2) + "\n");
   await writeFile(path.join(root, "artifacts/visual/render-manifest.json"), renderBytes);
