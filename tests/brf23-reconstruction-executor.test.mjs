@@ -197,6 +197,55 @@ async function setup(t) {
   evidenceBindings.privateMediaQualityReport = { filename: artifacts.privateMediaQualityReport,
     byteSize: qualityReportBytes.length, sha256: sha(qualityReportBytes) };
 
+  const rightsAdmission = {
+    schemaVersion: "1.0.0",
+    recordType: "brf-45-exact-asset-rights-admission",
+    evaluationId: "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION",
+    evaluatedAt: "2026-10-28T00:00:00.000Z",
+    requestedPurpose: "private-local-reconstruction-and-validation",
+    sourceBinding: {
+      sourceManifestFilename: artifacts.sourceManifest,
+      sampleId: sourceManifest.sampleId,
+      sourceRepositoryCommit: dataset.sourceRepositoryCommit,
+      declaredLicense: dataset.license,
+      licenseScope: dataset.licenseScope,
+      rightsStatus: dataset.rightsStatus,
+    },
+    requiredScopes: ["inspect-source", "use-for-validation", "derive-model"],
+    policy: {
+      inferPermissionFromPublicAvailability: false,
+      repositoryLicenseAloneSufficient: false,
+      requireExactAssetByteBinding: true,
+      requireHumanReview: true,
+      sourceRedistributionRequested: false,
+      publicDerivedModelDisplayRequested: false,
+    },
+    assets: sourceViews.map(view => ({
+      sourceId: view.id,
+      filename: view.filename,
+      sourceUrl: view.sourceUrl,
+      sourceRepositoryCommit: dataset.sourceRepositoryCommit,
+      byteSize: view.expectedByteSize,
+      sha256: view.expectedSha256,
+      requestedScopes: ["inspect-source", "use-for-validation", "derive-model"],
+      decision: "pending",
+      rights: null,
+    })),
+    releaseFlags: {
+      acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false,
+    },
+  };
+  const rightsAdmissionBytes = Buffer.from(JSON.stringify(rightsAdmission, null, 2) + "\n");
+  await writeFile(path.join(artifactRoot, "brf-45-exact-asset-rights-admission.json"), rightsAdmissionBytes);
+  const rightsAdmissionBinding = {
+    filename: "brf-45-exact-asset-rights-admission.json",
+    byteSize: rightsAdmissionBytes.length,
+    sha256: sha(rightsAdmissionBytes),
+    evaluationId: rightsAdmission.evaluationId,
+    assetCount: rightsAdmission.assets.length,
+    pendingDecisionCount: rightsAdmission.assets.length,
+  };
+
   const decision = {
     schemaVersion: "1.0.0", recordType: "brf-21-human-review-decision", sampleId: "test-sample",
     evidenceBindings, reviewer: { name: "Synthetic Reviewer", identifier: "synthetic-reviewer" },
@@ -226,6 +275,7 @@ async function setup(t) {
     assessedInputs: {
       evidenceBindings,
       imageQualityPreflight: qualitySummary,
+      rightsAdmission: rightsAdmissionBinding,
       humanDecision: { filename: "decision.json", byteSize: decisionBytes.length, sha256: sha(decisionBytes),
         validationStatus: "valid", overallDisposition: decision.overallDisposition,
         reviewer: decision.reviewer, reviewedAtUtc: decision.reviewedAtUtc },
@@ -246,7 +296,7 @@ async function setup(t) {
   };
   const reportBytes = Buffer.from(JSON.stringify(report, null, 2) + "\n");
   await writeFile(path.join(artifactRoot, "preflight.json"), reportBytes);
-  return { workspaceRoot, artifactRoot, imageRoot, report, reportBytes, sourceRecords, qualityReport };
+  return { workspaceRoot, artifactRoot, imageRoot, report, reportBytes, sourceRecords, qualityReport, rightsAdmission };
 }
 function optionsFor(f, overrides = {}) {
   return {
@@ -293,6 +343,56 @@ async function refreshBoundQualityAndReview(f, qualityReport, qualitySummary = q
   await writeFile(path.join(f.artifactRoot, "preflight.json"), f.reportBytes);
 }
 
+async function refreshBoundRightsAdmission(f) {
+  const bytes = Buffer.from(JSON.stringify(f.rightsAdmission, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, "brf-45-exact-asset-rights-admission.json"), bytes);
+  f.report.assessedInputs.rightsAdmission = {
+    filename: "brf-45-exact-asset-rights-admission.json",
+    byteSize: bytes.length,
+    sha256: sha(bytes),
+    evaluationId: "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION",
+    assetCount: f.rightsAdmission.assets.length,
+    pendingDecisionCount: f.rightsAdmission.assets.filter(row => row.decision !== "approved").length,
+  };
+  f.reportBytes = Buffer.from(JSON.stringify(f.report, null, 2) + "\n");
+  await writeFile(path.join(f.artifactRoot, "preflight.json"), f.reportBytes);
+}
+async function approveAllRights(f) {
+  const evidenceDir = path.join(f.artifactRoot, "rights-evidence");
+  await mkdir(evidenceDir, { recursive: true });
+  for (const row of f.rightsAdmission.assets) {
+    const filename = "rights-evidence/" + row.sourceId + ".txt";
+    const bytes = Buffer.from("Synthetic permission evidence for " + row.sourceId + "; no real grant.\n");
+    await writeFile(path.join(f.artifactRoot, filename), bytes);
+    row.decision = "approved";
+    row.rights = {
+      status: "approved",
+      rightsHolderOrGrantor: "Synthetic test grantor; not a real rights holder",
+      authorityBasis: "Synthetic fixture only",
+      license: { identifier: "SYNTHETIC-TEST", name: "Synthetic test license", url: "https://example.test/license" },
+      scopeDescription: "Private local reconstruction and validation of synthetic source only.",
+      attributionText: "Synthetic test attribution.",
+      restrictionsText: "Fixture only; not a real permission statement.",
+      grantedScopes: ["inspect-source", "use-for-validation", "derive-model"],
+      evidenceSnapshots: [{
+        filename,
+        sourceUrl: "https://example.test/rights/" + row.sourceId,
+        retrievedAt: f.rightsAdmission.evaluatedAt,
+        byteSize: bytes.length,
+        sha256: sha(bytes),
+        evidenceType: "synthetic-test-grant-record",
+      }],
+      reviewedBy: "synthetic-reviewer",
+      reviewedAt: f.rightsAdmission.evaluatedAt,
+      decisionId: "synthetic-rights-decision-" + row.sourceId,
+      effectiveAt: f.rightsAdmission.evaluatedAt,
+      expiresAt: null,
+      revoked: false,
+      explicitGrantConfirmed: true,
+    };
+  }
+  await refreshBoundRightsAdmission(f);
+}
 test("accepts only a complete pinned local-only preflight structure", async t => {
   const f = await setup(t);
   const result = validateBrf23ExecutionReport(f.report);
@@ -371,12 +471,50 @@ test("rejects unsupported frame, negative up-axis, and COLMAP version drift", as
     colmapVersionProbe: async () => "4.2.0",
   })), /COLMAP version changed/);
 });
+test("only a complete separate BRF-45 admission can satisfy the source-use gate", async t => {
+  const f = await setup(t);
+  await approveAllRights(f);
+  let workerCalls = 0;
+  const result = await runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
+    workerImpl: async args => {
+      workerCalls += 1;
+      return { jobDir: args.workspaceRoot, modelPath: "mock.glb",
+        reportPath: path.join(args.workspaceRoot, "mock-report.json"),
+        report: { status: "completed-requires-review", outputs: { glb: {
+          sha256: "d".repeat(64), relativePath: "model.glb", bytes: 2048,
+        } } } };
+    },
+  }));
+  assert.equal(workerCalls, 1);
+  assert.equal(result.authorization.candidateGlbGenerated, true);
+  assert.equal(result.report.candidateGeometryValidated, false);
+  assert.equal(result.report.independentReferenceVerified, false);
+  assert.equal(result.report.heldOutCheckpointAccuracyVerified, false);
+  assert.equal(result.report.acceptanceEligible, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.automaticApproval, false);
+  const saved = JSON.parse(await readFile(result.authorizationPath, "utf8"));
+  assert.equal(saved.preflightReport.sha256, sha(f.reportBytes));
+});
+
+test("a stale or source-mismatched BRF-45 register never reaches the worker", async t => {
+  const f = await setup(t);
+  await approveAllRights(f);
+  f.rightsAdmission.assets[0].sha256 = "f".repeat(64);
+  await refreshBoundRightsAdmission(f);
+  let workerCalls = 0;
+  await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
+    workerImpl: async () => { workerCalls += 1; throw new Error("worker must not run"); },
+  })), /BRF-45 exact-asset rights admission is blocked/);
+  assert.equal(workerCalls, 0);
+});
 test("blocks COLMAP before authorization when BRF-42 rights remain unreviewed", async t => {
   const f = await setup(t);
   let workerCalls = 0;
   await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
     workerImpl: async () => { workerCalls += 1; throw new Error("worker must not run"); },
-  })), /BRF-42 evidence cannot authorize COLMAP.*rights remain unreviewed.*worker was not started/);
+  })), /BRF-45 exact-asset rights admission is blocked/);
   assert.equal(workerCalls, 0);
   await assert.rejects(
     readFile(path.join(f.workspaceRoot, ".building-engine", "authorizations", "building-one", "unit-test-job.json")),
