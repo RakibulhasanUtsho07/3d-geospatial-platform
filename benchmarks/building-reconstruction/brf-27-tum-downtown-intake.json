@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "brf27-tum-downtown-pilot-blocked",
+  "dataset": {
+    "title": "UAV Laser Scanning and Photogrammetry of TUM Downtown Campus",
+    "doi": "https://doi.org/10.5281/zenodo.15282970",
+    "recordUrl": "https://zenodo.org/records/15282970",
+    "recordVersion": "1.2.0",
+    "recordPublishedAt": "2025-04-25",
+    "datasetRole": "candidate source-discovery only; no building selected or evidence accepted",
+    "sourcePages": {
+      "uasImages": "https://tum2t.win/datasets/im-uas",
+      "uasLaserScanning": "https://tum2t.win/datasets/pc-uas",
+      "uasPhotogrammetry": "https://tum2t.win/datasets/pc-uasp",
+      "semanticBuildingModels": "https://tum2t.win/datasets/cm-buildings"
+    },
+    "knownPublishedMetadata": {
+      "imagesArchive": {
+        "filename": "Images.zip",
+        "displaySize": "5.9 GB",
+        "publisherMd5": "3916db207856346dc596d373e477143e"
+      },
+      "independentSurfaceCandidate": {
+        "filename": "TUM_Downtown_ULS_20241217_manual.laz",
+        "displaySize": "2.8 GB",
+        "publisherMd5": "37ce114fb348fb28066cc967cde9771d"
+      },
+      "photogrammetryCloud": {
+        "filename": "TUM_Downtown_Photogrammetry_20241217.laz",
+        "displaySize": "4.3 GB",
+        "publisherMd5": "e5639848bbedd483c838da8107d35663"
+      },
+      "metadataDocument": {
+        "filename": "TUM_Downtown_ULS_Photogrammetry_20241217_docu.pdf",
+        "displaySize": "1.3 MB",
+        "publisherMd5": "3427e70196d1db6a126acb6f041da04a"
+      }
+    },
+    "metadataLimitations": [
+      "Published display sizes and MD5 values are source-record metadata only; they are not local byte verification and are not SHA-256 pins.",
+      "The Zenodo record page rendered in this audit did not show a specific rights licence in its Rights section; exact asset/version licence and permitted use remain unreviewed.",
+      "The metadata PDF has not yet been inspected for horizontal CRS, coordinate units, vertical datum, local offsets or transformations.",
+      "The campus dataset does not by itself map a selected image subset, ULS point-cloud crop and individual LOD3 model to one identified building.",
+      "RTK-georeferenced imagery and ULS are promising separate sensing modalities, but this manifest does not assert independent held-out survey controls or candidate accuracy."
+    ]
+  },
+  "building": {
+    "id": "tum-downtown-unselected-building",
+    "name": "TUM Downtown — building not yet selected",
+    "identityEvidence": ""
+  },
+  "evaluation": {
+    "coordinateFrameId": "",
+    "units": "m"
+  },
+  "assets": [
+    {
+      "id": "tum-images-archive",
+      "role": "candidate-image",
+      "buildingId": "tum-downtown-unselected-building",
+      "sourceUrl": "https://zenodo.org/records/15282970/files/Images.zip?download=1",
+      "filename": "Images.zip",
+      "localPath": "external-not-downloaded/Images.zip",
+      "byteSize": null,
+      "sha256": null,
+      "publisherDisplaySize": "5.9 GB",
+      "publisherMd5": "3916db207856346dc596d373e477143e",
+      "assetScope": "archive-discovery-only; candidate frames have not been selected or extracted",
+      "license": {
+        "reviewStatus": "pending",
+        "name": "not established from the record page inspected",
+        "url": "https://zenodo.org/records/15282970",
+        "attribution": "pending exact asset/version review",
+        "reviewedBy": "",
+        "reviewedAt": ""
+      }
+    },
+    {
+      "id": "tum-uls-manual",
+      "role": "independent-surface",
+      "buildingId": "tum-downtown-unselected-building",
+      "sourceUrl": "https://zenodo.org/records/15282970/files/TUM_Downtown_ULS_20241217_manual.laz?download=1",
+      "filename": "TUM_Downtown_ULS_20241217_manual.laz",
+      "localPath": "external-not-downloaded/TUM_Downtown_ULS_20241217_manual.laz",
+      "byteSize": null,
+      "sha256": null,
+      "publisherDisplaySize": "2.8 GB",
+      "publisherMd5": "37ce114fb348fb28066cc967cde9771d",
+      "assetScope": "potential independent-sensor reference only; not downloaded, cropped, or tied to a selected building",
+      "license": {
+        "reviewStatus": "pending",
+        "name": "not established from the record page inspected",
+        "url": "https://zenodo.org/records/15282970",
+        "attribution": "pending exact asset/version review",
+        "reviewedBy": "",
+        "reviewedAt": ""
+      }
+    }
+  ],
+  "candidate": {
+    "buildingId": "tum-downtown-unselected-building",
+    "generator": "engine-multiview-reconstruction",
+    "generatedByPlatform": false,
+    "groundTruthModelImported": false,
+    "glbPath": "",
+    "glbSha256": "",
+    "sourceAssetIds": [],
+    "modelCoordinateFrameId": "",
+    "evaluationCoordinateFrameId": "",
+    "modelToEvaluationFrameMatrix4x4": null
+  },
+  "reference": {
+    "buildingId": "tum-downtown-unselected-building",
+    "sourceAssetIds": [
+      "tum-uls-manual"
+    ],
+    "sourceCoordinateFrameId": "",
+    "coordinateFrameId": "",
+    "units": "m",
+    "crs": "",
+    "verticalDatum": "",
+    "frameRegistrationEvidence": "",
+    "sourceToEvaluationFrameMatrix4x4": null
+  },
+  "controls": {
+    "fitControls": [],
+    "heldOutCheckpoints": []
+  },
+  "statusNote": "This file intentionally stays blocked. It is not a chosen-building manifest, a download verification, a completed rights review, an engine candidate, a registered reference, or an accuracy result. Replace each unknown only from inspected source evidence; never use publisher MD5 as SHA-256 or invent held-out points."
+}
