@@ -291,20 +291,31 @@ def inspect_urlopen(url: str, opener: Any | None = None) -> dict[str, Any]:
                 contentRange=content_range,
                 finalUrl=final_url,
             )
+        expected_length = end - start + 1
         if content_length is not None:
             try:
-                if int(content_length) > MAX_PREFIX_BYTES:
+                declared_content_length = int(content_length)
+                if declared_content_length > MAX_PREFIX_BYTES:
                     return blocked_report(
                         "range-response-too-large",
                         httpStatus=status_code,
                         contentRange=content_range,
                         contentLength=content_length,
                     )
+                if declared_content_length != expected_length:
+                    return blocked_report(
+                        "content-length-does-not-match-content-range",
+                        httpStatus=status_code,
+                        contentRange=content_range,
+                        contentLength=content_length,
+                        expectedRangeBytes=expected_length,
+                    )
             except ValueError:
                 return blocked_report("invalid-content-length-header", httpStatus=status_code)
 
-        expected_length = end - start + 1
-        prefix = response.read(expected_length + 1)
+        # Read at most the validated Content-Range length (<= 8 MiB). Never
+        # probe for an extra byte beyond the configured range ceiling.
+        prefix = response.read(expected_length)
         if len(prefix) != expected_length or len(prefix) > MAX_PREFIX_BYTES:
             return blocked_report(
                 "range-body-length-mismatch",
