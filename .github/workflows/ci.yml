@@ -61,6 +61,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
       - feat/brf46-source-operation-scope-gate
+      - feat/p3-6-multibuilding-tiles-package
   pull_request:
     branches:
       - main
@@ -572,6 +573,9 @@ jobs:
       - name: Test Dhaka 3D Tiles footprint alignment and deterministic camera evidence
         run: npm run test:dhaka-3d-tiles-alignment-review
 
+
+      - name: Test multi-building Dhaka 3D Tiles package, hashes and failure gates
+        run: npm run test:dhaka-3d-tiles-package
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
