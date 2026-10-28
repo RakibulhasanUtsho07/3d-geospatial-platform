@@ -298,11 +298,18 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
                 isinstance(result.get("licence"), str) and bool(result["licence"].strip()) and
                 isinstance(result.get("quality"), dict) and result.get("error") is None,
                 "BRF-42 image-quality row has mismatched bytes, missing metrics, or changed rights status for " + view_id + ".")
+        if isinstance(manifest_view.get("declaredWidth"), int) and not isinstance(manifest_view.get("declaredWidth"), bool):
+            require(result["width"] == manifest_view["declaredWidth"],
+                    "BRF-42 decoded width does not match the source manifest for " + view_id + ".")
+        if isinstance(manifest_view.get("declaredHeight"), int) and not isinstance(manifest_view.get("declaredHeight"), bool):
+            require(result["height"] == manifest_view["declaredHeight"],
+                    "BRF-42 decoded height does not match the source manifest for " + view_id + ".")
 
     review_and_release = quality_report.get("reviewAndRelease")
     release_flags = quality_report.get("releaseFlags")
     require(isinstance(review_and_release, dict) and
             review_and_release.get("rightsReview") == "pending-human-review" and
+            review_and_release.get("sameBuildingIdentity") == "source-declared-not-independently-confirmed" and
             review_and_release.get("visualOverlap") == "pending-human-review" and
             review_and_release.get("facadeRoofCoverage") == "pending-human-review" and
             review_and_release.get("sourceUpAxis") == "pending-human-review" and
