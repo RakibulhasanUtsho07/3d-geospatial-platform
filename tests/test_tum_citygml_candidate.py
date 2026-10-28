@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -172,6 +173,56 @@ class TestPinnedCandidateReportContract(unittest.TestCase):
         self.assertEqual(len(MODULE.CANDIDATE_LFS_SHA256), 64)
         self.assertEqual(len(MODULE.CANDIDATE_BLOB_SHA), 40)
 
+
+
+class TestPinnedCandidateLoader(unittest.TestCase):
+    def test_requires_snapshot_and_matching_screening_hash_pins(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            files = [{"filename": f"other-{n}.gml", "path": f"{MODULE.CATALOG_PATH}/other-{n}.gml", "repositoryBlobId": "b" * 40} for n in range(26)]
+            files.append({
+                "filename": MODULE.CANDIDATE_FILENAME,
+                "path": f"{MODULE.CATALOG_PATH}/{MODULE.CANDIDATE_FILENAME}",
+                "repositoryBlobId": MODULE.CANDIDATE_BLOB_SHA,
+            })
+            snapshot = {
+                "source": {"resolvedCommitSha": MODULE.SOURCE_COMMIT},
+                "inventory": {"files": files},
+            }
+            models = [{"filename": f"other-{n}.gml"} for n in range(26)]
+            models.append({
+                "filename": MODULE.CANDIDATE_FILENAME,
+                "repositoryBlobId": MODULE.CANDIDATE_BLOB_SHA,
+                "lfsDeclaredSha256": MODULE.CANDIDATE_LFS_SHA256,
+                "lfsDeclaredBytes": MODULE.CANDIDATE_BYTES,
+                "prefixSha256": "c" * 64,
+                "srsName": "EPSG:25832",
+            })
+            screening = {"source": {"commit": MODULE.SOURCE_COMMIT}, "models": models}
+            snapshot_path = root / "snapshot.json"
+            report_path = root / "screening.json"
+            snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+            report_path.write_text(json.dumps(screening), encoding="utf-8")
+            resolved = MODULE.load_candidate_pins(snapshot_path, report_path)
+            self.assertEqual(resolved["repositoryBlobId"], MODULE.CANDIDATE_BLOB_SHA)
+            self.assertEqual(resolved["lfsDeclaredSha256"], MODULE.CANDIDATE_LFS_SHA256)
+            self.assertEqual(resolved["lfsDeclaredBytes"], MODULE.CANDIDATE_BYTES)
+
+    def test_rejects_screening_report_with_wrong_source_commit(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            files = [{"filename": f"other-{n}.gml", "path": f"{MODULE.CATALOG_PATH}/other-{n}.gml", "repositoryBlobId": "b" * 40} for n in range(26)]
+            files.append({
+                "filename": MODULE.CANDIDATE_FILENAME,
+                "path": f"{MODULE.CATALOG_PATH}/{MODULE.CANDIDATE_FILENAME}",
+                "repositoryBlobId": MODULE.CANDIDATE_BLOB_SHA,
+            })
+            snapshot_path = root / "snapshot.json"
+            report_path = root / "screening.json"
+            snapshot_path.write_text(json.dumps({"source": {"resolvedCommitSha": MODULE.SOURCE_COMMIT}, "inventory": {"files": files}}), encoding="utf-8")
+            report_path.write_text(json.dumps({"source": {"commit": "0" * 40}, "models": []}), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                MODULE.load_candidate_pins(snapshot_path, report_path)
 
 if __name__ == "__main__":
     unittest.main()
