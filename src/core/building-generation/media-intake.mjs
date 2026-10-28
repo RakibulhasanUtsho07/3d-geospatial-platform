@@ -141,6 +141,7 @@ export function toBuildingSpecSource(record) {
   return {
     id: record.id, kind: record.kind, title: record.title ?? record.id, assetId: record.assetId,
     usageStatus: record.usageStatus ?? "unreviewed", licence: record.licence ?? "unknown",
+    ...(Array.isArray(record.permittedOperations) ? { permittedOperations: [...record.permittedOperations] } : {}),
     ...(record.url ? { url: record.url } : {}), ...(record.author ? { author: record.author } : {}),
     ...(record.attribution ? { attribution: record.attribution } : {}), ...(record.capturedAt ? { capturedAt: record.capturedAt } : {}),
     ...(record.location ? { location: record.location } : {}),
