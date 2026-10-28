@@ -247,7 +247,7 @@ test("source-camera evidence must bind the reviewed building and exact candidate
   const { root } = await setup(t, { mode: "real-evidence", wrongSourceCameraBinding: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 1, result.stderr + "\n" + result.stdout);
   assert.equal(report.status, "VALIDATION_FAILED");
   assert.ok(report.failures.some((item) => item.id === "source-camera-candidate-binding"));
 });
@@ -256,7 +256,7 @@ test("a visual review cannot omit a fixed-camera render view", async (t) => {
   const { root } = await setup(t, { mode: "real-evidence", extraRenderView: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   assert.equal(report.status, "BLOCKED");
   assert.ok(report.blockers.some((item) => item.id === "visual-review-view-coverage"));
 });
@@ -265,7 +265,7 @@ test("mismatched source-camera building identity is a validation failure", async
   const { root } = await setup(t, { mode: "real-evidence", wrongSourceCameraBuilding: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 1, result.stderr + "\n" + result.stdout);
   assert.ok(report.failures.some((item) => item.id === "source-camera-building-binding"));
 });
 
@@ -273,13 +273,13 @@ test("render manifest must use the exact candidate GLB and cannot assert release
   const { root } = await setup(t, { mode: "real-evidence", wrongRenderCandidateBinding: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 1, result.stderr + "\n" + result.stdout);
   assert.ok(report.failures.some((item) => item.id === "render-manifest-candidate-binding"));
 
   const second = await setup(t, { mode: "real-evidence", visualReleaseFlag: true });
   const releaseResult = run(second.root);
   const releaseReport = JSON.parse(await readFile(path.join(second.root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(releaseResult.status, 1, releaseResult.stderr + "\\n" + releaseResult.stdout);
+  assert.equal(releaseResult.status, 1, releaseResult.stderr + "\n" + releaseResult.stdout);
   assert.ok(releaseReport.failures.some((item) => item.id === "visual-review-release-flags-false"));
   assert.equal(releaseReport.policy.publicationEligible, false);
 });
@@ -290,20 +290,20 @@ test("symlinked artifacts and path traversal fail closed", async (t) => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   await symlink(path.join(first.root, "evidence/reference.json"), path.join(first.root, "evidence/reference-link.json"));
   manifest.artifacts.independentReference.path = "evidence/reference-link.json";
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
   const symlinkResult = run(first.root);
   const symlinkReport = JSON.parse(await readFile(path.join(first.root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(symlinkResult.status, 1, symlinkResult.stderr + "\\n" + symlinkResult.stdout);
+  assert.equal(symlinkResult.status, 1, symlinkResult.stderr + "\n" + symlinkResult.stdout);
   assert.ok(symlinkReport.failures.some((item) => item.id === "artifact-readable-independentReference"));
 
   const second = await setup(t, { mode: "real-evidence" });
   const traversalPath = path.join(second.root, "artifacts/bundle-manifest.json");
   const traversalManifest = JSON.parse(await readFile(traversalPath, "utf8"));
   traversalManifest.artifacts.independentReference.path = "../outside-reference.json";
-  await writeFile(traversalPath, JSON.stringify(traversalManifest, null, 2) + "\\n");
+  await writeFile(traversalPath, JSON.stringify(traversalManifest, null, 2) + "\n");
   const traversalResult = run(second.root);
   const traversalReport = JSON.parse(await readFile(path.join(second.root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(traversalResult.status, 1, traversalResult.stderr + "\\n" + traversalResult.stdout);
+  assert.equal(traversalResult.status, 1, traversalResult.stderr + "\n" + traversalResult.stdout);
   assert.ok(traversalReport.failures.some((item) => item.id === "artifact-readable-independentReference"));
 });
 
@@ -316,7 +316,7 @@ test("malformed manifests and attempts to overwrite an existing report are rejec
 
   const overwrite = await setup(t);
   const first = run(overwrite.root);
-  assert.equal(first.status, 2, first.stderr + "\\n" + first.stdout);
+  assert.equal(first.status, 2, first.stderr + "\n" + first.stdout);
   const outputPath = path.join(overwrite.root, "artifacts/bundle-report.json");
   const before = await readFile(outputPath);
   const second = run(overwrite.root);
@@ -330,10 +330,10 @@ test("a changed source-review decision cannot reuse the stale hash chain", async
   const reviewPath = path.join(root, "evidence/source-review.json");
   const review = JSON.parse(await readFile(reviewPath, "utf8"));
   review.coverageAssessment.rationale = "Changed after its authorization was created.";
-  await writeFile(reviewPath, JSON.stringify(review, null, 2) + "\\n");
+  await writeFile(reviewPath, JSON.stringify(review, null, 2) + "\n");
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 1, result.stderr + "\n" + result.stdout);
   assert.ok(report.failures.some((item) => item.id === "artifact-hash-pinned-sourceReviewDecision"));
   assert.equal(report.policy.acceptanceEligible, false);
 });
@@ -343,7 +343,7 @@ test("rehashes the actual source-camera PNG and every fixed-camera render PNG", 
   const { root } = await setup(t, { mode: "synthetic-test" });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   assert.equal(report.visualReview.sourceCameraRender.verified, true);
   assert.equal(report.visualReview.renderedViews.length, 1);
   assert.equal(report.visualReview.renderedViews[0].verified, true);
@@ -354,14 +354,14 @@ test("source-camera and fixed-camera PNG byte changes block sign-off readiness",
   const camera = await setup(t, { mode: "real-evidence", corruptSourceCameraPng: true });
   const cameraResult = run(camera.root);
   const cameraReport = JSON.parse(await readFile(path.join(camera.root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(cameraResult.status, 2, cameraResult.stderr + "\\n" + cameraResult.stdout);
+  assert.equal(cameraResult.status, 2, cameraResult.stderr + "\n" + cameraResult.stdout);
   assert.ok(cameraReport.blockers.some((item) => item.id === "source-camera-render-bytes-binding"));
   assert.equal(cameraReport.visualReview.sourceCameraRender.verified, false);
 
   const fixed = await setup(t, { mode: "real-evidence", corruptRenderPng: true });
   const fixedResult = run(fixed.root);
   const fixedReport = JSON.parse(await readFile(path.join(fixed.root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(fixedResult.status, 2, fixedResult.stderr + "\\n" + fixedResult.stdout);
+  assert.equal(fixedResult.status, 2, fixedResult.stderr + "\n" + fixedResult.stdout);
   assert.ok(fixedReport.blockers.some((item) => item.id === "render-manifest-render-bytes-binding"));
   assert.equal(fixedReport.visualReview.renderedViews[0].verified, false);
 });
@@ -371,7 +371,7 @@ test("source-camera image must be one of the exact human-reviewed included sourc
   const { root } = await setup(t, { mode: "real-evidence", wrongSourceImageBinding: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   assert.equal(report.status, "BLOCKED");
   assert.ok(report.blockers.some((item) => item.id === "source-camera-source-image-reviewed"));
 });
@@ -381,7 +381,7 @@ test("conflicting nested source-image hash/dimensions in camera evidence fail va
   const { root } = await setup(t, { mode: "real-evidence", inconsistentNestedSourceImage: true });
   const result = run(root);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
-  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(result.status, 1, result.stderr + "\n" + result.stdout);
   assert.equal(report.status, "VALIDATION_FAILED");
   assert.ok(report.failures.some((item) => item.id === "source-camera-source-image-consistency"));
 });
