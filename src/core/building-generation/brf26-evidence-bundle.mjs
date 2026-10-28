@@ -25,6 +25,22 @@ function timestampUtc(value) {
 function flagsFalse(value) {
   return object(value) && RELEASE_FLAGS.every((key) => value[key] === false);
 }
+function modelHashClaims(value) {
+  const nested = object(value?.manifest) ? value.manifest : {};
+  return [
+    value?.candidateGlbSha256, value?.modelSha256, value?.model?.sha256,
+    nested.candidateGlbSha256, nested.modelSha256, nested.model?.sha256,
+  ].filter((item) => item !== undefined && item !== null && item !== "");
+}
+function bindsEveryModelHash(value, expectedSha256) {
+  const claims = modelHashClaims(value);
+  return claims.length > 0 && claims.every((item) => hash(item) && item.toLowerCase() === expectedSha256);
+}
+function buildingIdClaims(value) {
+  const nested = object(value?.manifest) ? value.manifest : {};
+  return [value?.buildingId, nested.buildingId]
+    .filter((item) => item !== undefined && item !== null && item !== "");
+}
 function checkFactory() {
   const checks = [];
   const failures = [];
@@ -197,6 +213,33 @@ export function assessBrf26EvidenceBundle(input = {}) {
   check("geometry-release-flags-false", flagsFalse(geometry.policy) && flagsFalse(evaluation.policy),
     "Geometry/evaluator policy objects must keep every release flag false.", "failed");
 
+  const sourceCameraBuildingIds = buildingIdClaims(sourceCamera);
+  check("source-camera-building-binding", sourceCameraBuildingIds.length > 0 &&
+    sourceCameraBuildingIds.every((value) => value === manifest.buildingId),
+  "Source-camera evidence must declare the same building ID as the bundle manifest.", "failed");
+  check("source-camera-candidate-binding", bindsEveryModelHash(sourceCamera, candidateSha),
+    "Source-camera evidence must bind its model hash to the exact candidate GLB bytes.", "failed");
+
+  const renderManifestBuildingIds = buildingIdClaims(renderManifest);
+  check("render-manifest-building-binding", renderManifestBuildingIds.length === 0 ||
+    renderManifestBuildingIds.every((value) => value === manifest.buildingId),
+  "Any building ID declared by the render manifest must match the bundle building.", "failed");
+  check("render-manifest-candidate-binding", bindsEveryModelHash(renderManifest, candidateSha),
+    "The fixed-camera render manifest must bind its model hash to the exact candidate GLB bytes.", "failed");
+
+  const renderViews = Array.isArray(renderManifest.views) ? renderManifest.views :
+    Array.isArray(renderManifest.manifest?.views) ? renderManifest.manifest.views : null;
+  const renderViewIds = Array.isArray(renderViews) ? renderViews.map((view) =>
+    object(view) ? (nonempty(view.id) ? view.id : view.viewId) : null) : [];
+  const renderViewIdsValid = renderViewIds.length > 0 &&
+    renderViewIds.every(nonempty) &&
+    new Set(renderViewIds).size === renderViewIds.length;
+  check("render-manifest-view-set", renderViewIdsValid,
+    "Render manifest must contain a non-empty set of uniquely identified fixed-camera views.", "failed");
+  check("render-manifest-render-complete", renderViewIdsValid && renderViews.every((view) =>
+    object(view) && view.renderComplete === true),
+  "Every render-manifest view must be explicitly marked renderComplete=true.", "blocked");
+
   check("visual-review-schema", visual.recordType === "brf-26-visual-review-decision" &&
     visual.schemaVersion === "1.0.0",
   "Visual review must use the BRF-26 human-authored decision schema.", "failed");
@@ -215,10 +258,17 @@ export function assessBrf26EvidenceBundle(input = {}) {
   check("visual-review-release-flags-false", flagsFalse(visual),
     "Human visual review must not set model release flags.", "failed");
   const views = visual.views;
-  check("visual-views-reviewed", Array.isArray(views) && views.length > 0 &&
-    views.every((view) => object(view) && nonempty(view.viewId) &&
-      ["pass", "fail", "not-comparable"].includes(view.disposition) && nonempty(view.rationale)),
-  "Every reviewed view must have a disposition and rationale; pending/empty templates cannot pass.", "blocked");
+  const visualViewIds = Array.isArray(views) ? views.map((view) => object(view) ? view.viewId : null) : [];
+  const visualViewIdsValid = visualViewIds.length > 0 &&
+    visualViewIds.every(nonempty) &&
+    new Set(visualViewIds).size === visualViewIds.length;
+  check("visual-views-reviewed", visualViewIdsValid && views.every((view) => object(view) &&
+    ["pass", "fail", "not-comparable"].includes(view.disposition) && nonempty(view.rationale)),
+  "Every reviewed view must have a unique ID, a disposition and a rationale; pending/empty templates cannot pass.", "blocked");
+  check("visual-review-view-coverage", renderViewIdsValid && visualViewIdsValid &&
+    renderViewIds.length === visualViewIds.length &&
+    renderViewIds.every((viewId) => visualViewIds.includes(viewId)),
+  "Human review must cover every render-manifest view exactly once; omitted or invented view IDs block sign-off.", "blocked");
   check("visual-review-disposition", visual.overallDisposition === "pass",
     visual.overallDisposition === "fail" ? "Human visual review rejected the candidate." :
       visual.overallDisposition === "not-comparable" ? "Visual evidence is not comparable." :
