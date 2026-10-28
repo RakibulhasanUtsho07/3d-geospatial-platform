@@ -10,6 +10,7 @@ on:
       - "scripts/review-building-source.mjs"
       - "scripts/build-building-from-media.mjs"
       - "src/core/building-generation/source-workflow.mjs"
+      - "src/core/building-generation/source-operation-scopes.mjs"
       - "src/core/building-generation/building-spec.mjs"
       - "src/core/building-generation/media-intake.mjs"
       - "src/core/building-generation/media-to-model-workflow.mjs"
@@ -20,6 +21,7 @@ on:
       - "tests/media-to-model-workflow.test.mjs"
       - "tests/colmap-reconstruction.test.mjs"
       - "tests/single-image-3d-worker.test.mjs"
+      - "tests/video-frame-extractor-operation-scopes.test.mjs"
       - "package.json"
       - "package-lock.json"
   push:
@@ -32,6 +34,7 @@ on:
       - "scripts/review-building-source.mjs"
       - "scripts/build-building-from-media.mjs"
       - "src/core/building-generation/source-workflow.mjs"
+      - "src/core/building-generation/source-operation-scopes.mjs"
       - "src/core/building-generation/building-spec.mjs"
       - "src/core/building-generation/media-intake.mjs"
       - "src/core/building-generation/media-to-model-workflow.mjs"
@@ -42,6 +45,7 @@ on:
       - "tests/media-to-model-workflow.test.mjs"
       - "tests/colmap-reconstruction.test.mjs"
       - "tests/single-image-3d-worker.test.mjs"
+      - "tests/video-frame-extractor-operation-scopes.test.mjs"
       - "package.json"
       - "package-lock.json"
   workflow_dispatch:
@@ -74,6 +78,8 @@ jobs:
         run: npm run test:colmap-worker
       - name: Test direct single-image AI source-scope enforcement
         run: npm run test:single-image-3d
+      - name: Test video frame operation-scope inheritance and cache invalidation
+        run: npm run test:video-frame-operation-scopes
       - name: Check operation-scope flags are exposed in both operator CLIs
         shell: bash
         run: |
