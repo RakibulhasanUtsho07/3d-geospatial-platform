@@ -12,6 +12,7 @@ const DEMO_USES = new Set([
   "source-byte-integrity-smoke-test",
   "private-image-ingestion-smoke-test",
   "private-render-smoke-test",
+  "private-image-quality-preflight",
 ]);
 const REQUIRED_DEMO_DENIALS = [
   "independent-reference-truth",
