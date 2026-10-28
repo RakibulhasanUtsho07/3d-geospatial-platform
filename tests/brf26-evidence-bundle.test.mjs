@@ -23,7 +23,7 @@ async function setup(t, {
   mode = "synthetic-test", pendingVisual = false, staleCandidatePin = false,
   extraRenderView = false, wrongSourceCameraBinding = false, wrongSourceCameraBuilding = false,
   wrongRenderCandidateBinding = false, wrongVisualBuilding = false, visualReleaseFlag = false,
-  corruptSourceCameraPng = false, corruptRenderPng = false,
+  corruptSourceCameraPng = false, corruptRenderPng = false, wrongSourceImageBinding = false,
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf26-bundle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -39,8 +39,14 @@ async function setup(t, {
   await writeFile(path.join(root, "evidence/reference.json"), referenceBytes);
   const referenceSha = sha(referenceBytes);
 
+  const sourceImageSha = sha(Buffer.from("synthetic-only-reviewed-source-image"));
   const sourceReview = {
     schemaVersion: "1.0.0", recordType: "brf-21-human-review-decision", sampleId: "sample-01",
+    sourceViews: [{
+      id: "source-view-01", sourceImageSha256: sourceImageSha,
+      visibleSurfaces: ["facade"], occlusion: "none", imageQuality: "usable",
+      decision: "include", rationale: "Synthetic fixture source view inclusion only.",
+    }],
     overallDisposition: "continue-to-reconstruction-preflight",
     reviewer: { name: "Synthetic Test Reviewer", identifier: "synthetic-reviewer-01" },
     reviewedAtUtc: "2026-10-28T00:00:00Z",
@@ -107,6 +113,7 @@ async function setup(t, {
     schemaVersion: "1.0.0", recordType: "synthetic-source-camera-evidence",
     buildingId: wrongSourceCameraBuilding ? "building-other" : "building-01",
     candidateGlbSha256: wrongSourceCameraBinding ? sha(Buffer.from("different-camera-model")) : candidateSha,
+    sourceImageSha256: wrongSourceImageBinding ? sha(Buffer.from("unreviewed-camera-source-image")) : sourceImageSha,
     status: "same-camera-comparable", sameCameraComparable: true,
     sourceImageSize: { width: 512, height: 512 },
     render: { filename: "source-camera.png", width: 512, height: 512,
@@ -351,4 +358,14 @@ test("source-camera and fixed-camera PNG byte changes block sign-off readiness",
   assert.equal(fixedResult.status, 2, fixedResult.stderr + "\\n" + fixedResult.stdout);
   assert.ok(fixedReport.blockers.some((item) => item.id === "render-manifest-render-bytes-binding"));
   assert.equal(fixedReport.visualReview.renderedViews[0].verified, false);
+});
+
+
+test("source-camera image must be one of the exact human-reviewed included source views", async (t) => {
+  const { root } = await setup(t, { mode: "real-evidence", wrongSourceImageBinding: true });
+  const result = run(root);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
+  assert.equal(report.status, "BLOCKED");
+  assert.ok(report.blockers.some((item) => item.id === "source-camera-source-image-reviewed"));
 });
