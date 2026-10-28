@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-33-TUM-CITYGML-FULL-GEOMETRY-INSPECTION",
+  "observedAt": "2026-10-28T06:57:25.383616+00:00",
+  "status": "full-object-hash-verified-xml-valid-geometry-extracted",
+  "source": {
+    "project": "tum-gis/tum2twin-datasets",
+    "projectId": 152545,
+    "commit": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+    "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+    "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+    "repositoryBlobId": "2fd72c942399ff0cc78e3478dced74b60180e5dd",
+    "lfsExpectedBytes": 51178520,
+    "lfsExpectedSha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37"
+  },
+  "byteVerification": {
+    "status": "whole-object-sha256-and-size-verified",
+    "actualBytes": 51178520,
+    "actualSha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37",
+    "expectedBytes": 51178520,
+    "expectedSha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37",
+    "gitLfsPointerBytes": 133,
+    "gitLfsPointerSha256": "4bddd08b4a1df34ff05407f1fcd2deabc9e0ffc29a673959d8e494a48aab0a00"
+  },
+  "geometry": {
+    "status": "geometry-extracted",
+    "reason": null,
+    "filename": "DEBY_LOD3_4959323.gml",
+    "root": {
+      "element": "CityModel",
+      "gmlId": null,
+      "srsName": null
+    },
+    "rootGmlIds": [
+      "DEBY_LOD2_4959323"
+    ],
+    "buildingGmlIds": [
+      "DEBY_LOD2_4959323"
+    ],
+    "srsNamesObserved": [
+      "EPSG:25832"
+    ],
+    "geometryCounts": {
+      "Building": 1,
+      "Door": 1,
+      "GroundSurface": 1,
+      "LinearRing": 63160,
+      "MultiSurface": 119,
+      "Polygon": 62576,
+      "RoofSurface": 11,
+      "WallSurface": 107,
+      "Window": 102
+    },
+    "coordinateTupleCount": 389813,
+    "coordinateTupleCount3D": 389813,
+    "coordinateTokenCount": 1169439,
+    "coordinateTextErrors": 0,
+    "coordinateDimensionInferredForElements": 0,
+    "coordinateBounds": {
+      "minX": 691045.511,
+      "minY": 5336061.116,
+      "minZ": 514.588,
+      "maxX": 691090.284,
+      "maxY": 5336132.407,
+      "maxZ": 537.723
+    },
+    "fullXmlDocumentValidated": true,
+    "fullGeometryPayloadParsed": true
+  },
+  "candidateStatus": "inspection-only-not-selected",
+  "assetRightsReviewStatus": "pending-exact-file-scope-review",
+  "coordinateFrameStatus": "source-declared-only-no-transform",
+  "sameBuildingVerified": false,
+  "platformGeneratedCandidateGlbExists": false,
+  "independentHeldOutCheckpointsExist": false,
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "evidence": {
+    "workflowRunUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40647004350",
+    "artifactUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40647004350/artifacts/12798027293",
+    "originalArtifactReportSha256": "c7e20940575c994e7ea9fcf6f59f535ab360ce3e38fd978ef2357450045e8498",
+    "artifactZipSha256": "f4bdb9609f598f760fd5935d240e402ad0aac03010a79dc636641a5dc7be9717",
+    "note": "originalArtifactReportSha256 hashes the unmodified report.json produced by the successful run; this committed record adds this evidence object."
+  }
+}
