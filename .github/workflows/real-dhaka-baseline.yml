@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - "feat/p3-4-*"
     paths:
       - "src/app/**"
       - "src/core/map-engine/**"
