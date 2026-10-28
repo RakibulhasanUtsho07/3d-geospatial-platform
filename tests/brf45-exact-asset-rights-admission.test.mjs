@@ -199,6 +199,23 @@ test("changed evidence bytes cannot be hidden by a valid-looking rights manifest
   assert.ok(report.blockers.some(value => value.includes("evidence-bytes-rights-evidence/view-1.txt")));
 });
 
+test("symlinked local rights evidence cannot satisfy byte verification", async t => {
+  const f = await setup(t);
+  await approveAll(f);
+  const snapshot = f.manifest.assets[0].rights.evidenceSnapshots[0];
+  const target = path.join(f.evidenceRoot, snapshot.filename);
+  const outside = path.join(f.root, "outside-rights-evidence.txt");
+  await writeFile(outside, await readFile(target));
+  await rm(target);
+  await symlink(outside, target);
+  const report = await validateBrf45ExactAssetRightsAdmission(f.manifest, {
+    sourceManifest: f.sourceManifest,
+    evidenceRoot: f.evidenceRoot,
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.some(value => value.includes("-evidence-bytes-" + snapshot.filename)));
+});
+
 test("path traversal, duplicate asset IDs and attempted release promotion are blocked", async t => {
   const f = await setup(t);
   await approveAll(f);
