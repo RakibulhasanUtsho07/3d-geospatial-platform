@@ -355,6 +355,46 @@ jobs:
           if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
           NODE
 
+      - name: Test BRF-41 interim dataset use and accuracy claim boundaries
+        run: npm run test:brf41-interim-dataset-policy
+      - name: Validate interim dataset policy remains demo-only and fail-closed
+        run: |
+          mkdir -p artifacts
+          node scripts/validate-brf41-interim-dataset-policy.mjs benchmarks/building-reconstruction/brf-41-interim-dataset-policy.json --report artifacts/brf41-interim-dataset-policy-report.json > artifacts/brf41-interim-dataset-policy-summary.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const summary = JSON.parse(fs.readFileSync("artifacts/brf41-interim-dataset-policy-summary.json", "utf8"));
+          const report = JSON.parse(fs.readFileSync("artifacts/brf41-interim-dataset-policy-report.json", "utf8"));
+          if (summary.status !== "policy-compliant-demo-only" || report.status !== "policy-compliant-demo-only") {
+            throw new Error("BRF-41 interim dataset register must remain policy-compliant and demo-only.");
+          }
+          if (report.demoOnlyAssetCount !== 1 || report.blockedAssetCount !== 5) {
+            throw new Error("Expected one narrowly-scoped demo image and five blocked research leads.");
+          }
+          const requiredBlocked = [
+            "tum-citygml-4959323",
+            "tum-uas-images-archive",
+            "tum-uls-source-manual",
+            "gt-lod3-goldcoast-collection",
+            "gt-lod3-tum-subset"
+          ];
+          for (const id of requiredBlocked) {
+            if (!report.assets.some((asset) => asset.id === id && asset.decision === "blocked")) {
+              throw new Error("Unresolved source must remain blocked: " + id);
+            }
+          }
+          const demo = report.assets.find((asset) => asset.id === "brf13-flat-roof-image-0005");
+          if (!demo || demo.decision !== "demo-only" ||
+              demo.allowedUses.includes("independent-reference-truth") ||
+              demo.allowedUses.includes("production-map-publication")) {
+            throw new Error("The interim image must remain restricted to the private smoke-test lane.");
+          }
+          if (Object.values(report.releaseFlags).some(Boolean)) {
+            throw new Error("BRF-41 must not promote acceptance/publication/map/automatic approval.");
+          }
+          console.log("BRF-41 policy validated: one private demo-only image, five blocked source leads, release flags false.");
+          NODE
+
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
