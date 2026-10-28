@@ -224,7 +224,7 @@ function validateRights(asset, allAssets, byteReport, evaluatedAt, checks, block
   };
 }
 
-function validateDerivedOutputs(outputs, allAssets, rightsReports, checks, blockers) {
+function validateDerivedOutputs(outputs, allAssets, rightsReports, byteReport, checks, blockers) {
   const outputReports = [];
   const ids = new Set();
   for (const [index, output] of outputs.entries()) {
@@ -345,7 +345,7 @@ export function validateBrf38RightsScope(manifest, byteReport) {
         : "Rights evidence snapshot is unavailable, not byte-verified or missing its evidence type.");
   }
 
-  const outputReports = validateDerivedOutputs(manifest.derivedOutputs, allAssets, rightsReports, checks, blockers);
+  const outputReports = validateDerivedOutputs(manifest.derivedOutputs, allAssets, rightsReports, byteReport, checks, blockers);
   const policyOk = record(manifest.releaseFlags) &&
     Object.keys(FLAGS).every((flag) => manifest.releaseFlags[flag] === false);
   add(checks, blockers, "release-flags-false", policyOk,
