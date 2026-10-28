@@ -34,6 +34,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         self.profile_path = self.temp_root / "profile.json"
         self.executable = self.temp_root / "fake-colmap"
         self._rebind_test_images()
+        self._write_rights_admission()
         self.fixture.template = PREFLIGHT.brf21.prepare_template(self.root)
         self.decision = self.fixture.complete_record()
         self._write_decision(self.decision)
@@ -109,6 +110,47 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
             row["byteSize"] = data["byteSize"]
         self._write_json(self.root / "private-multiview-media-intake-report.json", quality_report)
 
+    def _write_rights_admission(self):
+        source = self._read_json("brf-14-multiview-source.json")
+        dataset = source["dataset"]
+        manifest = {
+            "schemaVersion": "1.0.0",
+            "recordType": "brf-45-exact-asset-rights-admission",
+            "evaluationId": "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION",
+            "evaluatedAt": "2026-10-28T00:00:00.000Z",
+            "requestedPurpose": "private-local-reconstruction-and-validation",
+            "sourceBinding": {
+                "sourceManifestFilename": "brf-14-multiview-source.json",
+                "sampleId": source["sampleId"],
+                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
+                "declaredLicense": dataset["license"],
+                "licenseScope": dataset["licenseScope"],
+                "rightsStatus": dataset["rightsStatus"],
+            },
+            "requiredScopes": ["inspect-source", "use-for-validation", "derive-model"],
+            "policy": {
+                "inferPermissionFromPublicAvailability": False,
+                "repositoryLicenseAloneSufficient": False,
+                "requireExactAssetByteBinding": True,
+                "requireHumanReview": True,
+                "sourceRedistributionRequested": False,
+                "publicDerivedModelDisplayRequested": False,
+            },
+            "assets": [{
+                "sourceId": view["id"],
+                "filename": view["filename"],
+                "sourceUrl": view["sourceUrl"],
+                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
+                "byteSize": view["expectedByteSize"],
+                "sha256": view["expectedSha256"],
+                "requestedScopes": ["inspect-source", "use-for-validation", "derive-model"],
+                "decision": "pending",
+                "rights": None,
+            } for view in source["views"]],
+            "releaseFlags": {flag: False for flag in PREFLIGHT.RELEASE_FLAGS},
+        }
+        self._write_json(self.root / "brf-45-exact-asset-rights-admission.json", manifest)
+
     def _write_decision(self, decision):
         self._write_json(self.root / "review-decision.json", decision)
 
@@ -152,6 +194,13 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         report = self._assess()
         self.assertEqual(report["status"], "preflight-ready-for-local-reconstruction-attempt", report["blockers"])
         self.assertEqual(report["assessedInputs"]["sourceImages"]["verifiedCount"], 3)
+        rights = report["assessedInputs"]["rightsAdmission"]
+        self.assertEqual(rights["filename"], "brf-45-exact-asset-rights-admission.json")
+        self.assertEqual(rights["assetCount"], 3)
+        self.assertEqual(rights["pendingDecisionCount"], 3)
+        self.assertEqual(rights["sha256"], hashlib.sha256(
+            (self.root / rights["filename"]).read_bytes()
+        ).hexdigest())
         self.assertEqual(report["assessedInputs"]["imageQualityPreflight"]["status"], "all-images-decoded-and-measured")
         self.assertIs(report["assessedInputs"]["imageQualityPreflight"]["rightsApproved"], False)
         self.assertIs(report["assessedInputs"]["imageQualityPreflight"]["safeToSubmitToColmap"], False)
@@ -162,6 +211,18 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         self.assertFalse(report["independentReferenceVerified"])
         for flag in PREFLIGHT.RELEASE_FLAGS:
             self.assertIs(report[flag], False)
+
+    def test_rights_admission_must_match_all_source_hashes_and_metadata(self):
+        manifest = self._read_json("brf-45-exact-asset-rights-admission.json")
+        manifest["assets"][0]["sha256"] = "f" * 64
+        self._write_json(self.root / "brf-45-exact-asset-rights-admission.json", manifest)
+        with self.assertRaisesRegex(ValueError, "does not match the exact source bytes"):
+            self._assess()
+
+    def test_missing_rights_admission_register_blocks_preflight(self):
+        (self.root / "brf-45-exact-asset-rights-admission.json").unlink()
+        with self.assertRaisesRegex(ValueError, "Required artifact is missing"):
+            self._assess()
 
     def test_blank_human_review_template_stays_blocked_even_if_other_checks_pass(self):
         self._write_json(self.root / "pending-template.json", self.fixture.template)
