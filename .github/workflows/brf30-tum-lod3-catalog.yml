@@ -18,6 +18,7 @@ on:
       - "tests/test_tum_lod3_catalog.py"
       - "docs/research/BRF-30-TUM-LOD3-CATALOG.md"
       - "benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json"
+      - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
   workflow_dispatch:
 
 permissions:
