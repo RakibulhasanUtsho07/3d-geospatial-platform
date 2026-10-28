@@ -7,6 +7,8 @@ on:
     paths:
       - ".github/workflows/brf-14-multiview-source-intake.yml"
       - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json"
+      - "src/core/building-generation/brf45-exact-asset-rights-admission.mjs"
       - "scripts/verify-brf14-multiview-source.mjs"
       - "scripts/run-brf42-multiview-private-intake.mjs"
       - "tests/brf42-multiview-private-intake.test.mjs"
@@ -189,7 +191,9 @@ jobs:
             --output-dir artifacts/brf-14
 
       - name: Stage the exact pinned BRF-14 manifest beside derived review artifacts
-        run: cp benchmarks/building-reconstruction/brf-14-multiview-source.json artifacts/brf-14/brf-14-multiview-source.json
+        run: |
+          cp benchmarks/building-reconstruction/brf-14-multiview-source.json artifacts/brf-14/brf-14-multiview-source.json
+          cp benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json artifacts/brf-14/brf-45-exact-asset-rights-admission.json
 
       - name: Generate a blank human-review decision form from verified evidence
         run: python scripts/brf21_human_review.py template --artifact-root artifacts/brf-14 --output multiview-human-review-decision-template.json
@@ -210,6 +214,7 @@ jobs:
           name: brf-20-multiview-human-review-packet
           path: |
             artifacts/brf-14/brf-14-multiview-source.json
+            artifacts/brf-14/brf-45-exact-asset-rights-admission.json
             artifacts/brf-14/multiview-source-byte-verification.json
             artifacts/brf-14/private-multiview-media-intake-report.json
             artifacts/brf-14/multiview-contact-sheet.png
