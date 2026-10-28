@@ -32,7 +32,11 @@ test("BRF-29 source-rights matrix separates repository licence claims from selec
   const tum2twin = registry.licenseEvidence.find((item) => item.id === "tum2twin-github-project-license");
   assert.ok(tum2twin);
   assert.equal(tum2twin.licenseName, "CC BY 4.0");
-  assert.equal(tum2twin.status, "external-dataset-license-unverified");
+  assert.equal(tum2twin.status, "repository-license-file-verified-scope-review-pending");
+  assert.equal(tum2twin.repositoryCommitSha, "e032a71fc9b3c9c3d4869e3aca9677d1234086aa");
+  assert.equal(tum2twin.licenseFileSha256, "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411");
+  assert.equal(registry.catalogInventory.gmlFileCount, 27);
+  assert.deepEqual(registry.catalogInventory.filenamePrefixCounts, { DEBY: 27 });
   assert.equal(tum2twin.externalAssetRepositoryUrl, "https://gitlab.lrz.de/tum-gis/tum2twin-datasets");
 
   assert.equal(registry.sourceProvenance.selectedImagesByteVerified, false);
