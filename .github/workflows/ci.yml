@@ -304,6 +304,26 @@ jobs:
       - name: Test BRF-36 source asset byte verifier
         run: npm run test:brf36-source-byte-verifier
 
+      - name: Test BRF-37 explicitly pinned PROJ operation executor
+        run: npm run test:brf37-proj-operation
+      - name: Verify the real BRF-37 operation manifest remains blocked pending review
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/run-brf37-proj-operation.mjs benchmarks/building-reconstruction/brf-37-proj-operation.json --asset-root . --report artifacts/brf37-proj-operation-blocked.json > artifacts/brf37-proj-operation-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf37-proj-operation-summary.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The production operation manifest must remain blocked.");
+          if (!report.blockers.includes("operation-review")) throw new Error("Missing operation review blocker.");
+          if (report.interpretation.verticalDatum !== "unresolved") throw new Error("Vertical datum must remain unresolved.");
+          if (Object.values(report.interpretation.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          console.log("Production operation and release flags remain blocked pending reviewed evidence.");
+          NODE
+
       - name: Validate BRF-35 real candidate remains blocked
         run: |
           mkdir -p artifacts
