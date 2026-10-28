@@ -1,8 +1,7 @@
+import { SOURCE_OPERATION_SCOPES as SOURCE_OPERATION_SCOPE_LIST } from "./source-operation-scopes.mjs";
+
 const SOURCE_KINDS = new Set(["text", "image", "video", "video-frame", "floor-plan", "cad", "bim", "survey", "map", "other"]);
-const SOURCE_OPERATION_SCOPES = new Set([
-  "private-media-ingestion", "private-image-quality-preflight", "video-frame-extraction",
-  "procedural-model-derivation", "single-image-ai-reconstruction", "photogrammetry-reconstruction", "texture-baking",
-]);
+const SOURCE_OPERATION_SCOPES = new Set(SOURCE_OPERATION_SCOPE_LIST);
 const CONFIDENCE = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown"]);
 const ROOFS = new Set(["flat", "terrace", "pitched"]);
 const EARTH_RADIUS_M = 6378137;
