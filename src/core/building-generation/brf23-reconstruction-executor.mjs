@@ -233,6 +233,13 @@ async function verifyEvidence(artifactRoot, bindings, validated) {
     rightsAdmissionFile.sha256 === validated.rightsAdmission.sha256,
     "BRF-45 rights-admission register changed after BRF-23 preflight.");
   const rightsAdmission = parseJson(rightsAdmissionFile.bytes, "BRF-45 exact-asset rights admission");
+  requireValue(rightsAdmission?.schemaVersion === "1.0.0" &&
+    rightsAdmission?.recordType === "brf-45-exact-asset-rights-admission" &&
+    rightsAdmission?.evaluationId === validated.rightsAdmission.evaluationId &&
+    Array.isArray(rightsAdmission.assets) &&
+    rightsAdmission.assets.length === validated.rightsAdmission.assetCount &&
+    rightsAdmission.assets.filter(row => row?.decision !== "approved").length === validated.rightsAdmission.pendingDecisionCount,
+    "BRF-45 register identity/count/pending-decision summary differs from the preflight-bound metadata.");
   requireValue(sourceManifest?.schemaVersion === "1.0.0" &&
     sourceManifest?.evaluationStage === "multiview-source-byte-intake-only" &&
     Array.isArray(sourceManifest.views) && sourceManifest.views.length === validated.imageSet.expectedCount &&
