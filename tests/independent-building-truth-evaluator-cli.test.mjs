@@ -219,6 +219,8 @@ test("replays exact candidate GLB and independent source bytes before producing 
   assert.equal(execution.status, 0, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "report.json"), "utf8"));
   assert.equal(report.status, "benchmark-review-required");
+  assert.equal(report.metricComputation.status, "computed-after-source-replay");
+  assert.ok(report.metrics, "metrics are only present after source bytes and both replays pass");
   assert.equal(report.assetIntegrity.filter((item) => item.status !== "passed").length, 0);
   assert.equal(report.geometryExtractionProvenance.candidate.status, "passed");
   assert.equal(report.geometryExtractionProvenance.reference.status, "passed");
@@ -276,6 +278,9 @@ test("replay catches a caller changing candidate geometry even after refreshing 
   assert.equal(report.status, "benchmark-failed");
   assert.equal(report.geometryExtractionProvenance.candidate.status, "passed");
   assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
 });
 
@@ -295,6 +300,9 @@ test("replay catches a changed registration transform before accepting candidate
   const report = JSON.parse(await readFile(path.join(root, "matrix-replay-failed-report.json"), "utf8"));
   assert.equal(report.status, "benchmark-failed");
   assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
 });
 
@@ -310,6 +318,9 @@ test("replay catches altered independent-reference coordinates even after refres
   assert.equal(report.status, "benchmark-failed");
   assert.equal(report.geometryExtractionProvenance.reference.status, "passed");
   assert.equal(report.geometryReplay.reference.status, "failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "reference-geometry-replay-from-source-bytes"));
 });
 
@@ -323,6 +334,9 @@ test("fails when extractor registration metadata is missing instead of silently 
   const report = JSON.parse(await readFile(path.join(root, "missing-replay-config-report.json"), "utf8"));
   assert.equal(report.status, "benchmark-failed");
   assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
 });
 
@@ -353,6 +367,9 @@ test("reports an exact-byte mismatch as failed instead of trusting stale referen
   assert.equal(execution.status, 1, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "report-failed.json"), "utf8"));
   assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "reference-source-byte-integrity"));
   assert.equal(report.policy.acceptanceEligible, false);
 });

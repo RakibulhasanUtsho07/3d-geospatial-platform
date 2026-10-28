@@ -189,3 +189,18 @@ Other metric limits:
 - SHA-256 proves exact byte identity only, not physical building identity or survey truth.
 
 BRF-08 is not closed until the geometry extractor/provenance path, suitable real held-out buildings, independently reviewed measurements, calibrated coordinate frames, failure-case review and human sign-off are actually exercised. Real-building acceptance remains release-blocking. Do not infer accurate Ahsan Manzil/Bangabhaban geometry from synthetic CI. Keep all publication/map-ready gates disabled until their separate requirements pass.
+
+
+## 3.2 Metric computation is gated by exact-source replay (BRF-40)
+
+The filesystem evaluator must not calculate or expose footprint, dimension, held-out checkpoint or surface-distance metrics from inline manifest geometry unless all of these prerequisites pass first:
+
+- the preparation configuration's bytes match its recorded SHA-256;
+- candidate GLB bytes match the declared candidate SHA-256;
+- independent reference source bytes match the declared reference SHA-256;
+- replaying the GLB extraction from those exact bytes and the pinned transformation/checkpoint bindings reproduces the prepared candidate geometry digest; and
+- replaying the reference JSON adapter from its exact bytes, declared source frame and metric-preserving transform reproduces the prepared reference geometry digest.
+
+When any required prerequisite is failed or incomplete, the report uses \`metrics: null\` and \`metricComputation.status: "withheld"\`, with a reason-coded check; the CLI exits non-zero. It must not compute numbers from the untrusted inline geometry and then merely label those numbers failed. On success, the report records \`metricComputation.status: "computed-after-source-replay"\`. A successful replay still does not certify the real-world identity, license, survey quality or accuracy of the building; every release flag remains false.
+
+Regression coverage is in \`tests/independent-building-truth-evaluator-cli.test.mjs\`, including altered candidate geometry despite a refreshed declared digest, changed registration transforms, altered reference measurements and mutated reference-source bytes.
