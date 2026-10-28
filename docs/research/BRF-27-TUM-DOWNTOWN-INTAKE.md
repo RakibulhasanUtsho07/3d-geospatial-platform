@@ -34,6 +34,12 @@ npm run assess:building-benchmark-readiness -- benchmarks/building-reconstructio
 
 The assessment command exits with code `2` because blockers are intentional. It is not a CI failure when interpreted as a fixture result; the regression test must pass.
 
+## Metadata-document inspection automation
+
+The [BRF-27 metadata workflow](../../.github/workflows/brf27-tum-metadata-intake.yml) fetches only the 1.3 MB PDF (never the multi-GB source archives), enforces a 10 MiB byte ceiling, verifies the publisher's recorded MD5 against the downloaded bytes, computes SHA-256, runs `pdfinfo` / `pdftotext`, and produces a keyword-evidence JSON plus extracted text. It uploads only the derived audit files; the raw PDF stays in ephemeral runner storage.
+
+The report is a navigation aid, not a CRS decision. Human review must trace any CRS, horizontal units, vertical datum, offset and transformation values back to the relevant page and figure/table. A missing keyword is not proof that a field is absent if the document uses a different name or image-only table. The readiness manifest remains blocked until those source facts are explicitly recorded and checked.
+
 ## Required order to unblock
 
 1. Download the Zenodo metadata PDF and inspect its pages and embedded tables. Record the exact CRS/units/vertical datum/offsets and pin the document bytes.
