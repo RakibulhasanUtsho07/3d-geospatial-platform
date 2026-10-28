@@ -157,6 +157,12 @@ jobs:
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
+      - name: Test privacy-safe imagery tile error diagnostics
+        run: npm run test:imagery-tile-error-diagnostics
+
+      - name: Test map canvas visual anomaly diagnostics
+        run: npm run test:canvas-red-pixel-diagnostics
+
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
@@ -649,6 +655,9 @@ jobs:
 
       - name: Test source-derived building facade styles
         run: npm run test:building-style
+
+      - name: Test map viewport UX defaults and home navigation
+        run: npm run test:map-viewport-ux
 
       - name: Generate parametric Ahsan Manzil LOD assets
         run: npm run build:heritage-model
