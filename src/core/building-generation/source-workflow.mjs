@@ -4,35 +4,10 @@ import { lstat, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "n
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { toBuildingSpecSource } from "./media-intake.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
+export { SOURCE_OPERATION_SCOPES, normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
-
-export const SOURCE_OPERATION_SCOPES = Object.freeze([
-  "private-media-ingestion",
-  "private-image-quality-preflight",
-  "video-frame-extraction",
-  "procedural-model-derivation",
-  "single-image-ai-reconstruction",
-  "photogrammetry-reconstruction",
-  "texture-baking",
-]);
-
-export function normalizeSourceOperationScopes(value, label = "permittedOperations") {
-  if (!Array.isArray(value) || value.length < 1 || value.length > SOURCE_OPERATION_SCOPES.length) {
-    throw new TypeError(label + " must explicitly list one or more recognized operation scopes");
-  }
-  const normalized = value.map((item, index) => {
-    const scope = text(item, label + "[" + index + "]", 80, true);
-    if (!SOURCE_OPERATION_SCOPES.includes(scope)) {
-      throw new TypeError(label + " contains an unsupported operation scope: " + scope);
-    }
-    return scope;
-  });
-  if (new Set(normalized).size !== normalized.length) {
-    throw new TypeError(label + " must not contain duplicate operation scopes");
-  }
-  return normalized.sort();
-}
 
 function safeId(value, label) {
   if (typeof value !== "string" || !ID.test(value)) throw new TypeError(label + " is invalid");
