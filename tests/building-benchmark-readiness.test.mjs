@@ -146,3 +146,36 @@ test("returns a fail-closed invalid result for a non-object manifest", () => {
   assert.deepEqual(report.blockers, ["manifest-object"]);
   assert.equal(report.mapReady, false);
 });
+
+test("keeps the real TUM Downtown intake blocked until the exact building, rights, bytes, frame and candidate are verified", async () => {
+  const manifestUrl = new URL("../benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json", import.meta.url);
+  const manifest = JSON.parse(await (await import("node:fs/promises")).readFile(manifestUrl, "utf8"));
+  const report = assessBuildingBenchmarkReadiness(manifest);
+
+  assert.equal(report.status, "blocked");
+  for (const blocker of [
+    "building-identity",
+    "evaluation-frame",
+    "asset-tum-images-archive-source",
+    "asset-tum-images-archive-license-review",
+    "asset-tum-uls-manual-source",
+    "asset-tum-uls-manual-license-review",
+    "candidate-image-inputs",
+    "candidate-engine-generated",
+    "candidate-glb-integrity-fields",
+    "candidate-frame-transform",
+    "candidate-reference-separation",
+    "reference-frame-registration",
+    "fit-controls",
+    "held-out-checkpoints",
+  ]) {
+    assert.ok(report.blockers.includes(blocker), "Expected real-data blocker: " + blocker);
+  }
+
+  assert.deepEqual(manifest.candidate.sourceAssetIds, []);
+  assert.equal(manifest.assets.every((asset) => asset.sha256 === null && asset.byteSize === null), true);
+  assert.equal(report.acceptanceEligible, false);
+  assert.equal(report.publicationEligible, false);
+  assert.equal(report.mapReady, false);
+  assert.equal(report.automaticApproval, false);
+});
