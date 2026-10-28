@@ -95,6 +95,7 @@ class TestPinnedCatalogSnapshot(unittest.TestCase):
         files = snapshot["inventory"]["files"]
         self.assertEqual(len(files), 27)
         self.assertEqual(len({item["path"] for item in files}), 27)
+        self.assertTrue(all(__import__("re").fullmatch(r"[0-9a-f]{40}", item["repositoryBlobId"]) for item in files))
         self.assertTrue(all(item["payloadDownloaded"] is False for item in files))
         self.assertTrue(all(item["buildingIdentityVerified"] is False for item in files))
         self.assertTrue(all(item["assetRightsReviewed"] is False for item in files))
