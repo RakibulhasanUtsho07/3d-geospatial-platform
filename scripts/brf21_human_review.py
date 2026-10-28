@@ -142,8 +142,10 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
             quality_report.get("status") == "private-multiview-preflight-complete-not-reconstruction-approved" and
             quality_report.get("workspaceMode") == "ephemeral-private",
             "BRF-42 private multi-view quality report must be complete and remain in the private, not-approved stage.")
-    require(quality_report.get("sourceManifest", {}).get("sampleId") == source_manifest.get("sampleId"),
-            "BRF-42 quality report sampleId does not match BRF-14 source manifest.")
+    quality_source_object = quality_report.get("sourceManifest")
+    require(isinstance(quality_source_object, dict) and
+            quality_source_object.get("sampleId") == source_manifest.get("sampleId"),
+            "BRF-42 quality report sourceManifest object/sampleId does not match BRF-14 source manifest.")
 
     require(source_manifest.get("sampleId") == review_packet.get("sampleId") == overlap_report.get("sampleId"),
             "BRF-14/20/21 sampleId values must all match.")
@@ -219,6 +221,11 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
 
     quality_source_binding = quality_report.get("sourceManifest")
     require(isinstance(quality_source_binding, dict) and
+            quality_source_binding.get("sourceCommit") == source_dataset.get("sourceRepositoryCommit") and
+            quality_source_binding.get("declaredLicense") == source_dataset.get("license") and
+            quality_source_binding.get("licenseScope") == source_dataset.get("licenseScope") and
+            quality_source_binding.get("rightsStatus") == source_dataset.get("rightsStatus") and
+            quality_source_binding.get("attribution") == source_dataset.get("attribution") and
             quality_source_binding.get("manifestSha256") == sha256_file(root / ARTIFACT_FILENAMES["sourceManifest"]) and
             quality_source_binding.get("priorVerificationReportSha256") == sha256_file(root / ARTIFACT_FILENAMES["byteVerificationReport"]) and
             isinstance(quality_source_binding.get("freshVerificationReportSha256"), str) and
