@@ -60,6 +60,7 @@ on:
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
+      - feat/brf46-source-operation-scope-gate
   pull_request:
     branches:
       - main
@@ -100,6 +101,7 @@ on:
       - feat/p2-18-selected-geometry-lru-cache
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
+      - feat/brf46-source-operation-scope-gate
       - development
 
 permissions:
@@ -248,6 +250,178 @@ jobs:
         run: npm run test:mask-guided-building-sketches
       - name: Test labelled segmentation benchmark, held-out split and class metrics
         run: npm run test:building-segmentation-benchmark
+      - name: Test independent building truth footprint, dimensions, checkpoints and optional mesh metrics
+        run: npm run test:independent-building-truth
+      - name: Test BRF-10 benchmark intake metadata and CLI fail-closed behavior
+        run: npm run test:building-benchmark-readiness
+      - name: Validate BRF-10 benchmark readiness CLI
+        run: npm run assess:building-benchmark-readiness -- --help
+      - name: Test BRF-11 local benchmark asset byte integrity and path safety
+        run: npm run test:building-benchmark-asset-integrity
+      - name: Validate BRF-11 asset byte verifier CLI
+        run: npm run verify:building-benchmark-assets -- --help
+      - name: Test BRF-14 bounded multi-view source-byte intake and frame metadata contract
+        run: node --test tests/brf14-multiview-source-intake.test.mjs
+      - name: Validate BRF-14 multi-view source verifier CLI
+        run: node scripts/verify-brf14-multiview-source.mjs --help
+      - name: Test BRF-22 hash-bound multi-view human review contract
+        run: python3 -m unittest discover -s tests -p "test_brf21_human_review.py"
+      - name: Validate BRF-22 human-review CLI syntax
+        run: python3 scripts/brf21_human_review.py --help
+      - name: Test BRF-23 reconstruction preflight and fail-closed gate
+        run: python3 -m unittest discover -s tests -p "test_brf23_reconstruction_preflight.py"
+      - name: Validate BRF-23 reconstruction preflight CLI
+        run: python3 scripts/brf23_reconstruction_preflight.py --help
+      - name: Test BRF-24 hash-bound preflight authorization for COLMAP execution
+        run: npm run test:brf24-colmap-authorization
+      - name: Validate BRF-24 reviewed reconstruction CLI
+        run: node scripts/reconstruct-brf23-reviewed-source.mjs --help
+      - name: Test BRF-25 reviewed-candidate geometry validation chain
+        run: npm run test:brf25-geometry-validation
+      - name: Validate BRF-25 geometry validation runner CLI
+        run: node scripts/run-brf25-geometry-validation.mjs --help
+      - name: Test BRF-26 end-to-end evidence bundle and fail-closed gates
+        run: npm run test:brf26-evidence-bundle
+      - name: Validate BRF-26 evidence bundle CLI
+        run: node scripts/build-brf26-evidence-bundle.mjs --help
+      - name: Test BRF-15 MnGeo flight-swath work-unit discovery
+        run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
+      - name: Validate BRF-15 work-unit resolver CLI
+        run: node scripts/resolve-mngeo-lidar-work-units.mjs --help
+      - name: Test BRF-16 USGS TNM point-cloud product discovery
+        run: node --test tests/discover-usgs-tnm-lidar-products.test.mjs
+      - name: Validate BRF-16 TNM product discovery CLI
+        run: node scripts/discover-usgs-tnm-lidar-products.mjs --help
+      - name: Test BRF-16 exact LAZ tile manifest and path integrity
+        run: python3 -m unittest discover -s tests -p "test_inspect_usgs_laz_tile.py"
+      - name: Validate BRF-16 LAZ header inspector syntax
+        run: python3 -m py_compile scripts/inspect-usgs-laz-tile.py
+      - name: Test BRF-16 public EPT metadata, URL trust and node bounds
+        run: python3 -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
+      - name: Validate BRF-16 EPT inspector syntax
+        run: python3 -m py_compile scripts/inspect-usgs-ept-reference.py
+      - name: Test BRF-35 same-building linkage and metric-frame gate
+        run: npm run test:brf35-building-linkage
+
+      - name: Test BRF-36 source asset byte verifier
+        run: npm run test:brf36-source-byte-verifier
+
+      - name: Test BRF-37 explicitly pinned PROJ operation executor
+        run: npm run test:brf37-proj-operation
+      - name: Verify the real BRF-37 operation manifest remains blocked pending review
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/run-brf37-proj-operation.mjs benchmarks/building-reconstruction/brf-37-proj-operation.json --asset-root . --report artifacts/brf37-proj-operation-blocked.json > artifacts/brf37-proj-operation-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf37-proj-operation-summary.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The production operation manifest must remain blocked.");
+          if (!report.blockers.includes("operation-review")) throw new Error("Missing operation review blocker.");
+          if (report.interpretation.verticalDatum !== "unresolved") throw new Error("Vertical datum must remain unresolved.");
+          if (Object.values(report.interpretation.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          console.log("Production operation and release flags remain blocked pending reviewed evidence.");
+          NODE
+
+      - name: Test BRF-38 exact-asset rights-scope evidence gate
+        run: npm run test:brf38-rights-scope
+      - name: Validate the real TUM2TWIN rights manifest remains blocked
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/validate-brf38-rights-scope.mjs benchmarks/building-reconstruction/brf-38-rights-scope.json --asset-root . --report artifacts/brf38-rights-scope-report.json > artifacts/brf38-rights-scope-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf38-rights-scope-report.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The real rights manifest must remain blocked.");
+          if (report.rightsScope.rightsApprovedAssetCount !== 0) throw new Error("No real asset rights grants were approved.");
+          if (!report.rightsScope.blockers.includes("rights-evidence-assets-present")) throw new Error("Missing evidence-snapshot blocker.");
+          if (Object.values(report.rightsScope.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          console.log("Real source rights remain blocked pending exact-asset evidence.");
+          NODE
+
+      - name: Test TUM2TWIN asset-level rights clarification request packet
+        run: npm run test:brf29-rights-request-packet
+
+      - name: Validate BRF-35 real candidate remains blocked
+        run: |
+          mkdir -p artifacts
+          node scripts/validate-brf35-building-linkage.mjs benchmarks/building-reconstruction/brf-35-candidate-linkage.json benchmarks/building-reconstruction/brf-33-citygml-candidate-geometry.json artifacts/brf35-linkage-validation.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf35-linkage-validation.json", "utf8"));
+          if (report.status !== "blocked-missing-or-invalid-evidence") throw new Error("Real candidate must remain blocked.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          NODE
+
+      - name: Test BRF-41 interim dataset use and accuracy claim boundaries
+        run: npm run test:brf41-interim-dataset-policy
+      - name: Test BRF-41 private demo-image ingestion and image-quality preflight
+        run: npm run test:brf41-demo-image-smoke
+
+      - name: Validate interim dataset policy remains demo-only and fail-closed
+        run: |
+          mkdir -p artifacts
+          node scripts/validate-brf41-interim-dataset-policy.mjs benchmarks/building-reconstruction/brf-41-interim-dataset-policy.json --report artifacts/brf41-interim-dataset-policy-report.json > artifacts/brf41-interim-dataset-policy-summary.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const summary = JSON.parse(fs.readFileSync("artifacts/brf41-interim-dataset-policy-summary.json", "utf8"));
+          const report = JSON.parse(fs.readFileSync("artifacts/brf41-interim-dataset-policy-report.json", "utf8"));
+          if (summary.status !== "policy-compliant-demo-only" || report.status !== "policy-compliant-demo-only") {
+            throw new Error("BRF-41 interim dataset register must remain policy-compliant and demo-only.");
+          }
+          if (report.demoOnlyAssetCount !== 1 || report.blockedAssetCount !== 5) {
+            throw new Error("Expected one narrowly-scoped demo image and five blocked research leads.");
+          }
+          const requiredBlocked = [
+            "tum-citygml-4959323",
+            "tum-uas-images-archive",
+            "tum-uls-source-manual",
+            "gt-lod3-goldcoast-collection",
+            "gt-lod3-tum-subset"
+          ];
+          for (const id of requiredBlocked) {
+            if (!report.assets.some((asset) => asset.id === id && asset.decision === "blocked")) {
+              throw new Error("Unresolved source must remain blocked: " + id);
+            }
+          }
+          const demo = report.assets.find((asset) => asset.id === "brf13-flat-roof-image-0005");
+          if (!demo || demo.decision !== "demo-only" ||
+              demo.allowedUses.includes("independent-reference-truth") ||
+              demo.allowedUses.includes("production-map-publication")) {
+            throw new Error("The interim image must remain restricted to the private smoke-test lane.");
+          }
+          if (Object.values(report.releaseFlags).some(Boolean)) {
+            throw new Error("BRF-41 must not promote acceptance/publication/map/automatic approval.");
+          }
+          console.log("BRF-41 policy validated: one private demo-only image, five blocked source leads, release flags false.");
+          NODE
+
+      - name: Test BRF-45 exact-asset rights admission validator and execution gate
+        run: npm run test:brf45-rights-admission
+
+      - name: Confirm the real 16-view BRF-45 register stays blocked without grant evidence
+        run: |
+          set +e
+          npm run validate:brf45-rights-admission
+          status=$?
+          set -e
+          test "$status" -eq 2
+
+      - name: Validate independent building truth evaluator CLI
+        run: npm run evaluate:independent-building-truth -- --help
+      - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
+        run: node --test tests/glb-geometry-extraction.test.mjs
+      - name: Test independent geometry manifest preparation and fail-closed evaluation integration
+        run: node --test tests/independent-building-geometry-preparation-cli.test.mjs
+      - name: Validate independent geometry preparation CLI
+        run: npm run prepare:independent-building-truth -- --help
       - name: Test source-bound semantic mask provider and reviewed fallback
         run: npm run test:building-mask-provider
       - name: Test evidence-linked architectural observation schema and review history
@@ -351,6 +525,9 @@ jobs:
 
       - name: Test single-image AI-to-GLB preview worker
         run: npm run test:single-image-3d
+
+      - name: Test video-frame operation-scope inheritance and cache invalidation
+        run: npm run test:video-frame-operation-scopes
 
       - name: Test camera-aware viewport feature budget
         run: npm run test:viewport-budget

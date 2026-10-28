@@ -1,4 +1,7 @@
+import { SOURCE_OPERATION_SCOPES as SOURCE_OPERATION_SCOPE_LIST } from "./source-operation-scopes.mjs";
+
 const SOURCE_KINDS = new Set(["text", "image", "video", "video-frame", "floor-plan", "cad", "bim", "survey", "map", "other"]);
+const SOURCE_OPERATION_SCOPES = new Set(SOURCE_OPERATION_SCOPE_LIST);
 const CONFIDENCE = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown"]);
 const ROOFS = new Set(["flat", "terrace", "pitched"]);
 const EARTH_RADIUS_M = 6378137;
@@ -46,6 +49,19 @@ function sourcesOf(value) {
     const kind = str(s.kind, "sources[" + index + "].kind", 40).toLowerCase();
     if (!SOURCE_KINDS.has(kind)) throw new TypeError("unsupported source kind '" + kind + "'");
     const out = { id: sid, kind, title: s.title === undefined ? kind : str(s.title, "source title"), usageStatus: s.usageStatus === undefined ? "unreviewed" : str(s.usageStatus, "usageStatus", 40) };
+    if (s.permittedOperations !== undefined) {
+      if (!Array.isArray(s.permittedOperations) || s.permittedOperations.length < 1 ||
+          s.permittedOperations.length > SOURCE_OPERATION_SCOPES.size) {
+        throw new TypeError("sources[" + index + "].permittedOperations must explicitly list recognized operation scopes");
+      }
+      const operationScopes = s.permittedOperations.map((value, scopeIndex) =>
+        str(value, "sources[" + index + "].permittedOperations[" + scopeIndex + "]", 80));
+      if (operationScopes.some(scope => !SOURCE_OPERATION_SCOPES.has(scope)) ||
+          new Set(operationScopes).size !== operationScopes.length) {
+        throw new TypeError("sources[" + index + "].permittedOperations contains an unsupported or duplicate scope");
+      }
+      out.permittedOperations = operationScopes.sort();
+    }
     if (s.url) {
       let url;
       try { url = new URL(str(s.url, "source URL", 2048)); } catch { throw new TypeError("source URL must be an absolute HTTPS URL"); }

@@ -1,0 +1,57 @@
+name: BRF-27 TUM Downtown metadata inspection
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf27-tum-metadata-intake.yml"
+      - "scripts/inspect-brf27-tum-metadata.sh"
+      - "docs/research/BRF-27-TUM-DOWNTOWN-INTAKE.md"
+      - "benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf27-tum-metadata-intake.yml"
+      - "scripts/inspect-brf27-tum-metadata.sh"
+      - "docs/research/BRF-27-TUM-DOWNTOWN-INTAKE.md"
+      - "benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf27-tum-metadata-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install PDF text tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
+
+      - name: Validate script syntax
+        run: bash -n scripts/inspect-brf27-tum-metadata.sh
+
+      - name: Download, checksum and inspect metadata PDF
+        run: bash scripts/inspect-brf27-tum-metadata.sh artifacts/brf27-tum-metadata
+
+      - name: Upload derived text and metadata audit only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf27-tum-downtown-metadata-audit
+          path: |
+            artifacts/brf27-tum-metadata/metadata-audit.json
+            artifacts/brf27-tum-metadata/metadata-extract.txt
+            artifacts/brf27-tum-metadata/pdfinfo.txt
+            artifacts/brf27-tum-metadata/page-preview-*.png
+          if-no-files-found: warn
+          retention-days: 14

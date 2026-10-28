@@ -1,0 +1,72 @@
+name: BRF-31 bounded CityGML metadata inspection
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf31-citygml-metadata.yml"
+      - "scripts/inspect_tum_citygml_metadata.py"
+      - "tests/test_tum_citygml_metadata.py"
+      - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+      - "docs/research/BRF-31-CITYGML-METADATA.md"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf31-citygml-metadata.yml"
+      - "scripts/inspect_tum_citygml_metadata.py"
+      - "tests/test_tum_citygml_metadata.py"
+      - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+      - "docs/research/BRF-31-CITYGML-METADATA.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf31-citygml-metadata-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-bounded-model-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/inspect_tum_citygml_metadata.py tests/test_tum_citygml_metadata.py
+
+      - name: Run CityGML parsing and bounded-download safety tests
+        run: python -m unittest discover -s tests -p 'test_tum_citygml_metadata.py' -v
+
+      - name: Inspect pinned CityGML model metadata with bounded HTTP ranges
+        run: python scripts/inspect_tum_citygml_metadata.py --output artifacts/brf31-citygml-metadata/metadata.json
+
+      - name: Require at least one actual CityGML envelope to be extracted
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/brf31-citygml-metadata/metadata.json").read_text(encoding="utf-8"))
+          models = report.get("models", [])
+          envelopes = [
+              item for item in models
+              if (item.get("metadata") or {}).get("envelopeStatus") == "found-in-prefix"
+          ]
+          if len(models) != 27:
+              raise SystemExit(f"Expected 27 pinned catalog records; got {len(models)}")
+          if not envelopes:
+              raise SystemExit("No model envelope could be extracted from any bounded GML prefix; do not accept a names-only inventory as spatial evidence.")
+          print(f"Extracted bounded CityGML envelope metadata for {len(envelopes)} of {len(models)} catalog entries.")
+          print(json.dumps(report.get("inventorySummary", {}), indent=2))
+          PY
+
+      - name: Upload bounded CityGML metadata report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf31-bounded-citygml-metadata
+          path: artifacts/brf31-citygml-metadata/metadata.json
+          if-no-files-found: warn
+          retention-days: 14

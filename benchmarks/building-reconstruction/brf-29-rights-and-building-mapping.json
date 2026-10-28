@@ -1,0 +1,238 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-29-TUM-DOWNTOWN-RIGHTS-AND-BUILDING-MAPPING",
+  "status": "blocked",
+  "reviewedAt": "2026-10-28",
+  "issueUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/240",
+  "buildingSelection": {
+    "status": "not-selected",
+    "buildingId": "",
+    "gmlId": "",
+    "locationEvidence": [],
+    "imageAssetIds": [],
+    "independentSurfaceAssetIds": [],
+    "referenceModelAssetIds": [],
+    "sameBuildingEvidenceUrl": "",
+    "reviewer": "",
+    "reviewedAt": "",
+    "candidateShortlistStatus": "research-only-unverified",
+    "candidates": [
+      {
+        "candidateId": "tum-lod3-4959323",
+        "gmlId": "DEBY_LOD3_4959323",
+        "filename": "DEBY_LOD3_4959323.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "inspect-first",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "relatedBenchmarkSourceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark/blob/main/pc2lod_predictor.ipynb",
+        "evidence": [
+          "GT-LOD3's public notebook contains a commented TUM GML input path ending in DEBY_LOD3_4959323.gml.",
+          "TUM2TWIN's public LOD3 model directory lists this GML filename."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "It is explicitly referenced by the benchmark notebook and listed in the TUM2TWIN model catalogue, making it a traceable candidate to inspect first; neither source proves identity with the ULS crop or selected images."
+      },
+      {
+        "candidateId": "tum-lod3-4959457",
+        "gmlId": "DEBY_LOD3_4959457",
+        "filename": "DEBY_LOD3_4959457.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "alternate",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959457.gml",
+        "relatedAppearanceFolderUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/tree/main/citygml/lod3-building-datasets/DEBY_LOD3_4959457_appearance",
+        "evidence": [
+          "TUM2TWIN's public LOD3 directory lists this GML file and a related appearance folder.",
+          "The folder history shows a commit message referring to the main entrance building; this is a triage hint, not direct identity evidence for the GML file."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "Potential visually distinctive candidate only; no building-footprint or image-to-ULS match has been proven."
+      },
+      {
+        "candidateId": "tum-lod3-4959460",
+        "gmlId": "DEBY_LOD3_4959460",
+        "filename": "DEBY_LOD3_4959460.gml",
+        "selectionStatus": "candidate-not-selected",
+        "priorityForInspection": "alternate",
+        "sourceFileListingUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/main/citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+        "relatedTutorialUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+        "evidence": [
+          "TUM2TWIN's public LOD3 directory lists the GML file.",
+          "The public 3D City Database tutorial names this model as an example of a detailed LOD3 import; its sample query point is generic and is not stated to be this model's centroid."
+        ],
+        "exactFileLicenseStatus": "unverified-for-this-external-file",
+        "fileBytesVerified": false,
+        "sha256": null,
+        "footprintCoordinatesVerified": false,
+        "sourceCrsVerified": false,
+        "verticalReferenceVerified": false,
+        "intersectsUlsCropVerified": false,
+        "sameBuildingImageMappingVerified": false,
+        "candidateReason": "The tutorial gives a traceable model ID worth checking, but it does not establish a match to the selected ULS crop or imagery."
+      }
+    ],
+    "notes": [
+      "Candidate identifiers are a shortlist only. buildingId and gmlId remain empty and status remains not-selected.",
+      "The LAZ header bounds are campus-wide/source-file bounds, not evidence that any listed GML footprint intersects the relevant crop.",
+      "One tutorial example point lies inside the LAZ header XY envelope, but the source does not identify that point as the centroid of a shortlisted building.",
+      "TUM2TWIN's tutorial uses EPSG:25832 in its example database configuration; the ULS header declares EPSG:32632. The exact candidate GML srsName must be inspected and an explicit coordinate operation documented before comparing geometry.",
+      "A possible vertical-reference lead was added: TUM2TWIN's example database configuration uses EPSG:7837 (DHHN2016 height). It is explicitly only a candidate until the selected ULS/GML metadata confirms it; the vertical-datum release blocker remains."
+    ]
+  },
+  "licenseEvidence": [
+    {
+      "id": "zenodo-tum-downtown-source-record",
+      "sourceUrl": "https://zenodo.org/records/15282970",
+      "scope": "Images.zip and TUM_Downtown_ULS_20241217_manual.laz in Zenodo record v1.2.0",
+      "accessLabelObserved": "Dataset Open",
+      "licenseName": null,
+      "licenseUrl": null,
+      "status": "license-unresolved",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The record lists image and ULS archives and publisher MD5 values, but the record-page review did not establish an explicit asset-level licence value.",
+        "The Dataset Open label is an access/discovery cue; it is not treated as a licence grant.",
+        "No derivative/publication/commercial use is approved for these two assets."
+      ]
+    },
+    {
+      "id": "gt-lod3-benchmark-reference-dataset",
+      "sourceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "licenseEvidenceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark#license",
+      "scope": "GT-LOD3 Benchmark dataset as declared by its public README, including its stated TUM subset (28 manually modelled LOD3 instances)",
+      "status": "source-declared-file-not-selected",
+      "exactAssetSelectionStatus": "not-selected",
+      "selectedFilePath": "",
+      "selectedBuildingGmlId": "",
+      "requiredAttribution": "GT-LOD3 Benchmark Dataset, Han Sae Kim et al.; licensed under CC BY 4.0.",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The repository-level CC BY 4.0 statement is evidence for the GT-LOD3 dataset it describes; retain attribution and a modification notice when applicable.",
+        "A specific TUM LOD3 file/model has not yet been selected or byte-pinned, so no selected-file approval is recorded.",
+        "Its geometry/label derivation must be documented before treating it as independent ground truth for any particular metric."
+      ]
+    },
+    {
+      "id": "tum2twin-github-project-license",
+      "sourceUrl": "https://github.com/tum-gis/tum2twin",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://github.com/tum-gis/tum2twin/blob/main/LICENSE",
+      "scope": "The public tum-gis/tum2twin GitHub code repository itself",
+      "externalAssetRepositoryUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "status": "external-dataset-license-unverified",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The GitHub repository has a CC BY 4.0 LICENSE, but its README points to a separate GitLab repository for actual model data.",
+        "The GitHub repository licence is not automatically asserted to apply to every separate GitLab model file or the distinct Zenodo ULS/images archive.",
+        "The separate data-repository root LICENSE is recorded in the tum2twin-dataset-gitlab-license entry."
+      ]
+    },
+    {
+      "id": "tum2twin-dataset-gitlab-license",
+      "sourceUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/LICENSE",
+      "scope": "Root LICENSE file in tum-gis/tum2twin-datasets at immutable commit e032a71fc9b3c9c3d4869e3aca9677d1234086aa; first line identifies Attribution 4.0 International",
+      "externalAssetRepositoryUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "repositoryCommitSha": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+      "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+      "status": "repository-license-file-verified-scope-review-pending",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The actual GitLab root LICENSE bytes were fetched at the immutable commit; the text starts with Attribution 4.0 International and its SHA-256 is recorded.",
+        "A metadata-only recursive inventory at that commit found 27 GML files under citygml/lod3-building-datasets, all named DEBY_LOD3_*.gml.",
+        "This verifies the repository licence-file contents; a human must still review scope, any per-file exceptions, derivative publication/commercial use, and attribution for the exact chosen model.",
+        "No individual GML payload was downloaded; no building is selected or matched to ULS/image data yet."
+      ]
+    }
+  ],
+  "sourceProvenance": {
+    "zenodoRecordVersion": "1.2.0",
+    "zenodoRecordUrl": "https://zenodo.org/records/15282970",
+    "selectedImagesByteVerified": false,
+    "selectedUlsCropByteVerified": false,
+    "selectedReferenceModelByteVerified": false,
+    "fullUlsChecksumVerified": false,
+    "ulsHeaderPrefixOnlyBytes": 8388608,
+    "ulsHeaderPrefixSha256": "3a9b3ae9d07520dcee6bae53ab17d932a9a76483cbb8673ec0ad6ac9dbd4abb4",
+    "ulsProjectedCrsCodeCandidate": 32632,
+    "namedVerticalDatumVerified": false,
+    "localToProjectedTransformVerified": false,
+    "sourceToEvaluationTransformVerified": false,
+    "candidateVerticalReference": {
+      "epsgCode": 7837,
+      "name": "DHHN2016 height",
+      "sourceUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+      "epsgDefinitionUrl": "https://epsg.io/7837",
+      "evidence": "The TUM2TWIN tutorial's example database configuration sets HEIGHT_EPSG=7837; EPSG defines 7837 as DHHN2016 height.",
+      "status": "candidate-only-not-verified-for-selected-files",
+      "appliesToSelectedUlsLaz": false,
+      "appliesToSelectedGml": false,
+      "transformationVerified": false,
+      "caution": "This is a lead for checking vertical coordinates, not evidence that the specific LAZ or a particular GML file uses DHHN2016 height. The metadata PDF only says elevation above mean sea level."
+    }
+  },
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "blockers": [
+    "zenodo-images-license-unresolved",
+    "zenodo-uls-license-unresolved",
+    "gt-lod3-specific-file-not-selected",
+    "tum2twin-gitlab-data-license-not-verified",
+    "building-gml-id-not-selected",
+    "cross-modal-same-building-mapping-missing",
+    "selected-source-files-not-hash-pinned",
+    "named-vertical-datum-unresolved",
+    "local-coordinate-frame-semantics-unresolved",
+    "platform-generated-candidate-glb-missing",
+    "independent-held-out-controls-missing",
+    "candidate-gml-footprint-not-extracted",
+    "candidate-gml-exact-file-rights-unverified",
+    "candidate-uls-image-intersection-not-proven",
+    "candidate-gml-source-crs-not-read",
+    "epsg-32632-to-candidate-crs-operation-unverified"
+  ],
+  "catalogInventory": {
+    "source": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+    "branch": "main",
+    "resolvedCommitSha": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+    "catalogPath": "citygml/lod3-building-datasets",
+    "gmlFileCount": 27,
+    "filenamePrefixCounts": {
+      "DEBY": 27
+    },
+    "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+    "reportSha256": "d2398630dc00175e40310fc567dd18cd3d4f2e72f8b0e955cdb72cd5b8baf64a",
+    "workflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479",
+    "artifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479/artifacts/12795532392",
+    "status": "metadata-only-inventory; exact model identity and rights scope pending",
+    "snapshotPath": "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json",
+    "snapshotCommit": "648f9fb3571ea21cd3f665f03a8f8b309a7fe8be"
+  }
+}

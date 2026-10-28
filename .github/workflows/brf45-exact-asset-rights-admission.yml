@@ -1,0 +1,65 @@
+name: BRF-45 exact-asset rights admission
+
+on:
+  push:
+    branches:
+      - development
+      - feat/brf45-exact-asset-rights-admission
+    paths:
+      - "src/core/building-generation/brf45-exact-asset-rights-admission.mjs"
+      - "scripts/validate-brf45-exact-asset-rights-admission.mjs"
+      - "tests/brf45-exact-asset-rights-admission.test.mjs"
+      - "tests/brf45-exact-asset-rights-admission-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "docs/research/BRF-45-EXACT-ASSET-RIGHTS-ADMISSION.md"
+      - ".github/workflows/brf45-exact-asset-rights-admission.yml"
+      - "package.json"
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "src/core/building-generation/brf45-exact-asset-rights-admission.mjs"
+      - "scripts/validate-brf45-exact-asset-rights-admission.mjs"
+      - "tests/brf45-exact-asset-rights-admission.test.mjs"
+      - "tests/brf45-exact-asset-rights-admission-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "docs/research/BRF-45-EXACT-ASSET-RIGHTS-ADMISSION.md"
+      - ".github/workflows/brf45-exact-asset-rights-admission.yml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf45-exact-asset-rights-admission
+  cancel-in-progress: true
+
+jobs:
+  exact-asset-rights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies and reconcile repository lockfile
+        run: npm install
+      - name: Test exact-asset rights admission and byte-evidence gate
+        run: npm run test:brf45-rights-admission
+      - name: Confirm the real 16-view intake remains blocked pending source-use evidence
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/validate-brf45-exact-asset-rights-admission.mjs \
+            benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json \
+            --source-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --evidence-root "$RUNNER_TEMP" --report artifacts/brf-45-rights-admission-report.json
+          status=$?
+          set -e
+          test "$status" -eq 2

@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-41-INTERIM-DATA-ADMISSION-POLICY",
+  "policyCheckedOn": "2026-10-28",
+  "policy": {
+    "productMode": "potentially-commercial",
+    "noLicenseInferenceFromPublicAvailability": true,
+    "humanReviewRequired": true,
+    "releaseApprovalAllowed": false,
+    "temporaryDataCannotEstablishRealWorldAccuracy": true,
+    "note": "This register controls permitted engineering claims and separates demo smoke tests from independent truth. It is not a license interpreter or legal approval."
+  },
+  "assets": [
+    {
+      "id": "brf13-flat-roof-image-0005",
+      "kind": "image",
+      "role": "candidate-image",
+      "decision": "demo-only",
+      "source": {
+        "recordUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans",
+        "assetUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822183442_0005_D.JPG",
+        "version": "source-manifest-commit-19b3ce9cccf3e8fd414ff705f75d0f2105846fc1",
+        "fileName": "DJI_20260822183442_0005_D.JPG",
+        "byteSize": 8343552,
+        "sha256": "ba7e497c124267242aec031d77f42eab3225e073ca26bf58dd61089017e2798a"
+      },
+      "rights": {
+        "status": "source-declared-not-independently-authenticated",
+        "licenseIdentifier": "CC-BY-4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+        "scope": "Source dataset card declares CC BY 4.0; source README states the license covers imagery. Do not infer rights for the separate textured GLB or third-party marks.",
+        "attribution": "Drone Building Scans — Matthew Guertin, 2026. CC BY 4.0. https://github.com/Matt1Up/drone-building-scans-dataset"
+      },
+      "allowedUses": [
+        "source-byte-integrity-smoke-test",
+        "private-image-ingestion-smoke-test",
+        "private-render-smoke-test",
+        "private-image-quality-preflight"
+      ],
+      "deniedUses": [
+        "independent-reference-truth",
+        "held-out-checkpoint",
+        "survey-accuracy-claim",
+        "public-image-redistribution",
+        "derived-model-publication",
+        "production-map-publication"
+      ],
+      "actualByteVerification": {
+        "status": "verified-ephemeral-ci",
+        "runUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40493556811",
+        "exactHeadSha": "ecd69ac49f31d24e81b13ec6b04dcc1d1dd984c9",
+        "actualByteSize": 8343552,
+        "actualSha256": "ba7e497c124267242aec031d77f42eab3225e073ca26bf58dd61089017e2798a",
+        "note": "Historical byte check only. The image was not retained. Every new download must be independently re-hashed before use."
+      },
+      "independence": {
+        "status": "not-independent",
+        "reason": "The published textured GLB comes from the same capture imagery, and the 1.997 m AprilTag bar was used as scan-scaling control. Neither is established as independent held-out building truth."
+      },
+      "limitations": [
+        "One image byte check does not establish a complete multi-view capture.",
+        "No independent full-building survey, independent dimensions, vertical datum or held-out checkpoints are established for this sample.",
+        "Source license declaration and uploader authority have not been independently authenticated."
+      ]
+    },
+    {
+      "id": "tum-citygml-4959323",
+      "kind": "reference-model",
+      "role": "independent-reference",
+      "decision": "blocked",
+      "source": {
+        "recordUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+        "assetUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "version": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+        "fileName": "DEBY_LOD3_4959323.gml"
+      },
+      "rights": {
+        "status": "evidence-incomplete",
+        "licenseIdentifier": null,
+        "licenseUrl": null,
+        "scope": "Repository-level CC BY 4.0 lead exists, but the exact file's license snapshot, applicable upstream restrictions, local byte hash and human decision have not been completed."
+      },
+      "allowedUses": [],
+      "deniedUses": [
+        "all-use-pending-exact-file-rights-review"
+      ],
+      "blockReason": "No locally acquired and hash-verified rights-evidence snapshot or completed exact-file human review; real source bytes are not present."
+    },
+    {
+      "id": "tum-uas-images-archive",
+      "kind": "image",
+      "role": "candidate-image",
+      "decision": "blocked",
+      "source": {
+        "recordUrl": "https://zenodo.org/records/15282970",
+        "assetUrl": "https://zenodo.org/records/15282970",
+        "version": "1.2.0",
+        "fileName": "Images.zip"
+      },
+      "rights": {
+        "status": "evidence-incomplete",
+        "licenseIdentifier": null,
+        "licenseUrl": null,
+        "scope": "The visible Zenodo rights/license field is blank; TUM2TWIN describes imagery as openly available without a visible asset-specific license."
+      },
+      "allowedUses": [],
+      "deniedUses": [
+        "all-use-pending-exact-file-rights-review"
+      ],
+      "blockReason": "Exact-file rights and requested derivative/commercial/public-display scopes have not been confirmed."
+    },
+    {
+      "id": "tum-uls-source-manual",
+      "kind": "point-cloud",
+      "role": "candidate-points",
+      "decision": "blocked",
+      "source": {
+        "recordUrl": "https://zenodo.org/records/15282970",
+        "assetUrl": "https://zenodo.org/records/15282970",
+        "version": "1.2.0",
+        "fileName": "TUM_Downtown_ULS_20241217_manual.laz"
+      },
+      "rights": {
+        "status": "evidence-incomplete",
+        "licenseIdentifier": null,
+        "licenseUrl": null,
+        "scope": "The visible Zenodo rights/license field is blank; no exact-file permission, locally verified SHA-256 or reviewed commercial-derived-use scope is recorded."
+      },
+      "allowedUses": [],
+      "deniedUses": [
+        "all-use-pending-exact-file-rights-review"
+      ],
+      "blockReason": "No exact-file rights evidence or verified same-building crop/reference linkage is available."
+    },
+    {
+      "id": "gt-lod3-goldcoast-collection",
+      "kind": "reference-model",
+      "role": "independent-reference",
+      "decision": "blocked",
+      "source": {
+        "recordUrl": "https://stac.d2s.org/api/v1/collections/ee10a5c0-2554-44e5-b59f-81eedfe02eb6",
+        "version": "collection-license-metadata-checked-2026-10-28",
+        "fileName": null
+      },
+      "rights": {
+        "status": "source-license-conflict",
+        "licenseIdentifier": null,
+        "licenseUrl": null,
+        "scope": "The repository README declares CC BY 4.0 while this linked Gold Coast STAC collection declares CC-BY-NC-4.0; the exact item/license scope has not been resolved."
+      },
+      "allowedUses": [],
+      "deniedUses": [
+        "commercial-use",
+        "model-derivation",
+        "publication-pending-license-clarification"
+      ],
+      "blockReason": "Conflicting repository/collection license declarations and no exact item pinned. Do not admit for the potentially commercial workflow until the owner clarifies in writing."
+    },
+    {
+      "id": "gt-lod3-tum-subset",
+      "kind": "reference-model",
+      "role": "independent-reference",
+      "decision": "blocked",
+      "source": {
+        "recordUrl": "https://github.com/gdslab/GT-LOD3-Benchmark",
+        "version": "exact-TUM-subset-item-not-yet-pinned",
+        "fileName": null
+      },
+      "rights": {
+        "status": "evidence-incomplete",
+        "licenseIdentifier": null,
+        "licenseUrl": null,
+        "scope": "Repository-level CC BY 4.0 does not prove license coverage for each exact TUM subset image, point cloud or LOD3 model."
+      },
+      "allowedUses": [],
+      "deniedUses": [
+        "all-use-pending-exact-item-license-and-mapping-review"
+      ],
+      "blockReason": "Exact downloadable item URLs, immutable versions, asset-specific rights and same-building mapping remain unresolved."
+    }
+  ],
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  }
+}

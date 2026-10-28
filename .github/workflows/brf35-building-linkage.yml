@@ -1,0 +1,62 @@
+name: BRF-35 same-building linkage and metric-frame gate
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf35-building-linkage.yml"
+      - "src/core/building-generation/brf35-building-linkage.mjs"
+      - "scripts/validate-brf35-building-linkage.mjs"
+      - "tests/brf35-building-linkage.test.mjs"
+      - "benchmarks/building-reconstruction/brf-35-candidate-linkage.json"
+      - "benchmarks/building-reconstruction/brf-33-citygml-candidate-geometry.json"
+      - "docs/research/BRF-35-BUILDING-LINKAGE-AND-METRIC-FRAME.md"
+      - "package.json"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf35-building-linkage.yml"
+      - "src/core/building-generation/brf35-building-linkage.mjs"
+      - "scripts/validate-brf35-building-linkage.mjs"
+      - "tests/brf35-building-linkage.test.mjs"
+      - "benchmarks/building-reconstruction/brf-35-candidate-linkage.json"
+      - "benchmarks/building-reconstruction/brf-33-citygml-candidate-geometry.json"
+      - "docs/research/BRF-35-BUILDING-LINKAGE-AND-METRIC-FRAME.md"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf35-building-linkage
+  cancel-in-progress: true
+
+jobs:
+  linkage-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run contract and fail-closed regression tests
+        run: npm run test:brf35-building-linkage
+      - name: Validate that the real candidate remains blocked
+        run: |
+          mkdir -p artifacts
+          node scripts/validate-brf35-building-linkage.mjs benchmarks/building-reconstruction/brf-35-candidate-linkage.json benchmarks/building-reconstruction/brf-33-citygml-candidate-geometry.json artifacts/brf35-linkage-validation.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf35-linkage-validation.json", "utf8"));
+          if (report.status !== "blocked-missing-or-invalid-evidence") throw new Error("Real-world candidate unexpectedly left the blocked state.");
+          if (report.blockingCount < 1) throw new Error("Candidate has no recorded blockers.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must all remain false.");
+          for (const required of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed", "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present", "held-out-checkpoints-independent"]) {
+            if (!report.blockers.includes(required)) throw new Error("Expected blocker not preserved: " + required);
+          }
+          console.log("BRF-35 remains fail-closed; " + report.blockingCount + " blockers recorded.");
+          NODE

@@ -24,22 +24,28 @@ test("source cannot be approved without explicit rights attestation and a known 
 });
 test("review records explicit licence, attribution and capture metadata after hash verification",async t=>{
   const root=await workspace(t);const ingested=await intake(root,"photo-a");
-  const result=await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"photo-a",licence:"CC BY 4.0",confirmRights:true,author:"Sample photographer",attribution:"Sample photographer / source page",sourceUrl:"https://example.org/photo",captureLocation:{longitude:90.406,latitude:23.709,headingDegrees:182}});
+  const result=await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"photo-a",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","procedural-model-derivation"],confirmRights:true,author:"Sample photographer",attribution:"Sample photographer / source page",sourceUrl:"https://example.org/photo",captureLocation:{longitude:90.406,latitude:23.709,headingDegrees:182}});
   assert.equal(result.record.usageStatus,"approved");assert.equal(result.record.licence,"CC BY 4.0");assert.equal(result.record.author,"Sample photographer");
   assert.equal(result.record.location.headingDegrees,182);assert.equal(result.assetSha256,ingested.record.sha256);assert.ok(result.record.rightsReviewedAt);
+});
+test("source review requires explicit recognized per-operation permission scopes",async t=>{
+  const root=await workspace(t);await intake(root,"scoped-photo");
+  await assert.rejects(reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"scoped-photo",licence:"CC BY 4.0",confirmRights:true}),/permittedOperations/);
+  await assert.rejects(reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"scoped-photo",licence:"CC BY 4.0",permittedOperations:["photogrammetry-reconstruction","photogrammetry-reconstruction"],confirmRights:true}),/duplicate operation scopes/);
+  await assert.rejects(reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"scoped-photo",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","admin-everything"],confirmRights:true}),/unsupported operation scope/);
 });
 test("source review refuses tampered source bytes",async t=>{
   const root=await workspace(t);const ingested=await intake(root,"photo-tampered");
   await writeFile(path.join(root,ingested.record.relativePath),"tampered image bytes");
-  await assert.rejects(reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"photo-tampered",licence:"CC BY 4.0",confirmRights:true}),/SHA-256/);
+  await assert.rejects(reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"photo-tampered",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","procedural-model-derivation"],confirmRights:true}),/SHA-256/);
 });
 test("prepares a versioned BuildingSpec using selected current source records and preserves other sources",async t=>{
   const root=await workspace(t);await intake(root,"front-photo");
-  await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"front-photo",licence:"CC BY 4.0",confirmRights:true,attribution:"Open sample attribution"});
+  await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"front-photo",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","procedural-model-derivation"],confirmRights:true,attribution:"Open sample attribution"});
   const prepared=await prepareBuildingSpecSources({workspaceRoot:root,buildingSpec:fixture,sourceIds:["front-photo"]});
   assert.equal(prepared.buildingSpec.id,fixture.id);assert.ok(prepared.buildingSpec.sources.some(s=>s.id==="survey-notes"));
   const photo=prepared.buildingSpec.sources.find(s=>s.id==="front-photo");
-  assert.equal(photo.assetId,prepared.sourceStatuses[0].assetId);assert.equal(photo.usageStatus,"approved");assert.equal(photo.licence,"CC BY 4.0");
+  assert.equal(photo.assetId,prepared.sourceStatuses[0].assetId);assert.equal(photo.usageStatus,"approved");assert.equal(photo.licence,"CC BY 4.0");assert.deepEqual(photo.permittedOperations,["private-media-ingestion","procedural-model-derivation"]);
 });
 test("rejects duplicate source IDs and missing media records when preparing a spec",async t=>{
   const root=await workspace(t);

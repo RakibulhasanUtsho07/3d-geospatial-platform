@@ -1,0 +1,121 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const registryUrl = new URL("../benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json", import.meta.url);
+const registry = JSON.parse(await readFile(registryUrl, "utf8"));
+
+test("BRF-29 source-rights matrix separates repository licence claims from selected assets", () => {
+  assert.equal(registry.schemaVersion, "1.0.0");
+  assert.equal(registry.status, "blocked");
+  assert.equal(registry.buildingSelection.status, "not-selected");
+  assert.equal(registry.buildingSelection.buildingId, "");
+  assert.equal(registry.buildingSelection.gmlId, "");
+  assert.deepEqual(registry.buildingSelection.imageAssetIds, []);
+  assert.deepEqual(registry.buildingSelection.independentSurfaceAssetIds, []);
+  assert.deepEqual(registry.buildingSelection.referenceModelAssetIds, []);
+
+  const zenodo = registry.licenseEvidence.find((item) => item.id === "zenodo-tum-downtown-source-record");
+  assert.ok(zenodo);
+  assert.equal(zenodo.licenseName, null);
+  assert.equal(zenodo.status, "license-unresolved");
+
+  const gtLod3 = registry.licenseEvidence.find((item) => item.id === "gt-lod3-benchmark-reference-dataset");
+  assert.ok(gtLod3);
+  assert.equal(gtLod3.licenseName, "CC BY 4.0");
+  assert.equal(gtLod3.status, "source-declared-file-not-selected");
+  assert.equal(gtLod3.selectedFilePath, "");
+  assert.equal(gtLod3.selectedBuildingGmlId, "");
+  assert.equal(gtLod3.reviewedBy, "");
+  assert.equal(gtLod3.reviewedAt, "");
+
+  const tum2twin = registry.licenseEvidence.find((item) => item.id === "tum2twin-github-project-license");
+  assert.ok(tum2twin);
+  assert.equal(tum2twin.licenseName, "CC BY 4.0");
+  assert.equal(tum2twin.status, "external-dataset-license-unverified");
+
+  const gitlabData = registry.licenseEvidence.find((item) => item.id === "tum2twin-dataset-gitlab-license");
+  assert.ok(gitlabData);
+  assert.equal(gitlabData.licenseName, "CC BY 4.0");
+  assert.equal(gitlabData.status, "repository-license-file-verified-scope-review-pending");
+  assert.equal(gitlabData.repositoryCommitSha, "e032a71fc9b3c9c3d4869e3aca9677d1234086aa");
+  assert.equal(gitlabData.licenseFileSha256, "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411");
+  assert.equal(registry.catalogInventory.gmlFileCount, 27);
+  assert.equal(registry.catalogInventory.snapshotPath, "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json");
+  assert.equal(registry.catalogInventory.snapshotCommit, "648f9fb3571ea21cd3f665f03a8f8b309a7fe8be");
+  assert.deepEqual(registry.catalogInventory.filenamePrefixCounts, { DEBY: 27 });
+  assert.equal(tum2twin.externalAssetRepositoryUrl, "https://gitlab.lrz.de/tum-gis/tum2twin-datasets");
+
+  assert.equal(registry.sourceProvenance.selectedImagesByteVerified, false);
+  assert.equal(registry.sourceProvenance.selectedUlsCropByteVerified, false);
+  assert.equal(registry.sourceProvenance.selectedReferenceModelByteVerified, false);
+  assert.equal(registry.sourceProvenance.fullUlsChecksumVerified, false);
+  assert.equal(registry.sourceProvenance.namedVerticalDatumVerified, false);
+  assert.equal(registry.sourceProvenance.localToProjectedTransformVerified, false);
+  assert.equal(registry.sourceProvenance.sourceToEvaluationTransformVerified, false);
+});
+
+test("BRF-29 cannot promote any release flag while rights and building identity remain blocked", () => {
+  assert.deepEqual(registry.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+  assert.ok(registry.blockers.includes("zenodo-images-license-unresolved"));
+  assert.ok(registry.blockers.includes("zenodo-uls-license-unresolved"));
+  assert.ok(registry.blockers.includes("building-gml-id-not-selected"));
+  assert.ok(registry.blockers.includes("cross-modal-same-building-mapping-missing"));
+  assert.ok(registry.blockers.includes("named-vertical-datum-unresolved"));
+  assert.ok(registry.blockers.includes("platform-generated-candidate-glb-missing"));
+  assert.ok(registry.blockers.includes("independent-held-out-controls-missing"));
+});
+
+test("no asset-level rights review is falsely recorded as approved", () => {
+  for (const item of registry.licenseEvidence) {
+    assert.notEqual(item.status, "approved");
+    assert.equal(item.exactAssetSelectionStatus, "not-selected");
+  }
+});
+
+test("BRF-30 records a traceable candidate shortlist without selecting or approving a building", () => {
+  const candidates = registry.buildingSelection.candidates;
+  assert.equal(registry.buildingSelection.status, "not-selected");
+  assert.equal(registry.buildingSelection.candidateShortlistStatus, "research-only-unverified");
+  assert.equal(registry.buildingSelection.buildingId, "");
+  assert.equal(registry.buildingSelection.gmlId, "");
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.gmlId),
+    ["DEBY_LOD3_4959323", "DEBY_LOD3_4959457", "DEBY_LOD3_4959460"],
+  );
+  assert.equal(candidates[0].priorityForInspection, "inspect-first");
+  assert.ok(candidates[0].relatedBenchmarkSourceUrl.includes("GT-LOD3-Benchmark"));
+  for (const candidate of candidates) {
+    assert.equal(candidate.selectionStatus, "candidate-not-selected");
+    assert.equal(candidate.exactFileLicenseStatus, "unverified-for-this-external-file");
+    assert.equal(candidate.fileBytesVerified, false);
+    assert.equal(candidate.sha256, null);
+    assert.equal(candidate.footprintCoordinatesVerified, false);
+    assert.equal(candidate.sourceCrsVerified, false);
+    assert.equal(candidate.verticalReferenceVerified, false);
+    assert.equal(candidate.intersectsUlsCropVerified, false);
+    assert.equal(candidate.sameBuildingImageMappingVerified, false);
+  }
+  assert.ok(registry.blockers.includes("candidate-gml-footprint-not-extracted"));
+  assert.ok(registry.blockers.includes("candidate-gml-exact-file-rights-unverified"));
+  assert.ok(registry.blockers.includes("candidate-uls-image-intersection-not-proven"));
+  assert.ok(registry.blockers.includes("epsg-32632-to-candidate-crs-operation-unverified"));
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.epsgCode, 7837);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.name, "DHHN2016 height");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.status, "candidate-only-not-verified-for-selected-files");
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedUlsLaz, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.appliesToSelectedGml, false);
+  assert.equal(registry.sourceProvenance.candidateVerticalReference.transformationVerified, false);
+  assert.ok(registry.blockers.includes("named-vertical-datum-unresolved"));
+  assert.deepEqual(registry.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});

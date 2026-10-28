@@ -1,0 +1,212 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-38-TUM-EXACT-ASSET-RIGHTS-SCOPE",
+  "evaluatedAt": "2026-10-28T00:00:00.000Z",
+  "policy": {
+    "requestedPurpose": "rights-cleared reconstruction candidate and evidence-based accuracy review",
+    "requiredHumanReview": true,
+    "releaseApprovalAllowed": false,
+    "note": "This gate validates exact-asset evidence completeness only. It is not a license interpreter and cannot infer permission from openness or a repository-level license."
+  },
+  "assets": [
+    {
+      "id": "tum-citygml-4959323",
+      "kind": "source",
+      "role": "citygml-reference",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": 51178520,
+      "sha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37",
+      "source": {
+        "recordUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "version": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+        "fileName": "DEBY_LOD3_4959323.gml",
+        "buildingGmlId": "DEBY_LOD2_4959323",
+        "sourceCrs": "EPSG:25832",
+        "note": "Expected source bytes are pinned by BRF-33 evidence, but this rights gate cannot rehash the source until an actual local copy is supplied under the selected asset root."
+      },
+      "requestedScopes": [
+        "inspect-source",
+        "use-for-validation"
+      ],
+      "rights": {
+        "status": "pending-exact-file-scope-review",
+        "assetSha256": null,
+        "sourceFileName": null,
+        "sourceVersion": null,
+        "sourceRecordUrl": null,
+        "license": null,
+        "evidenceUrl": null,
+        "evidenceRetrievedAt": null,
+        "evidenceContentSha256": null,
+        "evidenceAssetIds": [],
+        "rightsHolderOrGrantor": null,
+        "scopeDescription": null,
+        "attributionText": null,
+        "restrictionsText": null,
+        "grantedScopes": [],
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "decisionId": null,
+        "effectiveAt": null,
+        "expiresAt": null,
+        "revoked": false,
+        "explicitGrantConfirmed": false
+      }
+    },
+    {
+      "id": "tum-uas-images-archive",
+      "kind": "source",
+      "role": "uas-image-archive",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "source": {
+        "recordUrl": "https://zenodo.org/records/15282970",
+        "version": "1.2.0",
+        "fileName": "Images.zip",
+        "publishedChecksumAlgorithm": "MD5",
+        "publishedChecksum": "3916db207856346dc596d373e477143e",
+        "note": "The published checksum is MD5, not SHA-256, and cannot substitute for the required actual-byte SHA-256. File is listed as 5.9 GB on the record; exact byte size is not inferred from the rounded display."
+      },
+      "requestedScopes": [
+        "inspect-source",
+        "derive-model",
+        "public-display-derived-model",
+        "commercial-use-derived-model"
+      ],
+      "rights": {
+        "status": "pending-exact-file-scope-review",
+        "assetSha256": null,
+        "sourceFileName": null,
+        "sourceVersion": null,
+        "sourceRecordUrl": null,
+        "license": null,
+        "evidenceUrl": null,
+        "evidenceRetrievedAt": null,
+        "evidenceContentSha256": null,
+        "evidenceAssetIds": [],
+        "rightsHolderOrGrantor": null,
+        "scopeDescription": null,
+        "attributionText": null,
+        "restrictionsText": null,
+        "grantedScopes": [],
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "decisionId": null,
+        "effectiveAt": null,
+        "expiresAt": null,
+        "revoked": false,
+        "explicitGrantConfirmed": false
+      }
+    },
+    {
+      "id": "tum-uls-source-manual",
+      "kind": "source",
+      "role": "uas-laser-scan-source",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "source": {
+        "recordUrl": "https://zenodo.org/records/15282970",
+        "version": "1.2.0",
+        "fileName": "TUM_Downtown_ULS_20241217_manual.laz",
+        "publishedChecksumAlgorithm": "MD5",
+        "publishedChecksum": "37ce114fb348fb28066cc967cde9771d",
+        "note": "The record reports a rounded 2.8 GB size. This full scan is not a building-specific crop, and no derived crop has yet been hash-pinned or identity-reviewed."
+      },
+      "requestedScopes": [
+        "inspect-source",
+        "use-for-validation",
+        "derive-model",
+        "public-display-derived-model",
+        "commercial-use-derived-model"
+      ],
+      "rights": {
+        "status": "pending-exact-file-scope-review",
+        "assetSha256": null,
+        "sourceFileName": null,
+        "sourceVersion": null,
+        "sourceRecordUrl": null,
+        "license": null,
+        "evidenceUrl": null,
+        "evidenceRetrievedAt": null,
+        "evidenceContentSha256": null,
+        "evidenceAssetIds": [],
+        "rightsHolderOrGrantor": null,
+        "scopeDescription": null,
+        "attributionText": null,
+        "restrictionsText": null,
+        "grantedScopes": [],
+        "reviewedBy": null,
+        "reviewedAt": null,
+        "decisionId": null,
+        "effectiveAt": null,
+        "expiresAt": null,
+        "revoked": false,
+        "explicitGrantConfirmed": false
+      }
+    },
+    {
+      "id": "platform-candidate-glb-artifact",
+      "kind": "derived-output",
+      "role": "platform-reconstruction-candidate",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null
+    }
+  ],
+  "derivedOutputs": [
+    {
+      "id": "platform-candidate-glb",
+      "status": "not-generated",
+      "artifactAssetId": "platform-candidate-glb-artifact",
+      "parentAssetIds": [
+        "tum-uas-images-archive",
+        "tum-uls-source-manual"
+      ],
+      "requiredParentScopes": [
+        "derive-model",
+        "public-display-derived-model",
+        "commercial-use-derived-model"
+      ],
+      "requestedScopes": [
+        "public-display-derived-model",
+        "commercial-use-derived-model"
+      ],
+      "note": "Candidate geometry must be generated from rights-cleared reconstruction inputs; the CityGML reference is held out for evaluation and is not assumed to be an input to candidate generation."
+    }
+  ],
+  "researchContext": [
+    {
+      "id": "tum2twin-uas-images-page",
+      "url": "https://tum2t.win/datasets/im-uas",
+      "observedClaim": "The data are described as openly available; the page does not state an asset-specific license."
+    },
+    {
+      "id": "tum2twin-uls-page",
+      "url": "https://tum2t.win/datasets/pc-uas",
+      "observedClaim": "The data are described as openly available; the page does not state an asset-specific license."
+    },
+    {
+      "id": "zenodo-tum2twin-record",
+      "url": "https://zenodo.org/records/15282970",
+      "version": "1.2.0",
+      "observedClaim": "The rendered Rights section displays a License heading with no license value."
+    },
+    {
+      "id": "separate-gt-lod3-repository",
+      "url": "https://github.com/gdslab/GT-LOD3-Benchmark",
+      "observedClaim": "This distinct repository declares CC BY 4.0 for its benchmark dataset; this is not automatically evidence for the separate Zenodo/TUM2TWIN assets listed above."
+    }
+  ],
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  }
+}
