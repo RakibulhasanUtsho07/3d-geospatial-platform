@@ -6,6 +6,7 @@ import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { normalizeSourceOperationScopes } from "./source-workflow.mjs";
 import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
 import { buildModelReviewSummary } from "./model-review-summary.mjs";
 import { analyzeColmapTextModelFiles } from "./colmap-view-coverage.mjs";
@@ -90,6 +91,10 @@ async function readApprovedSources(root,buildingId,sourceIds,spec){
   if(record.id!==sourceId||record.buildingId!==buildingId)throw new TypeError("media source metadata identity mismatch for "+sourceId);
   if(!["image","video-frame"].includes(record.kind)||!["image/jpeg","image/png"].includes(record.mimeType))throw new TypeError("COLMAP worker accepts ingested JPEG/PNG image or video-frame sources only: "+sourceId);
   if(record.usageStatus!=="approved"||typeof record.licence!=="string"||!record.licence.trim()||record.licence.toLowerCase()==="unknown")throw new TypeError("source "+sourceId+" needs a reviewed licence and usageStatus=approved");
+  const recordedScopes=normalizeSourceOperationScopes(record.permittedOperations, "source " + sourceId + " permittedOperations");
+  const declaredScopes=normalizeSourceOperationScopes(declared?.permittedOperations, "BuildingSpec source " + sourceId + " permittedOperations");
+  if(JSON.stringify(recordedScopes)!==JSON.stringify(declaredScopes))throw new TypeError("BuildingSpec source " + sourceId + " permitted operation scopes do not match the verified source record");
+  for(const scope of ["photogrammetry-reconstruction","texture-baking"]){if(!recordedScopes.includes(scope))throw new TypeError("source "+sourceId+" lacks explicit "+scope+" permission");}
   const declared=specById.get(sourceId);
   if(!declared||declared.assetId!==record.assetId||declared.usageStatus!=="approved"||declared.licence!==record.licence)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
   if(typeof record.relativePath!=="string"||record.relativePath.includes("\\"))throw new TypeError("invalid asset relativePath for "+sourceId);
