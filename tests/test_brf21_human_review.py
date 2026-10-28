@@ -412,7 +412,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["views"][0]["expectedSha256"] = "0" * 64
         self.write_json(manifest_path.name, manifest)
-        with self.assertRaisesRegex(ValueError, "BRF-20 source image hash/size disagrees"):
+        with self.assertRaisesRegex(ValueError, "quality report must bind the exact BRF-14 manifest|BRF-20 source image hash/size disagrees"):
             MODULE.validate_decision(self.root, decision)
 
     def test_byte_verification_report_provenance_mismatch_is_rejected(self):
