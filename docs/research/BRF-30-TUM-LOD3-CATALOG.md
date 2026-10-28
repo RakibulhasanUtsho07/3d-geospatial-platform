@@ -9,6 +9,8 @@ Resolve the next concrete blocker without downloading a bulk model repository: e
 
 The official [TUM2TWIN semantic building-model page](https://tum2t.win/datasets/cm-buildings) says the individual LOD3 CityGML models are manually modelled based on official LOD2 building models plus additional mobile laser scan point clouds. The [GT-LOD3 benchmark README](https://github.com/gdslab/GT-LOD3-Benchmark) separately documents a TUM subset of 28 manually modelled LOD3 building instances and its own CC BY 4.0 dataset statement. These are useful sources, but they must not be assumed to refer to the same exact GML IDs or imply the same provenance for every source file.
 
+A stable metadata snapshot is committed at [brf-30-tum-lod3-catalog-snapshot.json](../../benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json). It contains the 27 path/blob-id records at the immutable source commit, but no GML payloads. The snapshot's contract tests ensure every entry remains unreviewed and that no building/release flag is accidentally promoted.
+
 ## What the automation does
 
 ## Live inventory result (28 October 2026)
