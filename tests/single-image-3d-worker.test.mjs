@@ -45,6 +45,15 @@ test("requires explicit single-view opt-in and reviewed source licence",async t=
  const unknown={...buildingSpec,sources:buildingSpec.sources.map(s=>({...s,licence:"unknown"}))};
  await assert.rejects(runSingleImage3D({...base,buildingSpec:unknown,allowSingleViewInference:true}),/match the approved source licence/);
 });
+test("direct single-image worker rejects a source without explicit AI reconstruction scope",async t=>{
+ const root=await workspace(t),{buildingId,buildingSpec}=await setupPhoto(t,root);
+ const runner=path.join(root,"run.py");await writeFile(runner,"# locally installed TripoSR runner placeholder\n");
+ const denied={...buildingSpec,sources:buildingSpec.sources.map(source=>({...source,permittedOperations:["private-media-ingestion"]}))};
+ await assert.rejects(runSingleImage3D({
+  workspaceRoot:root,buildingId,buildingSpec:denied,jobId:"missing-operation-scope",sourceId:"facade-image",
+  runnerScript:runner,allowSingleViewInference:true,device:"cpu",mcResolution:128,spawnImpl:mockedSpawn,
+ }),/permitted operation scopes do not match/);
+});
 test("runs a mocked TripoSR command and emits an AI-proposed non-map-ready GLB report",async t=>{
  const root=await workspace(t),{buildingId,buildingSpec}=await setupPhoto(t,root);
  const runner=path.join(root,"run.py");await writeFile(runner,"# locally installed TripoSR runner placeholder\n");
