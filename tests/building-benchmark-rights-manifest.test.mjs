@@ -37,6 +37,7 @@ test("BRF-29 source-rights matrix separates repository licence claims from selec
   assert.equal(tum2twin.licenseFileSha256, "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411");
   assert.equal(registry.catalogInventory.gmlFileCount, 27);
   assert.equal(registry.catalogInventory.snapshotPath, "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json");
+  assert.equal(registry.catalogInventory.snapshotCommit, "648f9fb3571ea21cd3f665f03a8f8b309a7fe8be");
   assert.deepEqual(registry.catalogInventory.filenamePrefixCounts, { DEBY: 27 });
   assert.equal(tum2twin.externalAssetRepositoryUrl, "https://gitlab.lrz.de/tum-gis/tum2twin-datasets");
 
