@@ -66,13 +66,13 @@ export async function extractVideoFrames(options) {
       let ingested;
       try{
         const existing=await loadVerifiedSource(root,buildingId,frameSourceId);
-        if(existing.sha256!==imageSha256||existing.record.parentSourceId!==sourceId||existing.record.kind!=="video-frame"||JSON.stringify(existing.record.permittedOperations??[])!==JSON.stringify(videoRecord?.permittedOperations??[])){
+        if(existing.sha256!==imageSha256||existing.record.parentSourceId!==sourceId||existing.record.kind!=="video-frame"||JSON.stringify(existing.record.permittedOperations??[])!==JSON.stringify(parentScopes)){
           throw new TypeError("existing video-frame ID '"+frameSourceId+"' does not match the sampled source frame");
         }
         ingested={record:existing.record};
       }catch(error){
         if(error?.code!=="ENOENT")throw error;
-        ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:relative,buildingId,sourceId:frameSourceId,kind:"video-frame",title:(videoRecord?.title||sourceId)+" frame "+index,licence:videoRecord?.licence||"unknown",author:videoRecord?.author,attribution:videoRecord?.attribution,usageStatus:videoRecord?.usageStatus||"unreviewed",permittedOperations:videoRecord?.permittedOperations,parentSourceId:sourceId,description:"FFmpeg sample: frame "+index+"; nominal sample time "+((index-1)/options.fps)+" seconds at "+options.fps+" fps. This timestamp is approximate and is not camera calibration."});
+        ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:relative,buildingId,sourceId:frameSourceId,kind:"video-frame",title:(videoRecord?.title||sourceId)+" frame "+index,licence:videoRecord?.licence||"unknown",author:videoRecord?.author,attribution:videoRecord?.attribution,usageStatus:videoRecord?.usageStatus||"unreviewed",permittedOperations:parentScopes,parentSourceId:sourceId,description:"FFmpeg sample: frame "+index+"; nominal sample time "+((index-1)/options.fps)+" seconds at "+options.fps+" fps. This timestamp is approximate and is not camera calibration."});
       }
       frames.push({...ingested.record,frameNumber:index,nominalTimeSeconds:Number(((index-1)/options.fps).toFixed(3))});
     }
