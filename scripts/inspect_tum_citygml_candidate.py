@@ -22,6 +22,7 @@ PROJECT_PATH = "tum-gis/tum2twin-datasets"
 SOURCE_COMMIT = "e032a71fc9b3c9c3d4869e3aca9677d1234086aa"
 CATALOG_PATH = "citygml/lod3-building-datasets"
 SNAPSHOT_PATH = "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+ENVELOPE_REPORT_PATH = "benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json"
 CANDIDATE_FILENAME = "DEBY_LOD3_4959323.gml"
 CANDIDATE_BLOB_SHA = "2fd72c942399ff0cc78e3478dced74b60180e5dd"
 CANDIDATE_LFS_SHA256 = "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37"
@@ -253,6 +254,7 @@ def parse_full_citygml(payload: bytes, filename: str = CANDIDATE_FILENAME) -> di
     axis_min = [math.inf, math.inf, math.inf]
     axis_max = [-math.inf, -math.inf, -math.inf]
     coordinate_tuples = 0
+    coordinate_tuples_3d = 0
     coordinate_tokens = 0
     coordinate_text_errors = 0
     inferred_dimension_elements = 0
@@ -313,9 +315,11 @@ def parse_full_citygml(payload: bytes, filename: str = CANDIDATE_FILENAME) -> di
                         group.append(value)
                         if len(group) == dimension:
                             coordinate_tuples += 1
-                            for axis in range(min(3, dimension)):
-                                axis_min[axis] = min(axis_min[axis], group[axis])
-                                axis_max[axis] = max(axis_max[axis], group[axis])
+                            if dimension >= 3:
+                                coordinate_tuples_3d += 1
+                                for axis in range(3):
+                                    axis_min[axis] = min(axis_min[axis], group[axis])
+                                    axis_max[axis] = max(axis_max[axis], group[axis])
                             group.clear()
                     if group:
                         coordinate_text_errors += 1
@@ -338,14 +342,14 @@ def parse_full_citygml(payload: bytes, filename: str = CANDIDATE_FILENAME) -> di
             coordinateTextErrors=coordinate_text_errors,
         )
     bounds = None
-    if coordinate_tuples:
+    if coordinate_tuples_3d:
         bounds = {
             "minX": axis_min[0], "minY": axis_min[1], "minZ": axis_min[2],
             "maxX": axis_max[0], "maxY": axis_max[1], "maxZ": axis_max[2],
         }
     return {
-        "status": "geometry-extracted" if coordinate_tuples else "blocked",
-        "reason": None if coordinate_tuples else "no-3d-coordinate-tuples-found",
+        "status": "geometry-extracted" if coordinate_tuples_3d else "blocked",
+        "reason": None if coordinate_tuples_3d else "no-3d-coordinate-tuples-found",
         "filename": filename,
         "root": root_info,
         "rootGmlIds": root_ids,
@@ -353,6 +357,7 @@ def parse_full_citygml(payload: bytes, filename: str = CANDIDATE_FILENAME) -> di
         "srsNamesObserved": srs_names,
         "geometryCounts": dict(sorted(geometry_counts.items())),
         "coordinateTupleCount": coordinate_tuples,
+        "coordinateTupleCount3D": coordinate_tuples_3d,
         "coordinateTokenCount": coordinate_tokens,
         "coordinateTextErrors": coordinate_text_errors,
         "coordinateDimensionInferredForElements": inferred_dimension_elements,
@@ -362,7 +367,7 @@ def parse_full_citygml(payload: bytes, filename: str = CANDIDATE_FILENAME) -> di
     }
 
 
-def load_snapshot(snapshot_path: Path) -> dict[str, Any]:
+def load_candidate_pins(snapshot_path: Path, envelope_report_path: Path) -> dict[str, Any]:
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
     source = snapshot.get("source", {})
     if source.get("resolvedCommitSha") != SOURCE_COMMIT:
@@ -370,21 +375,41 @@ def load_snapshot(snapshot_path: Path) -> dict[str, Any]:
     files = snapshot.get("inventory", {}).get("files")
     if not isinstance(files, list) or len(files) != 27:
         raise ValueError("Expected exactly 27 pinned CityGML catalog records.")
-    candidate = [item for item in files if item.get("filename") == CANDIDATE_FILENAME]
-    if len(candidate) != 1:
+    candidates = [item for item in files if item.get("filename") == CANDIDATE_FILENAME]
+    if len(candidates) != 1:
         raise ValueError("Pinned candidate filename must occur exactly once in the catalog snapshot.")
-    item = candidate[0]
+    candidate = candidates[0]
     if (
-        item.get("repositoryBlobId") != CANDIDATE_BLOB_SHA
-        or item.get("lfsDeclaredSha256") != CANDIDATE_LFS_SHA256
-        or item.get("lfsDeclaredBytes") != CANDIDATE_BYTES
-        or item.get("path") != f"{CATALOG_PATH}/{CANDIDATE_FILENAME}"
+        candidate.get("repositoryBlobId") != CANDIDATE_BLOB_SHA
+        or candidate.get("path") != f"{CATALOG_PATH}/{CANDIDATE_FILENAME}"
     ):
-        raise ValueError("Candidate catalog pins do not match the explicitly reviewed BRF-33 values.")
-    return item
+        raise ValueError("Candidate repository blob/path does not match the explicit BRF-33 pin.")
 
+    screening = json.loads(envelope_report_path.read_text(encoding="utf-8"))
+    if screening.get("source", {}).get("commit") != SOURCE_COMMIT:
+        raise ValueError("BRF-31 envelope report source commit does not match the pinned revision.")
+    models = screening.get("models")
+    if not isinstance(models, list) or len(models) != 27:
+        raise ValueError("Expected 27 persisted BRF-31 model inspection records.")
+    matched = [item for item in models if item.get("filename") == CANDIDATE_FILENAME]
+    if len(matched) != 1:
+        raise ValueError("Pinned candidate must occur exactly once in the BRF-31 envelope report.")
+    model = matched[0]
+    if (
+        model.get("repositoryBlobId") != CANDIDATE_BLOB_SHA
+        or model.get("lfsDeclaredSha256") != CANDIDATE_LFS_SHA256
+        or model.get("lfsDeclaredBytes") != CANDIDATE_BYTES
+    ):
+        raise ValueError("Candidate Git LFS pins do not match the reviewed BRF-31 screening record.")
+    return {
+        **candidate,
+        "lfsDeclaredSha256": model["lfsDeclaredSha256"],
+        "lfsDeclaredBytes": model["lfsDeclaredBytes"],
+        "screeningPrefixSha256": model.get("prefixSha256"),
+        "screeningSrsName": model.get("srsName"),
+    }
 
-def inspect_candidate(snapshot_path: Path, opener: Callable[..., Any] = urllib.request.urlopen) -> dict[str, Any]:
+def inspect_candidate(snapshot_path: Path, envelope_report_path: Path, opener: Callable[..., Any] = urllib.request.urlopen) -> dict[str, Any]:
     report: dict[str, Any] = {
         "schemaVersion": "1.0.0",
         "evaluationId": "BRF-33-TUM-CITYGML-FULL-GEOMETRY-INSPECTION",
@@ -413,7 +438,7 @@ def inspect_candidate(snapshot_path: Path, opener: Callable[..., Any] = urllib.r
         },
     }
     try:
-        item = load_snapshot(snapshot_path)
+        item = load_candidate_pins(snapshot_path, envelope_report_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         report.update({"status": "blocked", "reason": "pinned-catalog-snapshot-invalid", "detail": str(exc)[:200]})
         return report
