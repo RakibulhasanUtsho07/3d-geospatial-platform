@@ -174,14 +174,13 @@ export async function verifyTilesetPackage({
       ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"].some((key) => build.releaseFlags[key] !== false)) {
     errors.push("All release flags must remain explicitly false for this experimental package.");
   }
+  const contentEntries = collectContentEntries(tileset);
+  const contentUris = contentEntries.map((entry) => entry.uri);
   if (isRecord(build.validation) &&
       build.validation.contentCount !== undefined &&
       build.validation.contentCount !== contentEntries.length) {
     errors.push("build-manifest validation contentCount does not match the tileset.");
   }
-
-  const contentEntries = collectContentEntries(tileset);
-  const contentUris = contentEntries.map((entry) => entry.uri);
   if (contentUris.length === 0) errors.push("The tileset contains no tile content.");
   if (contentUris.some((uri) => typeof uri !== "string" || !safeRelativePath(uri))) {
     errors.push("The tileset contains an unsafe content URI.");
