@@ -11,7 +11,11 @@ const runner = fileURLToPath(new URL("../scripts/build-brf26-evidence-bundle.mjs
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const flags = { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false };
 
-async function setup(t, { mode = "synthetic-test", pendingVisual = false, staleCandidatePin = false } = {}) {
+async function setup(t, {
+  mode = "synthetic-test", pendingVisual = false, staleCandidatePin = false,
+  extraRenderView = false, wrongSourceCameraBinding = false, wrongSourceCameraBuilding = false,
+  wrongRenderCandidateBinding = false, wrongVisualBuilding = false, visualReleaseFlag = false,
+} = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf26-bundle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, "workspace/output"), { recursive: true });
@@ -87,17 +91,28 @@ async function setup(t, { mode = "synthetic-test", pendingVisual = false, staleC
   };
   await writeFile(path.join(root, "artifacts/brf25/geometry-validation.json"), JSON.stringify(geometry, null, 2) + "\n");
 
-  const sourceCamera = { schemaVersion: "1.0.0", recordType: "synthetic-source-camera-evidence", candidateGlbSha256: candidateSha };
+  const sourceCamera = {
+    schemaVersion: "1.0.0", recordType: "synthetic-source-camera-evidence",
+    buildingId: wrongSourceCameraBuilding ? "building-other" : "building-01",
+    candidateGlbSha256: wrongSourceCameraBinding ? sha(Buffer.from("different-camera-model")) : candidateSha,
+  };
   const sourceCameraBytes = Buffer.from(JSON.stringify(sourceCamera, null, 2) + "\n");
   await writeFile(path.join(root, "artifacts/visual/source-camera-report.json"), sourceCameraBytes);
-  const renderManifest = { schemaVersion: "1.0.0", recordType: "synthetic-render-manifest", candidateGlbSha256: candidateSha };
+  const renderManifest = {
+    schemaVersion: "1.0.0", recordType: "synthetic-render-manifest", buildingId: "building-01",
+    candidateGlbSha256: wrongRenderCandidateBinding ? sha(Buffer.from("different-render-model")) : candidateSha,
+    views: [
+      { id: "view-01", filename: "view-01.png", renderComplete: true },
+      ...(extraRenderView ? [{ id: "view-02", filename: "view-02.png", renderComplete: true }] : []),
+    ],
+  };
   const renderBytes = Buffer.from(JSON.stringify(renderManifest, null, 2) + "\n");
   await writeFile(path.join(root, "artifacts/visual/render-manifest.json"), renderBytes);
 
   const visualDecision = {
     schemaVersion: "1.0.0", recordType: "brf-26-visual-review-decision",
     status: pendingVisual ? "pending-human-review" : "human-review-complete",
-    buildingId: "building-01", candidateGlbSha256: candidateSha,
+    buildingId: wrongVisualBuilding ? "building-other" : "building-01", candidateGlbSha256: candidateSha,
     sourceCameraReportSha256: sha(sourceCameraBytes), renderManifestSha256: sha(renderBytes),
     reviewer: pendingVisual ? { name: "", identifier: "" } : { name: "Synthetic Visual Reviewer", identifier: "synthetic-visual-01" },
     reviewedAtUtc: pendingVisual ? null : "2026-10-28T00:00:00Z",
@@ -105,6 +120,7 @@ async function setup(t, { mode = "synthetic-test", pendingVisual = false, staleC
     views: [{ viewId: "view-01", disposition: pendingVisual ? "pending" : "pass",
       rationale: pendingVisual ? "" : "Synthetic fixture only; not a real visual review." }],
     ...flags,
+    ...(visualReleaseFlag ? { publicationEligible: true } : {}),
   };
   await writeFile(path.join(root, "artifacts/visual/visual-review-decision.json"), JSON.stringify(visualDecision, null, 2) + "\n");
 
