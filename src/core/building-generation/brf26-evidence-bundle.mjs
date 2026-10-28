@@ -229,6 +229,8 @@ export function assessBrf26EvidenceBundle(input = {}) {
     sourceCamera.sourceImageSize?.width === sourceCamera.render.width &&
     sourceCamera.sourceImageSize?.height === sourceCamera.render.height,
   "Source-camera report must declare a comparable projection and complete, hash-pinned render with source-matching dimensions.", "blocked");
+  check("source-camera-render-bytes-binding", sourceCamera._brf26RenderImageVerification?.verified === true,
+    "The actual source-camera PNG must match the report's pinned SHA-256, byte size and dimensions.", "blocked");
 
   const renderManifestBuildingIds = buildingIdClaims(renderManifest);
   check("render-manifest-building-binding", renderManifestBuildingIds.length === 0 ||
@@ -246,9 +248,15 @@ export function assessBrf26EvidenceBundle(input = {}) {
     new Set(renderViewIds).size === renderViewIds.length;
   check("render-manifest-view-set", renderViewIdsValid,
     "Render manifest must contain a non-empty set of uniquely identified fixed-camera views.", "failed");
+  check("render-manifest-validation", renderManifest.valid === true &&
+    Array.isArray(renderManifest.errors) && renderManifest.errors.length === 0,
+  "The upstream fixed-camera render manifest must itself be valid and report no rendering errors.", "failed");
   check("render-manifest-render-complete", renderViewIdsValid && renderViews.every((view) =>
     object(view) && view.renderComplete === true),
   "Every render-manifest view must be explicitly marked renderComplete=true.", "blocked");
+  check("render-manifest-render-bytes-binding", renderViewIdsValid && renderViews.every((view) =>
+    view._brf26ImageVerification?.verified === true),
+  "Every fixed-camera PNG must match its manifest SHA-256, byte size and dimensions.", "blocked");
 
   check("visual-review-schema", visual.recordType === "brf-26-visual-review-decision" &&
     visual.schemaVersion === "1.0.0",
@@ -322,6 +330,16 @@ export function assessBrf26EvidenceBundle(input = {}) {
       reviewer: visual.reviewer ?? null,
       sourceCameraReportSha256: visual.sourceCameraReportSha256 ?? null,
       renderManifestSha256: visual.renderManifestSha256 ?? null,
+      sourceCameraRender: sourceCamera._brf26RenderImageVerification ?? null,
+      renderedViews: Array.isArray(renderViews) ? renderViews.map((view) => ({
+        viewId: object(view) ? (view.id ?? view.viewId ?? null) : null,
+        path: view?._brf26ImageVerification?.path ?? null,
+        expectedSha256: view?.sha256 ?? null,
+        actualSha256: view?._brf26ImageVerification?.actualSha256 ?? null,
+        expectedByteSize: view?.bytes ?? null,
+        actualByteSize: view?._brf26ImageVerification?.actualByteSize ?? null,
+        verified: view?._brf26ImageVerification?.verified === true,
+      })) : [],
     },
     policy: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
     limitations: [
