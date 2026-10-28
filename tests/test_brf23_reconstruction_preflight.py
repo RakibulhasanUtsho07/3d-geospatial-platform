@@ -34,6 +34,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         self.profile_path = self.temp_root / "profile.json"
         self.executable = self.temp_root / "fake-colmap"
         self._rebind_test_images()
+        self._write_rights_admission()
         self.fixture.template = PREFLIGHT.brf21.prepare_template(self.root)
         self.decision = self.fixture.complete_record()
         self._write_decision(self.decision)
@@ -55,6 +56,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         by_id = {}
         for view in source["views"]:
             # Exact 128-byte synthetic JPEG-like fixture. Not real imagery.
+            view["sourceUrl"] = view.get("sourceUrl") or ("https://example.test/synthetic/" + view["filename"])
             payload = (b"\xff\xd8\xff" + ("synthetic-" + view["id"]).encode("ascii"))
             payload = payload.ljust(128, b"x")[:128]
             (self.images / view["filename"]).write_bytes(payload)
@@ -99,15 +101,98 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         quality_report["sourceManifest"]["priorVerificationReportSha256"] = hashlib.sha256(
             (self.root / "multiview-source-byte-verification.json").read_bytes()
         ).hexdigest()
+        source_url_by_id = {view["id"]: view["sourceUrl"] for view in source["views"]}
         for record in quality_report["privateMediaIntake"]["records"]:
             data = by_id[record["sourceId"]]
             record["sha256"] = data["sha256"]
             record["byteSize"] = data["byteSize"]
+            record["sourceUrl"] = source_url_by_id[record["sourceId"]]
         for row in quality_report["imageQualityPreflight"]["sources"]:
             data = by_id[row["sourceId"]]
             row["sha256"] = data["sha256"]
             row["byteSize"] = data["byteSize"]
         self._write_json(self.root / "private-multiview-media-intake-report.json", quality_report)
+
+    def _write_rights_admission(self, approved=False):
+        source = self._read_json("brf-14-multiview-source.json")
+        dataset = source["dataset"]
+        assets = []
+        for view in source["views"]:
+            row = {
+                "sourceId": view["id"],
+                "filename": view["filename"],
+                "sourceUrl": view["sourceUrl"],
+                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
+                "byteSize": view["expectedByteSize"],
+                "sha256": view["expectedSha256"],
+                "requestedScopes": ["inspect-source", "use-for-validation", "derive-model"],
+                "decision": "pending",
+                "rights": None,
+            }
+            if approved:
+                evidence_name = "rights-evidence/" + view["id"] + ".txt"
+                evidence_dir = self.root / "rights-evidence"
+                evidence_dir.mkdir(parents=True, exist_ok=True)
+                evidence_bytes = ("Synthetic rights evidence for " + view["id"] + "; fixture only.\n").encode()
+                (self.root / evidence_name).write_bytes(evidence_bytes)
+                row["decision"] = "approved"
+                row["rights"] = {
+                    "status": "approved",
+                    "rightsHolderOrGrantor": "Synthetic test grantor; not a real rights holder",
+                    "authorityBasis": "Synthetic fixture only",
+                    "license": {
+                        "identifier": "SYNTHETIC-TEST",
+                        "name": "Synthetic test license",
+                        "url": "https://example.test/license",
+                    },
+                    "scopeDescription": "Private local reconstruction and validation of synthetic sources only.",
+                    "attributionText": "Synthetic test attribution.",
+                    "restrictionsText": "Fixture only; no real permission is asserted.",
+                    "grantedScopes": ["inspect-source", "use-for-validation", "derive-model"],
+                    "evidenceSnapshots": [{
+                        "filename": evidence_name,
+                        "sourceUrl": "https://example.test/rights/" + view["id"],
+                        "retrievedAt": "2026-10-28T00:00:00.000Z",
+                        "byteSize": len(evidence_bytes),
+                        "sha256": hashlib.sha256(evidence_bytes).hexdigest(),
+                        "evidenceType": "synthetic-test-grant-record",
+                    }],
+                    "reviewedBy": "synthetic-reviewer",
+                    "reviewedAt": "2026-10-28T00:00:00.000Z",
+                    "decisionId": "synthetic-rights-decision-" + view["id"],
+                    "effectiveAt": "2026-10-28T00:00:00.000Z",
+                    "expiresAt": None,
+                    "revoked": False,
+                    "explicitGrantConfirmed": True,
+                }
+            assets.append(row)
+        manifest = {
+            "schemaVersion": "1.0.0",
+            "recordType": "brf-45-exact-asset-rights-admission",
+            "evaluationId": "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION",
+            "evaluatedAt": "2026-10-28T00:00:00.000Z",
+            "requestedPurpose": "private-local-reconstruction-and-validation",
+            "sourceBinding": {
+                "sourceManifestFilename": "brf-14-multiview-source.json",
+                "sampleId": source["sampleId"],
+                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
+                "declaredLicense": dataset["license"],
+                "licenseScope": dataset["licenseScope"],
+                "rightsStatus": dataset["rightsStatus"],
+            },
+            "requiredScopes": ["inspect-source", "use-for-validation", "derive-model"],
+            "policy": {
+                "inferPermissionFromPublicAvailability": False,
+                "repositoryLicenseAloneSufficient": False,
+                "requireExactAssetByteBinding": True,
+                "requireHumanReview": True,
+                "sourceRedistributionRequested": False,
+                "publicDerivedModelDisplayRequested": False,
+            },
+            "assets": assets,
+            "releaseFlags": {flag: False for flag in PREFLIGHT.RELEASE_FLAGS},
+        }
+        self._write_json(self.root / "brf-45-exact-asset-rights-admission.json", manifest)
 
     def _write_decision(self, decision):
         self._write_json(self.root / "review-decision.json", decision)
@@ -149,9 +234,18 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
                                 "reconstruction-preflight-report.json")
 
     def test_reviewed_hash_pinned_local_inputs_can_only_pass_preflight(self):
+        self._write_rights_admission(approved=True)
         report = self._assess()
         self.assertEqual(report["status"], "preflight-ready-for-local-reconstruction-attempt", report["blockers"])
         self.assertEqual(report["assessedInputs"]["sourceImages"]["verifiedCount"], 3)
+        rights = report["assessedInputs"]["rightsAdmission"]
+        self.assertEqual(rights["filename"], "brf-45-exact-asset-rights-admission.json")
+        self.assertEqual(rights["assetCount"], 3)
+        self.assertEqual(rights["pendingDecisionCount"], 0)
+        self.assertEqual(rights["deniedDecisionCount"], 0)
+        self.assertEqual(rights["sha256"], hashlib.sha256(
+            (self.root / rights["filename"]).read_bytes()
+        ).hexdigest())
         self.assertEqual(report["assessedInputs"]["imageQualityPreflight"]["status"], "all-images-decoded-and-measured")
         self.assertIs(report["assessedInputs"]["imageQualityPreflight"]["rightsApproved"], False)
         self.assertIs(report["assessedInputs"]["imageQualityPreflight"]["safeToSubmitToColmap"], False)
@@ -162,6 +256,29 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         self.assertFalse(report["independentReferenceVerified"])
         for flag in PREFLIGHT.RELEASE_FLAGS:
             self.assertIs(report[flag], False)
+
+    def test_pending_rights_admission_blocks_even_when_human_review_would_continue(self):
+        report = self._assess()
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["assessedInputs"]["humanDecision"]["validationStatus"], "valid")
+        self.assertEqual(report["assessedInputs"]["rightsAdmission"]["pendingDecisionCount"], 3)
+        self.assertTrue(any("BRF-45 exact-asset rights admission has pending source rows" in item
+                            for item in report["blockers"]))
+        self.assertFalse(report["candidateGlbGenerated"])
+        for flag in PREFLIGHT.RELEASE_FLAGS:
+            self.assertFalse(report[flag])
+
+    def test_rights_admission_must_match_all_source_hashes_and_metadata(self):
+        manifest = self._read_json("brf-45-exact-asset-rights-admission.json")
+        manifest["assets"][0]["sha256"] = "f" * 64
+        self._write_json(self.root / "brf-45-exact-asset-rights-admission.json", manifest)
+        with self.assertRaisesRegex(ValueError, "does not match the exact source bytes"):
+            self._assess()
+
+    def test_missing_rights_admission_register_blocks_preflight(self):
+        (self.root / "brf-45-exact-asset-rights-admission.json").unlink()
+        with self.assertRaisesRegex(ValueError, "Required artifact is missing"):
+            self._assess()
 
     def test_blank_human_review_template_stays_blocked_even_if_other_checks_pass(self):
         self._write_json(self.root / "pending-template.json", self.fixture.template)

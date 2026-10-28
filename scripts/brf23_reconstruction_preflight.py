@@ -26,6 +26,10 @@ VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
 OUTPUT_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,160}$")
 RELEASE_FLAGS = ("acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval")
+RIGHTS_ADMISSION_FILENAME = "brf-45-exact-asset-rights-admission.json"
+RIGHTS_REQUIRED_SCOPES = ("inspect-source", "use-for-validation", "derive-model")
+RIGHTS_ALLOWED_SCOPES = set((*RIGHTS_REQUIRED_SCOPES, "public-display-derived-model",
+                             "commercial-use-derived-model", "redistribute-source", "redistribute-derived-model"))
 
 
 def require(condition: bool, message: str) -> None:
@@ -189,6 +193,65 @@ def inspect_colmap(toolchain: dict[str, Any]) -> dict[str, Any]:
             "versionOutputExcerpt": output[:500]}
 
 
+def load_rights_admission_manifest(root: Path, source_manifest: dict[str, Any]) -> tuple[dict[str, Any], bytes]:
+    rights_path = brf21.safe_file(root, RIGHTS_ADMISSION_FILENAME, max_bytes=brf21.MAX_JSON_BYTES)
+    rights_manifest, raw = load_json_regular_file(rights_path, brf21.MAX_JSON_BYTES)
+    require(isinstance(rights_manifest, dict) and
+            rights_manifest.get("schemaVersion") == SCHEMA_VERSION and
+            rights_manifest.get("recordType") == "brf-45-exact-asset-rights-admission" and
+            rights_manifest.get("evaluationId") == "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION" and
+            rights_manifest.get("requestedPurpose") == "private-local-reconstruction-and-validation",
+            "A supported BRF-45 exact-asset rights admission register is required.")
+    source_binding = rights_manifest.get("sourceBinding")
+    dataset = source_manifest.get("dataset")
+    require(isinstance(source_binding, dict) and isinstance(dataset, dict) and
+            source_binding.get("sourceManifestFilename") == "brf-14-multiview-source.json" and
+            source_binding.get("sampleId") == source_manifest.get("sampleId") and
+            source_binding.get("sourceRepositoryCommit") == dataset.get("sourceRepositoryCommit") and
+            source_binding.get("declaredLicense") == dataset.get("license") and
+            source_binding.get("licenseScope") == dataset.get("licenseScope") and
+            source_binding.get("rightsStatus") == dataset.get("rightsStatus"),
+            "BRF-45 register is not bound to the exact source manifest/sample metadata.")
+    require(rights_manifest.get("requiredScopes") == list(RIGHTS_REQUIRED_SCOPES),
+            "BRF-45 required scopes must be inspection, validation and model derivation only.")
+    policy = rights_manifest.get("policy")
+    require(isinstance(policy, dict) and
+            policy.get("inferPermissionFromPublicAvailability") is False and
+            policy.get("repositoryLicenseAloneSufficient") is False and
+            policy.get("requireExactAssetByteBinding") is True and
+            policy.get("requireHumanReview") is True and
+            policy.get("sourceRedistributionRequested") is False and
+            policy.get("publicDerivedModelDisplayRequested") is False,
+            "BRF-45 policy must not infer permission from public availability or request broad distribution uses.")
+    flags = rights_manifest.get("releaseFlags")
+    require(isinstance(flags, dict) and set(flags) == set(RELEASE_FLAGS) and
+            all(flags.get(flag) is False for flag in RELEASE_FLAGS),
+            "BRF-45 must explicitly keep all release flags false.")
+    source_views = source_manifest.get("views")
+    rows = rights_manifest.get("assets")
+    require(isinstance(source_views, list) and isinstance(rows, list) and
+            len(rows) == len(source_views) and 3 <= len(rows) <= 32,
+            "BRF-45 must have exactly one rights row per bounded source view.")
+    source_by_id = {view.get("id"): view for view in source_views if isinstance(view, dict)}
+    ids = [row.get("sourceId") for row in rows if isinstance(row, dict)]
+    require(len(ids) == len(rows) and len(ids) == len(set(ids)) and set(ids) == set(source_by_id),
+            "BRF-45 rights rows have missing, duplicate or unknown source IDs.")
+    for row in rows:
+        source = source_by_id[row["sourceId"]]
+        require(row.get("filename") == source.get("filename") and
+                row.get("sourceUrl") == source.get("sourceUrl") and
+                row.get("sourceRepositoryCommit") == dataset.get("sourceRepositoryCommit") and
+                row.get("sha256") == source.get("expectedSha256") and
+                row.get("byteSize") == source.get("expectedByteSize") and
+                row.get("requestedScopes") == list(RIGHTS_REQUIRED_SCOPES) and
+                row.get("decision") in ("pending", "approved", "denied"),
+                "BRF-45 row does not match the exact source bytes or permitted decision state: " + row["sourceId"])
+        if row["decision"] == "approved":
+            require(isinstance(row.get("rights"), dict),
+                    "An approved BRF-45 row must include the structured grant record: " + row["sourceId"])
+    return rights_manifest, raw
+
+
 def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, profile_path_arg: Path,
            output_name: str) -> dict[str, Any]:
     root = brf21.safe_root(artifact_root_arg)
@@ -203,9 +266,23 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
     profile = validate_profile(profile)
 
     _, source_manifest, _, _, _, _, evidence_bindings, _, _ = brf21.load_evidence(root)
+    rights_admission, rights_admission_bytes = load_rights_admission_manifest(root, source_manifest)
+    rights_admission_binding = {
+        "filename": RIGHTS_ADMISSION_FILENAME,
+        "byteSize": len(rights_admission_bytes),
+        "sha256": hashlib.sha256(rights_admission_bytes).hexdigest(),
+        "evaluationId": rights_admission["evaluationId"],
+        "assetCount": len(rights_admission["assets"]),
+        "pendingDecisionCount": sum(row.get("decision") == "pending" for row in rights_admission["assets"]),
+        "deniedDecisionCount": sum(row.get("decision") == "denied" for row in rights_admission["assets"]),
+    }
     decision_path = brf21.safe_file(root, decision_name, max_bytes=brf21.MAX_JSON_BYTES)
     decision, decision_bytes = load_json_regular_file(decision_path, brf21.MAX_JSON_BYTES)
     blockers: list[str] = []
+    if rights_admission_binding["pendingDecisionCount"] > 0:
+        blockers.append("BRF-45 exact-asset rights admission has pending source rows.")
+    if rights_admission_binding["deniedDecisionCount"] > 0:
+        blockers.append("BRF-45 exact-asset rights admission contains denied source rows.")
     human_review_result: dict[str, Any] | None = None
     try:
         human_review_result = brf21.validate_decision(root, decision)
@@ -243,6 +320,7 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
             ),
             "profile": {"filename": profile_path.name, "byteSize": len(profile_bytes),
                         "sha256": hashlib.sha256(profile_bytes).hexdigest()},
+            "rightsAdmission": rights_admission_binding,
             "sourceImages": {"verifiedCount": len(image_records),
                              "expectedCount": len(source_manifest.get("views", [])),
                              "records": image_records},

@@ -222,7 +222,9 @@
     "run:brf42-multiview-private-intake": "node scripts/run-brf42-multiview-private-intake.mjs",
     "validate:brf41-interim-dataset-policy": "node scripts/validate-brf41-interim-dataset-policy.mjs",
     "test:brf41-demo-image-smoke": "node --test tests/brf41-demo-image-smoke-test.test.mjs",
-    "run:brf41-demo-image-smoke": "node scripts/run-brf41-demo-image-smoke-test.mjs"
+    "run:brf41-demo-image-smoke": "node scripts/run-brf41-demo-image-smoke-test.mjs",
+    "test:brf45-rights-admission": "node --test tests/brf45-exact-asset-rights-admission.test.mjs tests/brf45-exact-asset-rights-admission-cli.test.mjs",
+    "validate:brf45-rights-admission": "node scripts/validate-brf45-exact-asset-rights-admission.mjs benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json --source-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json --evidence-root ."
   },
   "dependencies": {
     "cesium": "^1.146.0",

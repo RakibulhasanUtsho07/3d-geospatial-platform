@@ -4,6 +4,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runColmapReconstruction } from "./colmap-worker.mjs";
+import { validateBrf45ExactAssetRightsAdmission } from "./brf45-exact-asset-rights-admission.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const BASENAME = /^[A-Za-z0-9_.-]{1,160}$/;
@@ -178,6 +179,15 @@ function validateReport(report) {
     filenames.add(image.filename); hashes.add(image.sha256);
   }
   const imageQualityPreflight = validateImageQualitySummary(inputs.imageQualityPreflight, imageSet);
+  const rightsAdmission = inputs.rightsAdmission;
+  requireValue(rightsAdmission && rightsAdmission.filename === "brf-45-exact-asset-rights-admission.json" &&
+    Number.isSafeInteger(rightsAdmission.byteSize) && rightsAdmission.byteSize > 0 &&
+    typeof rightsAdmission.sha256 === "string" && SHA256.test(rightsAdmission.sha256) &&
+    rightsAdmission.evaluationId === "BRF-45-EXACT-ASSET-RIGHTS-ADMISSION" &&
+    rightsAdmission.assetCount === imageSet.expectedCount &&
+    Number.isSafeInteger(rightsAdmission.pendingDecisionCount) &&
+    rightsAdmission.pendingDecisionCount >= 0 && rightsAdmission.pendingDecisionCount <= rightsAdmission.assetCount,
+    "BRF-45 exact-asset rights admission must be separately hash-bound to the preflight.");
   const profile = inputs.profile;
   requireValue(profile && typeof profile.filename === "string" && BASENAME.test(profile.filename) &&
     Number.isSafeInteger(profile.byteSize) && profile.byteSize > 0 &&
@@ -197,7 +207,7 @@ function validateReport(report) {
   requireValue(["X", "Y", "Z"].includes(frame.reviewedSourceUpAxis) &&
     frame.reviewedSourceUpAxisPositiveDirection === "positive",
     "The exporter supports only a reviewer-confirmed positive X/Y/Z up-axis.");
-  return { inputs, bindings, decision, imageSet, imageQualityPreflight, profile, profileId: report.profileId, tool, frame };
+  return { inputs, bindings, decision, imageSet, imageQualityPreflight, rightsAdmission, profile, profileId: report.profileId, tool, frame };
 }
 
 async function verifyEvidence(artifactRoot, bindings, validated) {
@@ -216,6 +226,20 @@ async function verifyEvidence(artifactRoot, bindings, validated) {
   const sourceManifest = parseJson(files.sourceManifest.bytes, "BRF-14 source manifest");
   const byteReport = parseJson(files.byteVerificationReport.bytes, "BRF-14 byte-verification report");
   const qualityReport = parseJson(files.privateMediaQualityReport.bytes, "BRF-42 private multi-view quality report");
+  const rightsAdmissionFile = await readRegularFile(
+    path.join(artifactRoot, safeBasename(validated.rightsAdmission.filename, "BRF-45 rights-admission filename")),
+    "BRF-45 rights-admission register", 20 * 1024 * 1024);
+  requireValue(rightsAdmissionFile.byteSize === validated.rightsAdmission.byteSize &&
+    rightsAdmissionFile.sha256 === validated.rightsAdmission.sha256,
+    "BRF-45 rights-admission register changed after BRF-23 preflight.");
+  const rightsAdmission = parseJson(rightsAdmissionFile.bytes, "BRF-45 exact-asset rights admission");
+  requireValue(rightsAdmission?.schemaVersion === "1.0.0" &&
+    rightsAdmission?.recordType === "brf-45-exact-asset-rights-admission" &&
+    rightsAdmission?.evaluationId === validated.rightsAdmission.evaluationId &&
+    Array.isArray(rightsAdmission.assets) &&
+    rightsAdmission.assets.length === validated.rightsAdmission.assetCount &&
+    rightsAdmission.assets.filter(row => row?.decision !== "approved").length === validated.rightsAdmission.pendingDecisionCount,
+    "BRF-45 register identity/count/pending-decision summary differs from the preflight-bound metadata.");
   requireValue(sourceManifest?.schemaVersion === "1.0.0" &&
     sourceManifest?.evaluationStage === "multiview-source-byte-intake-only" &&
     Array.isArray(sourceManifest.views) && sourceManifest.views.length === validated.imageSet.expectedCount &&
@@ -352,7 +376,12 @@ async function verifyEvidence(artifactRoot, bindings, validated) {
     flags && RELEASE_FLAGS.every(flag => flags[flag] === false) &&
     RELEASE_FLAGS.every(flag => sourceManifest[flag] === false),
     "BRF-42 report must keep rights/identity/reconstruction pending and every release flag false.");
-  return qualityReport;
+  const rightsAdmissionReport = await validateBrf45ExactAssetRightsAdmission(rightsAdmission, {
+    sourceManifest,
+    evidenceRoot: artifactRoot,
+    sourceManifestSha256: files.sourceManifest.sha256,
+  });
+  return { sourceManifest, qualityReport, rightsAdmission, rightsAdmissionReport };
 }
 async function verifyDecisionAndProfile(artifactRoot, profilePath, validated) {
   const reportDecision = validated.decision;
@@ -399,7 +428,7 @@ async function verifyRawImages(imageRoot, imageSet) {
       file.bytes.subarray(0, 3).equals(JPEG_SIGNATURE), "Source image bytes changed after preflight: " + image.filename);
   }
 }
-async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildingSpec, imageSet) {
+async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildingSpec, imageSet, rightsAdmissionReport) {
   safeId(buildingId, "buildingId");
   requireValue(Array.isArray(sourceIds) && sourceIds.length >= 3 && sourceIds.length <= 120 &&
     new Set(sourceIds).size === sourceIds.length, "Select 3–120 distinct reviewed media source IDs.");
@@ -407,6 +436,7 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
   const sourceRoot = await checkDirectoryTree(workspaceRoot, [".building-engine", "media", buildingId, "sources"]);
   const assetRoot = await checkDirectoryTree(workspaceRoot, [".building-engine", "media", buildingId, "assets"]);
   const approvedByHash = new Map(imageSet.records.map(row => [row.sha256, row]));
+  const rightsById = new Map((rightsAdmissionReport?.assets || []).map(row => [row.sourceId, row]));
   const specSources = new Map((buildingSpec?.sources || []).map(row => [row.id, row]));
   const selected = [];
   const seenHashes = new Set();
@@ -417,9 +447,13 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
     requireValue(record.id === sourceId && record.buildingId === buildingId &&
       record.kind === "image" && ["image/jpeg", "image/png"].includes(record.mimeType),
       "Invalid selected source identity or media type: " + sourceId);
-    requireValue(record.usageStatus === "approved" && typeof record.licence === "string" &&
-      record.licence.trim() && record.licence.toLowerCase() !== "unknown",
-      "Selected source lacks reviewed rights: " + sourceId);
+    requireValue(typeof record.licence === "string" && record.licence.trim(),
+      "Selected source lacks source-license metadata; this metadata is not itself a rights grant.");
+    const rightsRecord = rightsById.get(sourceId);
+    requireValue(rightsRecord?.status === "evidence-complete-human-review-required" &&
+      rightsRecord.sha256?.toLowerCase() === String(record.sha256 ?? "").toLowerCase() &&
+      rightsRecord.byteSize > 0,
+      "Selected source is not covered by BRF-45 exact-asset rights admission: " + sourceId);
     requireValue(typeof record.sha256 === "string" && SHA256.test(record.sha256) && record.assetId === record.sha256,
       "Source asset is not content-hash addressed: " + sourceId);
     const pinned = approvedByHash.get(record.sha256);
@@ -441,10 +475,13 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
       (!isPng && assetFile.bytes.subarray(0, 3).equals(JPEG_SIGNATURE)),
       "Selected asset file signature does not match its media type: " + sourceId);
     const spec = specSources.get(sourceId);
-    requireValue(spec && spec.assetId === record.assetId && spec.usageStatus === "approved" &&
-      spec.licence === record.licence, "BuildingSpec must bind the exact approved media metadata: " + sourceId);
+    requireValue(spec && spec.assetId === record.assetId &&
+      spec.licence === record.licence, "BuildingSpec must bind the exact selected media metadata: " + sourceId);
+    requireValue(rightsRecord.filename === pinned.filename && rightsRecord.byteSize === assetFile.byteSize,
+      "Selected media filename or byte size differs from BRF-45 admission: " + sourceId);
     selected.push({ id: sourceId, filename: pinned.filename, sha256: record.sha256,
-      byteSize: assetFile.byteSize, licence: record.licence, usageStatus: record.usageStatus });
+      byteSize: assetFile.byteSize, licence: record.licence, usageStatus: record.usageStatus,
+      rightsAdmissionStatus: rightsRecord.status });
   }
   requireValue(selected.length >= 3 && within(workspaceRoot, mediaRoot),
     "Insufficient or unsafe selected media.");
@@ -505,7 +542,7 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     "BRF-23 report SHA-256 differs from the explicitly pinned value.");
   const report = parseJson(reportFile.bytes, "BRF-23 report");
   const validated = validateReport(report);
-  const brf42QualityReport = await verifyEvidence(artifactRoot, validated.bindings, validated);
+  const verifiedEvidence = await verifyEvidence(artifactRoot, validated.bindings, validated);
   requireValue(decisionName === validated.decision.filename, "Decision name differs from BRF-23's exact binding.");
   await verifyDecisionAndProfile(artifactRoot, options.profilePath, validated);
   await verifyRawImages(imageRoot, validated.imageSet);
@@ -524,23 +561,21 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     "Fresh BRF-23 report differs from pinned report; evidence, decision, profile, or inputs changed.");
   validateReport(parseJson(freshFile.bytes, "Revalidated BRF-23 report"));
 
+  // BRF-42 remains an immutable history of the original unreviewed intake.
+  // Only the separately hash-bound BRF-45 per-asset grant evidence can satisfy the
+  // source-use gate; human-review continuation or mutable media metadata cannot.
+  const rightsAdmissionReport = verifiedEvidence.rightsAdmissionReport;
+  requireValue(rightsAdmissionReport.status === "rights-admission-complete-human-review-required",
+    "BRF-45 exact-asset rights admission is blocked: " +
+    rightsAdmissionReport.blockers.slice(0, 12).join(", ") +
+    ". The COLMAP worker was not started; acquire and review exact-source rights evidence first.");
+
   const selected = await verifySelectedMedia(workspaceRoot, buildingId, options.sourceIds,
-    options.buildingSpec, validated.imageSet);
+    options.buildingSpec, validated.imageSet, rightsAdmissionReport);
   const version = await (options.colmapVersionProbe || probeVersion)(
     validated.tool.resolvedExecutable, options.colmapSpawnImpl || nodeSpawn);
   requireValue(version === validated.tool.expectedVersion,
     "COLMAP version changed after preflight; expected " + validated.tool.expectedVersion + ", got " + String(version) + ".");
-
-  // BRF-42 is an engineering-only intake report, not a rights grant. Do not let a
-  // separate human decision or a mutable media registry override its unreviewed state.
-  const brf42Quality = brf42QualityReport.imageQualityPreflight;
-  const brf42IntakeRecords = brf42QualityReport.privateMediaIntake.records;
-  requireValue(brf42Quality.rightsApproved === true &&
-    brf42Quality.safeToSubmitToColmap === true &&
-    brf42IntakeRecords.every(row => row.usageStatus === "approved") &&
-    brf42Quality.sources.every(row => row.usageStatus === "approved") &&
-    brf42QualityReport.reviewAndRelease.rightsReview === "approved-for-this-use",
-    "BRF-42 evidence cannot authorize COLMAP: source rights remain unreviewed and safeToSubmitToColmap=false. Obtain exact-asset rights-cleared admission evidence before reconstruction; worker was not started.");
 
   const authorization = {
     schemaVersion: "1.0.0",
@@ -548,6 +583,23 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     status: "authorized-for-local-reconstruction-attempt",
     authorizedAtUtc: new Date().toISOString(),
     preflightReport: { filename: reportName, sha256: reportFile.sha256 },
+    rightsAdmission: {
+      filename: validated.rightsAdmission.filename,
+      sha256: validated.rightsAdmission.sha256,
+      status: rightsAdmissionReport.status,
+      sourceViewCount: rightsAdmissionReport.sourceViewCount,
+      rightsApprovedAssetCount: rightsAdmissionReport.rightsApprovedAssetCount,
+      sourceManifestSha256: rightsAdmissionReport.sourceManifestSha256,
+      reviewedAssetDecisions: rightsAdmissionReport.assets.map(row => ({
+        sourceId: row.sourceId,
+        status: row.status,
+        decisionId: row.decisionId ?? null,
+        reviewedBy: row.reviewedBy ?? null,
+        reviewedAt: row.reviewedAt ?? null,
+        grantedScopes: row.grantedScopes ?? [],
+      })),
+      validatedBeforeExecution: true,
+    },
     humanDecision: { filename: decisionName, sha256: validated.decision.sha256,
       reviewer: validated.decision.reviewer, reviewedAtUtc: validated.decision.reviewedAtUtc,
       overallDisposition: validated.decision.overallDisposition, humanReview: report.humanReview },
