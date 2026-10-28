@@ -28,6 +28,11 @@ These are whole-source bounds, not a selected-building crop. A sample point show
 
 A second check is the coordinate system: the inspected LAZ header declares WGS 84 / UTM 32N (EPSG:32632), whereas the TUM2TWIN 3D City Database tutorial shows a database example using EPSG:25832. This does not prove every GML file is EPSG:25832, but it means the exact candidate GML `srsName` must be read and an explicit geodetic coordinate operation recorded. Do not assume coordinates are interchangeable merely because both are UTM zone 32N. The named vertical datum/geoid is also unresolved.
 
+
+### Vertical-reference lead — not yet verified
+
+The [TUM2TWIN 3D City Database tutorial](https://tum2t.win/tutorials/cm-3dcitydb) uses `HEIGHT_EPSG=7837` in an example database configuration. EPSG identifies code 7837 as [DHHN2016 height](https://epsg.io/7837), a German gravity-related height CRS in metres. This is a useful lead for frame investigation, **not proof** that the selected ULS LAZ or any candidate GML uses DHHN2016. The ULS metadata PDF only states “above mean sea level” and the inspected LAZ prefix has no VerticalCSTypeGeoKey. The exact file's vertical metadata and source-to-target vertical operation must still be reviewed; the blocker remains open.
+
 ## Required next steps
 
 1. Read the selected GML's exact bytes only after the source's file-level licence/terms are verified; record actual byte size and SHA-256.
