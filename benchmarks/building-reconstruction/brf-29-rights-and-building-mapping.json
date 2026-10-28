@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-29-TUM-DOWNTOWN-RIGHTS-AND-BUILDING-MAPPING",
+  "status": "blocked",
+  "reviewedAt": "2026-10-28",
+  "issueUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/240",
+  "buildingSelection": {
+    "status": "not-selected",
+    "buildingId": "",
+    "gmlId": "",
+    "locationEvidence": [],
+    "imageAssetIds": [],
+    "independentSurfaceAssetIds": [],
+    "referenceModelAssetIds": [],
+    "sameBuildingEvidenceUrl": "",
+    "reviewer": "",
+    "reviewedAt": ""
+  },
+  "licenseEvidence": [
+    {
+      "id": "zenodo-tum-downtown-source-record",
+      "sourceUrl": "https://zenodo.org/records/15282970",
+      "scope": "Images.zip and TUM_Downtown_ULS_20241217_manual.laz in Zenodo record v1.2.0",
+      "accessLabelObserved": "Dataset Open",
+      "licenseName": null,
+      "licenseUrl": null,
+      "status": "license-unresolved",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The record lists image and ULS archives and publisher MD5 values, but the record-page review did not establish an explicit asset-level licence value.",
+        "The Dataset Open label is an access/discovery cue; it is not treated as a licence grant.",
+        "No derivative/publication/commercial use is approved for these two assets."
+      ]
+    },
+    {
+      "id": "gt-lod3-benchmark-reference-dataset",
+      "sourceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "licenseEvidenceUrl": "https://github.com/gdslab/GT-LOD3-Benchmark#license",
+      "scope": "GT-LOD3 Benchmark dataset as declared by its public README, including its stated TUM subset (28 manually modelled LOD3 instances)",
+      "status": "source-declared-file-not-selected",
+      "exactAssetSelectionStatus": "not-selected",
+      "selectedFilePath": "",
+      "selectedBuildingGmlId": "",
+      "requiredAttribution": "GT-LOD3 Benchmark Dataset, Han Sae Kim et al.; licensed under CC BY 4.0.",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The repository-level CC BY 4.0 statement is evidence for the GT-LOD3 dataset it describes; retain attribution and a modification notice when applicable.",
+        "A specific TUM LOD3 file/model has not yet been selected or byte-pinned, so no selected-file approval is recorded.",
+        "Its geometry/label derivation must be documented before treating it as independent ground truth for any particular metric."
+      ]
+    },
+    {
+      "id": "tum2twin-github-project-license",
+      "sourceUrl": "https://github.com/tum-gis/tum2twin",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://github.com/tum-gis/tum2twin/blob/main/LICENSE",
+      "scope": "The public tum-gis/tum2twin GitHub repository itself",
+      "externalAssetRepositoryUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "status": "external-dataset-license-unverified",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The GitHub README points to a separate GitLab repository for model data. The GitHub repository's LICENSE is not automatically asserted to license every file stored in that separate repository.",
+        "Verify the separate data repository licence and any per-file terms before relying on these models in publication or a commercial application."
+      ]
+    }
+  ],
+  "sourceProvenance": {
+    "zenodoRecordVersion": "1.2.0",
+    "zenodoRecordUrl": "https://zenodo.org/records/15282970",
+    "selectedImagesByteVerified": false,
+    "selectedUlsCropByteVerified": false,
+    "selectedReferenceModelByteVerified": false,
+    "fullUlsChecksumVerified": false,
+    "ulsHeaderPrefixOnlyBytes": 8388608,
+    "ulsHeaderPrefixSha256": "3a9b3ae9d07520dcee6bae53ab17d932a9a76483cbb8673ec0ad6ac9dbd4abb4",
+    "ulsProjectedCrsCodeCandidate": 32632,
+    "namedVerticalDatumVerified": false,
+    "localToProjectedTransformVerified": false,
+    "sourceToEvaluationTransformVerified": false
+  },
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "blockers": [
+    "zenodo-images-license-unresolved",
+    "zenodo-uls-license-unresolved",
+    "gt-lod3-specific-file-not-selected",
+    "tum2twin-gitlab-data-license-not-verified",
+    "building-gml-id-not-selected",
+    "cross-modal-same-building-mapping-missing",
+    "selected-source-files-not-hash-pinned",
+    "named-vertical-datum-unresolved",
+    "local-coordinate-frame-semantics-unresolved",
+    "platform-generated-candidate-glb-missing",
+    "independent-held-out-controls-missing"
+  ]
+}
