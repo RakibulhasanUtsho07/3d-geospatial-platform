@@ -107,6 +107,15 @@ test("requires explicit operator review and approved asset provenance",async t=>
  const unapproved={...buildingSpec,sources:buildingSpec.sources.map((s,i)=>i===0?{...s,usageStatus:"unreviewed"}:s)};
  await assert.rejects(runColmapReconstruction({workspaceRoot:root,buildingSpec:unapproved,buildingId:buildingSpec.id,jobId:"job-2",sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)}),/approved/);
 });
+test("direct COLMAP worker rejects a source spec whose operation scopes omit reconstruction",async t=>{
+ const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
+ const denied={...buildingSpec,sources:buildingSpec.sources.map((source,index)=>index===0?{...source,permittedOperations:["private-media-ingestion"]}:source)};
+ await assert.rejects(runColmapReconstruction({
+  workspaceRoot:root,buildingSpec:denied,buildingId:buildingSpec.id,jobId:"missing-operation-scope",
+  sourceIds:["view-1","view-2","view-3"],upAxis:"Z",upAxisReviewed:true,matchConfirmed:true,overlapReviewed:true,
+  spawnImpl:mockedColmapSpawn,qualityAnalyzer:async input=>mockImageQuality(input)
+ }),/permitted operation scopes do not match/);
+});
 test("runs mocked COLMAP reconstruction, converts texture atlas and marks model review-only",async t=>{
  const root=await workspace(t),{buildingSpec}=await setupApprovedViews(t,root);
  const result=await runColmapReconstruction({
