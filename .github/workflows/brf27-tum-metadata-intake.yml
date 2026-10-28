@@ -1,6 +1,13 @@
 name: BRF-27 TUM Downtown metadata inspection
 
 on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf27-tum-metadata-intake.yml"
+      - "scripts/inspect-brf27-tum-metadata.sh"
+      - "docs/research/BRF-27-TUM-DOWNTOWN-INTAKE.md"
+      - "benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json"
   pull_request:
     branches: [development]
     paths:
