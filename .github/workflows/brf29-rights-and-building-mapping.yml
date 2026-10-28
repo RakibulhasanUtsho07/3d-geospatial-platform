@@ -1,0 +1,46 @@
+name: BRF-29 asset rights and building mapping contract
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf29-rights-and-building-mapping.yml"
+      - "benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json"
+      - "docs/research/BRF-29-ASSET-RIGHTS-AND-BUILDING-MAPPING.md"
+      - "tests/building-benchmark-rights-manifest.test.mjs"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf29-rights-and-building-mapping.yml"
+      - "benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json"
+      - "docs/research/BRF-29-ASSET-RIGHTS-AND-BUILDING-MAPPING.md"
+      - "tests/building-benchmark-rights-manifest.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf29-rights-mapping-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-rights-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate rights matrix JSON
+        run: node --input-type=module -e "import fs from 'node:fs'; JSON.parse(fs.readFileSync('benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json', 'utf8'));"
+
+      - name: Run fail-closed rights and building mapping tests
+        run: node --test tests/building-benchmark-rights-manifest.test.mjs
+
+      - name: Upload machine-readable rights registry
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf29-asset-rights-and-building-mapping
+          path: benchmarks/building-reconstruction/brf-29-rights-and-building-mapping.json
+          retention-days: 14
