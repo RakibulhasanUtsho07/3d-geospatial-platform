@@ -88,7 +88,8 @@
       "Candidate identifiers are a shortlist only. buildingId and gmlId remain empty and status remains not-selected.",
       "The LAZ header bounds are campus-wide/source-file bounds, not evidence that any listed GML footprint intersects the relevant crop.",
       "One tutorial example point lies inside the LAZ header XY envelope, but the source does not identify that point as the centroid of a shortlisted building.",
-      "TUM2TWIN's tutorial uses EPSG:25832 in its example database configuration; the ULS header declares EPSG:32632. The exact candidate GML srsName must be inspected and an explicit coordinate operation documented before comparing geometry."
+      "TUM2TWIN's tutorial uses EPSG:25832 in its example database configuration; the ULS header declares EPSG:32632. The exact candidate GML srsName must be inspected and an explicit coordinate operation documented before comparing geometry.",
+      "A possible vertical-reference lead was added: TUM2TWIN's example database configuration uses EPSG:7837 (DHHN2016 height). It is explicitly only a candidate until the selected ULS/GML metadata confirms it; the vertical-datum release blocker remains."
     ]
   },
   "licenseEvidence": [
@@ -158,7 +159,19 @@
     "ulsProjectedCrsCodeCandidate": 32632,
     "namedVerticalDatumVerified": false,
     "localToProjectedTransformVerified": false,
-    "sourceToEvaluationTransformVerified": false
+    "sourceToEvaluationTransformVerified": false,
+    "candidateVerticalReference": {
+      "epsgCode": 7837,
+      "name": "DHHN2016 height",
+      "sourceUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+      "epsgDefinitionUrl": "https://epsg.io/7837",
+      "evidence": "The TUM2TWIN tutorial's example database configuration sets HEIGHT_EPSG=7837; EPSG defines 7837 as DHHN2016 height.",
+      "status": "candidate-only-not-verified-for-selected-files",
+      "appliesToSelectedUlsLaz": false,
+      "appliesToSelectedGml": false,
+      "transformationVerified": false,
+      "caution": "This is a lead for checking vertical coordinates, not evidence that the specific LAZ or a particular GML file uses DHHN2016 height. The metadata PDF only says elevation above mean sea level."
+    }
   },
   "releaseFlags": {
     "acceptanceEligible": false,
