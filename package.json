@@ -227,7 +227,10 @@
     "test:brf45-rights-admission": "node --test tests/brf45-exact-asset-rights-admission.test.mjs tests/brf45-exact-asset-rights-admission-cli.test.mjs",
     "validate:brf45-rights-admission": "node scripts/validate-brf45-exact-asset-rights-admission.mjs benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json --source-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json --evidence-root .",
     "validate:brf26-evidence-bundle": "node scripts/build-brf26-evidence-bundle.mjs",
-    "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs"
+    "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs",
+    "build:dhaka-3d-tiles-package": "node scripts/build-dhaka-3d-tiles-package.mjs",
+    "verify:dhaka-3d-tiles-package": "node scripts/verify-dhaka-3d-tiles-package.mjs",
+    "test:dhaka-3d-tiles-package": "node --test tests/dhaka-3d-tiles-package.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
