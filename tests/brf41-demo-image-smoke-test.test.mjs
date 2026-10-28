@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile, access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -64,8 +65,6 @@ function fakeFfmpeg() {
     return child;
   };
 }
-import { createHash } from "node:crypto";
-
 test("verified demo image is privately ingested and decoded, never accepted as reconstruction truth", async t => {
   const fixture = await makeFixture(t);
   const report = await runBrf41DemoImageSmokeTest({
