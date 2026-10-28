@@ -56,23 +56,40 @@
     },
     {
       "id": "tum2twin-github-project-license",
+      "sourceUrl": "https://github.com/tum-gis/tum2twin",
+      "licenseName": "CC BY 4.0",
+      "licenseUrl": "https://github.com/tum-gis/tum2twin/blob/main/LICENSE",
+      "scope": "The public tum-gis/tum2twin GitHub code repository itself",
+      "externalAssetRepositoryUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "status": "external-dataset-license-unverified",
+      "exactAssetSelectionStatus": "not-selected",
+      "reviewedBy": "",
+      "reviewedAt": "",
+      "notes": [
+        "The GitHub repository has a CC BY 4.0 LICENSE, but its README points to a separate GitLab repository for actual model data.",
+        "The GitHub repository licence is not automatically asserted to apply to every separate GitLab model file or the distinct Zenodo ULS/images archive.",
+        "The separate data-repository root LICENSE is recorded in the tum2twin-dataset-gitlab-license entry."
+      ]
+    },
+    {
+      "id": "tum2twin-dataset-gitlab-license",
       "sourceUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
       "licenseName": "CC BY 4.0",
       "licenseUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/LICENSE",
       "scope": "Root LICENSE file in tum-gis/tum2twin-datasets at immutable commit e032a71fc9b3c9c3d4869e3aca9677d1234086aa; first line identifies Attribution 4.0 International",
       "externalAssetRepositoryUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "repositoryCommitSha": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+      "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
       "status": "repository-license-file-verified-scope-review-pending",
       "exactAssetSelectionStatus": "not-selected",
       "reviewedBy": "",
       "reviewedAt": "",
       "notes": [
-        "The actual GitLab root LICENSE bytes were fetched at immutable commit e032a71fc9b3c9c3d4869e3aca9677d1234086aa; the text starts with Attribution 4.0 International and its SHA-256 is recorded.",
+        "The actual GitLab root LICENSE bytes were fetched at the immutable commit; the text starts with Attribution 4.0 International and its SHA-256 is recorded.",
         "A metadata-only recursive inventory at that commit found 27 GML files under citygml/lod3-building-datasets, all named DEBY_LOD3_*.gml.",
-        "This is stronger evidence than the GitHub code repository LICENSE alone, but scope, any per-file exceptions, derivative publication/commercial use and the exact chosen model still need explicit review.",
+        "This verifies the repository licence-file contents; a human must still review scope, any per-file exceptions, derivative publication/commercial use, and attribution for the exact chosen model.",
         "No individual GML payload was downloaded; no building is selected or matched to ULS/image data yet."
-      ],
-      "repositoryCommitSha": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
-      "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411"
+      ]
     }
   ],
   "sourceProvenance": {
