@@ -51,6 +51,70 @@ async function readArtifact(root, entry, key) {
       errorKind: error?.code === "ENOENT" ? "missing" : "unsafe" };
   }
 }
+function pngDimensions(bytes, label) {
+  const signature = Buffer.from([137,80,78,71,13,10,26,10]);
+  if (bytes.length < 24 || !bytes.subarray(0, 8).equals(signature) ||
+      bytes.toString("ascii", 12, 16) !== "IHDR") {
+    throw new TypeError(label + " must be a PNG with an IHDR header.");
+  }
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (width < 1 || height < 1) throw new TypeError(label + " has invalid PNG dimensions.");
+  return { width, height };
+}
+async function verifySiblingPng(root, reportPath, filename, expectedSha256, expectedBytes, expectedWidth, expectedHeight, label) {
+  const verification = {
+    path: null, expectedSha256: expectedSha256 ?? null, actualSha256: null,
+    expectedByteSize: expectedBytes ?? null, actualByteSize: null,
+    expectedWidth: expectedWidth ?? null, expectedHeight: expectedHeight ?? null,
+    actualWidth: null, actualHeight: null, verified: false,
+  };
+  try {
+    const safeName = safeRelative(filename, label + " filename");
+    if (safeName.includes("/")) throw new TypeError(label + " filename must be a basename beside its report.");
+    const relative = path.posix.join(path.posix.dirname(reportPath), safeName);
+    const image = await readSafe(root, relative, label + " PNG", false);
+    const dimensions = pngDimensions(image.bytes, label);
+    Object.assign(verification, {
+      path: image.path, actualSha256: image.sha256, actualByteSize: image.byteSize,
+      actualWidth: dimensions.width, actualHeight: dimensions.height,
+    });
+    verification.verified =
+      typeof expectedSha256 === "string" && /^[a-f0-9]{64}$/i.test(expectedSha256) &&
+      expectedSha256.toLowerCase() === image.sha256.toLowerCase() &&
+      Number.isSafeInteger(expectedBytes) && expectedBytes === image.byteSize &&
+      Number.isSafeInteger(expectedWidth) && expectedWidth === dimensions.width &&
+      Number.isSafeInteger(expectedHeight) && expectedHeight === dimensions.height;
+    if (!verification.verified) verification.error = "Rendered PNG bytes, SHA-256, byte size, or dimensions do not match the pinned report.";
+  } catch (error) {
+    verification.error = error instanceof Error ? error.message : String(error);
+  }
+  return verification;
+}
+async function verifyVisualImageBindings(root, artifacts) {
+  const cameraItem = artifacts.sourceCameraReport;
+  if (!cameraItem?.error && !cameraItem?.parseError && cameraItem?.value && typeof cameraItem.value === "object") {
+    const report = cameraItem.value;
+    const render = report.render;
+    report._brf26RenderImageVerification = render && typeof render === "object"
+      ? await verifySiblingPng(root, cameraItem.path, render.filename, render.sha256, render.bytes,
+          render.width, render.height, "Source-camera render")
+      : { verified: false, error: "Source-camera report has no rendered PNG record." };
+  }
+  const renderItem = artifacts.renderManifest;
+  if (!renderItem?.error && !renderItem?.parseError && renderItem?.value && typeof renderItem.value === "object") {
+    const report = renderItem.value;
+    const views = Array.isArray(report.views) ? report.views :
+      Array.isArray(report.manifest?.views) ? report.manifest.views : null;
+    if (views) {
+      for (const view of views) {
+        if (!view || typeof view !== "object" || Array.isArray(view)) continue;
+        view._brf26ImageVerification = await verifySiblingPng(root, renderItem.path, view.filename,
+          view.sha256, view.bytes, view.width, view.height, "Fixed-camera view " + (view.id ?? view.viewId ?? "unknown"));
+      }
+    }
+  }
+}
 async function safeOutput(root, relative) {
   const safe = safeRelative(relative, "Output report");
   const resolved = path.resolve(root, ...safe.split("/"));
@@ -92,6 +156,7 @@ async function main() {
   await Promise.all(BRF26_REQUIRED_ARTIFACT_KEYS.map(async (key) => {
     artifacts[key] = await readArtifact(root, manifest.artifacts?.[key], key);
   }));
+  await verifyVisualImageBindings(root, artifacts);
 
   let candidatePathBindingValid = false;
   const auth = artifacts.authorizationRecord;
