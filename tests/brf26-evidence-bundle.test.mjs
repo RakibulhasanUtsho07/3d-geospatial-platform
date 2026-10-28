@@ -151,8 +151,9 @@ test("BRF-26 CLI help is available", () => {
 test("a fully cross-linked synthetic chain remains BLOCKED and never grants approval", async (t) => {
   const { root } = await setup(t, { mode: "synthetic-test" });
   const result = run(root);
-  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout + "\n" +
+    JSON.stringify({ failed: report.checks.filter((item) => item.status === "failed"), blockers: report.blockers }, null, 2));
   assert.equal(report.status, "BLOCKED");
   assert.equal(report.evidenceMode, "synthetic-test");
   assert.ok(report.checks.some((item) => item.id === "real-evidence-mode" && item.status === "blocked"));
@@ -166,8 +167,9 @@ test("a fully cross-linked synthetic chain remains BLOCKED and never grants appr
 test("pending visual review blocks a real-evidence manifest even when file hashes agree", async (t) => {
   const { root } = await setup(t, { mode: "real-evidence", pendingVisual: true });
   const result = run(root);
-  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout + "\n" +
+    JSON.stringify({ failed: report.checks.filter((item) => item.status === "failed"), blockers: report.blockers }, null, 2));
   assert.equal(report.status, "BLOCKED");
   assert.ok(report.blockers.some((item) => item.id === "visual-review-disposition"));
   assert.ok(report.blockers.some((item) => item.id === "visual-review-reviewer"));
