@@ -24,6 +24,7 @@ async function setup(t, {
   extraRenderView = false, wrongSourceCameraBinding = false, wrongSourceCameraBuilding = false,
   wrongRenderCandidateBinding = false, wrongVisualBuilding = false, visualReleaseFlag = false,
   corruptSourceCameraPng = false, corruptRenderPng = false, wrongSourceImageBinding = false,
+  inconsistentNestedSourceImage = false,
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf26-bundle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -114,6 +115,11 @@ async function setup(t, {
     buildingId: wrongSourceCameraBuilding ? "building-other" : "building-01",
     candidateGlbSha256: wrongSourceCameraBinding ? sha(Buffer.from("different-camera-model")) : candidateSha,
     sourceImageSha256: wrongSourceImageBinding ? sha(Buffer.from("unreviewed-camera-source-image")) : sourceImageSha,
+    sourceImage: {
+      sha256: inconsistentNestedSourceImage ? sha(Buffer.from("different-nested-source-image")) :
+        wrongSourceImageBinding ? sha(Buffer.from("unreviewed-camera-source-image")) : sourceImageSha,
+      width: 512, height: 512,
+    },
     status: "same-camera-comparable", sameCameraComparable: true,
     sourceImageSize: { width: 512, height: 512 },
     render: { filename: "source-camera.png", width: 512, height: 512,
@@ -368,4 +374,14 @@ test("source-camera image must be one of the exact human-reviewed included sourc
   assert.equal(result.status, 2, result.stderr + "\\n" + result.stdout);
   assert.equal(report.status, "BLOCKED");
   assert.ok(report.blockers.some((item) => item.id === "source-camera-source-image-reviewed"));
+});
+
+
+test("conflicting nested source-image hash/dimensions in camera evidence fail validation", async (t) => {
+  const { root } = await setup(t, { mode: "real-evidence", inconsistentNestedSourceImage: true });
+  const result = run(root);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/bundle-report.json"), "utf8"));
+  assert.equal(result.status, 1, result.stderr + "\\n" + result.stdout);
+  assert.equal(report.status, "VALIDATION_FAILED");
+  assert.ok(report.failures.some((item) => item.id === "source-camera-source-image-consistency"));
 });
