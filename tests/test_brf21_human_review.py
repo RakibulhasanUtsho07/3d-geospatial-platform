@@ -50,7 +50,7 @@ class Brf21HumanReviewTests(unittest.TestCase):
         source_manifest = {
             "schemaVersion": "1.0.0", "sampleId": "synthetic-test-only",
             "evaluationStage": "multiview-source-byte-intake-only",
-            "dataset": {"sourceRepositoryCommit": "test-commit"},
+            "dataset": {"sourceRepositoryCommit": "test-commit", "license": "CC-BY-4.0", "licenseScope": "Synthetic fixture only", "attribution": "Synthetic test fixture only", "rightsStatus": "unreviewed"},
             "selectionMethod": {"expectedViewCount": 3}, "expectedTotalBytes": 384,
             "views": [{"id": view["id"], "filename": view["filename"],
                        "expectedSha256": view["expectedSha256"], "expectedByteSize": 128} for view in views],
