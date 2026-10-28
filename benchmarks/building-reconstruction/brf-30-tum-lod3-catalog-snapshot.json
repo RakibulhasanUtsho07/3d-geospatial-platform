@@ -1,0 +1,293 @@
+{
+  "schemaVersion": "1.0.0",
+  "snapshotId": "BRF-30-TUM2TWIN-LOD3-CATALOG",
+  "createdAt": "2026-10-28T06:06:35.803333+00:00",
+  "status": "pinned-metadata-snapshot-pending-file-identity-and-rights-review",
+  "source": {
+    "project": "tum-gis/tum2twin-datasets",
+    "projectId": 152545,
+    "branch": "main",
+    "resolvedCommitSha": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+    "committedDate": "2025-12-05T09:02:45.000+01:00",
+    "catalogPath": "citygml/lod3-building-datasets",
+    "treePages": 2,
+    "licensePath": "LICENSE",
+    "licenseTextFirstLine": "Attribution 4.0 International",
+    "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+    "inventoryWorkflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479",
+    "inventoryArtifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479/artifacts/12795532392",
+    "inventoryReportSha256": "d2398630dc00175e40310fc567dd18cd3d4f2e72f8b0e955cdb72cd5b8baf64a"
+  },
+  "inventory": {
+    "gmlFileCount": 27,
+    "filenamePrefixCounts": {
+      "DEBY": 27
+    },
+    "modelPayloadsDownloaded": false,
+    "files": [
+      {
+        "filename": "DEBY_LOD3_4906965.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906965.gml",
+        "repositoryBlobId": "abb32454c304035ef3287d5645a525cdaa0ee239",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906965.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906966.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906966.gml",
+        "repositoryBlobId": "ece1d474b5d3ee0b6faf13d7e1daf4ecb61e07b7",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906966.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906970.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906970.gml",
+        "repositoryBlobId": "42a0def4fa5caface90fe60b41c46d7a8873db11",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906970.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906972.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906972.gml",
+        "repositoryBlobId": "ee70d80a23940ad66656ee1b338002ede637ded7",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906972.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906976.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906976.gml",
+        "repositoryBlobId": "c093499de814cff9b746fb7239971fbf7bc81cda",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906976.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906978.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906978.gml",
+        "repositoryBlobId": "1e150f6b8db1276046f3a3a2e55d384a3f8b39f4",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906978.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906979.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906979.gml",
+        "repositoryBlobId": "dc996a492f9c30d338f2f4550a6a52b2a2efaaaf",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906979.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906980.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906980.gml",
+        "repositoryBlobId": "79666bcb258ec7328d0889ca82f320be6f3640a5",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906980.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4906981.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4906981.gml",
+        "repositoryBlobId": "c8115287980196ac045ab609b108b9b58fe44460",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4906981.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907506.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907506.gml",
+        "repositoryBlobId": "0466e4cecd9aab984f2b583a22ae022b6144c8c2",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907506.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907507.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907507.gml",
+        "repositoryBlobId": "b344d2ac9737afd1e17ab26b0ba667f8c325fe28",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907507.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907514.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907514.gml",
+        "repositoryBlobId": "73c67dd5eff3c9b1eab11a2e28780d8d70cc86af",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907514.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907515.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907515.gml",
+        "repositoryBlobId": "41e14cb085f70677b51b2b2f804e78db5b62821c",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907515.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907516.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907516.gml",
+        "repositoryBlobId": "2bcfa28197612ac0c2938a3352d8500d79d349a5",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907516.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907517.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907517.gml",
+        "repositoryBlobId": "3820bd7517430f941ce05a910cd763aa00bf9e66",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907517.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907518.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907518.gml",
+        "repositoryBlobId": "20759d2e1264080d4cf2566e664bae403a14da",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907518.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907520.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907520.gml",
+        "repositoryBlobId": "b0dc6e17da183eecfbacf20cd9e7dd9bef43ed6f",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907520.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4907521.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4907521.gml",
+        "repositoryBlobId": "7ff5a4df61095c4237e822a16f1121fbe04eeaff",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4907521.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959321.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959321.gml",
+        "repositoryBlobId": "763bab501c1158c7c30e4a0c104795b4ecc6979c",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959321.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959322.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959322.gml",
+        "repositoryBlobId": "99cf596b223a88619f5cdd091b989c567dde9235",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959322.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959323.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "repositoryBlobId": "2fd72c942399ff0cc78e3478dced74b60180e5dd",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959324.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959324.gml",
+        "repositoryBlobId": "04dca410135dd75a32f2b8c6dd2bcd17b5063f5f",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959324.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959457.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959457.gml",
+        "repositoryBlobId": "c07d1bf900f55f72d45af986e34bb818106cdc32",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959457.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959458.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959458.gml",
+        "repositoryBlobId": "eb8e658313d10bcdf8cb819640172e76ca2ad750",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959458.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959460.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+        "repositoryBlobId": "07bf30ed7c0581c0c210b031fe814fed8668f4bb",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_4959462.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959462.gml",
+        "repositoryBlobId": "c418631f095229496931d4eaf205595a524e1e2b",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_4959462.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      },
+      {
+        "filename": "DEBY_LOD3_60042.gml",
+        "path": "citygml/lod3-building-datasets/DEBY_LOD3_60042.gml",
+        "repositoryBlobId": "8b6d29c01abfe51e8de3482a37fde6de64cc1608",
+        "webUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets/-/blob/e032a71fc9b3c9c3d4869e3aca9677d1234086aa/citygml/lod3-building-datasets/DEBY_LOD3_60042.gml",
+        "payloadDownloaded": false,
+        "buildingIdentityVerified": false,
+        "assetRightsReviewed": false
+      }
+    ]
+  },
+  "buildingSelection": {
+    "status": "not-selected",
+    "candidateBuildingId": "",
+    "candidateGmlId": "",
+    "selectedModelPath": "",
+    "reason": "Catalog names and blob IDs are not enough to determine same-building linkage to the TUM Downtown ULS/images; candidate GML payload geometry and identity still need inspection under rights review."
+  },
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "limitations": [
+    "This is a pinned metadata snapshot, not a copy of model files.",
+    "The root LICENSE file content is verified, but use scope and file-level exceptions require human review for the selected model.",
+    "No actual GML payloads have been downloaded or inspected; no model bounds, coordinate reference, or GML building identifiers are asserted.",
+    "The Zenodo image archive and ULS LAZ retain separate unresolved rights and are not licensed by this snapshot.",
+    "No candidate building or same-building correspondence across model, image frames and ULS crop has been approved."
+  ]
+}
