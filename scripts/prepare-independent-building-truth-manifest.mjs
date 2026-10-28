@@ -108,7 +108,8 @@ async function main(){
     surfaceMesh:{sourceGlbSha256:candidateSha,vertices:extracted.surfaceMesh.vertices,triangles:extracted.surfaceMesh.triangles},
     geometryExtractionSummary:extracted.extractionSummary,inputHashPinned:candidatePinned,
     modelCoordinateFrameId:config.candidate.modelCoordinateFrameId??"unspecified-glb-scene-frame",
-    modelToEvaluationFrameMatrix4x4:registration};
+    modelToEvaluationFrameMatrix4x4:registration,
+    checkPointBindings:config.candidate.checkPointBindings??[]};
   const reference={sourcePath:referenceFile.relative,sourceId:truth.sourceId,sourceSha256:referenceSha,geometrySourceSha256:referenceSha,
     evidenceBasis:truth.evidenceBasis,sourceDescription:truth.sourceDescription,reviewedBy:truth.reviewedBy,reviewedAt:truth.reviewedAt,
     coordinateFrameId:adaptedReference.coordinateFrameId,units:"m",footprint:adaptedReference.footprint,dimensionsM:adaptedReference.dimensionsM,

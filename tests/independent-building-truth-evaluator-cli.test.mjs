@@ -1,78 +1,197 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { geometryPayloadSha256 } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { extractGlbGeometry } from "../src/core/building-generation/glb-geometry-extraction.mjs";
+import { adaptIndependentReferenceGeometry } from "../src/core/building-generation/independent-reference-geometry-adapter.mjs";
+import { geometryPayloadSha256 } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
+import {
+  createBuildingGlb,
+  MODEL_TO_EVALUATION,
+  surveyGeometryDocument,
+} from "./fixtures/glb-geometry-fixture.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const reviewedAt = "2026-10-26T10:00:00Z";
-const candidateBytes = Buffer.from("candidate GLB byte-integrity fixture; structural QA is a separate check");
-const referenceBytes = Buffer.from("independent survey source byte-integrity fixture");
+const frameId = "site-local-enu-01";
+const identity = [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+const candidateBindings = [
+  { id: "survey-check-01", nodeIndex: 1, primitiveIndex: 0, vertexIndex: 0 },
+  { id: "survey-check-02", nodeIndex: 1, primitiveIndex: 0, vertexIndex: 1 },
+  { id: "survey-check-03", nodeIndex: 1, primitiveIndex: 0, vertexIndex: 6 },
+];
+const candidateBytes = createBuildingGlb();
+const candidateSha = hash(candidateBytes);
+const candidateExtracted = extractGlbGeometry(candidateBytes, {
+  coordinateFrameId: frameId,
+  units: "m",
+  modelToEvaluationFrameMatrix4x4: MODEL_TO_EVALUATION,
+  checkPointBindings: candidateBindings,
+});
+const referenceDocument = surveyGeometryDocument({ coordinateFrameId: frameId, localCoordinates: false });
+const referenceBytes = Buffer.from(JSON.stringify(referenceDocument, null, 2) + "\n");
+const referenceSha = hash(referenceBytes);
+const adaptedReference = adaptIndependentReferenceGeometry(referenceDocument, {
+  sourceCoordinateFrameId: frameId,
+  evaluationCoordinateFrameId: frameId,
+  sourceToEvaluationFrameMatrix4x4: identity,
+});
 const extractorBytes = Buffer.from("reproducible geometry extractor source fixture");
-const extractorConfigBytes = Buffer.from(JSON.stringify({ units: "m", frame: "site-local-enu-01" }));
+const adapterBytes = Buffer.from("reproducible reference adapter source fixture");
+const extractorConfigBytes = Buffer.from(JSON.stringify({
+  schemaVersion: "1.0.0",
+  evaluationId: "cli-site-eval-01",
+  buildingId: "cli-site-building",
+  generatedAt: "2026-10-27T08:00:00Z",
+  extractorCommitSha: "1234567890abcdef1234567890abcdef12345678",
+  candidate: {
+    glbPath: "evidence/candidate.glb",
+    expectedGlbSha256: candidateSha,
+    coordinateFrameId: frameId,
+    units: "m",
+    modelCoordinateFrameId: "candidate-local-frame-v1",
+    modelToEvaluationFrameMatrix4x4: MODEL_TO_EVALUATION,
+    checkPointBindings: candidateBindings,
+  },
+  reference: {
+    sourcePath: "evidence/survey.json",
+    expectedSourceSha256: referenceSha,
+    sourceCoordinateFrameId: frameId,
+    sourceToEvaluationFrameMatrix4x4: identity,
+  },
+  tolerances: {
+    footprintAreaRelativeErrorPercent: 5,
+    footprintBoundaryP95M: 0.1,
+    footprintBoundaryMaxM: 0.2,
+    dimensionRelativeErrorPercent: 5,
+    checkPointRmseM: 0.1,
+    checkPointMaxM: 0.2,
+    surfaceDistanceP95M: 0.1,
+    surfaceDistanceMaxM: 0.2,
+  },
+}, null, 2) + "\n");
 
-function polygon() {
-  return [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }, { x: 0, z: 2 }];
-}
-function checkPoints() {
-  return [
-    { id: "gcp-check-01", x: 0, y: 0, z: 0 },
-    { id: "gcp-check-02", x: 2, y: 0, z: 0 },
-    { id: "gcp-check-03", x: 2, y: 0, z: 2 },
-  ];
-}
-function makeManifest() {
-  const glbSha256 = hash(candidateBytes);
-  const sourceSha256 = hash(referenceBytes);
-  const manifest = {
-    schemaVersion: "1.0.0", evaluationId: "cli-site-eval-01", buildingId: "cli-site-building",
-    generatedAt: "2026-10-27T08:00:00Z",
-    candidate: {
-      glbPath: "evidence/candidate.glb", glbSha256, geometrySourceGlbSha256: glbSha256,
-      coordinateFrameId: "site-local-enu-01", units: "m", footprint: polygon(),
-      dimensionsM: { widthM: 2, depthM: 2, heightM: 3 }, checkPoints: checkPoints(),
+function candidatePayload() {
+  return {
+    glbPath: "evidence/candidate.glb",
+    glbSha256: candidateSha,
+    geometrySourceGlbSha256: candidateSha,
+    coordinateFrameId: frameId,
+    units: "m",
+    footprint: candidateExtracted.footprint.map((point) => ({ ...point })),
+    dimensionsM: { ...candidateExtracted.dimensionsM },
+    checkPoints: candidateExtracted.checkPoints.map((point) => ({ ...point })),
+    surfaceMesh: {
+      sourceGlbSha256: candidateSha,
+      vertices: candidateExtracted.surfaceMesh.vertices.map((vertex) => [...vertex]),
+      triangles: candidateExtracted.surfaceMesh.triangles.map((triangle) => [...triangle]),
     },
-    reference: {
-      sourcePath: "evidence/survey.json", sourceId: "site-survey-01",
-      sourceSha256, geometrySourceSha256: sourceSha256, evidenceBasis: "surveyed",
-      sourceDescription: "Independent survey source fixture.", reviewedBy: "reviewer-a", reviewedAt,
-      coordinateFrameId: "site-local-enu-01", units: "m", footprint: polygon(),
-      dimensionsM: { widthM: 2, depthM: 2, heightM: 3 },
-      checkPoints: checkPoints().map((point) => ({ ...point, independentOfFit: true })),
+    geometryExtractionSummary: candidateExtracted.extractionSummary,
+    modelCoordinateFrameId: "candidate-local-frame-v1",
+    modelToEvaluationFrameMatrix4x4: MODEL_TO_EVALUATION,
+    checkPointBindings: candidateBindings,
+  };
+}
+
+function referencePayload() {
+  return {
+    sourcePath: "evidence/survey.json",
+    sourceId: referenceDocument.sourceId,
+    sourceSha256: referenceSha,
+    geometrySourceSha256: referenceSha,
+    evidenceBasis: referenceDocument.evidenceBasis,
+    sourceDescription: referenceDocument.sourceDescription,
+    reviewedBy: referenceDocument.reviewedBy,
+    reviewedAt: referenceDocument.reviewedAt,
+    coordinateFrameId: adaptedReference.coordinateFrameId,
+    units: "m",
+    footprint: adaptedReference.footprint.map((point) => ({ ...point })),
+    dimensionsM: { ...adaptedReference.dimensionsM },
+    checkPoints: adaptedReference.checkPoints.map((point) => ({ ...point })),
+    surfaceMesh: {
+      sha256: referenceSha,
+      vertices: adaptedReference.surfaceMesh.vertices.map((vertex) => [...vertex]),
+      triangles: adaptedReference.surfaceMesh.triangles.map((triangle) => [...triangle]),
     },
-    tolerances: {
-      footprintAreaRelativeErrorPercent: 5, footprintBoundaryP95M: 0.1, footprintBoundaryMaxM: 0.2,
-      dimensionRelativeErrorPercent: 5, checkPointRmseM: 0.1, checkPointMaxM: 0.2,
+    inputHashPinned: true,
+    geometryExtractionSummary: {
+      method: "reviewed-independent-reference-json-import-v1",
+      exactSourceSha256: referenceSha,
+      sourceCoordinateFrameId: referenceDocument.coordinateFrameId,
+      coordinateFrameId: frameId,
+      units: "m",
+      frameTransform: adaptedReference.frameTransform,
     },
   };
-  for (const [role, sourceHash] of [["candidate", glbSha256], ["reference", sourceSha256]]) {
-    const geometry = manifest[role];
+}
+
+function makeManifest() {
+  const candidate = candidatePayload();
+  const reference = referencePayload();
+  for (const [role, geometry, sourceHash] of [
+    ["candidate", candidate, candidateSha],
+    ["reference", reference, referenceSha],
+  ]) {
     geometry.geometryExtractionProvenance = {
       schemaVersion: "1.0.0",
       extractionRunId: role + "-extract-run-01",
-      method: "fixture-extractor-v1",
+      method: role === "candidate"
+        ? "glb-2.0-position-index-and-node-transform-v1"
+        : "reviewed-independent-reference-json-import-v1",
       extractedAt: reviewedAt,
       inputArtifactSha256: sourceHash,
       outputGeometrySha256: geometryPayloadSha256(geometry),
       coordinateFrameId: geometry.coordinateFrameId,
       units: geometry.units,
       extractor: {
-        id: "fixture-geometry-extractor",
+        id: role === "candidate" ? "fixture-geometry-extractor" : "fixture-reference-adapter",
         version: "1.0.0",
         commitSha: "1234567890abcdef1234567890abcdef12345678",
-        artifactPath: "tools/geometry-extractor.mjs",
-        artifactSha256: hash(extractorBytes),
+        artifactPath: role === "candidate"
+          ? "tools/geometry-extractor.mjs"
+          : "tools/reference-adapter.mjs",
+        artifactSha256: hash(role === "candidate" ? extractorBytes : adapterBytes),
         configurationPath: "configs/geometry-extractor.json",
         configurationSha256: hash(extractorConfigBytes),
       },
     };
   }
-  return manifest;
+  return {
+    schemaVersion: "1.0.0",
+    evaluationId: "cli-site-eval-01",
+    buildingId: "cli-site-building",
+    generatedAt: "2026-10-27T08:00:00Z",
+    candidate,
+    reference,
+    preparation: {
+      method: "brf-09-actual-glb-and-independent-reference-adapter-v1",
+      configPath: "configs/geometry-extractor.json",
+      configSha256: hash(extractorConfigBytes),
+      candidateModelToEvaluationTransform: MODEL_TO_EVALUATION,
+      referenceSourceCoordinateFrameId: frameId,
+      referenceSourceToEvaluationFrameMatrix4x4: identity,
+      acceptanceEligible: false,
+      publicationEligible: false,
+      mapReady: false,
+      automaticApproval: false,
+    },
+    tolerances: {
+      footprintAreaRelativeErrorPercent: 5,
+      footprintBoundaryP95M: 0.1,
+      footprintBoundaryMaxM: 0.2,
+      dimensionRelativeErrorPercent: 5,
+      checkPointRmseM: 0.1,
+      checkPointMaxM: 0.2,
+      surfaceDistanceP95M: 0.1,
+      surfaceDistanceMaxM: 0.2,
+    },
+  };
 }
+
 async function setup(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "independent-building-truth-cli-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -82,6 +201,7 @@ async function setup(t) {
   await writeFile(path.join(root, "evidence/candidate.glb"), candidateBytes);
   await writeFile(path.join(root, "evidence/survey.json"), referenceBytes);
   await writeFile(path.join(root, "tools/geometry-extractor.mjs"), extractorBytes);
+  await writeFile(path.join(root, "tools/reference-adapter.mjs"), adapterBytes);
   await writeFile(path.join(root, "configs/geometry-extractor.json"), extractorConfigBytes);
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(makeManifest(), null, 2));
   return { root };
@@ -93,22 +213,25 @@ function run(root, output) {
   ], { cwd: root, encoding: "utf8" });
 }
 
-test("verifies exact candidate/reference bytes and writes a review-required report", async (t) => {
+test("replays exact candidate GLB and independent source bytes before producing a review-required report", async (t) => {
   const { root } = await setup(t);
   const execution = run(root, "report.json");
   assert.equal(execution.status, 0, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "report.json"), "utf8"));
   assert.equal(report.status, "benchmark-review-required");
-  assert.equal(report.assetIntegrity.every((item) => item.status === "passed"), true);
+  assert.equal(report.assetIntegrity.filter((item) => item.status !== "passed").length, 0);
   assert.equal(report.geometryExtractionProvenance.candidate.status, "passed");
   assert.equal(report.geometryExtractionProvenance.reference.status, "passed");
+  assert.equal(report.geometryReplay.candidate.status, "passed");
+  assert.equal(report.geometryReplay.reference.status, "passed");
+  assert.ok(report.checks.some((check) => check.id === "candidate-geometry-replay-from-source-bytes" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.id === "reference-geometry-replay-from-source-bytes" && check.status === "passed"));
   assert.ok(report.checks.some((check) => check.id === "candidate-extractor-artifact-byte-integrity" && check.status === "passed"));
   assert.ok(report.checks.some((check) => check.id === "reference-extractor-configuration-byte-integrity" && check.status === "passed"));
   assert.equal(report.policy.acceptanceEligible, false);
   assert.equal(report.policy.publicationEligible, false);
   assert.equal(report.policy.mapReady, false);
 });
-
 
 test("rejects Windows backslash paths before reading evidence", async (t) => {
   const { root } = await setup(t);
@@ -141,16 +264,66 @@ test("fails when extractor source bytes no longer match the pinned provenance di
   assert.ok(report.failures.some((check) => check.id === "candidate-extractor-artifact-byte-integrity"));
 });
 
-test("detects changed inline geometry when the pinned extraction output digest is stale", async (t) => {
+test("replay catches a caller changing candidate geometry even after refreshing its declared geometry digest", async (t) => {
   const { root } = await setup(t);
   const manifest = makeManifest();
-  manifest.candidate.footprint[1].x = 2.25;
+  manifest.candidate.footprint = manifest.candidate.footprint.map((point) => ({ ...point, x: point.x + 0.25 }));
+  manifest.candidate.geometryExtractionProvenance.outputGeometrySha256 = geometryPayloadSha256(manifest.candidate);
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
-  const execution = run(root, "geometry-stale-report.json");
+  const execution = run(root, "geometry-replay-failed-report.json");
   assert.equal(execution.status, 1, execution.stderr);
-  const report = JSON.parse(await readFile(path.join(root, "geometry-stale-report.json"), "utf8"));
+  const report = JSON.parse(await readFile(path.join(root, "geometry-replay-failed-report.json"), "utf8"));
   assert.equal(report.status, "benchmark-failed");
-  assert.ok(report.failures.some((check) => check.id === "candidate-extraction-output-binding"));
+  assert.equal(report.geometryExtractionProvenance.candidate.status, "passed");
+  assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
+});
+
+test("replay catches a changed registration transform before accepting candidate metrics", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  manifest.candidate.modelToEvaluationFrameMatrix4x4 = [
+    ...MODEL_TO_EVALUATION.slice(0, 12),
+    MODEL_TO_EVALUATION[12] + 0.5,
+    MODEL_TO_EVALUATION[13],
+    MODEL_TO_EVALUATION[14],
+    MODEL_TO_EVALUATION[15],
+  ];
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "matrix-replay-failed-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "matrix-replay-failed-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
+});
+
+test("replay catches altered independent-reference coordinates even after refreshing its declared geometry digest", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  manifest.reference.dimensionsM.widthM += 0.5;
+  manifest.reference.geometryExtractionProvenance.outputGeometrySha256 = geometryPayloadSha256(manifest.reference);
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "reference-replay-failed-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "reference-replay-failed-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.geometryExtractionProvenance.reference.status, "passed");
+  assert.equal(report.geometryReplay.reference.status, "failed");
+  assert.ok(report.failures.some((check) => check.id === "reference-geometry-replay-from-source-bytes"));
+});
+
+test("fails when extractor registration metadata is missing instead of silently trusting inline geometry", async (t) => {
+  const { root } = await setup(t);
+  const manifest = makeManifest();
+  delete manifest.candidate.modelToEvaluationFrameMatrix4x4;
+  await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
+  const execution = run(root, "missing-replay-config-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "missing-replay-config-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.geometryReplay.candidate.status, "failed");
+  assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
 });
 
 test("keeps an unprovenanced geometry source incomplete rather than silently passing", async (t) => {
@@ -159,15 +332,23 @@ test("keeps an unprovenanced geometry source incomplete rather than silently pas
   delete manifest.reference.geometryExtractionProvenance;
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(manifest, null, 2));
   const execution = run(root, "missing-provenance-report.json");
-  assert.equal(execution.status, 2, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "missing-provenance-report.json"), "utf8"));
+  assert.equal(execution.status, 2, JSON.stringify({
+    stderr: execution.stderr,
+    stdout: execution.stdout,
+    reportStatus: report.status,
+    failures: report.failures,
+    warnings: report.warnings,
+    geometryReplay: report.geometryReplay,
+    preparationConfig: report.assetIntegrity?.find((item) => item.kind === "preparation-config"),
+  }, null, 2));
   assert.equal(report.status, "benchmark-incomplete");
   assert.ok(report.warnings.some((check) => check.id === "reference-extraction-provenance-present"));
 });
 
 test("reports an exact-byte mismatch as failed instead of trusting stale reference metrics", async (t) => {
   const { root } = await setup(t);
-  await writeFile(path.join(root, "evidence/survey.json"), "changed after measurement review");
+  await writeFile(path.join(root, "evidence/survey.json"), JSON.stringify({ schemaVersion: "1.0.0", coordinateFrameId: frameId, units: "m" }));
   const execution = run(root, "report-failed.json");
   assert.equal(execution.status, 1, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "report-failed.json"), "utf8"));
