@@ -468,6 +468,7 @@ test("rejects unsupported frame, negative up-axis, and COLMAP version drift", as
   assert.throws(() => validateBrf23ExecutionReport({ ...f.report, coordinateFrame: {
     ...f.report.coordinateFrame, reviewedSourceUpAxisPositiveDirection: "negative",
   } }), /positive X\/Y\/Z/);
+  await approveAllRights(f);
   await assert.rejects(runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
     colmapVersionProbe: async () => "4.2.0",
   })), /COLMAP version changed/);
