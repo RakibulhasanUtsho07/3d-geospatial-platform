@@ -273,11 +273,16 @@ def assess(artifact_root_arg: Path, image_root_arg: Path, decision_name: str, pr
         "sha256": hashlib.sha256(rights_admission_bytes).hexdigest(),
         "evaluationId": rights_admission["evaluationId"],
         "assetCount": len(rights_admission["assets"]),
-        "pendingDecisionCount": sum(row.get("decision") != "approved" for row in rights_admission["assets"]),
+        "pendingDecisionCount": sum(row.get("decision") == "pending" for row in rights_admission["assets"]),
+        "deniedDecisionCount": sum(row.get("decision") == "denied" for row in rights_admission["assets"]),
     }
     decision_path = brf21.safe_file(root, decision_name, max_bytes=brf21.MAX_JSON_BYTES)
     decision, decision_bytes = load_json_regular_file(decision_path, brf21.MAX_JSON_BYTES)
     blockers: list[str] = []
+    if rights_admission_binding["pendingDecisionCount"] > 0:
+        blockers.append("BRF-45 exact-asset rights admission has pending source rows.")
+    if rights_admission_binding["deniedDecisionCount"] > 0:
+        blockers.append("BRF-45 exact-asset rights admission contains denied source rows.")
     human_review_result: dict[str, Any] | None = None
     try:
         human_review_result = brf21.validate_decision(root, decision)
