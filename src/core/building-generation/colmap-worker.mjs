@@ -91,12 +91,13 @@ async function readApprovedSources(root,buildingId,sourceIds,spec){
   if(record.id!==sourceId||record.buildingId!==buildingId)throw new TypeError("media source metadata identity mismatch for "+sourceId);
   if(!["image","video-frame"].includes(record.kind)||!["image/jpeg","image/png"].includes(record.mimeType))throw new TypeError("COLMAP worker accepts ingested JPEG/PNG image or video-frame sources only: "+sourceId);
   if(record.usageStatus!=="approved"||typeof record.licence!=="string"||!record.licence.trim()||record.licence.toLowerCase()==="unknown")throw new TypeError("source "+sourceId+" needs a reviewed licence and usageStatus=approved");
+  const declared=specById.get(sourceId);
+  if(!declared)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
   const recordedScopes=normalizeSourceOperationScopes(record.permittedOperations, "source " + sourceId + " permittedOperations");
-  const declaredScopes=normalizeSourceOperationScopes(declared?.permittedOperations, "BuildingSpec source " + sourceId + " permittedOperations");
+  const declaredScopes=normalizeSourceOperationScopes(declared.permittedOperations, "BuildingSpec source " + sourceId + " permittedOperations");
   if(JSON.stringify(recordedScopes)!==JSON.stringify(declaredScopes))throw new TypeError("BuildingSpec source " + sourceId + " permitted operation scopes do not match the verified source record");
   for(const scope of ["photogrammetry-reconstruction","texture-baking"]){if(!recordedScopes.includes(scope))throw new TypeError("source "+sourceId+" lacks explicit "+scope+" permission");}
-  const declared=specById.get(sourceId);
-  if(!declared||declared.assetId!==record.assetId||declared.usageStatus!=="approved"||declared.licence!==record.licence)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
+  if(declared.assetId!==record.assetId||declared.usageStatus!=="approved"||declared.licence!==record.licence)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
   if(typeof record.relativePath!=="string"||record.relativePath.includes("\\"))throw new TypeError("invalid asset relativePath for "+sourceId);
   const absolute=path.resolve(root,record.relativePath);if(!inside(root,absolute))throw new TypeError("asset path escapes workspaceRoot");
   const lstatResult=await lstat(absolute);if(lstatResult.isSymbolicLink()||!lstatResult.isFile())throw new TypeError("media asset must be a regular non-symlink file");
