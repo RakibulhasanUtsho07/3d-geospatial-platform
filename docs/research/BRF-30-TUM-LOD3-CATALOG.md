@@ -11,6 +11,12 @@ The official [TUM2TWIN semantic building-model page](https://tum2t.win/datasets/
 
 ## What the automation does
 
+## Live inventory result (28 October 2026)
+
+Workflow [#40641848479](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479) completed successfully. It resolved `main` to commit `e032a71fc9b3c9c3d4869e3aca9677d1234086aa` (committed 5 December 2025), paged through the catalog in two requests, and found **27 GML files**, all with the `DEBY_LOD3_` filename prefix. The full metadata report is [artifact #12795532392](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40641848479/artifacts/12795532392); its JSON SHA-256 is `d2398630dc00175e40310fc567dd18cd3d4f2e72f8b0e955cdb72cd5b8baf64a`.
+
+The repository's root `LICENSE` was fetched separately: it begins `Attribution 4.0 International`, and SHA-256 is `9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411`. That verifies the content of the licence file at the pinned revision, not automatically the intended rights for an exact derived model or unrelated image/ULS asset. The catalog names are stored as inventory records, not accepted building identities.
+
 - Resolves the public GitLab project's `main` branch to a commit SHA, then queries the tree at that immutable commit.
 - Paginates the `citygml/lod3-building-datasets` path with strict response-size and page-count limits.
 - Inventories filenames, paths, blob IDs, suffixes and prefix counts; it does not download any GML/CityGML or model payload.
