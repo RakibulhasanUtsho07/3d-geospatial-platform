@@ -357,6 +357,9 @@ jobs:
 
       - name: Test BRF-41 interim dataset use and accuracy claim boundaries
         run: npm run test:brf41-interim-dataset-policy
+      - name: Test BRF-41 private demo-image ingestion and image-quality preflight
+        run: npm run test:brf41-demo-image-smoke
+
       - name: Validate interim dataset policy remains demo-only and fail-closed
         run: |
           mkdir -p artifacts
