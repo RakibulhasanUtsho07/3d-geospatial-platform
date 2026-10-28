@@ -209,11 +209,17 @@ def parse_las_prefix(prefix: bytes) -> dict[str, Any]:
                 "text": wkt[:5000],
                 "textTruncated": len(wkt) > 5000,
             }
-            epsg_codes = sorted(set(re.findall(
-                r"(?:EPSG\\s*[:=]\\s*|ID\\s*\\[\\s*[\"']EPSG[\"']\\s*,\\s*|AUTHORITY\\s*\\[\\s*[\"']EPSG[\"']\\s*,\\s*[\"'])(\\d+)",
-                wkt,
-                flags=re.IGNORECASE,
-            )))
+            epsg_codes = set()
+            patterns = (
+                r"EPSG\s*[:=]\s*(\d+)",
+                r'ID\s*\[\s*"EPSG"\s*,\s*(\d+)',
+                r"ID\s*\[\s*'EPSG'\s*,\s*(\d+)",
+                r'AUTHORITY\s*\[\s*"EPSG"\s*,\s*"(\d+)"',
+                r"AUTHORITY\s*\[\s*'EPSG'\s*,\s*'(\d+)'",
+            )
+            for pattern in patterns:
+                epsg_codes.update(re.findall(pattern, wkt, flags=re.IGNORECASE))
+            epsg_codes = sorted(epsg_codes)
             crs_entry["epsgCodesFound"] = epsg_codes
             result["crsEvidence"].append(crs_entry)
         elif user_id.casefold() == "lasf_projection" and record_id in (34735, 34736, 34737):
