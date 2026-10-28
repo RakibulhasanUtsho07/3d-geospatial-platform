@@ -12,7 +12,7 @@ const {values,positionals}=parseArgs({
  }
 });
 if(positionals.length!==3||!values.licence||process.argv.includes("--help")){
- console.log("Usage: node scripts/review-building-source.mjs <workspaceRoot> <buildingId> <sourceId> --licence <known licence/permission basis> --permitted-operation <scope> (repeat per scope) --confirm-rights [--author <name>] [--attribution <credit>] [--source-url <https://...>] [--capture-lon <deg> --capture-lat <deg> [--heading-degrees <0..360>]]\nScopes: private-image-ingestion, private-image-quality-preflight, video-frame-extraction, procedural-model-derivation, single-image-ai-reconstruction, photogrammetry-reconstruction, texture-baking. Only attest to scopes you have independently confirmed; this CLI does not verify legal rights.");
+ console.log("Usage: node scripts/review-building-source.mjs <workspaceRoot> <buildingId> <sourceId> --licence <known licence/permission basis> --permitted-operation <scope> (repeat per scope) --confirm-rights [--author <name>] [--attribution <credit>] [--source-url <https://...>] [--capture-lon <deg> --capture-lat <deg> [--heading-degrees <0..360>]]\nScopes: private-media-ingestion, private-image-quality-preflight, video-frame-extraction, procedural-model-derivation, single-image-ai-reconstruction, photogrammetry-reconstruction, texture-baking. Only attest to scopes you have independently confirmed; this CLI does not verify legal rights.");
  process.exit(process.argv.includes("--help")?0:2);
 }
 const [workspaceRoot,buildingId,sourceId]=positionals;
