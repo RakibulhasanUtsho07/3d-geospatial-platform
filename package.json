@@ -215,7 +215,8 @@
     "test:brf35-building-linkage": "node --test tests/brf35-building-linkage.test.mjs",
     "test:brf36-source-byte-verifier": "node --test tests/brf36-source-byte-verifier.test.mjs tests/brf36-source-byte-verifier-cli.test.mjs",
     "test:brf37-proj-operation": "node --test tests/brf37-proj-operation.test.mjs tests/brf37-proj-operation-cli.test.mjs",
-    "test:brf37-proj-operation:integration": "node scripts/test-brf37-proj-integration.mjs"
+    "test:brf37-proj-operation:integration": "node scripts/test-brf37-proj-integration.mjs",
+    "test:brf38-rights-scope": "node --test tests/brf38-rights-scope.test.mjs tests/brf38-rights-scope-cli.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
