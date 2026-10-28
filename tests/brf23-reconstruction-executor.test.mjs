@@ -302,7 +302,7 @@ function optionsFor(f, overrides = {}) {
   return {
     workspaceRoot: f.workspaceRoot, buildingId: "building-one", jobId: "unit-test-job",
     buildingSpec: { id: "building-one", sources: f.sourceRecords.map(row => ({
-      id: row.id, assetId: row.assetId, usageStatus: "approved", licence: row.licence,
+      id: row.id, assetId: row.assetId, usageStatus: row.usageStatus, licence: row.licence,
     })) },
     sourceIds: f.sourceRecords.map(row => row.id), artifactRoot: f.artifactRoot, imageRoot: f.imageRoot,
     decisionName: "decision.json", profilePath: path.join(f.artifactRoot, "profile.json"),
@@ -475,6 +475,13 @@ test("rejects unsupported frame, negative up-axis, and COLMAP version drift", as
 test("only a complete separate BRF-45 admission can satisfy the source-use gate", async t => {
   const f = await setup(t);
   await approveAllRights(f);
+  // A mutable registry value is metadata, not the source-use grant. Keep it unreviewed
+  // to prove that explicit, exact-byte BRF-45 admission is the permission authority.
+  for (const row of f.sourceRecords) {
+    row.usageStatus = "unreviewed";
+    await writeFile(path.join(f.workspaceRoot, ".building-engine", "media", "building-one", "sources", row.id + ".json"),
+      JSON.stringify(row, null, 2) + "\n");
+  }
   let workerCalls = 0;
   const result = await runBrf23AuthorizedColmapReconstruction(optionsFor(f, {
     workerImpl: async args => {
@@ -487,6 +494,9 @@ test("only a complete separate BRF-45 admission can satisfy the source-use gate"
     },
   }));
   assert.equal(workerCalls, 1);
+  assert.ok(result.authorization.selectedSourceImages.every(row => row.usageStatus === "unreviewed"));
+  assert.ok(result.authorization.selectedSourceImages.every(row =>
+    row.rightsAdmissionStatus === "evidence-complete-human-review-required"));
   assert.equal(result.authorization.candidateGlbGenerated, true);
   assert.equal(result.report.candidateGeometryValidated, false);
   assert.equal(result.report.independentReferenceVerified, false);
