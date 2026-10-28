@@ -29,6 +29,25 @@ This image may exercise source-byte verification, image ingestion and private re
 
 The published textured reference GLB comes from the same capture imagery, while the 1.997 m AprilTag bar was used as a scale control for the reference scan. They are not independent held-out truth on the current evidence.
 
+## Private sample ingestion workflow
+
+The next BRF-41 slice adds an allowlisted, reproducible workflow for the one demo image:
+
+1. The workflow downloads the image into the GitHub runner's temporary workspace only.
+2. `run-brf41-demo-image-smoke-test.mjs` validates the live source bytes against BRF-13's declared byte size and SHA-256 and verifies that the source pin still matches the BRF-41 admission register.
+3. Only after byte verification passes, the existing private `ingestMediaFile` pipeline stores a content-addressed private copy and a source record with the declared attribution, but keeps `usageStatus=unreviewed`.
+4. The existing FFmpeg image quality preflight checks decode, dimensions and bounded image metrics. One image is expected to remain **not** reconstruction-ready and **not** safe to submit to COLMAP.
+5. The workflow uploads a metadata-only JSON report. Neither the source image nor the privately ingested copy is uploaded as an artifact.
+
+Commands:
+
+~~~bash
+npm run test:brf41-demo-image-smoke
+node scripts/run-brf41-demo-image-smoke-test.mjs --help
+~~~
+
+The output status `demo-smoke-tested-not-accuracy-validated` means only that byte verification, private intake and one-image decode/quality preflight succeeded. It is not a 3D model render, mesh reconstruction, independent reference, licence authentication, accuracy pass or publication decision. The CI asserts that `safeToSubmitToColmap`, `reconstructionCandidate`, `rightsApproved` and every release flag remain false.
+
 ## Policy behavior
 
 Run:
