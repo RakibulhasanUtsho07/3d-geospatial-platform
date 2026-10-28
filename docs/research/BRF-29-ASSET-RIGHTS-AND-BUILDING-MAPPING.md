@@ -17,6 +17,10 @@ The machine-readable matrix is [brf-29-rights-and-building-mapping.json](../../b
 - **TUM2TWIN:** the [public GitHub repository](https://github.com/tum-gis/tum2twin) contains a [CC BY 4.0 LICENSE](https://github.com/tum-gis/tum2twin/blob/main/LICENSE), but its README points to the separate [tum2twin-datasets GitLab repository](https://gitlab.lrz.de/tum-gis/tum2twin-datasets) for actual model files. This matrix does not assume the GitHub project licence automatically covers every separate GitLab data file or the distinct Zenodo imagery/ULS archive.
 - **Model derivation:** the [TUM2TWIN semantic-model page](https://tum2t.win/datasets/cm-buildings) says individual LOD3 models are manually modelled based on official LOD2 models plus additional mobile-laser-scan point clouds. This provenance must be reflected in any accuracy claim: a model can be a useful reference, but its derivation does not by itself make every geometric dimension an independent survey checkpoint.
 
+## BRF-30 candidate shortlist
+
+A source-backed shortlist now lives in [BRF-30-TUM-BUILDING-CANDIDATE-SHORTLIST.md](BRF-30-TUM-BUILDING-CANDIDATE-SHORTLIST.md). It names three candidate GML IDs seen in public TUM2TWIN/GT-LOD3 sources, but none is selected. Their exact file-level licence, footprint geometry, GML CRS/vertical reference, intersection with the ULS crop, and match to candidate images remain unverified. In particular, the ULS header declares EPSG:32632 while a TUM2TWIN database tutorial uses EPSG:25832 for its example configuration; inspect each file's own `srsName` and record an explicit coordinate operation rather than assuming equivalence.
+
 ## Required steps to unblock
 
 1. **Rights scope:** for each intended image, ULS crop, trajectory, metadata and reference model, record the exact source/version/file and applicable licence/permission. Store required attribution and modification notices, and state whether commercial platform use, public model display and model-file redistribution are allowed. If the licence is not explicit, keep it pending and request written clarification from the asset owners.
