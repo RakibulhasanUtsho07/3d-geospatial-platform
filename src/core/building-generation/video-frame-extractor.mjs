@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readdir, mkdir, realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { ingestMediaFile } from "./media-intake.mjs";
-import { loadVerifiedSource } from "./source-workflow.mjs";
+import { loadVerifiedSource, normalizeSourceOperationScopes } from "./source-workflow.mjs";
 import { readFile } from "node:fs/promises";
 
 function validateOptions(options) {
@@ -39,6 +39,15 @@ export async function extractVideoFrames(options) {
   if(!inside(root,videoPath))throw new TypeError("video must be inside workspaceRoot");
   const videoStat=await stat(videoPath);if(!videoStat.isFile()||videoStat.size<=0)throw new TypeError("video input must be a non-empty regular file");
   const buildingId=safeId(options.buildingId,"buildingId"),sourceId=safeId(options.sourceId,"sourceId");
+  const videoRecord=options.videoRecord;
+  if(!videoRecord||videoRecord.id!==sourceId||videoRecord.buildingId!==buildingId||videoRecord.kind!=="video"){
+    throw new TypeError("video frame extraction requires the matching reviewed video source record");
+  }
+  if(videoRecord.usageStatus!=="approved"||typeof videoRecord.licence!=="string"||!videoRecord.licence.trim()||videoRecord.licence.toLowerCase()==="unknown"){
+    throw new TypeError("video frame extraction requires a reviewed source licence and usageStatus=approved");
+  }
+  const parentScopes=normalizeSourceOperationScopes(videoRecord.permittedOperations,"video source "+sourceId+" permittedOperations");
+  if(!parentScopes.includes("video-frame-extraction"))throw new TypeError("video source "+sourceId+" lacks explicit video-frame-extraction permission");
   const workRoot=path.join(root,".building-engine","tmp"),workDir=path.join(workRoot,buildingId+"-"+sourceId+"-"+randomUUID());
   if(!inside(root,workDir))throw new TypeError("temporary frame path escapes workspaceRoot");
   await mkdir(workDir,{recursive:true});
@@ -48,7 +57,7 @@ export async function extractVideoFrames(options) {
     const names=(await readdir(workDir)).filter(n=>/^frame-\d{6}\.jpg$/.test(n)).sort();
     if(!names.length)throw new Error("FFmpeg succeeded but produced no video frames");
     if(names.length>options.maxFrames)throw new Error("FFmpeg output exceeded maxFrames");
-    const videoRecord=options.videoRecord,frames=[];
+    const frames=[];
     for(const name of names){
       const index=Number(name.match(/-(\d+)\.jpg$/)[1]),frameSourceId=(sourceId+"-frame-"+String(index).padStart(6,"0")).slice(0,80);
       const relative=path.relative(root,path.join(workDir,name)).split(path.sep).join("/");
