@@ -1,12 +1,12 @@
 # BRF-22 — Hash-bound human-review decision contract
 
 **Tracking:** [Issue #226](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/226).  
-**Inputs:** BRF-14 exact-byte verification, BRF-20 review manifest/contact sheet/coverage plot and BRF-21 pairwise report/graph.  
+**Inputs:** BRF-14 exact-byte verification, BRF-20 review manifest/contact sheet/coverage plot, BRF-21 pairwise report/graph, and the BRF-42 private multi-view quality-preflight report.  
 **Decision:** the real sample stays pending until an authorized reviewer records decisions against the exact evidence hashes.
 
 ## Commands
 
-Place the seven evidence files from the CI artifact in one dedicated directory. Do not add raw source images to Git or to a shared artifact. Generate a blank form:
+Place the eight hash-bound evidence files from the CI artifact in one dedicated directory, including `private-multiview-media-intake-report.json`. Do not add raw source images or the private media store to Git or to a shared artifact. Generate a blank form:
 
     python3 scripts/brf21_human_review.py template --artifact-root path/to/brf-14-artifacts
 
@@ -14,7 +14,7 @@ Fill in the generated multiview-human-review-decision-template.json only after p
 
     python3 scripts/brf21_human_review.py validate --artifact-root path/to/brf-14-artifacts --decision review-decision.json
 
-The template binds the exact bytes and sizes of all seven evidence artifacts: the pinned BRF-14 source manifest, its byte-verification report, the BRF-20 JSON manifest, BRF-21 JSON report, contact sheet, camera-angle plot and pairwise graph. It verifies the canonical verification-report hash references in both downstream reports, and compares each source image ID, filename, byte count and SHA-256 across the three stages and each BRF-21 pair. The validator recomputes each SHA-256 and rejects a stale or modified input rather than silently accepting the previously reviewed evidence.
+The template binds the exact bytes and sizes of all eight evidence artifacts: the pinned BRF-14 source manifest, byte-verification report, BRF-20 JSON manifest, BRF-21 JSON report, contact sheet, camera-angle plot, pairwise graph and BRF-42 `private-multiview-media-intake-report.json`. It verifies the raw SHA-256 links from the quality report to the exact BRF-14 source manifest and byte-verification report, matches all view IDs/hashes/sizes across intake and quality rows, checks that every intake record remains `usageStatus=unreviewed`, and requires `rightsApproved=false` and `safeToSubmitToColmap=false`. It does not treat decode/quality metrics as human overlap, same-building, up-axis or rights approval. The validator recomputes each evidence SHA-256 and rejects a missing, stale or modified input.
 
 ## Required human fields
 
