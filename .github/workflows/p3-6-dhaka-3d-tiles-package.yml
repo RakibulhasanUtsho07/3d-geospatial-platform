@@ -1,0 +1,70 @@
+name: P3.6 Dhaka multi-building 3D Tiles package
+
+on:
+  push:
+    branches:
+      - feat/p3-6-multibuilding-tiles-package
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "scripts/build-dhaka-3d-tiles-package.mjs"
+      - "scripts/verify-dhaka-3d-tiles-package.mjs"
+      - "src/core/geospatial/tileset-package-integrity.mjs"
+      - "src/core/geospatial/tileset-manifest-validation.mjs"
+      - "tests/dhaka-3d-tiles-package.test.mjs"
+      - "data/overture/dhaka-buildings-3d-pilot.geojson"
+      - "package.json"
+      - "package-lock.json"
+      - "docs/research/P3-6-DHAKA-3D-TILES-PACKAGE.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-6-dhaka-tiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-integrity:
+    name: Build and verify bounded real-Dhaka source package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TILE_PACKAGE_DIR: /tmp/dhaka-3d-tiles-multibuilding-pilot
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run deterministic synthetic-package and failure-injection tests
+        run: npm run test:dhaka-3d-tiles-package
+
+      - name: Build bounded multi-building package from the repository Dhaka extract
+        run: >-
+          npm run build:dhaka-3d-tiles-package --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --output "$TILE_PACKAGE_DIR"
+          --max-features 32
+          --height-meters 8
+
+      - name: Verify all generated source, tileset and GLB integrity records
+        run: npm run verify:dhaka-3d-tiles-package -- --package "$TILE_PACKAGE_DIR"
+
+      - name: Upload generated pilot package for inspection (not publication)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-multibuilding-3d-tiles-pilot
+          path: /tmp/dhaka-3d-tiles-multibuilding-pilot/
+          if-no-files-found: warn
+          retention-days: 14
