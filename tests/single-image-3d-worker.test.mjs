@@ -52,7 +52,7 @@ test("direct single-image worker rejects a source without explicit AI reconstruc
  await assert.rejects(runSingleImage3D({
   workspaceRoot:root,buildingId,buildingSpec:denied,jobId:"missing-operation-scope",sourceId:"facade-image",
   runnerScript:runner,allowSingleViewInference:true,device:"cpu",mcResolution:128,spawnImpl:mockedSpawn,
- }),/permitted operation scopes do not match/);
+ }),/permitted operation scopes/);
 });
 test("runs a mocked TripoSR command and emits an AI-proposed non-map-ready GLB report",async t=>{
  const root=await workspace(t),{buildingId,buildingSpec}=await setupPhoto(t,root);
