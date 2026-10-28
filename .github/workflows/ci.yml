@@ -298,6 +298,20 @@ jobs:
         run: python3 -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
       - name: Validate BRF-16 EPT inspector syntax
         run: python3 -m py_compile scripts/inspect-usgs-ept-reference.py
+      - name: Test BRF-35 same-building linkage and metric-frame gate
+        run: npm run test:brf35-building-linkage
+
+      - name: Validate BRF-35 real candidate remains blocked
+        run: |
+          mkdir -p artifacts
+          node scripts/validate-brf35-building-linkage.mjs benchmarks/building-reconstruction/brf-35-candidate-linkage.json benchmarks/building-reconstruction/brf-33-citygml-candidate-geometry.json artifacts/brf35-linkage-validation.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf35-linkage-validation.json", "utf8"));
+          if (report.status !== "blocked-missing-or-invalid-evidence") throw new Error("Real candidate must remain blocked.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          NODE
+
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
