@@ -121,7 +121,7 @@ test("policy must explicitly allow private image quality preflight", async t => 
   asset.allowedUses = asset.allowedUses.filter(use => use !== "private-image-quality-preflight");
   await assert.rejects(
     runBrf41DemoImageSmokeTest({ ...fixture, sourceRelativePath: "input/sample.jpg", spawnImpl: fakeFfmpeg() }),
-    /admission policy is blocked/i,
+    /not explicitly admitted/i,
   );
 });
 
