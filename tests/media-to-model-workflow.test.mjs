@@ -94,6 +94,12 @@ test("source-specific operation scope is mandatory and strategy-specific",async 
   workspaceRoot:root,buildingSpec:fixture,jobId:"unknown-operation-scope",strategy:"procedural",confirmRights:true,
   sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","publish-to-production"]}],
  }),/unsupported operation scope/);
+ const videoBytes=Buffer.from([0,0,0,24,0x66,0x74,0x79,0x70,0x69,0x73,0x6f,0x6d,0,0,0,0]);
+ await writeFile(path.join(root,"uploads","clip.mp4"),videoBytes);
+ await assert.rejects(runMediaToModelWorkflow({
+  workspaceRoot:root,buildingSpec:fixture,jobId:"video-frame-scope-missing",strategy:"procedural",confirmRights:true,
+  sources:[{sourceId:"clip",relativePath:"uploads/clip.mp4",kind:"video",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","procedural-model-derivation"]}],
+ }),/video-frame-extraction/);
  await assert.rejects(stat(path.join(root,".building-engine")),/ENOENT/);
 });
 test("can use an already-ingested, reviewed image selected by source ID without importing it twice",async t=>{
