@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-37-TUM-PROJ-OPERATION",
+  "purpose": "human-reviewed horizontal coordinate-operation execution only",
+  "sourceModelId": "DEBY_LOD3_4959323",
+  "operation": {
+    "id": "tum-25832-to-32632",
+    "registryOperationId": null,
+    "reviewStatus": "pending-review",
+    "reviewRecord": null,
+    "sourceCrs": "EPSG:25832",
+    "targetCrs": "EPSG:32632",
+    "inputAxisOrder": ["easting", "northing"],
+    "outputAxisOrder": ["easting", "northing"],
+    "unit": "metre",
+    "areaOfUse": null,
+    "nominalAccuracyMeters": null,
+    "horizontalOnly": true,
+    "verticalFrameStatus": "unresolved",
+    "projVersion": null,
+    "dataDirectory": null,
+    "projDatabase": null,
+    "definition": null,
+    "grids": []
+  },
+  "controlVectors": [],
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "notes": [
+    "This manifest intentionally cannot execute until a human reviews and pins the exact operation definition, PROJ version, proj.db bytes, required grid bytes, area of use and control vectors.",
+    "The current CityGML Z datum and ULS height reference remain unresolved; this runner accepts only horizontal 2D inputs.",
+    "Synthetic CI control vectors prove runner mechanics only and are not the real-building benchmark or an accuracy claim."
+  ]
+}
