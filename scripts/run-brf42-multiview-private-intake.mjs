@@ -7,8 +7,6 @@ import { verifyBrf14MultiviewSource } from "./verify-brf14-multiview-source.mjs"
 import { ingestMediaFile } from "../src/core/building-generation/media-intake.mjs";
 import { assessBuildingMediaSources } from "../src/core/building-generation/media-quality-preflight.mjs";
 
-const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DEFAULT_MANIFEST = path.join(REPOSITORY_ROOT, "benchmarks/building-reconstruction/brf-14-multiview-source.json");
 const BUILDING_ID = "brf42-flat-roof-demo";
 const RELEASE_FLAGS = Object.freeze({
   acceptanceEligible: false,
