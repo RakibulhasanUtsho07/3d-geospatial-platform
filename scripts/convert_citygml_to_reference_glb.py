@@ -197,7 +197,7 @@ def pack_glb(gltf,binary):
 
 def build_reference_glb(payload: bytes, *, source_commit: str, source_path: str, expected_sha256: str,
                         expected_bytes: int, source_crs: str, rights_review_status="pending-exact-file-scope-review",
-                        local_review_only=False):
+                        local_review_only=False, rights_evidence_url=None, attribution_text=None, rights_reviewed_by=None):
     if not COMMIT.fullmatch(source_commit): raise ConversionError("source_commit must be a 40-character immutable Git commit SHA")
     if not isinstance(source_path,str) or not source_path.strip() or source_path.startswith("/") or "\\" in source_path or ".." in Path(source_path).parts:
         raise ConversionError("source_path must be a normalized repository-relative path")
@@ -205,6 +205,13 @@ def build_reference_glb(payload: bytes, *, source_commit: str, source_path: str,
     if rights_review_status not in {"pending-exact-file-scope-review","approved","rejected"}: raise ConversionError("invalid rights_review_status")
     if rights_review_status=="rejected": raise ConversionError("source asset rights are rejected; conversion is blocked")
     if rights_review_status!="approved" and not local_review_only: raise ConversionError("exact-file rights are not approved; local_review_only is required for private diagnostics")
+    if rights_review_status=="approved":
+        if not isinstance(rights_evidence_url,str) or not re.fullmatch(r"https://[^\\s]+",rights_evidence_url):
+            raise ConversionError("approved rights require an HTTPS rights_evidence_url")
+        if not isinstance(attribution_text,str) or not attribution_text.strip():
+            raise ConversionError("approved rights require non-empty attribution_text")
+        if not isinstance(rights_reviewed_by,str) or not rights_reviewed_by.strip():
+            raise ConversionError("approved rights require a non-empty rights_reviewed_by reviewer reference")
     if not isinstance(expected_bytes,int) or not 1<=expected_bytes<=MAX_INPUT_BYTES: raise ConversionError("expected_bytes is outside input ceiling")
     if not SHA256.fullmatch(expected_sha256): raise ConversionError("expected_sha256 must be a 64-character lowercase SHA-256")
     if len(payload)!=expected_bytes: raise ConversionError("source byte count does not match pinned expected_bytes")
@@ -223,7 +230,7 @@ def build_reference_glb(payload: bytes, *, source_commit: str, source_path: str,
         "outputClassification":"source-reference-geometry-not-platform-reconstruction","sourceCommit":source_commit,"sourcePath":source_path,
         "sourceSha256":observed,"sourceBytes":len(payload),"sourceCrs":source_crs,"glbOriginSourceCoordinates":list(origin),
         "sourceToGlbAxisMapping":"x'=E-originE; y'=H-originH; z'=-(N-originN); no scale or CRS transform",
-        "rightsReviewStatus":rights_review_status,"localReviewOnly":local_review_only,"sameBuildingVerified":False,
+        "rightsReviewStatus":rights_review_status,"localReviewOnly":local_review_only,\n        "rightsEvidenceUrl":rights_evidence_url if rights_review_status=="approved" else None,\n        "requiredAttribution":attribution_text if rights_review_status=="approved" else None,\n        "rightsReviewedBy":rights_reviewed_by if rights_review_status=="approved" else None,"sameBuildingVerified":False,
         "platformGeneratedCandidateGlbExists":False,"independentHeldOutCheckpointsExist":False,
         "releaseFlags":{"acceptanceEligible":False,"publicationEligible":False,"mapReady":False,"automaticApproval":False}}},
       "scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"name":"SourceReferenceGeometry","mesh":0}],
@@ -260,6 +267,7 @@ def main():
     parser.add_argument("--source-commit",required=True); parser.add_argument("--source-path",required=True)
     parser.add_argument("--expected-sha256",required=True); parser.add_argument("--expected-bytes",type=int,required=True)
     parser.add_argument("--source-crs",default="EPSG:25832"); parser.add_argument("--rights-review-status",default="pending-exact-file-scope-review")
+    parser.add_argument("--rights-evidence-url"); parser.add_argument("--attribution-text"); parser.add_argument("--rights-reviewed-by")
     parser.add_argument("--local-review-only",action="store_true"); parser.add_argument("--report-json")
     args=parser.parse_args(); src=Path(args.input_gml); dest=Path(args.output_glb)
     if src.resolve()==dest.resolve(): raise ConversionError("input and output paths must differ")
@@ -268,7 +276,7 @@ def main():
     if src.stat().st_size>MAX_INPUT_BYTES: raise ConversionError("input file exceeds 64 MiB ceiling")
     glb,report=build_reference_glb(src.read_bytes(),source_commit=args.source_commit,source_path=args.source_path,
       expected_sha256=args.expected_sha256,expected_bytes=args.expected_bytes,source_crs=args.source_crs,
-      rights_review_status=args.rights_review_status,local_review_only=args.local_review_only)
+      rights_review_status=args.rights_review_status,local_review_only=args.local_review_only,rights_evidence_url=args.rights_evidence_url,\n      attribution_text=args.attribution_text,rights_reviewed_by=args.rights_reviewed_by)
     dest.parent.mkdir(parents=True,exist_ok=True)
     with dest.open("xb") as stream: stream.write(glb)
     report_path=Path(args.report_json) if args.report_json else dest.with_suffix(".report.json")
