@@ -26,7 +26,7 @@ The source discovery is promising, but these are not yet verified facts for a sp
 The first exact-byte inspection succeeded in [workflow run #40634521973](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40634521973). The publisher MD5 matched the downloaded PDF; the PDF is 9 pages. Extracted text identifies these items:
 
 - **Horizontal CRS declared by the PDF:** WGS 84 / UTM 32N, EPSG:32632 (PDF page 2).
-- **Units:** meters and degrees. The same page says the XYZ coordinates are in a local coordinate system while separately identifying georeferenced data as EPSG:32632. Treat the target LAS/LAZ header/VLR and any local-to-georeferenced transformation as unverified until inspected.
+- **Units:** meters and degrees. The same page says the XYZ coordinates are in a local coordinate system while separately identifying georeferenced data as EPSG:32632. The selected ULS LAZ header/VLR has now been inspected and declares EPSG:32632; the meaning of “local” in the PDF and source-to-evaluation mapping remain unresolved.
 - **Vertical reference:** the PDF states elevation is above mean sea level but does not name a vertical CRS, datum or geoid model in the extracted text. This remains **BLOCKED** for metric 3D comparison.
 - **Within-ULS alignment:** the PDF lists a 4×4 rigid ICP transform for aligning point-cloud part 3 to part 1, with post-alignment mean/std distances of 3.6/4.5 cm and 5.8/5.7 cm for comparisons to parts 1/2 (page 4). This is a source-acquisition-internal alignment, not a generic candidate-to-reference transform.
 - **Source-product cross-comparison:** photogrammetry versus ULS (nadir-only) is reported with M3C2 mean difference 1.7 cm and standard deviation 22.8 cm (page 7). It is a comparison between related products of the same acquisition campaign—not accuracy for this platform's candidate GLB and not held-out checkpoint validation.
@@ -51,6 +51,28 @@ The assessment command exits with code `2` because blockers are intentional. It 
 The [BRF-27 metadata workflow](../../.github/workflows/brf27-tum-metadata-intake.yml) fetches only the 1.3 MB PDF (never the multi-GB source archives), enforces a 10 MiB byte ceiling, verifies the publisher's recorded MD5 against the downloaded bytes, computes SHA-256, runs `pdfinfo` / `pdftotext`, and produces a keyword-evidence JSON plus extracted text. The revised workflow also renders pages 2, 4 and 7 to PNG for visual checks. It uploads only derived audit files and these page previews; the raw PDF stays in ephemeral runner storage.
 
 The report is a navigation aid, not a CRS decision. Human review must trace any CRS, horizontal units, vertical datum, offset and transformation values back to the relevant page and figure/table. A missing keyword is not proof that a field is absent if the document uses a different name or image-only table. The readiness manifest remains blocked until those source facts are explicitly recorded and checked.
+
+## BRF-28 — bounded LAZ header and CRS-VLR inspection
+
+The [BRF-28 workflow](../../.github/workflows/brf28-laz-header-intake.yml) requests only bytes `0–8,388,607` from the selected ULS LAZ. It accepts the response only if the server returns HTTP `206` and a valid `Content-Range` beginning at byte zero with an end below the configured ceiling. If the origin responds with HTTP `200` instead, the script closes the response without reading the body and records a blocked result. It never attempts a full archive download.
+
+The script parses the LAS signature/version, header size, point-data offset, point format, record length, scale factors, offsets, bounds and any CRS-related VLRs contained in the downloaded prefix. It records a SHA-256 only for the prefix. It explicitly does **not** claim the publisher's whole-file MD5 was verified, and may not see an EVLR placed after point records.
+
+This is a metadata probe, not coordinate-frame approval. The header result must be compared with the documentation's local XYZ statement and EPSG:32632 declaration. It cannot name a vertical datum that the source does not specify, approve asset rights, establish a same-building identity, generate a candidate GLB, or certify any held-out accuracy result. All release gates remain false.
+
+The unit tests cover a synthetic LAS header with an EPSG WKT VLR, truncated VLRs, invalid signatures, malformed ranges and—critically—the no-read behavior when a range endpoint returns a whole-response `200`.
+
+## BRF-28 actual LAZ header findings
+
+The bounded probe succeeded in [workflow run #40636959484](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40636959484); the JSON report is in [artifact #12793024221](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40636959484/artifacts/12793024221).
+
+- The source returned HTTP 206 with Content-Range bytes 0-8388607/2840830691. Exactly 8,388,608 bytes were read. The prefix SHA-256 is 3a9b3ae9d07520dcee6bae53ab17d932a9a76483cbb8673ec0ad6ac9dbd4abb4. The whole LAZ was not downloaded and its publisher MD5 remains unverified.
+- The prefix parses as LAS 1.2: 227-byte header, point-data offset 1,186, four VLRs, compressed point format 3 (raw point-format byte 131), record length 34 bytes.
+- Coordinate scale is 0.0001 for X/Y/Z. Header offsets: X=690802.2210446384, Y=5335907.745415179, Z=568.5466850988182. Header bounds: X 690787.9737446384–691169.3342446384; Y 5335827.531815179–5336383.198915179; Z 530.5947850988182–606.4985850988182.
+- The GeoTIFF GeoKeyDirectoryTag identifies ProjectedCSTypeGeoKey = 32632. The companion GeoASCII tag says “WGS 84 / UTM zone 32N” and “WGS 84”. A WKT VLR stored with user ID liblas, record ID 2112, also states “WGS 84 / UTM zone 32N” and authority EPSG:32632. The linear-unit key is 9001 (metre).
+- The parsed GeoKeyDirectoryTag contains no VerticalCSTypeGeoKey. That does not prove a particular vertical datum; the named vertical reference/geoid remains unresolved.
+
+The header evidence strongly corroborates the projected horizontal CRS declaration. It does not resolve why the PDF describes local XYZ coordinates, nor does it establish a transform into an independently controlled evaluation frame. Header offsets and bounds are source-file coordinate metadata, not an approved candidate-to-reference transform.
 
 ## Required order to unblock
 
