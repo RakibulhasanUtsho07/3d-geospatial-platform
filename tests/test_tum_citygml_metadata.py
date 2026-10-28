@@ -127,6 +127,21 @@ class TestBoundedRangeSafety(unittest.TestCase):
 
 
 class TestLfsPrefixResolution(unittest.TestCase):
+
+    def test_large_git_blob_is_rejected_before_body_read(self):
+        fake = FakeResponse(
+            b"x" * 100000,
+            status=200,
+            headers={"Content-Length": str(MODULE.MAX_API_RESPONSE_BYTES + 1)},
+        )
+        result = MODULE.read_small_lfs_pointer_blob(
+            "a" * 40,
+            opener=lambda *_args, **_kwargs: fake,
+        )
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "blob-exceeds-small-pointer-cap")
+        self.assertEqual(fake.read_calls, [])
+
     def test_resolves_lfs_pointer_then_fetches_only_bounded_gml_prefix(self):
         pointer_oid = "b" * 64
         pointer = (
@@ -143,13 +158,10 @@ class TestLfsPrefixResolution(unittest.TestCase):
             url = request.full_url
             method = request.get_method()
             routes.append((url, method))
-            if "/repository/files/" in url:
+            if "/repository/blobs/" in url:
                 return FakeResponse(
-                    pointer, status=206,
-                    headers={
-                        "Content-Range": f"bytes 0-{len(pointer)-1}/{len(pointer)}",
-                        "Content-Length": str(len(pointer)),
-                    },
+                    pointer, status=200,
+                    headers={"Content-Length": str(len(pointer))},
                 )
             if "/info/lfs/objects/batch" in url and method == "POST":
                 payload = json.dumps({
@@ -174,7 +186,11 @@ class TestLfsPrefixResolution(unittest.TestCase):
             raise AssertionError("Unexpected request URL: " + url)
 
         result = MODULE.get_model_prefix(
-            "citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+            {
+                "path": "citygml/lod3-building-datasets/DEBY_LOD3_4959460.gml",
+                "filename": "DEBY_LOD3_4959460.gml",
+                "repositoryBlobId": "a" * 40,
+            },
             opener=opener,
         )
         self.assertEqual(result["status"], "range-read")
