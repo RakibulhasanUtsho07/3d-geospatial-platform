@@ -10,6 +10,7 @@ import { reviewBuildingSource } from "../src/core/building-generation/source-wor
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(128,31)]);
 const EARTH_RADIUS_M=6378137;
+const BROAD_TEST_SCOPES=["private-media-ingestion","private-image-quality-preflight","video-frame-extraction","procedural-model-derivation","single-image-ai-reconstruction","photogrammetry-reconstruction","texture-baking"];
 function makeControlPoints(){
  const scale=2.5,theta=30*Math.PI/180,c=Math.cos(theta),s=Math.sin(theta),lon0=90.4,lat0=23.7,tx=100,ty=200;
  return [[-10,-8],[10,-8],[10,8],[-10,8]].map(([modelX,modelZ],index)=>{
@@ -29,7 +30,7 @@ async function addExistingApprovedPhoto(root,sourceId="existing-front"){
  await mkdir(path.join(root,"uploads"),{recursive:true});
  await writeFile(path.join(root,"uploads",sourceId+".png"),Buffer.concat([png,Buffer.from(sourceId)]));
  const ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/"+sourceId+".png",buildingId:fixture.id,sourceId,kind:"image",title:"Existing photo"});
- await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId,licence:"CC BY 4.0",confirmRights:true,attribution:"Test rights attestation"});
+ await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId,licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES,confirmRights:true,attribution:"Test rights attestation"});
  return ingested;
 }
 test("runs a complete local image intake → rights record → BuildingSpec sync → procedural GLB → QA report",async t=>{
@@ -38,7 +39,7 @@ test("runs a complete local image intake → rights record → BuildingSpec sync
  await writeFile(path.join(root,"uploads","front.png"),Buffer.concat([png,Buffer.from("front-photo")]));
  const result=await runMediaToModelWorkflow({
   workspaceRoot:root,buildingSpec:fixture,jobId:"end-to-end-image",strategy:"procedural",confirmRights:true,
-  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",author:"Test photographer",attribution:"Test source credit"}],
+  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES,author:"Test photographer",attribution:"Test source credit"}],
  });
  const bytes=await readFile(result.modelPath),spec=JSON.parse(await readFile(result.specPath,"utf8"));
  const manifest=JSON.parse(await readFile(result.reportPath,"utf8"));
@@ -75,12 +76,24 @@ test("requires explicit rights attestation and a known licence before media inge
  const root=await workspace(t);await mkdir(path.join(root,"uploads"));await writeFile(path.join(root,"uploads","front.png"),png);
  await assert.rejects(runMediaToModelWorkflow({
   workspaceRoot:root,buildingSpec:fixture,jobId:"rights-missing",strategy:"procedural",
-  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0"}],confirmRights:false,
+  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES}],confirmRights:false,
  }),/confirmRights/);
  await assert.rejects(runMediaToModelWorkflow({
   workspaceRoot:root,buildingSpec:fixture,jobId:"licence-unknown",strategy:"procedural",
-  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"unknown"}],confirmRights:true,
+  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"unknown",permittedOperations:BROAD_TEST_SCOPES}],confirmRights:true,
  }),/known licence/);
+ await assert.rejects(stat(path.join(root,".building-engine")),/ENOENT/);
+});
+test("source-specific operation scope is mandatory and strategy-specific",async t=>{
+ const root=await workspace(t);await mkdir(path.join(root,"uploads"));await writeFile(path.join(root,"uploads","front.png"),png);
+ await assert.rejects(runMediaToModelWorkflow({
+  workspaceRoot:root,buildingSpec:fixture,jobId:"missing-operation-scope",strategy:"procedural",confirmRights:true,
+  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion"]}],
+ }),/lacks explicit operation permission scope.*procedural-model-derivation/);
+ await assert.rejects(runMediaToModelWorkflow({
+  workspaceRoot:root,buildingSpec:fixture,jobId:"unknown-operation-scope",strategy:"procedural",confirmRights:true,
+  sources:[{sourceId:"front-photo",relativePath:"uploads/front.png",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","publish-to-production"]}],
+ }),/unsupported operation scope/);
  await assert.rejects(stat(path.join(root,".building-engine")),/ENOENT/);
 });
 test("can use an already-ingested, reviewed image selected by source ID without importing it twice",async t=>{
@@ -95,10 +108,10 @@ test("can use an already-ingested, reviewed image selected by source ID without 
 test("rejects absolute media paths, path traversal, and incomplete reconstruction confirmations",async t=>{
  const root=await workspace(t);await mkdir(path.join(root,"uploads"));await writeFile(path.join(root,"uploads","front.png"),png);
  await assert.rejects(runMediaToModelWorkflow({
-  workspaceRoot:root,buildingSpec:fixture,jobId:"absolute-path",sources:[{sourceId:"a",relativePath:path.resolve(root,"uploads/front.png"),licence:"CC BY 4.0"}],confirmRights:true,
+  workspaceRoot:root,buildingSpec:fixture,jobId:"absolute-path",sources:[{sourceId:"a",relativePath:path.resolve(root,"uploads/front.png"),licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES}],confirmRights:true,
  }),/must be relative/);
  await assert.rejects(runMediaToModelWorkflow({
-  workspaceRoot:root,buildingSpec:fixture,jobId:"traversal",sources:[{sourceId:"a",relativePath:"../outside.png",licence:"CC BY 4.0"}],confirmRights:true,
+  workspaceRoot:root,buildingSpec:fixture,jobId:"traversal",sources:[{sourceId:"a",relativePath:"../outside.png",licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES}],confirmRights:true,
  }),/escapes workspaceRoot/);
  await assert.rejects(runMediaToModelWorkflow({
   workspaceRoot:root,buildingSpec:fixture,jobId:"missing-overlap",strategy:"photogrammetry",sources:[],viewSourceIds:["one","two","three"],upAxis:"Z",confirmSameBuilding:true,confirmOverlapReviewed:false,confirmUpAxisReviewed:true,
@@ -113,7 +126,7 @@ test("resumes media-to-model artifacts without re-ingesting sources or rebuildin
  await writeFile(sourcePath,Buffer.concat([png,Buffer.from("resumable-source")]));
  const options={
   workspaceRoot:root,buildingSpec:fixture,jobId:"resumable-flow",strategy:"procedural",confirmRights:true,
-  sources:[{sourceId:"resume-front",relativePath:"uploads/resume-front.png",licence:"CC BY 4.0",author:"Test photographer",attribution:"Test source credit"}],
+  sources:[{sourceId:"resume-front",relativePath:"uploads/resume-front.png",licence:"CC BY 4.0",permittedOperations:BROAD_TEST_SCOPES,author:"Test photographer",attribution:"Test source credit"}],
  };
  const first=await runMediaToModelWorkflow(options);
  const statePath=path.join(root,".building-engine","reconstruction-jobs",fixture.id,"resumable-flow","job-state.json");
