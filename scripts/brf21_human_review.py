@@ -28,6 +28,7 @@ ARTIFACT_FILENAMES = {
     "contactSheet": "multiview-contact-sheet.png",
     "cameraCoveragePlot": "camera-angle-coverage.png",
     "overlapGraph": "pairwise-overlap-graph.png",
+    "privateMediaQualityReport": "private-multiview-media-intake-report.json",
 }
 SURFACE_VALUES = {"roof", "facade", "site", "other", "unknown"}
 VIEW_DECISIONS = {"include", "exclude", "uncertain"}
@@ -97,13 +98,14 @@ def _artifact_binding(root: Path, role: str) -> dict[str, Any]:
     return {"filename": filename, "byteSize": path.stat().st_size, "sha256": sha256_file(path)}
 
 
-def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[dict[str, Any]]]:
+def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], list[str], list[dict[str, Any]]]:
     root = safe_root(root_arg)
     bindings = {role: _artifact_binding(root, role) for role in ARTIFACT_FILENAMES}
     source_manifest = load_json_file(root / ARTIFACT_FILENAMES["sourceManifest"])
     verification = load_json_file(root / ARTIFACT_FILENAMES["byteVerificationReport"])
     review_packet = load_json_file(root / ARTIFACT_FILENAMES["reviewManifest"])
     overlap_report = load_json_file(root / ARTIFACT_FILENAMES["overlapReport"])
+    quality_report = load_json_file(root / ARTIFACT_FILENAMES["privateMediaQualityReport"])
 
     require(isinstance(source_manifest, dict), "BRF-14 source manifest must be a JSON object.")
     require(source_manifest.get("schemaVersion") == SCHEMA_VERSION and
@@ -135,6 +137,13 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
     require(review_packet.get("sampleId") and
             review_packet.get("sampleId") == overlap_report.get("sampleId"),
             "BRF-20 packet and BRF-21 report sampleId values must match.")
+    require(isinstance(quality_report, dict) and quality_report.get("schemaVersion") == SCHEMA_VERSION and
+            quality_report.get("evaluationId") == "BRF-42-PRIVATE-MULTIVIEW-INTAKE" and
+            quality_report.get("status") == "private-multiview-preflight-complete-not-reconstruction-approved" and
+            quality_report.get("workspaceMode") == "ephemeral-private",
+            "BRF-42 private multi-view quality report must be complete and remain in the private, not-approved stage.")
+    require(quality_report.get("sourceManifest", {}).get("sampleId") == source_manifest.get("sampleId"),
+            "BRF-42 quality report sampleId does not match BRF-14 source manifest.")
 
     require(source_manifest.get("sampleId") == review_packet.get("sampleId") == overlap_report.get("sampleId"),
             "BRF-14/20/21 sampleId values must all match.")
@@ -207,6 +216,102 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
             packet_binding.get("actualTotalBytes") == overlap_binding.get("actualTotalBytes") == total_bytes and
             packet_binding.get("byteVerificationStatus") == overlap_binding.get("byteVerificationStatus") == "views-byte-verified",
             "BRF-20/21 verification summary does not match the exact BRF-14 report.")
+
+    quality_source_binding = quality_report.get("sourceManifest")
+    require(isinstance(quality_source_binding, dict) and
+            quality_source_binding.get("manifestSha256") == sha256_file(root / ARTIFACT_FILENAMES["sourceManifest"]) and
+            quality_source_binding.get("priorVerificationReportSha256") == sha256_file(root / ARTIFACT_FILENAMES["byteVerificationReport"]) and
+            isinstance(quality_source_binding.get("freshVerificationReportSha256"), str) and
+            SHA256_RE.fullmatch(quality_source_binding["freshVerificationReportSha256"]) is not None,
+            "BRF-42 quality report must bind the exact BRF-14 manifest and byte-verification report hashes.")
+    quality_byte_check = quality_report.get("byteVerification")
+    require(isinstance(quality_byte_check, dict) and
+            quality_byte_check.get("status") == "views-byte-verified" and
+            quality_byte_check.get("selectedViewCount") == len(manifest_views) and
+            quality_byte_check.get("verifiedViewCount") == len(manifest_views) and
+            quality_byte_check.get("declaredTotalBytes") == quality_byte_check.get("actualTotalBytes") == total_bytes and
+            quality_byte_check.get("blockers") == [],
+            "BRF-42 quality report must confirm every exact source byte before intake.")
+
+    private_intake = quality_report.get("privateMediaIntake")
+    require(isinstance(private_intake, dict) and
+            private_intake.get("status") == "all-views-ingested-private" and
+            isinstance(private_intake.get("buildingId"), str) and private_intake["buildingId"] and
+            private_intake.get("selectedViewCount") == len(manifest_views) and
+            private_intake.get("ingestedCount") == len(manifest_views) and
+            isinstance(private_intake.get("records"), list) and len(private_intake["records"]) == len(manifest_views),
+            "BRF-42 report must document a complete private intake for every view.")
+    private_records: dict[str, dict[str, Any]] = {}
+    for record in private_intake["records"]:
+        require(isinstance(record, dict) and isinstance(record.get("sourceId"), str) and
+                record["sourceId"] not in private_records,
+                "BRF-42 private intake has an invalid or duplicate source record ID.")
+        private_records[record["sourceId"]] = record
+    require(set(private_records) == set(manifest_by_id),
+            "BRF-42 private intake contains missing or unknown source IDs.")
+    for view_id, manifest_view in manifest_by_id.items():
+        record = private_records[view_id]
+        require(record.get("sha256") == manifest_view["expectedSha256"] and
+                record.get("byteSize") == manifest_view["expectedByteSize"] and
+                record.get("usageStatus") == "unreviewed" and
+                isinstance(record.get("licence"), str) and bool(record["licence"].strip()),
+                "BRF-42 private intake hash/size or unreviewed rights status disagrees for " + view_id + ".")
+        if isinstance(manifest_view.get("sourceUrl"), str):
+            require(record.get("sourceUrl") == manifest_view["sourceUrl"],
+                    "BRF-42 private intake source URL mismatch for " + view_id + ".")
+        if isinstance(manifest_view.get("capturedAt"), str):
+            require(record.get("capturedAt") == manifest_view["capturedAt"],
+                    "BRF-42 private intake capture timestamp mismatch for " + view_id + ".")
+        gps = manifest_view.get("gps")
+        location = record.get("location")
+        if isinstance(gps, dict):
+            require(isinstance(location, dict) and
+                    location.get("latitude") == gps.get("latitude") and
+                    location.get("longitude") == gps.get("longitude"),
+                    "BRF-42 private intake GPS metadata mismatch for " + view_id + ".")
+
+    quality = quality_report.get("imageQualityPreflight")
+    require(isinstance(quality, dict) and
+            quality.get("status") == "all-images-decoded-and-measured" and
+            quality.get("qualityAnalysisComplete") is True and
+            quality.get("sourceCount") == len(manifest_views) and
+            quality.get("uniqueContentCount") == len(manifest_views) and
+            quality.get("rightsApproved") is False and
+            quality.get("safeToSubmitToColmap") is False and
+            isinstance(quality.get("sources"), list) and len(quality["sources"]) == len(manifest_views),
+            "BRF-42 image-quality preflight must be complete for every view while rights and COLMAP authorization remain false.")
+    quality_by_id: dict[str, dict[str, Any]] = {}
+    for result in quality["sources"]:
+        require(isinstance(result, dict) and isinstance(result.get("sourceId"), str) and
+                result["sourceId"] not in quality_by_id,
+                "BRF-42 image-quality report contains an invalid or duplicate source ID.")
+        quality_by_id[result["sourceId"]] = result
+    require(set(quality_by_id) == set(manifest_by_id),
+            "BRF-42 image-quality report has missing or unknown source IDs.")
+    for view_id, manifest_view in manifest_by_id.items():
+        result = quality_by_id[view_id]
+        require(result.get("sha256") == manifest_view["expectedSha256"] and
+                result.get("byteSize") == manifest_view["expectedByteSize"] and
+                isinstance(result.get("width"), int) and not isinstance(result.get("width"), bool) and result["width"] > 0 and
+                isinstance(result.get("height"), int) and not isinstance(result.get("height"), bool) and result["height"] > 0 and
+                result.get("usageStatus") == "unreviewed" and
+                isinstance(result.get("licence"), str) and bool(result["licence"].strip()) and
+                isinstance(result.get("quality"), dict) and result.get("error") is None,
+                "BRF-42 image-quality row has mismatched bytes, missing metrics, or changed rights status for " + view_id + ".")
+
+    review_and_release = quality_report.get("reviewAndRelease")
+    release_flags = quality_report.get("releaseFlags")
+    require(isinstance(review_and_release, dict) and
+            review_and_release.get("rightsReview") == "pending-human-review" and
+            review_and_release.get("visualOverlap") == "pending-human-review" and
+            review_and_release.get("facadeRoofCoverage") == "pending-human-review" and
+            review_and_release.get("sourceUpAxis") == "pending-human-review" and
+            review_and_release.get("independentReferenceVerified") is False and
+            review_and_release.get("candidateGlbGenerated") is False and
+            review_and_release.get("reconstructionExecuted") is False and
+            review_and_release.get("realWorldAccuracyValidated") is False and
+            isinstance(release_flags, dict) and all(release_flags.get(flag) is False for flag in RELEASE_FLAGS),
+            "BRF-42 report must leave rights, visual review, reconstruction and release approval pending/false.")
 
     require(source_manifest.get("acceptanceEligible") is False and source_manifest.get("publicationEligible") is False and
             source_manifest.get("mapReady") is False and source_manifest.get("automaticApproval") is False,
@@ -298,11 +403,11 @@ def load_evidence(root_arg: Path) -> tuple[Path, dict[str, Any], dict[str, Any],
     if isinstance(counts, dict) and "evaluatedPairs" in counts:
         require(counts["evaluatedPairs"] == len(pairs),
                 "BRF-21 counts.evaluatedPairs disagrees with its pair table.")
-    return root, source_manifest, verification, review_packet, overlap_report, bindings, view_ids, normalized_pairs
+    return root, source_manifest, verification, review_packet, overlap_report, quality_report, bindings, view_ids, normalized_pairs
 
 
 def prepare_template(root_arg: Path) -> dict[str, Any]:
-    _, _, _, packet, report, bindings, view_ids, pairs = load_evidence(root_arg)
+    _, _, _, packet, report, _, bindings, view_ids, pairs = load_evidence(root_arg)
     source_by_id = {view["id"]: view for view in packet["sourceViews"]}
     return {
         "schemaVersion": SCHEMA_VERSION,
@@ -343,6 +448,7 @@ def prepare_template(root_arg: Path) -> dict[str, Any]:
         "automaticApproval": False,
         "limitations": [
             "This form records human review only; it does not establish independent survey accuracy.",
+            "BRF-42 image-quality metrics are heuristics and do not replace human overlap, identity, coverage, up-axis or rights decisions.",
             "A continue-to-reconstruction-preflight disposition does not execute COLMAP or approve publication.",
             "The reviewer must independently inspect the exact hash-bound evidence files and relevant asset terms.",
         ],
@@ -403,7 +509,7 @@ def _is_connected(included_ids: set[str], reviews: list[dict[str, Any]]) -> bool
 
 
 def validate_decision(root_arg: Path, decision: Any) -> dict[str, Any]:
-    root, source_manifest, verification, packet, overlap_report, bindings, view_ids, expected_pairs = load_evidence(root_arg)
+    root, source_manifest, verification, packet, overlap_report, quality_report, bindings, view_ids, expected_pairs = load_evidence(root_arg)
     require(isinstance(decision, dict), "Decision record must be a JSON object.")
     require(decision.get("schemaVersion") == SCHEMA_VERSION and decision.get("recordType") == RECORD_TYPE,
             "Unsupported human-review decision schema or recordType.")
@@ -530,6 +636,13 @@ def validate_decision(root_arg: Path, decision: Any) -> dict[str, Any]:
             "uncertainViews": sum(1 for item in source_by_id.values() if item["decision"] == "uncertain"),
             "humanConfirmedUsefulOverlapPairs": sum(1 for item in normalized_pair_reviews if item["decision"] == "useful-overlap"),
         },
+        "imageQualityPreflight": {
+            "status": quality_report["imageQualityPreflight"]["status"],
+            "sourceCount": quality_report["imageQualityPreflight"]["sourceCount"],
+            "uniqueContentCount": quality_report["imageQualityPreflight"]["uniqueContentCount"],
+            "rightsApproved": False,
+            "safeToSubmitToColmap": False,
+        },
         "humanReview": {
             "sameBuildingIdentity": identity["decision"],
             "coverageAssessment": coverage["decision"],
@@ -540,6 +653,7 @@ def validate_decision(root_arg: Path, decision: Any) -> dict[str, Any]:
         "limitations": [
             "This report validates a human-authored review record and byte-level evidence binding; it does not authenticate reviewer identity or licence claims.",
             "It provides no independent survey truth, checkpoint accuracy, coordinate registration or geometry-accuracy result.",
+            "BRF-42 automated image-quality screening is bound to this decision but never constitutes a human review or COLMAP approval.",
             "All release and automatic-approval flags remain false regardless of the review disposition.",
         ],
         "acceptanceEligible": False,
