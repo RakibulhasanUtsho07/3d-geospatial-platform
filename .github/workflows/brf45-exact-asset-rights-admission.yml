@@ -48,8 +48,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies and reconcile repository lockfile
+        run: npm install
       - name: Test exact-asset rights admission and byte-evidence gate
         run: npm run test:brf45-rights-admission
       - name: Confirm the real 16-view intake remains blocked pending source-use evidence
