@@ -10,6 +10,7 @@ import { normalizeBuildingSpec } from "../src/core/building-generation/building-
 import { runSingleImage3D } from "../src/core/building-generation/single-image-3d-worker.mjs";
 import { generateBuildingAsset } from "../src/core/building-generation/generation-pipeline.mjs";
 import { ingestMediaFile, toBuildingSpecSource } from "../src/core/building-generation/media-intake.mjs";
+import { reviewBuildingSource } from "../src/core/building-generation/source-workflow.mjs";
 
 async function workspace(t){const root=await mkdtemp(path.join(os.tmpdir(),"single-image-3d-"));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(40,3)]);
@@ -29,8 +30,9 @@ function mockedSpawn(_executable,args){
 async function setupPhoto(t,root,{usageStatus="approved",licence="CC BY 4.0"}={}){
  await mkdir(path.join(root,"uploads"),{recursive:true});await writeFile(path.join(root,"uploads","facade.png"),png);
  const buildingId="single-photo-demo";
- const ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/facade.png",buildingId,sourceId:"facade-image",kind:"image",usageStatus,licence,title:"Facade photograph"});
- const source=toBuildingSpecSource(ingested.record),buildingSpec={...fixture,id:buildingId,sources:[source],evidence:[{field:"floorCount",value:null,confidence:"unknown",sourceIds:["facade-image"]}]};
+ let record=(await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/facade.png",buildingId,sourceId:"facade-image",kind:"image",usageStatus:"unreviewed",licence:"unknown",title:"Facade photograph"})).record;
+ if(usageStatus==="approved") record=(await reviewBuildingSource({workspaceRoot:root,buildingId,sourceId:"facade-image",licence,permittedOperations:["private-media-ingestion","single-image-ai-reconstruction"],confirmRights:true,attribution:"Test-only synthetic fixture"})).record;
+ const source=toBuildingSpecSource(record),buildingSpec={...fixture,id:buildingId,sources:[source],evidence:[{field:"floorCount",value:null,confidence:"unknown",sourceIds:["facade-image"]}]};
  return {buildingId,buildingSpec,source};
 }
 test("requires explicit single-view opt-in and reviewed source licence",async t=>{
