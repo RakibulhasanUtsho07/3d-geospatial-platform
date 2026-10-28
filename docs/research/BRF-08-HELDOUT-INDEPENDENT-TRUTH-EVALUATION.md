@@ -204,3 +204,8 @@ The filesystem evaluator must not calculate or expose footprint, dimension, held
 When any required prerequisite is failed or incomplete, the report uses \`metrics: null\` and \`metricComputation.status: "withheld"\`, with a reason-coded check; the CLI exits non-zero. It must not compute numbers from the untrusted inline geometry and then merely label those numbers failed. On success, the report records \`metricComputation.status: "computed-after-source-replay"\`. A successful replay still does not certify the real-world identity, license, survey quality or accuracy of the building; every release flag remains false.
 
 Regression coverage is in \`tests/independent-building-truth-evaluator-cli.test.mjs\`, including altered candidate geometry despite a refreshed declared digest, changed registration transforms, altered reference measurements and mutated reference-source bytes.
+
+
+### Additional exact-byte regressions
+
+The BRF-40 CLI regression matrix also mutates the on-disk candidate GLB bytes and the hash-pinned preparation configuration after the manifest is prepared. Both cases must exit non-zero, include the matching reason-coded prerequisite failure, set `metrics: null` and `metricComputation.status: "withheld"`, and preserve every release flag as false. These tests complement the inline-geometry replay tampering and independent-reference byte-mismatch cases; they protect the two other mandatory inputs to metric eligibility.

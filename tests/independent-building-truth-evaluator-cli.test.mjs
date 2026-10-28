@@ -360,6 +360,38 @@ test("keeps an unprovenanced geometry source incomplete rather than silently pas
   assert.ok(report.warnings.some((check) => check.id === "reference-extraction-provenance-present"));
 });
 
+test("withholds metrics when candidate GLB bytes differ from the pinned source hash", async (t) => {
+  const { root } = await setup(t);
+  await writeFile(path.join(root, "evidence/candidate.glb"), Buffer.from("tampered candidate GLB bytes"));
+  const execution = run(root, "candidate-hash-failed-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "candidate-hash-failed-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.metricComputation.prerequisites.some((item) =>
+    item.id === "candidate-glb-byte-integrity" && item.status === "failed"));
+  assert.ok(report.failures.some((check) =>
+    check.id === "geometry-metrics-withheld-until-source-replay-passes"));
+  assert.ok(Object.values(report.policy).every((value) => value === false));
+});
+
+test("withholds metrics when preparation config bytes differ from the pinned SHA-256", async (t) => {
+  const { root } = await setup(t);
+  await writeFile(path.join(root, "configs/geometry-extractor.json"), Buffer.from("tampered preparation configuration"));
+  const execution = run(root, "config-hash-failed-report.json");
+  assert.equal(execution.status, 1, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "config-hash-failed-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.metricComputation.prerequisites.some((item) =>
+    item.id === "preparation-config-byte-integrity" && item.status === "failed"));
+  assert.ok(report.failures.some((check) =>
+    check.id === "geometry-metrics-withheld-until-source-replay-passes"));
+  assert.ok(Object.values(report.policy).every((value) => value === false));
+});
+
 test("reports an exact-byte mismatch as failed instead of trusting stale reference metrics", async (t) => {
   const { root } = await setup(t);
   await writeFile(path.join(root, "evidence/survey.json"), JSON.stringify({ schemaVersion: "1.0.0", coordinateFrameId: frameId, units: "m" }));
