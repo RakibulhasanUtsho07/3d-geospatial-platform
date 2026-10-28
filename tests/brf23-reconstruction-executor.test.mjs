@@ -416,10 +416,11 @@ test("blocks pending review, stale report hashes, or absent operator confirmatio
   })), /Explicit operator confirmation/);
 });
 test("rejects modified report-bound evidence, decision, profile, and source bytes", async t => {
-  for (const type of ["evidence", "quality", "decision", "profile", "image"]) {
+  for (const type of ["evidence", "quality", "rights", "decision", "profile", "image"]) {
     const f = await setup(t);
     const target = type === "evidence" ? path.join(f.artifactRoot, artifacts.overlapGraph)
       : type === "quality" ? path.join(f.artifactRoot, artifacts.privateMediaQualityReport)
+      : type === "rights" ? path.join(f.artifactRoot, "brf-45-exact-asset-rights-admission.json")
       : type === "decision" ? path.join(f.artifactRoot, "decision.json")
       : type === "profile" ? path.join(f.artifactRoot, "profile.json")
       : path.join(f.imageRoot, f.report.assessedInputs.sourceImages.records[0].filename);
