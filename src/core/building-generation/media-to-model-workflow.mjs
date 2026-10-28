@@ -126,7 +126,7 @@ function parseSource(source){
  if(path.isAbsolute(source.relativePath)||path.win32.isAbsolute(source.relativePath))throw new TypeError("source paths must be relative to workspaceRoot");
  if(!KNOWN_LICENCE(source.licence))throw new TypeError("source "+sourceId+" needs a known licence/permission basis; unknown is not accepted for this media-to-3D workflow");
  const permittedOperations = normalizeSourceOperationScopes(source.permittedOperations, "source " + sourceId + " permittedOperations");
- if (!permittedOperations.includes("private-image-ingestion")) throw new TypeError("source " + sourceId + " must explicitly permit private-image-ingestion before local media intake");
+ if (!permittedOperations.includes("private-media-ingestion")) throw new TypeError("source " + sourceId + " must explicitly permit private-media-ingestion before local media intake");
  return {sourceId,relativePath:source.relativePath,licence:source.licence.trim(),permittedOperations,author:source.author,attribution:source.attribution,sourceUrl:source.sourceUrl,capturedAt:source.capturedAt,description:source.description,kind:source.kind??"auto",captureLocation:source.captureLocation};
 }
 function hashBytes(buffer){return createHash("sha256").update(buffer).digest("hex");}
