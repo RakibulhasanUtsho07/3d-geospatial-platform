@@ -1,0 +1,113 @@
+name: BRF-41 private demo-image ingestion and quality smoke test
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf41-demo-image-smoke.yml"
+      - "benchmarks/building-reconstruction/brf-13-drone-image-source.json"
+      - "benchmarks/building-reconstruction/brf-41-interim-dataset-policy.json"
+      - "scripts/verify-brf13-drone-image-source.mjs"
+      - "scripts/run-brf41-demo-image-smoke-test.mjs"
+      - "src/core/building-generation/brf41-interim-dataset-policy.mjs"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-quality-preflight.mjs"
+  push:
+    branches:
+      - development
+      - feat/brf41-interim-dataset-policy
+    paths:
+      - ".github/workflows/brf41-demo-image-smoke.yml"
+      - "benchmarks/building-reconstruction/brf-13-drone-image-source.json"
+      - "benchmarks/building-reconstruction/brf-41-interim-dataset-policy.json"
+      - "scripts/verify-brf13-drone-image-source.mjs"
+      - "scripts/run-brf41-demo-image-smoke-test.mjs"
+      - "src/core/building-generation/brf41-interim-dataset-policy.mjs"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-quality-preflight.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf41-demo-image-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  private-demo-image-smoke:
+    name: Verify, privately ingest and quality-check one sample image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install FFmpeg only if runner does not provide it
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+
+      - name: Test private demo-image workflow using synthetic local fixture
+        run: npm run test:brf41-demo-image-smoke
+
+      - name: Download one allowlisted image to runner temporary storage
+        env:
+          IMAGE_URL: https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822183442_0005_D.JPG
+        run: |
+          set -euo pipefail
+          workspace="$RUNNER_TEMP/brf41-workspace"
+          mkdir -p "$workspace/input" artifacts/brf41
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 180 \
+            "$IMAGE_URL" \
+            --output "$workspace/input/DJI_20260822183442_0005_D.JPG"
+
+      - name: Verify bytes, privately ingest image and run image-quality preflight
+        run: |
+          set -euo pipefail
+          node scripts/run-brf41-demo-image-smoke-test.mjs \
+            --workspace "$RUNNER_TEMP/brf41-workspace" \
+            --source "input/DJI_20260822183442_0005_D.JPG" \
+            --report "artifacts/brf41/demo-image-smoke-report.json"
+
+      - name: Assert this is only a private non-accuracy smoke test
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf41/demo-image-smoke-report.json", "utf8"));
+          if (report.status !== "demo-smoke-tested-not-accuracy-validated") {
+            throw new Error("Expected a completed demo smoke test without accuracy approval.");
+          }
+          if (report.mediaIntake.status !== "ingested-private" ||
+              report.mediaIntake.usageStatus !== "unreviewed") {
+            throw new Error("Source media must remain privately ingested and unreviewed.");
+          }
+          if (report.imageQualityPreflight.safeToSubmitToColmap !== false ||
+              report.imageQualityPreflight.reconstructionCandidate !== false ||
+              report.imageQualityPreflight.rightsApproved !== false) {
+            throw new Error("Single demo imagery must not be considered reconstruction-ready.");
+          }
+          if (Object.values(report.releaseFlags).some(Boolean)) {
+            throw new Error("Demo smoke test must not promote release flags.");
+          }
+          console.log("Verified and privately ingested one source image; no accuracy, reconstruction or publication gate was promoted.");
+          NODE
+
+      - name: Upload metadata-only smoke-test report (never the image)
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf41-demo-image-smoke-report
+          path: artifacts/brf41/demo-image-smoke-report.json
+          if-no-files-found: error
+          retention-days: 7
