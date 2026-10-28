@@ -8,6 +8,12 @@ on:
       - ".github/workflows/brf-14-multiview-source-intake.yml"
       - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
       - "scripts/verify-brf14-multiview-source.mjs"
+      - "scripts/run-brf42-multiview-private-intake.mjs"
+      - "tests/brf42-multiview-private-intake.test.mjs"
+      - "package.json"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-quality-preflight.mjs"
+      - "docs/research/BRF-42-MULTIVIEW-PRIVATE-INTAKE.md"
       - "tests/brf14-multiview-source-intake.test.mjs"
       - "scripts/prepare_brf14_multiview_review.py"
       - "tests/test_prepare_brf14_multiview_review.py"
@@ -36,7 +42,7 @@ jobs:
   verify-multi-view-images:
     name: Download and verify 16 pinned candidate views
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -105,6 +111,67 @@ jobs:
             --asset-root "$RUNNER_TEMP/brf14/images" \
             --report artifacts/brf-14/multiview-source-byte-verification.json
 
+      - name: Install FFmpeg from pinned action
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
+        continue-on-error: true
+        with:
+          ffmpeg-version: release
+          architecture: x64
+          linking-type: static
+
+      - name: Ensure FFmpeg is available for private image-quality preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! ffmpeg -hide_banner -version >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg
+          fi
+          ffmpeg -hide_banner -version | head -n 1
+
+      - name: Test BRF-42 private multi-view intake and quality gate
+        run: npm run test:brf42-multiview-private-intake
+
+      - name: Ingest all verified views privately and assess image quality
+        run: |
+          set -euo pipefail
+          node scripts/run-brf42-multiview-private-intake.mjs \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --workspace "$RUNNER_TEMP/brf14" \
+            --report artifacts/brf-14/private-multiview-media-intake-report.json
+
+      - name: Assert multi-view intake remains private and blocked for reconstruction
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf-14/private-multiview-media-intake-report.json", "utf8"));
+          if (report.status !== "private-multiview-preflight-complete-not-reconstruction-approved") {
+            throw new Error("Expected all-view private intake and quality preflight to complete.");
+          }
+          if (report.byteVerification.verifiedViewCount !== 16 ||
+              report.privateMediaIntake.ingestedCount !== 16 ||
+              report.imageQualityPreflight.sourceCount !== 16 ||
+              report.imageQualityPreflight.qualityAnalysisComplete !== true) {
+            throw new Error("All 16 pinned images must be independently reverified, privately ingested and quality-assessed.");
+          }
+          if (report.imageQualityPreflight.rightsApproved !== false ||
+              report.imageQualityPreflight.safeToSubmitToColmap !== false ||
+              report.reviewAndRelease.visualOverlap !== "pending-human-review" ||
+              report.reviewAndRelease.candidateGlbGenerated !== false ||
+              report.reviewAndRelease.reconstructionExecuted !== false) {
+            throw new Error("Multi-view demo data must remain blocked from reconstruction until rights and visual review gates pass.");
+          }
+          if (!report.privateMediaIntake.records.every((record) => record.usageStatus === "unreviewed")) {
+            throw new Error("Every source record must retain usageStatus=unreviewed.");
+          }
+          if (Object.values(report.releaseFlags).some(Boolean)) {
+            throw new Error("BRF-42 must not promote acceptance, publication, map-ready or automatic-approval flags.");
+          }
+          console.log("Verified 16 pinned views, privately ingested 16 records, preflighted all images; no reconstruction or release approval.");
+          NODE
+
       - name: Generate hash-bound contact sheet and camera-angle coverage plot
         run: |
           python scripts/prepare_brf14_multiview_review.py \
@@ -144,6 +211,7 @@ jobs:
           path: |
             artifacts/brf-14/brf-14-multiview-source.json
             artifacts/brf-14/multiview-source-byte-verification.json
+            artifacts/brf-14/private-multiview-media-intake-report.json
             artifacts/brf-14/multiview-contact-sheet.png
             artifacts/brf-14/camera-angle-coverage.png
             artifacts/brf-14/multiview-review-manifest.json
