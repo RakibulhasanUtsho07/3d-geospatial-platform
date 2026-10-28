@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "brf-26-visual-review-decision",
+  "status": "pending-human-review",
+  "buildingId": "",
+  "candidateGlbSha256": "",
+  "sourceCameraReportSha256": "",
+  "renderManifestSha256": "",
+  "reviewer": { "name": "", "identifier": "" },
+  "reviewedAtUtc": null,
+  "overallDisposition": "pending",
+  "views": [
+    { "viewId": "", "disposition": "pending", "rationale": "" }
+  ],
+  "reviewNotes": "",
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false,
+  "limitations": [
+    "This is a blank template, not a completed human review.",
+    "Every view must be reviewed against the exact candidate GLB, source-camera report and render manifest pinned above.",
+    "Not-comparable views cannot be counted as passing. A reviewer must record a reason for each disposition."
+  ]
+}

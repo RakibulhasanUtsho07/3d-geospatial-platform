@@ -278,6 +278,10 @@ jobs:
         run: npm run test:brf25-geometry-validation
       - name: Validate BRF-25 geometry validation runner CLI
         run: node scripts/run-brf25-geometry-validation.mjs --help
+      - name: Test BRF-26 end-to-end evidence bundle and fail-closed gates
+        run: npm run test:brf26-evidence-bundle
+      - name: Validate BRF-26 evidence bundle CLI
+        run: node scripts/build-brf26-evidence-bundle.mjs --help
       - name: Test BRF-15 MnGeo flight-swath work-unit discovery
         run: node --test tests/resolve-mngeo-lidar-work-units.test.mjs
       - name: Validate BRF-15 work-unit resolver CLI
