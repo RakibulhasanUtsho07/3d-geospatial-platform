@@ -54,7 +54,7 @@ def make_minimal_las_prefix(wkt=b'PROJCRS["WGS 84 / UTM zone 32N",ID["EPSG",3263
 
     vlr_header = bytearray(54)
     struct.pack_into("<H", vlr_header, 0, 0)
-    vlr_header[2:18] = b"LASF_Projection\0\0"
+    vlr_header[2:18] = b"LASF_Projection\0"
     struct.pack_into("<H", vlr_header, 18, 2112)
     struct.pack_into("<H", vlr_header, 20, len(wkt))
     vlr_header[22:22+len(b"WKT CRS")] = b"WKT CRS"
