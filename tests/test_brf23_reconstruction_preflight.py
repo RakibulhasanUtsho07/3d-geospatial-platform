@@ -113,9 +113,59 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
             row["byteSize"] = data["byteSize"]
         self._write_json(self.root / "private-multiview-media-intake-report.json", quality_report)
 
-    def _write_rights_admission(self):
+    def _write_rights_admission(self, approved=False):
         source = self._read_json("brf-14-multiview-source.json")
         dataset = source["dataset"]
+        assets = []
+        for view in source["views"]:
+            row = {
+                "sourceId": view["id"],
+                "filename": view["filename"],
+                "sourceUrl": view["sourceUrl"],
+                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
+                "byteSize": view["expectedByteSize"],
+                "sha256": view["expectedSha256"],
+                "requestedScopes": ["inspect-source", "use-for-validation", "derive-model"],
+                "decision": "pending",
+                "rights": None,
+            }
+            if approved:
+                evidence_name = "rights-evidence/" + view["id"] + ".txt"
+                evidence_dir = self.root / "rights-evidence"
+                evidence_dir.mkdir(parents=True, exist_ok=True)
+                evidence_bytes = ("Synthetic rights evidence for " + view["id"] + "; fixture only.\n").encode()
+                (self.root / evidence_name).write_bytes(evidence_bytes)
+                row["decision"] = "approved"
+                row["rights"] = {
+                    "status": "approved",
+                    "rightsHolderOrGrantor": "Synthetic test grantor; not a real rights holder",
+                    "authorityBasis": "Synthetic fixture only",
+                    "license": {
+                        "identifier": "SYNTHETIC-TEST",
+                        "name": "Synthetic test license",
+                        "url": "https://example.test/license",
+                    },
+                    "scopeDescription": "Private local reconstruction and validation of synthetic sources only.",
+                    "attributionText": "Synthetic test attribution.",
+                    "restrictionsText": "Fixture only; no real permission is asserted.",
+                    "grantedScopes": ["inspect-source", "use-for-validation", "derive-model"],
+                    "evidenceSnapshots": [{
+                        "filename": evidence_name,
+                        "sourceUrl": "https://example.test/rights/" + view["id"],
+                        "retrievedAt": "2026-10-28T00:00:00.000Z",
+                        "byteSize": len(evidence_bytes),
+                        "sha256": hashlib.sha256(evidence_bytes).hexdigest(),
+                        "evidenceType": "synthetic-test-grant-record",
+                    }],
+                    "reviewedBy": "synthetic-reviewer",
+                    "reviewedAt": "2026-10-28T00:00:00.000Z",
+                    "decisionId": "synthetic-rights-decision-" + view["id"],
+                    "effectiveAt": "2026-10-28T00:00:00.000Z",
+                    "expiresAt": None,
+                    "revoked": False,
+                    "explicitGrantConfirmed": True,
+                }
+            assets.append(row)
         manifest = {
             "schemaVersion": "1.0.0",
             "recordType": "brf-45-exact-asset-rights-admission",
@@ -139,17 +189,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
                 "sourceRedistributionRequested": False,
                 "publicDerivedModelDisplayRequested": False,
             },
-            "assets": [{
-                "sourceId": view["id"],
-                "filename": view["filename"],
-                "sourceUrl": view["sourceUrl"],
-                "sourceRepositoryCommit": dataset["sourceRepositoryCommit"],
-                "byteSize": view["expectedByteSize"],
-                "sha256": view["expectedSha256"],
-                "requestedScopes": ["inspect-source", "use-for-validation", "derive-model"],
-                "decision": "pending",
-                "rights": None,
-            } for view in source["views"]],
+            "assets": assets,
             "releaseFlags": {flag: False for flag in PREFLIGHT.RELEASE_FLAGS},
         }
         self._write_json(self.root / "brf-45-exact-asset-rights-admission.json", manifest)
@@ -194,13 +234,15 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
                                 "reconstruction-preflight-report.json")
 
     def test_reviewed_hash_pinned_local_inputs_can_only_pass_preflight(self):
+        self._write_rights_admission(approved=True)
         report = self._assess()
         self.assertEqual(report["status"], "preflight-ready-for-local-reconstruction-attempt", report["blockers"])
         self.assertEqual(report["assessedInputs"]["sourceImages"]["verifiedCount"], 3)
         rights = report["assessedInputs"]["rightsAdmission"]
         self.assertEqual(rights["filename"], "brf-45-exact-asset-rights-admission.json")
         self.assertEqual(rights["assetCount"], 3)
-        self.assertEqual(rights["pendingDecisionCount"], 3)
+        self.assertEqual(rights["pendingDecisionCount"], 0)
+        self.assertEqual(rights["deniedDecisionCount"], 0)
         self.assertEqual(rights["sha256"], hashlib.sha256(
             (self.root / rights["filename"]).read_bytes()
         ).hexdigest())
@@ -214,6 +256,17 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         self.assertFalse(report["independentReferenceVerified"])
         for flag in PREFLIGHT.RELEASE_FLAGS:
             self.assertIs(report[flag], False)
+
+    def test_pending_rights_admission_blocks_even_when_human_review_would_continue(self):
+        report = self._assess()
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["assessedInputs"]["humanDecision"]["validationStatus"], "valid")
+        self.assertEqual(report["assessedInputs"]["rightsAdmission"]["pendingDecisionCount"], 3)
+        self.assertTrue(any("BRF-45 exact-asset rights admission has pending source rows" in item
+                            for item in report["blockers"]))
+        self.assertFalse(report["candidateGlbGenerated"])
+        for flag in PREFLIGHT.RELEASE_FLAGS:
+            self.assertFalse(report[flag])
 
     def test_rights_admission_must_match_all_source_hashes_and_metadata(self):
         manifest = self._read_json("brf-45-exact-asset-rights-admission.json")
