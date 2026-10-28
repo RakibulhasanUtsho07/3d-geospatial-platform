@@ -49,14 +49,23 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install FFmpeg only if runner does not provide it
+      - name: Install FFmpeg from a pinned action
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
+        continue-on-error: true
+        with:
+          ffmpeg-version: release
+          architecture: x64
+          linking-type: static
+
+      - name: Verify or install FFmpeg fallback
+        shell: bash
         run: |
           set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! ffmpeg -hide_banner -version >/dev/null 2>&1; then
             sudo apt-get update
             sudo apt-get install --yes ffmpeg
           fi
-          ffmpeg -version | head -n 1
+          ffmpeg -hide_banner -version | head -n 1
 
       - name: Test private demo-image workflow using synthetic local fixture
         run: npm run test:brf41-demo-image-smoke
