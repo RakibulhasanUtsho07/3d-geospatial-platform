@@ -127,6 +127,98 @@ class Brf21HumanReviewTests(unittest.TestCase):
         }
         self.write_json("pairwise-overlap-report.json", report)
 
+        manifest_path = self.root / "brf-14-multiview-source.json"
+        verification_path = self.root / "multiview-source-byte-verification.json"
+        quality_sources = [
+            {
+                "sourceId": view["id"],
+                "sha256": view["actualSha256"],
+                "byteSize": view["actualByteSize"],
+                "width": 4096,
+                "height": 3072,
+                "usageStatus": "unreviewed",
+                "licence": "Synthetic declared-only test fixture",
+                "quality": {"sharpness": 12.5, "luminanceMean": 127.0, "warnings": []},
+                "error": None,
+            }
+            for view in views
+        ]
+        quality_report = {
+            "schemaVersion": "1.0.0",
+            "evaluationId": "BRF-42-PRIVATE-MULTIVIEW-INTAKE",
+            "status": "private-multiview-preflight-complete-not-reconstruction-approved",
+            "workspaceMode": "ephemeral-private",
+            "sourceManifest": {
+                "sampleId": "synthetic-test-only",
+                "sourceCommit": "test-commit",
+                "declaredLicense": "CC-BY-4.0",
+                "licenseScope": "Synthetic fixture only",
+                "rightsStatus": "unreviewed",
+                "attribution": "Synthetic test fixture only",
+                "manifestSha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                "priorVerificationReportSha256": hashlib.sha256(verification_path.read_bytes()).hexdigest(),
+                "freshVerificationReportSha256": hashlib.sha256(b"synthetic-fresh-verification").hexdigest(),
+            },
+            "byteVerification": {
+                "status": "views-byte-verified",
+                "selectedViewCount": len(views),
+                "verifiedViewCount": len(views),
+                "declaredTotalBytes": 384,
+                "actualTotalBytes": 384,
+                "blockers": [],
+            },
+            "privateMediaIntake": {
+                "status": "all-views-ingested-private",
+                "buildingId": "synthetic-test-building",
+                "selectedViewCount": len(views),
+                "ingestedCount": len(views),
+                "records": [
+                    {
+                        "sourceId": view["id"],
+                        "sha256": view["actualSha256"],
+                        "byteSize": view["actualByteSize"],
+                        "usageStatus": "unreviewed",
+                        "licence": "Synthetic declared-only test fixture",
+                    }
+                    for view in views
+                ],
+            },
+            "imageQualityPreflight": {
+                "status": "all-images-decoded-and-measured",
+                "qualityAnalysisComplete": True,
+                "sourceCount": len(views),
+                "uniqueContentCount": len(views),
+                "rightsApproved": False,
+                "safeToSubmitToColmap": False,
+                "qualityOnlyReconstructionCandidate": True,
+                "warnings": ["Synthetic fixture only; not an actual image review."],
+                "nearDuplicatePairs": [],
+                "sources": quality_sources,
+                "limitations": ["Synthetic fixture only; no human overlap or accuracy decision."],
+            },
+            "reviewAndRelease": {
+                "rightsReview": "pending-human-review",
+                "sameBuildingIdentity": "source-declared-not-independently-confirmed",
+                "visualOverlap": "pending-human-review",
+                "facadeRoofCoverage": "pending-human-review",
+                "sourceUpAxis": "pending-human-review",
+                "independentReferenceVerified": False,
+                "candidateGlbGenerated": False,
+                "reconstructionExecuted": False,
+                "realWorldAccuracyValidated": False,
+                "publicSourceRedistributionPermittedByThisGate": False,
+                "derivedModelPublicationPermittedByThisGate": False,
+                "productionMapPublicationPermitted": False,
+            },
+            "releaseFlags": {
+                "acceptanceEligible": False,
+                "publicationEligible": False,
+                "mapReady": False,
+                "automaticApproval": False,
+            },
+        }
+        self.write_json("private-multiview-media-intake-report.json", quality_report)
+
     def complete_record(self):
         result = json.loads(json.dumps(self.template))
         result["reviewer"] = {"name": "Synthetic Reviewer", "identifier": "test:reviewer"}
@@ -165,7 +257,10 @@ class Brf21HumanReviewTests(unittest.TestCase):
 
     def test_template_is_hash_bound_and_all_review_fields_pending(self):
         self.assertEqual(self.template["status"], "pending-human-review")
-        self.assertEqual(len(self.template["evidenceBindings"]), 7)
+        self.assertEqual(len(self.template["evidenceBindings"]), 8)
+        quality_binding = self.template["evidenceBindings"]["privateMediaQualityReport"]
+        self.assertEqual(quality_binding["filename"], "private-multiview-media-intake-report.json")
+        self.assertEqual(quality_binding["sha256"], self.artifact_record("private-multiview-media-intake-report.json")["sha256"])
         self.assertEqual(len(self.template["sourceViews"]), 3)
         self.assertEqual(len(self.template["pairReviews"]), 3)
         for item in self.template["sourceViews"]:
@@ -186,6 +281,53 @@ class Brf21HumanReviewTests(unittest.TestCase):
         self.assertEqual(report["reviewCounts"]["humanConfirmedUsefulOverlapPairs"], 2)
         for flag in MODULE.RELEASE_FLAGS:
             self.assertIs(report[flag], False)
+
+
+    def test_quality_report_is_required_for_human_review(self):
+        (self.root / "private-multiview-media-intake-report.json").unlink()
+        with self.assertRaisesRegex(ValueError, "Required artifact is missing"):
+            MODULE.prepare_template(self.root)
+
+    def test_quality_report_hash_change_invalidates_existing_decision(self):
+        decision = self.complete_record()
+        report_path = self.root / "private-multiview-media-intake-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["imageQualityPreflight"]["warnings"].append("post-review mutation")
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "Evidence binding mismatch"):
+            MODULE.validate_decision(self.root, decision)
+
+    def test_quality_report_source_hash_mismatch_is_rejected(self):
+        report_path = self.root / "private-multiview-media-intake-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["imageQualityPreflight"]["sources"][0]["sha256"] = "0" * 64
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "image-quality row has mismatched bytes"):
+            MODULE.prepare_template(self.root)
+
+    def test_quality_report_cannot_claim_rights_approval(self):
+        report_path = self.root / "private-multiview-media-intake-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["imageQualityPreflight"]["rightsApproved"] = True
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "rights and COLMAP authorization remain false"):
+            MODULE.prepare_template(self.root)
+
+    def test_quality_report_cannot_open_release_gate(self):
+        report_path = self.root / "private-multiview-media-intake-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["releaseFlags"]["mapReady"] = True
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "rights, visual review, reconstruction and release approval"):
+            MODULE.prepare_template(self.root)
+
+    def test_quality_report_manifest_provenance_mismatch_is_rejected(self):
+        report_path = self.root / "private-multiview-media-intake-report.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["sourceManifest"]["manifestSha256"] = "0" * 64
+        self.write_json(report_path.name, report)
+        with self.assertRaisesRegex(ValueError, "bind the exact BRF-14 manifest"):
+            MODULE.prepare_template(self.root)
 
     def test_pending_template_cannot_be_validated_as_complete(self):
         with self.assertRaisesRegex(ValueError, "reviewer.name|reviewedAtUtc|overallDisposition"):
