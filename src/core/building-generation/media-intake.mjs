@@ -3,6 +3,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, lstat, mkdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Transform } from "node:stream";
+import { SOURCE_OPERATION_SCOPES } from "./source-operation-scopes.mjs";
 import { pipeline } from "node:stream/promises";
 
 const MAX_BYTES = { image: 20 * 1024 * 1024, video: 500 * 1024 * 1024, "floor-plan": 50 * 1024 * 1024, "video-frame": 20 * 1024 * 1024, auto: 500 * 1024 * 1024 };
@@ -60,10 +61,7 @@ function buildMetadata(options, detectedMime, hash, byteSize, relativePath) {
     licence: optionalText(options.licence, "licence", 500) ?? "unknown",
   };
   if (options.permittedOperations !== undefined) {
-    const knownScopes = new Set([
-      "private-media-ingestion", "private-image-quality-preflight", "video-frame-extraction",
-      "procedural-model-derivation", "single-image-ai-reconstruction", "photogrammetry-reconstruction", "texture-baking",
-    ]);
+    const knownScopes = new Set(SOURCE_OPERATION_SCOPES);
     if (!Array.isArray(options.permittedOperations) || options.permittedOperations.length < 1 ||
         options.permittedOperations.length > knownScopes.size ||
         options.permittedOperations.some(scope => typeof scope !== "string" || !knownScopes.has(scope)) ||
