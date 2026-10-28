@@ -273,6 +273,9 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
       byteSize: row?.byteSize ?? null,
       status: approved ? "evidence-complete-human-review-required" : "blocked",
       grantor: rights.rightsHolderOrGrantor ?? null,
+      decisionId: rights.decisionId ?? null,
+      reviewedBy: rights.reviewedBy ?? null,
+      reviewedAt: rights.reviewedAt ?? null,
       grantedScopes: granted,
       evidenceSnapshots: checkedSnapshots,
     });
