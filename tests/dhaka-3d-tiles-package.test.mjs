@@ -216,6 +216,46 @@ test("rejects symbolic links in package assets", async () => {
   assert.ok(report.errors.some((error) => error.includes("Symbolic links are not allowed")));
 });
 
+test("cross-binds source hashes, per-tile content hashes and disabled release flags", async () => {
+  const sourceTamper = path.join(temporaryDirectory, "package-source-hash-mismatch");
+  await cp(packageA, sourceTamper, { recursive: true });
+  const tilesetPath = path.join(sourceTamper, "tileset.json");
+  const buildPath = path.join(sourceTamper, "build-manifest.json");
+  const tileset = JSON.parse(await readFile(tilesetPath, "utf8"));
+  const build = JSON.parse(await readFile(buildPath, "utf8"));
+  tileset.asset.extras.sourceSha256 = "0".repeat(64);
+  const modifiedTilesetBytes = Buffer.from(`${JSON.stringify(tileset, null, 2)}\n`);
+  await writeFile(tilesetPath, modifiedTilesetBytes);
+  build.files["tileset.json"] = {
+    sha256: sha256(modifiedTilesetBytes),
+    bytes: modifiedTilesetBytes.length,
+  };
+  await writeFile(buildPath, `${JSON.stringify(build, null, 2)}\n`);
+  const sourceMismatch = await verifyTilesetPackage({ directory: sourceTamper });
+  assert.equal(sourceMismatch.valid, false);
+  assert.ok(sourceMismatch.errors.some((error) => error.includes("source SHA-256 does not match")));
+
+  const tileHashTamper = path.join(temporaryDirectory, "package-tile-hash-mismatch");
+  await cp(packageA, tileHashTamper, { recursive: true });
+  const tileHashManifestPath = path.join(tileHashTamper, "build-manifest.json");
+  const tileHashManifest = JSON.parse(await readFile(tileHashManifestPath, "utf8"));
+  tileHashManifest.tiles[0].contentSha256 = "0".repeat(64);
+  await writeFile(tileHashManifestPath, `${JSON.stringify(tileHashManifest, null, 2)}\n`);
+  const tileHashMismatch = await verifyTilesetPackage({ directory: tileHashTamper });
+  assert.equal(tileHashMismatch.valid, false);
+  assert.ok(tileHashMismatch.errors.some((error) => error.includes("Tile content SHA-256 does not match")));
+
+  const releaseTamper = path.join(temporaryDirectory, "package-release-flag-enabled");
+  await cp(packageA, releaseTamper, { recursive: true });
+  const releaseManifestPath = path.join(releaseTamper, "build-manifest.json");
+  const releaseManifest = JSON.parse(await readFile(releaseManifestPath, "utf8"));
+  releaseManifest.releaseFlags.mapReady = true;
+  await writeFile(releaseManifestPath, `${JSON.stringify(releaseManifest, null, 2)}\n`);
+  const releaseMismatch = await verifyTilesetPackage({ directory: releaseTamper });
+  assert.equal(releaseMismatch.valid, false);
+  assert.ok(releaseMismatch.errors.some((error) => error.includes("release flags must remain explicitly false")));
+});
+
 test("rebuilds identical tileset, GLBs and build manifest from unchanged source/config", async () => {
   await preparePackage(packageB);
   const first = JSON.parse(await readFile(path.join(packageA, "build-manifest.json"), "utf8"));
