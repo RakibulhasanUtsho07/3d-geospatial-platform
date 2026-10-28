@@ -1,5 +1,4 @@
 import importlib.util
-import io
 import struct
 import unittest
 from pathlib import Path
@@ -38,7 +37,10 @@ class FakeResponse:
         return self._body[:size]
 
 
-def make_minimal_las_prefix(wkt=b'PROJCRS["WGS 84 / UTM zone 32N",ID["EPSG",32632]]'):
+def make_minimal_las_prefix(
+    wkt=b'PROJCRS["WGS 84 / UTM zone 32N",ID["EPSG",32632]]',
+    user_id=b"LASF_Projection",
+):
     header = bytearray(227)
     header[:4] = b"LASF"
     header[24] = 1
@@ -54,10 +56,10 @@ def make_minimal_las_prefix(wkt=b'PROJCRS["WGS 84 / UTM zone 32N",ID["EPSG",3263
 
     vlr_header = bytearray(54)
     struct.pack_into("<H", vlr_header, 0, 0)
-    vlr_header[2:18] = b"LASF_Projection\0"
+    vlr_header[2:18] = user_id.ljust(16, b"\0")[:16]
     struct.pack_into("<H", vlr_header, 18, 2112)
     struct.pack_into("<H", vlr_header, 20, len(wkt))
-    vlr_header[22:22+len(b"WKT CRS")] = b"WKT CRS"
+    vlr_header[22:29] = b"WKT CRS"
     return bytes(header + vlr_header + wkt)
 
 
@@ -70,6 +72,25 @@ class TestBoundedLazHeaderInspector(unittest.TestCase):
         self.assertEqual(parsed["coordinateScale"]["z"], 0.001)
         self.assertEqual(len(parsed["crsEvidence"]), 1)
         self.assertIn("32632", parsed["crsEvidence"][0]["epsgCodesFound"])
+
+    def test_parses_legacy_liblas_wkt_vlr(self):
+        parsed = MODULE.parse_las_prefix(make_minimal_las_prefix(user_id=b"liblas"))
+        self.assertEqual(parsed["status"], "header-parsed")
+        self.assertEqual(parsed["crsEvidence"][0]["userId"], "liblas")
+        self.assertIn("32632", parsed["crsEvidence"][0]["epsgCodesFound"])
+
+    def test_parses_projected_epsg_from_geokey_directory(self):
+        payload = struct.pack(
+            "<12H",
+            1, 1, 0, 2,
+            3072, 0, 1, 32632,
+            4099, 0, 1, 9001,
+        )
+        result = MODULE.parse_geokey_directory(payload)
+        self.assertEqual(result["parseStatus"], "parsed")
+        self.assertEqual(result["projectedCrsCodeCandidates"], [32632])
+        self.assertEqual(result["verticalCrsCodeCandidates"], [])
+        self.assertEqual(result["keys"][0]["keyName"], "ProjectedCSTypeGeoKey")
 
     def test_stops_when_prefix_does_not_contain_all_vlrs(self):
         parsed = MODULE.parse_las_prefix(make_minimal_las_prefix()[:240])
