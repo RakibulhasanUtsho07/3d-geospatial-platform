@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { assessBrf26EvidenceBundle, BRF26_REQUIRED_ARTIFACT_KEYS } from "../src/core/building-generation/brf26-evidence-bundle.mjs";
+import { validateBrf45ExactAssetRightsAdmission } from "../src/core/building-generation/brf45-exact-asset-rights-admission.mjs";
 
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function safeRelative(value, label) {
@@ -35,6 +36,22 @@ async function readSafe(root, relative, label, jsonRequired = true) {
     catch (error) { item.parseError = error instanceof Error ? error.message : String(error); }
   }
   return item;
+}
+async function resolveSafeDirectory(root, relative, label) {
+  const safe = safeRelative(relative, label);
+  const resolved = path.resolve(root, ...safe.split("/"));
+  if (!within(root, resolved)) throw new TypeError(label + " must remain within project root.");
+  let current = root;
+  for (const part of safe.split("/")) {
+    current = path.join(current, part);
+    const info = await lstat(current);
+    if (info.isSymbolicLink()) throw new TypeError(label + " must not traverse symbolic links.");
+    if (current !== resolved && !info.isDirectory()) throw new TypeError(label + " parent must be a directory.");
+    if (current === resolved && !info.isDirectory()) throw new TypeError(label + " must be a directory.");
+  }
+  const real = await realpath(resolved);
+  if (!within(root, real)) throw new TypeError(label + " resolves outside project root.");
+  return real;
 }
 async function readArtifact(root, entry, key) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry) || typeof entry.path !== "string") {
@@ -137,14 +154,16 @@ async function safeOutput(root, relative) {
   return resolved;
 }
 function usage() {
-  console.log("Usage: node scripts/build-brf26-evidence-bundle.mjs <bundle-manifest.json> <output-report.json> [--root=project-root] [--workspace=workspace-root]\nChecks hash-bound source review, BRF-24 authorization, exact candidate GLB, BRF-25 extraction/evaluation, independent reference and source-camera visual review. Output is review-readiness only and never enables publication.");
+  console.log("Usage: node scripts/build-brf26-evidence-bundle.mjs <bundle-manifest.json> <output-report.json> [--root=project-root] [--workspace=workspace-root] [--rights-evidence-root=project-relative-directory]\nChecks BRF-21 review, BRF-45 exact-asset rights and evidence bytes, BRF-24 authorization, exact candidate GLB, BRF-25 extraction/evaluation, independent reference and source-camera visual review. Output is review-readiness only and never enables publication.");
 }
 async function main() {
   const argv = process.argv.slice(2);
   if (process.argv.includes("--help")) { usage(); return; }
   const rootFlag = argv.find((arg) => arg.startsWith("--root="));
   const workspaceFlag = argv.find((arg) => arg.startsWith("--workspace="));
-  const positional = argv.filter((arg) => !arg.startsWith("--root=") && !arg.startsWith("--workspace="));
+  const rightsEvidenceRootFlag = argv.find((arg) => arg.startsWith("--rights-evidence-root="));
+  const positional = argv.filter((arg) => !arg.startsWith("--root=") &&
+    !arg.startsWith("--workspace=") && !arg.startsWith("--rights-evidence-root="));
   if (positional.length !== 2) { usage(); process.exitCode = 2; return; }
   const root = await realpath(path.resolve(rootFlag ? rootFlag.slice("--root=".length) : process.cwd()));
   const manifestFile = await readSafe(root, positional[0], "Bundle manifest");
@@ -178,8 +197,44 @@ async function main() {
     candidatePathBindingValid = false;
   }
 
+  let rightsAdmissionReport = {
+    status: "blocked",
+    sourceRightsStatus: "incomplete-or-invalid",
+    sourceManifestSha256: null,
+    sourceRepositoryCommit: null,
+    sourceViewCount: 0,
+    rightsApprovedAssetCount: 0,
+    blockers: ["BRF-45 rights register and exact BRF-14 source manifest were not both available for validation."],
+    assets: [],
+    releaseFlags: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+  };
+  const rightsRegister = artifacts.rightsAdmissionRegister;
+  const rightsSourceManifest = artifacts.rightsSourceManifest;
+  if (!rightsRegister?.error && !rightsRegister?.parseError && rightsRegister?.value &&
+      !rightsSourceManifest?.error && !rightsSourceManifest?.parseError && rightsSourceManifest?.value) {
+    try {
+      const configuredEvidenceRoot = rightsEvidenceRootFlag
+        ? rightsEvidenceRootFlag.slice("--rights-evidence-root=".length)
+        : manifest.rightsEvidenceRoot;
+      const evidenceRoot = configuredEvidenceRoot
+        ? await resolveSafeDirectory(root, configuredEvidenceRoot, "Rights evidence root")
+        : root;
+      rightsAdmissionReport = await validateBrf45ExactAssetRightsAdmission(rightsRegister.value, {
+        sourceManifest: rightsSourceManifest.value,
+        evidenceRoot,
+        sourceManifestSha256: rightsSourceManifest.actualSha256,
+      });
+    } catch (error) {
+      rightsAdmissionReport = {
+        ...rightsAdmissionReport,
+        status: "blocked",
+        blockers: [error instanceof Error ? error.message : String(error)],
+      };
+    }
+  }
+
   const report = assessBrf26EvidenceBundle({
-    manifest, artifacts, candidatePathBindingValid,
+    manifest, artifacts, candidatePathBindingValid, rightsAdmissionReport,
     manifestPath: manifestFile.path, manifestSha256: manifestFile.actualSha256,
   });
   report.manifest = { path: manifestFile.path, sha256: manifestFile.actualSha256 };
@@ -191,6 +246,8 @@ async function main() {
     passedChecks: report.checks.filter((item) => item.status === "passed").length,
     blockers: report.blockers.length,
     failures: report.failures.length,
+    rightsAdmissionStatus: report.rightsAdmission?.status ?? "unavailable",
+    rightsApprovedAssetCount: report.rightsAdmission?.rightsApprovedAssetCount ?? 0,
     acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false,
   }, null, 2));
   process.exitCode = report.status === "VALIDATION_FAILED" ? 1 :
