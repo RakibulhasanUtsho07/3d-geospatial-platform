@@ -230,7 +230,10 @@ def build_reference_glb(payload: bytes, *, source_commit: str, source_path: str,
         "outputClassification":"source-reference-geometry-not-platform-reconstruction","sourceCommit":source_commit,"sourcePath":source_path,
         "sourceSha256":observed,"sourceBytes":len(payload),"sourceCrs":source_crs,"glbOriginSourceCoordinates":list(origin),
         "sourceToGlbAxisMapping":"x'=E-originE; y'=H-originH; z'=-(N-originN); no scale or CRS transform",
-        "rightsReviewStatus":rights_review_status,"localReviewOnly":local_review_only,\n        "rightsEvidenceUrl":rights_evidence_url if rights_review_status=="approved" else None,\n        "requiredAttribution":attribution_text if rights_review_status=="approved" else None,\n        "rightsReviewedBy":rights_reviewed_by if rights_review_status=="approved" else None,"sameBuildingVerified":False,
+        "rightsReviewStatus":rights_review_status,"localReviewOnly":local_review_only,
+        "rightsEvidenceUrl":rights_evidence_url if rights_review_status=="approved" else None,
+        "requiredAttribution":attribution_text if rights_review_status=="approved" else None,
+        "rightsReviewedBy":rights_reviewed_by if rights_review_status=="approved" else None,"sameBuildingVerified":False,
         "platformGeneratedCandidateGlbExists":False,"independentHeldOutCheckpointsExist":False,
         "releaseFlags":{"acceptanceEligible":False,"publicationEligible":False,"mapReady":False,"automaticApproval":False}}},
       "scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"name":"SourceReferenceGeometry","mesh":0}],
@@ -276,7 +279,8 @@ def main():
     if src.stat().st_size>MAX_INPUT_BYTES: raise ConversionError("input file exceeds 64 MiB ceiling")
     glb,report=build_reference_glb(src.read_bytes(),source_commit=args.source_commit,source_path=args.source_path,
       expected_sha256=args.expected_sha256,expected_bytes=args.expected_bytes,source_crs=args.source_crs,
-      rights_review_status=args.rights_review_status,local_review_only=args.local_review_only,rights_evidence_url=args.rights_evidence_url,\n      attribution_text=args.attribution_text,rights_reviewed_by=args.rights_reviewed_by)
+      rights_review_status=args.rights_review_status,local_review_only=args.local_review_only,rights_evidence_url=args.rights_evidence_url,
+      attribution_text=args.attribution_text,rights_reviewed_by=args.rights_reviewed_by)
     dest.parent.mkdir(parents=True,exist_ok=True)
     with dest.open("xb") as stream: stream.write(glb)
     report_path=Path(args.report_json) if args.report_json else dest.with_suffix(".report.json")
