@@ -45,7 +45,8 @@
       "The exact asset/version licence and use-specific rights still need a human review; the metadata PDF does not by itself approve licence terms.",
       "The campus dataset does not yet map a selected image subset, ULS crop and individual LOD3 model to one identified building.",
       "No selected source images/point-cloud crops have been downloaded and SHA-256 verified locally for the intended building, and no platform-generated candidate GLB or held-out controls exist.",
-      "BRF-28 inspects only a bounded LAZ prefix; it deliberately refuses to consume a full HTTP 200 response and does not produce a whole-file hash."
+      "BRF-28 inspects only a bounded LAZ prefix; it deliberately refuses to consume a full HTTP 200 response and does not produce a whole-file hash.",
+      "BRF-28 read the first 8 MiB of the ULS LAZ via HTTP 206; header VLRs declare WGS 84 / UTM zone 32N (GeoKey projected-code candidate 32632) and metre units, but no named vertical CRS key was present. Source frame interpretation still needs review."
     ],
     "verifiedMetadata": {
       "document": {
@@ -130,21 +131,83 @@
       }
     },
     "headerRangeInspection": {
-      "status": "pending-ci",
+      "status": "prefix-inspected-pending-human-review",
+      "workflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40636959484",
+      "artifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40636959484/artifacts/12793024221",
       "filename": "TUM_Downtown_ULS_20241217_manual.laz",
       "sourceUrl": "https://zenodo.org/records/15282970/files/TUM_Downtown_ULS_20241217_manual.laz",
       "publisherMd5": "37ce114fb348fb28066cc967cde9771d",
+      "publisherMd5Verified": false,
       "publishedDisplaySize": "2.8 GB",
-      "maximumRangeBytes": 8388608,
-      "method": "HTTP Range bytes 0-8388607; verify HTTP 206 and Content-Range before reading",
-      "wholeFileDownloaded": false,
-      "wholeFileHashVerified": false,
+      "httpRange": {
+        "status": 206,
+        "contentRange": "bytes 0-8388607/2840830691",
+        "reportedTotalFileBytes": 2840830691,
+        "prefixBytesRead": 8388608,
+        "prefixSha256": "3a9b3ae9d07520dcee6bae53ab17d932a9a76483cbb8673ec0ad6ac9dbd4abb4",
+        "wholeFileDownloaded": false,
+        "wholeFileSha256": null
+      },
+      "lasHeader": {
+        "signature": "LASF",
+        "version": "1.2",
+        "headerSizeBytes": 227,
+        "pointDataOffsetBytes": 1186,
+        "declaredVlrCount": 4,
+        "pointFormatRaw": 131,
+        "pointFormat": 3,
+        "compressedFlag": true,
+        "pointRecordLengthBytes": 34,
+        "coordinateScale": {
+          "x": 0.0001,
+          "y": 0.0001,
+          "z": 0.0001
+        },
+        "coordinateOffset": {
+          "x": 690802.2210446384,
+          "y": 5335907.745415179,
+          "z": 568.5466850988182
+        },
+        "bounds": {
+          "maxX": 691169.3342446384,
+          "minX": 690787.9737446384,
+          "maxY": 5336383.198915179,
+          "minY": 5335827.531815179,
+          "maxZ": 606.4985850988182,
+          "minZ": 530.5947850988182
+        }
+      },
+      "crsHeaderEvidence": {
+        "geotiffCitation": [
+          "WGS 84 / UTM zone 32N",
+          "WGS 84"
+        ],
+        "projectedCrsCodeCandidate": 32632,
+        "wktVlr": {
+          "userId": "liblas",
+          "recordId": 2112,
+          "coordinateSystem": "WGS 84 / UTM zone 32N",
+          "epsgCodesFound": [
+            32632,
+            4326,
+            6326,
+            7030,
+            8901,
+            9001,
+            9122
+          ]
+        },
+        "linearUnitCitation": "metre",
+        "namedVerticalCrsKeyFound": false,
+        "interpretationStatus": "source-header-declaration; independent frame and vertical reference review required"
+      },
       "reviewStatus": "pending-human-review",
       "limitations": [
-        "A prefix SHA-256 is not a whole-file digest.",
-        "Only initial LAS header and VLRs can be inspected; EVLRs after point data may not be present in this prefix.",
-        "No CRS or local-to-georeferenced transform is approved merely because a header contains a CRS field.",
-        "Vertical datum, building identity, exact asset rights, engine candidate GLB and held-out evaluation remain blocked."
+        "The 8 MiB prefix digest is not a whole-file checksum and does not verify the publisher MD5.",
+        "The LAS header and GeoTIFF/WKT VLRs declare WGS 84 / UTM zone 32N, ProjectedCSTypeGeoKey candidate 32632 and metre units; the PDF's local-XYZ wording still needs reconciliation with the source processing description.",
+        "No VerticalCSTypeGeoKey is present in the parsed GeoKey directory; the named vertical datum/geoid remains unresolved. This absence does not prove a particular height datum.",
+        "The header coordinates/bounds do not establish a transform to an independently defined evaluation frame or held-out control points.",
+        "Exact license/attribution review, one-building identity, permitted imagery subset, engine-generated GLB and independent accuracy evidence remain missing."
       ]
     }
   },
