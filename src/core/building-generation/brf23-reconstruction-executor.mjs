@@ -428,7 +428,7 @@ async function verifyRawImages(imageRoot, imageSet) {
       file.bytes.subarray(0, 3).equals(JPEG_SIGNATURE), "Source image bytes changed after preflight: " + image.filename);
   }
 }
-async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildingSpec, imageSet) {
+async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildingSpec, imageSet, rightsAdmissionReport) {
   safeId(buildingId, "buildingId");
   requireValue(Array.isArray(sourceIds) && sourceIds.length >= 3 && sourceIds.length <= 120 &&
     new Set(sourceIds).size === sourceIds.length, "Select 3–120 distinct reviewed media source IDs.");
@@ -436,6 +436,7 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
   const sourceRoot = await checkDirectoryTree(workspaceRoot, [".building-engine", "media", buildingId, "sources"]);
   const assetRoot = await checkDirectoryTree(workspaceRoot, [".building-engine", "media", buildingId, "assets"]);
   const approvedByHash = new Map(imageSet.records.map(row => [row.sha256, row]));
+  const rightsById = new Map((rightsAdmissionReport?.assets || []).map(row => [row.sourceId, row]));
   const specSources = new Map((buildingSpec?.sources || []).map(row => [row.id, row]));
   const selected = [];
   const seenHashes = new Set();
@@ -446,9 +447,13 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
     requireValue(record.id === sourceId && record.buildingId === buildingId &&
       record.kind === "image" && ["image/jpeg", "image/png"].includes(record.mimeType),
       "Invalid selected source identity or media type: " + sourceId);
-    requireValue(record.usageStatus === "approved" && typeof record.licence === "string" &&
-      record.licence.trim() && record.licence.toLowerCase() !== "unknown",
-      "Selected source lacks reviewed rights: " + sourceId);
+    requireValue(typeof record.licence === "string" && record.licence.trim(),
+      "Selected source lacks source-license metadata; this metadata is not itself a rights grant.");
+    const rightsRecord = rightsById.get(sourceId);
+    requireValue(rightsRecord?.status === "evidence-complete-human-review-required" &&
+      rightsRecord.sha256?.toLowerCase() === String(record.sha256 ?? "").toLowerCase() &&
+      rightsRecord.byteSize > 0,
+      "Selected source is not covered by BRF-45 exact-asset rights admission: " + sourceId);
     requireValue(typeof record.sha256 === "string" && SHA256.test(record.sha256) && record.assetId === record.sha256,
       "Source asset is not content-hash addressed: " + sourceId);
     const pinned = approvedByHash.get(record.sha256);
@@ -470,10 +475,13 @@ async function verifySelectedMedia(workspaceRoot, buildingId, sourceIds, buildin
       (!isPng && assetFile.bytes.subarray(0, 3).equals(JPEG_SIGNATURE)),
       "Selected asset file signature does not match its media type: " + sourceId);
     const spec = specSources.get(sourceId);
-    requireValue(spec && spec.assetId === record.assetId && spec.usageStatus === "approved" &&
-      spec.licence === record.licence, "BuildingSpec must bind the exact approved media metadata: " + sourceId);
+    requireValue(spec && spec.assetId === record.assetId &&
+      spec.licence === record.licence, "BuildingSpec must bind the exact selected media metadata: " + sourceId);
+    requireValue(rightsRecord.filename === pinned.filename && rightsRecord.byteSize === assetFile.byteSize,
+      "Selected media filename or byte size differs from BRF-45 admission: " + sourceId);
     selected.push({ id: sourceId, filename: pinned.filename, sha256: record.sha256,
-      byteSize: assetFile.byteSize, licence: record.licence, usageStatus: record.usageStatus });
+      byteSize: assetFile.byteSize, licence: record.licence, usageStatus: record.usageStatus,
+      rightsAdmissionStatus: rightsRecord.status });
   }
   requireValue(selected.length >= 3 && within(workspaceRoot, mediaRoot),
     "Insufficient or unsafe selected media.");
@@ -553,9 +561,6 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     "Fresh BRF-23 report differs from pinned report; evidence, decision, profile, or inputs changed.");
   validateReport(parseJson(freshFile.bytes, "Revalidated BRF-23 report"));
 
-  const selected = await verifySelectedMedia(workspaceRoot, buildingId, options.sourceIds,
-    options.buildingSpec, validated.imageSet);
-
   // BRF-42 remains an immutable history of the original unreviewed intake.
   // Only the separately hash-bound BRF-45 per-asset grant evidence can satisfy the
   // source-use gate; human-review continuation or mutable media metadata cannot.
@@ -565,6 +570,8 @@ export async function runBrf23AuthorizedColmapReconstruction(options) {
     rightsAdmissionReport.blockers.slice(0, 12).join(", ") +
     ". The COLMAP worker was not started; acquire and review exact-source rights evidence first.");
 
+  const selected = await verifySelectedMedia(workspaceRoot, buildingId, options.sourceIds,
+    options.buildingSpec, validated.imageSet, rightsAdmissionReport);
   const version = await (options.colmapVersionProbe || probeVersion)(
     validated.tool.resolvedExecutable, options.colmapSpawnImpl || nodeSpawn);
   requireValue(version === validated.tool.expectedVersion,
