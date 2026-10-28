@@ -61,21 +61,23 @@ async function readPackageFile(root, relativePath, maximumBytes) {
   return readFile(current);
 }
 
-function collectContentUris(tileset) {
-  const uris = [];
+function collectContentEntries(tileset) {
+  const entries = [];
   const stack = [tileset.root];
   while (stack.length) {
     const tile = stack.pop();
     if (!isRecord(tile)) continue;
-    if (isRecord(tile.content)) uris.push(tile.content.uri ?? tile.content.url);
+    if (isRecord(tile.content)) {
+      entries.push({ uri: tile.content.uri ?? tile.content.url, tileExtras: tile.extras ?? null });
+    }
     if (Array.isArray(tile.contents)) {
-      for (const content of tile.contents) {
-        if (isRecord(content)) uris.push(content.uri ?? content.url);
+      for (const item of tile.contents) {
+        if (isRecord(item)) entries.push({ uri: item.uri ?? item.url, tileExtras: item.extras ?? tile.extras ?? null });
       }
     }
     if (Array.isArray(tile.children)) stack.push(...tile.children);
   }
-  return uris;
+  return entries;
 }
 
 function jsonFromBytes(bytes, name, errors) {
@@ -159,7 +161,27 @@ export async function verifyTilesetPackage({
     errors.push("Package source SHA-256 does not match the expected source SHA-256.");
   }
 
-  const contentUris = collectContentUris(tileset);
+  const assetExtras = isRecord(tileset.asset) && isRecord(tileset.asset.extras) ? tileset.asset.extras : null;
+  if (isRecord(build.source) && SHA256_PATTERN.test(build.source.sha256 ?? "") &&
+      assetExtras?.sourceSha256 !== build.source.sha256) {
+    errors.push("tileset asset source SHA-256 does not match build-manifest.json source SHA-256.");
+  }
+  if (isRecord(build.configuration) && assetExtras &&
+      build.configuration.syntheticHeightMeters !== assetExtras.syntheticHeightMeters) {
+    errors.push("tileset synthetic height does not match the build configuration.");
+  }
+  if (isRecord(build.releaseFlags) &&
+      ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"].some((key) => build.releaseFlags[key] !== false)) {
+    errors.push("All release flags must remain explicitly false for this experimental package.");
+  }
+  if (isRecord(build.validation) &&
+      build.validation.contentCount !== undefined &&
+      build.validation.contentCount !== contentEntries.length) {
+    errors.push("build-manifest validation contentCount does not match the tileset.");
+  }
+
+  const contentEntries = collectContentEntries(tileset);
+  const contentUris = contentEntries.map((entry) => entry.uri);
   if (contentUris.length === 0) errors.push("The tileset contains no tile content.");
   if (contentUris.some((uri) => typeof uri !== "string" || !safeRelativePath(uri))) {
     errors.push("The tileset contains an unsafe content URI.");
@@ -177,6 +199,23 @@ export async function verifyTilesetPackage({
   if (contentUris.some((uri) => !tileUris.includes(uri))) errors.push("A tileset content URI is absent from build-manifest.json tiles.");
   if (tileUris.some((uri) => !contentUris.includes(uri))) errors.push("build-manifest.json lists a tile that the tileset does not reference.");
 
+  const tileByUri = new Map(tiles.filter(isRecord).map((tile) => [tile.contentUri, tile]));
+  for (const entry of contentEntries) {
+    const tile = tileByUri.get(entry.uri);
+    if (!tile) continue;
+    if (!SHA256_PATTERN.test(tile.featureSha256 ?? "")) {
+      errors.push(`Tile ${entry.uri} has no valid source-feature SHA-256.`);
+    }
+    if (!SHA256_PATTERN.test(tile.contentSha256 ?? "")) {
+      errors.push(`Tile ${entry.uri} has no valid content SHA-256.`);
+    }
+    if (isRecord(entry.tileExtras) &&
+        (entry.tileExtras.sourceFeatureId !== tile.featureId ||
+         entry.tileExtras.sourceFeatureSha256 !== tile.featureSha256)) {
+      errors.push(`Tile source identity/hash extras do not match build-manifest.json for ${entry.uri}.`);
+    }
+  }
+
   if (!isRecord(build.files)) {
     errors.push("build-manifest.json files must be an object.");
   } else {
@@ -189,6 +228,17 @@ export async function verifyTilesetPackage({
     for (const relativePath of Object.keys(build.files)) {
       if (!safeRelativePath(relativePath)) {
         errors.push(`build-manifest.json contains unsafe file path ${relativePath}.`);
+      }
+    }
+    for (const tile of tiles) {
+      if (!isRecord(tile) || typeof tile.contentUri !== "string") continue;
+      const fileRecord = build.files[tile.contentUri];
+      if (!isRecord(fileRecord)) continue;
+      if (tile.contentSha256 !== fileRecord.sha256) {
+        errors.push(`Tile content SHA-256 does not match the package file record for ${tile.contentUri}.`);
+      }
+      if (tile.bytes !== fileRecord.bytes) {
+        errors.push(`Tile byte count does not match the package file record for ${tile.contentUri}.`);
       }
     }
 
