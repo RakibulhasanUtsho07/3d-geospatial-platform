@@ -194,8 +194,8 @@ export function assessBrf26EvidenceBundle(input = {}) {
     evaluation.counts?.failures === 0 && evaluation.counts?.warnings === 0 &&
     Array.isArray(evaluation.failures) && evaluation.failures.length === 0,
   "BRF-25 must finish metric evaluation without metric failures or warnings; review is still required.", "blocked");
-  check("geometry-release-flags-false", flagsFalse(geometry) && flagsFalse(evaluation.policy),
-    "Geometry/evaluator reports must keep every release flag false.", "failed");
+  check("geometry-release-flags-false", flagsFalse(geometry.policy) && flagsFalse(evaluation.policy),
+    "Geometry/evaluator policy objects must keep every release flag false.", "failed");
 
   check("visual-review-schema", visual.recordType === "brf-26-visual-review-decision" &&
     visual.schemaVersion === "1.0.0",
