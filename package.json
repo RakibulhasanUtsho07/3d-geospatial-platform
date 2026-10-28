@@ -225,7 +225,8 @@
     "run:brf41-demo-image-smoke": "node scripts/run-brf41-demo-image-smoke-test.mjs",
     "test:brf45-rights-admission": "node --test tests/brf45-exact-asset-rights-admission.test.mjs tests/brf45-exact-asset-rights-admission-cli.test.mjs",
     "validate:brf45-rights-admission": "node scripts/validate-brf45-exact-asset-rights-admission.mjs benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json --source-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json --evidence-root .",
-    "validate:brf26-evidence-bundle": "node scripts/build-brf26-evidence-bundle.mjs"
+    "validate:brf26-evidence-bundle": "node scripts/build-brf26-evidence-bundle.mjs",
+    "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

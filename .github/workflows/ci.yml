@@ -344,6 +344,9 @@ jobs:
           console.log("Real source rights remain blocked pending exact-asset evidence.");
           NODE
 
+      - name: Test TUM2TWIN asset-level rights clarification request packet
+        run: npm run test:brf29-rights-request-packet
+
       - name: Validate BRF-35 real candidate remains blocked
         run: |
           mkdir -p artifacts
