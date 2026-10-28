@@ -1,0 +1,84 @@
+name: BRF-33 pinned CityGML full-geometry inspection
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf33-citygml-candidate-geometry.yml"
+      - "scripts/inspect_tum_citygml_candidate.py"
+      - "tests/test_tum_citygml_candidate.py"
+      - "docs/research/BRF-33-CITYGML-CANDIDATE-GEOMETRY.md"
+      - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf33-citygml-candidate-geometry.yml"
+      - "scripts/inspect_tum_citygml_candidate.py"
+      - "tests/test_tum_citygml_candidate.py"
+      - "docs/research/BRF-33-CITYGML-CANDIDATE-GEOMETRY.md"
+      - "benchmarks/building-reconstruction/brf-30-tum-lod3-catalog-snapshot.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf33-citygml-full-geometry-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-one-pinned-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/inspect_tum_citygml_candidate.py tests/test_tum_citygml_candidate.py
+
+      - name: Test whole-object verification and CityGML geometry parser
+        run: python -m unittest discover -s tests -p 'test_tum_citygml_candidate.py' -v
+
+      - name: Download, verify, and inspect only the pinned 51 MB candidate
+        run: python scripts/inspect_tum_citygml_candidate.py --output artifacts/brf33-citygml-candidate/report.json
+
+      - name: Require verified whole-object hash and parsed geometry while keeping release blocked
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/brf33-citygml-candidate/report.json").read_text(encoding="utf-8"))
+          if report.get("status") != "full-object-hash-verified-xml-valid-geometry-extracted":
+              raise SystemExit("Candidate inspection was blocked: " + str(report.get("reason")))
+          if report["byteVerification"]["actualSha256"] != report["source"]["lfsExpectedSha256"]:
+              raise SystemExit("Whole-object SHA-256 does not match the pinned LFS object.")
+          if report["byteVerification"]["actualBytes"] != report["source"]["lfsExpectedBytes"]:
+              raise SystemExit("Whole-object byte size does not match the pinned LFS object.")
+          geometry = report.get("geometry", {})
+          if not geometry.get("fullXmlDocumentValidated") or geometry.get("coordinateTupleCount", 0) < 1:
+              raise SystemExit("Full CityGML XML or geometry extraction was not validated.")
+          if report.get("sameBuildingVerified") is not False:
+              raise SystemExit("Candidate must remain unselected until cross-modal evidence is reviewed.")
+          if any(report["releaseFlags"].values()):
+              raise SystemExit("A release flag was incorrectly enabled.")
+          print(json.dumps({
+              "status": report["status"],
+              "candidate": report["source"]["path"],
+              "bytes": report["byteVerification"]["actualBytes"],
+              "sha256": report["byteVerification"]["actualSha256"],
+              "coordinateTuples": geometry["coordinateTupleCount"],
+              "srsNames": geometry["srsNamesObserved"],
+              "bounds": geometry["coordinateBounds"],
+              "releaseFlags": report["releaseFlags"],
+          }, indent=2))
+          PY
+
+      - name: Upload non-sensitive candidate geometry summary only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf33-citygml-candidate-geometry-summary
+          path: artifacts/brf33-citygml-candidate/report.json
+          if-no-files-found: warn
+          retention-days: 14
