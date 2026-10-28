@@ -56,6 +56,7 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         by_id = {}
         for view in source["views"]:
             # Exact 128-byte synthetic JPEG-like fixture. Not real imagery.
+            view["sourceUrl"] = view.get("sourceUrl") or ("https://example.test/synthetic/" + view["filename"])
             payload = (b"\xff\xd8\xff" + ("synthetic-" + view["id"]).encode("ascii"))
             payload = payload.ljust(128, b"x")[:128]
             (self.images / view["filename"]).write_bytes(payload)
@@ -100,10 +101,12 @@ class Brf23ReconstructionPreflightTests(unittest.TestCase):
         quality_report["sourceManifest"]["priorVerificationReportSha256"] = hashlib.sha256(
             (self.root / "multiview-source-byte-verification.json").read_bytes()
         ).hexdigest()
+        source_url_by_id = {view["id"]: view["sourceUrl"] for view in source["views"]}
         for record in quality_report["privateMediaIntake"]["records"]:
             data = by_id[record["sourceId"]]
             record["sha256"] = data["sha256"]
             record["byteSize"] = data["byteSize"]
+            record["sourceUrl"] = source_url_by_id[record["sourceId"]]
         for row in quality_report["imageQualityPreflight"]["sources"]:
             data = by_id[row["sourceId"]]
             row["sha256"] = data["sha256"]
