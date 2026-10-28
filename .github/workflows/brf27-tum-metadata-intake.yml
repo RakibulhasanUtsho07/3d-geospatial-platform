@@ -52,5 +52,6 @@ jobs:
             artifacts/brf27-tum-metadata/metadata-audit.json
             artifacts/brf27-tum-metadata/metadata-extract.txt
             artifacts/brf27-tum-metadata/pdfinfo.txt
+            artifacts/brf27-tum-metadata/page-preview-*.png
           if-no-files-found: warn
           retention-days: 14
