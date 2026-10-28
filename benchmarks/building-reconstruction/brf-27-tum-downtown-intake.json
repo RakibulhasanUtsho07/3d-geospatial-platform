@@ -44,7 +44,8 @@
       "The photogrammetry-vs-ULS M3C2 mean (1.7 cm) and standard deviation (22.8 cm) compare related source products from the same campaign, not a platform candidate against independent held-out truth.",
       "The exact asset/version licence and use-specific rights still need a human review; the metadata PDF does not by itself approve licence terms.",
       "The campus dataset does not yet map a selected image subset, ULS crop and individual LOD3 model to one identified building.",
-      "No selected source images/point-cloud crops have been downloaded and SHA-256 verified locally for the intended building, and no platform-generated candidate GLB or held-out controls exist."
+      "No selected source images/point-cloud crops have been downloaded and SHA-256 verified locally for the intended building, and no platform-generated candidate GLB or held-out controls exist.",
+      "BRF-28 inspects only a bounded LAZ prefix; it deliberately refuses to consume a full HTTP 200 response and does not produce a whole-file hash."
     ],
     "verifiedMetadata": {
       "document": {
@@ -127,6 +128,24 @@
         "citation": "Metadata PDF page 7",
         "caution": "These are source-dataset cross-comparison statistics, not an engine-generated GLB result, and not genuinely held-out checkpoint accuracy for this platform."
       }
+    },
+    "headerRangeInspection": {
+      "status": "pending-ci",
+      "filename": "TUM_Downtown_ULS_20241217_manual.laz",
+      "sourceUrl": "https://zenodo.org/records/15282970/files/TUM_Downtown_ULS_20241217_manual.laz",
+      "publisherMd5": "37ce114fb348fb28066cc967cde9771d",
+      "publishedDisplaySize": "2.8 GB",
+      "maximumRangeBytes": 8388608,
+      "method": "HTTP Range bytes 0-8388607; verify HTTP 206 and Content-Range before reading",
+      "wholeFileDownloaded": false,
+      "wholeFileHashVerified": false,
+      "reviewStatus": "pending-human-review",
+      "limitations": [
+        "A prefix SHA-256 is not a whole-file digest.",
+        "Only initial LAS header and VLRs can be inspected; EVLRs after point data may not be present in this prefix.",
+        "No CRS or local-to-georeferenced transform is approved merely because a header contains a CRS field.",
+        "Vertical datum, building identity, exact asset rights, engine candidate GLB and held-out evaluation remain blocked."
+      ]
     }
   },
   "building": {
