@@ -301,6 +301,9 @@ jobs:
       - name: Test BRF-35 same-building linkage and metric-frame gate
         run: npm run test:brf35-building-linkage
 
+      - name: Test BRF-36 source asset byte verifier
+        run: npm run test:brf36-source-byte-verifier
+
       - name: Validate BRF-35 real candidate remains blocked
         run: |
           mkdir -p artifacts
