@@ -498,6 +498,11 @@ test("only a complete separate BRF-45 admission can satisfy the source-use gate"
   assert.ok(result.authorization.selectedSourceImages.every(row => row.usageStatus === "unreviewed"));
   assert.ok(result.authorization.selectedSourceImages.every(row =>
     row.rightsAdmissionStatus === "evidence-complete-human-review-required"));
+  assert.equal(result.authorization.rightsAdmission.status, "rights-admission-complete-human-review-required");
+  assert.equal(result.authorization.rightsAdmission.sourceViewCount, 3);
+  assert.equal(result.authorization.rightsAdmission.rightsApprovedAssetCount, 3);
+  assert.equal(result.authorization.rightsAdmission.sha256,
+    f.report.assessedInputs.rightsAdmission.sha256);
   assert.equal(result.authorization.candidateGlbGenerated, true);
   assert.equal(result.report.candidateGeometryValidated, false);
   assert.equal(result.report.independentReferenceVerified, false);
