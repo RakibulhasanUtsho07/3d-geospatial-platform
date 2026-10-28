@@ -398,6 +398,17 @@ jobs:
           console.log("BRF-41 policy validated: one private demo-only image, five blocked source leads, release flags false.");
           NODE
 
+      - name: Test BRF-45 exact-asset rights admission validator and execution gate
+        run: npm run test:brf45-rights-admission
+
+      - name: Confirm the real 16-view BRF-45 register stays blocked without grant evidence
+        run: |
+          set +e
+          npm run validate:brf45-rights-admission
+          status=$?
+          set -e
+          test "$status" -eq 2
+
       - name: Validate independent building truth evaluator CLI
         run: npm run evaluate:independent-building-truth -- --help
       - name: Test actual GLB geometry extraction, transforms, safety limits and deterministic output
