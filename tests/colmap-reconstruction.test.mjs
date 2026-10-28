@@ -9,6 +9,7 @@ import { convertTexturedPlyToGlb } from "../src/core/building-generation/texture
 import { runColmapReconstruction } from "../src/core/building-generation/colmap-worker.mjs";
 import { generateBuildingAsset } from "../src/core/building-generation/generation-pipeline.mjs";
 import { ingestMediaFile, toBuildingSpecSource } from "../src/core/building-generation/media-intake.mjs";
+import { reviewBuildingSource } from "../src/core/building-generation/source-workflow.mjs";
 
 async function workspace(t){const root=await mkdtemp(path.join(os.tmpdir(),"building-recon-"));t.after(()=>rm(root,{recursive:true,force:true}));return root;}
 const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.alloc(40,9)]);
@@ -77,8 +78,9 @@ async function setupApprovedViews(t,root,buildingId="demo-build"){
  const dir=path.join(root,"uploads");await mkdir(dir,{recursive:true});const sources=[];
  for(let i=0;i<3;i++){
   const file="view-"+(i+1)+".png",bytes=Buffer.concat([png,Buffer.from([i+1])]);await writeFile(path.join(dir,file),bytes);
-  const ingested=await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/"+file,buildingId,sourceId:"view-"+(i+1),kind:"image",licence:"CC BY 4.0",usageStatus:"approved",title:file,captureLocation:{longitude:90.406+i*0.00001,latitude:23.709}});
-  sources.push(toBuildingSpecSource(ingested.record));
+  await ingestMediaFile({workspaceRoot:root,sourcePath:"uploads/"+file,buildingId,sourceId:"view-"+(i+1),kind:"image",licence:"unknown",usageStatus:"unreviewed",title:file,captureLocation:{longitude:90.406+i*0.00001,latitude:23.709}});
+  const reviewed=await reviewBuildingSource({workspaceRoot:root,buildingId,sourceId:"view-"+(i+1),licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","photogrammetry-reconstruction","texture-baking"],confirmRights:true,attribution:"Test-only synthetic fixture"});
+  sources.push(toBuildingSpecSource(reviewed.record));
  }
  const buildingSpec={...fixture,id:buildingId,sources,evidence:[{field:"floorCount",value:5,confidence:"estimated",sourceIds:["view-1"]}]};
  return {sources,buildingSpec};
