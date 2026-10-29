@@ -237,7 +237,9 @@
     "test:dhaka-3d-tiles-pilot-browser-module": "node --test tests/dhaka-3d-tiles-pilot-browser-module.test.mjs",
     "test:dhaka-3d-tiles-controller-lifecycle-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts",
     "review:dhaka-3d-tiles-package-alignment": "node scripts/review-dhaka-3d-tiles-package-alignment.mjs",
-    "test:dhaka-3d-tiles-package-alignment": "node --test tests/dhaka-3d-tiles-package-alignment.test.mjs"
+    "test:dhaka-3d-tiles-package-alignment": "node --test tests/dhaka-3d-tiles-package-alignment.test.mjs",
+    "review:dhaka-3d-tiles-package-placement": "node scripts/review-dhaka-3d-tiles-package-placement.mjs",
+    "test:dhaka-3d-tiles-package-placement": "node --test tests/dhaka-3d-tiles-package-placement.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
