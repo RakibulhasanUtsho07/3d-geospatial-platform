@@ -153,6 +153,10 @@ jobs:
         run: npm run test:dhaka-3d-tiles-multitile-browser
 
       - name: Verify controller fallback, terminal failure and late-result cleanup in live Cesium
+        env:
+          # GITHUB_SHA can be the synthetic merge commit for pull_request.
+          # Bind lifecycle browser evidence to the proposed source head explicitly.
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run test:dhaka-3d-tiles-controller-lifecycle-browser
 
       - name: Upload multi-tile selective-fetch browser evidence
