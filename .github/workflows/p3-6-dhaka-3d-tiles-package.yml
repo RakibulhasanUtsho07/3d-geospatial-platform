@@ -12,12 +12,14 @@ on:
       - "scripts/verify-dhaka-3d-tiles-package.mjs"
       - "scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs"
       - "scripts/review-dhaka-3d-tiles-package-alignment.mjs"
+      - "scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs"
       - "src/core/map-engine/dhaka-3d-tiles-pilot-controller.mjs"
       - "src/core/geospatial/tileset-package-integrity.mjs"
       - "src/core/geospatial/tileset-manifest-validation.mjs"
       - "tests/dhaka-3d-tiles-package.test.mjs"
       - "tests/dhaka-3d-tiles-pilot-browser-module.test.mjs"
       - "tests/dhaka-3d-tiles-package-alignment.test.mjs"
+      - "tests/dhaka-3d-tiles-scale-profile.test.mjs"
       - "tests/dhaka-3d-tiles-pilot-controller.test.mjs"
       - "tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
       - "data/overture/dhaka-buildings-3d-pilot.geojson"
@@ -70,6 +72,9 @@ jobs:
       - name: Test per-tile footprint and placement residual reviewer
         run: npm run test:dhaka-3d-tiles-package-alignment
 
+      - name: Test bounded scale-profile parser, metrics and fail-closed behavior
+        run: npm run test:dhaka-3d-tiles-scale-profile
+
       - name: Build bounded multi-building package from the repository Dhaka extract
         run: >-
           npm run build:dhaka-3d-tiles-package --
@@ -87,6 +92,17 @@ jobs:
           --source data/overture/dhaka-buildings-3d-pilot.geojson
           --package "$TILE_PACKAGE_DIR"
           --output /tmp/dhaka-3d-tiles-package-alignment-review.json
+
+      - name: Profile package size, integrity, placement and wall time at 32/64/128 contents
+        env:
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          npm run benchmark:dhaka-3d-tiles-scale-profile --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --feature-counts 32,64,128
+          --height-meters 8
+          --tolerance-meters 0.5
+          --report /tmp/p3-6-dhaka-scale-profile.json
 
       - name: Build production app with the multi-tile review package
         run: npm run build
@@ -172,6 +188,15 @@ jobs:
         with:
           name: p3-6-dhaka-package-alignment-evidence
           path: /tmp/dhaka-3d-tiles-package-alignment-review.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload bounded 32/64/128 scale-profile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-3d-tiles-scale-profile
+          path: /tmp/p3-6-dhaka-scale-profile.json
           if-no-files-found: warn
           retention-days: 14
 
