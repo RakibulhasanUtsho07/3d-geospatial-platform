@@ -12,6 +12,14 @@ function isDestroyed(value) {
   }
 }
 
+function requestRender(viewer) {
+  try {
+    viewer?.scene?.requestRender?.();
+  } catch {
+    // Render scheduling is best-effort and must not turn a successful attachment into a failed load.
+  }
+}
+
 function destroyUnattachedTileset(tileset) {
   if (!tileset || isDestroyed(tileset)) return;
   try {
@@ -153,12 +161,14 @@ export class Dhaka3DTilesPilotController {
         if (primitives && typeof primitives.remove === "function") {
           removed = primitives.remove(tileset) === true;
         }
-        viewer.scene?.requestRender?.();
+        requestRender(viewer);
       } catch {
         removed = false;
       }
     }
-    if (!removed) destroyUnattachedTileset(tileset);
+    // A PrimitiveCollection may use destroyPrimitives=false: successful removal
+    // does not guarantee the primitive itself was destroyed.
+    if (!removed || !isDestroyed(tileset)) destroyUnattachedTileset(tileset);
   }
 
   enable({ url = this.#url, fallbackUrl = this.#fallbackUrl } = {}) {
@@ -322,7 +332,9 @@ export class Dhaka3DTilesPilotController {
       } catch {
         removedAfterFailedAdd = false;
       }
-      if (!removedAfterFailedAdd) destroyUnattachedTileset(loadedTileset);
+      // Removal can succeed without destruction when the collection is configured
+      // with destroyPrimitives=false, so explicitly destroy any surviving primitive.
+      if (!removedAfterFailedAdd || !isDestroyed(loadedTileset)) destroyUnattachedTileset(loadedTileset);
       this.#loading = false;
       const message = error instanceof Error ? error.message : String(error);
       this.#emit("error", { requestedUrl: primaryUrl, loadedUrl, message, failures });
@@ -333,7 +345,7 @@ export class Dhaka3DTilesPilotController {
     this.#tileset = loadedTileset;
     this.#attachedViewer = viewer;
     this.#attachedUrl = loadedUrl;
-    viewer.scene.requestRender?.();
+    requestRender(viewer);
     const result = {
       status: "loaded",
       tileset: loadedTileset,
