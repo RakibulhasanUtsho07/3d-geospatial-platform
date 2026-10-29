@@ -37,13 +37,15 @@ export async function buildDhaka3DTilesPilotBrowserModule({
   }
 
   await mkdir(outputDirectory, { recursive: true });
+  let outputInfo = null;
   try {
-    const outputInfo = await lstat(outputPath);
-    if (outputInfo.isSymbolicLink() || !outputInfo.isFile()) {
-      throw new Error("The generated browser module must not replace a non-regular asset.");
-    }
+    outputInfo = await lstat(outputPath);
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code !== "ENOENT") throw error;
+    const code = error && typeof error === "object" && "code" in error ? error.code : null;
+    if (code !== "ENOENT") throw error;
+  }
+  if (outputInfo && (outputInfo.isSymbolicLink() || !outputInfo.isFile())) {
+    throw new Error("The generated browser module must not replace a non-regular asset.");
   }
 
   const bytes = await readFile(sourcePath);
