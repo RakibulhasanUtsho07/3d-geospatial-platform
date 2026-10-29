@@ -52,6 +52,9 @@ jobs:
       - name: Run deterministic synthetic-package and failure-injection tests
         run: npm run test:dhaka-3d-tiles-package
 
+      - name: Test lifecycle races, bounded retry and explicit fallback
+        run: npm run test:dhaka-3d-tiles-pilot-controller
+
       - name: Build bounded multi-building package from the repository Dhaka extract
         run: >-
           npm run build:dhaka-3d-tiles-package --
