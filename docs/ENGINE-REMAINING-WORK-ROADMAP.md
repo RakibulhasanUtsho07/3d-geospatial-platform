@@ -79,9 +79,11 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ### Phase 7 — P3.7: Floor-plan to interior model review pipeline
 
-**Scope:** audit PR #80 and current raster-line proposals. Keep detected lines as suggestions until reviewed; add explicit scale calibration, vector review, room/wall/door/window semantics, measured-vector GLB validation, and floor-plan source-to-candidate hash linkage.
+**Current candidate slice:** branch `feat/p3-7-floor-plan-vector-calibration` introduces a fail-closed raster-proposal-to-metre-vector converter, an exact-source/proposal-hash-bound review contract, full candidate-by-candidate decisions, reviewed room/wall geometry, room-boundary closure checks and an in-memory GLB geometry preflight. Exact-head focused and full CI are required before the implementation can be considered validated. PR #80 was closed unmerged; its old branch is not merged blindly.
 
-**Acceptance gates:** synthetic and real sample fixtures; false-line/closed-room/scale tests; dimension comparison to independently measured plan; human review required before publication. Automatic PDF rasterization and CAD/IFC/BIM import remain separate backlog items until implemented.
+**Remaining scope:** build a review UI that edits normalized-raster points and records calibration evidence; expand real floor-plan test fixtures; test false-line rejection and split wall segments; connect review UI output to candidate generation; make door/window classification explicit; provide source-to-candidate lineage for generated renders and geometry QA. PDF rasterization and CAD/IFC/BIM import remain separate backlog items.
+
+**Acceptance gates:** synthetic and rights-cleared real plan fixtures; full candidate-review completeness; false-line/closed-room/scale regressions; geometry validity; dimension comparison to an independently measured plan; exact source and proposal hashes; fixed-camera render plus human review. Scale evidence, surveyed placement and publication approval are separate gates; this slice cannot auto-publish.
 
 ### Phase 8 — P3.8: Generation job and publication production hardening
 

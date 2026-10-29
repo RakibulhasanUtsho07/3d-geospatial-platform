@@ -151,6 +151,8 @@
     "publish:floor-plan-candidate": "node scripts/publish-floor-plan-candidate.mjs",
     "test:floor-plan-raster-line-proposals": "node --test tests/floor-plan-raster-line-proposals.test.mjs",
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
+    "test:floor-plan-raster-vector-calibration": "node --test tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs",
+    "calibrate:floor-plan-raster-vectors": "node scripts/calibrate-floor-plan-raster-vectors.mjs",
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",
     "test:shared-request-lifecycle": "node --test tests/shared-request-lifecycle.test.mjs",
