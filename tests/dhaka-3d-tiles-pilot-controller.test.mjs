@@ -422,6 +422,25 @@ test("if Cesium refuses attachment the loaded primitive is destroyed and the err
   controller.destroy();
 });
 
+test("if primitive insertion mutates then throws, the partial scene attachment is removed", async () => {
+  const tileset = mockTileset();
+  const viewer = mockScene();
+  viewer.scene.primitives.add = (item) => {
+    viewer.attached.add(item);
+    item.attached = true;
+    throw new Error("collection failed after insert");
+  };
+  const { controller } = setup({ viewer, fromUrl: async () => tileset });
+
+  await assert.rejects(controller.enable(), /collection failed after insert/);
+  assert.equal(viewer.attached.size, 0);
+  assert.equal(viewer.calls.removes, 1);
+  assert.equal(tileset.destroyed, true);
+  assert.equal(tileset.destroyCalls, 1);
+  assert.equal(controller.getState().attached, false);
+  controller.destroy();
+});
+
 test("if primitive removal fails, disable still destroys the owned tileset", async () => {
   const tileset = mockTileset();
   const viewer = mockScene({ removeReturns: false });
