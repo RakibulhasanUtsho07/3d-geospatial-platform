@@ -140,6 +140,14 @@ test("manual mask editor exports source/hash-bound binary PNG and a proposed man
   await page.locator("#load-existing-mask").click();
   await expect(page.locator("#import-status")).toContainText("does not match the exact loaded source");
   await expect(page.locator("#download-manifest")).toBeDisabled();
+
+  // A rejected replacement import must not erase the already loaded correction lineage.
+  const retainedPng = await downloadBytes(page, "#export-mask-png");
+  await assertBinaryPng(page, retainedPng.bytes);
+  const retainedJson = await downloadBytes(page, "#download-manifest");
+  const retainedManifest = JSON.parse(retainedJson.bytes.toString("utf8"));
+  assert.equal(retainedManifest.editHistory.mode, "corrected-existing-mask");
+  assert.equal(retainedManifest.editHistory.supersedesMaskSha256, sha256(png.bytes));
 });
 
 test("manual mask editor records a named human-review attestation but never approves publication", async ({ page }: { page: Page }) => {
@@ -166,6 +174,48 @@ test("manual mask editor records a named human-review attestation but never appr
   assert.equal(manifest.policy.mapReady, false);
   assert.equal(manifest.policy.automaticApproval, false);
   assert.equal(manifest.policy.publishable, false);
+});
+
+test("editing a reviewed mask or renaming its source ID resets the previous attestation", async ({ page }: { page: Page }) => {
+  await loadFixture(page, "fixture-review-reset");
+  await drawOneStroke(page);
+  await downloadBytes(page, "#export-mask-png");
+  await page.locator("#reviewer-id").fill("reviewer-before-edit");
+  await page.locator("#review-confirm").check();
+  const reviewedJson = await downloadBytes(page, "#download-manifest");
+  assert.equal(JSON.parse(reviewedJson.bytes.toString("utf8")).result.assessment.status, "reviewed");
+
+  await page.locator("#mask-canvas").click({ position: { x: 10, y: 10 } });
+  await expect(page.locator("#review-confirm")).not.toBeChecked();
+  await expect(page.locator("#reviewer-id")).toHaveValue("");
+  await downloadBytes(page, "#export-mask-png");
+  const editedJson = await downloadBytes(page, "#download-manifest");
+  const editedManifest = JSON.parse(editedJson.bytes.toString("utf8"));
+  assert.equal(editedManifest.result.assessment.status, "proposed");
+  assert.equal(editedManifest.result.assessment.humanReviewed, false);
+  assert.equal("reviewerId" in editedManifest.result.assessment, false);
+
+  await page.locator("#reviewer-id").fill("reviewer-before-rename");
+  await page.locator("#review-confirm").check();
+  const reReviewedJson = await downloadBytes(page, "#download-manifest");
+  assert.equal(JSON.parse(reReviewedJson.bytes.toString("utf8")).result.assessment.status, "reviewed");
+
+  await page.locator("#source-id").fill("fixture-renamed-view");
+  await expect(page.locator("#review-confirm")).not.toBeChecked();
+  await expect(page.locator("#reviewer-id")).toHaveValue("");
+  await expect(page.locator("#download-manifest")).toBeDisabled();
+  await downloadBytes(page, "#export-mask-png");
+  const renamedJson = await downloadBytes(page, "#download-manifest");
+  const renamedManifest = JSON.parse(renamedJson.bytes.toString("utf8"));
+  assert.equal(renamedManifest.source.sourceId, "fixture-renamed-view");
+  assert.equal(renamedManifest.result.assessment.status, "proposed");
+  assert.equal(renamedManifest.result.assessment.humanReviewed, false);
+  assert.equal("reviewerId" in renamedManifest.result.assessment, false);
+  assert.equal(renamedManifest.policy.acceptanceEligible, false);
+  assert.equal(renamedManifest.policy.publicationEligible, false);
+  assert.equal(renamedManifest.policy.mapReady, false);
+  assert.equal(renamedManifest.policy.automaticApproval, false);
+  assert.equal(renamedManifest.policy.publishable, false);
 });
 
 test("manual mask editor rejects empty masks and refuses reviewed export without reviewer identity", async ({ page }: { page: Page }) => {
