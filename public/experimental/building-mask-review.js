@@ -98,7 +98,7 @@ context.putImageData(imageData,0,0);let blob;
 try{blob=await toBlob(ui.maskCanvas);}finally{for(let i=0;i<total;i++){const o=i*4;imageData.data[o]=255;imageData.data[o+1]=255;imageData.data[o+2]=255;imageData.data[o+3]=foreground[i];}context.putImageData(imageData,0,0);}
 if(!blob)throw new Error("Mask PNG encoding failed.");if(blob.size>MAX_BYTES)throw new Error("Encoded mask exceeds the 30 MiB output limit.");
 const maskBytes=await blob.arrayBuffer(),maskSha256=await digest(maskBytes);
-const output={source,blob,maskSha256,maskBytes:blob.byteLength,width,height,foregroundCount:count,filename:safeFilename(source.sourceId,"-mask.png"),parentMaskSha256:state.importedMask?.sha256??null,editMode:state.importedMask?"corrected-existing-mask":"new-manual-mask"};
+const output={source,blob,maskSha256,maskBytes:maskBytes.byteLength,width,height,foregroundCount:count,filename:safeFilename(source.sourceId,"-mask.png"),parentMaskSha256:state.importedMask?.sha256??null,editMode:state.importedMask?"corrected-existing-mask":"new-manual-mask"};
 state.preparedExport=output;downloadBlob(blob,output.filename);ui.downloadManifest.disabled=false;
 setStatus(ui.exportStatus,"Mask PNG prepared and downloaded. SHA-256: "+maskSha256+" — "+blob.size+" bytes.","success");
 setStatus(ui.editStatus,"PNG matches the current source dimensions. Review metadata before downloading the manifest.","success");
