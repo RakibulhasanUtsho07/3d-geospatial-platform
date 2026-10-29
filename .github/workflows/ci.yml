@@ -693,6 +693,10 @@ jobs:
         env:
           GEOSPATIAL_API_BASE_URL: http://127.0.0.1:3000
           NEXT_PUBLIC_DHAKA_3D_TILES_PILOT: "true"
+          # The shared map-browser suite also validates the P3.6 review evidence
+          # binding. On pull_request, use the source branch head, not the synthetic
+          # merge SHA; on push/workflow dispatch, use the triggering commit.
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           ./node_modules/.bin/next start --hostname 127.0.0.1 --port 3000 > /tmp/geospatial-next.log 2>&1 &
           server_pid=$!
