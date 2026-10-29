@@ -150,11 +150,18 @@ test("live Cesium controller handles fallback, terminal failure and late complet
 
   const reportText = JSON.stringify(report, null, 2) + "\n";
   await writeFile(path.join(OUTPUT_DIRECTORY, "controller-lifecycle-review.json"), reportText, "utf8");
+  const sourceHeadSha = process.env.P3_6_SOURCE_HEAD_SHA ?? process.env.GITHUB_SHA ?? null;
+  const workflowSha = process.env.GITHUB_SHA ?? null;
   const evidenceManifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     evidenceType: "p3.6-controller-browser-evidence-manifest",
     status: "pass",
-    commit: process.env.GITHUB_SHA ?? null,
+    // GITHUB_SHA can be a synthetic merge commit on pull_request events.
+    // Keep source-head and workflow SHA distinct for traceable review evidence.
+    commit: sourceHeadSha,
+    sourceHeadSha,
+    workflowSha,
+    eventName: process.env.GITHUB_EVENT_NAME ?? null,
     browser: {
       name: "Chromium",
       version: browser.version(),
@@ -177,9 +184,27 @@ test("live Cesium controller handles fallback, terminal failure and late complet
     limitations: report.limitations,
     releaseFlags: report.releaseFlags,
   };
+  const manifestPath = path.join(OUTPUT_DIRECTORY, "evidence-manifest.json");
   await writeFile(
-    path.join(OUTPUT_DIRECTORY, "evidence-manifest.json"),
+    manifestPath,
     JSON.stringify(evidenceManifest, null, 2) + "\n",
     "utf8",
   );
+
+  // Validate persisted provenance as well as the runtime object.
+  const persistedManifest = JSON.parse(await readFile(manifestPath, "utf8")) as typeof evidenceManifest;
+  assert.equal(persistedManifest.schemaVersion, 2);
+  assert.equal(persistedManifest.evidenceType, "p3.6-controller-browser-evidence-manifest");
+  assert.equal(persistedManifest.status, "pass");
+  if (process.env.CI === "true") {
+    const expectedSourceHead = process.env.P3_6_SOURCE_HEAD_SHA;
+    assert.match(expectedSourceHead ?? "", /^[a-f0-9]{40}$/);
+    assert.equal(persistedManifest.sourceHeadSha, expectedSourceHead);
+    assert.equal(persistedManifest.commit, expectedSourceHead);
+    assert.match(persistedManifest.workflowSha ?? "", /^[a-f0-9]{40}$/);
+    assert.ok(
+      persistedManifest.eventName === "push" || persistedManifest.eventName === "pull_request",
+      "Artifact must identify its GitHub event.",
+    );
+  }
 });
