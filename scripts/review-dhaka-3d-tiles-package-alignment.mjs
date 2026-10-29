@@ -122,7 +122,9 @@ function parseGlb(bytes) {
   const jsonLength = bytes.readUInt32LE(offset);
   const jsonType = bytes.readUInt32LE(offset + 4);
   offset += 8;
-  if (jsonType !== 0x4e4f534a || jsonLength < 2 || offset + jsonLength > bytes.length) throw new Error("GLB JSON chunk is invalid.");
+  if (jsonType !== 0x4e4f534a || jsonLength < 2 || offset + jsonLength > bytes.length) {
+    throw new Error("GLB JSON chunk is invalid.");
+  }
   const gltf = readJson(bytes.subarray(offset, offset + jsonLength), "GLB JSON chunk");
   offset += jsonLength;
   if (offset + 8 > bytes.length) throw new Error("GLB binary chunk header is missing.");
@@ -136,40 +138,85 @@ function parseGlb(bytes) {
       !Array.isArray(gltf.bufferViews) || !Array.isArray(gltf.accessors) || !Array.isArray(gltf.meshes)) {
     throw new Error("GLB must contain one embedded buffer, bufferViews, accessors and meshes.");
   }
+
+  function readAccessor(accessor, type, componentTypes, itemBytes, label) {
+    if (!isRecord(accessor) || accessor.type !== type || !componentTypes.includes(accessor.componentType) ||
+        !Number.isSafeInteger(accessor.count) || accessor.count < 1 ||
+        !Number.isInteger(accessor.bufferView) || !isRecord(gltf.bufferViews[accessor.bufferView])) {
+      throw new Error("GLB " + label + " accessor is invalid.");
+    }
+    const view = gltf.bufferViews[accessor.bufferView];
+    const viewOffset = view.byteOffset ?? 0;
+    const accessorOffset = accessor.byteOffset ?? 0;
+    const stride = view.byteStride ?? itemBytes;
+    if ((view.buffer !== undefined && view.buffer !== 0) ||
+        !Number.isSafeInteger(viewOffset) || !Number.isSafeInteger(accessorOffset) ||
+        !Number.isSafeInteger(stride) || stride < itemBytes ||
+        !Number.isSafeInteger(view.byteLength) || viewOffset < 0 || accessorOffset < 0 || view.byteLength < 0) {
+      throw new Error("GLB " + label + " byte range or stride is invalid.");
+    }
+    const start = viewOffset + accessorOffset;
+    const end = start + (accessor.count - 1) * stride + itemBytes;
+    if (!Number.isSafeInteger(end) || end > viewOffset + view.byteLength || end > binary.length) {
+      throw new Error("GLB " + label + " accessor exceeds its binary byte range.");
+    }
+    return { start, stride };
+  }
+
   const positions = [];
+  const triangles = [];
   for (const mesh of gltf.meshes) {
     if (!isRecord(mesh) || !Array.isArray(mesh.primitives)) throw new Error("GLB mesh primitives are invalid.");
     for (const primitive of mesh.primitives) {
+      if ((primitive.mode ?? 4) !== 4) throw new Error("GLB placement review requires TRIANGLES primitives.");
       const accessorIndex = primitive && primitive.attributes && primitive.attributes.POSITION;
       const accessor = Number.isInteger(accessorIndex) ? gltf.accessors[accessorIndex] : null;
       if (!isRecord(accessor) || accessor.componentType !== 5126 || accessor.type !== "VEC3" ||
-          !Number.isSafeInteger(accessor.count) || accessor.count < 3 ||
-          !Number.isInteger(accessor.bufferView) || !isRecord(gltf.bufferViews[accessor.bufferView])) {
-        throw new Error("Each mesh primitive must reference a non-empty float32 VEC3 POSITION accessor.");
+          !Number.isSafeInteger(accessor.count) || accessor.count < 3 || accessor.count % 3 !== 0) {
+        throw new Error("Each mesh primitive must reference triangle-aligned float32 VEC3 POSITION data.");
       }
-      const view = gltf.bufferViews[accessor.bufferView];
-      const viewOffset = view.byteOffset ?? 0;
-      const accessorOffset = accessor.byteOffset ?? 0;
-      const stride = view.byteStride ?? 12;
-      if ((view.buffer !== undefined && view.buffer !== 0) ||
-          !Number.isSafeInteger(viewOffset) || !Number.isSafeInteger(accessorOffset) ||
-          !Number.isSafeInteger(stride) || stride < 12 || stride % 4 !== 0 ||
-          !Number.isSafeInteger(view.byteLength) || viewOffset < 0 || accessorOffset < 0 || view.byteLength < 0) {
-        throw new Error("GLB POSITION accessor byte range or stride is invalid.");
-      }
-      const start = viewOffset + accessorOffset;
-      const end = start + (accessor.count - 1) * stride + 12;
-      if (end > viewOffset + view.byteLength || end > binary.length) throw new Error("GLB POSITION accessor exceeds its binary byte range.");
+      const positionRange = readAccessor(accessor, "VEC3", [5126], 12, "POSITION");
+      const primitivePositions = [];
       for (let index = 0; index < accessor.count; index += 1) {
-        const pointOffset = start + index * stride;
+        const pointOffset = positionRange.start + index * positionRange.stride;
         const point = [binary.readFloatLE(pointOffset), binary.readFloatLE(pointOffset + 4), binary.readFloatLE(pointOffset + 8)];
         if (!point.every(Number.isFinite)) throw new Error("GLB POSITION contains a non-finite value.");
+        primitivePositions.push(point);
         positions.push(point);
+      }
+
+      const indexAccessor = Number.isInteger(primitive.indices) ? gltf.accessors[primitive.indices] : null;
+      let indices;
+      if (indexAccessor) {
+        if (indexAccessor.type !== "SCALAR" || !Number.isSafeInteger(indexAccessor.count) ||
+            indexAccessor.count < 3 || indexAccessor.count % 3 !== 0 ||
+            ![5121, 5123, 5125].includes(indexAccessor.componentType)) {
+          throw new Error("GLB triangle index accessor is invalid.");
+        }
+        const indexBytes = indexAccessor.componentType === 5125 ? 4 : indexAccessor.componentType === 5123 ? 2 : 1;
+        const indexRange = readAccessor(indexAccessor, "SCALAR", [indexAccessor.componentType], indexBytes, "indices");
+        indices = [];
+        for (let index = 0; index < indexAccessor.count; index += 1) {
+          const at = indexRange.start + index * indexRange.stride;
+          const value = indexBytes === 4 ? binary.readUInt32LE(at) :
+            indexBytes === 2 ? binary.readUInt16LE(at) : binary.readUInt8(at);
+          if (value >= primitivePositions.length) throw new Error("GLB triangle index references a missing position.");
+          indices.push(value);
+        }
+      } else {
+        indices = Array.from({ length: primitivePositions.length }, (_, index) => index);
+      }
+      for (let index = 0; index < indices.length; index += 3) {
+        triangles.push([
+          primitivePositions[indices[index]],
+          primitivePositions[indices[index + 1]],
+          primitivePositions[indices[index + 2]],
+        ]);
       }
     }
   }
-  if (positions.length < 3) throw new Error("GLB has no usable mesh positions.");
-  return { positions, gltf };
+  if (positions.length < 3 || triangles.length < 1) throw new Error("GLB has no usable triangle mesh.");
+  return { positions, triangles, gltf };
 }
 function minMax(values) {
   return { minimum: Math.min(...values), maximum: Math.max(...values) };
