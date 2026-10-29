@@ -69,7 +69,7 @@
         isEnabled: () => enabled,
         maxAttemptsPerUrl: 1,
         retryDelayMs: 0,
-        onStatus: (event) => events.push({ status: event.status, url: event.url, message: event.message || null }),
+        onStatus: (event) => events.push({ status: event.status, url: event.url, requestedUrl: event.requestedUrl || null, fromUrl: event.fromUrl || null, toUrl: event.toUrl || null, loadedUrl: event.loadedUrl || null, fallbackUsed: event.fallbackUsed ?? null, message: event.message || null }),
         ...options
       });
       return { controller, setEnabled: (value) => { enabled = value; } };
@@ -100,7 +100,7 @@
         fallbackUsed: result.fallbackUsed,
         loadedUrl: result.url,
         fallbackWasReported,
-        primaryFailureObserved: events.some((event) => event.status === "fallback" && event.url === MISSING_PRIMARY_URL),
+        primaryFailureObserved: events.some((event) => event.status === "fallback" && event.fromUrl === MISSING_PRIMARY_URL),
         duplicateStatus: duplicate.status,
         attachedBeforeDisable,
         primitiveDeltaWhileAttached,
@@ -108,7 +108,7 @@
         primitiveDeltaAfterDisable,
         attachedAfterDisable,
         runtimeFlagResultStatus,
-        releaseFlags: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false }
+        releaseFlags: buildManifest.releaseFlags
       };
     }
 
@@ -193,6 +193,16 @@
       ]);
       const { Dhaka3DTilesPilotController } = await import(MODULE_URL);
       if (typeof Dhaka3DTilesPilotController !== "function") throw new Error("Authoritative P3.6 controller export is missing.");
+      const tilesetManifest = JSON.parse(new TextDecoder().decode(tilesetBytes));
+      const buildManifest = JSON.parse(new TextDecoder().decode(manifestBytes));
+      if (tilesetManifest?.asset?.version !== "1.1") throw new Error("Controller lifecycle source package is not OGC 3D Tiles 1.1.");
+      if (tilesetManifest?.asset?.extras?.sourceSha256 !== buildManifest?.source?.sha256) {
+        throw new Error("Controller lifecycle source hash is not bound between the tileset and build manifest.");
+      }
+      const releaseKeys = ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"];
+      if (!buildManifest.releaseFlags || releaseKeys.some((key) => buildManifest.releaseFlags[key] !== false)) {
+        throw new Error("Lifecycle review refuses a package with any release flag enabled.");
+      }
 
       const viewer = new Cesium.Viewer("review-map", {
         terrainProvider: new Cesium.EllipsoidTerrainProvider(),
