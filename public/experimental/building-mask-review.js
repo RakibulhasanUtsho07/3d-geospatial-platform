@@ -23,7 +23,8 @@ function clearCanvas(){if(ui.maskCanvas.width&&ui.maskCanvas.height)context.clea
 function invalidatePreparedExport(reason){state.preparedExport=null;ui.downloadManifest.disabled=true;ui.exportMask.disabled=!state.source;setStatus(ui.exportStatus,reason||"Mask/source changed. Prepare a fresh PNG before exporting its manifest.","warning");}
 function updateBrushLabel(){ui.brushValue.textContent=ui.brushSize.value+" px";}
 function updateReviewStatus(){if(ui.reviewConfirm.checked){setStatus(ui.reviewStatus,ui.reviewerId.value.trim()?"A reviewer attestation will be recorded. Publication and acceptance stay blocked.":"A reviewer identifier is required to export a reviewed mask.","warning");}else setStatus(ui.reviewStatus,"Review is pending. The manifest will use assessment.status = proposed.","info");}
-function markMaskDirty(){invalidatePreparedExport("Mask has changed. Prepare a fresh PNG before exporting metadata.");if(state.source)setStatus(ui.editStatus,"Mask has unsaved edits. Create a fresh binary PNG before downloading the JSON manifest.","warning");}
+function resetHumanReview(){state.reviewedAt=null;ui.reviewConfirm.checked=false;ui.reviewerId.value="";updateReviewStatus();}
+function markMaskDirty(){resetHumanReview();invalidatePreparedExport("Mask has changed. Prepare a fresh PNG before exporting metadata.");if(state.source)setStatus(ui.editStatus,"Mask has unsaved edits. Create a fresh binary PNG before downloading the JSON manifest.","warning");}
 function pointFromEvent(event){const rect=ui.maskCanvas.getBoundingClientRect();return{x:Math.max(0,Math.min(ui.maskCanvas.width,(event.clientX-rect.left)*ui.maskCanvas.width/rect.width)),y:Math.max(0,Math.min(ui.maskCanvas.height,(event.clientY-rect.top)*ui.maskCanvas.height/rect.height))};}
 function paintSegment(start,end){const width=Number(ui.brushSize.value);context.save();if(ui.paintMode.value==="erase")context.globalCompositeOperation="destination-out";else{context.globalCompositeOperation="source-over";context.strokeStyle="#fff";context.fillStyle="#fff";}context.lineWidth=width;context.lineCap="round";context.lineJoin="round";context.beginPath();context.moveTo(start.x,start.y);context.lineTo(end.x,end.y);context.stroke();if(start.x===end.x&&start.y===end.y){context.beginPath();context.arc(start.x,start.y,width/2,0,Math.PI*2);context.fill();}context.restore();}
 function safeFilename(sourceId,suffix){return sourceId.replace(/[^a-z0-9._-]/gi,"-")+suffix;}
@@ -85,7 +86,7 @@ setStatus(ui.importStatus,"Existing mask source/hash verified. Edits reset revie
 setStatus(ui.editStatus,"Imported "+maskFile.name+". Re-review is required after correction.","warning");
 ui.maskStats.textContent=foregroundCount+" foreground pixels ("+(100*foregroundCount/(source.width*source.height)).toFixed(2)+"%). This is coverage, not an accuracy score.";updateReviewStatus();
 }finally{URL.revokeObjectURL(decoded.url);}
-}catch(error){state.importedMask=null;invalidatePreparedExport("Import failed; no new manifest can be exported until a fresh PNG is prepared.");setStatus(ui.importStatus,error instanceof Error?error.message:String(error),"error");}
+}catch(error){invalidatePreparedExport("Import failed; current annotation is unchanged. Prepare a fresh PNG before downloading metadata.");setStatus(ui.importStatus,error instanceof Error?error.message:String(error),"error");}
 }
 async function createMaskPng(){
 try{
@@ -129,7 +130,7 @@ setStatus(ui.exportStatus,"Hash-bound JSON manifest downloaded. It references th
 }catch(error){setStatus(ui.exportStatus,error instanceof Error?error.message:String(error),"error");}
 }
 ui.sourceFile.addEventListener("change",()=>loadSource(ui.sourceFile.files?.[0]));
-ui.sourceId.addEventListener("input",()=>{if(state.importedMask){state.importedMask=null;clearCanvas();setStatus(ui.importStatus,"Source ID changed. Imported mask cleared because its prior source binding no longer matches.","warning");}invalidatePreparedExport("Source ID changed. Prepare a new PNG before metadata export.");});
+ui.sourceId.addEventListener("input",()=>{if(state.importedMask){state.importedMask=null;clearCanvas();setStatus(ui.importStatus,"Source ID changed. Imported mask cleared because its prior source binding no longer matches.","warning");}resetHumanReview();invalidatePreparedExport("Source ID changed. Prepare a new PNG before metadata export.");});
 ui.loadExistingMask.addEventListener("click",loadExistingMask);
 ui.brushSize.addEventListener("input",updateBrushLabel);
 ui.confidence.addEventListener("input",()=>{ui.confidenceValue.textContent=Number(ui.confidence.value).toFixed(2);});
