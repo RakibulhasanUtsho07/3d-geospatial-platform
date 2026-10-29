@@ -235,7 +235,9 @@
     "test:dhaka-3d-tiles-multitile-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-multitile.spec.ts",
     "build:dhaka-3d-tiles-pilot-browser-module": "node scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs",
     "test:dhaka-3d-tiles-pilot-browser-module": "node --test tests/dhaka-3d-tiles-pilot-browser-module.test.mjs",
-    "test:dhaka-3d-tiles-controller-lifecycle-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
+    "test:dhaka-3d-tiles-controller-lifecycle-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts",
+    "review:dhaka-3d-tiles-package-alignment": "node scripts/review-dhaka-3d-tiles-package-alignment.mjs",
+    "test:dhaka-3d-tiles-package-alignment": "node --test tests/dhaka-3d-tiles-package-alignment.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
