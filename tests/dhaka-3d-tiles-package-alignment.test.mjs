@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { after, before } from "node:test";
 import { buildDhaka3DTilesPackage } from "../scripts/build-dhaka-3d-tiles-package.mjs";
 import { reviewDhaka3DTilesPackageAlignment } from "../scripts/review-dhaka-3d-tiles-package-alignment.mjs";
 
@@ -45,7 +45,7 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-test.before(async () => {
+before(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), "p3-6-package-alignment-"));
   sourcePath = path.join(root, "source.geojson");
   packagePath = path.join(root, "package");
@@ -58,7 +58,7 @@ test.before(async () => {
   });
 });
 
-test.after(async () => {
+after(async () => {
   if (root) await rm(root, { recursive: true, force: true });
 });
 
@@ -88,7 +88,7 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
 
 test("detects a shifted child transform even when package file hashes are recomputed", async () => {
   const damagedPath = path.join(root, "shifted-package");
-  await import("node:fs/promises").then(({ cp }) => cp(packagePath, damagedPath, { recursive: true }));
+  await cp(packagePath, damagedPath, { recursive: true });
   const tilesetPath = path.join(damagedPath, "tileset.json");
   const manifestPath = path.join(damagedPath, "build-manifest.json");
   const tileset = JSON.parse(await readFile(tilesetPath, "utf8"));
