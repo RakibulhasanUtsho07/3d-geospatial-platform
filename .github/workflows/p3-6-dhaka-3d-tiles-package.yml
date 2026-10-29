@@ -11,11 +11,13 @@ on:
       - "scripts/build-dhaka-3d-tiles-package.mjs"
       - "scripts/verify-dhaka-3d-tiles-package.mjs"
       - "scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs"
+      - "scripts/review-dhaka-3d-tiles-package-alignment.mjs"
       - "src/core/map-engine/dhaka-3d-tiles-pilot-controller.mjs"
       - "src/core/geospatial/tileset-package-integrity.mjs"
       - "src/core/geospatial/tileset-manifest-validation.mjs"
       - "tests/dhaka-3d-tiles-package.test.mjs"
       - "tests/dhaka-3d-tiles-pilot-browser-module.test.mjs"
+      - "tests/dhaka-3d-tiles-package-alignment.test.mjs"
       - "tests/dhaka-3d-tiles-pilot-controller.test.mjs"
       - "tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
       - "data/overture/dhaka-buildings-3d-pilot.geojson"
@@ -64,6 +66,9 @@ jobs:
       - name: Test generated browser-module source synchronization and symlink rejection
         run: npm run test:dhaka-3d-tiles-pilot-browser-module
 
+      - name: Test per-tile footprint and placement residual reviewer
+        run: npm run test:dhaka-3d-tiles-package-alignment
+
       - name: Build bounded multi-building package from the repository Dhaka extract
         run: >-
           npm run build:dhaka-3d-tiles-package --
@@ -74,6 +79,13 @@ jobs:
 
       - name: Verify all generated source, tileset and GLB integrity records
         run: npm run verify:dhaka-3d-tiles-package -- --package "$TILE_PACKAGE_DIR"
+
+      - name: Measure each emitted GLB footprint against source geometry
+        run: >-
+          npm run review:dhaka-3d-tiles-package-alignment --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --package "$TILE_PACKAGE_DIR"
+          --output /tmp/dhaka-3d-tiles-package-alignment-review.json
 
       - name: Build production app with the multi-tile review package
         run: npm run build
@@ -146,6 +158,15 @@ jobs:
         with:
           name: p3-6-dhaka-browser-server-diagnostics
           path: /tmp/p3-6-next-server.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload per-tile footprint and placement residual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-package-alignment-evidence
+          path: /tmp/dhaka-3d-tiles-package-alignment-review.json
           if-no-files-found: warn
           retention-days: 14
 
