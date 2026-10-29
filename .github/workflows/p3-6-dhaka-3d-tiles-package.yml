@@ -28,6 +28,7 @@ on:
       - "public/experimental/dhaka-3d-tiles-controller-lifecycle-review.html"
       - "tests/browser/dhaka-3d-tiles-multitile.spec.ts"
       - ".github/workflows/p3-6-dhaka-3d-tiles-package.yml"
+      - ".github/workflows/ci.yml"
   workflow_dispatch:
 
 permissions:
