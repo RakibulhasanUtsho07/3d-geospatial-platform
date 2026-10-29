@@ -173,6 +173,8 @@ jobs:
         run: npm run test:floor-plan-raster-line-job
       - name: Test hash-bound calibrated floor-plan vector draft and closed-room review
         run: npm run test:floor-plan-raster-vector-calibration
+      - name: Test local floor-plan review UI payload and boundary validation
+        run: npm run test:floor-plan-review-payload
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media

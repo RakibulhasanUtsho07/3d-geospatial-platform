@@ -1,4 +1,4 @@
-name: P3.7 Floor-plan raster vector calibration
+name: P3.7 Floor-plan review and vector calibration
 
 on:
   push:
@@ -9,6 +9,9 @@ on:
       - development
     paths:
       - "src/core/building-generation/floor-plan-raster-vector-calibration.mjs"
+      - "src/core/building-generation/floor-plan-review-payload.mjs"
+      - "src/app/experimental/floor-plan-review/page.tsx"
+      - "tests/floor-plan-review-payload.test.mjs"
       - "src/core/building-generation/floor-plan-model.mjs"
       - "scripts/calibrate-floor-plan-raster-vectors.mjs"
       - "tests/floor-plan-raster-vector-calibration.test.mjs"
@@ -51,6 +54,8 @@ jobs:
 
       - name: Test calibrated vector conversion and CLI source-byte binding
         run: npm run test:floor-plan-raster-vector-calibration
+      - name: Test local review payload, source binding and room boundary closure
+        run: npm run test:floor-plan-review-payload
 
       - name: Test existing measured floor-plan geometry generator
         run: npm run test:floor-plan-model
@@ -59,4 +64,4 @@ jobs:
         run: npm run test:floor-plan-raster-line-proposals && npm run test:floor-plan-raster-line-job
 
       - name: Lint the P3.7 implementation and regression suite
-        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs
+        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs src/core/building-generation/floor-plan-review-payload.mjs src/app/experimental/floor-plan-review/page.tsx scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs tests/floor-plan-review-payload.test.mjs

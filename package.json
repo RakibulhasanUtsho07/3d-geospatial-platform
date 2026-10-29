@@ -152,6 +152,7 @@
     "test:floor-plan-raster-line-proposals": "node --test tests/floor-plan-raster-line-proposals.test.mjs",
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
     "test:floor-plan-raster-vector-calibration": "node --test tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs",
+    "test:floor-plan-review-payload": "node --test tests/floor-plan-review-payload.test.mjs",
     "calibrate:floor-plan-raster-vectors": "node scripts/calibrate-floor-plan-raster-vectors.mjs",
     "test:async-request-policy": "node --test tests/async-request-policy.test.mjs",
     "test:road-request-policy": "node --test tests/road-request-policy.test.mjs",

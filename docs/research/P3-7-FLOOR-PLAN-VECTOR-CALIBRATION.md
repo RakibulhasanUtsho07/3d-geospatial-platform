@@ -49,3 +49,17 @@ This slice proves deterministic conversion mechanics, exact byte/hash binding, e
 ## Regression coverage
 
 The focused suite covers deterministic conversion, source-byte mismatch, stale proposal report, incomplete line review, large endpoint correction reasons, room boundary closure failure, implausible scale, unreviewed rooms, opening pixel-to-metre conversion and the private CLI/non-overwrite behavior.
+
+## Interactive local review editor
+
+Route: `/experimental/floor-plan-review`.
+
+1. Open the route in a secure browser context (HTTPS or localhost) and load both the proposal report JSON and the exact original raster image.
+2. The page computes browser-side SHA-256 for the source bytes and canonical proposal JSON. A size, MIME or source-hash mismatch blocks export. No fetch/XHR/API request is made by this page.
+3. Select each detected line and explicitly accept it as a wall or reject it with a reason. Drag its endpoints on the overlay or edit the pixel coordinates. Corrections exceeding 25 normalized pixels require a reason.
+4. Draw room polygon vertices on the overlay, finish each polygon, select it and mark it reviewed. Dragging a room vertex resets its reviewed flag. The export validator checks that every room boundary edge is covered by reviewed wall vectors after the declared calibration.
+5. Pick scale points A/B on the overlay and enter the dimension evidenced by the source drawing or survey. Pick the local pixel origin separately. Enter WGS84 placement/heading and level dimensions explicitly.
+6. Add door/window intervals to an accepted wall with offset/width in raster pixels and height/sill in metres. The payload builder checks basic fit; the conversion CLI runs the authoritative geometry/opening validation again.
+7. Export the review JSON, then run the calibration CLI below using the original image file, proposal report and exported review JSON.
+
+The route is a local review aid rather than an authenticated web service. It stores no review to the server and does not verify a person's identity. Review flags are operator assertions, not a digital signature. Never infer a real scale, placement or datum from the UI; the reviewer must cite measured evidence. Exports remain drafts and all publication/release flags stay false.
