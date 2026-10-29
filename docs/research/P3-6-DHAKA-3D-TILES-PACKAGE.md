@@ -151,6 +151,15 @@ The `scripts/review-dhaka-3d-tiles-package-alignment.mjs` reviewer complements p
 - Fixed-camera screenshot inspection found simple blue block extrusions against an otherwise empty dark background, without facade/roof detail. The automation passes the loading and integrity checks, but these screenshots are **not architecturally accepted** and do not establish real-building fidelity.
 - The release flags remain `acceptanceEligible=false`, `publicationEligible=false`, `mapReady=false`, and `automaticApproval=false`. Heights are synthetic 8 m; rights, same-building linkage and independent surveyed dimensions/elevations remain unresolved. Do not merge or publish based on these engineering checks alone.
 
+## Polygon interior-ring support (implementation slice)
+
+The package builder now preserves valid GeoJSON Polygon/MultiPolygon interior rings as courtyard holes. The repository's lockfile-pinned `earcut@3.0.2` triangulator is declared directly as a dependency. Roof and bottom surfaces use exterior-minus-holes triangulation, and vertical wall faces are emitted along courtyard boundaries.
+
+- Each hole must be strictly contained within its exterior and must not intersect, overlap, or nest with another hole. Invalid topology is excluded fail-closed and counted as `invalidHoleGeometry`.
+- An area check compares the triangulated surface with projected exterior area minus interior hole areas; incomplete, degenerate, or area-mismatched triangulations are rejected.
+- The package alignment reviewer now checks every exterior and interior source ring against GLB boundary edges before and after ECEF placement.
+- Regression tests recompute roof triangle area, check courtyard-boundary residuals, and reject an out-of-exterior hole. This remains footprint extrusion: it does not infer facades, roof structures, doors/windows, real heights, or survey accuracy.
+
 ### Gate matrix
 
 | Gate | Status at the source-code checkpoint | Evidence boundary |

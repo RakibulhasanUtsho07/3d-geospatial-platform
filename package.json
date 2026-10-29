@@ -243,6 +243,7 @@
   },
   "dependencies": {
     "cesium": "^1.146.0",
+    "earcut": "3.0.2",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

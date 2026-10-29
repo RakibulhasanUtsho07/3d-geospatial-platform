@@ -79,6 +79,12 @@ function sampleSource() {
         },
       },
       {
+        type: "Feature", id: "invalid-hole-outside", properties: {},
+        geometry: { type: "Polygon", coordinates: [
+          square(90.417,23.78,90.4171,23.7801), square(90.41715,23.78003,90.41718,23.78006)
+        ] }
+      },
+      {
         type: "Feature",
         id: "line",
         properties: {},
@@ -117,18 +123,19 @@ test("builds a real multi-content OGC 3D Tiles 1.1 hierarchy from source footpri
   const tileset = JSON.parse(await readFile(path.join(packageA, "tileset.json"), "utf8"));
   const manifest = JSON.parse(await readFile(path.join(packageA, "build-manifest.json"), "utf8"));
   assert.equal(tileset.asset.version, "1.1");
-  assert.equal(tileset.root.children.length, 3);
-  assert.equal(manifest.tiles.length, 3);
-  assert.equal(manifest.configuration.emittedFeatures, 3);
+  assert.equal(tileset.root.children.length, 4);
+  assert.equal(manifest.tiles.length, 4);
+  assert.equal(manifest.configuration.emittedFeatures, 4);
   assert.equal(manifest.source.sha256, sha256(sourceBytes));
-  assert.equal(manifest.validation.contentCount, 3);
+  assert.equal(manifest.validation.contentCount, 4);
   assert.equal(manifest.releaseFlags.acceptanceEligible, false);
   assert.equal(manifest.releaseFlags.publicationEligible, false);
   assert.equal(manifest.releaseFlags.mapReady, false);
   assert.equal(manifest.releaseFlags.automaticApproval, false);
   assert.equal(tileset.asset.extras.heightStatus, "synthetic-test-height");
   assert.ok(manifest.excludedCounts.outsideBounds >= 1);
-  assert.ok(manifest.excludedCounts.interiorRingsUnsupported >= 1);
+  assert.ok(manifest.excludedCounts.invalidHoleGeometry >= 1);
+  assert.equal(manifest.excludedCounts.interiorRingsUnsupported, undefined);
   assert.ok(manifest.excludedCounts.unsupportedGeometry >= 1);
   assert.ok(manifest.excludedCounts.duplicateIdentity >= 1);
   assert.ok(manifest.excludedCounts.footprintSizeOutOfRange >= 1);
@@ -161,14 +168,41 @@ test("GLB payloads are valid binary glTF with non-empty triangle geometry", asyn
   }
 });
 
+test("preserves courtyard void area and emits the interior boundary walls", async () => {
+  const manifest=JSON.parse(await readFile(path.join(packageA,"build-manifest.json"),"utf8"));
+  const tile=manifest.tiles.find(item=>item.id==="has-hole");
+  assert.ok(tile,"The valid polygon with a courtyard hole must be emitted.");
+  const bytes=await readFile(path.join(packageA,tile.contentUri));
+  const jsonLength=bytes.readUInt32LE(12),gltf=JSON.parse(bytes.toString("utf8",20,20+jsonLength));
+  const headerOffset=20+jsonLength,binary=bytes.subarray(headerOffset+8,headerOffset+8+bytes.readUInt32LE(headerOffset));
+  const pa=gltf.accessors[0],pv=gltf.bufferViews[pa.bufferView],positions=[];
+  for(let i=0;i<pa.count;i++){const o=(pv.byteOffset??0)+i*12;positions.push([binary.readFloatLE(o),binary.readFloatLE(o+4),binary.readFloatLE(o+8)]);}
+  const ia=gltf.accessors[2],iv=gltf.bufferViews[ia.bufferView],indices=[];
+  for(let i=0;i<ia.count;i++)indices.push(binary.readUInt32LE((iv.byteOffset??0)+i*4));
+  let roofArea=0,roofTriangles=0;
+  for(let i=0;i<indices.length;i+=3){
+    const a=positions[indices[i]],b=positions[indices[i+1]],c=positions[indices[i+2]];
+    if(![a,b,c].every(p=>Math.abs(p[1]-8)<1e-6))continue;
+    roofTriangles++;roofArea+=Math.abs((b[0]-a[0])*(c[2]-a[2])-(b[2]-a[2])*(c[0]-a[0]))/2;
+  }
+  const rings=sampleSource().features.find(item=>item.id==="has-hole").geometry.coordinates,outer=rings[0].slice(0,-1);
+  const lon=(Math.min(...outer.map(p=>p[0]))+Math.max(...outer.map(p=>p[0])))/2;
+  const lat=(Math.min(...outer.map(p=>p[1]))+Math.max(...outer.map(p=>p[1])))/2;
+  const area=ring=>{const p=ring.slice(0,-1).map(([x,y])=>[(x-lon)*111319.490793*Math.cos(lat*Math.PI/180),(y-lat)*111132.92]);return Math.abs(p.reduce((sum,v,i)=>{const n=p[(i+1)%p.length];return sum+v[0]*n[1]-n[0]*v[1];},0)/2);};
+  const expected=area(rings[0])-area(rings[1]);
+  assert.ok(roofTriangles>=8,"Roof triangulation should include the courtyard boundary.");
+  assert.ok(Math.abs(roofArea-expected)<0.01,"The roof must leave a real void over the courtyard.");
+  assert.equal(gltf.extras.interiorRingCount,1);
+});
+
 test("source, manifest and every GLB hash/byte length are bound and verified", async () => {
   const report = await verifyTilesetPackage({
     directory: packageA,
     expectedSourceSha256: sha256(sourceBytes),
   });
   assert.equal(report.valid, true, report.errors.join("; "));
-  assert.equal(report.tileCount, 4);
-  assert.equal(report.contentCount, 3);
+  assert.equal(report.tileCount, 5);
+  assert.equal(report.contentCount, 4);
   assert.equal(report.sourceSha256, sha256(sourceBytes));
   assert.ok(report.bytesVerified > 0);
 });

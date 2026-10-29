@@ -46,34 +46,27 @@ function featureHash(feature) {
   return sha256(Buffer.from(JSON.stringify(feature), "utf8"));
 }
 function sourceRings(geometry) {
-  if (!isRecord(geometry)) throw new Error("Source geometry is missing.");
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] :
-    geometry.type === "MultiPolygon" ? geometry.coordinates : null;
-  if (!Array.isArray(polygons) || polygons.length === 0) throw new Error("Source tile geometry must be Polygon or MultiPolygon.");
-  const rings = [];
-  for (const polygon of polygons) {
-    if (!Array.isArray(polygon) || polygon.length !== 1 || !Array.isArray(polygon[0])) {
-      throw new Error("Alignment review supports emitted polygons with one exterior ring and no holes.");
-    }
-    const ring = [];
-    for (const coordinate of polygon[0]) {
-      if (!Array.isArray(coordinate) || coordinate.length < 2 ||
-          !Number.isFinite(coordinate[0]) || !Number.isFinite(coordinate[1]) ||
-          coordinate[0] < -180 || coordinate[0] > 180 || coordinate[1] < -90 || coordinate[1] > 90) {
-        throw new Error("Source ring contains an invalid WGS84 coordinate.");
+  if(!isRecord(geometry))throw new Error("Source geometry is missing.");
+  const polygons=geometry.type==="Polygon"?[geometry.coordinates]:geometry.type==="MultiPolygon"?geometry.coordinates:null;
+  if(!Array.isArray(polygons)||!polygons.length)throw new Error("Source tile geometry must be Polygon or MultiPolygon.");
+  const rings=[];
+  for(const polygon of polygons){
+    if(!Array.isArray(polygon)||!polygon.length)throw new Error("Source polygon must contain an exterior ring.");
+    for(const rawRing of polygon){
+      if(!Array.isArray(rawRing))throw new Error("Source polygon ring must be an array.");
+      const ring=[];
+      for(const coordinate of rawRing){
+        if(!Array.isArray(coordinate)||coordinate.length<2||!Number.isFinite(coordinate[0])||!Number.isFinite(coordinate[1])||
+          coordinate[0]<-180||coordinate[0]>180||coordinate[1]<-90||coordinate[1]>90)throw new Error("Source ring contains an invalid WGS84 coordinate.");
+        const point=[coordinate[0],coordinate[1]],previous=ring.at(-1);
+        if(!previous||previous[0]!==point[0]||previous[1]!==point[1])ring.push(point);
       }
-      const point = [coordinate[0], coordinate[1]];
-      const previous = ring.at(-1);
-      if (!previous || previous[0] !== point[0] || previous[1] !== point[1]) ring.push(point);
+      if(ring.length>1&&ring[0][0]===ring.at(-1)[0]&&ring[0][1]===ring.at(-1)[1])ring.pop();
+      if(ring.length<3)throw new Error("Source ring has fewer than three unique vertices.");
+      rings.push(ring);
     }
-    if (ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
-    if (ring.length < 3) throw new Error("Source ring has fewer than three unique vertices.");
-    rings.push(ring);
   }
   return rings;
-}
-function sourceVertices(geometry) {
-  return sourceRings(geometry).flat();
 }
 function transformPoint(matrix, point) {
   const x = point[0], y = point[1], z = point[2];
@@ -361,7 +354,7 @@ function recoverMeshBoundarySegments(triangles, height, label) {
     const key = firstKey < secondKey ? firstKey + "|" + secondKey : secondKey + "|" + firstKey;
     segments.set(key, [first, second]);
   }
-  if (segments.size < 3) throw new Error("GLB " + label + " has fewer than three recoverable exterior boundary edges.");
+  if (segments.size < 3) throw new Error("GLB " + label + " has fewer than three recoverable footprint boundary edges.");
   return { segments: Array.from(segments.values()), degenerateTriangleCount };
 }
 function transformBoundarySegmentsToAnchorPlane(segments, transform, anchorLongitude, anchorLatitude) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import earcut from "earcut";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -76,41 +77,41 @@ function geometryBounds(geometry) {
   return Object.values(bounds).every(Number.isFinite) ? bounds : null;
 }
 
-function normalizeRing(rawRing) {
-  if (!Array.isArray(rawRing)) throw new Error("A polygon exterior ring must be an array.");
+function normalizeRing(rawRing, label = "Footprint") {
+  if (!Array.isArray(rawRing)) throw new Error(label + " ring must be an array.");
   const ring = [];
   for (const coordinate of rawRing) {
     if (!Array.isArray(coordinate) || coordinate.length < 2 ||
         !Number.isFinite(coordinate[0]) || !Number.isFinite(coordinate[1]) ||
-        coordinate[0] < -180 || coordinate[0] > 180 ||
-        coordinate[1] < -90 || coordinate[1] > 90) {
-      throw new Error("A footprint ring contains an invalid WGS84 coordinate.");
+        coordinate[0] < -180 || coordinate[0] > 180 || coordinate[1] < -90 || coordinate[1] > 90) {
+      throw new Error(label + " ring contains an invalid WGS84 coordinate.");
     }
     const point = [coordinate[0], coordinate[1]];
     const previous = ring.at(-1);
     if (!previous || previous[0] !== point[0] || previous[1] !== point[1]) ring.push(point);
   }
   if (ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
-  if (ring.length < 3) throw new Error("A footprint exterior ring must contain at least three distinct vertices.");
+  if (ring.length < 3) throw new Error(label + " ring must contain at least three distinct vertices.");
   return ring;
 }
 
-function getExteriorRings(geometry) {
+function getPolygons(geometry) {
   if (!isRecord(geometry)) throw new Error("Feature geometry is missing.");
   let polygons;
   if (geometry.type === "Polygon") polygons = [geometry.coordinates];
   else if (geometry.type === "MultiPolygon") polygons = geometry.coordinates;
   else throw new Error("Only Polygon and MultiPolygon footprints are supported.");
-
   if (!Array.isArray(polygons) || polygons.length === 0) throw new Error("Polygon geometry has no components.");
-  return polygons.map((polygon) => {
-    if (!Array.isArray(polygon) || polygon.length === 0) throw new Error("Polygon component has no exterior ring.");
-    if (polygon.length !== 1) throw new Error("Interior rings/holes are not supported by this pilot builder.");
-    return normalizeRing(polygon[0]);
+  return polygons.map((polygon, polygonIndex) => {
+    if (!Array.isArray(polygon) || polygon.length === 0) {
+      throw new Error("Polygon component " + polygonIndex + " has no exterior ring.");
+    }
+    return polygon.map((rawRing, ringIndex) =>
+      normalizeRing(rawRing, ringIndex === 0 ? "Polygon exterior" : "Interior hole"));
   });
 }
 
-function projectRing(ring, anchorLongitude, anchorLatitude) {
+function projectRing(ring, anchorLongitude, anchorLatitude, desiredWinding = 1) {
   const cosine = Math.cos(anchorLatitude * Math.PI / 180);
   const points = ring.map(([longitude, latitude]) => ({
     longitude,
@@ -143,7 +144,7 @@ function projectRing(ring, anchorLongitude, anchorLatitude) {
   if (!Number.isFinite(signedArea) || Math.abs(signedArea) < 1e-6) {
     throw new Error("Footprint projected area is degenerate.");
   }
-  if (signedArea < 0) points.reverse();
+  if ((signedArea > 0 && desiredWinding < 0) || (signedArea < 0 && desiredWinding > 0)) points.reverse();
   return points;
 }
 
@@ -151,52 +152,96 @@ function cross2(a, b, c) {
   return (b.x - a.x) * (c.north - a.north) - (b.north - a.north) * (c.x - a.x);
 }
 
-function pointInsideTriangle(point, a, b, c) {
-  const epsilon = 1e-9;
-  return cross2(a, b, point) >= -epsilon &&
-    cross2(b, c, point) >= -epsilon &&
-    cross2(c, a, point) >= -epsilon;
+function signedRingArea(points) {
+  return points.reduce((sum, current, index) => {
+    const next = points[(index + 1) % points.length];
+    return sum + current.x * next.north - next.x * current.north;
+  }, 0) / 2;
 }
-
-function triangulate(points) {
-  const remaining = points.map((_, index) => index);
-  const triangles = [];
-  let attempts = 0;
-  const maximumAttempts = points.length * points.length;
-
-  while (remaining.length > 3 && attempts < maximumAttempts) {
-    let clipped = false;
-    for (let cursor = 0; cursor < remaining.length; cursor += 1) {
-      const previousIndex = remaining[(cursor + remaining.length - 1) % remaining.length];
-      const currentIndex = remaining[cursor];
-      const nextIndex = remaining[(cursor + 1) % remaining.length];
-      const a = points[previousIndex];
-      const b = points[currentIndex];
-      const c = points[nextIndex];
-      if (cross2(a, b, c) <= 1e-9) continue;
-
-      let containsVertex = false;
-      for (const candidateIndex of remaining) {
-        if (candidateIndex === previousIndex || candidateIndex === currentIndex || candidateIndex === nextIndex) continue;
-        if (pointInsideTriangle(points[candidateIndex], a, b, c)) {
-          containsVertex = true;
-          break;
+function pointOnSegment(point, start, end) {
+  const epsilon = 1e-8;
+  return Math.abs(cross2(start, end, point)) <= epsilon &&
+    point.x >= Math.min(start.x, end.x)-epsilon && point.x <= Math.max(start.x, end.x)+epsilon &&
+    point.north >= Math.min(start.north, end.north)-epsilon && point.north <= Math.max(start.north, end.north)+epsilon;
+}
+// Returns 1 for inside, -1 for outside, and 0 for a boundary point.
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let index=0, previousIndex=ring.length-1; index<ring.length; previousIndex=index++) {
+    const current=ring[index], previous=ring[previousIndex];
+    if(pointOnSegment(point,previous,current))return 0;
+    if((current.north>point.north)!==(previous.north>point.north)){
+      const crossingX=(previous.x-current.x)*(point.north-current.north)/(previous.north-current.north)+current.x;
+      if(point.x<crossingX)inside=!inside;
+    }
+  }
+  return inside?1:-1;
+}
+function segmentsIntersect(a,b,c,d) {
+  const epsilon=1e-8;
+  const abC=cross2(a,b,c),abD=cross2(a,b,d),cdA=cross2(c,d,a),cdB=cross2(c,d,b);
+  if(Math.abs(abC)<=epsilon&&pointOnSegment(c,a,b))return true;
+  if(Math.abs(abD)<=epsilon&&pointOnSegment(d,a,b))return true;
+  if(Math.abs(cdA)<=epsilon&&pointOnSegment(a,c,d))return true;
+  if(Math.abs(cdB)<=epsilon&&pointOnSegment(b,c,d))return true;
+  return ((abC>epsilon&&abD< -epsilon)||(abC< -epsilon&&abD>epsilon))&&
+    ((cdA>epsilon&&cdB< -epsilon)||(cdA< -epsilon&&cdB>epsilon));
+}
+function assertHoleTopology(rings) {
+  if(!Array.isArray(rings)||rings.length===0)throw new Error("Polygon has no rings.");
+  const exterior=rings[0];
+  for(let holeIndex=1;holeIndex<rings.length;holeIndex++){
+    const hole=rings[holeIndex];
+    if(hole.some(point=>pointInRing(point,exterior)!==1)){
+      throw new Error("Hole ring must be strictly inside its exterior ring and must not touch the exterior boundary.");
+    }
+    for(let i=0;i<hole.length;i++)for(let j=0;j<exterior.length;j++){
+      if(segmentsIntersect(hole[i],hole[(i+1)%hole.length],exterior[j],exterior[(j+1)%exterior.length])){
+        throw new Error("Hole ring intersects its exterior boundary.");
+      }
+    }
+    for(let otherIndex=1;otherIndex<holeIndex;otherIndex++){
+      const other=rings[otherIndex];
+      if(pointInRing(hole[0],other)!==-1||pointInRing(other[0],hole)!==-1){
+        throw new Error("Interior hole rings must not overlap or nest.");
+      }
+      for(let i=0;i<hole.length;i++)for(let j=0;j<other.length;j++){
+        if(segmentsIntersect(hole[i],hole[(i+1)%hole.length],other[j],other[(j+1)%other.length])){
+          throw new Error("Interior hole rings must not intersect.");
         }
       }
-      if (containsVertex) continue;
-
-      triangles.push([previousIndex, currentIndex, nextIndex]);
-      remaining.splice(cursor, 1);
-      clipped = true;
-      break;
     }
-    if (!clipped) throw new Error("Footprint triangulation failed; refusing to emit incomplete roof geometry.");
-    attempts += 1;
   }
-
-  if (remaining.length !== 3) throw new Error("Footprint triangulation did not converge.");
-  triangles.push([remaining[0], remaining[1], remaining[2]]);
-  return triangles;
+}
+function triangulatePolygon(rings) {
+  assertHoleTopology(rings);
+  const points=rings.flat(),flatCoordinates=[],holeIndices=[];
+  let vertexOffset=0;
+  for(let ringIndex=0;ringIndex<rings.length;ringIndex++){
+    const ring=rings[ringIndex];
+    if(ringIndex>0)holeIndices.push(vertexOffset);
+    for(const point of ring)flatCoordinates.push(point.x,point.north);
+    vertexOffset+=ring.length;
+  }
+  const indices=earcut(flatCoordinates,holeIndices,2);
+  if((!Array.isArray(indices)&&!(indices instanceof Uint32Array))||indices.length<3||indices.length%3!==0){
+    throw new Error("Hole-aware triangulation returned an incomplete triangle index buffer.");
+  }
+  const expectedArea=Math.abs(signedRingArea(rings[0]))-
+    rings.slice(1).reduce((sum,ring)=>sum+Math.abs(signedRingArea(ring)),0);
+  if(!Number.isFinite(expectedArea)||expectedArea<=1e-6)throw new Error("Polygon exterior minus interior holes has no positive area.");
+  let actualArea=0;
+  for(let i=0;i<indices.length;i+=3){
+    const a=points[indices[i]],b=points[indices[i+1]],c=points[indices[i+2]];
+    if(!a||!b||!c)throw new Error("Hole-aware triangulation referenced a missing vertex.");
+    const area=Math.abs(cross2(a,b,c))/2;
+    if(!Number.isFinite(area)||area<=1e-10)throw new Error("Hole-aware triangulation emitted a degenerate roof triangle.");
+    actualArea+=area;
+  }
+  if(Math.abs(actualArea-expectedArea)>Math.max(1e-4,expectedArea*1e-6)){
+    throw new Error("Hole-aware triangulation area does not match exterior-minus-holes area.");
+  }
+  return {points,indices};
 }
 
 function wgs84ToEcef(longitude, latitude, height = 0) {
@@ -228,124 +273,79 @@ function localEnuToEcefTransform(longitude, latitude) {
   ];
 }
 
-function createGlb(rings, longitude, latitude, heightMeters, featureId, featureSha256) {
-  const positions = [];
-  const normals = [];
-  const indices = [];
-
-  function addTriangle(first, second, third, desiredNormalY = null) {
-    let a = first;
-    let b = second;
-    let c = third;
-    let ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2];
-    let bx = c[0] - a[0], by = c[1] - a[1], bz = c[2] - a[2];
-    let nx = ay * bz - az * by;
-    let ny = az * bx - ax * bz;
-    let nz = ax * by - ay * bx;
-    if (desiredNormalY !== null && ny * desiredNormalY < 0) {
-      [b, c] = [c, b];
-      ax = b[0] - a[0]; ay = b[1] - a[1]; az = b[2] - a[2];
-      bx = c[0] - a[0]; by = c[1] - a[1]; bz = c[2] - a[2];
-      nx = ay * bz - az * by;
-      ny = az * bx - ax * bz;
-      nz = ax * by - ay * bx;
+function createGlb(polygons, longitude, latitude, heightMeters, featureId, featureSha256) {
+  const positions=[],normals=[],indices=[];
+  function addTriangle(first,second,third,desiredNormalY=null) {
+    let a=first,b=second,c=third;
+    let ax=b[0]-a[0],ay=b[1]-a[1],az=b[2]-a[2];
+    let bx=c[0]-a[0],by=c[1]-a[1],bz=c[2]-a[2];
+    let nx=ay*bz-az*by,ny=az*bx-ax*bz,nz=ax*by-ay*bx;
+    if(desiredNormalY!==null&&ny*desiredNormalY<0){
+      [b,c]=[c,b];
+      ax=b[0]-a[0];ay=b[1]-a[1];az=b[2]-a[2];
+      bx=c[0]-a[0];by=c[1]-a[1];bz=c[2]-a[2];
+      nx=ay*bz-az*by;ny=az*bx-ax*bz;nz=ax*by-ay*bx;
     }
-    const length = Math.hypot(nx, ny, nz);
-    if (!Number.isFinite(length) || length < 1e-10) throw new Error("Degenerate triangle generated from footprint.");
-    const normal = [nx / length, ny / length, nz / length];
-    const start = positions.length / 3;
-    for (const point of [a, b, c]) {
-      positions.push(point[0], point[1], point[2]);
-      normals.push(...normal);
-    }
-    indices.push(start, start + 1, start + 2);
+    const length=Math.hypot(nx,ny,nz);
+    if(!Number.isFinite(length)||length<1e-10)throw new Error("Degenerate triangle generated from footprint.");
+    const normal=[nx/length,ny/length,nz/length],offset=positions.length/3;
+    for(const point of [a,b,c]){positions.push(...point);normals.push(...normal);}
+    indices.push(offset,offset+1,offset+2);
   }
-
-  for (const rawRing of rings) {
-    const points = projectRing(rawRing, longitude, latitude);
-    const roofTriangles = triangulate(points);
-    const bottom = points.map((point) => [point.x, 0, -point.north]);
-    const top = points.map((point) => [point.x, heightMeters, -point.north]);
-
-    for (const [a, b, c] of roofTriangles) {
-      addTriangle(top[a], top[b], top[c], 1);
-      addTriangle(bottom[c], bottom[b], bottom[a], -1);
+  for(const rawPolygon of polygons){
+    const projectedRings=rawPolygon.map((rawRing,ringIndex)=>projectRing(rawRing,longitude,latitude,ringIndex===0?1:-1));
+    const {points,indices:roofIndices}=triangulatePolygon(projectedRings);
+    const bottom=points.map(p=>[p.x,0,-p.north]),top=points.map(p=>[p.x,heightMeters,-p.north]);
+    for(let i=0;i<roofIndices.length;i+=3){
+      const a=roofIndices[i],b=roofIndices[i+1],c=roofIndices[i+2];
+      addTriangle(top[a],top[b],top[c],1);addTriangle(bottom[c],bottom[b],bottom[a],-1);
     }
-    for (let index = 0; index < points.length; index += 1) {
-      const next = (index + 1) % points.length;
-      addTriangle(bottom[index], bottom[next], top[next]);
-      addTriangle(bottom[index], top[next], top[index]);
+    let ringOffset=0;
+    for(const ring of projectedRings){
+      for(let i=0;i<ring.length;i++){
+        const current=ringOffset+i,next=ringOffset+(i+1)%ring.length;
+        addTriangle(bottom[current],bottom[next],top[next]);
+        addTriangle(bottom[current],top[next],top[current]);
+      }
+      ringOffset+=ring.length;
     }
   }
-
-  const positionBytes = Buffer.alloc(positions.length * 4);
-  const normalBytes = Buffer.alloc(normals.length * 4);
-  const indexBytes = Buffer.alloc(indices.length * 4);
-  positions.forEach((value, index) => positionBytes.writeFloatLE(value, index * 4));
-  normals.forEach((value, index) => normalBytes.writeFloatLE(value, index * 4));
-  indices.forEach((value, index) => indexBytes.writeUInt32LE(value, index * 4));
-  const binary = Buffer.concat([positionBytes, normalBytes, indexBytes]);
-  const minimum = [Infinity, Infinity, Infinity];
-  const maximum = [-Infinity, -Infinity, -Infinity];
-  for (let index = 0; index < positions.length; index += 3) {
-    for (let axis = 0; axis < 3; axis += 1) {
-      minimum[axis] = Math.min(minimum[axis], positions[index + axis]);
-      maximum[axis] = Math.max(maximum[axis], positions[index + axis]);
-    }
+  const positionBytes=Buffer.alloc(positions.length*4),normalBytes=Buffer.alloc(normals.length*4),indexBytes=Buffer.alloc(indices.length*4);
+  positions.forEach((value,index)=>positionBytes.writeFloatLE(value,index*4));
+  normals.forEach((value,index)=>normalBytes.writeFloatLE(value,index*4));
+  indices.forEach((value,index)=>indexBytes.writeUInt32LE(value,index*4));
+  const binary=Buffer.concat([positionBytes,normalBytes,indexBytes]);
+  const minimum=[Infinity,Infinity,Infinity],maximum=[-Infinity,-Infinity,-Infinity];
+  for(let i=0;i<positions.length;i+=3)for(let axis=0;axis<3;axis++){
+    minimum[axis]=Math.min(minimum[axis],positions[i+axis]);maximum[axis]=Math.max(maximum[axis],positions[i+axis]);
   }
-
-  const gltf = {
-    asset: { version: "2.0", generator: "3d-geospatial-platform P3.6 footprint tile pilot" },
-    scene: 0,
-    scenes: [{ nodes: [0] }],
-    nodes: [{ name: `Footprint extrusion ${featureId}`, mesh: 0 }],
-    meshes: [{
-      name: "Extruded source footprint; synthetic height",
-      primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }],
-    }],
-    materials: [{
-      name: "Neutral validation material",
-      doubleSided: true,
-      pbrMetallicRoughness: {
-        baseColorFactor: [0.42, 0.62, 0.78, 1],
-        metallicFactor: 0,
-        roughnessFactor: 0.9,
-      },
-    }],
-    buffers: [{ byteLength: binary.length }],
-    bufferViews: [
-      { buffer: 0, byteOffset: 0, byteLength: positionBytes.length, target: 34962 },
-      { buffer: 0, byteOffset: positionBytes.length, byteLength: normalBytes.length, target: 34962 },
-      { buffer: 0, byteOffset: positionBytes.length + normalBytes.length, byteLength: indexBytes.length, target: 34963 },
+  const gltf={
+    asset:{version:"2.0",generator:"3d-geospatial-platform P3.6 footprint tile pilot"},
+    scene:0,scenes:[{nodes:[0]}],nodes:[{name:`Footprint extrusion ${featureId}`,mesh:0}],
+    meshes:[{name:"Extruded source footprint; synthetic height",primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]}],
+    materials:[{name:"Neutral validation material",doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.42,0.62,0.78,1],metallicFactor:0,roughnessFactor:0.9}}],
+    buffers:[{byteLength:binary.length}],
+    bufferViews:[
+      {buffer:0,byteOffset:0,byteLength:positionBytes.length,target:34962},
+      {buffer:0,byteOffset:positionBytes.length,byteLength:normalBytes.length,target:34962},
+      {buffer:0,byteOffset:positionBytes.length+normalBytes.length,byteLength:indexBytes.length,target:34963}
     ],
-    accessors: [
-      { bufferView: 0, componentType: 5126, count: positions.length / 3, type: "VEC3", min: minimum, max: maximum },
-      { bufferView: 1, componentType: 5126, count: normals.length / 3, type: "VEC3" },
-      { bufferView: 2, componentType: 5125, count: indices.length, type: "SCALAR", min: [0], max: [positions.length / 3 - 1] },
+    accessors:[
+      {bufferView:0,componentType:5126,count:positions.length/3,type:"VEC3",min:minimum,max:maximum},
+      {bufferView:1,componentType:5126,count:normals.length/3,type:"VEC3"},
+      {bufferView:2,componentType:5125,count:indices.length,type:"SCALAR",min:[0],max:[positions.length/3-1]}
     ],
-    extras: {
-      sourceFeatureId: featureId,
-      sourceFeatureSha256: featureSha256,
-      heightStatus: "synthetic-test-height",
-      syntheticHeightMeters: heightMeters,
-    },
+    extras:{sourceFeatureId:featureId,sourceFeatureSha256:featureSha256,heightStatus:"synthetic-test-height",
+      syntheticHeightMeters:heightMeters,interiorRingCount:polygons.reduce((sum,polygon)=>sum+polygon.length-1,0)}
   };
-
-  const jsonBytes = Buffer.from(JSON.stringify(gltf), "utf8");
-  const paddedJson = Buffer.concat([jsonBytes, Buffer.alloc((4 - jsonBytes.length % 4) % 4, 0x20)]);
-  const paddedBinary = Buffer.concat([binary, Buffer.alloc((4 - binary.length % 4) % 4)]);
-  const totalLength = 12 + 8 + paddedJson.length + 8 + paddedBinary.length;
-  const header = Buffer.alloc(12);
-  header.write("glTF", 0, "ascii");
-  header.writeUInt32LE(2, 4);
-  header.writeUInt32LE(totalLength, 8);
-  const jsonHeader = Buffer.alloc(8);
-  jsonHeader.writeUInt32LE(paddedJson.length, 0);
-  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
-  const binaryHeader = Buffer.alloc(8);
-  binaryHeader.writeUInt32LE(paddedBinary.length, 0);
-  binaryHeader.writeUInt32LE(0x004e4942, 4);
-  return Buffer.concat([header, jsonHeader, paddedJson, binaryHeader, paddedBinary]);
+  const jsonBytes=Buffer.from(JSON.stringify(gltf),"utf8");
+  const paddedJson=Buffer.concat([jsonBytes,Buffer.alloc((4-jsonBytes.length%4)%4,0x20)]);
+  const paddedBinary=Buffer.concat([binary,Buffer.alloc((4-binary.length%4)%4)]);
+  const totalLength=12+8+paddedJson.length+8+paddedBinary.length;
+  const header=Buffer.alloc(12);header.write("glTF",0,"ascii");header.writeUInt32LE(2,4);header.writeUInt32LE(totalLength,8);
+  const jsonHeader=Buffer.alloc(8);jsonHeader.writeUInt32LE(paddedJson.length,0);jsonHeader.writeUInt32LE(0x4e4f534a,4);
+  const binaryHeader=Buffer.alloc(8);binaryHeader.writeUInt32LE(paddedBinary.length,0);binaryHeader.writeUInt32LE(0x004e4942,4);
+  return Buffer.concat([header,jsonHeader,paddedJson,binaryHeader,paddedBinary]);
 }
 
 function padBounds(bounds, latitude, paddingMeters = BOUNDS_PADDING_METERS) {
@@ -443,7 +443,7 @@ export async function buildDhaka3DTilesPackage({
   const excludedCounts = {
     invalidFeature: 0,
     unsupportedGeometry: 0,
-    interiorRingsUnsupported: 0,
+    invalidHoleGeometry: 0,
     invalidFootprint: 0,
     outsideBounds: 0,
     footprintSizeOutOfRange: 0,
@@ -459,12 +459,12 @@ export async function buildDhaka3DTilesPackage({
       excludedCounts.invalidFeature += 1;
       continue;
     }
-    let rings;
+    let polygons;
     try {
-      rings = getExteriorRings(feature.geometry);
+      polygons = getPolygons(feature.geometry);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (message.includes("Interior rings/holes")) excludedCounts.interiorRingsUnsupported += 1;
+      if (/interior hole/i.test(message)) excludedCounts.invalidHoleGeometry += 1;
       else if (message.includes("Only Polygon")) excludedCounts.unsupportedGeometry += 1;
       else excludedCounts.invalidFootprint += 1;
       continue;
@@ -497,7 +497,7 @@ export async function buildDhaka3DTilesPackage({
     candidates.push({
       feature,
       id,
-      rings,
+      polygons,
       bounds: featureBounds,
       longitude,
       latitude,
@@ -515,15 +515,17 @@ export async function buildDhaka3DTilesPackage({
     let contentBytes;
     try {
       contentBytes = createGlb(
-        candidate.rings,
+        candidate.polygons,
         candidate.longitude,
         candidate.latitude,
         syntheticHeightMeters,
         candidate.id,
         candidate.featureSha256,
       );
-    } catch {
-      excludedCounts.triangulationFailed += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/hole|interior ring/i.test(message)) excludedCounts.invalidHoleGeometry += 1;
+      else excludedCounts.triangulationFailed += 1;
       continue;
     }
     if (contentBytes.length > MAX_OUTPUT_BYTES) {
@@ -570,12 +572,12 @@ export async function buildDhaka3DTilesPackage({
         sourceSha256: sha256(sourceBytes),
         attribution: ATTRIBUTION,
         coordinateSystems: { geographic: "EPSG:4979", globalCartesian: "EPSG:4978" },
-        footprintGeometry: "source Polygon/MultiPolygon exterior rings",
+        footprintGeometry: "source Polygon/MultiPolygon exterior and interior rings",
         heightStatus: "synthetic-test-height",
         syntheticHeightMeters,
         limitations: [
           "Synthetic extrusion height; not a surveyed building height.",
-          "Exterior footprint only; polygons with interior rings are excluded.",
+          "Interior rings are triangulated as courtyard holes with vertical boundary walls; malformed, overlapping or out-of-exterior holes are rejected.",
           "No facade reconstruction, roof reconstruction, imagery texture or photogrammetric accuracy claim.",
         ],
       },
@@ -654,7 +656,7 @@ export async function buildDhaka3DTilesPackage({
     limitations: [
       "This is a bounded format/placement pilot, not a production-ready city-wide tiling system.",
       "Extrusion height is synthetic and must not be used as real building height.",
-      "Only Polygon/MultiPolygon exterior rings without holes are included.",
+      "Polygon and MultiPolygon interior rings are preserved as holes; invalid hole topology is excluded fail-closed.",
       "No independent survey, roof/facade reconstruction, texture, rights determination or visual review is implied.",
     ],
     releaseFlags: {

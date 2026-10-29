@@ -37,6 +37,13 @@ const sourceData = {
         [[[90.4120, 23.7800], [90.4121, 23.7800], [90.4121, 23.7801], [90.4120, 23.7801], [90.4120, 23.7800]]],
         [[[90.4125, 23.7805], [90.4126, 23.7805], [90.4126, 23.7806], [90.4125, 23.7806], [90.4125, 23.7805]]]
       ] }
+    },
+    {
+      type:"Feature",id:"alignment-hole",properties:{class:"building"},
+      geometry:{type:"Polygon",coordinates:[
+        [[90.4130,23.7800],[90.4131,23.7800],[90.4131,23.7801],[90.4130,23.7801],[90.4130,23.7800]],
+        [[90.41303,23.78003],[90.41303,23.78007],[90.41307,23.78007],[90.41307,23.78003],[90.41303,23.78003]]
+      ]}
     }
   ]
 };
@@ -67,8 +74,8 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
   assert.equal(report.status, "pass", report.errors.join("; "));
   assert.equal(report.evidenceType, "dhaka-3d-tiles-per-tile-footprint-placement-residual");
   assert.equal(report.package.integrityStatus, "pass");
-  assert.equal(report.summary.tileCount, 3);
-  assert.equal(report.tiles.length, 3);
+  assert.equal(report.summary.tileCount, 4);
+  assert.equal(report.tiles.length, 4);
   assert.equal(report.summary.allTransformedVerticesInsideDeclaredRegions, true);
   assert.ok(report.summary.maximumHorizontalResidualMeters <= report.thresholds.maximumHorizontalResidualMeters);
   assert.ok(report.summary.maximumFootprintPerimeterDifferenceMeters <= report.thresholds.maximumHorizontalResidualMeters);
@@ -89,6 +96,17 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
     assert.ok(tile.transformedGroundVertexCount <= tile.sourceVertexCount, tile.contentUri);
     assert.equal(tile.allTransformedVerticesInsideDeclaredRegion, true, tile.contentUri);
   }
+});
+
+test("compares all courtyard boundaries with the emitted GLB", async () => {
+  const report=await reviewDhaka3DTilesPackageAlignment({sourcePath,packageDirectory:packagePath});
+  const tile=report.tiles.find(item=>item.featureId==="alignment-hole"||item.sourceFeatureId==="alignment-hole");
+  assert.ok(tile,"Hole-bearing feature must be evaluated.");
+  assert.equal(tile.status,"pass",tile.errors?.join("; "));
+  assert.ok(tile.sourceBoundarySegmentCount>=8,"Source segments must include exterior and interior loops.");
+  assert.ok(tile.meshBoundarySegmentCount>=8,"GLB boundary segments must include courtyard walls.");
+  assert.ok(tile.maximumLocalFootprintBoundaryResidualMeters<=report.thresholds.maximumHorizontalResidualMeters);
+  assert.ok(tile.maximumTransformedFootprintBoundaryResidualMeters<=report.thresholds.maximumHorizontalResidualMeters);
 });
 
 test("detects a shifted child transform even when package file hashes are recomputed", async () => {
