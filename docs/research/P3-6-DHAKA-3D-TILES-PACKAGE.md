@@ -89,12 +89,12 @@ The opt-in `Dhaka3DTilesPilotController` now has explicit and bounded loading po
 - An optional `fallbackUrl` is opt-in and runs only after all retries against the primary fail. The loaded URL, fallback flag and failed attempts are emitted in status/result metadata. No fixture fallback is silently configured for another source.
 - Changing the requested URL tears down the previously attached tile set before loading the new one.
 - Disabling, destroying or replacing the viewer invalidates stale loads; a late-resolved tile set is destroyed instead of attached, and a late rejection does not produce an error status for an obsolete request.
-- If Cesium refuses primitive attachment or collection removal, owned tile resources are still destroyed. Telemetry callback exceptions are isolated from load/teardown.
+- If Cesium refuses primitive attachment, insertion partially mutates and then throws, or collection removal fails, the controller attempts removal and still destroys owned tile resources. Telemetry callback exceptions are isolated from load/teardown.
 - Permanent failure is emitted once as an error and leaves no controller-owned attached resource; it remains visible to the caller as a rejected promise.
 
 The controller still uses Cesium's public `fromUrl()` loader, which is not abortable here. Generation invalidation prevents stale attachment but cannot guarantee that an underlying network request stops immediately. These lifecycle tests use injected loaders and mock primitive collections; they prove controller policy, not a deployed browser's network cancellation behavior.
 
-The dedicated P3.6 workflow now explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` in addition to package-integrity and live Cesium browser validation. The new exact-head workflow must pass before the lifecycle slice is marked validated.
+The dedicated P3.6 workflow now explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` in addition to package-integrity and live Cesium browser validation. The dedicated workflow runs 19 lifecycle scenarios at this branch revision; the new exact-head workflow must pass before the lifecycle slice is marked validated.
 
 ## Remaining production acceptance gates
 
