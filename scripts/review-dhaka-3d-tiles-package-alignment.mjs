@@ -45,12 +45,12 @@ function featureIdentity(feature) {
 function featureHash(feature) {
   return sha256(Buffer.from(JSON.stringify(feature), "utf8"));
 }
-function sourceVertices(geometry) {
+function sourceRings(geometry) {
   if (!isRecord(geometry)) throw new Error("Source geometry is missing.");
   const polygons = geometry.type === "Polygon" ? [geometry.coordinates] :
     geometry.type === "MultiPolygon" ? geometry.coordinates : null;
   if (!Array.isArray(polygons) || polygons.length === 0) throw new Error("Source tile geometry must be Polygon or MultiPolygon.");
-  const points = [];
+  const rings = [];
   for (const polygon of polygons) {
     if (!Array.isArray(polygon) || polygon.length !== 1 || !Array.isArray(polygon[0])) {
       throw new Error("Alignment review supports emitted polygons with one exterior ring and no holes.");
@@ -68,9 +68,12 @@ function sourceVertices(geometry) {
     }
     if (ring.length > 1 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]) ring.pop();
     if (ring.length < 3) throw new Error("Source ring has fewer than three unique vertices.");
-    points.push(...ring);
+    rings.push(ring);
   }
-  return points;
+  return rings;
+}
+function sourceVertices(geometry) {
+  return sourceRings(geometry).flat();
 }
 function transformPoint(matrix, point) {
   const x = point[0], y = point[1], z = point[2];
