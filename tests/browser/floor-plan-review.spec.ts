@@ -54,6 +54,7 @@ async function loadProposalAndSource(page: Page, data: Awaited<ReturnType<typeof
   await page.getByLabel("Proposal report JSON").setInputFiles({
     name: "proposal-report.json", mimeType: "application/json", buffer: data.reportBytes,
   });
+  await expect(page.getByText("Proposal SHA-256", { exact: true })).toBeVisible();
   await page.getByLabel("Original raster source").setInputFiles({
     name: "source.png", mimeType: "image/png", buffer: data.sourceBytes,
   });
@@ -67,6 +68,7 @@ test("review UI blocks modified source bytes and only unlocks the exact original
   await page.getByLabel("Proposal report JSON").setInputFiles({
     name: "proposal-report.json", mimeType: "application/json", buffer: data.reportBytes,
   });
+  await expect(page.getByText("Proposal SHA-256", { exact: true })).toBeVisible();
   await page.getByLabel("Original raster source").setInputFiles({
     name: "changed-source.png",
     mimeType: "image/png",
