@@ -22,8 +22,8 @@
     "test:dhaka-3d-tiles-fixture": "node --test tests/dhaka-3d-tiles-fixture.test.mjs",
     "test:dhaka-3d-tiles-pilot-controller": "node --test tests/dhaka-3d-tiles-pilot-controller.test.mjs",
     "test:dhaka-3d-tiles-alignment-review": "node --test tests/dhaka-3d-tiles-alignment-review.test.mjs",
-    "predev": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment && npm run build:dhaka-3d-tiles-review-package",
-    "prebuild": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment && npm run build:dhaka-3d-tiles-review-package",
+    "predev": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment && npm run build:dhaka-3d-tiles-review-package && npm run build:dhaka-3d-tiles-pilot-browser-module",
+    "prebuild": "npm run copy:cesium && npm run build:heritage-model && npm run build:dhaka-3d-tiles-fixture && npm run review:dhaka-3d-tiles-alignment && npm run build:dhaka-3d-tiles-review-package && npm run build:dhaka-3d-tiles-pilot-browser-module",
     "test:selected-geometry-cache": "node --test tests/selected-geometry-cache.test.mjs",
     "test:viewport-cache": "node --test tests/viewport-response-cache.test.mjs",
     "test:viewport-load-policy": "node --test tests/viewport-load-policy.test.mjs",
@@ -232,7 +232,10 @@
     "verify:dhaka-3d-tiles-package": "node scripts/verify-dhaka-3d-tiles-package.mjs",
     "test:dhaka-3d-tiles-package": "node --test tests/dhaka-3d-tiles-package.test.mjs",
     "build:dhaka-3d-tiles-review-package": "node scripts/build-dhaka-3d-tiles-package.mjs --output public/experimental/dhaka-3d-tiles-multibuilding-pilot --max-features 32 --height-meters 8",
-    "test:dhaka-3d-tiles-multitile-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-multitile.spec.ts"
+    "test:dhaka-3d-tiles-multitile-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-multitile.spec.ts",
+    "build:dhaka-3d-tiles-pilot-browser-module": "node scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs",
+    "test:dhaka-3d-tiles-pilot-browser-module": "node --test tests/dhaka-3d-tiles-pilot-browser-module.test.mjs",
+    "test:dhaka-3d-tiles-controller-lifecycle-browser": "playwright test --config=playwright.config.ts tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
   },
   "dependencies": {
     "cesium": "^1.146.0",
