@@ -443,7 +443,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
   const emitted = [];
   const errors = [];
   let totalSourceVertices = 0, totalGroundVertices = 0, totalWorldVertices = 0;
-  let globalMaxResidual = 0, globalMaxHeightResidual = 0, allInside = true;
+  let globalMaxResidual = 0, globalMaxHeightResidual = 0, globalMaxPerimeterDifference = 0, globalDegenerateTriangleCount = 0, allInside = true;
 
   for (const tile of manifest.tiles) {
     if (!isRecord(tile) || typeof tile.featureId !== "string" || typeof tile.contentUri !== "string" ||
@@ -545,9 +545,25 @@ export async function reviewDhaka3DTilesPackageAlignment({
       sourceVertexCount: uniqueSource.length,
       transformedGroundVertexCount: uniqueGround.length,
       transformedTopVertexCount: uniquePoints(topWorld.map((point) => [point.longitudeDegrees, point.latitudeDegrees]), 7).length,
-      maximumSourceToMeshResidualMeters: Number(maxSourceResidual.toFixed(6)),
-      maximumMeshToSourceResidualMeters: Number(maxGroundResidual.toFixed(6)),
+      maximumSourceToMeshVertexResidualMeters: Number(maxSourceVertexResidual.toFixed(6)),
+      maximumMeshToSourceVertexResidualMeters: Number(maxGroundVertexResidual.toFixed(6)),
+      maximumLocalFootprintBoundaryResidualMeters: Number(localBoundary.maximumResidualMeters.toFixed(6)),
+      maximumTransformedFootprintBoundaryResidualMeters: Number(worldBoundary.maximumResidualMeters.toFixed(6)),
       maximumHorizontalResidualMeters: Number(maxResidual.toFixed(6)),
+      sourcePerimeterMeters: Number(localBoundary.expectedPerimeterMeters.toFixed(6)),
+      localMeshPerimeterMeters: Number(localBoundary.actualPerimeterMeters.toFixed(6)),
+      transformedMeshPerimeterMeters: Number(worldBoundary.actualPerimeterMeters.toFixed(6)),
+      maximumFootprintPerimeterDifferenceMeters: Number(maximumPerimeterDifferenceMeters.toFixed(6)),
+      sourceBoundarySegmentCount: localBoundary.expectedSegmentCount,
+      meshBoundarySegmentCount: localBoundary.actualSegmentCount,
+      degenerateTriangleCount: recoveredBoundary.degenerateTriangleCount,
+      transformQuality: {
+        valid: transformQuality.valid,
+        axisLengths: transformQuality.axisLengths ?? null,
+        axisDots: transformQuality.axisDots ?? null,
+        handedness: transformQuality.handedness ?? null,
+        translationResidualMeters: transformQuality.translationResidualMeters,
+      },
       maximumEllipsoidHeightResidualMeters: Number(heightResidual.toFixed(6)),
       transformedEllipsoidHeightRangeMeters: {
         ground: minMax(groundWorld.map((point) => point.ellipsoidHeightMeters)),
@@ -555,7 +571,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
       },
       allTransformedVerticesInsideDeclaredRegion: inside,
       declaredRegionRadians: region,
-      status: maxResidual <= toleranceMeters && heightResidual <= 0.05 && inside ? "pass" : "fail",
+      status: maxResidual <= toleranceMeters && maximumPerimeterDifferenceMeters <= toleranceMeters &&
+        recoveredBoundary.degenerateTriangleCount === 0 && transformQuality.valid && heightResidual <= 0.05 && inside ? "pass" : "fail",
     };
     emitted.push(metric);
     totalSourceVertices += uniqueSource.length;
@@ -563,6 +580,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
     totalWorldVertices += allTileVertices.length;
     globalMaxResidual = Math.max(globalMaxResidual, maxResidual);
     globalMaxHeightResidual = Math.max(globalMaxHeightResidual, heightResidual);
+    globalMaxPerimeterDifference = Math.max(globalMaxPerimeterDifference, maximumPerimeterDifferenceMeters);
+    globalDegenerateTriangleCount = Math.max(globalDegenerateTriangleCount, recoveredBoundary.degenerateTriangleCount);
     allInside &&= inside;
   }
 
@@ -591,13 +610,16 @@ export async function reviewDhaka3DTilesPackageAlignment({
       transformedUniqueGroundVertexCount: totalGroundVertices,
       transformedWorldVertexCountIncludingDuplicates: totalWorldVertices,
       maximumHorizontalResidualMeters: Number(globalMaxResidual.toFixed(6)),
+      maximumFootprintPerimeterDifferenceMeters: Number(globalMaxPerimeterDifference.toFixed(6)),
+      degenerateTriangleCountMaximumAcrossTiles: globalDegenerateTriangleCount,
       maximumEllipsoidHeightResidualMeters: Number(globalMaxHeightResidual.toFixed(6)),
       allTransformedVerticesInsideDeclaredRegions: allInside,
     },
     tiles: emitted,
     errors,
     limitations: [
-      "This checks GLB footprint vertex coordinates after child ECEF transform, child-region containment and source/hash binding. It is not rendered-pixel comparison or architectural accuracy.",
+      "Acceptance uses bidirectional sampled source-perimeter versus GLB base-boundary residuals in both local coordinates and after the ECEF transform; source-vertex nearest-vertex distances are diagnostic because collinear source vertices can be simplified away.",
+      "The reviewer checks indexed GLB triangles, degenerate triangles, transform axis orthonormality/handedness, source-anchor translation, vertical consistency and child-region containment. It is not rendered-pixel comparison or architectural accuracy.",
       "Source input has 2D footprints; vertical checks only validate ellipsoid transform and explicitly synthetic extrusion height.",
       "A pass is placement-plumbing evidence, not surveyed height, source-rights approval or production readiness.",
     ],
