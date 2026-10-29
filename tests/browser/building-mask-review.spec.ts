@@ -70,6 +70,7 @@ async function assertBinaryPng(page: Page, pngBytes: Buffer): Promise<void> {
     canvas.width = image.width;
     canvas.height = image.height;
     const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("Canvas 2D context is unavailable while validating the mask PNG.");
     context.drawImage(image, 0, 0);
     const data = context.getImageData(0, 0, image.width, image.height).data;
     let foreground = 0;
