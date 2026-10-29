@@ -16,7 +16,7 @@ const sourceData = {
       id: "alignment-square",
       properties: { class: "building" },
       geometry: { type: "Polygon", coordinates: [[
-        [90.4100, 23.7800], [90.4101, 23.7800], [90.4101, 23.7801],
+        [90.4100, 23.7800], [90.41005, 23.7800], [90.4101, 23.7800], [90.4101, 23.7801],
         [90.4100, 23.7801], [90.4100, 23.7800]
       ]] }
     },
@@ -71,6 +71,11 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
   assert.equal(report.tiles.length, 3);
   assert.equal(report.summary.allTransformedVerticesInsideDeclaredRegions, true);
   assert.ok(report.summary.maximumHorizontalResidualMeters <= report.thresholds.maximumHorizontalResidualMeters);
+  assert.ok(report.summary.maximumFootprintPerimeterDifferenceMeters <= report.thresholds.maximumHorizontalResidualMeters);
+  assert.equal(report.summary.degenerateTriangleCountMaximumAcrossTiles, 0);
+  assert.ok(report.tiles.every((tile) => tile.transformQuality.valid && tile.degenerateTriangleCount === 0));
+  assert.ok(report.tiles.every((tile) => tile.maximumLocalFootprintBoundaryResidualMeters <= report.thresholds.maximumHorizontalResidualMeters));
+  assert.ok(report.tiles.every((tile) => tile.maximumTransformedFootprintBoundaryResidualMeters <= report.thresholds.maximumHorizontalResidualMeters));
   assert.ok(report.summary.maximumEllipsoidHeightResidualMeters <= report.thresholds.maximumEllipsoidHeightResidualMeters);
   assert.deepEqual(report.releaseFlags, {
     acceptanceEligible: false,
@@ -81,7 +86,7 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
   for (const tile of report.tiles) {
     assert.equal(tile.status, "pass", tile.contentUri);
     assert.ok(tile.sourceVertexCount >= 4, tile.contentUri);
-    assert.equal(tile.sourceVertexCount, tile.transformedGroundVertexCount, tile.contentUri);
+    assert.ok(tile.transformedGroundVertexCount <= tile.sourceVertexCount, tile.contentUri);
     assert.equal(tile.allTransformedVerticesInsideDeclaredRegion, true, tile.contentUri);
   }
 });
@@ -103,8 +108,40 @@ test("detects a shifted child transform even when package file hashes are recomp
 
   const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
   assert.equal(report.status, "fail");
-  assert.ok(report.errors.some((error) => /footprint residual|escape child region/.test(error)));
+  assert.ok(report.errors.some((error) => /transform|footprint boundary residual|escape child region/.test(error)));
   assert.equal(report.tiles[0].status, "fail");
+});
+
+test("detects a shifted GLB perimeter even when all content hashes are consistently rebound", async () => {
+  const damagedPath = path.join(root, "shifted-glb-package");
+  await cp(packagePath, damagedPath, { recursive: true });
+  const manifestPath = path.join(damagedPath, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const uri = manifest.tiles[0].contentUri;
+  const glbPath = path.join(damagedPath, uri);
+  const bytes = await readFile(glbPath);
+  const jsonLength = bytes.readUInt32LE(12);
+  const binaryOffset = 20 + jsonLength + 8;
+  const gltf = JSON.parse(bytes.toString("utf8", 20, 20 + jsonLength));
+  const accessor = gltf.accessors[gltf.meshes[0].primitives[0].attributes.POSITION];
+  const view = gltf.bufferViews[accessor.bufferView];
+  const start = binaryOffset + (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const stride = view.byteStride ?? 12;
+  for (let index = 0; index < accessor.count; index += 1) {
+    const offset = start + index * stride;
+    bytes.writeFloatLE(bytes.readFloatLE(offset) + 1, offset);
+  }
+  await writeFile(glbPath, bytes);
+  const newHash = sha256(bytes);
+  manifest.files[uri] = { sha256: newHash, bytes: bytes.length };
+  const tile = manifest.tiles.find((item) => item.contentUri === uri);
+  tile.contentSha256 = newHash;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) => /footprint boundary residual|perimeter difference/.test(error)));
+  assert.ok(report.tiles.some((item) => item.contentUri === uri && item.status === "fail"));
 });
 
 test("rejects a wrong source dataset before producing an alignment pass", async () => {
