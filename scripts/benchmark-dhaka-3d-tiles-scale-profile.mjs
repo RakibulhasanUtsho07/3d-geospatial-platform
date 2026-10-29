@@ -99,6 +99,30 @@ async function measurePackageFiles(directory) {
   return { totalBytes, fileCount };
 }
 
+async function assertSafeSourcePath(sourcePath) {
+  const resolved = path.resolve(sourcePath);
+  const base = within(ROOT, resolved) ? ROOT : within(os.tmpdir(), resolved) ? os.tmpdir() : null;
+  if (!base) {
+    throw new TypeError("Source GeoJSON must be inside the repository or OS temporary directory.");
+  }
+
+  const relativeParent = path.relative(base, path.dirname(resolved));
+  let current = base;
+  for (const part of relativeParent.split(path.sep).filter(Boolean)) {
+    current = path.join(current, part);
+    const info = await lstat(current);
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new TypeError("Source GeoJSON must not traverse symlinked or non-directory parents.");
+    }
+  }
+
+  const sourceInfo = await lstat(resolved);
+  if (sourceInfo.isSymbolicLink() || !sourceInfo.isFile() || sourceInfo.size > 256 * 1024 * 1024) {
+    throw new TypeError("Source GeoJSON must be a regular non-symlink file no larger than 256 MiB.");
+  }
+  return resolved;
+}
+
 async function assertSafeReportPath(outputPath) {
   const resolved = path.resolve(outputPath);
   const underProject = within(ROOT, resolved);
@@ -162,14 +186,7 @@ export async function runDhaka3DTilesScaleProfile({
   if (!Number.isFinite(toleranceMeters) || toleranceMeters <= 0 || toleranceMeters > 5) {
     throw new TypeError("toleranceMeters must be finite and in the range (0, 5].");
   }
-  const source = path.resolve(sourcePath);
-  if (!within(ROOT, source) && !within(os.tmpdir(), source)) {
-    throw new TypeError("Source GeoJSON must be inside the repository or OS temporary directory.");
-  }
-  const sourceInfo = await lstat(source);
-  if (sourceInfo.isSymbolicLink() || !sourceInfo.isFile() || sourceInfo.size > 256 * 1024 * 1024) {
-    throw new TypeError("Source GeoJSON must be a regular non-symlink file no larger than 256 MiB.");
-  }
+  const source = await assertSafeSourcePath(sourcePath);
   const sourceBytes = await readFile(source);
   const parsedSource = JSON.parse(sourceBytes.toString("utf8"));
   if (!isRecord(parsedSource) || parsedSource.type !== "FeatureCollection" || !Array.isArray(parsedSource.features)) {
