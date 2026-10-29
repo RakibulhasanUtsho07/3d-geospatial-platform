@@ -80,6 +80,22 @@ The browser test is an integration/selection check, not a city-scale benchmark. 
 - Evidence artifact: [P3.6 browser evidence and screenshot](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40805652011). Screenshot SHA-256: `e20716377a55ec5ab70cc6ad134ab98eb1562941c1d97d27ae4c41420eac69d1`; report SHA-256: `e33b3d351e9e7bfa241b3b2595dae88f47fc0401dafabbdc95033bb6ad11d832`.
 - These results prove only bounded package integrity and lazy child-content loading in this CI viewport pair. They do not prove surveyed height, facade/roof fidelity, source rights or city-scale performance. Keep the release flags false.
 
+## Multi-tile controller lifecycle hardening (new)
+
+The opt-in `Dhaka3DTilesPilotController` now has explicit and bounded loading policy:
+
+- Same-source concurrent `enable()` calls share one in-flight promise. Repeated enable after attach returns `already-loaded` instead of duplicating primitives.
+- `maxAttemptsPerUrl` is constrained to 1–3 (default 2); `retryDelayMs` is constrained to 0–5000 ms (default 250). The retry loop re-checks lifecycle generation after each wait, so disable/destroy does not start another retry.
+- An optional `fallbackUrl` is opt-in and runs only after all retries against the primary fail. The loaded URL, fallback flag and failed attempts are emitted in status/result metadata. No fixture fallback is silently configured for another source.
+- Changing the requested URL tears down the previously attached tile set before loading the new one.
+- Disabling, destroying or replacing the viewer invalidates stale loads; a late-resolved tile set is destroyed instead of attached, and a late rejection does not produce an error status for an obsolete request.
+- If Cesium refuses primitive attachment or collection removal, owned tile resources are still destroyed. Telemetry callback exceptions are isolated from load/teardown.
+- Permanent failure is emitted once as an error and leaves no controller-owned attached resource; it remains visible to the caller as a rejected promise.
+
+The controller still uses Cesium's public `fromUrl()` loader, which is not abortable here. Generation invalidation prevents stale attachment but cannot guarantee that an underlying network request stops immediately. These lifecycle tests use injected loaders and mock primitive collections; they prove controller policy, not a deployed browser's network cancellation behavior.
+
+The dedicated P3.6 workflow now explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` in addition to package-integrity and live Cesium browser validation. The new exact-head workflow must pass before the lifecycle slice is marked validated.
+
 ## Remaining production acceptance gates
 
 This implementation does **not** complete P3.6 production acceptance. Before integrating this package into ordinary map loading, require:
