@@ -1,20 +1,21 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const REVIEW_URL = "/experimental/building-mask-review.html";
 
-function sha256(bytes) {
+function sha256(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function fixturePng(page) {
+async function fixturePng(page: Page): Promise<Buffer> {
   const dataUrl = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 48;
     const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D context is unavailable in the test browser.");
     context.fillStyle = "#8b9caf";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#d9c9b0";
@@ -27,7 +28,7 @@ async function fixturePng(page) {
   return Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
 }
 
-async function loadFixture(page, sourceId = "fixture-front") {
+async function loadFixture(page: Page, sourceId = "fixture-front"): Promise<Buffer> {
   await page.goto(REVIEW_URL);
   await expect(page.getByRole("heading", { name: "Building mask review" })).toBeVisible();
   const sourceBytes = await fixturePng(page);
@@ -43,14 +44,14 @@ async function loadFixture(page, sourceId = "fixture-front") {
   return sourceBytes;
 }
 
-async function drawOneStroke(page) {
+async function drawOneStroke(page: Page): Promise<void> {
   const canvas = page.locator("#mask-canvas");
   const bounds = await canvas.boundingBox();
   assert.ok(bounds, "mask canvas should have a visible bounding box");
   await canvas.click({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
 }
 
-async function downloadBytes(page, selector) {
+async function downloadBytes(page: Page, selector: string): Promise<{ filename: string; bytes: Buffer }> {
   const pending = page.waitForEvent("download");
   await page.locator(selector).click();
   const download = await pending;
@@ -59,8 +60,8 @@ async function downloadBytes(page, selector) {
   return { filename: download.suggestedFilename(), bytes: await readFile(path) };
 }
 
-async function assertBinaryPng(page, pngBytes) {
-  const decoded = await page.evaluate(async (base64) => {
+async function assertBinaryPng(page: Page, pngBytes: Buffer): Promise<void> {
+  const decoded = await page.evaluate(async (base64: string) => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
@@ -72,7 +73,7 @@ async function assertBinaryPng(page, pngBytes) {
     context.drawImage(image, 0, 0);
     const data = context.getImageData(0, 0, image.width, image.height).data;
     let foreground = 0;
-    const colours = new Set();
+    const colours = new Set<number>();
     for (let i = 0; i < data.length; i += 4) {
       if (data[i + 3] !== 255 || data[i] !== data[i + 1] || data[i + 1] !== data[i + 2] || (data[i] !== 0 && data[i] !== 255)) {
         throw new Error("PNG contains non-binary or non-opaque mask pixels");
@@ -85,10 +86,10 @@ async function assertBinaryPng(page, pngBytes) {
   assert.equal(decoded.width, 64);
   assert.equal(decoded.height, 48);
   assert.ok(decoded.foreground > 0 && decoded.foreground < decoded.width * decoded.height);
-  assert.deepEqual(decoded.colours.sort((a,b)=>a-b), [0,255]);
+  assert.deepEqual(decoded.colours.sort((a: number,b: number)=>a-b), [0,255]);
 }
 
-test("manual mask editor exports source/hash-bound binary PNG and a proposed manifest by default", async ({ page }) => {
+test("manual mask editor exports source/hash-bound binary PNG and a proposed manifest by default", async ({ page }: { page: Page }) => {
   const sourceBytes = await loadFixture(page);
   await drawOneStroke(page);
   const png = await downloadBytes(page, "#export-mask-png");
@@ -140,14 +141,17 @@ test("manual mask editor exports source/hash-bound binary PNG and a proposed man
   await expect(page.locator("#download-manifest")).toBeDisabled();
 });
 
-test("manual mask editor records a named human-review attestation but never approves publication", async ({ page }) => {
+test("manual mask editor records a named human-review attestation but never approves publication", async ({ page }: { page: Page }) => {
   await loadFixture(page, "fixture-heritage-front");
   await drawOneStroke(page);
   const png = await downloadBytes(page, "#export-mask-png");
   await assertBinaryPng(page, png.bytes);
 
   await page.locator("#reviewer-id").fill("reviewer-fixture-a");
-  await page.locator("#confidence").fill("0.75");
+  await page.locator("#confidence").evaluate((element: HTMLInputElement) => {
+    element.value = "0.75";
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   await page.locator("#review-confirm").check();
   const json = await downloadBytes(page, "#download-manifest");
   const manifest = JSON.parse(json.bytes.toString("utf8"));
@@ -163,7 +167,7 @@ test("manual mask editor records a named human-review attestation but never appr
   assert.equal(manifest.policy.publishable, false);
 });
 
-test("manual mask editor rejects empty masks and refuses reviewed export without reviewer identity", async ({ page }) => {
+test("manual mask editor rejects empty masks and refuses reviewed export without reviewer identity", async ({ page }: { page: Page }) => {
   await loadFixture(page, "fixture-edge-case");
   await page.locator("#export-mask-png").click();
   await expect(page.locator("#export-status")).toContainText("Mask must contain both building foreground and background pixels");
