@@ -229,6 +229,158 @@ function uniquePoints(points, digits) {
   }
   return output;
 }
+
+function wgs84ToEcef(longitudeDegrees, latitudeDegrees, heightMeters = 0) {
+  const longitude = longitudeDegrees * DEG;
+  const latitude = latitudeDegrees * DEG;
+  const sinLatitude = Math.sin(latitude);
+  const cosLatitude = Math.cos(latitude);
+  const normal = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLatitude * sinLatitude);
+  return [
+    (normal + heightMeters) * cosLatitude * Math.cos(longitude),
+    (normal + heightMeters) * cosLatitude * Math.sin(longitude),
+    (normal * (1 - WGS84_E2) + heightMeters) * sinLatitude,
+  ];
+}
+function vectorLength(point) { return Math.hypot(point[0], point[1], point[2]); }
+function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function subtract3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function validateTransformQuality(matrix, longitude, latitude) {
+  const errors = [];
+  if (!Array.isArray(matrix) || matrix.length !== 16 || !matrix.every(Number.isFinite)) {
+    return { valid: false, errors: ["Child transform must contain 16 finite column-major values."], translationResidualMeters: null };
+  }
+  const east = [matrix[0], matrix[1], matrix[2]];
+  const up = [matrix[4], matrix[5], matrix[6]];
+  const south = [matrix[8], matrix[9], matrix[10]];
+  const cross = [
+    east[1] * up[2] - east[2] * up[1],
+    east[2] * up[0] - east[0] * up[2],
+    east[0] * up[1] - east[1] * up[0],
+  ];
+  const axisLengths = [vectorLength(east), vectorLength(up), vectorLength(south)];
+  const axisDots = [dot3(east, up), dot3(east, south), dot3(up, south)];
+  const handedness = dot3(cross, south);
+  const translationResidualMeters = vectorLength(subtract3(
+    matrix.slice(12, 15),
+    wgs84ToEcef(longitude, latitude, 0),
+  ));
+  const tolerance = 1e-8;
+  if (axisLengths.some((length) => Math.abs(length - 1) > tolerance) ||
+      axisDots.some((value) => Math.abs(value) > tolerance) ||
+      Math.abs(handedness - 1) > tolerance) {
+    errors.push("Child transform axes are not orthonormal and right-handed ENU-to-ECEF.");
+  }
+  if (translationResidualMeters > 0.001) {
+    errors.push("Child transform translation differs from the source footprint anchor by " + translationResidualMeters.toFixed(4) + "m.");
+  }
+  return { valid: errors.length === 0, errors, axisLengths, axisDots, handedness, translationResidualMeters };
+}
+function projectToAnchorPlane(point, anchorLongitude, anchorLatitude) {
+  const longitude = point.longitudeDegrees ?? point[0];
+  const latitude = point.latitudeDegrees ?? point[1];
+  return [
+    (longitude - anchorLongitude) * 111319.490793 * Math.cos(anchorLatitude * DEG),
+    (latitude - anchorLatitude) * 111132.92,
+  ];
+}
+function pointToSegmentDistance(point, start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 1e-18) return Math.hypot(point[0] - start[0], point[1] - start[1]);
+  const t = Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / lengthSquared));
+  return Math.hypot(point[0] - (start[0] + t * dx), point[1] - (start[1] + t * dy));
+}
+function minDistanceToLinework(point, segments) {
+  let minimum = Infinity;
+  for (const segment of segments) minimum = Math.min(minimum, pointToSegmentDistance(point, segment[0], segment[1]));
+  return minimum;
+}
+function measureBoundaryResidual(expectedSegments, actualSegments) {
+  if (expectedSegments.length < 3 || actualSegments.length < 3) {
+    throw new Error("Source and emitted mesh must each provide at least three footprint boundary segments.");
+  }
+  const residuals = [];
+  for (const segments of [[expectedSegments, actualSegments], [actualSegments, expectedSegments]]) {
+    const [sampledSegments, targetSegments] = segments;
+    for (const segment of sampledSegments) {
+      for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+        const point = [
+          segment[0][0] + (segment[1][0] - segment[0][0]) * fraction,
+          segment[0][1] + (segment[1][1] - segment[0][1]) * fraction,
+        ];
+        residuals.push(minDistanceToLinework(point, targetSegments));
+      }
+    }
+  }
+  const perimeter = (segments) => segments.reduce((sum, segment) =>
+    sum + Math.hypot(segment[1][0] - segment[0][0], segment[1][1] - segment[0][1]), 0);
+  const expectedPerimeterMeters = perimeter(expectedSegments);
+  const actualPerimeterMeters = perimeter(actualSegments);
+  return {
+    maximumResidualMeters: Math.max(...residuals),
+    expectedPerimeterMeters,
+    actualPerimeterMeters,
+    perimeterDifferenceMeters: Math.abs(expectedPerimeterMeters - actualPerimeterMeters),
+    expectedSegmentCount: expectedSegments.length,
+    actualSegmentCount: actualSegments.length,
+  };
+}
+function sourceBoundarySegments(rings, anchorLongitude, anchorLatitude) {
+  const segments = [];
+  for (const ring of rings) {
+    const projected = ring.map((point) => projectToAnchorPlane(point, anchorLongitude, anchorLatitude));
+    for (let index = 0; index < projected.length; index += 1) {
+      segments.push([projected[index], projected[(index + 1) % projected.length]]);
+    }
+  }
+  return segments;
+}
+function recoverMeshBoundarySegments(triangles, height, label) {
+  const tolerance = Math.max(1e-4, height * 1e-6);
+  const segments = new Map();
+  let degenerateTriangleCount = 0;
+  for (const triangle of triangles) {
+    const [a, b, c] = triangle;
+    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const cross = [
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    ];
+    if (vectorLength(cross) < 1e-8) degenerateTriangleCount += 1;
+    const ground = triangle.filter((point) => Math.abs(point[1]) <= tolerance);
+    const top = triangle.filter((point) => Math.abs(point[1] - height) <= tolerance);
+    if (ground.length !== 2 || top.length !== 1) continue;
+    const first = [ground[0][0], -ground[0][2]];
+    const second = [ground[1][0], -ground[1][2]];
+    const firstKey = first.map((value) => value.toFixed(5)).join(",");
+    const secondKey = second.map((value) => value.toFixed(5)).join(",");
+    const key = firstKey < secondKey ? firstKey + "|" + secondKey : secondKey + "|" + firstKey;
+    segments.set(key, [first, second]);
+  }
+  if (segments.size < 3) throw new Error("GLB " + label + " has fewer than three recoverable exterior boundary edges.");
+  return { segments: Array.from(segments.values()), degenerateTriangleCount };
+}
+function transformBoundarySegmentsToAnchorPlane(segments, transform, anchorLongitude, anchorLatitude) {
+  const output = [];
+  for (const segment of segments) {
+    const samplePoints = [];
+    for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+      const east = segment[0][0] + (segment[1][0] - segment[0][0]) * fraction;
+      const north = segment[0][1] + (segment[1][1] - segment[0][1]) * fraction;
+      const world = ecefToWgs84(transformPoint(transform, [east, 0, -north]));
+      samplePoints.push(projectToAnchorPlane(world, anchorLongitude, anchorLatitude));
+    }
+    for (let index = 0; index < samplePoints.length - 1; index += 1) {
+      output.push([samplePoints[index], samplePoints[index + 1]]);
+    }
+  }
+  return output;
+}
+
 function insideRegion(point, region, toleranceMeters = 0.02) {
   if (!Array.isArray(region) || region.length !== 6 || !region.every(Number.isFinite)) {
     throw new Error("Tile boundingVolume.region must contain six finite numbers.");
