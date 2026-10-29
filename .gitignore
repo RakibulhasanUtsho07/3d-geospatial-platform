@@ -51,3 +51,4 @@ next-env.d.ts
 
 # Generated opt-in OGC 3D Tiles fixture (rebuild with npm run build:dhaka-3d-tiles-fixture)
 /public/experimental/dhaka-3d-tiles-fixture/
+/public/experimental/dhaka-3d-tiles-multibuilding-pilot/
