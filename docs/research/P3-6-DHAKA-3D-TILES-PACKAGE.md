@@ -138,6 +138,12 @@ The `scripts/review-dhaka-3d-tiles-package-alignment.mjs` reviewer complements p
 
 **Exact source-code head checked 2026-10-29:** `4c83d42716d0baeaae23cf302883887b342847b0` passed the dedicated P3.6 PR workflow [#40846806614](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40846806614) and push workflow [#40846798546](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40846798546). Full CI passed on that same source head in PR run [#40846806603](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40846806603) and push run [#40846798500](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40846798500). The dedicated workflow completed package/GLB integrity checks, the alignment/boundary-residual gate, live Cesium selective-fetch checks and controller-lifecycle browser checks. The workflow path filter now includes `.github/workflows/ci.yml` to validate the shared browser-test environment binding as well.
 
+### Bounded scale and resource profile (new)
+
+- The dedicated P3.6 workflow now profiles the same local Dhaka footprint extract with requested content limits `32`, `64`, and `128`. `scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs` records source SHA-256/size, emitted content count, total package bytes and file count, GLB size distribution, build-plus-embedded-integrity wall time, standalone integrity wall time, placement-review wall time, alignment residual summaries and RSS snapshots at phase boundaries.
+- The benchmark uses ephemeral package directories and uploads only a machine-readable JSON report (`p3-6-dhaka-3d-tiles-scale-profile`); it does not publish or check in generated packages. The report identifies the workflow SHA separately from the PR source head and binds the report to the source-data hash.
+- The 32/64/128 sequence is bounded engineering evidence, not a city-scale performance claim. Timings have no flaky CI threshold; RSS is sampled at phase boundaries rather than asserted as peak memory. The 8 m height remains synthetic, and no rights, surveyed accuracy, visual acceptance or release flag is inferred by a successful profile.
+
 ### Gate matrix
 
 | Gate | Status at the source-code checkpoint | Evidence boundary |
@@ -149,7 +155,7 @@ The `scripts/review-dhaka-3d-tiles-package-alignment.mjs` reviewer complements p
 | Real surveyed building heights / independent vertical truth | **Blocked** | The emitted height remains synthetic 8 m; source GeoJSON is 2D and no surveyed base/top elevations are bound to these features. |
 | File-level source rights, attribution and derivative/commercial-use scope | **Blocked** | Public accessibility or the separate benchmark's licence cannot be transferred to every TUM2TWIN/Zenodo asset. See [BRF-29 / issue #240](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/240). |
 | Human fixed-camera architectural review | **Blocked** | The observed review frames show simple footprint extrusions, not accepted facade/roof architecture. Hash-bound screenshots alone do not grant visual acceptance. |
-| Larger bounded tile-count performance/memory and production rollout review | **Not complete** | The current 32-feature pilot is not a city-scale readiness result. |
+| Bounded package scale profile at 32/64/128 contents | Implemented; exact-head artifact review pending | Records package bytes, GLB size distribution, phase wall times, alignment and phase-boundary RSS samples; shared-runner readings are not production SLOs or peak-memory guarantees. |
 
 ### Release decision
 
