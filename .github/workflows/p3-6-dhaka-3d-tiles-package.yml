@@ -17,6 +17,9 @@ on:
       - "package.json"
       - "package-lock.json"
       - "docs/research/P3-6-DHAKA-3D-TILES-PACKAGE.md"
+      - "public/experimental/dhaka-3d-tiles-multibuilding-review.html"
+      - "tests/browser/dhaka-3d-tiles-multitile.spec.ts"
+      - ".github/workflows/p3-6-dhaka-3d-tiles-package.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +33,7 @@ jobs:
   package-integrity:
     name: Build and verify bounded real-Dhaka source package
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       TILE_PACKAGE_DIR: /tmp/dhaka-3d-tiles-multibuilding-pilot
     steps:
@@ -59,6 +62,59 @@ jobs:
 
       - name: Verify all generated source, tileset and GLB integrity records
         run: npm run verify:dhaka-3d-tiles-package -- --package "$TILE_PACKAGE_DIR"
+
+      - name: Build production app with the multi-tile review package
+        run: npm run build
+
+      - name: Install Chromium for live multi-tile rendering test
+        run: npx playwright install chromium
+
+      - name: Start production server for the browser review
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/p3-6-next-server.log 2>&1 &
+          echo $! > /tmp/p3-6-next-server.pid
+          node --input-type=module <<'NODE'
+          const base = "http://127.0.0.1:3000";
+          const routes = [
+            "/experimental/dhaka-3d-tiles-multibuilding-review.html",
+            "/experimental/dhaka-3d-tiles-multibuilding-pilot/tileset.json",
+            "/experimental/dhaka-3d-tiles-multibuilding-pilot/build-manifest.json"
+          ];
+          const deadline = Date.now() + 60000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            try {
+              const responses = await Promise.all(routes.map((route) =>
+                fetch(base + route, { signal: AbortSignal.timeout(10000) })
+              ));
+              if (responses.every((response) => response.status === 200)) {
+                ready = true;
+                break;
+              }
+            } catch {
+              // Next.js is still starting.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          if (!ready) {
+            console.error("Production server did not serve the multi-tile review page and package manifest.");
+            process.exit(1);
+          }
+          NODE
+
+      - name: Verify real Cesium multi-tile selective viewport fetching
+        run: npm run test:dhaka-3d-tiles-multitile-browser
+
+      - name: Upload multi-tile browser evidence and server diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-multitile-browser-evidence
+          path: |
+            artifacts/p3.6-multitile-browser/
+            /tmp/p3-6-next-server.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload generated pilot package for inspection (not publication)
         if: always()
