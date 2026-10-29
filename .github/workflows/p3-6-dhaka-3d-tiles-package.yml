@@ -122,15 +122,30 @@ jobs:
       - name: Verify controller fallback, terminal failure and late-result cleanup in live Cesium
         run: npm run test:dhaka-3d-tiles-controller-lifecycle-browser
 
-      - name: Upload multi-tile browser evidence and server diagnostics
+      - name: Upload multi-tile selective-fetch browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: p3-6-dhaka-multitile-browser-evidence
-          path: |
-            artifacts/p3.6-multitile-browser/
-            artifacts/p3.6-controller-browser/
-            /tmp/p3-6-next-server.log
+          path: artifacts/p3.6-multitile-browser/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload controller lifecycle browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-controller-lifecycle-browser-evidence
+          path: artifacts/p3.6-controller-browser/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload production server diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-browser-server-diagnostics
+          path: /tmp/p3-6-next-server.log
           if-no-files-found: warn
           retention-days: 14
 
