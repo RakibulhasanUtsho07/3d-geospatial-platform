@@ -23,7 +23,7 @@ async function fixture() {
     { id: "line-0002", orientation: "vertical", start: { x: 300, y: 100 }, end: { x: 300, y: 300 }, lengthPx: 200, confidenceScore: 0.97 },
     { id: "line-0003", orientation: "horizontal", start: { x: 100, y: 300 }, end: { x: 300, y: 300 }, lengthPx: 200, confidenceScore: 0.96 },
     { id: "line-0004", orientation: "vertical", start: { x: 100, y: 100 }, end: { x: 100, y: 300 }, lengthPx: 200, confidenceScore: 0.95 },
-    { id: "line-0005", orientation: "horizontal", start: { x: 20, y: 30 }, end: { x: 90, y: 30 }, lengthPx: 70, confidenceScore: 0.72 },
+    FALSE_LINE,
   ];
   const report = {
     schemaVersion: "1.0.0",
