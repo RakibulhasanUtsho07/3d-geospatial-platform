@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 
 import {
@@ -52,6 +53,8 @@ export default function FloorPlanReviewPage() {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceHash, setSourceHash] = useState("");
+  const objectUrlRef = useRef("");
+  const sourceCheckTokenRef = useRef(0);
   const [sourceState, setSourceState] = useState<"missing" | "checking" | "matched" | "mismatch" | "error">("missing");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -92,33 +95,15 @@ export default function FloorPlanReviewPage() {
   const [openingSillM, setOpeningSillM] = useState("");
 
   useEffect(() => {
-    if (!sourceFile) { setSourceUrl(""); return; }
-    const url = URL.createObjectURL(sourceFile);
-    setSourceUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [sourceFile]);
-
-  useEffect(() => {
-    if (!report || !sourceFile) { setSourceHash(""); setSourceState("missing"); return; }
-    let cancelled = false;
-    setSourceState("checking");
-    void (async () => {
-      try {
-        const hash = await digestHex(await sourceFile.arrayBuffer());
-        if (cancelled) return;
-        setSourceHash(hash);
-        const matches = hash === report.source.sha256 &&
-          sourceFile.size === report.source.byteSize &&
-          sourceFile.type.toLowerCase() === report.source.mimeType.toLowerCase();
-        setSourceState(matches ? "matched" : "mismatch");
-        if (!matches) setError("Selected image does not match the recorded source hash, byte size and MIME type. Export is blocked.");
-        else setError("");
-      } catch (cause) {
-        if (!cancelled) { setSourceState("error"); setError(cause instanceof Error ? cause.message : "Could not hash source image."); }
+    const cleanupOnPageHide = () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = "";
       }
-    })();
-    return () => { cancelled = true; };
-  }, [report, sourceFile]);
+    };
+    window.addEventListener("pagehide", cleanupOnPageHide);
+    return () => window.removeEventListener("pagehide", cleanupOnPageHide);
+  }, []);
 
   const candidates = report?.candidates ?? [];
   const selectedReview = selectedCandidateId ? reviews[selectedCandidateId] : undefined;
@@ -135,6 +120,27 @@ export default function FloorPlanReviewPage() {
     return "Source bytes match. All review actions remain local to this browser.";
   }, [report, sourceState]);
 
+  async function verifySource(file: File, proposal: ProposalReport) {
+    const token = ++sourceCheckTokenRef.current;
+    setSourceState("checking");
+    setSourceHash("");
+    setError("");
+    try {
+      const hash = await digestHex(await file.arrayBuffer());
+      if (token !== sourceCheckTokenRef.current) return;
+      setSourceHash(hash);
+      const matches = hash === proposal.source.sha256 &&
+        file.size === proposal.source.byteSize &&
+        file.type.toLowerCase() === proposal.source.mimeType.toLowerCase();
+      setSourceState(matches ? "matched" : "mismatch");
+      if (!matches) setError("Selected image does not match the recorded source hash, byte size and MIME type. Export is blocked.");
+    } catch (cause) {
+      if (token !== sourceCheckTokenRef.current) return;
+      setSourceState("error");
+      setError(cause instanceof Error ? cause.message : "Could not hash source image.");
+    }
+  }
+
   async function loadProposal(file?: File) {
     if (!file) return;
     setError(""); setSuccess("");
@@ -144,6 +150,8 @@ export default function FloorPlanReviewPage() {
       validateFloorPlanReviewProposal(parsed);
       const proposalHash = await digestHex(new TextEncoder().encode(canonicalFloorPlanReviewJson(parsed)));
       setReport(parsed); setReportHash(proposalHash);
+      if (sourceFile) void verifySource(sourceFile, parsed);
+      else { sourceCheckTokenRef.current += 1; setSourceHash(""); setSourceState("missing"); }
       const initial: Record<string, CandidateReview> = {};
       parsed.candidates.forEach((candidate, index) => {
         initial[candidate.id] = {
@@ -161,6 +169,7 @@ export default function FloorPlanReviewPage() {
       if (!floorPlanName) setFloorPlanName("Reviewed floor plan");
       setSuccess("Proposal loaded and hashed. Every detected line starts undecided.");
     } catch (cause) {
+      sourceCheckTokenRef.current += 1;
       setReport(null); setReportHash(""); setReviews({}); setSourceState("missing");
       setError(cause instanceof Error ? cause.message : "Could not load this proposal report.");
     }
@@ -266,7 +275,17 @@ export default function FloorPlanReviewPage() {
               <input className={field} type="file" accept=".json,application/json" onChange={(e) => void loadProposal(e.currentTarget.files?.[0])} />
             </label>
             <label className="mt-4 block text-sm font-medium">Original raster source
-              <input className={field} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { setSourceFile(e.currentTarget.files?.[0] ?? null); setSuccess(""); setError(""); }} />
+              <input className={field} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => {
+                const nextFile = e.currentTarget.files?.[0] ?? null;
+                if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = nextFile ? URL.createObjectURL(nextFile) : "";
+                setSourceUrl(objectUrlRef.current);
+                setSourceFile(nextFile);
+                setSuccess("");
+                setError("");
+                if (nextFile && report) void verifySource(nextFile, report);
+                else { sourceCheckTokenRef.current += 1; setSourceHash(""); setSourceState("missing"); }
+              }} />
             </label>
             <div className={"mt-4 rounded-lg border px-3 py-2 text-sm " + (sourceState === "matched" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : sourceState === "mismatch" || sourceState === "error" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-slate-200 bg-slate-50 text-slate-700")}>{stageText}</div>
             {report && <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
@@ -307,7 +326,7 @@ export default function FloorPlanReviewPage() {
             {report && sourceUrl ? (
               <div className="mt-4 overflow-hidden rounded-xl border border-slate-300 bg-slate-100">
                 <div className="relative w-full select-none" style={{ aspectRatio: String(report.raster.width) + " / " + String(report.raster.height) }}>
-                  <img src={sourceUrl} alt="Locally loaded floor-plan source" className="absolute inset-0 h-full w-full object-fill" draggable={false} />
+                  <Image src={sourceUrl} alt="Locally loaded floor-plan source" fill unoptimized className="object-fill" draggable={false} />
                   <svg className={"absolute inset-0 h-full w-full " + (pickMode ? "cursor-crosshair" : "cursor-default")} viewBox={"0 0 " + report.raster.width + " " + report.raster.height} preserveAspectRatio="none" onClick={canvasClick} onPointerMove={canvasMove} onPointerUp={() => setDragging(null)} onPointerCancel={() => setDragging(null)} style={{ touchAction: "none" }} aria-label="Interactive floor-plan trace canvas">
                     {candidates.map((candidate) => {
                       const item = reviews[candidate.id];
