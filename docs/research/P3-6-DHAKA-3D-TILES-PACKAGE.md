@@ -59,6 +59,21 @@ The dedicated test suite uses synthetic input footprints and covers:
 
 A dedicated GitHub Actions workflow also builds and verifies a bounded package from the repository's actual Dhaka Overture pilot extract. Its generated artifact is CI evidence, not a published map asset.
 
+## Live Cesium multi-tile viewport harness (new)
+
+The focused browser page `/experimental/dhaka-3d-tiles-multibuilding-review.html` is generated with the same local package used by the production build. The dedicated P3.6 workflow now builds the production application, starts the real Next.js production server, and runs Playwright against the Cesium viewer.
+
+The browser harness:
+- validates the live OGC manifest/build-manifest relationship and keeps the four release flags false;
+- picks the two most geographically separated emitted building footprints;
+- moves the real Cesium camera to each target and waits for the target child content to load and become visible;
+- records requested GLB content URIs from browser resource timing, Cesium tile-load/visible/failure events, viewport dimensions, Cesium/browser versions, exact source/tileset/build-manifest hashes and a screenshot hash;
+- passes only if the first viewport fetches a strict subset of package contents, the second viewport loads at least one new child GLB, and the two views together do not fetch every GLB.
+
+The browser test is an integration/selection check, not a city-scale benchmark. A successful run will establish that this bounded package is fetched lazily by viewport rather than eagerly downloaded as a whole. It still does not prove that all source geometry matches the real buildings.
+
+**Current validation state:** the implementation and dedicated workflow are wired on this PR branch. The latest workflow result on the exact new head must pass before this browser-validation slice is accepted. If the real viewport selects all GLBs or cannot show the second target, investigate/correct the tile LOD/bounding-volume/camera-selection problem; do not loosen the selectivity assertion to force a pass.
+
 ## Remaining production acceptance gates
 
 This implementation does **not** complete P3.6 production acceptance. Before integrating this package into ordinary map loading, require:
