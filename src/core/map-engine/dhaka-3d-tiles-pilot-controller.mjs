@@ -163,7 +163,12 @@ export class Dhaka3DTilesPilotController {
 
   enable({ url = this.#url, fallbackUrl = this.#fallbackUrl } = {}) {
     if (this.#disposed) return Promise.resolve({ status: "disposed" });
-    if (!this.#isEnabled()) return Promise.resolve({ status: "disabled" });
+    if (!this.#isEnabled()) {
+      // A runtime feature-flag transition must not leave previously attached
+      // experimental content in the scene. Disable also invalidates late loads.
+      this.disable();
+      return Promise.resolve({ status: "disabled" });
+    }
 
     let primaryUrl;
     let secondaryUrl;
