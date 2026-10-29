@@ -144,3 +144,40 @@ test("rejects source files reached through symlinked parent directories", async 
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+test("rejects report outputs reached through symlinked parents or symlink targets", async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), "p3-6-scale-profile-report-symlink-"));
+  try {
+    const sourcePath = path.join(temp, "source.geojson");
+    await writeFile(sourcePath, JSON.stringify(sourceFixture()) + "\n");
+
+    const realDirectory = path.join(temp, "real-output");
+    const aliasDirectory = path.join(temp, "alias-output");
+    await mkdir(realDirectory);
+    await symlink(realDirectory, aliasDirectory, "dir");
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({
+        sourcePath,
+        featureCounts: [1],
+        reportPath: path.join(aliasDirectory, "report.json"),
+      }),
+      /Report output must not traverse symlinked or non-directory parents/,
+    );
+
+    const targetPath = path.join(temp, "actual-report.json");
+    const aliasTargetPath = path.join(temp, "report-link.json");
+    await writeFile(targetPath, "keep-me\n");
+    await symlink(targetPath, aliasTargetPath, "file");
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({
+        sourcePath,
+        featureCounts: [1],
+        reportPath: aliasTargetPath,
+      }),
+      /Report target must be a regular file and must not be a symbolic link/,
+    );
+    assert.equal(await readFile(targetPath, "utf8"), "keep-me\n");
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
