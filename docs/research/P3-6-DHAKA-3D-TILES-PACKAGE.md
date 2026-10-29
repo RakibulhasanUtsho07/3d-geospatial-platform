@@ -110,6 +110,14 @@ The dedicated workflow now exercises the authoritative `Dhaka3DTilesPilotControl
 **Validated on candidate commit `a62053d5e9d8bcfef1f848543530fab8b4b76875`:** dedicated push [run #40810011610](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40810011610) and PR [run #40810017273](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40810017273) passed the real-Cesium lifecycle scenario and uploaded browser evidence. The report verified explicit fallback loading, duplicate-enable coalescing, disable cleanup to baseline primitive count, a single terminal error when both URLs fail, and late-result cancellation/destruction with no stale error. These runs predate the later per-tile alignment slice; changed heads still require fresh CI.
 
 **Limitations:** the late-result test validates stale-result cleanup after a real loader completes; it does not prove Cesium's underlying network request is immediately abortable. It still does not establish real-building height, architectural accuracy, source rights, or production readiness.
+## Fixed-camera multi-viewport evidence integrity (current)
+
+The live-browser review captures a separate PNG after the first target is visible and before panning, then captures the second target after the camera move. The browser evidence manifest stores both stages, byte lengths and SHA-256 values. The Playwright test reopens the written manifest, re-reads both PNGs and report from disk, recomputes their hashes, checks stage order and safe basename paths, and asserts that all release flags remain false.
+
+The GitHub workflow explicitly passes `P3_6_SOURCE_HEAD_SHA` from the pull-request source branch (or the pushed commit). The report retains `workflowSha` independently because GitHub pull-request runs can execute against a synthetic merge commit. In CI, the test fails if the source-head SHA or workflow event is missing/malformed or the manifest does not match the expected source head.
+
+This makes the uploaded PNG/JSON package self-consistent and traceable; it does not turn the visual review into an accuracy claim. The current geometry is still a synthetic-height extrusion without facade/roof reconstruction. Human architectural acceptance, rights, surveyed elevations and production eligibility remain blocked.
+
 ## Per-tile GLB footprint and placement residual review (new)
 
 The new `scripts/review-dhaka-3d-tiles-package-alignment.mjs` reviewer complements package integrity by decoding each emitted GLB POSITION accessor, applying the corresponding child 4×4 ECEF transform, converting transformed coordinates back to WGS84 geodetic coordinates, and comparing the resulting mesh-footprint vertices with the exact source feature identified by the manifest.

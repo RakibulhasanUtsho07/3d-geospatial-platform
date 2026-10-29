@@ -186,5 +186,47 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     limitations: review.limitations,
     releaseFlags: review.releaseFlags,
   };
-  await writeFile(path.join(OUTPUT_DIRECTORY, "evidence-manifest.json"), JSON.stringify(evidenceManifest, null, 2) + "\n", "utf8");
+  const manifestPath = path.join(OUTPUT_DIRECTORY, "evidence-manifest.json");
+  const manifestText = JSON.stringify(evidenceManifest, null, 2) + "\n";
+  await writeFile(manifestPath, manifestText, "utf8");
+
+  // Verify the persisted artifact, not just the in-memory values used to build it.
+  const persistedManifest = JSON.parse(await readFile(manifestPath, "utf8")) as typeof evidenceManifest;
+  assert.equal(persistedManifest.schemaVersion, 2);
+  assert.equal(persistedManifest.evidenceType, "p3.6-multitile-browser-evidence-manifest");
+  assert.equal(persistedManifest.status, "pass");
+  assert.deepEqual(
+    persistedManifest.screenshots.map((item) => item.stage),
+    ["first-viewport", "second-viewport"],
+    "Both camera states must be represented, in order.",
+  );
+  for (const item of persistedManifest.screenshots) {
+    assert.match(item.sha256, /^[a-f0-9]{64}$/);
+    assert.ok(Number.isSafeInteger(item.bytes) && item.bytes > 1000);
+    assert.equal(path.basename(item.path), item.path, "Evidence screenshot paths must be safe basenames.");
+    const savedBytes = await readFile(path.join(OUTPUT_DIRECTORY, item.path));
+    assert.equal(savedBytes.length, item.bytes, item.stage + " screenshot byte count changed.");
+    assert.equal(sha256(savedBytes), item.sha256, item.stage + " screenshot SHA-256 mismatch.");
+  }
+  const savedReport = await readFile(reportPath);
+  assert.equal(persistedManifest.reviewReport.bytes, savedReport.length);
+  assert.equal(persistedManifest.reviewReport.sha256, sha256(savedReport));
+
+  assert.deepEqual(persistedManifest.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+  if (process.env.CI === "true") {
+    const expectedSourceHead = process.env.P3_6_SOURCE_HEAD_SHA;
+    assert.match(expectedSourceHead ?? "", /^[a-f0-9]{40}$/);
+    assert.equal(persistedManifest.sourceHeadSha, expectedSourceHead);
+    assert.equal(persistedManifest.commit, expectedSourceHead);
+    assert.match(persistedManifest.workflowSha ?? "", /^[a-f0-9]{40}$/);
+    assert.ok(
+      persistedManifest.eventName === "push" || persistedManifest.eventName === "pull_request",
+      "Artifact must identify its GitHub event.",
+    );
+  }
 });
