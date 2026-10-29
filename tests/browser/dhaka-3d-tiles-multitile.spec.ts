@@ -99,9 +99,11 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   assert.ok(requests.firstViewContentUris.length > 0, "The first viewport must request at least one child content GLB.");
   assert.ok(requests.firstViewContentUris.length < (review.input?.contentCount ?? 0), "The first viewport must not fetch the full package.");
   assert.ok(requests.firstViewSelectedSubset, "Selective loading must be explicitly reported.");
-  assert.ok(review.targetPair?.distanceMeters >= 20, "The test must pan between separated footprint targets.");
-  assert.ok(!requests.firstViewContentUris.includes(review.targetPair?.second.contentUri ?? ""), "The second target must not be prefetched before the pan.");
-  assert.ok(requests.secondViewNewContentUris.includes(review.targetPair?.second.contentUri ?? ""), "The camera pan must request new content for the second target.");
+  const targetPair = review.targetPair;
+  assert.ok(targetPair, "The review must report two selected footprint targets.");
+  assert.ok(targetPair.distanceMeters >= 20, "The test must pan between separated footprint targets.");
+  assert.ok(!requests.firstViewContentUris.includes(targetPair.second.contentUri), "The second target must not be prefetched before the pan.");
+  assert.ok(requests.secondViewNewContentUris.includes(targetPair.second.contentUri), "The camera pan must request new content for the second target.");
   assert.ok(requests.secondViewLoadedNewContent, "The second viewport must cause at least one new content request.");
   assert.ok(requests.cumulativeUniqueContentUris.length < (review.input?.contentCount ?? 0), "The two-view sample must remain a subset of package content.");
   assert.equal(requests.fullPackageFetched, false);
