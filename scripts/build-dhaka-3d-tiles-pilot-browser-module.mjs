@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -56,9 +56,22 @@ export async function buildDhaka3DTilesPilotBrowserModule({
   try {
     await rename(temporaryPath, outputPath);
   } catch (error) {
-    const { rm } = await import("node:fs/promises");
-    await rm(temporaryPath, { force: true });
-    throw error;
+    // Windows does not always replace an existing destination during rename.
+    // The destination was checked above and the temp file is complete, so use a
+    // guarded replacement fallback for existing regular files only.
+    const code = error && typeof error === "object" && "code" in error ? error.code : null;
+    if (process.platform === "win32" && (code === "EEXIST" || code === "EPERM")) {
+      try {
+        await unlink(outputPath);
+        await rename(temporaryPath, outputPath);
+      } catch (replacementError) {
+        await rm(temporaryPath, { force: true });
+        throw replacementError;
+      }
+    } else {
+      await rm(temporaryPath, { force: true });
+      throw error;
+    }
   }
 
   return {
