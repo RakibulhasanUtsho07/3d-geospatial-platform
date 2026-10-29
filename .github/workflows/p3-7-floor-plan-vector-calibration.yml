@@ -10,6 +10,7 @@ on:
     paths:
       - "src/core/building-generation/floor-plan-raster-vector-calibration.mjs"
       - "src/core/building-generation/floor-plan-review-payload.mjs"
+      - "src/core/building-generation/floor-plan-review-payload.d.mts"
       - "src/app/experimental/floor-plan-review/page.tsx"
       - "tests/floor-plan-review-payload.test.mjs"
       - "src/core/building-generation/floor-plan-model.mjs"
