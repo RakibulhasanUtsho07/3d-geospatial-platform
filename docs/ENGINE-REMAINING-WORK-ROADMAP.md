@@ -79,9 +79,11 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ### Phase 7 — P3.7: Floor-plan to interior model review pipeline
 
-**Scope:** audit PR #80 and current raster-line proposals. Keep detected lines as suggestions until reviewed; add explicit scale calibration, vector review, room/wall/door/window semantics, measured-vector GLB validation, and floor-plan source-to-candidate hash linkage.
+**Current candidate slice:** branch `feat/p3-7-floor-plan-vector-calibration` includes the hash-bound raster-proposal-to-metre-vector converter, exact source/proposal SHA-256 binding, complete line-candidate decisions, reviewed room/wall geometry, room-boundary closure checks, in-memory GLB geometry preflight, and local interactive editor at `/experimental/floor-plan-review`. The editor can adjust wall endpoints and room polygons, record two-point scale evidence, set origin/placement/level values explicitly, and add reviewed door/window intervals. It only downloads a review JSON and makes no API requests. PR #276 remains Draft pending fresh exact-head focused/full CI and evidence review.
 
-**Acceptance gates:** synthetic and real sample fixtures; false-line/closed-room/scale tests; dimension comparison to independently measured plan; human review required before publication. Automatic PDF rasterization and CAD/IFC/BIM import remain separate backlog items until implemented.
+**Remaining scope:** add rights-cleared real floor-plan fixtures and human-reviewed screenshots; test false-line rejection and split wall segments on real drawings; connect review exports to candidate generation and render/geometry QA; improve opening placement/visualization and floor-plan source lineage. PDF rasterization and CAD/IFC/BIM import remain separate backlog items.
+
+**Acceptance gates:** synthetic and rights-cleared real plan fixtures; full candidate-review completeness; false-line/closed-room/scale regressions; geometry validity; dimension comparison to an independently measured plan; exact source and proposal hashes; fixed-camera render plus human review. Scale evidence, surveyed placement and publication approval are separate gates; this slice cannot auto-publish.
 
 ### Phase 8 — P3.8: Generation job and publication production hardening
 
