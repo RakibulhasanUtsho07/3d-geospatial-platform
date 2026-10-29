@@ -576,6 +576,8 @@ jobs:
 
       - name: Test multi-building Dhaka 3D Tiles package, hashes and failure gates
         run: npm run test:dhaka-3d-tiles-package
+      - name: Test per-tile Dhaka 3D Tiles footprint and placement residuals
+        run: npm run test:dhaka-3d-tiles-package-alignment
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
 
