@@ -389,7 +389,7 @@ export async function reviewDhaka3DTilesPackagePlacement({
   const sourceFile = path.resolve(sourcePath);
   const packageRoot = path.resolve(packageDirectory);
   const outputFile = path.resolve(outputPath);
-  if (!within(projectRoot, sourceFile)) throw new Error("Refusing to read placement source outside the repository.");
+  if (!within(projectRoot, sourceFile) && !within(os.tmpdir(), sourceFile)) throw new Error("Refusing to read placement source outside the repository or OS temp directory.");
   if (!within(projectRoot, packageRoot) && !within(os.tmpdir(), packageRoot)) throw new Error("Refusing to read package outside the repository or OS temp directory.");
   if (!within(projectRoot, outputFile) && !within(os.tmpdir(), outputFile)) throw new Error("Refusing to write placement evidence outside the repository or OS temp directory.");
   if (!Number.isFinite(maxResidualMeters) || maxResidualMeters <= 0 || maxResidualMeters > 5) {
