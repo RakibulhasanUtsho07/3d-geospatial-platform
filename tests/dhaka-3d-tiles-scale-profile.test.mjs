@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -117,6 +117,28 @@ test("fails closed on malformed source data and invalid profile bounds", async (
     await assert.rejects(
       runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [1], toleranceMeters: 6 }),
       /toleranceMeters must be finite/,
+    );
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("rejects source files reached through symlinked parent directories", async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), "p3-6-scale-profile-symlink-parent-"));
+  try {
+    const realDirectory = path.join(temp, "real");
+    const aliasDirectory = path.join(temp, "alias");
+    await mkdir(realDirectory);
+    const actualSource = path.join(realDirectory, "source.geojson");
+    await writeFile(actualSource, JSON.stringify(sourceFixture()) + "\n");
+    await symlink(realDirectory, aliasDirectory, "dir");
+
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({
+        sourcePath: path.join(aliasDirectory, "source.geojson"),
+        featureCounts: [1],
+      }),
+      /Source GeoJSON must not traverse symlinked or non-directory parents/,
     );
   } finally {
     await rm(temp, { recursive: true, force: true });
