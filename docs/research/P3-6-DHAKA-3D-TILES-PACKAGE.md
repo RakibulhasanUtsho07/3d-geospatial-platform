@@ -110,6 +110,18 @@ The dedicated workflow now exercises the authoritative `Dhaka3DTilesPilotControl
 **Exact-head validation:** this browser harness and its source-copy builder have just been added. The exact current PR-head run must pass before the browser lifecycle gate is marked complete.
 
 **Limitations:** the late-result test validates stale-result cleanup after a real loader completes; it does not prove Cesium's underlying network request is immediately abortable. It still does not establish real-building height, architectural accuracy, source rights, or production readiness.
+## Per-tile GLB footprint and placement residual review (new)
+
+The new `scripts/review-dhaka-3d-tiles-package-alignment.mjs` reviewer complements package integrity by decoding each emitted GLB POSITION accessor, applying the corresponding child 4×4 ECEF transform, converting transformed coordinates back to WGS84 geodetic coordinates, and comparing the resulting mesh-footprint vertices with the exact source feature identified by the manifest.
+
+- It re-checks the package-integrity gate and cross-binds the full source SHA-256, each feature SHA-256, GLB SHA-256, child URI, and tileset/build-manifest source identity before measuring geometry.
+- It measures source-to-mesh and mesh-to-source nearest-vertex horizontal residuals per emitted tile; checks every transformed ground/top vertex against the child `boundingVolume.region`; and records the ellipsoid-height range and transform residual for ground and synthetic top vertices.
+- Default horizontal residual threshold is 0.5 m, chosen as a bounded diagnostic for the builder's local degree-to-metre approximation; ECEF-to-ellipsoid height residual threshold is 0.05 m. These are engineering checks, not independent survey tolerances.
+- CLI: `npm run review:dhaka-3d-tiles-package-alignment -- --source data/overture/dhaka-buildings-3d-pilot.geojson --package data/overture/dhaka-3d-tiles-multibuilding-pilot --output /tmp/dhaka-3d-tiles-package-alignment-review.json`.
+- Tests cover a convex footprint, a concave footprint, MultiPolygon geometry, exact source/package hash binding, a deliberately shifted child ECEF transform whose file hashes have been recomputed, and a wrong source dataset.
+- The dedicated P3.6 workflow runs the test suite, runs the reviewer on its bounded real-Dhaka package, and uploads the machine-readable per-tile residual report separately from the package artifact.
+
+**Interpretation limit:** the source GeoJSON carries 2D horizontal footprints. The vertical comparison only verifies transformation against the WGS84 ellipsoid and the explicitly synthetic extrusion; it is not a comparison to surveyed ground/top elevations. A pass does not establish rendered appearance, architecture fidelity, source rights, or production readiness. Exact-head CI and a review of its evidence are required before this new gate is marked passed.
 ## Remaining production acceptance gates
 
 This implementation does **not** complete P3.6 production acceptance. Before integrating this package into ordinary map loading, require:
