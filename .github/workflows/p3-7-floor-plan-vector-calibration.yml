@@ -13,6 +13,7 @@ on:
       - "src/core/building-generation/floor-plan-review-payload.d.mts"
       - "src/app/experimental/floor-plan-review/page.tsx"
       - "tests/floor-plan-review-payload.test.mjs"
+      - "tests/browser/floor-plan-review.spec.ts"
       - "src/core/building-generation/floor-plan-model.mjs"
       - "scripts/calibrate-floor-plan-raster-vectors.mjs"
       - "tests/floor-plan-raster-vector-calibration.test.mjs"
@@ -65,4 +66,4 @@ jobs:
         run: npm run test:floor-plan-raster-line-proposals && npm run test:floor-plan-raster-line-job
 
       - name: Lint the P3.7 implementation and regression suite
-        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs src/core/building-generation/floor-plan-review-payload.mjs src/app/experimental/floor-plan-review/page.tsx scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs tests/floor-plan-review-payload.test.mjs
+        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs src/core/building-generation/floor-plan-review-payload.mjs src/app/experimental/floor-plan-review/page.tsx scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs tests/floor-plan-review-payload.test.mjs tests/browser/floor-plan-review.spec.ts

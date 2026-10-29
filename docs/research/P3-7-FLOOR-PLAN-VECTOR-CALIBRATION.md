@@ -63,3 +63,10 @@ Route: `/experimental/floor-plan-review`.
 7. Export the review JSON, then run the calibration CLI below using the original image file, proposal report and exported review JSON.
 
 The route is a local review aid rather than an authenticated web service. It stores no review to the server and does not verify a person's identity. Review flags are operator assertions, not a digital signature. Never infer a real scale, placement or datum from the UI; the reviewer must cite measured evidence. Exports remain drafts and all publication/release flags stay false.
+
+
+## Browser regression coverage
+
+The production-server Playwright suite includes `tests/browser/floor-plan-review.spec.ts`. It uses a generated synthetic raster and source-bound proposal fixture to verify that modified source bytes block the review, exact source bytes unlock the local canvas, every detector line is explicitly decided, a false annotation can be rejected without breaking the room perimeter, a reviewer can draw/review a room and supply explicit scale/placement inputs, and a hash-bound review-only JSON download is emitted. It also asserts that the editor makes no `/api/` requests. The normal `npm run test:map-browser` command discovers this suite when the production Next.js server is running.
+
+This is synthetic interaction evidence only. It does not prove that the vectors correspond to a real architectural plan or that the scale/placement is surveyed.
