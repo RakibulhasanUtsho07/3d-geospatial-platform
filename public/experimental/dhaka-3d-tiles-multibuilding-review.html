@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-review-status="loading">
+<html lang="en" data-review-status="loading" data-review-stage="loading">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +40,10 @@
     function setStatus(status, message) {
       document.documentElement.dataset.reviewStatus = status;
       statusNode.textContent = message;
+    }
+
+    function setStage(stage) {
+      document.documentElement.dataset.reviewStage = stage;
     }
 
     async function fetchBytes(url) {
@@ -264,6 +268,19 @@
       if (firstViewUris.length >= contentUris.length) throw new Error("The first viewport fetched the full package; selective loading was not demonstrated.");
       if (firstViewUris.includes(secondTarget.tile.contentUri)) throw new Error("The separated second target was already fetched before the camera moved.");
 
+      setStage("first-view-ready");
+      statusNode.textContent = "FIRST VIEW READY · " + firstViewUris.length + " GLB(s) · " + firstTarget.tile.featureId;
+      if (new URLSearchParams(window.location.search).get("pauseAfterFirstViewport") === "1") {
+        await new Promise((resolve, reject) => {
+          const eventName = "p36-continue-after-first-view";
+          const timer = window.setTimeout(() => reject(new Error("Timed out waiting for first-viewport screenshot capture.")), 60_000);
+          window.addEventListener(eventName, () => {
+            window.clearTimeout(timer);
+            resolve(undefined);
+          }, { once: true });
+        });
+      }
+
       const visibleBeforeSecondView = diagnostics.tileVisibleCount;
       const secondAltitude = positionCamera(viewer, secondTarget);
       await waitForViewport(viewer, tilesetRuntime, diagnostics, secondTarget.tile.contentUri, visibleBeforeSecondView);
@@ -334,6 +351,7 @@
         ],
         releaseFlags: build.releaseFlags
       };
+      setStage("second-view-ready");
       resultNode.textContent = JSON.stringify(result);
       setStatus("ready", "PASS · " + firstViewUris.length + " initial GLB(s), +" + secondViewNewUris.length + " new after pan, " + contentUris.length + " in package · " + Math.round(pair.distanceMeters) + " m apart");
       viewer.scene.requestRender();
@@ -341,6 +359,7 @@
 
     main().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
+      setStage("error");
       resultNode.textContent = JSON.stringify({
         schemaVersion: 1,
         evidenceType: "p3.6-live-cesium-multitile-selective-viewport",

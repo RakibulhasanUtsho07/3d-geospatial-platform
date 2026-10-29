@@ -73,13 +73,33 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  const response = await page.goto(REVIEW_URL, { waitUntil: "load", timeout: 60_000 });
+  const response = await page.goto(`${REVIEW_URL}?pauseAfterFirstViewport=1`, { waitUntil: "load", timeout: 60_000 });
   assert.equal(response?.status(), 200, "The experimental multi-tile review page must be served.");
 
+  // Capture a real fixed-camera frame for the initial viewport before the page
+  // moves to the second target. The query flag pauses only this review run.
   await expect.poll(
-    () => page.locator("html").getAttribute("data-review-status"),
+    () => page.locator("html").getAttribute("data-review-stage"),
     { timeout: 120_000, intervals: [250, 500, 1000] },
-  ).toMatch(/^(ready|error)$/);
+  ).toMatch(/^(first-view-ready|error)$/);
+  const firstStage = await page.locator("html").getAttribute("data-review-stage");
+  if (firstStage === "error") {
+    const failedReview = await readReview(page);
+    throw new Error("Multi-tile browser review failed before first-view capture: " + JSON.stringify(failedReview));
+  }
+
+  const firstScreenshotName = "multitile-first-viewport-review.png";
+  const firstScreenshotPath = path.join(OUTPUT_DIRECTORY, firstScreenshotName);
+  await page.screenshot({ path: firstScreenshotPath, fullPage: false, animations: "disabled" });
+  const firstScreenshotBytes = await readFile(firstScreenshotPath);
+  assert.ok(firstScreenshotBytes.length > 1000, "The first viewport evidence screenshot should contain a real render.");
+
+  // Resume the same live Cesium session and let it pan to the second target.
+  await page.evaluate(() => window.dispatchEvent(new Event("p36-continue-after-first-view")));
+  await expect.poll(
+    () => page.locator("html").getAttribute("data-review-stage"),
+    { timeout: 120_000, intervals: [250, 500, 1000] },
+  ).toMatch(/^(second-view-ready|error)$/);
 
   const review = await readReview(page);
   assert.equal(review.status, "pass", "Multi-tile browser review failed: " + JSON.stringify(review));
@@ -119,17 +139,17 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     automaticApproval: false,
   });
 
-  const screenshotName = "multitile-two-viewport-review.png";
+  const screenshotName = "multitile-second-viewport-review.png";
   const screenshotPath = path.join(OUTPUT_DIRECTORY, screenshotName);
   await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled" });
   const screenshotBytes = await readFile(screenshotPath);
-  assert.ok(screenshotBytes.length > 1000, "The evidence screenshot should contain a real render.");
+  assert.ok(screenshotBytes.length > 1000, "The second viewport evidence screenshot should contain a real render.");
 
   const reportText = JSON.stringify(review, null, 2) + "\n";
   const reportPath = path.join(OUTPUT_DIRECTORY, "multitile-browser-review.json");
   await writeFile(reportPath, reportText, "utf8");
   const evidenceManifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     evidenceType: "p3.6-multitile-browser-evidence-manifest",
     status: "pass",
     commit: process.env.GITHUB_SHA ?? null,
@@ -143,6 +163,21 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     inputs: review.input,
     selectiveFetch: review.viewportRequests,
     runtimeDiagnostics: review.runtimeDiagnostics,
+    screenshots: [
+      {
+        stage: "first-viewport",
+        path: firstScreenshotName,
+        bytes: firstScreenshotBytes.length,
+        sha256: sha256(firstScreenshotBytes),
+      },
+      {
+        stage: "second-viewport",
+        path: screenshotName,
+        bytes: screenshotBytes.length,
+        sha256: sha256(screenshotBytes),
+      },
+    ],
+    // Retain the previous field name for consumers that only display one frame.
     screenshot: { path: screenshotName, bytes: screenshotBytes.length, sha256: sha256(screenshotBytes) },
     reviewReport: { path: "multitile-browser-review.json", bytes: Buffer.byteLength(reportText), sha256: sha256(reportText) },
     limitations: review.limitations,
