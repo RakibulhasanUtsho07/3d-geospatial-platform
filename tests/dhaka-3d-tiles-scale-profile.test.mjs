@@ -92,3 +92,33 @@ test("profiles small packages with integrity/alignment evidence and false releas
     await rm(temp, { recursive: true, force: true });
   }
 });
+
+
+test("fails closed on malformed source data and invalid profile bounds", async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), "p3-6-scale-profile-invalid-"));
+  try {
+    const malformedPath = path.join(temp, "malformed.geojson");
+    await writeFile(malformedPath, "{not-json\\n");
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({ sourcePath: malformedPath, featureCounts: [1] }),
+      SyntaxError,
+    );
+
+    const validPath = path.join(temp, "valid.geojson");
+    await writeFile(validPath, JSON.stringify(sourceFixture()) + "\\n");
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [] }),
+      /featureCounts must be a non-empty array/,
+    );
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [1], syntheticHeightMeters: 0 }),
+      /syntheticHeightMeters must be finite/,
+    );
+    await assert.rejects(
+      runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [1], toleranceMeters: 6 }),
+      /toleranceMeters must be finite/,
+    );
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
