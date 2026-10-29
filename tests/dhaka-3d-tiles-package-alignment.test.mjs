@@ -144,6 +144,42 @@ test("detects a shifted GLB perimeter even when all content hashes are consisten
   assert.ok(report.tiles.some((item) => item.contentUri === uri && item.status === "fail"));
 });
 
+test("rejects a degenerate indexed triangle even when GLB and package hashes are rebound", async () => {
+  const damagedPath = path.join(root, "degenerate-triangle-package");
+  await cp(packagePath, damagedPath, { recursive: true });
+  const manifestPath = path.join(damagedPath, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const uri = manifest.tiles[0].contentUri;
+  const glbPath = path.join(damagedPath, uri);
+  const bytes = await readFile(glbPath);
+  const jsonLength = bytes.readUInt32LE(12);
+  const binaryChunkHeader = 20 + jsonLength;
+  const binaryOffset = binaryChunkHeader + 8;
+  const gltf = JSON.parse(bytes.toString("utf8", 20, 20 + jsonLength));
+  const primitive = gltf.meshes[0].primitives[0];
+  const indexAccessor = gltf.accessors[primitive.indices];
+  assert.equal(indexAccessor.componentType, 5125, "Fixture should expose uint32 triangle indices.");
+  const indexView = gltf.bufferViews[indexAccessor.bufferView];
+  const indexOffset = binaryOffset + (indexView.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0);
+  const firstIndex = bytes.readUInt32LE(indexOffset);
+  // Collapse the first triangle to one point without changing GLB byte lengths.
+  bytes.writeUInt32LE(firstIndex, indexOffset + 4);
+  bytes.writeUInt32LE(firstIndex, indexOffset + 8);
+  await writeFile(glbPath, bytes);
+
+  const nextHash = sha256(bytes);
+  manifest.files[uri] = { sha256: nextHash, bytes: bytes.length };
+  const tile = manifest.tiles.find((item) => item.contentUri === uri);
+  tile.contentSha256 = nextHash;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) => /degenerate triangles/.test(error)));
+  assert.ok(report.tiles.some((item) => item.contentUri === uri &&
+    item.degenerateTriangleCount > 0 && item.status === "fail"));
+});
+
 test("rejects a wrong source dataset before producing an alignment pass", async () => {
   const wrongSourcePath = path.join(root, "different-source.geojson");
   await writeFile(wrongSourcePath, JSON.stringify({ type: "FeatureCollection", features: [] }), "utf8");
