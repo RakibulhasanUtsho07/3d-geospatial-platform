@@ -10,14 +10,20 @@ on:
     paths:
       - "scripts/build-dhaka-3d-tiles-package.mjs"
       - "scripts/verify-dhaka-3d-tiles-package.mjs"
+      - "scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs"
+      - "src/core/map-engine/dhaka-3d-tiles-pilot-controller.mjs"
       - "src/core/geospatial/tileset-package-integrity.mjs"
       - "src/core/geospatial/tileset-manifest-validation.mjs"
       - "tests/dhaka-3d-tiles-package.test.mjs"
+      - "tests/dhaka-3d-tiles-pilot-browser-module.test.mjs"
+      - "tests/dhaka-3d-tiles-pilot-controller.test.mjs"
+      - "tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
       - "data/overture/dhaka-buildings-3d-pilot.geojson"
       - "package.json"
       - "package-lock.json"
       - "docs/research/P3-6-DHAKA-3D-TILES-PACKAGE.md"
       - "public/experimental/dhaka-3d-tiles-multibuilding-review.html"
+      - "public/experimental/dhaka-3d-tiles-controller-lifecycle-review.html"
       - "tests/browser/dhaka-3d-tiles-multitile.spec.ts"
       - ".github/workflows/p3-6-dhaka-3d-tiles-package.yml"
   workflow_dispatch:
@@ -55,6 +61,9 @@ jobs:
       - name: Test lifecycle races, bounded retry and explicit fallback
         run: npm run test:dhaka-3d-tiles-pilot-controller
 
+      - name: Test generated browser-module source synchronization and symlink rejection
+        run: npm run test:dhaka-3d-tiles-pilot-browser-module
+
       - name: Build bounded multi-building package from the repository Dhaka extract
         run: >-
           npm run build:dhaka-3d-tiles-package --
@@ -80,6 +89,8 @@ jobs:
           const base = "http://127.0.0.1:3000";
           const routes = [
             "/experimental/dhaka-3d-tiles-multibuilding-review.html",
+            "/experimental/dhaka-3d-tiles-controller-lifecycle-review.html",
+            "/experimental/dhaka-3d-tiles-pilot-controller.mjs",
             "/experimental/dhaka-3d-tiles-multibuilding-pilot/tileset.json",
             "/experimental/dhaka-3d-tiles-multibuilding-pilot/build-manifest.json"
           ];
@@ -108,6 +119,9 @@ jobs:
       - name: Verify real Cesium multi-tile selective viewport fetching
         run: npm run test:dhaka-3d-tiles-multitile-browser
 
+      - name: Verify controller fallback, terminal failure and late-result cleanup in live Cesium
+        run: npm run test:dhaka-3d-tiles-controller-lifecycle-browser
+
       - name: Upload multi-tile browser evidence and server diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -115,6 +129,7 @@ jobs:
           name: p3-6-dhaka-multitile-browser-evidence
           path: |
             artifacts/p3.6-multitile-browser/
+            artifacts/p3.6-controller-browser/
             /tmp/p3-6-next-server.log
           if-no-files-found: warn
           retention-days: 14
