@@ -170,7 +170,7 @@ test("GLB payloads are valid binary glTF with non-empty triangle geometry", asyn
 
 test("preserves courtyard void area and emits the interior boundary walls", async () => {
   const manifest=JSON.parse(await readFile(path.join(packageA,"build-manifest.json"),"utf8"));
-  const tile=manifest.tiles.find(item=>item.id==="has-hole");
+  const tile=manifest.tiles.find(item=>item.featureId==="has-hole");
   assert.ok(tile,"The valid polygon with a courtyard hole must be emitted.");
   const bytes=await readFile(path.join(packageA,tile.contentUri));
   const jsonLength=bytes.readUInt32LE(12),gltf=JSON.parse(bytes.toString("utf8",20,20+jsonLength));
