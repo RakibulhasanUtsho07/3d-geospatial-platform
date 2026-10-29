@@ -94,7 +94,7 @@ The opt-in `Dhaka3DTilesPilotController` now has explicit and bounded loading po
 
 The controller still uses Cesium's public `fromUrl()` loader, which is not abortable here. Generation invalidation prevents stale attachment but cannot guarantee that an underlying network request stops immediately. These lifecycle tests use injected loaders and mock primitive collections; they prove controller policy, not a deployed browser's network cancellation behavior.
 
-The dedicated P3.6 workflow now explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` in addition to package-integrity and live Cesium browser validation. The dedicated workflow now runs 20 lifecycle scenarios, including runtime feature-flag shutdown while a different source is in flight. Disabling the flag via `enable()` removes the already attached experimental tileset and invalidates pending loads; the exact-head workflow must pass before the lifecycle slice is marked validated.
+The dedicated P3.6 workflow explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` alongside package-integrity checks and live Cesium browser validation. The focused suite now has 23 lifecycle scenarios. Recent regression coverage verifies runtime feature-flag shutdown while another source is in flight; explicit destruction when `PrimitiveCollection.remove()` succeeds with `destroyPrimitives=false`; partial insertion cleanup under that same configuration; and non-fatal `requestRender()` errors during viewer teardown. A passing exact-head workflow is still required before this lifecycle slice is considered validated.
 
 ## Remaining production acceptance gates
 
