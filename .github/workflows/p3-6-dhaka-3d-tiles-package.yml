@@ -1,0 +1,214 @@
+name: P3.6 Dhaka multi-building 3D Tiles package
+
+on:
+  push:
+    branches:
+      - feat/p3-6-multibuilding-tiles-package
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "scripts/build-dhaka-3d-tiles-package.mjs"
+      - "scripts/verify-dhaka-3d-tiles-package.mjs"
+      - "scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs"
+      - "scripts/review-dhaka-3d-tiles-package-alignment.mjs"
+      - "scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs"
+      - "src/core/map-engine/dhaka-3d-tiles-pilot-controller.mjs"
+      - "src/core/geospatial/tileset-package-integrity.mjs"
+      - "src/core/geospatial/tileset-manifest-validation.mjs"
+      - "tests/dhaka-3d-tiles-package.test.mjs"
+      - "tests/dhaka-3d-tiles-pilot-browser-module.test.mjs"
+      - "tests/dhaka-3d-tiles-package-alignment.test.mjs"
+      - "tests/dhaka-3d-tiles-scale-profile.test.mjs"
+      - "tests/dhaka-3d-tiles-pilot-controller.test.mjs"
+      - "tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts"
+      - "data/overture/dhaka-buildings-3d-pilot.geojson"
+      - "package.json"
+      - "package-lock.json"
+      - "docs/research/P3-6-DHAKA-3D-TILES-PACKAGE.md"
+      - "public/experimental/dhaka-3d-tiles-multibuilding-review.html"
+      - "public/experimental/dhaka-3d-tiles-controller-lifecycle-review.html"
+      - "tests/browser/dhaka-3d-tiles-multitile.spec.ts"
+      - ".github/workflows/p3-6-dhaka-3d-tiles-package.yml"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p3-6-dhaka-tiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-integrity:
+    name: Build and verify bounded real-Dhaka source package
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      TILE_PACKAGE_DIR: /tmp/dhaka-3d-tiles-multibuilding-pilot
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run deterministic synthetic-package and failure-injection tests
+        run: npm run test:dhaka-3d-tiles-package
+
+      - name: Test lifecycle races, bounded retry and explicit fallback
+        run: npm run test:dhaka-3d-tiles-pilot-controller
+
+      - name: Test generated browser-module source synchronization and symlink rejection
+        run: npm run test:dhaka-3d-tiles-pilot-browser-module
+
+      - name: Test per-tile footprint and placement residual reviewer
+        run: npm run test:dhaka-3d-tiles-package-alignment
+
+      - name: Test bounded scale-profile parser, metrics and fail-closed behavior
+        run: npm run test:dhaka-3d-tiles-scale-profile
+
+      - name: Build bounded multi-building package from the repository Dhaka extract
+        run: >-
+          npm run build:dhaka-3d-tiles-package --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --output "$TILE_PACKAGE_DIR"
+          --max-features 32
+          --height-meters 8
+
+      - name: Verify all generated source, tileset and GLB integrity records
+        run: npm run verify:dhaka-3d-tiles-package -- --package "$TILE_PACKAGE_DIR"
+
+      - name: Measure each emitted GLB footprint against source geometry
+        run: >-
+          npm run review:dhaka-3d-tiles-package-alignment --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --package "$TILE_PACKAGE_DIR"
+          --output /tmp/dhaka-3d-tiles-package-alignment-review.json
+
+      - name: Profile package size, integrity, placement and wall time at 32/64/128 contents
+        env:
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          npm run benchmark:dhaka-3d-tiles-scale-profile --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --feature-counts 32,64,128
+          --height-meters 8
+          --tolerance-meters 0.5
+          --report /tmp/p3-6-dhaka-scale-profile.json
+
+      - name: Build production app with the multi-tile review package
+        run: npm run build
+
+      - name: Install Chromium for live multi-tile rendering test
+        run: npx playwright install chromium
+
+      - name: Start production server for the browser review
+        run: |
+          npm run start -- --hostname 127.0.0.1 > /tmp/p3-6-next-server.log 2>&1 &
+          echo $! > /tmp/p3-6-next-server.pid
+          node --input-type=module <<'NODE'
+          const base = "http://127.0.0.1:3000";
+          const routes = [
+            "/experimental/dhaka-3d-tiles-multibuilding-review.html",
+            "/experimental/dhaka-3d-tiles-controller-lifecycle-review.html",
+            "/experimental/dhaka-3d-tiles-pilot-controller.mjs",
+            "/experimental/dhaka-3d-tiles-multibuilding-pilot/tileset.json",
+            "/experimental/dhaka-3d-tiles-multibuilding-pilot/build-manifest.json"
+          ];
+          const deadline = Date.now() + 60000;
+          let ready = false;
+          while (Date.now() < deadline) {
+            try {
+              const responses = await Promise.all(routes.map((route) =>
+                fetch(base + route, { signal: AbortSignal.timeout(10000) })
+              ));
+              if (responses.every((response) => response.status === 200)) {
+                ready = true;
+                break;
+              }
+            } catch {
+              // Next.js is still starting.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          if (!ready) {
+            console.error("Production server did not serve the multi-tile review page and package manifest.");
+            process.exit(1);
+          }
+          NODE
+
+      - name: Verify real Cesium multi-tile selective viewport fetching
+        env:
+          # On pull_request, GITHUB_SHA is the synthetic merge commit. Store
+          # the proposed source head separately so artifact provenance is unambiguous.
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run test:dhaka-3d-tiles-multitile-browser
+
+      - name: Verify controller fallback, terminal failure and late-result cleanup in live Cesium
+        env:
+          # GITHUB_SHA can be the synthetic merge commit for pull_request.
+          # Bind lifecycle browser evidence to the proposed source head explicitly.
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: npm run test:dhaka-3d-tiles-controller-lifecycle-browser
+
+      - name: Upload multi-tile selective-fetch browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-multitile-browser-evidence
+          path: artifacts/p3.6-multitile-browser/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload controller lifecycle browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-controller-lifecycle-browser-evidence
+          path: artifacts/p3.6-controller-browser/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload production server diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-browser-server-diagnostics
+          path: /tmp/p3-6-next-server.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload per-tile footprint and placement residual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-package-alignment-evidence
+          path: /tmp/dhaka-3d-tiles-package-alignment-review.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload bounded 32/64/128 scale-profile evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-3d-tiles-scale-profile
+          path: /tmp/p3-6-dhaka-scale-profile.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload generated pilot package for inspection (not publication)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-6-dhaka-multibuilding-3d-tiles-pilot
+          path: /tmp/dhaka-3d-tiles-multibuilding-pilot/
+          if-no-files-found: warn
+          retention-days: 14

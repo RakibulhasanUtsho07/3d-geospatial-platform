@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en" data-review-status="loading" data-review-stage="loading">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P3.6 — Multi-tile Cesium viewport validation</title>
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #08111f; color: #e5edf8; }
+    #review-map { width: 100%; height: 100%; background: #09111f; }
+    #review-map .cesium-viewer, #review-map .cesium-widget, #review-map canvas { width: 100%; height: 100%; }
+    header { position: absolute; z-index: 20; top: 14px; left: 14px; max-width: min(520px, calc(100vw - 28px)); padding: 13px 16px; border: 1px solid #35455d; border-radius: 10px; background: rgba(8, 17, 31, .92); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+    h1 { margin: 0; font-size: 15px; font-weight: 650; }
+    p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: #b4c2d4; }
+    #review-status { margin-top: 8px; font-size: 12px; color: #a7f3d0; overflow-wrap: anywhere; }
+    #review-result { display: none; }
+  </style>
+  <script>window.CESIUM_BASE_URL = "/cesium/";</script>
+  <script src="/cesium/Cesium.js"></script>
+</head>
+<body>
+  <header>
+    <h1>P3.6 · Multi-tile viewport fetch validation</h1>
+    <p>The camera visits two separated Dhaka footprint targets. This page records child-content requests and runtime tile events; it does not certify real building height or architectural accuracy.</p>
+    <div id="review-status" role="status">Verifying package manifest…</div>
+  </header>
+  <div id="review-map" aria-label="Experimental multi-building 3D Tiles review"></div>
+  <pre id="review-result" aria-hidden="true"></pre>
+  <script>
+  (() => {
+    "use strict";
+    const PACKAGE_ROOT = "/experimental/dhaka-3d-tiles-multibuilding-pilot/";
+    const TILESET_URL = PACKAGE_ROOT + "tileset.json";
+    const BUILD_URL = PACKAGE_ROOT + "build-manifest.json";
+    const statusNode = document.getElementById("review-status");
+    const resultNode = document.getElementById("review-result");
+
+    function setStatus(status, message) {
+      document.documentElement.dataset.reviewStatus = status;
+      statusNode.textContent = message;
+    }
+
+    function setStage(stage) {
+      document.documentElement.dataset.reviewStage = stage;
+    }
+
+    async function fetchBytes(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(url + " returned HTTP " + response.status);
+      return new Uint8Array(await response.arrayBuffer());
+    }
+
+    async function sha256Hex(bytes) {
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+    }
+
+    function parseJson(bytes, label) {
+      try {
+        return JSON.parse(new TextDecoder().decode(bytes));
+      } catch (error) {
+        throw new Error(label + " is invalid JSON: " + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+
+    function validatePackageContract(tileset, build) {
+      if (tileset?.asset?.version !== "1.1") throw new Error("The multi-tile package must declare OGC 3D Tiles 1.1.");
+      if (!tileset.root || !Array.isArray(tileset.root.children) || tileset.root.children.length < 2) {
+        throw new Error("The tileset must contain at least two child tiles to exercise selective viewport fetching.");
+      }
+      if (!Array.isArray(build.tiles) || build.tiles.length !== tileset.root.children.length) {
+        throw new Error("The tile manifest count does not match the tileset hierarchy.");
+      }
+      if (build.packageType !== "dhaka-multibuilding-3d-tiles-pilot") throw new Error("Unexpected build-manifest package type.");
+      if (tileset.asset.extras?.sourceSha256 !== build.source?.sha256) throw new Error("Source hash is not bound across manifest files.");
+      if (!build.releaseFlags || ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"].some((key) => build.releaseFlags[key] !== false)) {
+        throw new Error("All experimental package release flags must remain explicitly false.");
+      }
+      const manifestByUri = new Map(build.tiles.map((tile) => [tile.contentUri, tile]));
+      const seenUris = new Set();
+      for (const child of tileset.root.children) {
+        const uri = child?.content?.uri;
+        if (typeof uri !== "string" || !/^tiles\/[a-zA-Z0-9._-]+\.glb$/.test(uri) || uri.split("/").includes("..")) {
+          throw new Error("The tileset contains an unsafe or invalid child content URI.");
+        }
+        if (seenUris.has(uri)) throw new Error("The tileset repeats child content URI " + uri + ".");
+        seenUris.add(uri);
+        const item = manifestByUri.get(uri);
+        if (!item) throw new Error("Child content is missing from the build manifest: " + uri);
+        if (child.extras?.sourceFeatureId !== item.featureId ||
+            child.extras?.sourceFeatureSha256 !== item.featureSha256) {
+          throw new Error("Child source identity/hash does not match the build manifest: " + uri);
+        }
+        if (!/^[a-f0-9]{64}$/i.test(item.contentSha256 || "") || !Number.isSafeInteger(item.bytes) || item.bytes <= 0) {
+          throw new Error("Child content integrity metadata is invalid: " + uri);
+        }
+      }
+      return Array.from(seenUris);
+    }
+
+    function centerOf(bounds) {
+      return {
+        longitude: (bounds.west + bounds.east) / 2,
+        latitude: (bounds.south + bounds.north) / 2
+      };
+    }
+
+    function distanceMeters(left, right) {
+      const meanLatitude = (left.latitude + right.latitude) * Math.PI / 360;
+      const east = (left.longitude - right.longitude) * 111319.490793 * Math.cos(meanLatitude);
+      const north = (left.latitude - right.latitude) * 111132.92;
+      return Math.hypot(east, north);
+    }
+
+    function chooseSeparatedTargets(tiles) {
+      let best = null;
+      for (let left = 0; left < tiles.length; left += 1) {
+        for (let right = left + 1; right < tiles.length; right += 1) {
+          const leftCenter = centerOf(tiles[left].sourceBoundsDegrees);
+          const rightCenter = centerOf(tiles[right].sourceBoundsDegrees);
+          const distance = distanceMeters(leftCenter, rightCenter);
+          if (!best || distance > best.distanceMeters) {
+            best = { first: tiles[left], second: tiles[right], firstCenter: leftCenter, secondCenter: rightCenter, distanceMeters: distance };
+          }
+        }
+      }
+      if (!best || best.distanceMeters < 20) throw new Error("The emitted package does not provide two sufficiently separated tile targets.");
+      return best;
+    }
+
+    function createViewer() {
+      const viewer = new Cesium.Viewer("review-map", {
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+        baseLayer: false,
+        baseLayerPicker: false,
+        animation: false,
+        timeline: false,
+        geocoder: false,
+        homeButton: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        fullscreenButton: false,
+        infoBox: false,
+        selectionIndicator: false,
+        scene3DOnly: true,
+        requestRenderMode: false,
+        maximumRenderTimeChange: Infinity,
+        shouldAnimate: false
+      });
+      viewer.resize();
+      viewer.scene.globe.show = false;
+      viewer.scene.globe.enableLighting = false;
+      viewer.scene.fog.enabled = false;
+      viewer.scene.backgroundColor = Cesium.Color.fromCssColorString("#09111f");
+      if (viewer.scene.skyBox) viewer.scene.skyBox.show = false;
+      if (viewer.scene.skyAtmosphere) viewer.scene.skyAtmosphere.show = false;
+      if (viewer.scene.sun) viewer.scene.sun.show = false;
+      if (viewer.scene.moon) viewer.scene.moon.show = false;
+      viewer.scene.screenSpaceCameraController.enableInputs = false;
+      const rect = viewer.scene.canvas.getBoundingClientRect();
+      if (viewer.scene.canvas.width < 640 || viewer.scene.canvas.height < 400 || rect.width < 640 || rect.height < 400) {
+        throw new Error("Cesium canvas did not reach a usable browser viewport.");
+      }
+      return viewer;
+    }
+
+    function positionCamera(viewer, target) {
+      const span = Math.max(target.tile.widthMeters || 0, target.tile.depthMeters || 0);
+      const altitude = Math.max(65, span * 1.3);
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(target.center.longitude, target.center.latitude, altitude),
+        orientation: { heading: 0, pitch: -Math.PI / 2, roll: 0 }
+      });
+      viewer.scene.requestRender();
+      return altitude;
+    }
+
+    function observedContentPaths(expectedUris) {
+      const expectedPaths = new Map(expectedUris.map((uri) => [
+        new URL(uri, new URL(TILESET_URL, window.location.origin)).pathname,
+        uri
+      ]));
+      const paths = new Set();
+      for (const entry of performance.getEntriesByType("resource")) {
+        try {
+          const uri = expectedPaths.get(new URL(entry.name, window.location.origin).pathname);
+          if (uri) paths.add(uri);
+        } catch {
+          // Ignore browser resources with non-URL names.
+        }
+      }
+      return Array.from(paths).sort();
+    }
+
+    function waitForViewport(viewer, tileset, diagnostics, targetUri, visibleAtStart, timeoutMs = 45000) {
+      return new Promise((resolve, reject) => {
+        let readyFrames = 0;
+        let settled = false;
+        let timer;
+        let removePostRender;
+        const cleanup = () => {
+          if (timer !== undefined) clearTimeout(timer);
+          if (typeof removePostRender === "function") removePostRender();
+        };
+        const finish = (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          if (error) reject(error);
+          else resolve();
+        };
+        removePostRender = viewer.scene.postRender.addEventListener(() => {
+          const targetLoaded = observedContentPaths(diagnostics.contentUris).includes(targetUri);
+          const stageReady = targetLoaded && tileset.tilesLoaded === true &&
+            diagnostics.tileVisibleCount > visibleAtStart && diagnostics.tileFailed.length === 0;
+          readyFrames = stageReady ? readyFrames + 1 : 0;
+          if (readyFrames >= 2) {
+            finish();
+            return;
+          }
+          viewer.scene.requestRender();
+        });
+        timer = setTimeout(() => {
+          finish(new Error("Tile viewport did not settle for " + targetUri + ": " + JSON.stringify({
+            targetLoaded: observedContentPaths(diagnostics.contentUris).includes(targetUri),
+            tilesLoaded: tileset.tilesLoaded,
+            tileVisibleCount: diagnostics.tileVisibleCount,
+            tileFailed: diagnostics.tileFailed.slice(0, 3)
+          })));
+        }, timeoutMs);
+        viewer.scene.requestRender();
+      });
+    }
+
+    async function main() {
+      if (typeof Cesium === "undefined") throw new Error("Cesium did not load.");
+      const [tilesetBytes, buildBytes] = await Promise.all([fetchBytes(TILESET_URL), fetchBytes(BUILD_URL)]);
+      const tileset = parseJson(tilesetBytes, "tileset.json");
+      const build = parseJson(buildBytes, "build-manifest.json");
+      const tilesetSha256 = await sha256Hex(tilesetBytes);
+      const buildManifestSha256 = await sha256Hex(buildBytes);
+      const contentUris = validatePackageContract(tileset, build);
+      const pair = chooseSeparatedTargets(build.tiles);
+      const firstTarget = { tile: pair.first, center: pair.firstCenter };
+      const secondTarget = { tile: pair.second, center: pair.secondCenter };
+      const viewer = createViewer();
+      const diagnostics = { contentUris, tileLoadCount: 0, tileVisibleCount: 0, tileFailed: [] };
+      const tilesetRuntime = await Cesium.Cesium3DTileset.fromUrl(TILESET_URL, {
+        maximumScreenSpaceError: 8,
+        maximumMemoryUsage: 32,
+        preloadWhenHidden: false,
+        preloadFlightDestinations: false
+      });
+      tilesetRuntime.tileLoad.addEventListener(() => { diagnostics.tileLoadCount += 1; });
+      tilesetRuntime.tileVisible.addEventListener(() => { diagnostics.tileVisibleCount += 1; });
+      tilesetRuntime.tileFailed.addEventListener((event) => diagnostics.tileFailed.push({
+        url: typeof event?.url === "string" ? event.url : null,
+        message: typeof event?.message === "string" ? event.message : String(event)
+      }));
+      viewer.scene.primitives.add(tilesetRuntime);
+
+      const firstAltitude = positionCamera(viewer, firstTarget);
+      await waitForViewport(viewer, tilesetRuntime, diagnostics, firstTarget.tile.contentUri, diagnostics.tileVisibleCount);
+      const firstViewUris = observedContentPaths(contentUris);
+      if (!firstViewUris.includes(firstTarget.tile.contentUri)) throw new Error("The first viewport did not request its target tile.");
+      if (firstViewUris.length >= contentUris.length) throw new Error("The first viewport fetched the full package; selective loading was not demonstrated.");
+      if (firstViewUris.includes(secondTarget.tile.contentUri)) throw new Error("The separated second target was already fetched before the camera moved.");
+
+      setStage("first-view-ready");
+      statusNode.textContent = "FIRST VIEW READY · " + firstViewUris.length + " GLB(s) · " + firstTarget.tile.featureId;
+      if (new URLSearchParams(window.location.search).get("pauseAfterFirstViewport") === "1") {
+        await new Promise((resolve, reject) => {
+          const eventName = "p36-continue-after-first-view";
+          const timer = window.setTimeout(() => reject(new Error("Timed out waiting for first-viewport screenshot capture.")), 60_000);
+          window.addEventListener(eventName, () => {
+            window.clearTimeout(timer);
+            resolve(undefined);
+          }, { once: true });
+        });
+      }
+
+      const visibleBeforeSecondView = diagnostics.tileVisibleCount;
+      const secondAltitude = positionCamera(viewer, secondTarget);
+      await waitForViewport(viewer, tilesetRuntime, diagnostics, secondTarget.tile.contentUri, visibleBeforeSecondView);
+      const allFetchedUris = observedContentPaths(contentUris);
+      const secondViewNewUris = allFetchedUris.filter((uri) => !firstViewUris.includes(uri));
+      if (!allFetchedUris.includes(secondTarget.tile.contentUri)) throw new Error("The second viewport did not request its target tile.");
+      if (secondViewNewUris.length < 1) throw new Error("The second viewport did not trigger a new content request.");
+      if (allFetchedUris.length >= contentUris.length) throw new Error("The two viewport samples fetched every package tile; selectivity was not maintained.");
+      if (diagnostics.tileFailed.length > 0) throw new Error("Cesium reported child tile failures: " + JSON.stringify(diagnostics.tileFailed.slice(0, 3)));
+
+      const canvas = viewer.scene.canvas;
+      const view = {
+        width: canvas.width,
+        height: canvas.height,
+        cssWidth: canvas.getBoundingClientRect().width,
+        cssHeight: canvas.getBoundingClientRect().height
+      };
+      const result = {
+        schemaVersion: 1,
+        evidenceType: "p3.6-live-cesium-multitile-selective-viewport",
+        status: "pass",
+        runtime: {
+          cesiumVersion: Cesium.VERSION,
+          userAgent: navigator.userAgent,
+          viewport: view
+        },
+        input: {
+          sourceSha256: build.source.sha256,
+          tilesetSha256,
+          buildManifestSha256,
+          contentCount: contentUris.length,
+          hierarchyChildCount: tileset.root.children.length
+        },
+        targetPair: {
+          distanceMeters: Number(pair.distanceMeters.toFixed(3)),
+          first: {
+            featureId: firstTarget.tile.featureId,
+            contentUri: firstTarget.tile.contentUri,
+            center: firstTarget.center,
+            cameraAltitudeMeters: Number(firstAltitude.toFixed(3))
+          },
+          second: {
+            featureId: secondTarget.tile.featureId,
+            contentUri: secondTarget.tile.contentUri,
+            center: secondTarget.center,
+            cameraAltitudeMeters: Number(secondAltitude.toFixed(3))
+          }
+        },
+        viewportRequests: {
+          firstViewContentUris: firstViewUris,
+          secondViewNewContentUris: secondViewNewUris,
+          cumulativeUniqueContentUris: allFetchedUris,
+          firstViewSelectedSubset: firstViewUris.length < contentUris.length,
+          secondViewLoadedNewContent: secondViewNewUris.includes(secondTarget.tile.contentUri),
+          fullPackageFetched: allFetchedUris.length >= contentUris.length
+        },
+        runtimeDiagnostics: {
+          tileLoadEventCount: diagnostics.tileLoadCount,
+          tileVisibleEventCount: diagnostics.tileVisibleCount,
+          tileFailedCount: diagnostics.tileFailed.length,
+          tileFailed: diagnostics.tileFailed.slice(0, 5),
+          tilesLoadedAtCapture: tilesetRuntime.tilesLoaded === true
+        },
+        limitations: [
+          "Building heights are a synthetic uniform extrusion, not sourced or surveyed.",
+          "This validates Cesium loading, selective content fetch and package placement plumbing; it does not measure facade/roof accuracy or survey-grade geometry.",
+          "Browser resource timing identifies content resources requested by this viewport; this is not a city-scale performance benchmark."
+        ],
+        releaseFlags: build.releaseFlags
+      };
+      setStage("second-view-ready");
+      resultNode.textContent = JSON.stringify(result);
+      setStatus("ready", "PASS · " + firstViewUris.length + " initial GLB(s), +" + secondViewNewUris.length + " new after pan, " + contentUris.length + " in package · " + Math.round(pair.distanceMeters) + " m apart");
+      viewer.scene.requestRender();
+    }
+
+    main().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      setStage("error");
+      resultNode.textContent = JSON.stringify({
+        schemaVersion: 1,
+        evidenceType: "p3.6-live-cesium-multitile-selective-viewport",
+        status: "error",
+        error: message
+      });
+      setStatus("error", "FAILED · " + message);
+      console.error("[P3.6 multi-tile browser review]", error);
+    });
+  })();
+  </script>
+</body>
+</html>
