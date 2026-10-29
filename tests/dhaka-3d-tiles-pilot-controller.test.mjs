@@ -16,7 +16,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function mockScene({ removeReturns = true, addError = null } = {}) {
+function mockScene({ removeReturns = true, addError = null, destroyOnRemove = true } = {}) {
   const attached = new Set();
   const calls = { adds: 0, removes: 0, renders: 0 };
   return {
@@ -36,7 +36,7 @@ function mockScene({ removeReturns = true, addError = null } = {}) {
           if (!removeReturns || !attached.has(item)) return false;
           attached.delete(item);
           item.attached = false;
-          item.destroy();
+          if (destroyOnRemove) item.destroy();
           return true;
         },
       },
@@ -470,6 +470,56 @@ test("if primitive insertion mutates then throws, the partial scene attachment i
   assert.equal(tileset.destroyed, true);
   assert.equal(tileset.destroyCalls, 1);
   assert.equal(controller.getState().attached, false);
+  controller.destroy();
+});
+
+test("disable explicitly destroys tilesets when collection removal does not destroy primitives", async () => {
+  const tileset = mockTileset();
+  // Cesium PrimitiveCollection supports destroyPrimitives=false. The primitive
+  // is removed from the scene, but the owner must still release the resource.
+  const viewer = mockScene({ destroyOnRemove: false });
+  const { controller } = setup({ viewer, fromUrl: async () => tileset });
+
+  await controller.enable();
+  controller.disable();
+
+  assert.equal(viewer.attached.size, 0);
+  assert.equal(tileset.destroyed, true);
+  assert.equal(tileset.destroyCalls, 1);
+  assert.equal(controller.getState().attached, false);
+  controller.destroy();
+});
+
+test("partial primitive insertion is cleaned up when removal succeeds without destroying", async () => {
+  const tileset = mockTileset();
+  const viewer = mockScene({ destroyOnRemove: false });
+  viewer.scene.primitives.add = (item) => {
+    viewer.attached.add(item);
+    item.attached = true;
+    throw new Error("collection failed after insert");
+  };
+  const { controller } = setup({ viewer, fromUrl: async () => tileset });
+
+  await assert.rejects(controller.enable(), /collection failed after insert/);
+  assert.equal(viewer.attached.size, 0);
+  assert.equal(viewer.calls.removes, 1);
+  assert.equal(tileset.destroyed, true);
+  assert.equal(tileset.destroyCalls, 1);
+  controller.destroy();
+});
+
+test("requestRender exceptions do not turn successful attachment into a failed load", async () => {
+  const tileset = mockTileset();
+  const viewer = mockScene();
+  viewer.scene.requestRender = () => { throw new Error("scene is shutting down"); };
+  const { controller } = setup({ viewer, fromUrl: async () => tileset });
+
+  const result = await controller.enable();
+  assert.equal(result.status, "loaded");
+  assert.equal(controller.getState().attached, true);
+  controller.disable();
+  assert.equal(viewer.attached.size, 0);
+  assert.equal(tileset.destroyed, true);
   controller.destroy();
 });
 
