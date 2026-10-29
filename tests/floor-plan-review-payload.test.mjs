@@ -19,6 +19,7 @@ function fixture() {
     { id: "line-0002", orientation: "vertical", start: { x: 300, y: 100 }, end: { x: 300, y: 300 }, semanticClass: "ambiguous-line-candidate" },
     { id: "line-0003", orientation: "horizontal", start: { x: 100, y: 300 }, end: { x: 300, y: 300 }, semanticClass: "ambiguous-line-candidate" },
     { id: "line-0004", orientation: "vertical", start: { x: 100, y: 100 }, end: { x: 100, y: 300 }, semanticClass: "ambiguous-line-candidate" },
+    { id: "line-0005", orientation: "horizontal", start: { x: 20, y: 30 }, end: { x: 90, y: 30 }, semanticClass: "ambiguous-line-candidate" },
   ];
   const proposalReport = {
     schemaVersion: "1.0.0",
@@ -33,8 +34,9 @@ function fixture() {
   };
   const candidateReviews = candidates.map((candidate, index) => ({
     proposalId: candidate.id,
-    decision: "accept-wall",
-    wallId: ["north-wall", "east-wall", "south-wall", "west-wall"][index],
+    decision: index === 4 ? "reject" : "accept-wall",
+    wallId: ["north-wall", "east-wall", "south-wall", "west-wall"][index] ?? "unused-wall",
+    reason: index === 4 ? "False line from a dimension annotation." : "",
     startPx: [candidate.start.x, candidate.start.y],
     endPx: [candidate.end.x, candidate.end.y],
     openings: [],
@@ -80,7 +82,7 @@ test("creates the exact calibrated-vector review contract and matching canonical
   assert.equal(payload.sourceSha256, input.proposalReport.source.sha256);
   assert.equal(payload.proposalReportSha256, input.proposalReportSha256);
   assert.equal(payload.confirmedAgainstSource, true);
-  assert.equal(payload.candidateDecisions.length, 4);
+  assert.equal(payload.candidateDecisions.length, 5);
   assert.equal(payload.walls.length, 4);
   assert.equal(payload.walls[0].id, "north-wall");
   assert.deepEqual(payload.walls[0].startPx, [100, 100]);
@@ -129,15 +131,14 @@ test("requires a reasoned endpoint correction and enforces closed-world opening 
 
 test("converts candidate review decisions and retains explicit door/window dimensions in pixel and metric fields", () => {
   const input = fixture();
-  input.candidateReviews[3] = { proposalId: "line-0004", decision: "reject", reason: "False line from a page annotation." };
   input.candidateReviews[0].openings = [{
     id: "front-door", type: "door", offsetPx: 50, widthPx: 20, heightM: 2.1, sillHeightM: 0,
   }];
   const payload = buildFloorPlanRasterReviewPayload(input);
-  assert.deepEqual(payload.candidateDecisions[3], {
-    proposalId: "line-0004", decision: "reject", reason: "False line from a page annotation.",
+  assert.deepEqual(payload.candidateDecisions[4], {
+    proposalId: "line-0005", decision: "reject", reason: "False line from a dimension annotation.",
   });
-  assert.equal(payload.walls.length, 3);
+  assert.equal(payload.walls.length, 4);
   assert.deepEqual(payload.walls[0].openings[0], {
     id: "front-door", type: "door", offsetPx: 50, widthPx: 20, heightM: 2.1, sillHeightM: 0,
   });
