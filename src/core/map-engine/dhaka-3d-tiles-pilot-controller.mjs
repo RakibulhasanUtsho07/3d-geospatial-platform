@@ -306,7 +306,18 @@ export class Dhaka3DTilesPilotController {
     try {
       primitives.add(loadedTileset);
     } catch (error) {
-      destroyUnattachedTileset(loadedTileset);
+      // A custom primitive collection can throw after mutating its collection.
+      // Attempt removal before direct destruction so a partially-added primitive
+      // cannot remain referenced by a live scene.
+      let removedAfterFailedAdd = false;
+      try {
+        if (typeof primitives.remove === "function") {
+          removedAfterFailedAdd = primitives.remove(loadedTileset) === true;
+        }
+      } catch {
+        removedAfterFailedAdd = false;
+      }
+      if (!removedAfterFailedAdd) destroyUnattachedTileset(loadedTileset);
       this.#loading = false;
       const message = error instanceof Error ? error.message : String(error);
       this.#emit("error", { requestedUrl: primaryUrl, loadedUrl, message, failures });
