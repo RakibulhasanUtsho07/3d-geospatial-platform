@@ -28,7 +28,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p3-7-floor-plan-vector-calibration
+  group: p3-7-floor-plan-vector-calibration-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
