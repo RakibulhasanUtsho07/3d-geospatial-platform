@@ -135,6 +135,38 @@ test("does not request or attach a tileset while the feature flag is disabled", 
   controller.destroy();
 });
 
+test("runtime feature-flag disable detaches existing content and invalidates pending work", async () => {
+  let enabled = true;
+  const firstTileset = mockTileset();
+  const pending = deferred();
+  let requests = 0;
+  const { controller, viewer } = setup({
+    get enabled() { return enabled; },
+    isEnabled: () => enabled,
+    fromUrl: () => {
+      requests += 1;
+      return requests === 1 ? Promise.resolve(firstTileset) : pending.promise;
+    },
+  });
+
+  await controller.enable();
+  assert.equal(viewer.attached.size, 1);
+  const loading = controller.enable({ url: "/next/tileset.json", fallbackUrl: null });
+  assert.equal(requests, 2);
+  enabled = false;
+  const disabled = await controller.enable();
+
+  assert.equal(disabled.status, "disabled");
+  assert.equal(firstTileset.destroyed, true);
+  assert.equal(viewer.attached.size, 0);
+  pending.resolve(mockTileset());
+  assert.equal((await loading).status, "cancelled");
+  assert.equal(viewer.attached.size, 0);
+  assert.equal(controller.getState().attached, false);
+  assert.equal(controller.getState().loading, false);
+  controller.destroy();
+});
+
 test("loads and attaches one tileset, then removes and destroys it on disable", async () => {
   const tileset = mockTileset();
   const calls = [];
