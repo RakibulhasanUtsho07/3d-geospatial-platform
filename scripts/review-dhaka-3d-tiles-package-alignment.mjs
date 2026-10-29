@@ -485,17 +485,46 @@ export async function reviewDhaka3DTilesPackageAlignment({
     const topLocal = parsed.positions.filter((point) => Math.abs(point[1] - height) <= 1e-4);
     if (groundLocal.length < 3 || topLocal.length < 3) { errors.push("GLB lacks ground or top vertices for " + tile.contentUri); continue; }
 
-    const source = sourceVertices(feature.geometry);
+    const sourceRingsDegrees = sourceRings(feature.geometry);
+    const source = sourceRingsDegrees.flat();
     const uniqueSource = uniquePoints(source, 10);
     const groundWorld = groundLocal.map((point) => ecefToWgs84(transformPoint(child.transform, point)));
     const topWorld = topLocal.map((point) => ecefToWgs84(transformPoint(child.transform, point)));
     const uniqueGround = uniquePoints(groundWorld.map((point) => [point.longitudeDegrees, point.latitudeDegrees]), 7);
     if (uniqueGround.length < 3 || uniqueSource.length < 3) { errors.push("Tile has insufficient unique vertices: " + tile.contentUri); continue; }
+
+    const sourceBounds = tile.sourceBoundsDegrees;
+    if (!isRecord(sourceBounds) || ![sourceBounds.west, sourceBounds.south, sourceBounds.east, sourceBounds.north].every(Number.isFinite)) {
+      errors.push("Tile " + tile.contentUri + " has no valid sourceBoundsDegrees record.");
+      continue;
+    }
+    const anchorLongitude = (sourceBounds.west + sourceBounds.east) / 2;
+    const anchorLatitude = (sourceBounds.south + sourceBounds.north) / 2;
+    const transformQuality = validateTransformQuality(child.transform, anchorLongitude, anchorLatitude);
+    for (const error of transformQuality.errors) errors.push("Tile " + tile.contentUri + " transform: " + error);
+
+    // Vertex-to-vertex residual remains a diagnostic only: a valid polygon may
+    // include redundant collinear source vertices that the mesh simplifier removes.
     const sourceResiduals = uniqueSource.map((point) => Math.min(...uniqueGround.map((meshPoint) => residualMeters(point, meshPoint))));
     const groundResiduals = uniqueGround.map((point) => Math.min(...uniqueSource.map((sourcePoint) => residualMeters(point, sourcePoint))));
-    const maxSourceResidual = Math.max(...sourceResiduals);
-    const maxGroundResidual = Math.max(...groundResiduals);
-    const maxResidual = Math.max(maxSourceResidual, maxGroundResidual);
+    const maxSourceVertexResidual = Math.max(...sourceResiduals);
+    const maxGroundVertexResidual = Math.max(...groundResiduals);
+
+    const sourceSegments = sourceBoundarySegments(sourceRingsDegrees, anchorLongitude, anchorLatitude);
+    const recoveredBoundary = recoverMeshBoundarySegments(parsed.triangles, height, tile.contentUri);
+    const localBoundary = measureBoundaryResidual(sourceSegments, recoveredBoundary.segments);
+    const worldBoundarySegments = transformBoundarySegmentsToAnchorPlane(
+      recoveredBoundary.segments,
+      child.transform,
+      anchorLongitude,
+      anchorLatitude,
+    );
+    const worldBoundary = measureBoundaryResidual(sourceSegments, worldBoundarySegments);
+    const maxResidual = Math.max(localBoundary.maximumResidualMeters, worldBoundary.maximumResidualMeters);
+    const maximumPerimeterDifferenceMeters = Math.max(
+      localBoundary.perimeterDifferenceMeters,
+      worldBoundary.perimeterDifferenceMeters,
+    );
     const heightResidual = Math.max(
       ...groundWorld.map((point) => Math.abs(point.ellipsoidHeightMeters)),
       ...topWorld.map((point) => Math.abs(point.ellipsoidHeightMeters - height)),
@@ -503,7 +532,9 @@ export async function reviewDhaka3DTilesPackageAlignment({
     const allTileVertices = [...groundWorld, ...topWorld];
     const region = child.boundingVolume?.region;
     const inside = allTileVertices.every((point) => insideRegion(point, region));
-    if (maxResidual > toleranceMeters) errors.push("Tile " + tile.contentUri + " footprint residual " + maxResidual.toFixed(4) + "m exceeds " + toleranceMeters + "m.");
+    if (maxResidual > toleranceMeters) errors.push("Tile " + tile.contentUri + " footprint boundary residual " + maxResidual.toFixed(4) + "m exceeds " + toleranceMeters + "m.");
+    if (maximumPerimeterDifferenceMeters > toleranceMeters) errors.push("Tile " + tile.contentUri + " footprint perimeter difference " + maximumPerimeterDifferenceMeters.toFixed(4) + "m exceeds " + toleranceMeters + "m.");
+    if (recoveredBoundary.degenerateTriangleCount > 0) errors.push("Tile " + tile.contentUri + " contains " + recoveredBoundary.degenerateTriangleCount + " degenerate triangles.");
     if (heightResidual > 0.05) errors.push("Tile " + tile.contentUri + " ECEF/geodetic height residual " + heightResidual.toFixed(4) + "m exceeds 0.05m.");
     if (!inside) errors.push("Transformed vertices escape child region for " + tile.contentUri + ".");
     const metric = {
