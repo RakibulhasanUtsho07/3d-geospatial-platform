@@ -107,8 +107,7 @@
         destroyedAfterDisable,
         primitiveDeltaAfterDisable,
         attachedAfterDisable,
-        runtimeFlagResultStatus,
-        releaseFlags: buildManifest.releaseFlags
+        runtimeFlagResultStatus
       };
     }
 
@@ -253,7 +252,7 @@
           "The late-result scenario starts a real Cesium fromUrl operation and releases its returned tileset after disable; it proves stale-result destruction, not network-request abort.",
           "This validates controller lifecycle and package plumbing, not surveyed building heights, architecture, rights or production publication readiness."
         ],
-        releaseFlags: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false }
+        releaseFlags: buildManifest.releaseFlags
       };
       resultNode.textContent = JSON.stringify(report);
       setStatus("ready", "PASS · fallback/teardown, terminal failure and late-result cleanup validated");
