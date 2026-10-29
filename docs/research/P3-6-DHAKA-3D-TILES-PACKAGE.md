@@ -72,7 +72,13 @@ The browser harness:
 
 The browser test is an integration/selection check, not a city-scale benchmark. A successful run will establish that this bounded package is fetched lazily by viewport rather than eagerly downloaded as a whole. It still does not prove that all source geometry matches the real buildings.
 
-**Current validation state:** the implementation and dedicated workflow are wired on this PR branch. The latest workflow result on the exact new head must pass before this browser-validation slice is accepted. If the real viewport selects all GLBs or cannot show the second target, investigate/correct the tile LOD/bounding-volume/camera-selection problem; do not loosen the selectivity assertion to force a pass.
+**Verified browser result (commit `22305fee43effff4f4438252cfa6fa552c4adc44`):**
+- [Dedicated P3.6 run #40805652011](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40805652011) — success, including production build/server startup and the live Cesium Playwright check.
+- [Full CI push #40805652007](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40805652007) and [full CI PR run #40805656734](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40805656734) — success on the same code commit.
+- The run selected two footprint targets approximately **2,055.65 m apart** from a package with 32 child contents. The initial viewport fetched **1 GLB**; after moving the camera, a different GLB was fetched. The cumulative resource-timing list contained **2 of 32 GLBs**, not the full package.
+- Cesium reported **2 tileLoad events, 4 tileVisible events and 0 tileFailed events**; the target tile was ready at capture. Runtime was Cesium 1.146.0 with Chromium 156.0.8078.4 at a 1600×950 viewport.
+- Evidence artifact: [P3.6 browser evidence and screenshot](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40805652011). Screenshot SHA-256: `e20716377a55ec5ab70cc6ad134ab98eb1562941c1d97d27ae4c41420eac69d1`; report SHA-256: `e33b3d351e9e7bfa241b3b2595dae88f47fc0401dafabbdc95033bb6ad11d832`.
+- These results prove only bounded package integrity and lazy child-content loading in this CI viewport pair. They do not prove surveyed height, facade/roof fidelity, source rights or city-scale performance. Keep the release flags false.
 
 ## Remaining production acceptance gates
 
