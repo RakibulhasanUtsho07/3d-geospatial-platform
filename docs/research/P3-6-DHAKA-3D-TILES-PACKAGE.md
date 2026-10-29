@@ -96,6 +96,20 @@ The controller still uses Cesium's public `fromUrl()` loader, which is not abort
 
 The dedicated P3.6 workflow explicitly runs `npm run test:dhaka-3d-tiles-pilot-controller` alongside package-integrity checks and live Cesium browser validation. The focused suite now has 23 lifecycle scenarios. Recent regression coverage verifies runtime feature-flag shutdown while another source is in flight; explicit destruction when `PrimitiveCollection.remove()` succeeds with `destroyPrimitives=false`; partial insertion cleanup under that same configuration; and non-fatal `requestRender()` errors during viewer teardown. A passing exact-head workflow is still required before this lifecycle slice is considered validated.
 
+## Live Cesium controller lifecycle browser validation (new)
+
+The dedicated workflow now exercises the authoritative `Dhaka3DTilesPilotController` in a real Chromium/Cesium browser, separately from mock-only unit tests.
+
+- `scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs` creates a byte-for-byte browser-served copy from the authoritative source module during `predev` and `prebuild`. The output is ignored by Git to avoid a second hand-maintained implementation; the copy test checks hashes and rejects source/output symlinks.
+- The browser harness validates that source, tileset and build-manifest hashes are available, that the source hash binds across package manifests, and that all four release flags remain false.
+- Fallback scenario: the primary URL intentionally returns a missing-resource error; the controller must report fallback and load the real bounded Dhaka package. A repeated enable must return `already-loaded`; disabling must remove the primitive, destroy the tileset and return the primitive count to baseline. A subsequent call after the runtime flag turns off must return `disabled`.
+- Terminal failure scenario: both primary and fallback URLs intentionally fail. The caller must receive a rejection and exactly one terminal `error` event, with no attached primitive or stuck loading state.
+- Late-result scenario: start a real Cesium `Cesium3DTileset.fromUrl()` operation, disable the controller before the loader result is delivered to it, then release the actual loaded tileset. The controller must return `cancelled`, destroy the late tileset, and leave the scene unchanged without publishing a stale error.
+- The Playwright test writes a JSON report, evidence manifest, and screenshot with SHA-256 hashes. The dedicated workflow uploads these separately from the review-only tile package.
+
+**Exact-head validation:** this browser harness and its source-copy builder have just been added. The exact current PR-head run must pass before the browser lifecycle gate is marked complete.
+
+**Limitations:** the late-result test validates stale-result cleanup after a real loader completes; it does not prove Cesium's underlying network request is immediately abortable. It still does not establish real-building height, architectural accuracy, source rights, or production readiness.
 ## Remaining production acceptance gates
 
 This implementation does **not** complete P3.6 production acceptance. Before integrating this package into ordinary map loading, require:
