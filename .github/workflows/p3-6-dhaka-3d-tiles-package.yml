@@ -129,6 +129,10 @@ jobs:
           NODE
 
       - name: Verify real Cesium multi-tile selective viewport fetching
+        env:
+          # On pull_request, GITHUB_SHA is the synthetic merge commit. Store
+          # the proposed source head separately so artifact provenance is unambiguous.
+          P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run test:dhaka-3d-tiles-multitile-browser
 
       - name: Verify controller fallback, terminal failure and late-result cleanup in live Cesium

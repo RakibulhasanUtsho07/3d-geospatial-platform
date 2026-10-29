@@ -152,7 +152,10 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     schemaVersion: 2,
     evidenceType: "p3.6-multitile-browser-evidence-manifest",
     status: "pass",
-    commit: process.env.GITHUB_SHA ?? null,
+    commit: process.env.P3_6_SOURCE_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
+    sourceHeadSha: process.env.P3_6_SOURCE_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
+    workflowSha: process.env.GITHUB_SHA ?? null,
+    eventName: process.env.GITHUB_EVENT_NAME ?? null,
     browser: {
       name: "Chromium",
       version: browser.version(),
