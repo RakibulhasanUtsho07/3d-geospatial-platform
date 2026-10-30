@@ -47,6 +47,9 @@ async function createHandoff(root, glb = createBuildingGlb()) {
     buildingId: "building-a",
     sourceJobId: "source-job-01",
     disposition: "prepared-for-human-review",
+    handoffPrepared: true,
+    reviewRequired: true,
+    dispatchAllowed: false,
     candidate: { path: "candidate/model.glb", sha256: candidateSha, bytes: glb.length, geometryAccuracyEvaluated: false },
     checks: {
       sourceJobCompleted: true,
