@@ -12,6 +12,16 @@
 4. Keep changes in medium-sized, reviewable batches. Each batch must have focused regression tests, lint/build, CI evidence, and a written status update.
 5. Merge upward only after the source SHA is confirmed and all required CI checks succeed. Do not force-push protected work or merge stale branches wholesale.
 
+## Primary Dynamic 3D Map delivery path
+
+The highest-priority product outcome is one integrated building workflow: select/identify a building, upload rights-cleared media and information, generate and review a candidate, validate metric scale and geospatial placement, publish an approved version, and load it into the existing Cesium map without manual file copying.
+
+Use [Dynamic 3D Map End-to-End Execution Plan](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md) as the detailed execution checklist (D3M-00–D3M-13). Use [Engine Integration and Production Roadmap](./ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md) for cross-project dependencies and integration gates.
+
+**Immediate next task: D3M-00 — reconcile current branch/PR ancestry and exact-head CI before changing generation or map integration code.** Do not jump directly to a later implementation phase while the source branch and PR dependencies remain ambiguous.
+
+The roadmap distinguishes existing module foundations from accepted end-to-end behavior. Procedural GLB generation is not photo reconstruction; single-image output is an inference preview; a COLMAP result is a candidate; a GLB load is not geospatial validation; and a passing CI run is not architectural acceptance.
+
 ## Verified baseline
 
 - Current `main` candidate: `0bf007d2c6749475936d18d0168c168b1ca3fd7e`.
