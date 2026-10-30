@@ -180,3 +180,16 @@ The codebase still needs real-data validation and product-level completion. The 
 - All release flags remain fail-closed.
 
 **Next:** finish #280 exact-head CI and review. Then clean-port #278 sequentially (D3M-00.C).
+
+### D3M-00.C — BRF-06 architectural observation studio clean-base port (2026-10-30)
+
+**In progress — combined Draft PR [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281).**
+
+- Branch `feat/brf06-observation-review-dev-20261030` was created at the exact validated parent PR #280 head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, itself based on `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- New head: `f0de3b3bb2e4dd4aa7b3eafdec0483c93faff548`; combined development-relative diff is 9 unique paths, 917 additions, no deletions.
+- Parent PR #280's CI #2513 passed all steps, including browser/API integration, but it has no review and remains Draft/open.
+- Child/combined PR #281 includes the #280 mask editor and #278 observation studio. Do not merge #280 and #281 independently; after #281 is accepted, #280 is subsumed.
+- PR #281 CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is in progress; latest inspection showed ESLint running and later tests pending.
+- Important gap recorded: observation batches still have `mask: null`; a shared source-bound mask/observation contract remains D3M-01/WP-01 work.
+
+**Next:** resolve #281 CI, review combined diff, then define the unified BRF-05/06 evidence bundle. Release gates stay false.
