@@ -339,3 +339,17 @@ test("rejects symlinked evidence files", async (t) => {
 
   await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /non-symlink file/);
 });
+
+test("rejects symlinked parent directories for workspace evidence paths", async (t) => {
+  const root = await workspace(t);
+  await createSourceJob(root);
+  await writeEvidenceFiles(root);
+  await mkdir(path.join(root, "real-evidence"));
+  await writeFile(path.join(root, "real-evidence/visual.json"), await readFile(path.join(root, "visual.json")));
+  await symlink(path.join(root, "real-evidence"), path.join(root, "linked-evidence"));
+
+  await assert.rejects(
+    prepareSourceBoundReconstructionHandoff(handoffArgs(root, { visualBundlePath: "linked-evidence/visual.json" })),
+    /must not traverse symlink/,
+  );
+});
