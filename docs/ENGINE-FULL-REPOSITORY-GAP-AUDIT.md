@@ -350,3 +350,13 @@ Canonical combined Draft PR [#281](https://github.com/RakibulhasanUtsho07/3d-geo
 The unique diff against development is nine paths / 930 additions / 0 deletions. CI #2519 succeeded on the previous head; after adding the missing rejected-review normalization/round-trip assertions, updated CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) is in progress. Do not claim success until this exact run completes.
 
 Duplicate PR #282 was closed without merge and points to #281. Do not merge #280 independently; #281 is the combined candidate. Require human review before merge and keep all release gates false. The UI remains manual, and the mask+observation shared-bundle hand-off is still a D3M-01/WP-01 gap.
+
+### BRF-06 canonical PR reconciliation — 2026-10-30
+
+- Canonical combined clean-base candidate is [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), head `04b62ceb910b6c63986703ec1587846a1676bc85`, based on development. It contains both #280's mask editor and the BRF-06 observation review port (9 unique paths in total).
+- Updated exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) is pending/in progress at this checkpoint. Earlier #2519 passed only on the prior head and cannot validate the current commit.
+- Duplicate [PR #282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282) has been closed; do not merge/reopen it. Old-base #278 remains reference evidence only.
+- Keep #281 Draft; no merge until exact-head CI and human review. #280 is its parent content and must not be merged independently if #281 is accepted as the combined candidate.
+- Observation studio still exports `mask: null`; shared mask/observation bundle and cross-artifact tests are a D3M-01 prerequisite. Release gates remain false.
+
+See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3m-00c--canonical-brf-06-clean-base-port-2026-10-30) for exact dependency and continuation details.
