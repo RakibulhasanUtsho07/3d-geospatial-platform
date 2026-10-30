@@ -210,6 +210,7 @@
     "test:wireframe-mesh-readiness": "node --test tests/wireframe-mesh-readiness.test.mjs",
     "test:building-visual-evidence-package": "node --test tests/building-visual-evidence-package.test.mjs",
     "test:source-bound-visual-evidence-bundle": "node --test tests/source-bound-visual-evidence-bundle.test.mjs tests/source-bound-evidence-bundle-ui.test.mjs",
+    "test:source-bound-reconstruction-evidence": "node --test tests/source-bound-reconstruction-evidence.test.mjs",
     "build:building-visual-evidence-package": "node scripts/build-building-visual-evidence-package.mjs",
     "prepare:building-visual-review-packet": "node scripts/prepare-building-visual-review-packet.mjs",
     "test:building-visual-review-packet": "node --test tests/building-visual-review-packet.test.mjs",
