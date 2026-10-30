@@ -86,6 +86,19 @@ test("review append preserves the proposal and records an append-only audit hist
   assert.equal(rejected.originalProposal.geometry.coordinates[0][0], 10);
   assert.equal(rejected.reviews.length, 2);
   assert.equal(rejected.reviews[0].reviewerId, "architect-a");
+
+  const restored = normalizeArchitecturalObservationBatch({
+    ...fixture(),
+    observations: [rejected],
+  });
+  const normalized = restored.observations[0];
+  assert.equal(normalized.status, "rejected");
+  assert.equal(normalized.reviewedBy, "architect-b");
+  assert.equal(normalized.originalProposal.geometry.coordinates[0][0], 10);
+  assert.equal(normalized.reviews.length, 2);
+  assert.deepEqual(normalized.reviews.map((event) => event.decision), ["reviewed", "rejected"]);
+  assert.equal(normalized.reviews[0].notes, "Roof edge confirmed in this photo.");
+  assert.equal(normalized.reviews[1].reviewerId, "architect-b");
 });
 
 test("preserves a prior review trail when an observation is re-opened as proposed", () => {
