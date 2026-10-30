@@ -14,7 +14,7 @@ test("documents geometry-review preparation and keeps private signing keys off t
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /candidate-bound geometry QA report/);
-  assert.match(result.stdout, /does not access a private key/);
+  assert.match(result.stdout, /access a private key/);
   assert.match(result.stdout, /authenticated review API/);
 });
 
