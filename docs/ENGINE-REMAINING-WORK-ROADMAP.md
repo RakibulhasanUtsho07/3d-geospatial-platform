@@ -269,3 +269,12 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 
 
 **D3M-01.B exact-head CI correction checkpoint (2026-10-30):** first integration run [CI #2576](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072030603) failed only in the newly added evidence-linkage tests. The log identified a fixture variable typo (`groundControlManifestBytes` was not defined); the test was corrected to use the declared `groundManifestBytes`. The stale rights-report test was also corrected to assert a fail-closed blocked result rather than expecting an exception, and the unaudited-camera fixture now retains its byte-linked calibration artifact while asserting review-required status. Latest code head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; a fresh exact-head CI run has not appeared yet. Do not treat #2576 as passed.
+
+### D3M-01.C — immutable candidate hand-off (planned 2026-10-30)
+
+- Tracking issue: [#283](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/283).
+- Dependency: PR #281 exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; [exact-head CI #2581](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) was still running at production-server viewport/browser integration step 172. Do not begin code implementation or claim validation until that exact run reaches terminal success; repair and rerun if it fails.
+- Integrate the evidence *after* the model-generation stage has emitted the real candidate GLB, because D3M-01.B binds camera and ground-control evidence to that actual candidate hash. Bind the exact QA report and source/job identities in an immutable review-only hand-off. Reuse reconstruction-job stage artifacts and upstream fingerprints.
+- Reject stale/tampered bytes, inconsistent identities, unsafe paths, unlinked evidence assets and invalid GLB container data. Keep rights and human-review requirements explicit; do not mark any model accepted or map-ready.
+- Existing rights report remains human-review-required; WGS84 registration does not resolve vertical datum. No accuracy or publication claim.
+
