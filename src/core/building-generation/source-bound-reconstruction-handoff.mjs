@@ -473,6 +473,8 @@ export async function prepareSourceBoundReconstructionHandoff(input = {}) {
     now,
   });
 
+  const handoffCreatedAt = created.job.createdAt;
+
   const verificationFingerprint = fingerprintStageInput({
     stageId: CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS[0],
     inputs: {
@@ -530,7 +532,7 @@ export async function prepareSourceBoundReconstructionHandoff(input = {}) {
     schemaVersion: CONTRACT_VERSION,
     recordType: "source-bound-reconstruction-handoff",
     handoffId: handoffJobId,
-    createdAt: now,
+    createdAt: handoffCreatedAt,
     buildingId,
     sourceJobId,
     disposition: reviewReady ? "prepared-for-human-review" : "blocked",
