@@ -623,3 +623,15 @@ CI states below are GitHub Actions results observed for the exact listed head at
 5. Only after D3M-00 is complete begin D3M-01: define and test the shared mask + architectural-observation evidence bundle before connecting either to automatic reconstruction.
 
 **Live CI checkpoint (2026-10-30 10:11 +06):** updated run #2530 is still `in_progress` on exact head `04b62ceb910b6c63986703ec1587846a1676bc85`. All unit/contract test steps—including `Test evidence-linked architectural observation schema and review history`, `Test bounded per-view feature proposals and reviewed comparison`, and `Test integrated BRF-05–07 visual evidence package and fail-closed real-world gates`—have completed successfully. Chromium installation and production build have also succeeded. `Verify viewport API against the production server` remains in progress; evidence-upload steps are pending. Therefore full CI is **not yet complete** and PR #281 remains Draft.
+
+
+### 10.10 D3M-00.C exact-head CI completion — 2026-10-30
+
+**Status: exact-head CI PASS; PR review and merge decision still pending.**
+
+- Canonical PR: [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), exact head `04b62ceb910b6c63986703ec1587846a1676bc85`, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- Exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) completed with conclusion **success** on this exact SHA. The single workflow job `Lint and production build` completed successfully.
+- Verified completed steps include ESLint; all unit/contract suites (including architectural observation schema/history, per-view proposals/comparison, integrated BRF-05–07 fail-closed evidence package); production build; Chromium installation; production-server viewport API/browser integration; and uploads of P2.3, P2.4, P2.5 and P2.6 evidence/diagnostics. Every step in the job reports `completed/success`.
+- This closes the CI checkpoint only. PR #281 remains **open, Draft, unmerged**; human review is still required. #280 remains the parent prerequisite and must not be merged independently if #281 is accepted as the cumulative candidate. #282 remains closed duplicate; old-base #278 is not mergeable evidence.
+- No release gate is enabled: `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, and `automaticApproval` remain false.
+- **Next:** complete D3M-00 ancestry/duplicate reconciliation (#274/#196, #193, #228) while awaiting human review on #281. Then D3M-01/WP-01 must specify and test one source-bound evidence bundle linking mask and architectural observations; the observation editor currently emits `mask: null`. Do not begin automatic reconstruction or assert real-building accuracy from these manual annotations.
