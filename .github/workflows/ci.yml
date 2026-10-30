@@ -432,6 +432,8 @@ jobs:
         run: npm run test:building-visual-evidence-package
       - name: Test source-bound mask and architectural-observation evidence bundle
         run: npm run test:source-bound-visual-evidence-bundle
+      - name: Test source-bound rights, camera and ground-control reconstruction evidence
+        run: npm run test:source-bound-reconstruction-evidence
       - name: Test hash-pinned building visual review packet
         run: npm run test:building-visual-review-packet
       - name: Validate building visual evidence bundle CLI
