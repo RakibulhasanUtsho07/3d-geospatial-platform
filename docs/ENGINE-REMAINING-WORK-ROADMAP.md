@@ -263,7 +263,7 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 - Camera linkage verifies actual calibration-evidence bytes against declared SHA-256/size, binds each camera's calibration evidence ID/hash to the same building/source image and candidate GLB hash, and recomputes existing camera matrix/image-bounds/reprojection validation through `validateCameraProjectionEvidence`. Unverified calibration remains review-required.
 - Ground-control linkage verifies actual survey-evidence bytes, exact source-image and candidate-GLB hashes, requires each control point to reference a byte-verified evidence asset, and recomputes the existing WGS84 similarity registration through `registerModelToWgs84`. It retains the existing explicit limitation that vertical datum is not solved.
 - Added `tests/source-bound-reconstruction-evidence.test.mjs` for a valid synthetic linkage, stale rights-source-manifest hash, tampered camera evidence bytes, tampered survey evidence bytes, unaudited camera calibration and release-flag promotion attempts. Registered `test:source-bound-reconstruction-evidence` in package scripts and CI.
-- Canonical PR #281 branch `feat/brf06-observation-review-dev-20261030`, latest exact head `a89e0a0b6a3edb14a8d6fb7362ce7aa79c6b6e37`, 19 changed paths. CI for this exact head has not yet appeared at the time of this documentation update; do not infer success from the previous commit's green run.
+- Canonical parent PR #281's later exact head is `21ad424b0f611b0274693c4a3c4f633b7548bedc`; exact-head CI [#41072445284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) passed 181/181 steps. The earlier `a89e0a0...` snapshot was superseded; its pending state must not be mistaken for the later parent-head result.
 - The extension is a linkage/recomputation and review-preparation artifact only. It does not read or validate the GLB bytes, prove building identity, verify survey authority, authenticate human reviewers, solve vertical datum, establish architecture accuracy or authorize map placement/publication. Every policy/release flag remains false.
 - **Next:** wait for exact-head CI and fix any failing contract. Then define the explicit human review record and immutable decision flow; do not promote release flags. Afterward proceed to D3M-02 upload/intake UX only when the evidence contract is stable.
 
@@ -290,13 +290,13 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 
 ### D3M-01.D — trusted-signer geometry review (2026-10-30)
 
-**Status: Implemented on stacked Draft PR #286. Focused tests and production build passed; exact-head full CI remains in progress.**
+**Status: Implemented on stacked Draft PR #286; exact-head CI PASS, 182/182 workflow steps. PR remains Draft/unmerged.**
 
 - [Issue #285](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/285) / [PR #286](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/286), branch `feat/d3m01d-authenticated-geometry-review-20261030`, head `3e92b4be02d8f6bad6baec274887c148359ad8f7`. Stacked on D3M-01.C #284 head `dc326af772dce95484cd2565d581ed5f99744369`.
 - Runs existing GLB geometry/topology QA on exact D3M-01.C candidate bytes and pins the report to the immutable hand-off artifact, candidate SHA-256 and byte length.
 - Ed25519 signed review records use server-provisioned public keys only; decision payloads are canonical JSON, signed outside server, and stored in a separate immutable child job. API rejects untrusted reviewer IDs, wrong keys, payload tampering and caller-supplied public keys.
 - Continue-to-independent-validation is blocked unless all human review checks and upstream hand-off integrity flags are true, including vertical datum. That decision is not acceptance/publication approval.
-- Current full CI [#41082811923](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41082811923): focused D3M-01.D test step and production build passed; production-server viewport/browser integration was still running at the checkpoint.
+- Exact-head full CI [#41082811923](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41082811923) passed 182/182 steps, including D3M-01.D focused tests, production build and production-server viewport/browser integration. P2.3–P2.6, multi-tile workload and Ahsan Manzil GLB artifacts were uploaded.
 - Deployment still requires configuring `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` as server secrets. Private keys stay with the reviewer. No production reviewer registry is claimed.
-- All truth, geometry-acceptance, release, publication, map-ready and dispatch flags remain false. PR #286 and its parent chain remain Draft/unmerged.
+- All truth, geometry-acceptance, release, publication, map-ready and dispatch flags remain false. Deployment still needs `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`; private keys stay with reviewers. PR #286 and its parent chain remain Draft/unmerged. Next: D3M-01.E signed-receipt enforcement in independent-truth evaluation.
 
