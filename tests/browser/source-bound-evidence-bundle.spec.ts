@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
 const OBSERVATION_URL = "/experimental/architectural-observation-review.html";
