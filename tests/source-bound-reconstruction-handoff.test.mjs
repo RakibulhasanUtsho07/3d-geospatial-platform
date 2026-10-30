@@ -287,7 +287,7 @@ test("rejects candidate GLB bytes that differ from model-generation and evidence
   await writeEvidenceFiles(root);
   await writeFile(path.join(root, "candidate/model.glb"), Buffer.concat([glb, Buffer.from("tamper")]));
 
-  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /candidate GLB does not match/);
+  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /reconstruction evidence bundle does not bind the exact visual bundle, source and candidate GLB bytes|candidate GLB does not match/);
 });
 
 test("rejects a QA report that no longer matches report-finalization artifact bytes", async (t) => {
