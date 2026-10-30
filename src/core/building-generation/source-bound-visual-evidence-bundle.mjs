@@ -126,6 +126,7 @@ export function buildSourceBoundVisualEvidenceBundle(input = {}) {
     }
   }
 
+  assertFalsePolicy(rawBatch.policy, ["groundTruth", "publicationEligible", "publishable"], "observation input policy");
   const normalizedBatch = normalizeArchitecturalObservationBatch({
     ...rawBatch,
     mask: { sha256: maskSha256, width: source.width, height: source.height },
@@ -138,8 +139,8 @@ export function buildSourceBoundVisualEvidenceBundle(input = {}) {
     ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval", "publishable"],
     "mask manifest policy");
   assertFalsePolicy(normalizedBatch.policy,
-    ["groundTruth", "publicationEligible", "publishable"],
-    "observation batch policy");
+    ["groundTruth", "publicationEligible"],
+    "normalized observation batch policy");
 
   const assessment = result.assessment;
   if (!assessment || !["proposed", "reviewed"].includes(assessment.status) ||
