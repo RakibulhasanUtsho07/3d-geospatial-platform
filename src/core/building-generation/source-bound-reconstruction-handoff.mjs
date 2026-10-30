@@ -247,7 +247,12 @@ async function completeStage({
     inputFingerprint,
     now,
   });
-  if (started.reused) return { artifact: started.artifact, artifactRecord: started.job.stages.find((item) => item.id === stageId).artifacts.find((item) => item.artifactId === started.job.stages.find((item) => item.id === stageId).activeArtifactId), reused: true };
+  if (started.reused) {
+    const stage = started.job.stages.find((item) => item.id === stageId);
+    const artifactRecord = stage?.artifacts.find((item) => item.artifactId === stage.activeArtifactId);
+    if (!artifactRecord) throw new TypeError("reused stage is missing its active immutable artifact record.");
+    return { job: started.job, artifact: started.artifact, artifactRecord, reused: true };
+  }
   try {
     const result = await completeReconstructionStage({
       workspaceRoot,
