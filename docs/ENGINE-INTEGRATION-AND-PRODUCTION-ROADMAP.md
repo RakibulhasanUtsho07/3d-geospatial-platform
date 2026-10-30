@@ -311,3 +311,8 @@ See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3
 ### Exact-head CI completion — PR #281 (2026-10-30)
 
 The earlier in-progress checkpoint is superseded: exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) passed on `04b62ceb910b6c63986703ec1587846a1676bc85`. Verified steps include lint, complete unit/contract tests, production build, Chromium production-server viewport API/browser integration and P2.3–P2.6 evidence uploads. PR #281 is still Draft and unmerged pending human review. D3M-00 still has ancestry/duplicate reconciliation (#274/#196, #193, #228); D3M-01 remains blocked on a shared source-bound mask+observation bundle contract and cross-artifact tests.
+
+
+### D3M-00 branch reconciliation — 2026-10-30
+
+P3.4 is represented by clean-base PR #274 (head `439e5c8ee26f263471b060a35296d681e0add182`); exact-head CI #2285 and Real-Dhaka Browser Baseline #45 passed. Keep Draft pending human visual review. Duplicate #196 and stale-base #193 were closed without merge after confirming their code is already subsumed by #274/development; the generated-model-layer architecture note was preserved in the docs branch. Main promotion #228 remains blocked: development is 86 commits ahead and 4 behind main (204 changed paths); inspect the four main-only commits before promotion.
