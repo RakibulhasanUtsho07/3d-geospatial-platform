@@ -289,7 +289,7 @@ test("runs actual-GLB extraction then independent truth evaluation, and stays re
   const result = run(root, "artifacts/brf25/run-01", review);
   assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/run-01/brf25-geometry-validation.json"), "utf8"));
-  assert.equal(report.status, "geometry-evaluated-review-required");
+  assert.equal(report.status, "geometry-evaluated-review-required", JSON.stringify(report.blockers));
   assert.equal(report.binding.candidateGlbSha256, candidateHash);
   assert.equal(report.artifacts.authenticatedReview.decision, "continue-to-independent-validation");
   assert.equal(report.artifacts.authenticatedReview.candidateGlbSha256, candidateHash);
