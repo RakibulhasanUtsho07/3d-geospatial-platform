@@ -342,7 +342,7 @@ test("rejects symlinked evidence files", async (t) => {
   await rm(path.join(root, "visual.json"));
   await symlink(path.join(root, "outside.json"), path.join(root, "visual.json"));
 
-  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /non-symlink file/);
+  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /must not traverse symlink/);
 });
 
 test("rejects symlinked parent directories for workspace evidence paths", async (t) => {
