@@ -365,3 +365,10 @@ See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3
 ### Exact-head CI completion — PR #281 (2026-10-30)
 
 Correction to the pending status above: CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) completed successfully on exact head `04b62ceb910b6c63986703ec1587846a1676bc85`. All workflow job steps passed, including the full unit/contract suite, lint, production build, Chromium production-server viewport API/browser integration and P2.3–P2.6 evidence uploads. PR #281 remains Draft/open/unmerged pending human review; no merge or release-gate change is implied. The mask/observation bundle remains unintegrated (`mask: null`).
+
+
+### D3M-00 branch/PR reconciliation — 2026-10-30
+
+- Canonical P3.4 clean-base port is [PR #274](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/274), exact head `439e5c8ee26f263471b060a35296d681e0add182`; exact-head CI #2285 and Real-Dhaka Browser Baseline #45 both succeeded. PR remains Draft pending human inspection of six-sample evidence.
+- Duplicate #196 closed without merge (implementation patches match #274; #274 additionally carries the real-Dhaka baseline workflow). Old-base #193 closed without merge because its generated-model-layer code/test and CI/package hooks are already present on development; its architecture note is retained on the docs branch.
+- Main promotion #228 is not safe to merge yet: development is 86 ahead / 4 behind main with 204 changed paths. The four main-only commits remain to be individually inspected. No release gates are enabled.
