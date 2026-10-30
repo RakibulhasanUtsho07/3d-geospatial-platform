@@ -567,18 +567,19 @@ CI states below are GitHub Actions results observed for the exact listed head at
 - [x] Compare #274/#196 at patch level and identify duplicate ownership.
 - [x] Compare old-base BRF branches with development and identify why whole-branch merges are unsafe.
 - [ ] Reconcile the four main-only commits and final #228 merge candidate.
-- [ ] Clean-port #277 onto a new branch based exactly on verified development; add regression tests and require exact-head CI.
-- [ ] Clean-port #278 sequentially, after #277's schema/report state is settled.
+- [x] Clean-port #277 onto a new clean-base branch (#280); exact-head CI #2513 passed. Human review/acceptance remains pending.
+- [x] Clean-port #278 sequentially into the combined candidate (#281), stacked on #280. Current head has expanded unit coverage; exact-head CI #2530 is still running. Human review/acceptance remains pending.
 - [ ] Review #274 and decide whether #196 can be closed as duplicate.
 - [ ] Finish #193 PR-only diff review before marking superseded.
 - [ ] Re-check all critical PRs, review threads, and CI after each branch changes; do not mark D3M-00 complete until the selected integration path has no unresolved ancestry or duplicate ownership.
 
 ### 10.5 Next task — exact continuation pointer
 
-**Start with D3M-00.B: clean-port PR #277's manual mask editor from a new branch whose parent is exactly \`development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\`.**
+**Continue from the canonical combined PR #281**, not from the original #277/#278 branch histories or duplicate PR #282.
 
-Before writing code, re-fetch the current development head and the four source files in #277's PR diff. Apply only the PR-specific changes (editor HTML, editor JS, browser spec, and the additive report section) to the fresh base; do not cherry-pick its six-commit old-base history. Inspect the report's current end before applying the additive section. Run the focused browser test and \`npm run test:map-browser\`, then lint/build/full CI as required by the current workflow. If the head/base changes while working, stop and rebase the plan against the new observed SHA. After this port, update this execution log with the new branch, exact base/head SHAs, changed paths, exact workflow runs, and the next task (**D3M-00.C: clean-port #278**).
-
+1. Check CI #2530 for exact head `04b62ceb910b6c63986703ec1587846a1676bc85` and fix any failure.
+2. Keep #281 Draft until human review. It contains the #280 mask-editor parent plus #278 observation-review work; do not merge #280 independently.
+3. After the combined BRF candidate is reviewed and merged, continue the remaining D3M-00 items in Section 10.9.
 ### 10.6 D3M-00.B — BRF-05 manual mask editor clean-base port (2026-10-30)
 
 **Implementation status: VERIFIED by exact-head CI; human review and acceptance pending.**
