@@ -278,3 +278,11 @@ Exact run IDs and the full decision matrix live in [D3M-00 execution log](./DYNA
 **In progress:** Draft PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280). The replacement branch is based on the exact development SHA `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` and contains four paths selectively ported from #277. The old six-commit branch history was not cherry-picked.
 
 Head SHA: `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was in progress; no validation pass is claimed yet. Keep #277 open until the clean-base replacement is verified and reviewed. The next dependent operation is D3M-00.C (sequential #278 port), not a parallel change to the shared BRF evidence report.
+
+### WP-00 subtask D3M-00.C — BRF-06 observation studio
+
+**In progress:** combined Draft PR [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), branch `feat/brf06-observation-review-dev-20261030`, head `f0de3b3bb2e4dd4aa7b3eafdec0483c93faff548`, based on development `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` through parent PR #280.
+
+This is a 9-unique-path combined candidate that includes #280's mask editor plus the #278 architectural observation studio and review-history normalizer fix. Do not merge #280 and #281 independently. Parent CI #2513 passed all steps; child CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is pending/in progress.
+
+A specific integration gap is confirmed: observation exports still use `mask: null`. WP-01 must define a versioned shared mask/observation bundle bound to one source hash/dimension frame, plus invalidation and rights/reviewer controls. PR #281 does not complete that bundle or enable release gates.
