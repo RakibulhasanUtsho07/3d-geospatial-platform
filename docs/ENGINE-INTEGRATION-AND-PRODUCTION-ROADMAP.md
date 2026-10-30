@@ -295,3 +295,14 @@ A specific integration gap is confirmed: observation exports still use `mask: nu
 - A key gap remains for WP-01: the mask editor and observation studio currently export separate artifacts; observation batches still have `mask: null`. Define the shared source-bound mask+observation bundle before D3M-01 is accepted. Reviewer JSON is not authenticated or cryptographically signed.
 
 D3M-00 remains **IN PROGRESS**. Continue from CI #2530, then the outstanding #274/#196 duplicate, #193 residual diff and #228 ancestry review. Full exact SHAs and decisions are in the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30).
+
+
+### BRF-06 canonical PR reconciliation — 2026-10-30
+
+- Canonical combined clean-base candidate is [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), head `04b62ceb910b6c63986703ec1587846a1676bc85`, based on development. It contains both #280's mask editor and the BRF-06 observation review port (9 unique paths in total).
+- Updated exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) is pending/in progress at this checkpoint. Earlier #2519 passed only on the prior head and cannot validate the current commit.
+- Duplicate [PR #282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282) has been closed; do not merge/reopen it. Old-base #278 remains reference evidence only.
+- Keep #281 Draft; no merge until exact-head CI and human review. #280 is its parent content and must not be merged independently if #281 is accepted as the combined candidate.
+- Observation studio still exports `mask: null`; shared mask/observation bundle and cross-artifact tests are a D3M-01 prerequisite. Release gates remain false.
+
+See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3m-00c--canonical-brf-06-clean-base-port-2026-10-30) for exact dependency and continuation details.
