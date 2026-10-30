@@ -273,7 +273,7 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 ### D3M-01.C — immutable candidate hand-off (planned 2026-10-30)
 
 - Tracking issue: [#283](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/283).
-- Dependency: PR #281 exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; [exact-head CI #2581](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) was still running at production-server viewport/browser integration step 172. Do not begin code implementation or claim validation until that exact run reaches terminal success; repair and rerun if it fails.
+- Dependency: PR #281 exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; exact-head CI [#41072445284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) later passed 181/181 steps, including production-server viewport/browser integration. This supersedes the earlier planning-time snapshot that recorded the run as still in progress.
 - Integrate the evidence *after* the model-generation stage has emitted the real candidate GLB, because D3M-01.B binds camera and ground-control evidence to that actual candidate hash. Bind the exact QA report and source/job identities in an immutable review-only hand-off. Reuse reconstruction-job stage artifacts and upstream fingerprints.
 - Reject stale/tampered bytes, inconsistent identities, unsafe paths, unlinked evidence assets and invalid GLB container data. Keep rights and human-review requirements explicit; do not mark any model accepted or map-ready.
 - Existing rights report remains human-review-required; WGS84 registration does not resolve vertical datum. No accuracy or publication claim.
@@ -286,7 +286,7 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 - Validation: [CI #41076263050](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41076263050) PASS, 181/181 workflow steps; focused hand-off tests 11/11 pass, including immutable resume, incomplete-rights fail-closed, candidate/QA tamper, wrong source, malformed GLB, traversal and file/directory symlink tests.
 - Integration: two-stage immutable child job uses current reconstruction-job artifacts; CLI and CI test-step added. Candidate/evidence linkage happens only after actual worker GLB and QA report exist.
 - Still blocked: both PRs are Draft/unmerged; rights and calibration/GCP authority require human review; vertical datum and geometry/architectural accuracy are not proved. No dispatch, human acceptance, publication or map readiness.
-- Next: inspect and human-review the stacked PR pair together. Then specify D3M-01.D authenticated human decision + geometry-validation linkage without changing any release flags.
+- Next: inspect and human-review PRs #281 and #284 together. D3M-01.D is implemented on dependent PR #286 with exact-head CI PASS; proceed next to D3M-01.E signed-receipt enforcement in the independent-truth evaluation path, without changing release flags.
 
 ### D3M-01.D — trusted-signer geometry review (2026-10-30)
 
