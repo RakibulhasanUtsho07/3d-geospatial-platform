@@ -60,7 +60,7 @@ function input(overrides={}){
   visualBundleBytes:Buffer.from(JSON.stringify(visual)),candidateGlbSha256:glbSha,
   rightsSourceManifestBytes:rightsSourceBytes,rightsManifestBytes:rightsManifestBytes,rightsReportBytes,
   cameraManifestBytes,cameraEvidenceAssets:[{id:"camera-cal-1",bytes:cameraBytes}],
-  groundControlManifestBytes,groundControlEvidenceAssets:[{id:"survey-set-1",bytes:gcpBytes}],
+  groundControlManifestBytes:groundManifestBytes,groundControlEvidenceAssets:[{id:"survey-set-1",bytes:gcpBytes}],
   createdAt:"2026-10-30T12:00:00.000Z",...overrides,
  };
 }
@@ -80,7 +80,10 @@ test("links exact rights report, recomputes camera validation and WGS84 registra
 
 test("rejects a rights report bound to a different source manifest",()=>{
  const bad={...rightsReport,sourceManifestSha256:"f".repeat(64)};
- assert.throws(()=>buildSourceBoundReconstructionEvidence(input({rightsReportBytes:Buffer.from(JSON.stringify(bad))})),/rights register|release flags|exact source/i);
+ const result=buildSourceBoundReconstructionEvidence(input({rightsReportBytes:Buffer.from(JSON.stringify(bad))}));
+ assert.equal(result.rightsLinked,false);
+ assert.equal(result.bundle.rightsEvidence.status,"blocked-or-incomplete");
+ assert.equal(result.bundle.policy.publicationEligible,false);
 });
 
 test("rejects camera evidence whose actual bytes differ from the declared hash",()=>{
@@ -92,7 +95,7 @@ test("rejects ground-control evidence whose actual bytes differ from the declare
 });
 
 test("does not call unverified camera calibration complete",()=>{
- const camera={...cameraManifest,cameras:[{...cameraManifest.cameras[0],calibrationStatus:"unaudited",calibrationEvidence:undefined}]};
+ const camera={...cameraManifest,cameras:[{...cameraManifest.cameras[0],calibrationStatus:"unaudited"}]};
  const result=buildSourceBoundReconstructionEvidence(input({cameraManifestBytes:Buffer.from(JSON.stringify(camera))}));
  assert.equal(result.cameraReport.status,"review-required");
  assert.equal(result.bundle.cameraCalibration.status,"blocked-or-review-required");
