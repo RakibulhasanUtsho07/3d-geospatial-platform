@@ -843,33 +843,34 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   const jobConfig = stored.job.config;
   const expectedHash = expectedCandidateGlbSha256.toLowerCase();
 
-  if (!isObject(sourceManifest) || !isObject(jobConfig) ||
-      sourceManifest.schemaVersion !== REVIEW_SCHEMA_VERSION ||
-      sourceManifest.recordType !== "source-bound-authenticated-review-job-source" ||
-      sourceManifest.handoffJobId !== prepared.handoffJobId ||
-      sourceManifest.handoffArtifactSha256 !== prepared.handoffArtifactSha256 ||
-      sourceManifest.candidateGlbSha256 !== prepared.candidateSha256 ||
-      sourceManifest.geometryReportSha256 !== prepared.geometryReportSha256 ||
-      sourceManifest.reviewerId !== authentication?.reviewerId ||
-      sourceManifest.reviewerPublicKeyFingerprintSha256 !== authentication?.reviewerPublicKeyFingerprintSha256 ||
-      sourceManifest.signedPayloadSha256 !== authentication?.signedPayloadSha256 ||
-      sourceManifest.signatureSha256 !== authentication?.signatureSha256 ||
-      jobConfig.reviewContractVersion !== REVIEW_SCHEMA_VERSION ||
-      jobConfig.decision !== decisionRecord.decision ||
-      jobConfig.reviewerId !== authentication?.reviewerId ||
-      jobConfig.reviewerPublicKeyFingerprintSha256 !== authentication?.reviewerPublicKeyFingerprintSha256 ||
-      jobConfig.candidateGeometryValidated !== false ||
-      jobConfig.groundTruth !== false ||
-      jobConfig.acceptanceEligible !== false ||
-      jobConfig.publicationEligible !== false ||
-      jobConfig.publishable !== false ||
-      jobConfig.mapReady !== false ||
-      jobConfig.automaticApproval !== false ||
-      jobConfig.dispatchAllowed !== false ||
-      stored.job.buildingId !== buildingId ||
-      stored.job.jobId !== reviewJobId ||
-      stored.job.createdAt !== decisionRecord.recordedAtUtc) {
-    throw new TypeError("Authenticated-review job metadata does not match its immutable signed decision receipt.");
+  const metadataMismatches = [];
+  const requireMetadata = (id, passed) => {
+    if (!passed) metadataMismatches.push(id);
+  };
+  requireMetadata("job-source-manifest-object", isObject(sourceManifest));
+  requireMetadata("job-config-object", isObject(jobConfig));
+  requireMetadata("source-manifest-schema", sourceManifest?.schemaVersion === REVIEW_SCHEMA_VERSION);
+  requireMetadata("source-manifest-record-type", sourceManifest?.recordType === "source-bound-authenticated-review-job-source");
+  requireMetadata("source-manifest-handoff-id", sourceManifest?.handoffJobId === prepared.handoffJobId);
+  requireMetadata("source-manifest-handoff-hash", sourceManifest?.handoffArtifactSha256 === prepared.handoffArtifactSha256);
+  requireMetadata("source-manifest-candidate-hash", sourceManifest?.candidateGlbSha256 === prepared.candidateSha256);
+  requireMetadata("source-manifest-geometry-report-hash", sourceManifest?.geometryReportSha256 === prepared.geometryReportSha256);
+  requireMetadata("source-manifest-reviewer-id", sourceManifest?.reviewerId === authentication?.reviewerId);
+  requireMetadata("source-manifest-key-fingerprint", sourceManifest?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
+  requireMetadata("source-manifest-signed-payload-hash", sourceManifest?.signedPayloadSha256 === authentication?.signedPayloadSha256);
+  requireMetadata("source-manifest-signature-hash", sourceManifest?.signatureSha256 === authentication?.signatureSha256);
+  requireMetadata("job-config-review-contract", jobConfig?.reviewContractVersion === REVIEW_SCHEMA_VERSION);
+  requireMetadata("job-config-decision", jobConfig?.decision === decisionRecord.decision);
+  requireMetadata("job-config-reviewer-id", jobConfig?.reviewerId === authentication?.reviewerId);
+  requireMetadata("job-config-key-fingerprint", jobConfig?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
+  for (const flag of ["candidateGeometryValidated", "groundTruth", "acceptanceEligible", "publicationEligible", "publishable", "mapReady", "automaticApproval", "dispatchAllowed"]) {
+    requireMetadata("job-config-" + flag + "-false", jobConfig?.[flag] === false);
+  }
+  requireMetadata("job-building-id", stored.job.buildingId === buildingId);
+  requireMetadata("job-id", stored.job.jobId === reviewJobId);
+  requireMetadata("job-created-at", stored.job.createdAt === decisionRecord.recordedAtUtc);
+  if (metadataMismatches.length) {
+    throw new TypeError("Authenticated-review job metadata mismatch: " + metadataMismatches.join(", ") + ".");
   }
 
   if (decisionRecord.schemaVersion !== REVIEW_SCHEMA_VERSION ||
