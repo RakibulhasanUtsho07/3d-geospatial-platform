@@ -53,6 +53,18 @@ const REQUIRED_CONTINUE_CHECKS = Object.freeze([
   "geometryTopology",
   "sourceCameraComparison",
 ]);
+const REQUIRED_HANDOFF_INTEGRITY_CHECKS = Object.freeze([
+  "sourceJobCompleted",
+  "sourceJobArtifactsVerified",
+  "visualBundleHashRecomputed",
+  "reconstructionEvidenceHashRecomputed",
+  "candidateGlbHashRecomputed",
+  "candidateGlbContainerValid",
+  "qaReportHashRecomputed",
+  "qaReportMatchesImmutableSourceArtifact",
+  "visualSourceMatchesSelectedJobView",
+  "exactCandidateHashMatchesEvidenceBundle",
+]);
 const FALSE_POLICY = Object.freeze({
   candidateGeometryValidated: false,
   groundTruth: false,
@@ -286,6 +298,9 @@ export async function prepareSourceBoundGeometryReview({ workspaceRoot, building
       handoff.handoffId !== handoffId ||
       handoff.buildingId !== building ||
       handoff.recordType !== "source-bound-reconstruction-handoff" ||
+      handoff.handoffPrepared !== true ||
+      handoff.reviewRequired !== true ||
+      REQUIRED_HANDOFF_INTEGRITY_CHECKS.some((key) => handoff.checks?.[key] !== true) ||
       (handoff.policy?.candidateGeometryValidated !== undefined && handoff.policy?.candidateGeometryValidated !== false) ||
       handoff.candidate?.geometryAccuracyEvaluated !== false ||
       handoff.policy?.groundTruth !== false ||
