@@ -396,3 +396,17 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 
 
 **Latest exact-head checkpoint (2026-10-30):** browser end-to-end fixture was corrected to use a valid but hash-mismatched binary mask, and the wizard now validates observation batch ID/timestamp as well. Canonical PR #281 head is now `db3603b7f9280ba7e8aa9139c0dc9669d57295c5`, 17 changed paths / 1,635 additions against development. Exact-head CI #2569 / [run 41003359778](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41003359778) is pending; earlier run #2563 was cancelled after the head changed and cannot validate this SHA.
+
+
+### 10.13 D3M-01.B — rights, camera and ground-control evidence linkage (2026-10-30)
+
+**Status: implementation committed on canonical PR #281; exact-head CI pending. Not merged; not a release gate.**
+
+- Added `src/core/building-generation/source-bound-reconstruction-evidence.mjs` to link the per-view visual bundle to BRF-45 exact-asset rights records, camera calibration evidence and WGS84 ground-control evidence for one exact building/source/candidate-GLB tuple.
+- Rights linkage hashes the raw BRF-14 source manifest, BRF-45 rights register and BRF-45 validator report; checks source-manifest digest and exact source ID/SHA-256 across source view, rights row and validator report. It explicitly records that the rights validator report is linked but not recomputed by this module and does not authenticate grantor authority or legal permission.
+- Camera linkage verifies actual calibration-evidence bytes against declared SHA-256/size, binds each camera's calibration evidence ID/hash to the same building/source image and candidate GLB hash, and recomputes existing camera matrix/image-bounds/reprojection validation through `validateCameraProjectionEvidence`. Unverified calibration remains review-required.
+- Ground-control linkage verifies actual survey-evidence bytes, exact source-image and candidate-GLB hashes, requires each control point to reference a byte-verified evidence asset, and recomputes the existing WGS84 similarity registration through `registerModelToWgs84`. It retains the existing explicit limitation that vertical datum is not solved.
+- Added `tests/source-bound-reconstruction-evidence.test.mjs` for a valid synthetic linkage, stale rights-source-manifest hash, tampered camera evidence bytes, tampered survey evidence bytes, unaudited camera calibration and release-flag promotion attempts. Registered `test:source-bound-reconstruction-evidence` in package scripts and CI.
+- Canonical PR #281 branch `feat/brf06-observation-review-dev-20261030`, latest exact head `a89e0a0b6a3edb14a8d6fb7362ce7aa79c6b6e37`, 19 changed paths. CI for this exact head has not yet appeared at the time of this documentation update; do not infer success from the previous commit's green run.
+- The extension is a linkage/recomputation and review-preparation artifact only. It does not read or validate the GLB bytes, prove building identity, verify survey authority, authenticate human reviewers, solve vertical datum, establish architecture accuracy or authorize map placement/publication. Every policy/release flag remains false.
+- **Next:** wait for exact-head CI and fix any failing contract. Then define the explicit human review record and immutable decision flow; do not promote release flags. Afterward proceed to D3M-02 upload/intake UX only when the evidence contract is stable.
