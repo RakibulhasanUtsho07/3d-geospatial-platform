@@ -168,3 +168,15 @@ The codebase still needs real-data validation and product-level completion. The 
 - D3M-00 has not passed acceptance; no application code or release flags changed during the audit pass.
 
 **Next exact task:** D3M-00.B — create a new branch from the latest verified \`development\` head and selectively port only PR #277's manual mask editor, browser test, and additive report section. Do not cherry-pick the old branch history. Record exact-head focused/browser/full-CI results before moving to D3M-00.C (#278).
+
+### D3M-00.B — manual mask editor clean-base port (2026-10-30)
+
+**In progress — Draft PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280).**
+
+- New branch `feat/brf05-07-manual-mask-review-dev-20261030` is based exactly on `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- Four paths are ported from old-base PR #277: local mask editor HTML/JS, a Playwright browser spec, and the additive BRF-05–07 evidence-report section. No old branch history was cherry-picked.
+- PR head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`; exact-head CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was in progress at last check.
+- Keep the PR Draft; no test pass is claimed yet. Original PR #277 remains open until #280 is verified/reviewed.
+- All release flags remain fail-closed.
+
+**Next:** finish #280 exact-head CI and review. Then clean-port #278 sequentially (D3M-00.C).
