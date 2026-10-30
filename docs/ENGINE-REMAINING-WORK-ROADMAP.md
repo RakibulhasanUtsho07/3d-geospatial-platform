@@ -228,3 +228,8 @@ Correction to the earlier pending checkpoint: canonical combined PR #281 head `0
 - Duplicate #196 was closed without merge; its implementation patches are present in #274, which adds the real-Dhaka baseline workflow on current development. Old-base #193 was closed without merge because its generated-model-layer implementation and test are already byte-identical in development; architecture note preserved at `docs/MAP-ENGINE-MODULARIZATION.md`.
 - Main promotion PR #228 stays open/unmerged: development is 86 commits ahead / 4 behind main, 204 changed paths, merge base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c`. Inspect all four main-only commits before any promotion. Do not merge blindly.
 - Next: inspect four main-only commits, record their contents and decide safe reconciliation. D3M-01 remains blocked on the source-bound shared mask/observation bundle.
+
+
+### Main ancestry check — 2026-10-30
+
+A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its exact merge-base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c` reports 4 commits ahead, 0 behind, but **zero changed paths**. Thus the four main-only ancestry commits introduce no net tree difference relative to the merge base; the 204-path delta in PR #228 is the development-side work. Do not cherry-pick those four commits or describe them as missing code. Keep PR #228 unmerged until exact-head promotion CI/review is checked and the current development tree is intentionally approved for main. This resolves the content-loss concern, not the release authorization.
