@@ -286,3 +286,11 @@ Head SHA: `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. CI #2513 / [run 4099794973
 This is a 9-unique-path combined candidate that includes #280's mask editor plus the #278 architectural observation studio and review-history normalizer fix. Do not merge #280 and #281 independently. Parent CI #2513 passed all steps; child CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is pending/in progress.
 
 A specific integration gap is confirmed: observation exports still use `mask: null`. WP-01 must define a versioned shared mask/observation bundle bound to one source hash/dimension frame, plus invalidation and rights/reviewer controls. PR #281 does not complete that bundle or enable release gates.
+### WP-00 subtask update — BRF-05/06 clean-base ports (2026-10-30)
+
+- D3M-00.B / [PR #280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280): exact-head CI #2513 succeeded on `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, including browser/API integration. PR remains Draft pending human review.
+- D3M-00.C / [PR #282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282): clean-port of #278 on a branch whose parent is the exact #280 head; current head `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`. Six changed paths are confirmed relative to #280. CI #2526 / [run 41000728438](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000728438) was queued.
+- PR #282's base is temporarily `development` to ensure the full PR CI workflow is triggered; its diff therefore includes #280 until the parent merge. It must not merge before #280. After #280 is approved and merged, retarget #282 to development, ensure its diff becomes exactly the six BRF-06 paths, and rerun CI.
+- The original #277/#278 old-base PRs remain open as evidence, not integration candidates. Neither UI provides rights, metric, survey, georeference, or accuracy acceptance.
+
+D3M-00 remains **IN PROGRESS**. The live per-commit state and next pointer are in [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30).
