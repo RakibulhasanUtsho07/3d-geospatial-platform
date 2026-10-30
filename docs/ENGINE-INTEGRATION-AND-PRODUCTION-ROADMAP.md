@@ -306,3 +306,8 @@ D3M-00 remains **IN PROGRESS**. Continue from CI #2530, then the outstanding #27
 - Observation studio still exports `mask: null`; shared mask/observation bundle and cross-artifact tests are a D3M-01 prerequisite. Release gates remain false.
 
 See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3m-00c--canonical-brf-06-clean-base-port-2026-10-30) for exact dependency and continuation details.
+
+
+### Exact-head CI completion — PR #281 (2026-10-30)
+
+The earlier in-progress checkpoint is superseded: exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) passed on `04b62ceb910b6c63986703ec1587846a1676bc85`. Verified steps include lint, complete unit/contract tests, production build, Chromium production-server viewport API/browser integration and P2.3–P2.6 evidence uploads. PR #281 is still Draft and unmerged pending human review. D3M-00 still has ancestry/duplicate reconciliation (#274/#196, #193, #228); D3M-01 remains blocked on a shared source-bound mask+observation bundle contract and cross-artifact tests.
