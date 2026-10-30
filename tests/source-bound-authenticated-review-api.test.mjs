@@ -17,7 +17,7 @@ test("source-bound review API requires a dedicated service token and server-trus
 
 test("review API rejects caller-supplied public keys and bounds the request body", () => {
   assert.match(route, /MAX_REVIEW_BODY_BYTES = 64 \* 1024/);
-  assert.match(route, /Object\.keys\(input\)\.some/);
+  assert.match(route, /Object\\.keys\\(payload\\)\\.some/);
   assert.match(route, /Trusted public keys are server-configured/);
   assert.match(route, /signatureBase64/);
 });
