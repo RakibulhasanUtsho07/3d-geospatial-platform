@@ -336,3 +336,10 @@ This is metadata/diff review, not a fresh local build, deployment test, source-r
 A clean-base replacement for the old-base manual mask editor PR #277 has been opened as Draft PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280). Branch `feat/brf05-07-manual-mask-review-dev-20261030` is based exactly on `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, with head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. It changes four paths only (editor HTML/JS, Playwright browser spec, additive BRF report section); it does not cherry-pick the stale branch history or modify API/schema/release gates.
 
 Exact-head CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was in progress at the last check. No tests are claimed passed for this clean port yet. Keep #277 as source evidence until #280 is reviewed and accepted. D3M-00 remains in progress.
+### D3M-00.C — observation-review clean-base port
+
+The old-base BRF-06 studio from PR #278 is now selectively ported onto a branch descended from the validated mask-editor PR #280 head. The combined Draft PR is [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), head `f0de3b3bb2e4dd4aa7b3eafdec0483c93faff548`, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, 9 unique paths / 917 additions / 0 deletions. It includes the #280 prerequisite; do not merge #280 and #281 separately.
+
+Parent PR #280 exact-head CI #2513 passed all steps, including browser/API integration, but the PR remains Draft with no review. Combined PR #281 exact-head CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is in progress; no new-base pass is claimed yet.
+
+The observation studio still exports `mask: null`; it is not yet integrated with the manual mask editor. The shared source-bound mask/observation bundle, invalidation rules, rights/camera linkage, and authenticated review history remain open. JSON event validation does not provide a cryptographically signed audit log. All ground-truth/publication/map-ready gates remain false.
