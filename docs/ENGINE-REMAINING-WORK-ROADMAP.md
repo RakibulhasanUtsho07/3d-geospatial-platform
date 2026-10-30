@@ -152,3 +152,19 @@ The codebase still needs real-data validation and product-level completion. The 
 - Missing inputs or unpinned hashes stay incomplete; hash mismatches and explicit geometry/view/model-binding failures are not silently downgraded. No combined accuracy percentage is produced and publication/automatic approval remain disabled.
 - Added focused regression tests and a runbook/template. Tests validate policy and evidence linkage only; they do not establish the accuracy of a specific real building.
 - **Acceptance still pending:** no actual 2–3 building source/reference pack with independently verified dimensions, checked permissions, surveyed controls and human-reviewed renders was available in this session. Do not mark the models accurate until those inputs are supplied and the evidence report passes review.
+
+
+---
+
+## Dynamic 3D Map — live continuation status (2026-10-30)
+
+**D3M-00: IN PROGRESS.** The live branch and critical-PR snapshot is recorded in the [D3M-00 execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30). Do not restart the broad audit from zero; re-fetch the live SHAs and continue from its exact next-task pointer.
+
+- Integration baseline observed: \`development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\`; \`main@7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b\`; \`rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91\`.
+- \`development\` vs \`main\` is diverged (86 ahead / 4 behind); \`rakibul-hasan\` vs \`development\` is diverged (10 ahead / 89 behind). Do not merge stale histories wholesale.
+- PR #274 is the stronger current-base map-UX candidate; PR #196 has duplicate overlapping patches and stays open until #274 review.
+- PRs #277 and #278 are BRF-05/06 feature deltas on an old base. Clean-port them one at a time from a newly re-confirmed \`development\` head.
+- PR #228 is not ready for promotion based only on green CI; reconcile the main-only commits and review the exact merge candidate.
+- D3M-00 has not passed acceptance; no application code or release flags changed during the audit pass.
+
+**Next exact task:** D3M-00.B — create a new branch from the latest verified \`development\` head and selectively port only PR #277's manual mask editor, browser test, and additive report section. Do not cherry-pick the old branch history. Record exact-head focused/browser/full-CI results before moving to D3M-00.C (#278).
