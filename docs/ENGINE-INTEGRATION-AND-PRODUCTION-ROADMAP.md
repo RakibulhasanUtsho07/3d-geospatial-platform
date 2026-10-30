@@ -6,6 +6,8 @@
 
 This roadmap converts the repository audit into dependency-ordered work packages. It is an execution plan, not a claim that the work is complete. Update each item only with exact commit, tests, evidence, and remaining limitations.
 
+For the specific user-facing journey — building information/images → candidate 3D model → independent metric/geospatial validation → approval → automatic loading in the Dhaka map — follow the more granular [Dynamic 3D Map End-to-End Execution Plan](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md). Its D3M-00 through D3M-13 tasks are the execution checklist for that product workflow; this document remains the cross-project dependency roadmap.
+
 ## Execution rules
 
 1. Work in isolated, reviewable PRs. Do not merge a feature branch simply because its tests pass.
@@ -189,6 +191,31 @@ This roadmap converts the repository audit into dependency-ordered work packages
 - [ ] Network routing claims use a real routable network.
 - [ ] Accessibility/browser matrix and security review pass.
 - [ ] Deployment, rollback, backup and incident runbooks exist.
+
+### WP-11 — Dynamic 3D Map end-to-end building workflow
+**Priority:** P0/P1 · **Dependencies:** WP-00 through WP-07; publication and production work in WP-07/WP-10
+
+**Scope**
+- Deliver the integrated user journey from map-selected building and rights-cleared media intake through job execution, candidate review, evidence-backed placement, approved publication, and automatic loading in the existing Cesium map.
+- Reuse the current media intake, generation queue/worker, procedural/TripoSR/COLMAP routes, GLB QA, ground-control tools, review/publisher, generated-model layer, and viewport lifecycle rather than creating a parallel viewer.
+- Define the shared Building/SourceAsset/GenerationJob/Candidate/ReviewDecision/PlacementEvidence/PublishedModel contract and stage-state machine.
+- Add the map-facing upload/job-status/review experience; keep raw media and reviewer evidence private.
+- Make route selection evidence-driven. A single image remains an AI proposal; multi-view photogrammetry requires rights, same-building, overlap, and camera/axis evidence; procedural generation must not be described as image reconstruction.
+- Separate building identity, horizontal georeference, metric scale, vertical datum, geometry QA, texture QA, and human approval.
+- Connect approved publication to persistent viewport-aware model discovery/loading; do not require manual GLB copying or map panel coordinate entry.
+- Harden durable storage, identity/roles, worker recovery, audit, retention, and rollback before production.
+
+**Acceptance**
+- [ ] The exact end-to-end flow is browser-tested from upload to job status, review, publication, map load, page reload, version change, and rollback.
+- [ ] Source, model, QA, review, placement, and publication hashes remain bound end-to-end.
+- [ ] A generated model cannot become map-ready from a worker success status alone.
+- [ ] A missing coordinate, metric scale, vertical datum, rights grant, or building identity remains an explicit blocker.
+- [ ] Published models load using verified placement metadata and do not regress existing Overture, road, selection, or viewport behavior.
+- [ ] At least three independently referenced buildings are evaluated separately before broad production claims.
+- [ ] CI, human visual review, rights review, and independent survey checks are recorded for the exact candidate.
+- [ ] No universal 90% accuracy claim is made without a documented independent holdout protocol.
+
+**Execution detail:** [DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md), tasks D3M-00–D3M-13.
 
 ## Dependency overview
 
