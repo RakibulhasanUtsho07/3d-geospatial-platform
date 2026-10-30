@@ -249,3 +249,26 @@ flowchart TD
 - [ ] Human review completed for visual, rights, survey, and publication decisions.
 - [ ] Remaining limitations and external dependencies documented.
 - [ ] Release flags remain false unless their individual acceptance criteria are met.
+
+---
+
+## WP-00 live execution record — 2026-10-30
+
+**Status: IN PROGRESS — branch inventory and first critical-PR triage recorded; clean-base ports and release ancestry reconciliation remain open.**
+
+Current observed refs:
+- main@7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b
+- development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076
+- rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91
+
+Findings:
+- development vs main: diverged, 86 ahead / 4 behind. Hold PR #228 until the main-only commit content and exact merge candidate are reviewed.
+- rakibul-hasan vs development: diverged, 10 ahead / 89 behind. Do not bulk-promote this historical branch.
+- #274 is the stronger map-UX candidate than #196: the two overlap on 23 files and 21 common patches are identical; #274 also carries a real-Dhaka baseline workflow. #196 remains open pending #274 review.
+- #277/#278 are old-base BRF-05/06 deltas. Port selectively and sequentially from a fresh development branch; do not merge their old-base history.
+- #275 and #276 stay isolated as distinct P3.6 tile and P3.7 floor-plan workstreams.
+- #193's generated-model-layer.ts blob is already identical on development, and development's Cesium adapter delegates generated-model lifecycle calls. Verify residual PR-only docs/tests before closing as superseded.
+
+Exact run IDs and the full decision matrix live in [D3M-00 execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30). No source code, branch refs, PR states, or release flags were changed during this documentation update. Application tests were not rerun locally.
+
+**Next action:** D3M-00.B — clean-port only PR #277's mask editor and regression coverage onto a newly re-confirmed development head, then record exact branch/base/head and CI before starting the sequential #278 port.
