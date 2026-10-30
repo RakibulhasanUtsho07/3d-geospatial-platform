@@ -203,3 +203,18 @@ A minimal bundle shape is shown below. The entries in angle brackets are placeho
 \`\`\`
 
 The CLI report is diagnostic evidence, not the final sign-off. The reference silhouette must be independently reviewed and source-bound; the candidate silhouette must have been extracted from the exact source-camera render. The candidate GLB still needs the existing geometry/topology/texture QA and visual review workflows. A \`review-required\` report is not approval, and \`incomplete\` / \`not-comparable\` should be treated as blocked acceptance.
+
+
+## Manual source-bound mask authoring/editor (clean development-base port)
+
+A local-only browser editor is added at `/experimental/building-mask-review.html` (script: `public/experimental/building-mask-review.js`). This fills the authoring gap where the existing backend validator and review-packet CLI accepted reviewed masks, but mask creation still required external tooling.
+
+- Loads a user-selected PNG/JPEG/WebP locally; rejects unsupported files, inputs larger than 30 MiB, and images above 15 million pixels. Computes SHA-256 from the exact source file bytes and records decoded dimensions.
+- Supports source-pixel brush painting and erasing using a stable top-left pixel coordinate convention. Exports an opaque black/white PNG (background 0, building foreground 255) matching source dimensions.
+- Exports a JSON result compatible with the existing `building-mask-provider-v1` contract: exact source ID/hash, provider identity/version/configuration hash, encoded-mask SHA-256/byte count/dimensions/encoding, and review status/confidence.
+- Existing mask correction requires the matching manifest and validates source identity/hash/bytes/dimensions, exact encoded-mask hash/byte length, and binary opaque pixels. Editing resets the review state.
+- A mask defaults to `assessment.status: proposed`. A named operator may attest a review; reviewer identity and confidence remain operator-supplied rather than independently authenticated.
+- Policy flags remain false: `acceptanceEligible`, `publicationEligible`, `mapReady`, `automaticApproval`, and `publishable`.
+- Browser coverage checks source hashing, binary output pixels, output hashes/byte counts, proposed/reviewed states, reviewer identity requirements, mask round-trip import, and stale source-hash rejection. The spec runs as part of `npm run test:map-browser`.
+
+**Boundary:** this is local manual annotation tooling, not automatic segmentation, physical building identification, rights adjudication, camera calibration, hidden-surface inference, metric/survey truth, or publication approval. It must remain review-only until independent review and real-building evidence pass.
