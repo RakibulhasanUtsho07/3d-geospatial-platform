@@ -46,6 +46,7 @@ on:
       - feat/final-merge-cleanup
       - feat/texture-projection-validation
       - feat/p2-7-viewport-tile-selectivity
+      - feat/brf06-observation-review-dev-20261030
       - feat/p2-8-startup-coverage-alignment
       - feat/p2-9-startup-tile-fetch-cost
       - feat/p2-10-viewport-fetch-cost-evidence
@@ -61,6 +62,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
       - feat/brf46-source-operation-scope-gate
+      - feat/d3m01c-candidate-evidence-handoff-20261030
   pull_request:
     branches:
       - main
