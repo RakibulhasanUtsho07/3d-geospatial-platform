@@ -193,3 +193,12 @@ The codebase still needs real-data validation and product-level completion. The 
 - Important gap recorded: observation batches still have `mask: null`; a shared source-bound mask/observation contract remains D3M-01/WP-01 work.
 
 **Next:** resolve #281 CI, review combined diff, then define the unified BRF-05/06 evidence bundle. Release gates stay false.
+
+### D3M-00.B / D3M-00.C — BRF-05/06 clean-base ports (2026-10-30)
+
+- **D3M-00.B:** [PR #280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), exact head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, exact base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`. Full CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) succeeded, including browser/API steps. PR remains Draft with no review submissions.
+- **D3M-00.C:** [PR #282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282), exact head `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`, stacked on #280. Its six-path delta against #280 has been checked; the temporary nine-path diff against development includes the parent work. Exact-head CI #2526 / [run 41000728438](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000728438) was queued at the last check.
+- **Merge order is mandatory:** do not merge #282 before #280. After #280 has human review and merges, retarget #282 to development, verify exactly six BRF-06 paths remain in its diff, then rerun exact-head CI. Original old-base PRs #277/#278 remain open as source evidence until their replacements are accepted.
+- All ground-truth, acceptance, publication, map-ready and automatic-approval flags remain false. CI validates code paths, not physical-building truth.
+
+**Next:** inspect #282 run #2526 at its exact head. Then complete remaining D3M-00 duplicate/release-ancestry work as recorded in the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30).
