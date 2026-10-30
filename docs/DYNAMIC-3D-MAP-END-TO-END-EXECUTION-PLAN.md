@@ -132,15 +132,16 @@ Each phase must be implemented in a focused PR with exact-head tests. A phase is
 
 ### D3M-00 — Reconcile integration branches and PR dependencies
 
-**Priority:** P0 · **Status:** Required first · **Dependencies:** none
+**Priority:** P0 · **Status:** IN PROGRESS — live branch/PR inventory captured; reconciliation and clean-base ports remain open · **Dependencies:** none
 
 **Purpose:** Establish one safe source of truth before connecting more components.
 
 **Tasks**
-- [ ] Re-read current `main`, `development`, and `rakibul-hasan` SHAs.
-- [ ] Compare open PR base/head SHAs, merge bases, changed paths, stacked dependencies, and exact-head CI.
-- [ ] Map existing generation, media upload, queue/worker, review, publish, model-layer, BRF, and 3D Tiles PRs to this plan.
-- [ ] Identify duplicate or superseded implementations by file and commit, not by branch name.
+- [x] Re-read current `main`, `development`, and `rakibul-hasan` SHAs (snapshot below; refresh before each write/merge).
+- [x] Compare selected pipeline-critical PR base/head SHAs, changed paths, and exact-head CI; record unresolved ancestry below.
+- [x] Map the currently identified map UX, BRF-05/06, generated-model-layer, 3D Tiles and floor-plan PRs to this plan.
+- [x] Identify the #274/#196 duplicate overlap and the old-base #277/#278 ports by exact changed paths/patch comparison.
+- [ ] Finish the `main`/`development` ancestry and content reconciliation, clean-port old-base work, and close only PRs proven redundant.
 - [ ] Agree the canonical integration base for each work package; preserve the `rakibul-hasan → development → main` promotion policy where ancestry permits.
 - [ ] Do not bulk-merge stale branches or force-push user work.
 
@@ -510,3 +511,70 @@ Status meanings:
 - **ACCEPTED:** required technical and human acceptance gates have passed.
 
 Never upgrade a task to VERIFIED or ACCEPTED from code presence, documentation, a synthetic fixture, or an unrelated green CI run.
+
+
+---
+
+## 10. D3M-00 live execution log — 2026-10-30
+
+**Status:** IN PROGRESS. The repository snapshot and a first critical-PR dependency map are recorded. Branch divergence is not reconciled, old-base BRF work has not yet been ported, and no PR has been merged or closed.
+
+### 10.1 Exact branch baseline
+
+| Ref | Exact SHA observed | Finding |
+|---|---|---|
+| \`main\` | \`7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b\` | Default branch |
+| \`development\` | \`98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\` | Current integration candidate |
+| \`rakibul-hasan\` | \`01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91\` | Stale relative to development |
+| \`docs/full-repository-gap-audit-20261030\` | \`3a77866039c575bf01b782e479618ba4fde86d8c\` before this log update | Documentation-only continuation branch |
+
+The branch inventory was paged to completion and returned 244 branch names. The counts below are point-in-time Git ancestry counts, not file-equivalence claims:
+
+- \`development\` compared with \`main\`: **86 ahead / 4 behind**, diverged, merge base \`e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c\`.
+- \`rakibul-hasan\` compared with \`development\`: **10 ahead / 89 behind**, diverged. Its ten unique commits include floor-plan raster-trace work and BRF-05–07 evidence work; the old branch history must not be merged wholesale.
+- The four commits reachable only from the inspected \`main\` head include a documentation status change, an earlier development-promotion preparation, the previous release merge, and PR #205's BRF-05–07 integration. These are ancestry/content reconciliation items, not automatic merge instructions.
+
+### 10.2 Pipeline-critical PR decision matrix
+
+CI states below are GitHub Actions results observed for the exact listed head at audit time. A green run proves only its declared test matrix on that commit; it does not replace source-rights, survey, visual, reviewer, or deployment acceptance.
+
+| PR | Base → head (short SHA) | Exact-head CI / evidence observed | D3M decision |
+|---|---|---|---|
+| [#228](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/228) | \`main@7d90b76\` → \`development@98b2fa5\` | CI #2282 and BRF-05–07 #187 passed on development SHA \`98b2fa5\` | HOLD release promotion. Resolve the 4 main-only ancestry/content commits and obtain review on the exact merge candidate before promotion. |
+| [#279](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/279) | \`development@98b2fa5\` → \`docs/...@3a77866\` | CI #2508 was in progress when checked | Keep Draft; documentation-only. This log is added on this branch; re-check exact-head CI after the new commit. |
+| [#274](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/274) | \`development@98b2fa5\` → \`feat/p3-4-map-ux-imagery-diagnostics-dev-20261029@439e5c8\` | CI #2285 and Real-Dhaka Browser Baseline #45 passed on exact head | Canonical map-UX candidate for review. Keep Draft/unmerged until human diff and screenshot/evidence review. |
+| [#196](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/196) | \`development@98b2fa5\` → \`fix/map-viewport-ux-current-base-20261026@f307d57\` | CI #1855 passed on exact head | Duplicate/superseded candidate: 23 paths overlap #274; 21 common file patches are byte-identical, and the two remaining differences are package/workflow placement/order. #274 additionally contains the real-Dhaka baseline workflow. Do not close #196 until #274 is reviewed and its unique value is confirmed. |
+| [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277) | \`rakibul-hasan@01fc0caf\` → \`feat/brf05-07-manual-mask-review@df684a4\` | CI #2495 passed on exact head | Do not merge this old-base branch. Clean-port only its mask-editor/report/browser-test delta onto a branch created from the current development head, then rerun focused and full CI. |
+| [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278) | \`rakibul-hasan@01fc0caf\` → \`feat/brf06-architectural-observation-review-studio@22be966\` | CI #2503 passed on exact head | Do not merge this old-base branch. Port separately after the mask-editor work; reconcile its observation-schema change and shared BRF report update against the new development head. |
+| [#275](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/275) | \`development@98b2fa5\` → \`feat/p3-6-multibuilding-tiles-package@36a2e5f\` | CI #2501 and P3.6 package workflow #188 passed on exact head | Keep Draft for review. This validates a bounded footprint-extrusion/tiles path; synthetic 8 m heights and footprint baselines are not image-derived facade reconstruction or independent survey truth. |
+| [#276](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/276) | \`development@98b2fa5\` → \`feat/p3-7-floor-plan-vector-calibration@0e907de\` | CI #2424 and P3.7 workflow #20 passed on exact head | Keep as a separate interior/floor-plan workstream; it is not a prerequisite for the first exterior-building map workflow. |
+| [#193](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/193) | old \`rakibul-hasan\` base \`fa08cb5\` → \`integration/generated-model-layer-current-head@ddcbc33\` | No new exact-head CI was relied on in this audit | Likely functionally superseded on development: \`generated-model-layer.ts\` has the exact same blob SHA \`40f79953cf2202dab79200134643432232920ab3\`, and current \`cesium-adapter.ts\` already instantiates the layer and delegates add/update/remove. Do not close until the remaining PR-specific diff/docs/tests are checked. |
+
+### 10.3 Concrete reconciliation conclusions
+
+1. **Do not merge #228 yet.** The PR is open and mergeable according to GitHub metadata, but it promotes 86 commits across 204 files and the base has four commits not reachable from development. A clean mergeability signal does not explain these historical/content differences. Review the merge-base delta and run acceptance checks on the final candidate.
+2. **Use #274 as the map-UX review candidate; hold #196 as a duplicate.** Patch-level comparison found 21 exact common patches out of 23 shared files; #274's extra baseline workflow makes it the stronger candidate. Do not close either PR before reviewing #274's current diff/evidence.
+3. **Port #277 and #278 from the current development base.** Both source PRs target the old \`rakibul-hasan\` head, and development is 89 commits ahead of that base. The PR-specific changes are small enough to port selectively; preserve each original PR as evidence until its replacement is validated. #277 and #278 both update the same BRF report, so port them sequentially rather than in parallel.
+4. **Keep #275 and #276 isolated.** Their exact-head CI is green, but their acceptance scope is distinct; tile footprint/placement checks must not be described as photo-to-3D reconstruction or survey accuracy, and floor-plan calibration is a separate interior workflow.
+5. **Do not re-port #193 blindly.** The generated model layer file is byte-identical on development and its Cesium adapter already delegates the public lifecycle methods. Finish reviewing PR-only doc/test changes before deciding it is fully superseded.
+6. **No branch refs, code, release flags, or PR states were changed by this audit.** No application tests were run locally in this documentation pass; CI states above are remote GitHub workflow records.
+
+### 10.4 D3M-00 checklist status
+
+- [x] Read exact branch heads for main, development, rakibul-hasan, and the docs continuation branch.
+- [x] Enumerate the repository branch names (244 returned across paged results).
+- [x] Inspect the principal map UX, BRF-05/06, 3D Tiles, floor-plan, generated-model-layer, docs, and release PR metadata.
+- [x] Compare #274/#196 at patch level and identify duplicate ownership.
+- [x] Compare old-base BRF branches with development and identify why whole-branch merges are unsafe.
+- [ ] Reconcile the four main-only commits and final #228 merge candidate.
+- [ ] Clean-port #277 onto a new branch based exactly on verified development; add regression tests and require exact-head CI.
+- [ ] Clean-port #278 sequentially, after #277's schema/report state is settled.
+- [ ] Review #274 and decide whether #196 can be closed as duplicate.
+- [ ] Finish #193 PR-only diff review before marking superseded.
+- [ ] Re-check all critical PRs, review threads, and CI after each branch changes; do not mark D3M-00 complete until the selected integration path has no unresolved ancestry or duplicate ownership.
+
+### 10.5 Next task — exact continuation pointer
+
+**Start with D3M-00.B: clean-port PR #277's manual mask editor from a new branch whose parent is exactly \`development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\`.**
+
+Before writing code, re-fetch the current development head and the four source files in #277's PR diff. Apply only the PR-specific changes (editor HTML, editor JS, browser spec, and the additive report section) to the fresh base; do not cherry-pick its six-commit old-base history. Inspect the report's current end before applying the additive section. Run the focused browser test and \`npm run test:map-browser\`, then lint/build/full CI as required by the current workflow. If the head/base changes while working, stop and rebase the plan against the new observed SHA. After this port, update this execution log with the new branch, exact base/head SHAs, changed paths, exact workflow runs, and the next task (**D3M-00.C: clean-port #278**).
