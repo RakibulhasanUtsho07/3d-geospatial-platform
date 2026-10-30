@@ -58,7 +58,7 @@ function validateObservationBatch(batch,source,maskSha256){
   if(item.reviews!==undefined){
    if(!Array.isArray(item.reviews)||item.reviews.length>100||(item.reviews.length&&!item.originalProposal))throw new Error("Append-only review history is malformed.");
    for(const review of item.reviews)if(!review||!["reviewed","rejected"].includes(review.decision)||!review.reviewerId?.trim()||
-      !Number.isFinite(Date.parse(review.reviewedAt||""))||(typeof review.notes==="string"&&review.notes.length>2000))throw new Error("A review event is malformed.");
+      !Number.isFinite(Date.parse(review.reviewedAt||""))||(review.notes!==undefined&&(typeof review.notes!=="string"||review.notes.length>2000)))throw new Error("A review event is malformed.");
    if(item.status!=="proposed"&&item.reviews.length){const last=item.reviews.at(-1);if(last.decision!==item.status||last.reviewerId!==item.reviewedBy||
       new Date(last.reviewedAt).toISOString()!==new Date(item.reviewedAt).toISOString())throw new Error("Current observation state differs from its latest review event.");}
   }
