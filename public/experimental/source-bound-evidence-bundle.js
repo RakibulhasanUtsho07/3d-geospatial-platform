@@ -89,7 +89,7 @@ async function build(){
   if(!mask||mask.sha256?.toLowerCase()!==maskSha256||mask.bytes!==maskBytes.byteLength||mask.width!==sourceSize.width||mask.height!==sourceSize.height||
      mask.encoding!==MASK_ENCODING||mask.coordinateConvention!==MASK_COORDINATES||mask.backgroundValue!==0||mask.foregroundValue!==255)
    throw new Error("Mask PNG bytes, dimensions or encoding do not match its manifest.");
-  if(b.schemaVersion!=="1.0.0"||b.coordinateConvention!==OBS_COORDINATES||b.source?.id!==src.sourceId||
+  if(b.schemaVersion!=="1.0.0"||!safeId(b.batchId)||!Number.isFinite(Date.parse(b.createdAt||""))||b.coordinateConvention!==OBS_COORDINATES||b.source?.id!==src.sourceId||
      b.source?.sha256?.toLowerCase()!==sourceSha256||b.source?.width!==sourceSize.width||b.source?.height!==sourceSize.height||
      !safeId(b.buildingId)||!safeId(b.viewId)||!Array.isArray(b.observations)||b.observations.length>2000)
    throw new Error("Observation batch must match the exact source ID, bytes, dimensions and pixel coordinate convention.");
