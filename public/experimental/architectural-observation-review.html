@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark">
+<title>Architectural observation review studio</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#0b1220;color:#e5edf8}*{box-sizing:border-box}body{margin:0}main{max-width:1450px;margin:auto;padding:22px}
+h1{font-size:clamp(1.4rem,3vw,2rem);margin:0 0 8px}h2{font-size:1.05rem;margin:0 0 13px}p{color:#a9bad2;line-height:1.5}
+.intro{max-width:1000px;margin-bottom:18px}.warning{border-left:3px solid #d8a64d;background:#261f15;color:#f5dca9;padding:12px;border-radius:4px;font-size:.88rem;line-height:1.5}
+.layout{display:grid;grid-template-columns:minmax(290px,370px) minmax(0,1fr);gap:18px;margin-top:18px;align-items:start}
+.panel{border:1px solid #33445e;border-radius:12px;background:#111c2d;padding:17px;min-width:0}
+label{display:block;color:#d5e1f2;font-size:.9rem;margin:12px 0 6px}input,select,button,textarea{font:inherit}
+input[type=text],input[type=file],select,textarea{width:100%;border:1px solid #526783;border-radius:8px;padding:9px;background:#0b1422;color:#e5edf8}
+textarea{min-height:70px;resize:vertical}input[type=range]{width:100%}input:disabled,select:disabled,textarea:disabled{opacity:.55}
+button{border:1px solid #5272a3;border-radius:8px;padding:9px 11px;background:#1f4e86;color:white;cursor:pointer}button.secondary{background:#1a2638;border-color:#526783}button.danger{background:#552b3a;border-color:#875064}button:disabled{opacity:.4;cursor:not-allowed}
+.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}.hint,.status,.stats{font-size:.84rem;line-height:1.45;color:#a9bad2;overflow-wrap:anywhere}
+.status{padding:10px;border:1px solid #354b68;border-radius:8px;background:#17263a;margin-top:10px}.status[data-kind=error]{color:#ffd2d2;background:#321b28;border-color:#8c4b57}.status[data-kind=success]{color:#d0f8df;background:#143024;border-color:#397653}.status[data-kind=warning]{color:#ffe5ad;background:#302819;border-color:#81682c}
+.meta{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere}.grid-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stage-wrap{min-height:220px;padding:12px;background:#080d16;border:1px solid #33445e;border-radius:12px;overflow:auto}
+#image-stage{position:relative;width:fit-content;max-width:100%;margin:auto}#source-image{display:block;width:100%;max-width:1100px;height:auto}
+#annotation-canvas{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.toolbar{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px}.toolbar label{margin-top:0}
+.observation-list{display:flex;flex-direction:column;gap:7px;max-height:290px;overflow:auto;margin-top:10px}
+.observation-item{display:flex;align-items:center;justify-content:space-between;gap:9px;text-align:left;width:100%;background:#0d1726;border-color:#344a68}
+.observation-item[aria-pressed=true]{border-color:#ffcf70;box-shadow:inset 0 0 0 1px #ffcf70}
+.obs-label{min-width:0}.obs-label strong{display:block;overflow-wrap:anywhere}.obs-label small{display:block;color:#a9bad2;margin-top:3px}
+.badge{font-size:.72rem;padding:3px 6px;border-radius:5px;background:#4a3e20;color:#fbe5a9;white-space:nowrap}.badge.reviewed{background:#214a37;color:#c5f5d5}.badge.rejected{background:#522a37;color:#ffd1d1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;color:#a9bad2;font-size:.82rem}.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;margin-right:5px;background:#70c6ff}.dot.selected{background:#ffcf70}.dot.rejected{background:#fa7777}
+hr{border:0;border-top:1px solid #33445e;margin:18px 0}[hidden]{display:none!important}
+@media(max-width:960px){.layout{grid-template-columns:1fr}main{padding:14px}}
+@media(max-width:540px){.toolbar,.grid-two{grid-template-columns:1fr}.panel{padding:13px}}
+</style>
+</head>
+<body><main>
+<div class="intro"><h1>Architectural observation review studio</h1>
+<p>Annotate rooflines, domes, arches, windows, columns and other visible architectural features directly on one source photo. Each observation records original-image pixel coordinates, visibility, confidence and source/view provenance. Review decisions keep an append-only history.</p></div>
+<div class="warning">This tool records human observations; it does not recognize buildings, create ground truth, estimate metric dimensions or approve publication. A “reviewed” item is an operator attestation only. Keep occluded, not-visible and not-detected states explicit instead of inventing hidden architecture.</div>
+<div class="layout">
+<section class="panel">
+<h2>1. Source identity</h2>
+<label for="source-file">Original image (PNG, JPEG or WebP)</label><input id="source-file" type="file" accept="image/png,image/jpeg,image/webp">
+<div class="grid-two"><div><label for="building-id">Building ID</label><input id="building-id" type="text" placeholder="ahsan-manzil"></div><div><label for="view-id">View ID</label><input id="view-id" type="text" placeholder="front"></div></div>
+<label for="source-id">Stable source ID</label><input id="source-id" type="text" placeholder="ahsan-front-view-01">
+<p class="hint">The selected image is hashed locally. Maximum 30 MiB and 15 million decoded pixels.</p>
+<div id="source-status" class="status" role="status" aria-live="polite">Choose an image and enter the building, view and source IDs.</div>
+<label>Source SHA-256</label><div id="source-hash" class="meta">Not available</div><label>Decoded dimensions</label><div id="source-dimensions" class="meta">Not available</div>
+<hr>
+<h2>4. Import / export</h2><label for="batch-file">Continue an existing observation batch</label><input id="batch-file" type="file" accept="application/json,.json" disabled>
+<div class="buttons"><button id="import-batch" class="secondary" type="button" disabled>Validate and import</button><button id="export-batch" type="button" disabled>Download observation JSON</button></div>
+<div id="batch-status" class="status" role="status" aria-live="polite">Load a source image first.</div>
+</section>
+<section class="panel">
+<h2>2. Annotate a feature in source pixels</h2>
+<div class="toolbar">
+<div><label for="category">Feature category</label><select id="category">
+<option value="silhouette-bounds">Silhouette bounds</option><option value="roofline-segment">Roofline segment</option><option value="outer-corner">Outer corner</option><option value="floor-band">Floor band</option><option value="facade-region">Facade region</option><option value="window-candidate">Window candidate</option><option value="door-candidate">Door candidate</option><option value="balcony-candidate">Balcony candidate</option><option value="visible-occluder">Visible occluder</option><option value="arch-candidate">Arch candidate</option><option value="column-candidate">Column candidate</option><option value="dome-candidate">Dome candidate</option><option value="cornice-candidate">Cornice candidate</option><option value="pediment-candidate">Pediment candidate</option><option value="staircase-candidate">Staircase candidate</option><option value="parapet-candidate">Parapet candidate</option><option value="ornament-candidate">Ornament candidate</option>
+</select></div>
+<div><label for="geometry-type">Geometry tool</label><select id="geometry-type"><option value="Point">Point</option><option value="LineString">Line</option><option value="BoundingBox">Rectangle</option><option value="Polygon">Polygon</option></select></div>
+<div><label for="visibility">Visibility</label><select id="visibility"><option value="visible">Visible</option><option value="partially-occluded">Partially occluded</option><option value="occluded">Occluded</option><option value="not-visible">Not visible in this view</option><option value="not-detected">Not detected</option></select></div>
+</div>
+<div class="grid-two"><div><label for="confidence">Self-assessed confidence: <span id="confidence-value">0.50</span></label><input id="confidence" type="range" min="0" max="1" step="0.05" value="0.5"></div><div><label>Drawing instruction</label><div id="coordinate-help" class="status">Click once to mark a point.</div></div></div>
+<div class="stage-wrap"><div id="image-stage" hidden><img id="source-image" alt="Original building source image"><canvas id="annotation-canvas" aria-label="Source pixel annotation canvas. Click for points or vertices."></canvas></div><div id="empty-stage" class="hint">The original source image and annotation overlay will appear here.</div></div>
+<div class="legend"><span><i class="dot"></i>Proposed</span><span><i class="dot selected"></i>Selected</span><span><i class="dot rejected"></i>Rejected</span></div>
+<div class="buttons"><button id="finish-geometry" disabled type="button">Finish line / polygon</button><button id="undo-point" disabled class="secondary" type="button">Undo vertex</button><button id="cancel-geometry" disabled class="secondary" type="button">Cancel drawing</button><button id="add-no-geometry" disabled class="secondary" type="button" hidden>Add without geometry</button></div>
+<p id="drawing-stats" class="stats">Coordinates are stored in the original image's top-left pixel space, not screen pixels.</p>
+<div id="edit-status" class="status" role="status" aria-live="polite">Load a source image to enable annotation.</div>
+<hr>
+<h2>3. Review and preserve observation history</h2>
+<p class="hint">Select an observation to review it. Reopen a decision as proposed without deleting its original proposal or earlier review events.</p>
+<div id="observation-list" class="observation-list" aria-label="Architectural observations"></div>
+<div class="grid-two"><div><label for="reviewer-id">Reviewer identifier</label><input id="reviewer-id" type="text" placeholder="Reviewer ID" disabled></div><div><label>Selected state</label><div id="selected-status" class="status">No observation selected.</div></div></div>
+<label for="review-notes">Review notes (maximum 2,000 characters)</label><textarea id="review-notes" maxlength="2000" placeholder="Visible evidence, uncertainty or reason for rejection." disabled></textarea>
+<div class="buttons"><button id="review-observation" type="button" disabled>Mark reviewed</button><button id="reject-observation" class="danger" type="button" disabled>Reject</button><button id="reopen-observation" class="secondary" type="button" disabled>Reopen as proposed</button></div>
+<div id="review-status" class="status" role="status" aria-live="polite">Review decisions do not enable ground-truth or publication flags.</div>
+</section></div></main>
+<script src="/experimental/architectural-observation-review.js" defer></script></body></html>
