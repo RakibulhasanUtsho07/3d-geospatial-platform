@@ -330,3 +330,9 @@ The detailed PR-by-PR continuation matrix is maintained in [Dynamic 3D Map — D
 - #193's generated-model-layer module blob is identical to the current development file, and current development's Cesium adapter already delegates model lifecycle methods. A final PR-specific docs/tests comparison is still needed before closing it as superseded.
 
 This is metadata/diff review, not a fresh local build, deployment test, source-rights decision, survey, or architectural visual acceptance. No application code, branch refs, PR state, or release flags changed during this addendum. D3M-00 remains **IN PROGRESS**.
+
+### D3M-00.B implementation note — 2026-10-30
+
+A clean-base replacement for the old-base manual mask editor PR #277 has been opened as Draft PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280). Branch `feat/brf05-07-manual-mask-review-dev-20261030` is based exactly on `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, with head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. It changes four paths only (editor HTML/JS, Playwright browser spec, additive BRF report section); it does not cherry-pick the stale branch history or modify API/schema/release gates.
+
+Exact-head CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was in progress at the last check. No tests are claimed passed for this clean port yet. Keep #277 as source evidence until #280 is reviewed and accepted. D3M-00 remains in progress.
