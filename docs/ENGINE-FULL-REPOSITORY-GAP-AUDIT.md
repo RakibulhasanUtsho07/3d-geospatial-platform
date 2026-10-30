@@ -360,3 +360,8 @@ Duplicate PR #282 was closed without merge and points to #281. Do not merge #280
 - Observation studio still exports `mask: null`; shared mask/observation bundle and cross-artifact tests are a D3M-01 prerequisite. Release gates remain false.
 
 See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3m-00c--canonical-brf-06-clean-base-port-2026-10-30) for exact dependency and continuation details.
+
+
+### Exact-head CI completion — PR #281 (2026-10-30)
+
+Correction to the pending status above: CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) completed successfully on exact head `04b62ceb910b6c63986703ec1587846a1676bc85`. All workflow job steps passed, including the full unit/contract suite, lint, production build, Chromium production-server viewport API/browser integration and P2.3–P2.6 evidence uploads. PR #281 remains Draft/open/unmerged pending human review; no merge or release-gate change is implied. The mask/observation bundle remains unintegrated (`mask: null`).
