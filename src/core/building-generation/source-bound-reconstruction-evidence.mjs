@@ -20,6 +20,10 @@ function safeId(value){return typeof value==="string"&&SAFE_ID.test(value);}
 function requireFalseFlags(policy,label){
  if(!isObject(policy)||FALSE_FLAGS.some(key=>policy[key]!==false))throw new TypeError(label+" must explicitly keep all release and truth flags false.");
 }
+function existingReleaseFlagsFalse(policy,label){
+ const keys=["acceptanceEligible","publicationEligible","mapReady","automaticApproval"];
+ if(!isObject(policy)||keys.some(key=>policy[key]!==false)||Object.keys(policy).some(key=>!keys.includes(key))) throw new TypeError(label+" must contain only recognized release flags, all explicitly false.");
+}
 function linkSource(source,bundle,label){
  if(!isObject(source)||source.id!==bundle.source.id||source.sha256?.toLowerCase()!==bundle.source.sha256)
   throw new TypeError(label+" must reference the exact visual-bundle source ID and SHA-256.");
@@ -89,8 +93,8 @@ export function buildSourceBoundReconstructionEvidence(input={}){
  const rightsComplete=rightsLinked&&rightsReport.status==="rights-admission-complete-human-review-required"&&
   Array.isArray(rightsReport.blockers)&&rightsReport.blockers.length===0&&
   exactRightsReport.status==="evidence-complete-human-review-required";
- if(isObject(rightsManifest.releaseFlags))requireFalseFlags(rightsManifest.releaseFlags,"rights register release flags");
- if(isObject(rightsReport.releaseFlags))requireFalseFlags(rightsReport.releaseFlags,"rights report release flags");
+ if(isObject(rightsManifest.releaseFlags))existingReleaseFlagsFalse(rightsManifest.releaseFlags,"rights register release flags");
+ if(isObject(rightsReport.releaseFlags))existingReleaseFlagsFalse(rightsReport.releaseFlags,"rights report release flags");
 
  const cameraManifestBytes=readBytes(input.cameraManifestBytes,"camera calibration manifest");
  const cameraManifest=parse(cameraManifestBytes,"camera calibration manifest");
