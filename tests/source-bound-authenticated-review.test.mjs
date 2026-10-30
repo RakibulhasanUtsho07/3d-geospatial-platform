@@ -357,19 +357,39 @@ test("blocks continue decisions until every human check and hand-off evidence bl
   }), /vertical-datum evidence/);
 });
 
-test("allows a signed hold when geometry QA cannot parse candidate geometry but never marks it validated", async (t) => {
+test("allows a signed hold when geometry QA rejects mesh content but never marks it validated", async (t) => {
   const root = await workspace(t);
-  const { glb } = await createHandoff(root);
-  const malformed = Buffer.from("invalid candidate");
-  await writeFile(path.join(root, "candidate/model.glb"), malformed);
-  const handoffJob = await prepareSourceBoundGeometryReview({
+  const geometryInvalidGlb = createBuildingGlb((gltf) => { gltf.meshes = []; });
+  await createHandoff(root, { glb: geometryInvalidGlb });
+  const keys = makeKeys();
+  const registry = makeReviewerRegistry(keys.publicKeyPem);
+  const { prepared, submission } = await prepareSubmission(root, {
+    decision: "hold",
+    checks: makeChecks({
+      rightsUseScope: "not-reviewed",
+      sameBuildingIdentity: "not-reviewed",
+      cameraCalibration: "not-reviewed",
+      groundControlCorrespondence: "not-reviewed",
+      metricScale: "not-reviewed",
+      verticalDatum: "unresolved",
+      geometryTopology: "not-reviewed",
+      sourceCameraComparison: "not-reviewed",
+    }),
+  });
+  assert.equal(prepared.geometryReport.geometryStatus, "geometry-qa-failed");
+  assert.equal(prepared.geometryReport.geometryQa, null);
+  const result = await recordSourceBoundAuthenticatedReview({
     workspaceRoot: root,
     buildingId: "building-a",
     handoffJobId: "handoff-test-01",
-  }).catch((error) => error);
-  assert.ok(handoffJob instanceof TypeError);
-  // The immutable hand-off hash correctly prevents replacing a candidate after hand-off.
-  assert.ok(glb.length > 0);
+    submission,
+    signatureBase64: signSubmission(submission, keys.privateKey),
+    trustedReviewerKeys: registry,
+    now: "2026-10-30T15:10:00.000Z",
+  });
+  assert.equal(result.decision, "hold");
+  assert.equal(result.decisionRecord.geometryQa.valid, false);
+  assert.equal(result.decisionRecord.policy.candidateGeometryValidated, false);
 });
 
 test("rejects stale candidate bytes and mismatched decision hand-off identities", async (t) => {
