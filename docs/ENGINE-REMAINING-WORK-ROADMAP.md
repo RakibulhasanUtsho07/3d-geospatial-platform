@@ -220,3 +220,11 @@ See the [D3M execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#107-d3
 ### Exact-head CI completion — PR #281 (2026-10-30)
 
 Correction to the earlier pending checkpoint: canonical combined PR #281 head `04b62ceb910b6c63986703ec1587846a1676bc85` completed exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) with **success**. All job steps passed, including ESLint, unit/contract tests, production build, Chromium production-server viewport API/browser integration and P2.3–P2.6 evidence uploads. This does not equal human review or merge approval: #281 remains Draft/open/unmerged, #280 remains its parent, and the shared mask/observation bundle gap (`mask: null`) remains. Continue D3M-00 ancestry reconciliation (#274/#196, #193, #228); do not enable release flags.
+
+
+### D3M-00 branch reconciliation — 2026-10-30
+
+- P3.4 canonical [PR #274](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/274), head `439e5c8ee26f263471b060a35296d681e0add182`: exact-head CI #2285 and Real-Dhaka Browser Baseline #45 both passed. Keep Draft pending human review of six-sample evidence; no claim that the imagery anomaly is fixed.
+- Duplicate #196 was closed without merge; its implementation patches are present in #274, which adds the real-Dhaka baseline workflow on current development. Old-base #193 was closed without merge because its generated-model-layer implementation and test are already byte-identical in development; architecture note preserved at `docs/MAP-ENGINE-MODULARIZATION.md`.
+- Main promotion PR #228 stays open/unmerged: development is 86 commits ahead / 4 behind main, 204 changed paths, merge base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c`. Inspect all four main-only commits before any promotion. Do not merge blindly.
+- Next: inspect four main-only commits, record their contents and decide safe reconciliation. D3M-01 remains blocked on the source-bound shared mask/observation bundle.
