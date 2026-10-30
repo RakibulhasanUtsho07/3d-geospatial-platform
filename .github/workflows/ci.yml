@@ -280,7 +280,7 @@ jobs:
         run: npm run test:brf24-colmap-authorization
       - name: Validate BRF-24 reviewed reconstruction CLI
         run: node scripts/reconstruct-brf23-reviewed-source.mjs --help
-      - name: Test BRF-25 reviewed-candidate geometry validation chain
+      - name: Test D3M-01.E signed review receipt authorization in BRF-25
         run: npm run test:brf25-geometry-validation
       - name: Validate BRF-25 geometry validation runner CLI
         run: node scripts/run-brf25-geometry-validation.mjs --help
