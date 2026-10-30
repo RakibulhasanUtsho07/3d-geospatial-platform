@@ -300,3 +300,14 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 - Deployment still requires configuring `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` as server secrets. Private keys stay with the reviewer. No production reviewer registry is claimed.
 - All truth, geometry-acceptance, release, publication, map-ready and dispatch flags remain false. Deployment still needs `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`; private keys stay with reviewers. PR #286 and its parent chain remain Draft/unmerged. Next: D3M-01.E signed-receipt enforcement in independent-truth evaluation.
 
+
+
+## D3M-01.E — signed reviewer receipt required by BRF-25 (2026-10-30)
+
+[Issue #287](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/287) / [Draft PR #288](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/288), stacked on D3M-01.D PR #286. Branch `feat/d3m01e-brf25-authenticated-review-gate-20261030`; current head `8bd2bc4c74bc57cd0375a256e9d97a31ab8baf7f`.
+
+The BRF-25 runner requires the D3M-01.D immutable reviewer child-job ID and building ID. It recomputes the hand-off, candidate GLB and geometry QA report, reads and checksum-validates the stored review artifact/job, reconstructs the canonical signed payload, and re-verifies the signature against the current server registry. It blocks all extraction/evaluation for absent receipts, invalid/rotated trust keys, hash or identity mismatches, malformed metadata and decisions other than `continue-to-independent-validation`.
+
+CI regression coverage includes a valid synthetic receipt and blocked missing/rotated-key/hold receipts before extraction. The verifier's signature-hash check deliberately derives the digest from stored signature bytes and compares it to the immutable source manifest, preserving compatibility with the D3M-01.D receipt schema without assuming a duplicate hash field inside its authentication object.
+
+Exact head CI [#41094817059](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41094817059) is **in progress** as of this update; earlier heads failed on issues that have since been corrected, so there is no D3M-01.E pass claim yet. All truth, accuracy, acceptance, publication, map-ready and dispatch flags remain false. Synthetic keys do not represent a provisioned production reviewer trust registry or real human review. Next: terminal exact-head CI success, all evaluator entry-point bypass review, then human PR review. Keep #288 and all parent PRs Draft/unmerged.
