@@ -602,7 +602,7 @@ Before writing code, re-fetch the current development head and the four source f
 - **Next task:** finish #280 exact-head validation and review. If pass, record the final SHA and then start **D3M-00.C: clean-port PR #278 sequentially**. Do not port #278 in parallel because both feature PRs edit the same BRF evidence report and #278 additionally changes the observation schema.
 
 
-**CI checkpoint update (2026-10-30):** the most recent PR #280 workflow snapshot confirms the non-browser checks above are green; browser/API verification remains pending. No code changes were made after head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd` at the time of this checkpoint.
+**CI completion update (2026-10-30):** the exact-head CI #2513 completed successfully across the full workflow, including browser/API integration. This verifies automated checks only. PR #280 remains Draft and has no review submissions; visual annotation quality, independent rights/identity, and real-building evidence remain unaccepted.
 
 
 **CI checkpoint update (later 2026-10-30):** PR #280 workflow #2513 advanced beyond Chromium installation to the production-server viewport API/browser integration step. That step is still in progress, so keep D3M-00.B **IN PROGRESS** and do not begin D3M-00.C yet.
@@ -631,3 +631,26 @@ Before writing code, re-fetch the current development head and the four source f
 **CI checkpoint update (later 2026-10-30):** PR #281 run #2519 has completed the remaining unit/contract tests, including `Test evidence-linked architectural observation schema and review history`, and all later map, heritage, geospatial-tile checks plus `Build production app` with success. Chromium installation is now in progress; the production-server viewport/API browser integration and evidence uploads remain pending. The exact-head run is not yet complete, so this is a partial pass only.
 
 **Static source safety review:** the observation studio script/HTML has no `fetch`, `XMLHttpRequest`, WebSocket, external HTTP(S) URL, `innerHTML`, `eval`, `new Function`, localStorage or sessionStorage usage in the scanned source. It processes selected files in-browser, uses text-safe DOM construction, and enforces the observed 30 MiB input, 15-million-pixel and 2,000-observation limits. This source scan does not replace browser runtime tests or a formal security review.
+### 10.7 D3M-00.C — clean-base architectural observation review port (2026-10-30)
+
+**Status: IMPLEMENTED ON A STACKED BRANCH; exact-head CI queued; human review pending.**
+
+- **Source PR:** [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278), old base `rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91`, source head `22be966342cf6075105f55bd99679f22e44b348f`.
+- **Parent dependency:** PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), exact head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, exact base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, full CI #2513 success.
+- **New branch:** `feat/brf06-observation-review-stacked-20261030`, created from the exact #280 head above.
+- **Current head:** `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`.
+- **Replacement PR:** [#282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282), open Draft, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`; GitHub metadata reports mergeable=true. No PR review submissions were present at the last check.
+- **Stack/diff discipline:** compared the branch against parent #280 and confirmed exactly six BRF-06 paths. Compared against development, the temporary cumulative PR diff has nine paths because it includes #280's four paths plus the six #278 paths, with the shared report file counted once. This is intentional stacked history; never merge #282 before #280.
+- **Six ported paths:** `public/experimental/architectural-observation-review.html`, `public/experimental/architectural-observation-review.js`, `src/core/building-generation/architectural-observation-schema.mjs`, `tests/architectural-observation-schema.test.mjs`, `tests/browser/architectural-observation-review.spec.ts`, and the additive section in `docs/research/BRF-05-07-IMPLEMENTATION-AND-EVIDENCE-REPORT.md`.
+- **Implementation:** the local-only studio binds source ID/hash/dimensions, building/view IDs, source-pixel geometry and visibility states. The M07 normalizer now preserves `originalProposal` and append-only `reviews`, validates original source/view/geometry provenance, event limits, review metadata and latest current-state consistency. Unit/browser tests cover review → reject → reopen, round-trip import/export, null-geometry unknown visibility, stale/tampered history and notes limits.
+- **Exact-head CI:** [run #41000728438 / CI #2526](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000728438) was **queued** at the time of this record. No CI pass is claimed for #282 yet.
+- **Safety boundary:** this UI records operator-authored visual annotations only. It does not authenticate reviewer identity, rights, building identity, camera calibration, metric dimensions or survey truth. `groundTruth`, `publicationEligible`, `publishable`, `acceptanceEligible`, `mapReady`, and `automaticApproval` remain false.
+- **Original #278:** keep open as source/evidence until #282 passes CI and review; close only if replacement is accepted.
+- **Merge order:** review and merge #280 first only after human approval and its checks remain green. Then retarget #282 to `development`, verify its diff contains only the six BRF-06 paths, rerun full exact-head CI, and only then consider its merge. Do not squash or cherry-pick #282 ahead of its parent.
+
+### 10.8 Current continuation pointer
+
+1. Check CI #2526 for exact head `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`; fix any failure and record a new exact head/run.
+2. Keep PR #282 Draft until #280 is reviewed/merged. Human review is not present on either replacement PR at this checkpoint.
+3. After #280 merges, retarget #282 to development, inspect that its diff shrinks to exactly the six BRF-06 paths, and rerun CI on the resulting head.
+4. Only after that resume remaining D3M-00 work: #274/#196 duplicate decision, #193 residual docs/tests, and the four main-only commit reconciliation for #228.
