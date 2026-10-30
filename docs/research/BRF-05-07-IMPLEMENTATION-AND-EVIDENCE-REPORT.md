@@ -218,3 +218,17 @@ A local-only browser editor is added at `/experimental/building-mask-review.html
 - Browser coverage checks source hashing, binary output pixels, output hashes/byte counts, proposed/reviewed states, reviewer identity requirements, mask round-trip import, and stale source-hash rejection. The spec runs as part of `npm run test:map-browser`.
 
 **Boundary:** this is local manual annotation tooling, not automatic segmentation, physical building identification, rights adjudication, camera calibration, hidden-surface inference, metric/survey truth, or publication approval. It must remain review-only until independent review and real-building evidence pass.
+
+## BRF-06 architectural observation review studio (stacked clean-base port)
+
+A local-only browser tool is available at `/experimental/architectural-observation-review.html` (script: `public/experimental/architectural-observation-review.js`). It uses the existing M07 observation categories and source-pixel coordinate contract rather than introducing a competing schema.
+
+- Binds one PNG/JPEG/WebP source image to a stable building ID, view ID, source ID, exact source SHA-256 and decoded dimensions. Identity fields lock after source load.
+- Supports source-pixel Point, LineString, BoundingBox and Polygon observations. Feature categories include roofline, corners, floor bands, facade regions, windows, doors, balconies, occluders, arches, columns, domes, cornices, pediments, staircases, parapets and ornaments.
+- Requires explicit visibility state. `occluded`, `not-visible` and `not-detected` can be recorded with null geometry; visible and partially-occluded observations require geometry.
+- Exports a versioned per-view batch with exact source hash/dimensions and the existing `source-image-pixel-origin-top-left` convention. Confidence is self-assessed and the method is `human-review`.
+- Review/reject actions append reviewer, timestamp and notes while retaining the original proposal. Reopening an observation returns its current state to `proposed` without deleting prior event history.
+- The M07 normalizer now round-trips `originalProposal` and `reviews`, bounds event count/content, validates source/view/geometry provenance, and checks that reviewed/rejected current state agrees with the latest history entry. This prevents the previous normalizer from silently discarding history created by `appendArchitecturalObservationReview()`.
+- Browser tests cover source-bound point and polygon creation, review → reject → reopen history, batch import/export round-trip, and distinct null-geometry visibility states. Unit tests cover normalization, reopened history and tamper rejection.
+
+**Boundary:** this is manual source-pixel evidence, not automatic recognition, metric measurement, independently verified ground truth or publication approval. The tool does not establish source rights, camera calibration, physical building identity or real-world accuracy. The normalized batch policy keeps `groundTruth`, `publicationEligible`, and `publishable` false. Reviewer identifiers remain operator-supplied, not independently authenticated.
