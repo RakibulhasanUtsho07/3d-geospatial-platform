@@ -287,3 +287,16 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 - Integration: two-stage immutable child job uses current reconstruction-job artifacts; CLI and CI test-step added. Candidate/evidence linkage happens only after actual worker GLB and QA report exist.
 - Still blocked: both PRs are Draft/unmerged; rights and calibration/GCP authority require human review; vertical datum and geometry/architectural accuracy are not proved. No dispatch, human acceptance, publication or map readiness.
 - Next: inspect and human-review the stacked PR pair together. Then specify D3M-01.D authenticated human decision + geometry-validation linkage without changing any release flags.
+
+### D3M-01.D — trusted-signer geometry review (2026-10-30)
+
+**Status: Implemented on stacked Draft PR #286. Focused tests and production build passed; exact-head full CI remains in progress.**
+
+- [Issue #285](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/285) / [PR #286](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/286), branch `feat/d3m01d-authenticated-geometry-review-20261030`, head `3e92b4be02d8f6bad6baec274887c148359ad8f7`. Stacked on D3M-01.C #284 head `dc326af772dce95484cd2565d581ed5f99744369`.
+- Runs existing GLB geometry/topology QA on exact D3M-01.C candidate bytes and pins the report to the immutable hand-off artifact, candidate SHA-256 and byte length.
+- Ed25519 signed review records use server-provisioned public keys only; decision payloads are canonical JSON, signed outside server, and stored in a separate immutable child job. API rejects untrusted reviewer IDs, wrong keys, payload tampering and caller-supplied public keys.
+- Continue-to-independent-validation is blocked unless all human review checks and upstream hand-off integrity flags are true, including vertical datum. That decision is not acceptance/publication approval.
+- Current full CI [#41082811923](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41082811923): focused D3M-01.D test step and production build passed; production-server viewport/browser integration was still running at the checkpoint.
+- Deployment still requires configuring `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` as server secrets. Private keys stay with the reviewer. No production reviewer registry is claimed.
+- All truth, geometry-acceptance, release, publication, map-ready and dispatch flags remain false. PR #286 and its parent chain remain Draft/unmerged.
+
