@@ -272,3 +272,9 @@ Findings:
 Exact run IDs and the full decision matrix live in [D3M-00 execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30). No source code, branch refs, PR states, or release flags were changed during this documentation update. Application tests were not rerun locally.
 
 **Next action:** D3M-00.B — clean-port only PR #277's mask editor and regression coverage onto a newly re-confirmed development head, then record exact branch/base/head and CI before starting the sequential #278 port.
+
+### WP-00 subtask D3M-00.B — manual mask editor port
+
+**In progress:** Draft PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280). The replacement branch is based on the exact development SHA `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` and contains four paths selectively ported from #277. The old six-commit branch history was not cherry-picked.
+
+Head SHA: `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was in progress; no validation pass is claimed yet. Keep #277 open until the clean-base replacement is verified and reviewed. The next dependent operation is D3M-00.C (sequential #278 port), not a parallel change to the shared BRF evidence report.
