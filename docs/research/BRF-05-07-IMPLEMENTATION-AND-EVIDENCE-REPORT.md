@@ -203,3 +203,34 @@ A minimal bundle shape is shown below. The entries in angle brackets are placeho
 \`\`\`
 
 The CLI report is diagnostic evidence, not the final sign-off. The reference silhouette must be independently reviewed and source-bound; the candidate silhouette must have been extracted from the exact source-camera render. The candidate GLB still needs the existing geometry/topology/texture QA and visual review workflows. A \`review-required\` report is not approval, and \`incomplete\` / \`not-comparable\` should be treated as blocked acceptance.
+
+
+## Manual source-bound mask authoring/editor (clean development-base port)
+
+A local-only browser editor is added at `/experimental/building-mask-review.html` (script: `public/experimental/building-mask-review.js`). This fills the authoring gap where the existing backend validator and review-packet CLI accepted reviewed masks, but mask creation still required external tooling.
+
+- Loads a user-selected PNG/JPEG/WebP locally; rejects unsupported files, inputs larger than 30 MiB, and images above 15 million pixels. Computes SHA-256 from the exact source file bytes and records decoded dimensions.
+- Supports source-pixel brush painting and erasing using a stable top-left pixel coordinate convention. Exports an opaque black/white PNG (background 0, building foreground 255) matching source dimensions.
+- Exports a JSON result compatible with the existing `building-mask-provider-v1` contract: exact source ID/hash, provider identity/version/configuration hash, encoded-mask SHA-256/byte count/dimensions/encoding, and review status/confidence.
+- Existing mask correction requires the matching manifest and validates source identity/hash/bytes/dimensions, exact encoded-mask hash/byte length, and binary opaque pixels. Editing resets the review state.
+- A mask defaults to `assessment.status: proposed`. A named operator may attest a review; reviewer identity and confidence remain operator-supplied rather than independently authenticated.
+- Policy flags remain false: `acceptanceEligible`, `publicationEligible`, `mapReady`, `automaticApproval`, and `publishable`.
+- Browser coverage checks source hashing, binary output pixels, output hashes/byte counts, proposed/reviewed states, reviewer identity requirements, mask round-trip import, and stale source-hash rejection. The spec runs as part of `npm run test:map-browser`.
+
+**Boundary:** this is local manual annotation tooling, not automatic segmentation, physical building identification, rights adjudication, camera calibration, hidden-surface inference, metric/survey truth, or publication approval. It must remain review-only until independent review and real-building evidence pass.
+
+## BRF-06 manual architectural observation review studio (clean-base port)
+
+A local-only browser tool is available at `/experimental/architectural-observation-review.html` (script: `public/experimental/architectural-observation-review.js`). It uses the existing M07 observation categories and source-pixel coordinate contract rather than introducing a competing schema.
+
+- Binds one PNG/JPEG/WebP source image to a stable building ID, view ID, source ID, exact source SHA-256 and decoded dimensions. Identity fields lock after source load.
+- Supports source-pixel Point, LineString, BoundingBox and Polygon observations. Categories include roofline, corners, floor bands, facade regions, windows, doors, balconies, occluders, arches, columns, domes, cornices, pediments, staircases, parapets and ornaments.
+- Requires explicit visibility state. `occluded`, `not-visible` and `not-detected` can be recorded with null geometry; visible and partially-occluded observations require geometry.
+- Exports a versioned per-view batch with exact source hash/dimensions and the existing `source-image-pixel-origin-top-left` convention. Confidence is self-assessed and method is `human-review`.
+- Review/reject actions retain the original proposal and the review history. Reopening returns the current state to `proposed` without deleting prior review events.
+- The M07 normalizer now round-trips `originalProposal` and `reviews`, validates event limits/content and checks that reviewed/rejected current state agrees with the latest history entry. It previously discarded history created by `appendArchitecturalObservationReview()`.
+- Unit tests cover reopening, current state/history mismatch, tampered reviewer identity, oversized notes, and missing original proposal. Browser tests cover source-bound Point/Polygon authoring, review → reject → reopen, import/export round-trip, and separate null-geometry visibility states.
+
+**Integration boundary:** exported observation batches currently set `mask: null`; the mask editor added in D3M-00.B is not yet wired into this studio. The two artifacts must be joined by exact source ID/hash/dimensions and a mask SHA-256 in the later unified BRF-05/06 evidence bundle (D3M-01/WP-01). Do not treat the separate tools as a combined evidence package yet.
+
+**Trust boundary:** review history is preserved and structurally validated in exported JSON, but reviewer IDs are operator-supplied and the local JSON history is not a cryptographically signed or server-authenticated audit log. This is manual source-pixel evidence, not automatic recognition, metric measurement, independently verified ground truth or publication approval. Source rights, camera calibration, physical building identity, held-out accuracy and publication remain separate gates. `groundTruth`, `publicationEligible`, and `publishable` remain false.
