@@ -15,6 +15,7 @@ The remaining risk is not simply missing features. It is the gap between **a too
 2. The reconstruction path still needs proof that source media, rights, camera/coordinate frames, observations/masks, generated geometry, texture, and final QA remain bound end-to-end.
 3. Several user-facing workflows remain pilot/local or illustrative rather than production multi-user services.
 4. A green CI run validates the tested commit and test matrix; it does not establish visual fidelity, survey accuracy, production load capacity, or universal device performance.
+5. The requested user journey — upload building information/images, generate a candidate, establish trustworthy dimensions and geographic placement, approve it, and have the existing map load it — is not yet demonstrated as one end-to-end workflow. Existing generation, job, review, publishing, and map-loader components remain partly operator-driven and separated by manual evidence/placement steps.
 
 **No universal accuracy percentage (including 90%) is supported by this audit.** Accuracy must be reported per metric, per building, and against independent evidence.
 
@@ -56,6 +57,7 @@ This is a repository/document/PR metadata audit, not a fresh execution of every 
 | Floor plans | Raster line proposals, vector calibration and measured-vector shell work | Full PDF/image-to-semantic floor-plan extraction and verified interior model remain incomplete |
 | 3D Tiles | Manifest/fixture and tile-related validation work | Fixture validation is not proof of production-quality real-content conversion/rendering |
 | Product | Interactive pilot and illustrative property listings | Listings, accounts, persistence, moderation and deployment are not a production marketplace |
+| Generated-building user journey | Media intake/upload, generation workers, review/publishing tools, catalog reader, and Cesium GLB layer exist | No accepted single flow yet connects map intake → rights-aware job → reviewed reconstruction → independent placement → approved publication → persistent viewport-aware map loading |
 
 The README explicitly labels property listings illustrative and footprint/gross-floor-area values approximate rather than survey measurements or verified flat sizes. Keep those labels visible in product UI and API responses until real data and validation exist.
 
@@ -288,7 +290,7 @@ A rights-cleared asset is not automatically accurate. A structurally valid GLB i
 
 ## 6. Recommended immediate sequence
 
-The dependency-aware execution plan is maintained in [ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md](./ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md). The short order is:
+The cross-project dependency plan is maintained in [ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md](./ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md). For the specific image/information-to-live-map feature, use [DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md), which breaks the work into D3M-00 through D3M-13. The short repository-wide order is:
 
 1. Reconcile branch/PR state and establish a single integration baseline.
 2. Complete BRF-05/06 combined evidence-bundle contract and tests.
