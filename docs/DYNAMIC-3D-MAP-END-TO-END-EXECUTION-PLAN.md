@@ -1,0 +1,512 @@
+# Dynamic 3D Map — End-to-End Building Reconstruction Execution Plan
+
+**Created:** 2026-10-30  
+**Planning baseline:** `development` at `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`  
+**Current integration baseline:** see [Full Repository Gap Audit](./ENGINE-FULL-REPOSITORY-GAP-AUDIT.md)  
+**Parent roadmap:** [Engine Integration and Production Roadmap](./ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md)  
+**Status:** Planned work. This document does not certify that the end-to-end workflow currently works.
+
+---
+
+## 1. Goal
+
+Deliver one coherent workflow in the existing Cesium map:
+
+1. An operator selects a building or supplies its identity and known information.
+2. The operator uploads one or more rights-cleared building images, or a permitted video/capture set.
+3. The platform validates and records the exact source assets.
+4. The engine selects a reconstruction method that is appropriate for the available evidence.
+5. A 3D building candidate is generated, checked, and presented for review.
+6. Scale, orientation, horizontal position, and vertical reference are established from evidence rather than guessed.
+7. A reviewer accepts or rejects the exact candidate version.
+8. An approved, versioned model becomes available in the existing Dhaka map at its verified location.
+9. The model and job history remain available after page refresh and deployment restart.
+
+The intended user experience is simple. The engineering contract behind it must distinguish what was observed, measured, inferred, and left unknown.
+
+## 2. What counts as complete
+
+The feature is complete only when a new building can pass through the same traceable workflow from intake to map display, without a developer manually copying a GLB or typing placement values into the development preview.
+
+A successful GLB export alone is not completion. A successful Cesium load alone is not completion. A green CI run alone is not completion.
+
+The minimum end-to-end acceptance run must prove all of the following against the exact model and source hashes:
+
+- source rights and permitted operations were checked;
+- source files are bound to a building identity and the intended views;
+- the selected reconstruction route actually executed;
+- the GLB contains supported geometry and valid materials/textures;
+- dimensions and scale were compared with independent evidence;
+- horizontal position and vertical datum were separately checked;
+- reviewer decisions refer to the exact candidate hash;
+- publication creates an immutable version and a traceable placement record;
+- the existing map loads the active version from the published service/catalog;
+- reload, version change, failed replacement, and rollback behave correctly.
+
+## 3. Current baseline: what exists and what remains disconnected
+
+The status labels below describe the inspected repository baseline. They are not completion percentages.
+
+| Area | Baseline status | Existing foundation | Remaining gap |
+|---|---|---|---|
+| Existing Dhaka map | Implemented foundation | Cesium map, Overture building layer, viewport loading, search, picking, and map controls | Generated-building lifecycle must be integrated into the ordinary map data flow and tested with real published assets |
+| Generated GLB loader | Implemented foundation | `GeneratedModelLayer` supports load/update/show/hide/remove and geographic transforms | Placement is supplied to the layer; it is not inferred automatically |
+| Procedural generation | Implemented, limited | BuildingSpec can produce parametric GLB geometry | Input images do not change procedural geometry; the result is not a photogrammetric model |
+| Single-image route | Partial | TripoSR worker integration exists | External Python/model runner/compute setup; single-view output is approximate and has unknown hidden surfaces, scale, and georeference |
+| Multi-view route | Partial | COLMAP worker, dense mesh/texture conversion, diagnostics, and GLB output exist | External COLMAP runtime, view coverage, camera/scale evidence, and accepted georeferencing still need a proven end-to-end run |
+| Media intake/upload | Partial | Private media intake, source hashes, rights metadata, and an upload API exist | Upload UI and job submission must be connected; upload currently remains unreviewed until rights review |
+| Generation queue/worker | Partial | Authenticated endpoints and a local file-backed queue/worker exist | Shared durable storage, multi-user authorization, production worker operations, and completed-job-to-map integration |
+| Geometry and visual QA | Partial | GLB geometry extraction, topology/texture checks, render review, and accuracy tooling exist | One unified gate must bind fresh reports and human review to the exact candidate |
+| Ground-control registration | Partial | Registration/metric validation components exist | A repeatable independently evidenced coordinate and vertical-datum workflow is not yet accepted for a real Dhaka building |
+| Review/publishing | Partial | Review APIs, approved-job publisher, versioned manifest, checksum validation, and CLI publication exist | Operator-facing review and publication UX; secure persistent asset storage; no automatic map insertion after approval |
+| Published catalog map UI | Implemented foundation | The map panel can fetch the static catalog and manually load an active model | It is a manual/session workflow; page refresh does not restore the in-memory model automatically |
+| End-to-end user workflow | Not established | Components exist across multiple modules | A browser-tested upload → process → review → publish → map-load flow is still required |
+
+### Important implementation facts
+
+- The default generation route is procedural from BuildingSpec. It does not automatically interpret the supplied images.
+- The photogrammetry route requires explicit source selection and review confirmations; the COLMAP worker produces a review candidate and does not claim WGS84 ground-control registration.
+- The single-image route explicitly marks scale and georeference as unsolved and requires human review.
+- Generation jobs deliberately retain fail-closed values such as `mapReady=false` and `publicationEligible=false`.
+- The current published-model workflow is based on a static manifest plus local CLI publication. It is not yet a complete authenticated Admin publication service.
+- The map loader requires explicit geographic placement metadata. Do not claim that it discovers exact coordinates or metric scale from an ordinary photograph.
+
+## 4. Product and data contract to agree before implementation
+
+Create one versioned contract shared by upload UI, API, worker, review, publisher, and map loader. Avoid separate loosely related JSON shapes for each phase.
+
+### 4.1 Building record
+
+At minimum:
+
+- stable building ID and display name;
+- selected map feature ID or independently reviewed building identity;
+- source footprint and its CRS/provenance;
+- address or locality where available;
+- building use/type where known;
+- known dimensions and their source, units, uncertainty, and evidence tier;
+- horizontal coordinate frame and vertical datum state;
+- status: draft, intake, processing, candidate, review-required, approved, published, rejected, or failed.
+
+### 4.2 Source asset record
+
+At minimum:
+
+- stable source ID, exact byte size, SHA-256, media type, dimensions, and safe storage key;
+- source/building/view linkage and capture side/viewpoint when known;
+- creator/rights-holder, licence or permission record, attribution, permitted operations, expiry/territory where applicable;
+- EXIF/capture time/location only where present and permitted;
+- quality/occlusion/duplicate assessment;
+- explicit review state: unreviewed, approved-for-specific-operations, rejected, expired, or unknown.
+
+A hash establishes byte identity, not copyright permission or building identity.
+
+### 4.3 Reconstruction job record
+
+At minimum:
+
+- job ID, building ID, immutable input manifest hash, selected strategy, configuration hash, model/tool versions;
+- stage state, progress, timestamps, retries, worker identity, cancellation state, and structured failure reason;
+- exact candidate GLB hash and all QA/render report hashes;
+- separate confidence and evidence state for geometry, scale, horizontal position, vertical position, texture, and source rights;
+- explicit readiness fields: `candidateGenerated`, `geometryValidated`, `metricValidated`, `humanReviewed`, `publicationEligible`, and `mapReady`.
+
+Do not collapse these independent gates into one generic `completed` status.
+
+### 4.4 Published model record
+
+At minimum:
+
+- stable building/model ID and immutable version ID;
+- content-addressed GLB URL/storage key and SHA-256;
+- longitude/latitude/height, heading/pitch/roll, model scale and axis conventions;
+- horizontal CRS, vertical datum, placement evidence ID, and uncertainty;
+- reviewer, timestamp, decision, evidence-package hash, and all required review checks;
+- active/retired state and rollback target.
+
+The map must consume this published record rather than accept untrusted arbitrary client URLs or unverified placement values.
+
+## 5. Dependency-ordered execution phases
+
+Each phase must be implemented in a focused PR with exact-head tests. A phase is not done because its files exist; close it only when its acceptance evidence is attached.
+
+### D3M-00 — Reconcile integration branches and PR dependencies
+
+**Priority:** P0 · **Status:** Required first · **Dependencies:** none
+
+**Purpose:** Establish one safe source of truth before connecting more components.
+
+**Tasks**
+- [ ] Re-read current `main`, `development`, and `rakibul-hasan` SHAs.
+- [ ] Compare open PR base/head SHAs, merge bases, changed paths, stacked dependencies, and exact-head CI.
+- [ ] Map existing generation, media upload, queue/worker, review, publish, model-layer, BRF, and 3D Tiles PRs to this plan.
+- [ ] Identify duplicate or superseded implementations by file and commit, not by branch name.
+- [ ] Agree the canonical integration base for each work package; preserve the `rakibul-hasan → development → main` promotion policy where ancestry permits.
+- [ ] Do not bulk-merge stale branches or force-push user work.
+
+**Likely files:** GitHub branch/PR metadata; `docs/ENGINE-FULL-REPOSITORY-GAP-AUDIT.md`; `docs/ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md`.
+
+**Acceptance**
+- [ ] A dependency matrix records PR number, base, head SHA, merge base, CI state, owner, and decision.
+- [ ] No unreviewed conflict or unexplained divergent commit remains in the selected path.
+- [ ] The next implementation branch is based on the verified integration head.
+
+### D3M-01 — Freeze the workflow contract and stage state machine
+
+**Priority:** P0 · **Status:** Not established end-to-end · **Dependencies:** D3M-00
+
+**Tasks**
+- [ ] Define versioned schemas for Building, SourceAsset, GenerationJob, Candidate, ReviewDecision, PlacementEvidence, and PublishedModel.
+- [ ] Define state transitions and legal transitions, including cancellation, retry, stale candidate, rejected review, superseded version, and rollback.
+- [ ] Define idempotency keys for uploads, enqueue requests, worker stages, review submissions, and publication.
+- [ ] Bind each stage to input/output hashes, configuration version, tool/model versions, and timestamps.
+- [ ] Define explicit unknown/estimated/observed/independently-measured values; never silently fill missing dimensions or coordinates.
+- [ ] Define the API contract and the boundary between public map-readable metadata and private source/review files.
+
+**Likely files:** `src/core/building-generation/` schemas and state modules; `src/app/api/building-generation/`; generation and publication docs.
+
+**Acceptance**
+- [ ] Schema validation rejects missing IDs, invalid state transitions, stale hashes, and cross-building references.
+- [ ] Contract tests cover request/response compatibility between API, worker, review, and publisher.
+- [ ] Existing generation and publication flows can be migrated without weakening fail-closed flags.
+
+### D3M-02 — Build the actual map-facing building intake experience
+
+**Priority:** P1 · **Status:** Gap · **Dependencies:** D3M-01
+
+**Tasks**
+- [ ] Add an intake action to the existing map, attached to a selected building or an explicit “add building” workflow.
+- [ ] Allow building identity/information entry and one or more image/video uploads.
+- [ ] Show per-file upload progress, validation errors, rights/attribution fields, and source-view labels.
+- [ ] Require the user to choose the intended building on the map or provide enough identity evidence before intake is accepted.
+- [ ] Show upload completion separately from rights approval and reconstruction readiness.
+- [ ] Create a generation job only after required metadata and explicit source-operation confirmations pass.
+- [ ] Keep original assets private; never put unreviewed source media or private evidence under public static paths.
+
+**Likely files:** `src/features/map/components/`; `src/app/map/page.tsx`; `src/app/api/building-generation/uploads/route.ts`; `src/app/api/building-generation/jobs/route.ts`; `src/core/building-generation/generation-media-upload.mjs`.
+
+**Acceptance**
+- [ ] Browser test uploads valid, oversized, corrupt, duplicate, and unsupported files.
+- [ ] A refresh or network interruption does not create duplicate jobs or lose the upload/job association.
+- [ ] Unreviewed media cannot be submitted to reconstruction.
+- [ ] Keyboard, mobile viewport, and accessible error states are covered.
+
+### D3M-03 — Complete rights-aware intake and source provenance continuity
+
+**Priority:** P0 · **Status:** Partial · **Dependencies:** D3M-01, D3M-02
+
+**Tasks**
+- [ ] Bind exact file bytes to the rights record and source identity.
+- [ ] Enforce permitted operations separately for storage, display, image quality analysis, segmentation, frame extraction, photogrammetry, single-image inference, derivative creation, review export, and publication.
+- [ ] Revalidate rights when a job starts, resumes, reuses a cached output, or publishes.
+- [ ] Carry source hashes and transformation provenance through video frames, masks, observations, meshes, textures, and evidence packages.
+- [ ] Handle expiry, revocation, attribution duties, territory, and derivative-use restrictions.
+- [ ] Keep unknown or conflicting rights blocked.
+
+**Likely files:** `src/core/building-generation/media-intake.mjs`; `source-workflow.mjs`; `source-operation-scopes.mjs`; BRF-38/45/46 modules and tests.
+
+**Acceptance**
+- [ ] Positive and negative tests exist for every permitted operation.
+- [ ] Mutated bytes, revoked permissions, expired permissions, scope mismatch, and cached-output replay are rejected.
+- [ ] The evidence bundle can trace every published derivative back to the exact approved source set.
+
+### D3M-04 — Establish building identity, map target, footprint, and location evidence
+
+**Priority:** P0 · **Status:** Partial / external evidence required · **Dependencies:** D3M-01, D3M-02
+
+**Tasks**
+- [ ] Support selecting an existing Overture/map building and binding its stable source feature ID to the reconstruction job.
+- [ ] Support a separately reviewed new-building footprint when no suitable map feature exists.
+- [ ] Store the footprint CRS, source, timestamp, geometry hash, and identity-review decision.
+- [ ] Distinguish a building identity match from a nearby or visually similar building.
+- [ ] Accept surveyed control points or another documented independent location source.
+- [ ] Define what happens when the image has no trustworthy location: ask for map selection/address/control evidence and mark location unresolved.
+- [ ] Do not treat an ordinary street photograph or an EXIF coordinate as proof of the building footprint or exact facade location.
+
+**Likely files:** `src/app/api/geospatial/overture-buildings/`; `src/core/building-generation/brf35-building-linkage.mjs`; footprint/linkage and ground-control modules.
+
+**Acceptance**
+- [ ] Wrong-building, duplicate-building, adjacent-building, and mismatched-footprint tests fail safely.
+- [ ] Identity, footprint, and location provenance are separately reported.
+- [ ] No exact placement is asserted without accepted coordinate evidence.
+
+### D3M-05 — Integrate image quality, view coverage, masks, observations, and camera calibration
+
+**Priority:** P0 · **Status:** Partial · **Dependencies:** D3M-03, D3M-04
+
+**Tasks**
+- [ ] Normalize image orientation and preserve original pixel dimensions and crop/resize transforms.
+- [ ] Detect blur, clipping, near-duplicates, severe occlusion, and unusable views; record per-view decisions.
+- [ ] Bind each image to front/rear/left/right/roof/corner or an explicit unknown viewpoint.
+- [ ] Connect BRF-05 manual masks and BRF-06 architectural observations into one hash-bound bundle.
+- [ ] Record camera intrinsics, distortion, pose, uncertainty, coordinate frame, and calibration source—or explicitly mark each unknown.
+- [ ] Estimate overlap and camera coverage; distinguish “same building” confirmation from image overlap.
+- [ ] Link observations such as corners, rooflines, floor bands, windows, arches, columns, and balconies to source pixels and review history.
+
+**Likely files:** `image-quality-preflight.mjs`; `media-quality-preflight.mjs`; `building-mask-provider.mjs`; `architectural-observation-schema.mjs`; `architectural-feature-proposals.mjs`; BRF-05/06/07 work.
+
+**Acceptance**
+- [ ] Combined mask/observation export and re-import preserve source IDs, bytes, dimensions, and pixel coordinates.
+- [ ] Stale source hashes, mismatched dimensions, unsupported crop transforms, and dangling observations are rejected.
+- [ ] Camera calibration state and coverage uncertainty are visible to the route selector.
+- [ ] A browser review test covers mask and observation correction.
+
+### D3M-06 — Make reconstruction strategy selection evidence-driven
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-03, D3M-05
+
+**Tasks**
+- [ ] Define an explicit route policy using number of usable views, overlap, camera calibration, rights scope, source quality, scale evidence, and compute availability.
+- [ ] Route a single image to an AI-proposed preview only when the operator explicitly accepts single-view inference and its limitations.
+- [ ] Route sufficient same-building overlapping views to COLMAP only after all required rights, identity, overlap, and axis checks pass.
+- [ ] Use procedural BuildingSpec generation only as a clearly labelled parametric estimate or as a supported prior—not as image reconstruction.
+- [ ] Refuse unsupported routes and explain the missing evidence instead of silently falling back to a misleading model.
+- [ ] Record why a route was selected or blocked and which external tool/model version was used.
+
+**Likely files:** `generation-engine.mjs`; `generation-pipeline.mjs`; `media-to-model-workflow.mjs`; `colmap-worker.mjs`; `single-image-3d-worker.mjs`.
+
+**Acceptance**
+- [ ] Tests cover one image, two images, adequate multi-view, duplicate views, wrong-building views, low overlap, missing rights, missing runtime, and unsupported formats.
+- [ ] The job report distinguishes procedural, single-image AI, and photogrammetry output and never calls them equivalent evidence tiers.
+- [ ] Actual worker execution is proven on at least one controlled sample for each route claimed as supported.
+
+### D3M-07 — Produce and refine building geometry from the selected route
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-05, D3M-06
+
+**Tasks**
+- [ ] Convert the selected route output into a documented local metric frame.
+- [ ] Bind each reconstructed component/surface to supporting views or mark it inferred/unknown.
+- [ ] Combine independently measured footprint/dimensions with photo-derived visible surfaces only where coordinate/calibration evidence supports the fusion.
+- [ ] Integrate reviewed architectural masks/observations with the geometry workflow; corrections must change the candidate geometry, not only create review tasks.
+- [ ] Preserve source meshes and every repair/correction as immutable candidate versions.
+- [ ] Separate geometry creation from texture projection so texture cannot hide incorrect massing or openings.
+
+**Likely files:** `colmap-worker.mjs`; `wireframe-to-mesh.mjs`; `multi-view-wireframe-registration.mjs`; `confidence-aware-wireframe-fusion.mjs`; `architectural-geometry-workflow.mjs`; `textured-glb-export.mjs`.
+
+**Acceptance**
+- [ ] A candidate is generated from the declared input route and exact source hashes.
+- [ ] A fixed review camera set exposes all available sides and marks unsupported/occluded sides.
+- [ ] Correction tests prove that a geometry correction changes the GLB hash and improves its declared metric or render comparison.
+- [ ] No missing facade/roof is represented as measured truth.
+
+### D3M-08 — Unify GLB, topology, dimension, and texture quality gates
+
+**Priority:** P0 for publication · **Status:** Partial · **Dependencies:** D3M-07
+
+**Tasks**
+- [ ] Run actual GLB byte parsing and geometry extraction on the exact candidate file.
+- [ ] Check primitive counts, vertex/triangle bounds, degenerate faces, normals, open/non-manifold boundaries, connected components, extreme edges, and invalid transforms.
+- [ ] Check units, axes, bounds, footprint shape, and independent dimensions separately.
+- [ ] Check material references, texture presence, UV coverage, stretch, seams, resolution, and background/occluder contamination.
+- [ ] Bind geometry QA, texture QA, review renders, and correction reports to the same candidate hash.
+- [ ] Define warning and hard-fail thresholds by model class; do not allow a clean container check to imply visual fidelity.
+
+**Likely files:** `glb-geometry-extraction.mjs`; `glb-geometry-qa.mjs`; `mesh-topology-qa.mjs`; texture QA modules; release-readiness modules.
+
+**Acceptance**
+- [ ] Adversarial fixtures exist for every hard-fail condition.
+- [ ] Stale or mismatched report hashes are rejected.
+- [ ] Missing texture or missing geometry evidence cannot be interpreted as a pass.
+- [ ] Candidate review packet includes geometry, texture, and fixed-camera visual evidence.
+
+### D3M-09 — Establish independent metric scale and geographic registration
+
+**Priority:** P0 · **Status:** Partial / external survey dependency · **Dependencies:** D3M-04, D3M-07, D3M-08
+
+**Tasks**
+- [ ] Define the model-local frame, units, axis order, handedness, and heading convention.
+- [ ] Calibrate metric scale from independent measurements, not from the generated model itself.
+- [ ] Register horizontal placement from at least three suitable non-collinear control points where the selected method requires a 2D rigid/similarity fit.
+- [ ] Keep fitting controls separate from held-out check points.
+- [ ] Record source CRS, target CRS, pinned coordinate-operation pipeline/version, axis order, grids, units, and transformation evidence.
+- [ ] Record vertical CRS/datum separately from horizontal WGS84; distinguish ellipsoidal height, orthometric height, terrain elevation, building base, and relative roof height.
+- [ ] Store residuals, uncertainty, evidence IDs, and unresolved values.
+- [ ] Require map footprint overlay and independent reviewer acceptance before placement approval.
+
+**Likely files:** `ground-control-registration.mjs`; `reference-dimension-validation.mjs`; `brf37-proj-operation-executor.mjs`; `brf35-building-linkage.mjs`; placement policy/types.
+
+**Acceptance**
+- [ ] Synthetic known-transform tests cover axis swap, wrong units, mirrored model, bad controls, outliers, and vertical-datum mismatch.
+- [ ] Real building placement report binds the exact GLB hash and independent control source hashes.
+- [ ] Held-out residuals are reported separately from fit residuals.
+- [ ] Unknown height datum or missing independent scale blocks metric/map-ready claims.
+
+### D3M-10 — Add an operator review and correction experience
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-08, D3M-09
+
+**Tasks**
+- [ ] Show source images, selected views, masks/observations, candidate GLB, and fixed review renders side by side.
+- [ ] Show geometry/texture QA, dimensions, control-point residuals, source rights, confidence, and unresolved warnings.
+- [ ] Allow accept, reject, request-correction, and annotate decisions with reviewer identity and timestamp.
+- [ ] Bind every decision to exact GLB, source-manifest, QA-report, and placement-evidence hashes.
+- [ ] Invalidate approvals when the candidate, source, rights, calibration, QA, or placement changes.
+- [ ] Keep operator, reviewer, administrator, and publisher permissions separate.
+
+**Likely files:** `src/features/map/components/GeneratedModelPanel.tsx`; Admin/review components; `generation-job-review.mjs`; review API routes; evidence package modules.
+
+**Acceptance**
+- [ ] Browser tests cover approve, reject, correction, stale approval, and unauthorized user paths.
+- [ ] The reviewer cannot approve a different GLB than the one shown.
+- [ ] Approval history is immutable and auditable.
+
+### D3M-11 — Publish approved versions and integrate automatic map loading
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-09, D3M-10
+
+**Tasks**
+- [ ] Replace local-only publication assumptions with a server-side publisher authorized by the role model.
+- [ ] Store immutable GLB bytes in private/object storage until approval; expose only approved map assets through authorized or intentionally public delivery.
+- [ ] Publish model metadata and placement as one atomic versioned record.
+- [ ] Make map initialization or a generated-model catalog service discover active models for the current viewport.
+- [ ] Load only models intersecting the viewport/selected area; avoid loading every published GLB globally.
+- [ ] Restore active models after page reload and reconcile visibility/version changes.
+- [ ] Add version rollback, asset retirement, cache invalidation, and integrity checks.
+- [ ] Keep manual preview as a development-only path, visibly separate from production publishing.
+
+**Likely files:** `published-model-catalog.mjs`; `published-model-catalog-reader.mjs`; `publish-approved-generation-job.mjs`; `generated-model-layer.ts`; `GeneratedModelPanel.tsx`; `MapCanvas.tsx`; `map-engine.ts`.
+
+**Acceptance**
+- [ ] A fully approved job is published without manual file copying or editing a public manifest.
+- [ ] The map loads the published model using verified placement metadata.
+- [ ] A hard refresh restores the active model; a retired/rolled-back version is not loaded.
+- [ ] Wrong hashes, invalid placement, unauthorized publication, duplicate model IDs, and failed asset fetches fail safely.
+- [ ] Existing Overture buildings, roads, map selection, and viewport performance do not regress.
+
+### D3M-12 — Make the workflow production-safe and operable
+
+**Priority:** P0 before production · **Status:** Partial · **Dependencies:** D3M-02, D3M-03, D3M-11
+
+**Tasks**
+- [ ] Replace local-only job/result assumptions with durable database state and private shared object storage.
+- [ ] Define authentication, RBAC, project/building isolation, token rotation, rate limits, quotas, and audit identity.
+- [ ] Add worker leases, concurrency control, heartbeat, retries, dead-letter handling, cancellation, and safe restart/recovery.
+- [ ] Scan/validate uploads, enforce per-media size limits, isolate parsers/processes, and restrict outbound/network access.
+- [ ] Define retention, user deletion, backup/restore, encryption, monitoring, alerting, and operational runbooks.
+- [ ] Measure job latency/resource consumption and map model-load latency separately.
+- [ ] Prevent private inputs, review images, tokens, and internal paths from appearing in public responses/logs.
+
+**Likely files:** generation API/auth/queue/worker modules; storage adapter; deployment configuration; operational tests and docs.
+
+**Acceptance**
+- [ ] Multi-user authorization and cross-project isolation tests pass.
+- [ ] Concurrent worker, process crash, retry, cancellation, and recovery tests pass.
+- [ ] Backup/restore and deletion workflows are demonstrated.
+- [ ] Upload/parser security, quota, and retention checks are documented and tested.
+- [ ] Operational dashboards/runbooks report queue depth, stage failures, worker health, storage, and map loading.
+
+### D3M-13 — Prove the complete workflow with independent buildings
+
+**Priority:** P0 release gate · **Status:** Not established · **Dependencies:** D3M-00 through D3M-12
+
+**Tasks**
+- [ ] Select a bounded validation set containing an ordinary residential/commercial building, an irregular building, and a complex landmark; verify rights and identity first.
+- [ ] Obtain independent dimensions, horizontal controls, vertical datum, and held-out checkpoints.
+- [ ] Run the entire browser-to-worker-to-review-to-publish-to-map flow on exact pinned commits.
+- [ ] Capture source images, input hashes, worker logs, candidate GLB hashes, review renders, QA reports, placement residuals, reviewer decisions, published version IDs, and browser screenshots.
+- [ ] Test single-image preview and multi-view reconstruction as separate evidence tiers.
+- [ ] Test missing data, bad images, wrong-building match, low overlap, insufficient controls, failed workers, unauthorized review/publish, stale hashes, rollback, page reload, and viewport changes.
+- [ ] Report success/failure per building and per metric; record all unknown and occluded surfaces.
+- [ ] Run cold/warm map-load and multi-building viewport checks on documented browser/device/network conditions.
+
+**Acceptance**
+- [ ] At least three independent buildings have complete, rights-cleared, hash-bound evidence; any unavailable external survey/rights data remains explicitly blocked.
+- [ ] Each building has separate geometry, dimension, texture, horizontal placement, vertical reference, and human visual-review outcomes.
+- [ ] Held-out checkpoints are not used for fitting or correction.
+- [ ] The same approved model version loads in the map after refresh and can be rolled back.
+- [ ] Exact-head CI, API tests, browser tests, and relevant specialized workflows pass.
+- [ ] No universal 90% accuracy claim is made unless a preregistered metric, independent holdout set, uncertainty, and sample size support it.
+
+## 6. Dependency graph
+
+```mermaid
+flowchart TD
+  M00[D3M-00 Branch and PR reconciliation] --> M01[D3M-01 Shared workflow contract]
+  M01 --> M02[D3M-02 Map intake UI and upload]
+  M01 --> M03[D3M-03 Rights and provenance]
+  M02 --> M03
+  M02 --> M04[D3M-04 Building identity and location]
+  M03 --> M05[D3M-05 Image understanding and calibration]
+  M04 --> M05
+  M03 --> M06[D3M-06 Evidence-driven route selection]
+  M05 --> M06
+  M06 --> M07[D3M-07 Geometry generation and refinement]
+  M07 --> M08[D3M-08 GLB and texture QA]
+  M04 --> M09[D3M-09 Metric and geospatial registration]
+  M08 --> M09
+  M08 --> M10[D3M-10 Review and correction]
+  M09 --> M10
+  M10 --> M11[D3M-11 Publish and map integration]
+  M02 --> M12[D3M-12 Production operations]
+  M03 --> M12
+  M11 --> M12
+  M12 --> M13[D3M-13 Independent end-to-end acceptance]
+  M11 --> M13
+```
+
+## 7. Existing test commands to reuse
+
+Run only the suites relevant to the changed work package, then the complete required CI matrix for the exact PR head. These commands are present in the inspected package scripts at the planning baseline; re-check current package scripts before execution.
+
+| Area | Existing command(s) |
+|---|---|
+| BuildingSpec/procedural generator | `npm run test:building-generation` |
+| Media intake and pipeline | `npm run test:building-media`; `npm run test:media-to-model-workflow` |
+| Single-image route | `npm run test:single-image-3d` |
+| COLMAP route | `npm run test:colmap-worker` |
+| Queue and worker | `npm run test:generation-queue` |
+| Upload/API | `npm run test:generation-media-upload` |
+| Review API | `npm run test:generation-review` |
+| GLB geometry/topology | `npm run test:glb-geometry-qa` |
+| Metric and dimension evidence | `npm run test:reference-dimension-validation`; `npm run test:building-accuracy-benchmark` |
+| Release-readiness evidence | `npm run test:building-release-readiness` |
+| Generated model policy/layer | `npm run test:generated-model-policy`; `npm run test:generated-model-layer-boundary` |
+| Published catalog/publisher | `npm run test:published-model-catalog`; `npm run test:publish-approved-generation-job` |
+| Map browser integration | `npm run test:map-browser` |
+| Build quality | `npm run lint`; `npm run build` |
+
+Add new tests where the current suites stop at module boundaries. In particular, add one Playwright test that drives a real test upload through job status, review, publication, map load, page reload, and rollback using deterministic local fixtures.
+
+## 8. Release gates that must remain false until independently satisfied
+
+Do not enable any of these merely because a worker returned exit code zero or a GLB file exists:
+
+- `rightsApproved`
+- `sourceIdentityVerified`
+- `geometryValidated`
+- `metricValidated`
+- `horizontalGeoreferenceVerified`
+- `verticalDatumVerified`
+- `humanReviewed`
+- `acceptanceEligible`
+- `publicationEligible`
+- `mapReady`
+- `automaticApproval`
+
+A human attestation must refer to the exact candidate and evidence hashes. The attestation mechanism verifies recorded fields and file hashes; it does not independently authenticate the reviewer, rights grant, survey, or architectural truth.
+
+## 9. Execution board and update protocol
+
+The first implementation task is **D3M-00**. Do not jump to later phases while branch dependencies or source evidence are unresolved.
+
+For every completed D3M task, update this board and record:
+
+- exact D3M ID, branch, base SHA, head SHA, and PR;
+- changed files and API/schema version impact;
+- exact test commands and workflow run URLs on the head SHA;
+- candidate/source/evidence hashes where relevant;
+- pass/fail/blocked result and unresolved external dependency;
+- impact on each fail-closed release flag;
+- exactly one next task.
+
+Status meanings:
+
+- **PLANNED:** not started.
+- **IN PROGRESS:** implementation underway on a focused branch/PR.
+- **IMPLEMENTED:** code exists but required evidence may still be pending.
+- **VERIFIED:** exact tests/evidence pass for the declared scope.
+- **BLOCKED:** external evidence, rights, survey, credentials, or infrastructure is missing.
+- **ACCEPTED:** required technical and human acceptance gates have passed.
+
+Never upgrade a task to VERIFIED or ACCEPTED from code presence, documentation, a synthetic fixture, or an unrelated green CI run.
