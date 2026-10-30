@@ -357,3 +357,11 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 
 
 **D3M-01.B exact-head CI correction checkpoint (2026-10-30):** first integration run [CI #2576](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072030603) failed only in the newly added evidence-linkage tests. The log identified a fixture variable typo (`groundControlManifestBytes` was not defined); the test was corrected to use the declared `groundManifestBytes`. The stale rights-report test was also corrected to assert a fail-closed blocked result rather than expecting an exception, and the unaudited-camera fixture now retains its byte-linked calibration artifact while asserting review-required status. Latest code head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; a fresh exact-head CI run has not appeared yet. Do not treat #2576 as passed.
+
+### D3M-01.C — candidate evidence hand-off planning (2026-10-30)
+
+[Issue #283](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/283) tracks the next integration task. The existing media-to-model path emits an actual GLB at `model-generation` and finalizes the QA report afterward. Since D3M-01.B binds calibration and survey evidence to the candidate GLB hash, a hand-off cannot safely precede candidate generation. Implement the binding after candidate creation and before downstream review/acceptance/placement; persist it as an immutable reconstruction-job artifact with exact source, candidate and report hashes.
+
+Current gate: PR #281 head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; exact-head CI #2581 / [run 41072445284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) remained in progress at production-server viewport integration (step 172) at this checkpoint. PR #281 remains Draft. No D3M-01.C implementation or promotion is claimed.
+
+The hand-off is review-only: BRF-45 rights report still requires human review, camera/GCP authority and same-building correspondence are not independently authenticated, vertical datum is unresolved, and GLB hash validity is not model accuracy. Preserve every release/truth flag as false.
