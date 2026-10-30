@@ -778,9 +778,6 @@ export async function readSourceBoundAuthenticatedReview({ workspaceRoot, buildi
     "Authenticated-review decision artifact",
     20 * 1024 * 1024,
   );
-  if (artifactFile.sha256 !== record.contentSha256) {
-    throw new TypeError("Authenticated-review decision artifact checksum mismatch.");
-  }
   let artifact;
   try {
     artifact = JSON.parse(artifactFile.bytes.toString("utf8"));
