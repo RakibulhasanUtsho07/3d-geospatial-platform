@@ -280,7 +280,7 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 
 ### D3M-01.C — candidate evidence hand-off implementation (2026-10-30)
 
-<badge>Implemented; exact-head CI passed</badge>
+**Status: Implemented; exact-head CI passed.**
 
 - Code: stacked Draft [PR #284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/284), exact head `dc326af772dce95484cd2565d581ed5f99744369`, parent [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281) exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`.
 - Validation: [CI #41076263050](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41076263050) PASS, 181/181 workflow steps; focused hand-off tests 11/11 pass, including immutable resume, incomplete-rights fail-closed, candidate/QA tamper, wrong source, malformed GLB, traversal and file/directory symlink tests.
