@@ -10,6 +10,7 @@ import {
   fingerprintStageInput,
   readReconstructionJob,
   startReconstructionStage,
+  validateStageArtifact,
   failReconstructionStage,
 } from "./reconstruction-job-state.mjs";
 
@@ -100,19 +101,18 @@ async function readJobArtifact(jobDirectory, record, label) {
   const actual = await realpath(target);
   if (!inside(jobDirectory, actual)) throw new TypeError(label + " stage artifact resolves outside the job directory.");
   const bytes = await readFile(actual);
-  if (sha256(bytes) !== record.contentSha256) {
-    throw new TypeError(label + " stage artifact bytes do not match the immutable job-state checksum.");
-  }
   let artifact;
   try {
     artifact = JSON.parse(bytes.toString("utf8"));
   } catch {
     throw new TypeError(label + " stage artifact is not valid JSON.");
   }
-  if (!isObject(artifact) ||
-      artifact.schemaId !== "reconstruction-stage-artifact" ||
-      artifact.schemaVersion !== "1.0.0" ||
-      artifact.stageId === undefined ||
+  try {
+    validateStageArtifact(artifact);
+  } catch (error) {
+    throw new TypeError(label + " stage artifact failed checksum/schema validation: " + error.message);
+  }
+  if (artifact.stageId === undefined ||
       artifact.contentSha256 !== record.contentSha256 ||
       artifact.inputFingerprint !== record.inputFingerprint ||
       artifact.revision !== record.revision) {
