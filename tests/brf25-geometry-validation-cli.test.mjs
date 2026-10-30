@@ -185,7 +185,7 @@ const copyMap = [
   ["src/core/building-generation/independent-building-truth-evaluator.mjs", "../src/core/building-generation/independent-building-truth-evaluator.mjs"],
 ];
 
-async function setup(t, { staleConfigHash = false } = {}) {
+async function setup(t, { staleConfigHash = false, reviewDecision = "continue-to-independent-validation" } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf25-geometry-chain-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const dir of [
@@ -262,7 +262,7 @@ async function setup(t, { staleConfigHash = false } = {}) {
   };
   await writeFile(path.join(root, "workspace/.building-engine/authorizations/building-01/job-01.json"),
     JSON.stringify(authorization, null, 2) + "\n");
-  const review = await createReviewReceipt(path.join(root, "workspace"));
+  const review = await createReviewReceipt(path.join(root, "workspace"), { decision: reviewDecision });
   return { root, glb, candidateHash, review };
 }
 
@@ -347,8 +347,7 @@ test("blocks BRF-25 when the current trusted key no longer verifies the stored r
 });
 
 test("blocks BRF-25 when a signed non-continue decision is present", async (t) => {
-  const { root } = await setup(t);
-  const review = await createReviewReceipt(path.join(root, "workspace"), { decision: "hold" });
+  const { root, review } = await setup(t, { reviewDecision: "hold" });
   const result = run(root, "artifacts/brf25/hold-decision", review);
   assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/hold-decision/brf25-geometry-validation.json"), "utf8"));
