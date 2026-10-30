@@ -285,9 +285,14 @@ test("rejects candidate GLB bytes that differ from model-generation and evidence
   const root = await workspace(t);
   const { glb } = await createSourceJob(root);
   await writeEvidenceFiles(root);
-  await writeFile(path.join(root, "candidate/model.glb"), Buffer.concat([glb, Buffer.from("tamper")]));
+  const changedGlb = Buffer.from(glb);
+  const sceneMarker = Buffer.from('"scene":0');
+  const sceneOffset = changedGlb.indexOf(sceneMarker);
+  assert.notEqual(sceneOffset, -1);
+  changedGlb[sceneOffset + sceneMarker.length - 1] = "1".charCodeAt(0);
+  await writeFile(path.join(root, "candidate/model.glb"), changedGlb);
 
-  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /reconstruction evidence bundle does not bind the exact visual bundle, source and candidate GLB bytes|candidate GLB does not match/);
+  await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /reconstruction evidence bundle does not bind the exact visual bundle, source and candidate GLB bytes/);
 });
 
 test("rejects a QA report that no longer matches report-finalization artifact bytes", async (t) => {
@@ -325,7 +330,7 @@ test("rejects malformed GLB containers and workspace path traversal", async (t) 
   await assert.rejects(prepareSourceBoundReconstructionHandoff(handoffArgs(root)), /structurally valid GLB/);
   await assert.rejects(
     prepareSourceBoundReconstructionHandoff(handoffArgs(root, { candidateGlbPath: "../candidate/model.glb" })),
-    /workspace-relative POSIX path/,
+    /unsafe path segment/,
   );
 });
 
