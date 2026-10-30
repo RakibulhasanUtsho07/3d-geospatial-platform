@@ -6,7 +6,7 @@ const OBSERVATION_URL = "/experimental/architectural-observation-review.html";
 const BUNDLE_URL = "/experimental/source-bound-evidence-bundle.html";
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
-async function png(page: Page, mask = false): Promise<Buffer> {
+async function png(page: Page, mask = false, variant = false): Promise<Buffer> {
   const dataUrl = await page.evaluate((isMask: boolean) => {
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 48;
@@ -14,13 +14,13 @@ async function png(page: Page, mask = false): Promise<Buffer> {
     if (!context) throw new Error("Canvas fixture context unavailable.");
     if (!isMask) {
       context.fillStyle = "#a9b8c9"; context.fillRect(0, 0, 64, 48);
-      context.fillStyle = "#ffffff"; context.fillRect(12, 6, 40, 36);
+      context.fillStyle = "#ffffff"; context.fillRect(isVariant ? 20 : 12, isVariant ? 10 : 6, isVariant ? 20 : 40, isVariant ? 20 : 36);
     } else {
       context.clearRect(0, 0, 64, 48);
       context.fillStyle = "#ffffff"; context.fillRect(12, 6, 40, 36);
     }
     return canvas.toDataURL("image/png");
-  }, mask);
+  }, { mask, variant });
   return Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
 }
 
@@ -99,7 +99,7 @@ test("browser wizard links real source, mask and observation exports into one fa
 test("browser wizard rejects a mask PNG whose bytes do not match its manifest", async ({ page }: { page: Page }) => {
   const source = await png(page);
   const mask = await png(page, true);
-  const alteredMask = await png(page, false);
+  const alteredMask = await png(page, true, true);
   const sourceHash = sha256(source);
   const manifest = {
     schemaVersion: "1.0.0", artifactType: "source-bound-manual-mask-review",
