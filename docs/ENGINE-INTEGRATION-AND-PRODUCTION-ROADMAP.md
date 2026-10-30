@@ -316,3 +316,8 @@ The earlier in-progress checkpoint is superseded: exact-head CI #2530 / [run 410
 ### D3M-00 branch reconciliation — 2026-10-30
 
 P3.4 is represented by clean-base PR #274 (head `439e5c8ee26f263471b060a35296d681e0add182`); exact-head CI #2285 and Real-Dhaka Browser Baseline #45 passed. Keep Draft pending human visual review. Duplicate #196 and stale-base #193 were closed without merge after confirming their code is already subsumed by #274/development; the generated-model-layer architecture note was preserved in the docs branch. Main promotion #228 remains blocked: development is 86 commits ahead and 4 behind main (204 changed paths); inspect the four main-only commits before promotion.
+
+
+### Main ancestry check — 2026-10-30
+
+A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its exact merge-base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c` reports 4 commits ahead, 0 behind, but **zero changed paths**. Thus the four main-only ancestry commits introduce no net tree difference relative to the merge base; the 204-path delta in PR #228 is the development-side work. Do not cherry-pick those four commits or describe them as missing code. Keep PR #228 unmerged until exact-head promotion CI/review is checked and the current development tree is intentionally approved for main. This resolves the content-loss concern, not the release authorization.
