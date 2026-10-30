@@ -312,3 +312,21 @@ Update this document only when a concrete artifact changes status. Each status u
 - whether the change affects a release gate.
 
 Do not mark an external dependency complete because a request packet or intake manifest was created. Do not mark visual acceptance complete from CI screenshots without human review.
+
+
+---
+
+## D3M-00 live branch/PR reconciliation addendum — 2026-10-30
+
+The detailed PR-by-PR continuation matrix is maintained in [Dynamic 3D Map — D3M-00 execution log](./DYNAMIC-3D-MAP-END-TO-END-EXECUTION-PLAN.md#10-d3m-00-live-execution-log--2026-10-30).
+
+**Freshly observed refs:** \`main@7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b\`, \`development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\`, and \`rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91\`.
+
+- \`development\` and \`main\` are diverged (86 ahead / 4 behind). PR #228 remains a release candidate only; the four main-only commits require content/ancestry review before promotion.
+- \`rakibul-hasan\` and \`development\` are diverged (10 ahead / 89 behind). Do not merge the stale branch wholesale.
+- #274 and #196 overlap on 23 files, with 21 identical common patches; #274 is the stronger map-UX candidate because it also includes the real-Dhaka baseline workflow. Keep #196 open pending #274 review.
+- #277 and #278 each target the old \`rakibul-hasan\` base. Their feature deltas require clean-base ports and exact-head revalidation, not history promotion.
+- #275 (bounded Dhaka 3D Tiles) and #276 (floor-plan vector calibration) remain separate Draft workstreams with their own passed exact-head CI; neither proves image-driven, independently surveyed exterior reconstruction.
+- #193's generated-model-layer module blob is identical to the current development file, and current development's Cesium adapter already delegates model lifecycle methods. A final PR-specific docs/tests comparison is still needed before closing it as superseded.
+
+This is metadata/diff review, not a fresh local build, deployment test, source-rights decision, survey, or architectural visual acceptance. No application code, branch refs, PR state, or release flags changed during this addendum. D3M-00 remains **IN PROGRESS**.
