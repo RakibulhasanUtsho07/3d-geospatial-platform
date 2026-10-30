@@ -19,6 +19,7 @@ import {
   prepareSourceBoundGeometryReview,
   readSourceBoundAuthenticatedReview,
   recordSourceBoundAuthenticatedReview,
+  verifySourceBoundAuthenticatedReviewForIndependentValidation,
 } from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -457,4 +458,118 @@ test("records changes-requested and reject decisions without release-gate promot
   assert.equal(result.decisionRecord.policy.candidateGeometryValidated, false);
   assert.equal(result.decisionRecord.policy.publicationEligible, false);
   assert.equal(result.decisionRecord.policy.mapReady, false);
+});
+
+
+test("re-verifies the immutable signed continue receipt against current trusted keys and exact candidate bytes", async (t) => {
+  const root = await workspace(t);
+  const { candidateSha } = await createHandoff(root);
+  const keys = makeKeys();
+  const registry = makeReviewerRegistry(keys.publicKeyPem);
+  const { submission } = await prepareSubmission(root);
+  const signatureBase64 = signSubmission(submission, keys.privateKey);
+  const recorded = await recordSourceBoundAuthenticatedReview({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    handoffJobId: "handoff-test-01",
+    submission,
+    signatureBase64,
+    trustedReviewerKeys: registry,
+    now: "2026-10-30T15:10:00.000Z",
+  });
+
+  const verified = await verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    reviewJobId: recorded.reviewJobId,
+    expectedCandidateGlbSha256: candidateSha,
+    trustedReviewerKeys: registry,
+  });
+  assert.equal(verified.receipt.status, "cryptographically-reverified");
+  assert.equal(verified.receipt.decision, "continue-to-independent-validation");
+  assert.equal(verified.receipt.candidateGlbSha256, candidateSha);
+  assert.equal(verified.receipt.handoffArtifactSha256, recorded.decisionRecord.handoffArtifactSha256);
+  assert.equal(verified.receipt.geometryReportSha256, recorded.geometryReportSha256);
+  assert.equal(verified.receipt.reviewDecisionArtifactSha256, recorded.artifact.contentSha256);
+  assert.equal(verified.receipt.reviewerPublicKeyFingerprintSha256, recorded.decisionRecord.authentication.reviewerPublicKeyFingerprintSha256);
+  assert.equal(verified.receipt.acceptanceEligible, false);
+  assert.equal(verified.receipt.publicationEligible, false);
+  assert.equal(verified.receipt.mapReady, false);
+  assert.equal(verified.receipt.automaticApproval, false);
+});
+
+test("rejects current-key rotation, wrong candidate, and wrong building when consuming a review receipt", async (t) => {
+  const root = await workspace(t);
+  const { candidateSha } = await createHandoff(root);
+  const keys = makeKeys();
+  const replacement = makeKeys();
+  const registry = makeReviewerRegistry(keys.publicKeyPem);
+  const { submission } = await prepareSubmission(root);
+  const recorded = await recordSourceBoundAuthenticatedReview({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    handoffJobId: "handoff-test-01",
+    submission,
+    signatureBase64: signSubmission(submission, keys.privateKey),
+    trustedReviewerKeys: registry,
+    now: "2026-10-30T15:10:00.000Z",
+  });
+
+  await assert.rejects(verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    reviewJobId: recorded.reviewJobId,
+    expectedCandidateGlbSha256: candidateSha,
+    trustedReviewerKeys: makeReviewerRegistry(replacement.publicKeyPem),
+  }), /signature is invalid/);
+  await assert.rejects(verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    reviewJobId: recorded.reviewJobId,
+    expectedCandidateGlbSha256: "f".repeat(64),
+    trustedReviewerKeys: registry,
+  }), /does not bind the exact BRF-25/);
+  await assert.rejects(verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot: root,
+    buildingId: "building-b",
+    reviewJobId: recorded.reviewJobId,
+    expectedCandidateGlbSha256: candidateSha,
+    trustedReviewerKeys: registry,
+  }), /not a completed authenticated-review decision job|does not bind the exact BRF-25/);
+});
+
+test("does not allow hold or changes-requested receipts to authorize BRF-25", async (t) => {
+  const root = await workspace(t);
+  const { candidateSha } = await createHandoff(root);
+  const keys = makeKeys();
+  const registry = makeReviewerRegistry(keys.publicKeyPem);
+  const { submission } = await prepareSubmission(root, {
+    decision: "hold",
+    checks: makeChecks({
+      rightsUseScope: "not-reviewed",
+      sameBuildingIdentity: "not-reviewed",
+      cameraCalibration: "not-reviewed",
+      groundControlCorrespondence: "not-reviewed",
+      metricScale: "not-reviewed",
+      verticalDatum: "unresolved",
+      geometryTopology: "not-reviewed",
+      sourceCameraComparison: "not-reviewed",
+    }),
+  });
+  const recorded = await recordSourceBoundAuthenticatedReview({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    handoffJobId: "handoff-test-01",
+    submission,
+    signatureBase64: signSubmission(submission, keys.privateKey),
+    trustedReviewerKeys: registry,
+    now: "2026-10-30T15:10:00.000Z",
+  });
+  await assert.rejects(verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    reviewJobId: recorded.reviewJobId,
+    expectedCandidateGlbSha256: candidateSha,
+    trustedReviewerKeys: registry,
+  }), /requires a signed continue-to-independent-validation decision/);
 });
