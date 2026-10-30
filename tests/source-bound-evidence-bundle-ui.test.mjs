@@ -26,6 +26,7 @@ test("wizard links the exact mask hash into the normalized per-view observation 
   assert.match(script, /b\.source\?\.sha256\?\.toLowerCase\(\)!==sourceSha256/);
   assert.match(script, /mask:\{sha256:maskSha256,width:sourceSize\.width,height:sourceSize\.height\}/);
   assert.match(script, /validateObservationBatch\(b,/);
+  assert.match(script, /!safeId\(b\.batchId\)/);
   assert.match(script, /Original proposal snapshot has mismatched provenance/);
   assert.match(script, /maskAndObservationsShareExactSource:true/);
   assert.match(script, /observationsReferenceExactMask:true/);
