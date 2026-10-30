@@ -858,7 +858,6 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   requireMetadata("source-manifest-reviewer-id", sourceManifest?.reviewerId === authentication?.reviewerId);
   requireMetadata("source-manifest-key-fingerprint", sourceManifest?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
   requireMetadata("source-manifest-signed-payload-hash", sourceManifest?.signedPayloadSha256 === authentication?.signedPayloadSha256);
-  requireMetadata("source-manifest-signature-hash", sourceManifest?.signatureSha256 === authentication?.signatureSha256);
   requireMetadata("job-config-review-contract", jobConfig?.reviewContractVersion === REVIEW_SCHEMA_VERSION);
   requireMetadata("job-config-decision", jobConfig?.decision === decisionRecord.decision);
   requireMetadata("job-config-reviewer-id", jobConfig?.reviewerId === authentication?.reviewerId);
@@ -917,7 +916,9 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
       authentication.reviewerId !== signature.reviewerId ||
       authentication.reviewerPublicKeyFingerprintSha256 !== signature.publicKeyFingerprintSha256 ||
       authentication.signedPayloadSha256 !== signature.payloadSha256 ||
-      authentication.signatureSha256 !== signature.signatureSha256) {
+      sourceManifest.signatureSha256 !== signature.signatureSha256 ||
+      (authentication.signatureSha256 !== undefined &&
+        authentication.signatureSha256 !== signature.signatureSha256)) {
     throw new TypeError("Stored authenticated-review signature, payload digest or trusted reviewer-key fingerprint does not verify against the current registry.");
   }
 
