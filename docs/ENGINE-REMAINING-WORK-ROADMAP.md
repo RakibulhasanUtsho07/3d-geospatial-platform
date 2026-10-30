@@ -278,3 +278,12 @@ A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its 
 - Reject stale/tampered bytes, inconsistent identities, unsafe paths, unlinked evidence assets and invalid GLB container data. Keep rights and human-review requirements explicit; do not mark any model accepted or map-ready.
 - Existing rights report remains human-review-required; WGS84 registration does not resolve vertical datum. No accuracy or publication claim.
 
+### D3M-01.C — candidate evidence hand-off implementation (2026-10-30)
+
+<badge>Implemented; exact-head CI passed</badge>
+
+- Code: stacked Draft [PR #284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/284), exact head `dc326af772dce95484cd2565d581ed5f99744369`, parent [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281) exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`.
+- Validation: [CI #41076263050](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41076263050) PASS, 181/181 workflow steps; focused hand-off tests 11/11 pass, including immutable resume, incomplete-rights fail-closed, candidate/QA tamper, wrong source, malformed GLB, traversal and file/directory symlink tests.
+- Integration: two-stage immutable child job uses current reconstruction-job artifacts; CLI and CI test-step added. Candidate/evidence linkage happens only after actual worker GLB and QA report exist.
+- Still blocked: both PRs are Draft/unmerged; rights and calibration/GCP authority require human review; vertical datum and geometry/architectural accuracy are not proved. No dispatch, human acceptance, publication or map readiness.
+- Next: inspect and human-review the stacked PR pair together. Then specify D3M-01.D authenticated human decision + geometry-validation linkage without changing any release flags.
