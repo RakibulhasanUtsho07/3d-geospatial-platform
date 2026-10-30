@@ -807,3 +807,111 @@ export async function readSourceBoundAuthenticatedReview({ workspaceRoot, buildi
   }
   return { job, artifact, decisionRecord };
 }
+
+
+/**
+ * Re-verify a stored D3M-01.D decision immediately before BRF-25 consumes it.
+ * This deliberately replays the hand-off and geometry report from workspace
+ * bytes, reconstructs the exact signed submission, and verifies Ed25519 against
+ * the current server-controlled trust registry. A persisted "verified" label
+ * or caller-provided decision string is not sufficient authorization.
+ */
+export async function verifySourceBoundAuthenticatedReviewForIndependentValidation({
+  workspaceRoot,
+  buildingId,
+  reviewJobId,
+  expectedCandidateGlbSha256,
+  trustedReviewerKeys,
+}) {
+  if (typeof expectedCandidateGlbSha256 !== "string" ||
+      !HASH.test(expectedCandidateGlbSha256)) {
+    throw new TypeError("expectedCandidateGlbSha256 must be a lowercase SHA-256 hash.");
+  }
+  const stored = await readSourceBoundAuthenticatedReview({
+    workspaceRoot,
+    buildingId,
+    reviewJobId,
+  });
+  const prepared = await prepareSourceBoundGeometryReview({
+    workspaceRoot,
+    buildingId,
+    handoffJobId: stored.decisionRecord.handoffJobId,
+  });
+  const decisionRecord = stored.decisionRecord;
+  const authentication = decisionRecord.authentication;
+  const expectedHash = expectedCandidateGlbSha256.toLowerCase();
+
+  if (decisionRecord.schemaVersion !== REVIEW_SCHEMA_VERSION ||
+      decisionRecord.recordType !== "source-bound-authenticated-reconstruction-review" ||
+      decisionRecord.reviewJobId !== reviewJobId ||
+      decisionRecord.buildingId !== buildingId ||
+      decisionRecord.sourceJobId !== prepared.geometryReport.sourceJobId ||
+      decisionRecord.handoffJobId !== prepared.handoffJobId ||
+      decisionRecord.handoffArtifactSha256 !== prepared.handoffArtifactSha256 ||
+      decisionRecord.candidateGlbSha256 !== prepared.candidateSha256 ||
+      decisionRecord.geometryReportSha256 !== prepared.geometryReportSha256 ||
+      prepared.candidateSha256 !== expectedHash) {
+    throw new TypeError("Authenticated review receipt does not bind the exact BRF-25 building, hand-off, geometry report and candidate GLB bytes.");
+  }
+
+  if (decisionRecord.decision !== "continue-to-independent-validation") {
+    throw new Error("BRF-25 requires a signed continue-to-independent-validation decision; the stored reviewer disposition is " +
+      String(decisionRecord.decision) + ".");
+  }
+
+  if (authentication?.method !== "ed25519-signature-over-canonical-review-payload" ||
+      authentication?.signatureAlgorithm !== "Ed25519" ||
+      authentication?.identityAssurance !== "possession-of-server-trusted-private-key-only" ||
+      typeof authentication.signatureBase64 !== "string") {
+    throw new TypeError("Authenticated review receipt has incomplete or unsupported signature metadata.");
+  }
+
+  const reconstructedSubmission = {
+    ...prepared.submissionTemplate,
+    reviewerId: authentication.reviewerId,
+    reviewedAtUtc: decisionRecord.reviewedAtUtc,
+    decision: decisionRecord.decision,
+    checks: decisionRecord.checks,
+    notes: decisionRecord.notes,
+  };
+  const normalizedSubmission = validateSubmission(reconstructedSubmission, prepared);
+  const signature = verifyReviewerSignature({
+    submission: normalizedSubmission,
+    signatureBase64: authentication.signatureBase64,
+    reviewerKeys: trustedReviewerKeys,
+  });
+
+  if (authentication.status !== "signature-verified-against-server-trusted-reviewer-key" ||
+      authentication.reviewerId !== signature.reviewerId ||
+      authentication.reviewerPublicKeyFingerprintSha256 !== signature.publicKeyFingerprintSha256 ||
+      authentication.signedPayloadSha256 !== signature.payloadSha256 ||
+      authentication.signatureSha256 !== signature.signatureSha256) {
+    throw new TypeError("Stored authenticated-review signature, payload digest or trusted reviewer-key fingerprint does not verify against the current registry.");
+  }
+
+  const receipt = Object.freeze({
+    schemaVersion: REVIEW_SCHEMA_VERSION,
+    status: "cryptographically-reverified",
+    decision: decisionRecord.decision,
+    buildingId,
+    reviewJobId,
+    handoffJobId: prepared.handoffJobId,
+    handoffArtifactSha256: prepared.handoffArtifactSha256,
+    candidateGlbSha256: prepared.candidateSha256,
+    geometryReportSha256: prepared.geometryReportSha256,
+    reviewerId: signature.reviewerId,
+    reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
+    signedPayloadSha256: signature.payloadSha256,
+    signatureSha256: signature.signatureSha256,
+    reviewDecisionArtifactSha256: stored.artifact.contentSha256,
+    reviewedAtUtc: decisionRecord.reviewedAtUtc,
+    recordedAtUtc: decisionRecord.recordedAtUtc,
+    identityAssurance: "possession-of-server-trusted-private-key-only",
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+
+  return { receipt, job: stored.job, artifact: stored.artifact, decisionRecord };
+}
