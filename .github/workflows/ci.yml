@@ -63,6 +63,8 @@ on:
       - development
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
+      - feat/d3m01c-candidate-evidence-handoff-20261030
+      - feat/d3m01d-authenticated-geometry-review-20261030
   pull_request:
     branches:
       - main
@@ -439,6 +441,9 @@ jobs:
 
       - name: Test immutable source-bound reconstruction candidate hand-off
         run: npm run test:source-bound-reconstruction-handoff
+
+      - name: Test trusted-signer candidate geometry and human-review evidence
+        run: npm run test:source-bound-authenticated-review
       - name: Test hash-pinned building visual review packet
         run: npm run test:building-visual-review-packet
       - name: Validate building visual evidence bundle CLI
