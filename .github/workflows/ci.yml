@@ -63,7 +63,6 @@ on:
       - development
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
-      - feat/d3m01c-candidate-evidence-handoff-20261030
       - feat/d3m01d-authenticated-geometry-review-20261030
   pull_request:
     branches:
@@ -106,6 +105,7 @@ on:
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
       - feat/brf46-source-operation-scope-gate
+      - feat/d3m01c-candidate-evidence-handoff-20261030
       - development
 
 permissions:
