@@ -343,3 +343,10 @@ The old-base BRF-06 studio from PR #278 is now selectively ported onto a branch 
 Parent PR #280 exact-head CI #2513 passed all steps, including browser/API integration, but the PR remains Draft with no review. Combined PR #281 exact-head CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is in progress; no new-base pass is claimed yet.
 
 The observation studio still exports `mask: null`; it is not yet integrated with the manual mask editor. The shared source-bound mask/observation bundle, invalidation rules, rights/camera linkage, and authenticated review history remain open. JSON event validation does not provide a cryptographically signed audit log. All ground-truth/publication/map-ready gates remain false.
+### D3M-00.C — BRF-06 clean-base port status (2026-10-30)
+
+The source-bound observation studio and review-history schema update from old-base PR #278 have been selectively ported to stacked Draft PR [#282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282). Branch `feat/brf06-observation-review-stacked-20261030` descends from the verified #280 head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`; current head is `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`.
+
+A compare against #280 confirms exactly six BRF-06 changed paths. The current PR target is development for CI triggering, so its cumulative diff temporarily includes the four #280 paths as well. **Do not merge #282 before #280.** After #280 merges and receives human approval, retarget #282 to development, verify only the six BRF-06 paths remain, and rerun exact-head CI.
+
+CI #2526 / [run 41000728438](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000728438) was queued at the last check; no pass is claimed. The tool remains local/manual, and no source rights, building identity, survey truth, physical geometry accuracy or publication approval is asserted. All release gates remain fail-closed.
