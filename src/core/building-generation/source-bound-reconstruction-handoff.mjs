@@ -67,10 +67,27 @@ function inside(root, candidate) {
   );
 }
 
+async function assertNoSymlinkSegments(root, relativePath, label) {
+  let current = root;
+  const segments = relativePath.split("/");
+  for (let index = 0; index < segments.length; index += 1) {
+    current = path.join(current, segments[index]);
+    const entry = await lstat(current);
+    if (entry.isSymbolicLink()) {
+      throw new TypeError(label + " path must not traverse symlink: " + segments[index]);
+    }
+    if (index < segments.length - 1 && !entry.isDirectory()) {
+      throw new TypeError(label + " path parent must be a real directory.");
+    }
+  }
+  return current;
+}
+
 async function readWorkspaceFile(root, relativePath, label, maximumBytes) {
   const safePath = safeRelativePath(relativePath, label + " path");
   const target = path.resolve(root, ...safePath.split("/"));
   if (!inside(root, target)) throw new TypeError(label + " path escapes workspaceRoot.");
+  await assertNoSymlinkSegments(root, safePath, label);
   const entry = await lstat(target);
   if (entry.isSymbolicLink() || !entry.isFile()) {
     throw new TypeError(label + " must be a regular non-symlink file.");
@@ -94,6 +111,7 @@ async function readJobArtifact(jobDirectory, record, label) {
   const relative = safeRelativePath(record.path, label + " artifact");
   const target = path.resolve(jobDirectory, ...relative.split("/"));
   if (!inside(jobDirectory, target)) throw new TypeError(label + " stage artifact escapes the job directory.");
+  await assertNoSymlinkSegments(jobDirectory, relative, label + " stage artifact");
   const entry = await lstat(target);
   if (entry.isSymbolicLink() || !entry.isFile() || entry.size < 1 || entry.size > MAX_JOB_ARTIFACT_BYTES) {
     throw new TypeError(label + " stage artifact must be a bounded regular file.");
@@ -101,6 +119,9 @@ async function readJobArtifact(jobDirectory, record, label) {
   const actual = await realpath(target);
   if (!inside(jobDirectory, actual)) throw new TypeError(label + " stage artifact resolves outside the job directory.");
   const bytes = await readFile(actual);
+  if (bytes.length !== entry.size || bytes.length < 1 || bytes.length > MAX_JOB_ARTIFACT_BYTES) {
+    throw new TypeError(label + " stage artifact changed while it was being read or exceeds its byte limit.");
+  }
   let artifact;
   try {
     artifact = JSON.parse(bytes.toString("utf8"));
