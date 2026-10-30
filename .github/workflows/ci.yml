@@ -434,6 +434,9 @@ jobs:
         run: npm run test:source-bound-visual-evidence-bundle
       - name: Test source-bound rights, camera and ground-control reconstruction evidence
         run: npm run test:source-bound-reconstruction-evidence
+
+      - name: Test immutable source-bound reconstruction candidate hand-off
+        run: npm run test:source-bound-reconstruction-handoff
       - name: Test hash-pinned building visual review packet
         run: npm run test:building-visual-review-packet
       - name: Validate building visual evidence bundle CLI
