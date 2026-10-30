@@ -1,0 +1,224 @@
+# Engine Integration and Production Roadmap
+
+**Created:** 2026-10-30  
+**Baseline:** `development` at `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`  
+**Companion audit:** [Full Repository Gap Audit](./ENGINE-FULL-REPOSITORY-GAP-AUDIT.md)
+
+This roadmap converts the repository audit into dependency-ordered work packages. It is an execution plan, not a claim that the work is complete. Update each item only with exact commit, tests, evidence, and remaining limitations.
+
+## Execution rules
+
+1. Work in isolated, reviewable PRs. Do not merge a feature branch simply because its tests pass.
+2. Require exact-head CI for lint, production build, unit/integration tests, API/browser tests, and relevant specialized workflows.
+3. Visual, rights, survey, and publication acceptance require their own evidence and human review.
+4. Keep unknown/occluded values explicit; never synthesize missing measurements.
+5. Preserve fail-closed release flags: `groundTruth=false`, `acceptanceEligible=false`, `publicationEligible=false`, `publishable=false`, and `automaticApproval=false` until their separate criteria pass.
+6. External data access, rights grants, surveying, and deployment infrastructure must be recorded as dependencies—not simulated as completed code tasks.
+
+## Work packages
+
+### WP-00 — Integration baseline and PR dependency reconciliation
+**Priority:** P0 · **Dependencies:** none
+
+**Scope**
+- Capture branch SHAs for `main`, `development`, and `rakibul-hasan`.
+- Compare open PR heads/bases/merge bases and changed paths.
+- Identify duplicate, superseded, stacked, and conflicting PRs.
+- Define the canonical next integration path without force-pushing or bulk-merging.
+
+**Acceptance**
+- [ ] Dependency matrix covers every open PR touching engine, BRF, map, or floor-plan code.
+- [ ] Every PR has a verified base, exact head SHA, and exact-head CI state.
+- [ ] No unresolved duplicate ownership or unreviewed branch divergence.
+- [ ] Promotion plan preserves the repository's `rakibul-hasan → development → main` policy where ancestry permits; any exception is documented and approved.
+
+### WP-01 — Unified source evidence bundle (BRF-05 + BRF-06)
+**Priority:** P0 · **Dependencies:** WP-00
+
+**Scope**
+- Define a versioned schema for source image, building/view/source IDs, exact source bytes/hash/dimensions, manual mask, architectural observations, review history, rights/operation scope, and export metadata.
+- Replace the BRF-06 `mask:null` placeholder with validated source-bound mask linkage.
+- Preserve source-pixel coordinate frame and crop/resize transforms.
+- Invalidate reviewer attestations and downstream exports when source, mask, observation, or rights state changes.
+
+**Acceptance**
+- [ ] One bundle imports/exports masks and observations together.
+- [ ] Source mismatch, hash mismatch, dimension mismatch, dangling references, and invalid coordinate transforms are rejected.
+- [ ] Reviewer events are append-only and latest-state consistency is enforced.
+- [ ] Editing a dependency invalidates all affected attestations/exports.
+- [ ] Unit, API and Playwright tests cover success and adversarial cases.
+
+### WP-02 — Camera and image-coordinate calibration (BRF-07)
+**Priority:** P0 · **Dependencies:** WP-01
+
+**Scope**
+- Bind each view to calibration state: intrinsics, distortion model, camera pose, image dimensions, crop/resize transform, coordinate convention, and world CRS.
+- Support explicit uncalibrated/unknown states.
+- Map observations to rays/planes/3D constraints only when assumptions and calibration permit.
+- Link architectural features to mesh regions and correction history.
+
+**Acceptance**
+- [ ] Synthetic reprojection fixtures with known camera parameters.
+- [ ] Pixel-to-ray and crop/resize invariance tests.
+- [ ] Reprojection residuals and uncertainty reported.
+- [ ] No metric geometry is inferred from uncalibrated pixels.
+- [ ] Every correction traces to source observation, calibration, model hash, and reviewer.
+
+### WP-03 — BRF-26 evidence bundle integration
+**Priority:** P0 · **Dependencies:** WP-01, WP-02
+
+**Scope**
+- Connect source identity, rights, camera/view evidence, masks, observations, reconstruction inputs, exact GLB bytes, geometry/metric QA, render references, and review decisions.
+- Pin transformation code/config/model versions and all input/output hashes.
+- Define deterministic bundle export and independent verification.
+
+**Acceptance**
+- [ ] Bundle is reproducible from immutable inputs.
+- [ ] All referenced assets resolve and hashes verify.
+- [ ] Missing/unknown evidence remains missing/unknown.
+- [ ] Re-import rejects tampered, stale, or cross-building assets.
+- [ ] Evidence report separates rights, identity, dimensions, georeferencing, geometry, texture, and human visual review.
+
+### WP-04 — Rights, source operations, and cache safety (BRF-27–46)
+**Priority:** P0 · **Dependencies:** WP-03
+
+**Scope**
+- Reconcile BRF-27–46 artifacts against one source-rights contract.
+- Enforce per-asset permissions for download, storage, display, frame extraction, feature extraction, training, reconstruction, derivative creation, export, and publication.
+- Re-check permission on cache hits and worker resume.
+- Keep TUM/other external benchmark intake blocked until source-to-building match, license, coordinate frame, and held-out checkpoints are verified.
+
+**Acceptance**
+- [ ] Operation matrix is explicit and versioned.
+- [ ] Positive/negative tests for every operation and every stage.
+- [ ] Expired/revoked rights and cache replay fail closed.
+- [ ] No source is used beyond its granted scope.
+- [ ] External rights and data-matching evidence are linked, not inferred from metadata.
+
+### WP-05 — GLB geometry and metric QA hardening
+**Priority:** P0 · **Dependencies:** WP-03
+
+**Scope**
+- Unify actual GLB extraction, topology checks, dimensions, coordinate frame, transform provenance, and deterministic render references.
+- Separate geometry validity from real-world correctness.
+- Add model-class-specific thresholds and uncertainty-aware comparisons.
+
+**Acceptance**
+- [ ] Adversarial fixtures cover degenerate faces, non-manifold/open boundaries, disconnected components, extreme edges, invalid normals, missing UV/material/texture, scale and transform errors.
+- [ ] Reports bind to exact GLB SHA-256.
+- [ ] Metric comparisons use independently measured references and held-out controls.
+- [ ] No combined accuracy score without a documented defensible method.
+
+### WP-06 — Independent Dhaka benchmark pack
+**Priority:** P0 · **Dependencies:** WP-03, WP-04, WP-05; external survey and rights dependencies
+
+**Scope**
+- Choose at least 2–3 buildings across complex landmark and ordinary building types.
+- Verify building identity, source rights, and image coverage.
+- Obtain independent dimensions/control points with uncertainty, CRS and vertical datum.
+- Reserve held-out measurements not used during reconstruction/correction.
+- Generate fixed-camera views and reviewer packets.
+
+**Acceptance**
+- [ ] Source pack and rights evidence complete.
+- [ ] Independent survey records are attributable and hash-bound.
+- [ ] Horizontal and vertical residuals reported separately.
+- [ ] Held-out checkpoints are not used for fitting/correction.
+- [ ] Human review records pass/fail per facade/roof/texture/occlusion category.
+- [ ] Any unsupported or missing metric remains unavailable; no 90% claim without statistically defensible evidence.
+
+### WP-07 — Production job, storage, and security platform
+**Priority:** P0 before production · **Dependencies:** WP-00, WP-03
+
+**Scope**
+- Durable DB-backed job state, queue leases/locking, idempotency, retries, resume and dead-letter handling.
+- Private object storage with signed access, encryption, retention/deletion, backup/restore.
+- Identity and RBAC for submitter/operator/reviewer/admin/publisher; per-project/building isolation.
+- Quotas, rate limiting, worker resource budgets, audit logs and operational health.
+
+**Acceptance**
+- [ ] Authorization matrix and negative access tests.
+- [ ] Concurrent claim, process crash/restart, retry and idempotency tests.
+- [ ] Cross-user asset isolation and signed URL expiry tests.
+- [ ] Retention/deletion and backup restore demonstrated.
+- [ ] Runbook, alerts and incident/audit records documented.
+
+### WP-08 — Production 3D Tiles pipeline and city-scale validation
+**Priority:** P1 · **Dependencies:** WP-00, WP-05
+
+**Scope**
+- Implement and validate a real source-to-3D-Tiles conversion path.
+- Define CRS transforms, bounding volumes, geometric error, LOD/refinement, content URI safety, metadata, parent/part deduplication and coverage.
+- Validate one bounded real Dhaka package before scaling.
+
+**Acceptance**
+- [ ] Tile schema and content integrity checks pass.
+- [ ] Independent footprint/placement overlay reviewed.
+- [ ] Selective viewport fetch returns expected content.
+- [ ] Fixed-camera browser screenshots and multi-tile pan/zoom evidence attached.
+- [ ] Cancellation, retry, cache eviction and memory behavior tested.
+- [ ] Dataset coverage and known gaps documented.
+
+### WP-09 — Floor-plan to semantic interior model
+**Priority:** P1 · **Dependencies:** WP-00, WP-05
+
+**Scope**
+- PDF/image intake and rasterization; explicit scale calibration; wall, room, door, window and dimension proposals; editable vector review; measured-vector GLB generation.
+- Keep furniture and interior design as a separate configurable layer.
+- Plan CAD/IFC/BIM import as a separate adapter track.
+
+**Acceptance**
+- [ ] Synthetic and real floor-plan fixtures.
+- [ ] Scale, rotation, skew, noise, false-line, missing-opening and room-closure tests.
+- [ ] Independent plan dimension comparisons.
+- [ ] Reviewed semantic vectors linked to source hashes.
+- [ ] Human approval required before publish/export.
+
+### WP-10 — Product data, accessibility, and release readiness
+**Priority:** P1 · **Dependencies:** WP-07, WP-08
+
+**Scope**
+- Replace illustrative listings with sourced, moderated, persistent data.
+- Add verified owner/agent workflows, listing freshness, fraud reporting and audit.
+- Clearly distinguish straight-line distance from route-network distance/time.
+- Complete accessibility, responsive UX, attribution, privacy, monitoring, backups and rollback.
+
+**Acceptance**
+- [ ] No demo listing presented as verified inventory.
+- [ ] Listing provenance/freshness and moderation are auditable.
+- [ ] Network routing claims use a real routable network.
+- [ ] Accessibility/browser matrix and security review pass.
+- [ ] Deployment, rollback, backup and incident runbooks exist.
+
+## Dependency overview
+
+```mermaid
+flowchart TD
+  WP00[WP-00 Integration baseline] --> WP01[WP-01 Source evidence bundle]
+  WP01 --> WP02[WP-02 Camera calibration]
+  WP01 --> WP03[WP-03 BRF-26 evidence integration]
+  WP02 --> WP03
+  WP03 --> WP04[WP-04 Rights and cache safety]
+  WP03 --> WP05[WP-05 GLB geometry and metric QA]
+  WP04 --> WP06[WP-06 Independent Dhaka benchmark]
+  WP05 --> WP06
+  WP03 --> WP07[WP-07 Production jobs and security]
+  WP00 --> WP08[WP-08 Production 3D Tiles]
+  WP05 --> WP08
+  WP00 --> WP09[WP-09 Floor-plan interior]
+  WP05 --> WP09
+  WP07 --> WP10[WP-10 Product and release]
+  WP08 --> WP10
+```
+
+## Definition of done for every work package
+
+- [ ] Scope and non-goals documented.
+- [ ] Exact source/base/head SHA recorded.
+- [ ] Tests cover success, failure, malformed input, stale state, and authorization boundaries where relevant.
+- [ ] Lint and production build pass.
+- [ ] Relevant unit, integration, API, browser and specialized workflows pass on the exact PR head.
+- [ ] Evidence artifacts are hash-bound and reproducible.
+- [ ] Human review completed for visual, rights, survey, and publication decisions.
+- [ ] Remaining limitations and external dependencies documented.
+- [ ] Release flags remain false unless their individual acceptance criteria are met.
