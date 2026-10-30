@@ -9,6 +9,7 @@ import {
   fingerprintStageInput,
   readReconstructionJob,
   startReconstructionStage,
+  validateStageArtifact,
 } from "./reconstruction-job-state.mjs";
 import { readSourceBoundReconstructionHandoff } from "./source-bound-reconstruction-handoff.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
@@ -279,7 +280,8 @@ export async function prepareSourceBoundGeometryReview({ workspaceRoot, building
       handoff.handoffId !== handoffId ||
       handoff.buildingId !== building ||
       handoff.recordType !== "source-bound-reconstruction-handoff" ||
-      handoff.policy?.candidateGeometryValidated !== false && handoff.policy?.candidateGeometryValidated !== undefined ||
+      (handoff.policy?.candidateGeometryValidated !== undefined && handoff.policy?.candidateGeometryValidated !== false) ||
+      handoff.candidate?.geometryAccuracyEvaluated !== false ||
       handoff.policy?.groundTruth !== false ||
       handoff.policy?.acceptanceEligible !== false ||
       handoff.policy?.publicationEligible !== false ||
@@ -733,7 +735,7 @@ export async function readSourceBoundAuthenticatedReview({ workspaceRoot, buildi
   const root = await realpath(path.resolve(workspaceRoot ?? ""));
   const building = safeId(buildingId, "buildingId");
   const id = safeId(reviewJobId, "reviewJobId");
-  const { job } = await readReconstructionJob({
+  const { job, jobDirectory } = await readReconstructionJob({
     workspaceRoot: root,
     buildingId: building,
     jobId: id,
@@ -748,11 +750,29 @@ export async function readSourceBoundAuthenticatedReview({ workspaceRoot, buildi
   if (!record || !HASH.test(record.contentSha256 ?? "")) {
     throw new TypeError("Authenticated-review decision artifact is missing.");
   }
-  const jobDirectory = path.resolve(root, ".building-engine", "reconstruction-jobs", building, id);
-  const artifactPath = path.resolve(jobDirectory, ...record.path.split("/"));
-  if (!inside(jobDirectory, artifactPath)) throw new TypeError("Authenticated-review artifact path escapes its job directory.");
-  const bytes = await readFile(artifactPath);
-  const artifact = JSON.parse(bytes.toString("utf8"));
+  const artifactFile = await readWorkspaceFile(
+    jobDirectory,
+    record.path,
+    "Authenticated-review decision artifact",
+    20 * 1024 * 1024,
+  );
+  if (artifactFile.sha256 !== record.contentSha256) {
+    throw new TypeError("Authenticated-review decision artifact checksum mismatch.");
+  }
+  let artifact;
+  try {
+    artifact = JSON.parse(artifactFile.bytes.toString("utf8"));
+    validateStageArtifact(artifact);
+  } catch (error) {
+    throw new TypeError("Authenticated-review decision artifact failed schema/checksum validation: " +
+      (error instanceof Error ? error.message : String(error)));
+  }
+  if (artifact.stageId !== SOURCE_BOUND_AUTHENTICATED_REVIEW_STAGE_IDS[1] ||
+      artifact.contentSha256 !== record.contentSha256 ||
+      artifact.inputFingerprint !== record.inputFingerprint ||
+      artifact.revision !== record.revision) {
+    throw new TypeError("Authenticated-review decision artifact does not match its immutable job-state record.");
+  }
   const decisionRecord = artifact.payload?.decisionRecord;
   if (!isObject(decisionRecord) ||
       decisionRecord.authentication?.status !== "signature-verified-against-server-trusted-reviewer-key" ||
@@ -760,8 +780,10 @@ export async function readSourceBoundAuthenticatedReview({ workspaceRoot, buildi
       decisionRecord.policy?.groundTruth !== false ||
       decisionRecord.policy?.acceptanceEligible !== false ||
       decisionRecord.policy?.publicationEligible !== false ||
+      decisionRecord.policy?.publishable !== false ||
       decisionRecord.policy?.mapReady !== false ||
-      decisionRecord.policy?.automaticApproval !== false) {
+      decisionRecord.policy?.automaticApproval !== false ||
+      decisionRecord.policy?.dispatchAllowed !== false) {
     throw new TypeError("Authenticated-review decision artifact violates its signed review-only contract.");
   }
   return { job, artifact, decisionRecord };
