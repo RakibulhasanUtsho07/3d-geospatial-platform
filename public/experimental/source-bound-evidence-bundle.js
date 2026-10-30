@@ -25,6 +25,45 @@ async function dimensions(file,label,inspectMask=false){
 }
 function assertFalse(policy,keys,label){if(!policy||keys.some(key=>policy[key]!==false))throw new Error(label+" must explicitly keep "+keys.join(", ")+" false.");}
 function safeId(value){return typeof value==="string"&&/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(value);}
+const CATEGORIES=new Set(["silhouette-bounds","roofline-segment","outer-corner","floor-band","facade-region","window-candidate","door-candidate","balcony-candidate","visible-occluder","arch-candidate","column-candidate","dome-candidate","cornice-candidate","pediment-candidate","staircase-candidate","parapet-candidate","ornament-candidate"]);
+const METHODS=new Set(["mask-foreground-bounds","mask-top-envelope","mask-extrema-candidate","masked-edge-horizontal-band-density","masked-edge-component","human-review"]);
+const STATUSES=new Set(["proposed","reviewed","rejected"]),VISIBILITY=new Set(["visible","partially-occluded","occluded","not-visible","not-detected"]);
+function point(value,width,height){return Array.isArray(value)&&value.length===2&&value.every(Number.isFinite)&&value[0]>=0&&value[1]>=0&&value[0]<=width-1&&value[1]<=height-1;}
+function geometry(value,width,height,visibility){
+ if(value===null||value===undefined){if(["occluded","not-visible","not-detected"].includes(visibility))return;throw new Error("Visible observations require geometry.");}
+ if(value.type==="Point"&&point(value.coordinates,width,height))return;
+ if(value.type==="LineString"&&Array.isArray(value.coordinates)&&value.coordinates.length>=2&&value.coordinates.every(p=>point(p,width,height)))return;
+ if(value.type==="BoundingBox"){const [x,y,w,h]=value.coordinates??[];if([x,y,w,h].every(Number.isFinite)&&x>=0&&y>=0&&w>0&&h>0&&x+w<=width&&y+h<=height)return;}
+ if(value.type==="Polygon"&&Array.isArray(value.coordinates)&&value.coordinates.length&&value.coordinates.every(r=>Array.isArray(r)&&r.length>=4&&r.every(p=>point(p,width,height))&&r[0][0]===r.at(-1)[0]&&r[0][1]===r.at(-1)[1]))return;
+ throw new Error("An observation contains unsupported or out-of-image geometry.");
+}
+function validateObservationBatch(batch,source,maskSha256){
+ const ids=new Set();
+ for(const item of batch.observations){
+  if(!item||!safeId(item.id)||ids.has(item.id)||!CATEGORIES.has(item.category)||!METHODS.has(item.method)||!STATUSES.has(item.status)||!VISIBILITY.has(item.visibility)||
+     item.sourceId!==source.id||item.sourceSha256?.toLowerCase()!==source.sha256||item.viewId!==batch.viewId||
+     !Number.isFinite(item.confidence)||item.confidence<0||item.confidence>1)throw new Error("Observation identity, category, method, state or confidence is invalid.");
+  ids.add(item.id);geometry(item.geometry,source.width,source.height,item.visibility);
+  if(item.status!=="proposed"&&(!item.reviewedBy?.trim()||!Number.isFinite(Date.parse(item.reviewedAt||""))))throw new Error("Reviewed/rejected observations need a reviewer and timestamp.");
+  for(const evidence of [item.evidence,item.originalProposal?.evidence])if(evidence?.maskSha256&&evidence.maskSha256.toLowerCase()!==maskSha256)throw new Error("An observation references a different mask SHA-256.");
+  if(item.evidence?.edgeMapSha256&&!/^[a-f0-9]{64}$/i.test(item.evidence.edgeMapSha256))throw new Error("Observation edge-map evidence hash is invalid.");
+  if(item.originalProposal){
+   const original=item.originalProposal;
+   if(original.id!==item.id||original.sourceId!==source.id||original.sourceSha256?.toLowerCase()!==source.sha256||
+      original.viewId!==batch.viewId||!CATEGORIES.has(original.category)||!METHODS.has(original.method)||original.status!=="proposed"||
+      !VISIBILITY.has(original.visibility)||!Number.isFinite(original.confidence)||original.confidence<0||original.confidence>1)
+    throw new Error("Original proposal snapshot has mismatched provenance.");
+   geometry(original.geometry,source.width,source.height,original.visibility);
+  }
+  if(item.reviews!==undefined){
+   if(!Array.isArray(item.reviews)||item.reviews.length>100||(item.reviews.length&&!item.originalProposal))throw new Error("Append-only review history is malformed.");
+   for(const review of item.reviews)if(!review||!["reviewed","rejected"].includes(review.decision)||!review.reviewerId?.trim()||
+      !Number.isFinite(Date.parse(review.reviewedAt||""))||(typeof review.notes==="string"&&review.notes.length>2000))throw new Error("A review event is malformed.");
+   if(item.status!=="proposed"&&item.reviews.length){const last=item.reviews.at(-1);if(last.decision!==item.status||last.reviewerId!==item.reviewedBy||
+      new Date(last.reviewedAt).toISOString()!==new Date(item.reviewedAt).toISOString())throw new Error("Current observation state differs from its latest review event.");}
+  }
+ }
+}
 async function build(){
  ui.download.disabled=true;outputBlob=null;
  try{
@@ -56,6 +95,7 @@ async function build(){
    throw new Error("Observation batch must match the exact source ID, bytes, dimensions and pixel coordinate convention.");
   if(b.mask&&(b.mask.sha256?.toLowerCase()!==maskSha256||b.mask.width!==sourceSize.width||b.mask.height!==sourceSize.height))
    throw new Error("Observation batch already contains a conflicting mask reference.");
+  validateObservationBatch(b,{id:src.sourceId,sha256:sourceSha256,width:sourceSize.width,height:sourceSize.height},maskSha256);
   for(const item of b.observations){
    if(!item||item.sourceId!==src.sourceId||item.sourceSha256?.toLowerCase()!==sourceSha256||item.viewId!==b.viewId)
     throw new Error("An observation has mismatched source or view provenance.");
