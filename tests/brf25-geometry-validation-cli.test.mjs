@@ -338,8 +338,7 @@ test("blocks BRF-25 when the current trusted key no longer verifies the stored r
   const replacementPem = replacement.publicKey.export({ type: "spki", format: "pem" }).toString();
   const rotated = { ...review, registryJson: JSON.stringify([{ reviewerId: "reviewer-brf25", publicKeyPem: replacementPem }]) };
   const result = run(root, "artifacts/brf25/rotated-key", rotated);
-  assert.equal(result.status, 2, result.stderr + "
-" + result.stdout);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/rotated-key/brf25-geometry-validation.json"), "utf8"));
   assert.equal(report.status, "blocked");
   assert.match(report.blockers.find((item) => item.id === "authenticated-review-receipt").detail, /signature is invalid/);
