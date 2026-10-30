@@ -150,10 +150,17 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  if (!input || typeof input !== "object" || Array.isArray(input) ||
-      Object.keys(input).some((key) => !["submission", "signatureBase64"].includes(key)) ||
-      typeof (input as { signatureBase64?: unknown }).signatureBase64 !== "string" ||
-      !("submission" in input)) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return NextResponse.json({
+      error: "Request must contain only submission and signatureBase64. Trusted public keys are server-configured and must not be sent by the caller.",
+    }, { status: 400 });
+  }
+  const payload = input as Record<string, unknown>;
+  const submission = payload.submission;
+  const signatureBase64 = payload.signatureBase64;
+  if (Object.keys(payload).some((key) => !["submission", "signatureBase64"].includes(key)) ||
+      !Object.prototype.hasOwnProperty.call(payload, "submission") ||
+      typeof signatureBase64 !== "string") {
     return NextResponse.json({
       error: "Request must contain only submission and signatureBase64. Trusted public keys are server-configured and must not be sent by the caller.",
     }, { status: 400 });
@@ -165,9 +172,10 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceRoot: auth.workspaceRoot!,
       buildingId,
       handoffJobId,
-      submission: (input as { submission: unknown }).submission,
-      signatureBase64: (input as { signatureBase64: string }).signatureBase64,
+      submission,
+      signatureBase64,
       trustedReviewerKeys: auth.reviewerKeys!,
+      now: new Date().toISOString(),
     });
     return NextResponse.json({
       reviewJobId: result.reviewJobId,
