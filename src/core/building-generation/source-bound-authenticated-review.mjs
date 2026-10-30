@@ -321,6 +321,7 @@ export async function prepareSourceBoundGeometryReview({ workspaceRoot, building
     candidateSha256: candidate.sha256,
   });
   return {
+    handoff,
     handoffJobId: handoffId,
     handoffArtifactSha256: handoffArtifact.contentSha256,
     candidateSha256: candidate.sha256,
