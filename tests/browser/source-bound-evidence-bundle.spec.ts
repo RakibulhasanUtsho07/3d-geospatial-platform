@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 
 const OBSERVATION_URL = "/experimental/architectural-observation-review.html";
@@ -7,17 +8,17 @@ const BUNDLE_URL = "/experimental/source-bound-evidence-bundle.html";
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
 async function png(page: Page, mask = false, variant = false): Promise<Buffer> {
-  const dataUrl = await page.evaluate((isMask: boolean) => {
+  const dataUrl = await page.evaluate(({ mask: isMask, variant: isVariant }: { mask: boolean; variant: boolean }) => {
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 48;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas fixture context unavailable.");
     if (!isMask) {
       context.fillStyle = "#a9b8c9"; context.fillRect(0, 0, 64, 48);
-      context.fillStyle = "#ffffff"; context.fillRect(isVariant ? 20 : 12, isVariant ? 10 : 6, isVariant ? 20 : 40, isVariant ? 20 : 36);
+      context.fillStyle = "#ffffff"; context.fillRect(16, 6, 32, 36);
     } else {
       context.clearRect(0, 0, 64, 48);
-      context.fillStyle = "#ffffff"; context.fillRect(12, 6, 40, 36);
+      context.fillStyle = "#ffffff"; context.fillRect(isVariant ? 20 : 12, isVariant ? 10 : 6, isVariant ? 20 : 40, isVariant ? 20 : 36);
     }
     return canvas.toDataURL("image/png");
   }, { mask, variant });
