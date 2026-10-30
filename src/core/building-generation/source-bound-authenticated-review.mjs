@@ -839,7 +839,38 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   });
   const decisionRecord = stored.decisionRecord;
   const authentication = decisionRecord.authentication;
+  const sourceManifest = stored.job.sourceManifest;
+  const jobConfig = stored.job.config;
   const expectedHash = expectedCandidateGlbSha256.toLowerCase();
+
+  if (!isObject(sourceManifest) || !isObject(jobConfig) ||
+      sourceManifest.schemaVersion !== REVIEW_SCHEMA_VERSION ||
+      sourceManifest.recordType !== "source-bound-authenticated-review-job-source" ||
+      sourceManifest.handoffJobId !== prepared.handoffJobId ||
+      sourceManifest.handoffArtifactSha256 !== prepared.handoffArtifactSha256 ||
+      sourceManifest.candidateGlbSha256 !== prepared.candidateSha256 ||
+      sourceManifest.geometryReportSha256 !== prepared.geometryReportSha256 ||
+      sourceManifest.reviewerId !== authentication?.reviewerId ||
+      sourceManifest.reviewerPublicKeyFingerprintSha256 !== authentication?.reviewerPublicKeyFingerprintSha256 ||
+      sourceManifest.signedPayloadSha256 !== authentication?.signedPayloadSha256 ||
+      sourceManifest.signatureSha256 !== authentication?.signatureSha256 ||
+      jobConfig.reviewContractVersion !== REVIEW_SCHEMA_VERSION ||
+      jobConfig.decision !== decisionRecord.decision ||
+      jobConfig.reviewerId !== authentication?.reviewerId ||
+      jobConfig.reviewerPublicKeyFingerprintSha256 !== authentication?.reviewerPublicKeyFingerprintSha256 ||
+      jobConfig.candidateGeometryValidated !== false ||
+      jobConfig.groundTruth !== false ||
+      jobConfig.acceptanceEligible !== false ||
+      jobConfig.publicationEligible !== false ||
+      jobConfig.publishable !== false ||
+      jobConfig.mapReady !== false ||
+      jobConfig.automaticApproval !== false ||
+      jobConfig.dispatchAllowed !== false ||
+      stored.job.buildingId !== buildingId ||
+      stored.job.jobId !== reviewJobId ||
+      stored.job.createdAt !== decisionRecord.recordedAtUtc) {
+    throw new TypeError("Authenticated-review job metadata does not match its immutable signed decision receipt.");
+  }
 
   if (decisionRecord.schemaVersion !== REVIEW_SCHEMA_VERSION ||
       decisionRecord.recordType !== "source-bound-authenticated-reconstruction-review" ||
