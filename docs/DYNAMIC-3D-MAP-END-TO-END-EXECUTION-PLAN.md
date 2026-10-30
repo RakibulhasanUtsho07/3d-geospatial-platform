@@ -579,78 +579,47 @@ CI states below are GitHub Actions results observed for the exact listed head at
 
 Before writing code, re-fetch the current development head and the four source files in #277's PR diff. Apply only the PR-specific changes (editor HTML, editor JS, browser spec, and the additive report section) to the fresh base; do not cherry-pick its six-commit old-base history. Inspect the report's current end before applying the additive section. Run the focused browser test and \`npm run test:map-browser\`, then lint/build/full CI as required by the current workflow. If the head/base changes while working, stop and rebase the plan against the new observed SHA. After this port, update this execution log with the new branch, exact base/head SHAs, changed paths, exact workflow runs, and the next task (**D3M-00.C: clean-port #278**).
 
-### 10.6 D3M-00.B — clean-base manual mask editor port (2026-10-30)
+### 10.6 D3M-00.B — BRF-05 manual mask editor clean-base port (2026-10-30)
 
-**Status: IN PROGRESS.**
+**Implementation status: VERIFIED by exact-head CI; human review and acceptance pending.**
 
-- **Source PR:** [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277), old base `rakibul-hasan@01fc0caf`, source head `df684a4d36f36133609839bfa2b751d25205b924`.
-- **New branch:** `feat/brf05-07-manual-mask-review-dev-20261030`.
-- **Exact base:** `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
-- **Current head:** `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`.
-- **Replacement PR:** [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), open and Draft, target `development`; GitHub reports mergeable=true at the latest metadata read. No review has been submitted.
-- **Port scope:** exactly four paths, 428 additions / 0 deletions:
-  - `public/experimental/building-mask-review.html`
-  - `public/experimental/building-mask-review.js`
-  - `tests/browser/building-mask-review.spec.ts`
-  - `docs/research/BRF-05-07-IMPLEMENTATION-AND-EVIDENCE-REPORT.md`
-- **Port strategy:** copied the three new source files from #277 and applied the additive report section on top of the current development report. Did not cherry-pick #277's six-commit old-base history; no API, schema, package script, CI workflow, or release-gate code was changed.
-- **Contract cross-check:** the editor's exported `result` fields match the existing `building-mask-provider-v1` validator shape (source ID/hash, provider ID/kind/version/config hash, mask digest/bytes/dimensions/encoding/pixel convention, assessment status/confidence/reviewer). This is a static contract comparison; runtime tests are still pending.
-- **Exact-head CI:** [run #40997949731 / CI #2513](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) is **in progress**. Latest job-step inspection shows dependency install, ESLint, all unit/contract steps before browser integration, spatial-tile checks, and production build completed successfully. Chromium installation has completed and the `Verify viewport API against the production server` integration step is now in progress; the browser/API verification result is not yet confirmed. Do not mark the port VERIFIED until the workflow completes successfully on this exact or a later recorded head.
-- **Local test status:** no local test/build was run in this connector-only pass. The PR CI workflow includes lint, production build, browser/API integration and `npm run test:map-browser`; inspect the actual run summary rather than assuming all steps passed.
-- **Release gates:** unchanged and fail-closed: `acceptanceEligible=false`, `publicationEligible=false`, `mapReady=false`, `automaticApproval=false`, `publishable=false`.
-- **Original #277:** keep open as source/evidence until #280 is reviewed and accepted; only then decide whether #277 can be closed as superseded.
-- **Next task:** finish #280 exact-head validation and review. If pass, record the final SHA and then start **D3M-00.C: clean-port PR #278 sequentially**. Do not port #278 in parallel because both feature PRs edit the same BRF evidence report and #278 additionally changes the observation schema.
+- **Source:** old-base PR [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277), base `rakibul-hasan@01fc0caf`, source head `df684a4d36f36133609839bfa2b751d25205b924`.
+- **Clean branch:** `feat/brf05-07-manual-mask-review-dev-20261030`; exact parent `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`; branch head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`.
+- **PR:** [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), Draft/open, mergeable at last check, no review submissions. Four paths, 428 additions, zero deletions.
+- **Port paths:** `public/experimental/building-mask-review.html`, `public/experimental/building-mask-review.js`, `tests/browser/building-mask-review.spec.ts`, and the additive BRF-05–07 evidence-report section.
+- **Port strategy:** selected source files and additive documentation only; no cherry-pick of the stale six-commit history; no API/schema/package-script/workflow changes.
+- **Contract review:** output `result` matches the existing `building-mask-provider-v1` contract: source ID/hash, provider identity/version/config hash, mask digest/bytes/dimensions/encoding/pixel convention and assessment status/confidence/reviewer.
+- **Exact-head CI:** [CI #2513 / run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) completed successfully on head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. All job steps succeeded, including lint, unit/contract suites, production build, Chromium installation, production-server viewport API/browser integration and evidence uploads.
+- **Acceptance boundary:** CI does not verify real mask visual quality, reviewer identity, source rights, building identity or metric/survey truth. All release flags remain false.
+- **Disposition:** #280 is retained as the verified parent commit of the combined PR #281. Do not merge #280 independently because #281 contains the full parent history and the BRF-06 extension.
 
+### 10.7 D3M-00.C — BRF-06 architectural observation studio clean-base port (2026-10-30)
 
-**CI completion update (2026-10-30):** the exact-head CI #2513 completed successfully across the full workflow, including browser/API integration. This verifies automated checks only. PR #280 remains Draft and has no review submissions; visual annotation quality, independent rights/identity, and real-building evidence remain unaccepted.
+**Implementation status: VERIFIED at the prior combined head; expanded unit coverage added; current exact-head CI pending. Human review pending.**
 
+- **Source:** old-base PR [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278), base `rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91`, source head `22be966342cf6075105f55bd99679f22e44b348f`. Old-base CI is not used as current-base acceptance.
+- **Canonical branch:** `feat/brf06-observation-review-dev-20261030`, created from the exact PR #280 head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`.
+- **Canonical PR:** [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), Draft/open, target `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`; combined 9-path diff, 930 additions, zero deletions after the latest unit-test expansion.
+- **Current exact head:** `04b62ceb910b6c63986703ec1587846a1676bc85`.
+- **Parent / merge policy:** PR #281 includes PR #280's four-path mask-editor change plus the BRF-06 studio/schema/tests and shared report update. The unique changed-path set is nine. Merge the combined PR #281 only after its full exact-head CI and review pass; do not merge #280 separately. Once #281 is accepted, #280 can be closed as subsumed.
+- **BRF-06 delta relative to #280:** six paths — `public/experimental/architectural-observation-review.html`, `public/experimental/architectural-observation-review.js`, `src/core/building-generation/architectural-observation-schema.mjs`, `tests/architectural-observation-schema.test.mjs`, `tests/browser/architectural-observation-review.spec.ts`, and the shared BRF report.
+- **Implementation:** source-bound, local-only Point/LineString/BoundingBox/Polygon observations; source ID/hash/dimensions and building/view identity; explicit `occluded`/`not-visible`/`not-detected` states with null geometry; append-only review/reject events and reopen state; M07 normalizer retains and validates original proposal snapshots and review history.
+- **Test coverage:** unit tests include append/reject round-trip, reopening while preserving prior events, tampered latest-review rejection, missing proposal snapshot rejection and notes-length limits. The latest update copied the full source unit-test file so the rejected-state normalization round-trip assertions are not omitted. Browser tests cover source-bound point/polygon annotation, review → reject → reopen, import/export round-trip, and unknown visibility without invented geometry.
+- **Prior exact-head CI:** [CI #2519 / run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) succeeded on the earlier head `f0de3b3bb2e4dd4aa7b3eafdec0483c93faff548`. This prior pass is not applied to the expanded head.
+- **Current exact-head CI:** [CI #2530 / run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) is in progress for head `04b62ceb910b6c63986703ec1587846a1676bc85`. Do not call the latest head VERIFIED until this run succeeds.
+- **Important integration gap:** the observation studio still exports `mask: null`; the mask editor and observation studio remain separate. D3M-01/WP-01 must define and test a shared bundle binding mask and observations to the same source ID/hash/dimensions and exact mask SHA-256.
+- **Trust boundary:** reviewer ID/decision is operator-supplied; JSON history is structurally validated, not cryptographically signed or server-authenticated. The UI does not establish source rights, building identity, camera calibration, dimensions, survey truth or publication approval. `groundTruth`, `publicationEligible`, `publishable`, `acceptanceEligible`, `mapReady`, and `automaticApproval` remain false.
 
-**CI checkpoint update (later 2026-10-30):** PR #280 workflow #2513 advanced beyond Chromium installation to the production-server viewport API/browser integration step. That step is still in progress, so keep D3M-00.B **IN PROGRESS** and do not begin D3M-00.C yet.
+### 10.8 Duplicate PR reconciliation
 
+- PR [#282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282) was created during a second pass but was proven redundant: its observation HTML/JS/schema/browser files matched #281 by SHA; it carried the same six-path BRF-06 delta and the same #280 parent. #281's shared report and branch log were more complete.
+- The one test-file difference was reconciled by copying the fuller source unit-test file into #281, adding the rejected-review round-trip assertions. #281's current head is now `04b62ceb910b6c63986703ec1587846a1676bc85`, with CI #2530 running.
+- PR #282 was closed as duplicate (not merged) with a comment linking to canonical PR #281. No source code is lost; canonical #281 now contains the fuller test file.
 
-### 10.7 D3M-00.C — clean-base architectural observation studio port (2026-10-30)
+### 10.9 Current continuation pointer
 
-**Status: IN PROGRESS — implementation committed; exact-head CI and review pending.**
-
-- **Source PR:** [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278), old base `rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91`, source head `22be966342cf6075105f55bd99679f22e44b348f`. Its old-base CI #2503 passed; this is not current-base validation.
-- **Parent validation:** PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), exact head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, was validated by CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731): the lint, unit/contract, production build, Chromium install, production-server viewport/browser integration and evidence-upload steps all completed successfully. No PR review exists; #280 remains Draft/open and is not merged.
-- **Clean branch:** `feat/brf06-observation-review-dev-20261030`, created at the exact #280 head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd` (which descends from `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`). The stale #278 commit history was not cherry-picked.
-- **Current head:** `f0de3b3bb2e4dd4aa7b3eafdec0483c93faff548`.
-- **Combined Draft PR:** [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, 10 commits ahead, 9 unique changed paths, 917 additions, 0 deletions. The 9 paths are the parent #280 mask-editor HTML/JS/browser spec, the shared BRF report, and the BRF-06 observation HTML/JS/schema/unit test/browser spec.
-- **Merge ordering:** do not merge #280 and #281 independently. PR #281 contains #280's exact file content plus the BRF-06 port; it is the combined candidate. After #281 passes review and is accepted, #280 should be closed as subsumed rather than independently merged. Keep original #277/#278 open as source history until the replacement is accepted.
-- **BRF-06 scope:** local source-bound image annotation; Point/LineString/BoundingBox/Polygon in original pixels; explicit unknown visibility states; review/reject/reopen with preserved proposal and review list; M07 normalizer retains and validates `originalProposal`/`reviews`; unit and browser regression tests.
-- **Static patch verification:** development-relative compare reports exactly the nine expected paths, zero deletions, no package-script/CI-workflow change. The schema contains one `normalizeReviewHistory` implementation, invokes it for each observation, and spreads the normalized history into output. The unit file has the two new review-history regression cases.
-- **Exact-head CI:** PR #281 CI #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) is in progress. The latest step snapshot showed `Run ESLint` in progress and later tests pending. No current-base test pass is claimed yet.
-- **Important integration gap found:** the observation editor batch currently writes `mask: null`; the mask-review editor and architectural-observation studio are still separate tools. The shared BRF-05/06 bundle must join them by exact source ID, source hash, dimensions and mask SHA-256. This is a required D3M-01/WP-01 contract task, not completed by #281.
-- **Trust boundary:** reviewer IDs and decisions are operator-supplied; JSON history is structurally validated but is not a cryptographically signed or server-authenticated audit log. Do not treat it as tamper-proof or as independent architectural truth.
-- **Release flags:** no flag was changed. `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, and `automaticApproval` remain false.
-- **No local test/build was run** in this GitHub-connector pass. The exact-head GitHub Actions run is the authoritative pending validation record.
-
-**Next action:** inspect the remaining steps in CI #2519 and fix any failure on the current branch. After full CI passes, inspect the full diff/review evidence for #281. Keep D3M-00 open until duplicate PR ownership is resolved and the combined candidate has been reviewed. Then start D3M-01/WP-01 to design the shared mask/observation evidence bundle and cross-artifact invalidation tests; do not jump directly to automatic segmentation or publication.
-**CI checkpoint update (later 2026-10-30):** PR #281 exact-head workflow #2519 / run `40998801920` is still in progress. The latest job-step snapshot showed earlier lint/unit/contract steps completed and `Test heritage model GLBs, parameters and map navigation` running; uploads, spatial-tile checks, production build, Chromium, production-server viewport/browser validation and evidence uploads were still pending. No full CI result is claimed.
-**CI checkpoint update (later 2026-10-30):** PR #281 run #2519 has completed the remaining unit/contract tests, including `Test evidence-linked architectural observation schema and review history`, and all later map, heritage, geospatial-tile checks plus `Build production app` with success. Chromium installation is now in progress; the production-server viewport/API browser integration and evidence uploads remain pending. The exact-head run is not yet complete, so this is a partial pass only.
-
-**Static source safety review:** the observation studio script/HTML has no `fetch`, `XMLHttpRequest`, WebSocket, external HTTP(S) URL, `innerHTML`, `eval`, `new Function`, localStorage or sessionStorage usage in the scanned source. It processes selected files in-browser, uses text-safe DOM construction, and enforces the observed 30 MiB input, 15-million-pixel and 2,000-observation limits. This source scan does not replace browser runtime tests or a formal security review.
-### 10.7 D3M-00.C — clean-base architectural observation review port (2026-10-30)
-
-**Status: IMPLEMENTED ON A STACKED BRANCH; exact-head CI queued; human review pending.**
-
-- **Source PR:** [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278), old base `rakibul-hasan@01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91`, source head `22be966342cf6075105f55bd99679f22e44b348f`.
-- **Parent dependency:** PR [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), exact head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`, exact base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`, full CI #2513 success.
-- **New branch:** `feat/brf06-observation-review-stacked-20261030`, created from the exact #280 head above.
-- **Current head:** `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`.
-- **Replacement PR:** [#282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282), open Draft, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`; GitHub metadata reports mergeable=true. No PR review submissions were present at the last check.
-- **Stack/diff discipline:** compared the branch against parent #280 and confirmed exactly six BRF-06 paths. Compared against development, the temporary cumulative PR diff has nine paths because it includes #280's four paths plus the six #278 paths, with the shared report file counted once. This is intentional stacked history; never merge #282 before #280.
-- **Six ported paths:** `public/experimental/architectural-observation-review.html`, `public/experimental/architectural-observation-review.js`, `src/core/building-generation/architectural-observation-schema.mjs`, `tests/architectural-observation-schema.test.mjs`, `tests/browser/architectural-observation-review.spec.ts`, and the additive section in `docs/research/BRF-05-07-IMPLEMENTATION-AND-EVIDENCE-REPORT.md`.
-- **Implementation:** the local-only studio binds source ID/hash/dimensions, building/view IDs, source-pixel geometry and visibility states. The M07 normalizer now preserves `originalProposal` and append-only `reviews`, validates original source/view/geometry provenance, event limits, review metadata and latest current-state consistency. Unit/browser tests cover review → reject → reopen, round-trip import/export, null-geometry unknown visibility, stale/tampered history and notes limits.
-- **Exact-head CI:** [run #41000728438 / CI #2526](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000728438) was **queued** at the time of this record. No CI pass is claimed for #282 yet.
-- **Safety boundary:** this UI records operator-authored visual annotations only. It does not authenticate reviewer identity, rights, building identity, camera calibration, metric dimensions or survey truth. `groundTruth`, `publicationEligible`, `publishable`, `acceptanceEligible`, `mapReady`, and `automaticApproval` remain false.
-- **Original #278:** keep open as source/evidence until #282 passes CI and review; close only if replacement is accepted.
-- **Merge order:** review and merge #280 first only after human approval and its checks remain green. Then retarget #282 to `development`, verify its diff contains only the six BRF-06 paths, rerun full exact-head CI, and only then consider its merge. Do not squash or cherry-pick #282 ahead of its parent.
-
-### 10.8 Current continuation pointer
-
-1. Check CI #2526 for exact head `e4e3ad7283d1ed9b8d2fcd57f6ee8e2f403c279f`; fix any failure and record a new exact head/run.
-2. Keep PR #282 Draft until #280 is reviewed/merged. Human review is not present on either replacement PR at this checkpoint.
-3. After #280 merges, retarget #282 to development, inspect that its diff shrinks to exactly the six BRF-06 paths, and rerun CI on the resulting head.
-4. Only after that resume remaining D3M-00 work: #274/#196 duplicate decision, #193 residual docs/tests, and the four main-only commit reconciliation for #228.
+1. Check [CI #2530 / run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) for exact head `04b62ceb910b6c63986703ec1587846a1676bc85`; fix any failure and record the resulting head/run.
+2. Keep PR #281 Draft until human code review and acceptance of the documented mask/observation hand-off limitation. It is the single combined BRF-05/06 candidate; do not merge #280 independently.
+3. Keep old-base #277/#278 open as source references until combined PR #281 is accepted. After #281 merges, close #280/#277/#278 as superseded only after verifying they are fully subsumed.
+4. After the BRF combined candidate is resolved, complete remaining D3M-00 items: #274/#196 duplicate decision, #193 residual docs/tests, and the four main-only commits in the #228 release ancestry comparison.
+5. Only when D3M-00 integration ancestry and duplicate ownership are resolved should D3M-01/WP-01 begin: the shared mask + observations evidence-bundle contract.
