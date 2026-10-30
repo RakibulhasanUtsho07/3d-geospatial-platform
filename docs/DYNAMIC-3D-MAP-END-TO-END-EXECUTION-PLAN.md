@@ -578,3 +578,25 @@ CI states below are GitHub Actions results observed for the exact listed head at
 **Start with D3M-00.B: clean-port PR #277's manual mask editor from a new branch whose parent is exactly \`development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\`.**
 
 Before writing code, re-fetch the current development head and the four source files in #277's PR diff. Apply only the PR-specific changes (editor HTML, editor JS, browser spec, and the additive report section) to the fresh base; do not cherry-pick its six-commit old-base history. Inspect the report's current end before applying the additive section. Run the focused browser test and \`npm run test:map-browser\`, then lint/build/full CI as required by the current workflow. If the head/base changes while working, stop and rebase the plan against the new observed SHA. After this port, update this execution log with the new branch, exact base/head SHAs, changed paths, exact workflow runs, and the next task (**D3M-00.C: clean-port #278**).
+
+### 10.6 D3M-00.B — clean-base manual mask editor port (2026-10-30)
+
+**Status: IN PROGRESS.**
+
+- **Source PR:** [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277), old base `rakibul-hasan@01fc0caf`, source head `df684a4d36f36133609839bfa2b751d25205b924`.
+- **New branch:** `feat/brf05-07-manual-mask-review-dev-20261030`.
+- **Exact base:** `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- **Current head:** `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`.
+- **Replacement PR:** [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), open and Draft, target `development`; GitHub reports mergeable=true at the latest metadata read. No review has been submitted.
+- **Port scope:** exactly four paths, 428 additions / 0 deletions:
+  - `public/experimental/building-mask-review.html`
+  - `public/experimental/building-mask-review.js`
+  - `tests/browser/building-mask-review.spec.ts`
+  - `docs/research/BRF-05-07-IMPLEMENTATION-AND-EVIDENCE-REPORT.md`
+- **Port strategy:** copied the three new source files from #277 and applied the additive report section on top of the current development report. Did not cherry-pick #277's six-commit old-base history; no API, schema, package script, CI workflow, or release-gate code was changed.
+- **Contract cross-check:** the editor's exported `result` fields match the existing `building-mask-provider-v1` validator shape (source ID/hash, provider ID/kind/version/config hash, mask digest/bytes/dimensions/encoding/pixel convention, assessment status/confidence/reviewer). This is a static contract comparison; runtime tests are still pending.
+- **Exact-head CI:** [run #40997949731 / CI #2513](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) was **in progress** when this record was written. Do not mark the port VERIFIED until the workflow completes successfully on this exact or a later recorded head.
+- **Local test status:** no local test/build was run in this connector-only pass. The PR CI workflow includes lint, production build, browser/API integration and `npm run test:map-browser`; inspect the actual run summary rather than assuming all steps passed.
+- **Release gates:** unchanged and fail-closed: `acceptanceEligible=false`, `publicationEligible=false`, `mapReady=false`, `automaticApproval=false`, `publishable=false`.
+- **Original #277:** keep open as source/evidence until #280 is reviewed and accepted; only then decide whether #277 can be closed as superseded.
+- **Next task:** finish #280 exact-head validation and review. If pass, record the final SHA and then start **D3M-00.C: clean-port PR #278 sequentially**. Do not port #278 in parallel because both feature PRs edit the same BRF evidence report and #278 additionally changes the observation schema.
