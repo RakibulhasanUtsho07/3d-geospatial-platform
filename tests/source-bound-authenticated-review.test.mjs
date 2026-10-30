@@ -535,7 +535,7 @@ test("rejects current-key rotation, wrong candidate, and wrong building when con
     reviewJobId: recorded.reviewJobId,
     expectedCandidateGlbSha256: candidateSha,
     trustedReviewerKeys: registry,
-  }), /not a completed authenticated-review decision job|does not bind the exact BRF-25/);
+  }), /ENOENT|not a completed authenticated-review decision job|does not bind the exact BRF-25/);
 });
 
 test("does not allow hold or changes-requested receipts to authorize BRF-25", async (t) => {
