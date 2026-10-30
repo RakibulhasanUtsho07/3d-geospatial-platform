@@ -17,7 +17,12 @@ import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 const HASH = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
-const MAX_CANDIDATE_BYTES = 256 * 1024 * 1024;
+const MAX_CANDIDATE_BYTES = 128 * 1024 * 1024;
+const GEOMETRY_QA_OPTIONS = Object.freeze({
+  maxVertices: 2_000_000,
+  maxTopologyVertices: 250_000,
+  maxDegenerateTriangleRatio: 0.01,
+});
 const MAX_REVIEWER_KEYS = 100;
 const REVIEW_SCHEMA_VERSION = "1.0.0";
 const REVIEW_RECORD_TYPE = "source-bound-reconstruction-human-review-submission";
@@ -185,7 +190,7 @@ function makeGeometryReport({ handoff, handoffArtifactSha256, candidateFile }) {
   let geometryStatus = "geometry-qa-failed";
   let geometryError = null;
   try {
-    geometryQa = analyzeGlbQuality(candidateFile.bytes);
+    geometryQa = analyzeGlbQuality(candidateFile.bytes, GEOMETRY_QA_OPTIONS);
     geometryStatus = geometryQa.valid === true ? geometryQa.status : "geometry-qa-failed";
   } catch (error) {
     geometryQa = null;
@@ -204,6 +209,7 @@ function makeGeometryReport({ handoff, handoffArtifactSha256, candidateFile }) {
       sha256: candidateFile.sha256,
       byteLength: candidateFile.byteLength,
     },
+    geometryQaOptions: { ...GEOMETRY_QA_OPTIONS },
     geometryQa: geometryQa ? {
       engine: geometryQa.engine,
       status: geometryQa.status,
