@@ -805,3 +805,28 @@ Operator lifecycle, secret-manager handling, onboarding, rotation, emergency rev
 
 
 **D3M-01.F schema contract correction (2026-10-31):** A further contract audit found the published JSON Schema's canonical UTC timestamp regex had an extra escape, even though the runtime parser enforced canonical UTC timestamps correctly. The schema regex now matches exactly one literal decimal point, and `tests/trusted-reviewer-registry.test.mjs` loads the published schema and verifies canonical and malformed timestamp examples. Latest code head is `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`; exact-head CI run [#41163682609](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163682609) has been queued. No overall CI pass is claimed until it completes.
+
+
+## D3M-01.F — terminal exact-head validation and next external gates (2026-10-31)
+
+**Terminal CI correction:** the earlier note above that described run #41163682609 as queued is superseded. GitHub now reports [run #41163682609](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163682609) as **completed / success** on the exact D3M-01.F code head `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`. All workflow jobs and steps completed successfully, including the dedicated signed-review/trusted-reviewer-registry tests, independent-truth and BRF-25 validation suites, production build, production-server viewport verification and evidence uploads.
+
+The documentation candidate at the then-current head `30153db0c743cd900c78b02802fb64c06e17b367` also passed [docs CI run #41163793071](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163793071). This note is a new documentation change, so the updated docs head must receive its own exact-head CI result before this docs PR can be considered validated.
+
+**Stack / branch state observed on 2026-10-31:**
+- #281 (BRF-05/06 and D3M-01.B) remains Draft/open/unmerged on `development`.
+- #284 (D3M-01.C) is stacked on #281; #286 (D3M-01.D) is stacked on #284; #288 (D3M-01.E) is stacked on #286; #290 (D3M-01.F) is stacked on #288.
+- #290 base is exactly #288 head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64`; #290 exact head is `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`.
+- All of these PRs remain Draft/open/unmerged. No promotion to `development` or `main` is authorized by CI success. Do not merge child PRs independently of their parent stack.
+
+**Production trust anchor — not provisioned:** implementation and operator runbook exist, but no real reviewer has been onboarded and no production `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` deployment secret has been created or verified. The deployment operator must independently verify the reviewer's identity, role and authority; the reviewer retains their private Ed25519 key; only the public-key registry is supplied through the production secret manager. Do not create synthetic production identities, place private keys in Git/CI, or log the registry secret. The runbook remains the authoritative operator procedure.
+
+**Independent measurement — not run:** no exact rights-cleared same-building source pairing, independently authenticated survey/reference geometry, confirmed evaluation frame/vertical datum, platform-generated candidate GLB, or genuinely held-out checkpoint pack has been admitted for a real-building accuracy result. The evaluator and receipt-protected CLI paths are software-validated only. Do not convert synthetic fixtures, photogrammetric source-to-source comparisons, or generated reference models into a real accuracy claim.
+
+**Next execution order:**
+1. Deployment operator completes reviewer identity/authority checks and provisions the versioned public-key-only registry out of band; verify only non-secret registry/key IDs and public-key fingerprints.
+2. Resolve exact asset-level rights and same-physical-building linkage for a candidate benchmark; reconcile the GT-LOD3 README vs Gold Coast STAC licence discrepancy and the blank TUM2TWIN/Zenodo licence field before using those files for commercial product validation.
+3. Obtain independent metric reference geometry, documented horizontal/vertical frame and uncertainty, separate fit controls, and at least six genuinely held-out checkpoints.
+4. Generate and hash the candidate through this platform's own reconstruction path, then run the signed-review-gated preparation and independent-truth evaluation CLIs and human-review the exact evidence report.
+
+Until those external inputs and reviews pass, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain false.
