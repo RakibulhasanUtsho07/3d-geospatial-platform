@@ -63,9 +63,11 @@ on:
       - development
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
+      - feat/d3m01e-brf25-authenticated-review-gate-20261030
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01e-brf25-authenticated-review-gate-20261030
+      - feat/d3m01f-governed-reviewer-registry-20261031
   pull_request:
     branches:
       - main
@@ -284,6 +286,8 @@ jobs:
         run: node scripts/reconstruct-brf23-reviewed-source.mjs --help
       - name: Test D3M-01.E signed review receipt authorization in BRF-25
         run: npm run test:brf25-geometry-validation
+      - name: Test D3M-01.D signed review and D3M-01.F governed reviewer registry lifecycle
+        run: npm run test:source-bound-authenticated-review
       - name: Validate BRF-25 geometry validation runner CLI
         run: node scripts/run-brf25-geometry-validation.mjs --help
       - name: Test BRF-26 end-to-end evidence bundle and fail-closed gates
