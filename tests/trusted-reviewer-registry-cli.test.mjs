@@ -38,11 +38,11 @@ function makeRegistry(keyPair, status = "active") {
   };
 }
 
-function runCli(overrides = {}) {
+function runCli(overrides = {}, args = []) {
   const env = { ...process.env, NODE_ENV: "production" };
   delete env[ENV_NAME];
   Object.assign(env, overrides);
-  return spawnSync(process.execPath, [CLI], {
+  return spawnSync(process.execPath, [CLI, ...args], {
     encoding: "utf8",
     env,
     timeout: 10_000,
@@ -77,6 +77,19 @@ test("prints only approved non-secret metadata for a valid production registry",
   assert.equal(outputText(result).includes(raw), false);
   assert.equal(outputText(result).includes(pair.publicKeyPem), false);
   assert.equal(outputText(result).includes(pair.privateKeyPem), false);
+  assert.equal(outputText(result).includes("reviewer-opaque-01"), false);
+  assert.equal(outputText(result).includes("reviewerId"), false);
+});
+
+
+test("never accepts registry JSON as a command-line argument", () => {
+  const pair = makeKeyPair();
+  const raw = JSON.stringify(makeRegistry(pair));
+  const result = runCli({}, [raw]);
+  assert.equal(result.status, 2);
+  assert.equal(JSON.parse(result.stderr).errorCode, "unexpected-command-line-arguments");
+  assert.equal(outputText(result).includes(raw), false);
+  assert.equal(outputText(result).includes(pair.publicKeyPem), false);
 });
 
 test("reports a valid all-revoked registry as an emergency lockout and exits non-zero", () => {
