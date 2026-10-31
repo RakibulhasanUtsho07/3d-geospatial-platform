@@ -844,3 +844,21 @@ The preflight reads only `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`, requires p
 **Still external / not provisioned:** no production secret-manager value, genuine reviewer identity/authority verification or actual reviewer onboarding was performed. The CLI is a local/deployment-operator preflight only; it cannot read or configure a hosted secret store. Do not paste production registry data into chat, Git, CI logs or issue comments. Keep all ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
 
 **Next:** deployment operator completes the out-of-band reviewer identity/authority check and provisions the public-key-only registry through the production secret manager; run the preflight in that deployment environment and record only its sanitized output. Independently, BRF-29 exact-asset licensing and same-building/independent-survey admission remain blocked; no dataset reuse or building-accuracy claim is authorized by these CI results.
+
+
+## BRF-14 — immutable image-data revision pin (2026-10-31)
+
+Tracking: [Issue #293](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/293) · [Draft PR #294](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/294).
+
+The BRF-14 sixteen-view sample no longer points at mutable Hugging Face `resolve/main` URLs. It now declares a separate immutable Hugging Face data revision `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f`; the GitHub metadata/inventory/checksum/COLMAP repository remains independently pinned at `19b3ce9cccf3e8fd414ff705f75d0f2105846fc1`. BRF-45 carries both identities and its validator rejects data-revision drift at source-manifest and per-asset level. BRF-42 private intake checks that the prior verification report and fresh byte rehash carry the same data revision.
+
+**Exact code head:** `3897523a88bd6a868e90deef0339aa0c985ca3e5` (branch `feat/brf14-pin-hf-revision-20261031`, based on `development` `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`).
+
+**Dedicated workflow evidence on that head:**
+- [BRF-14 run #41170936404](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936404): success; 16/16 image downloads matched actual byte sizes and SHA-256 hashes at the immutable data revision; BRF-42 private intake/quality tests and downstream private intake step passed.
+- [BRF-45 run #41170936394](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936394): success; actual sample remains blocked because each asset's scoped grant evidence is still pending.
+- [BRF-16 run #41170936442](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936442) and [BRF-18 run #41170936439](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936439): success.
+
+**Full CI:** [run #41170936398](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936398) is still in progress on this exact head; do not claim a terminal pass until its conclusion is `success`. PR #294 remains Draft/open/unmerged. Do not promote to `development` or `main` without exact-head full CI and human review.
+
+This source-stage validates immutable provenance and source bytes only. It does not authenticate an exact-asset rights grant or provide independent surveyed truth. The upstream AprilTag scale bar belongs to the source reconstruction and is not independent held-out geometry truth. Keep ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
