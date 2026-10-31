@@ -15,7 +15,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const sourceManifestPath = path.join(repoRoot, "benchmarks/building-reconstruction/brf-14-multiview-source.json");
 const cliPath = path.join(repoRoot, "scripts/run-brf42-multiview-private-intake.mjs");
 const originalManifest = JSON.parse(await readFile(sourceManifestPath, "utf8"));
-const SOURCE_PREFIX = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/";
+const DATA_REPOSITORY_REVISION = originalManifest.dataset.dataRepositoryRevision;
+const SOURCE_PREFIX = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/" + DATA_REPOSITORY_REVISION + "/flat-roof/images/";
 const jpegHeader = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x07, 0x08, 0x0c, 0x00, 0x10, 0x00, 0x30]);
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
@@ -92,6 +93,10 @@ test("ingests all 16 verified views privately and completes image-quality prefli
   assert.equal(report.status, "private-multiview-preflight-complete-not-reconstruction-approved");
   assert.equal(report.byteVerification.status, "views-byte-verified");
   assert.equal(report.byteVerification.selectedViewCount, 16);
+  assert.equal(report.byteVerification.dataRepositoryRevision, DATA_REPOSITORY_REVISION);
+  assert.equal(report.sourceManifest.dataRepositoryRevision, DATA_REPOSITORY_REVISION);
+  assert.ok(report.privateMediaIntake.records.every(record => record.dataRepositoryRevision === DATA_REPOSITORY_REVISION));
+  assert.ok(report.privateMediaIntake.records.every(record => record.sourceUrl.includes("/resolve/" + DATA_REPOSITORY_REVISION + "/")));
   assert.equal(report.byteVerification.verifiedViewCount, 16);
   assert.equal(report.privateMediaIntake.status, "all-views-ingested-private");
   assert.equal(report.privateMediaIntake.ingestedCount, 16);
