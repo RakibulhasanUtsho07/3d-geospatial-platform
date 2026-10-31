@@ -610,3 +610,22 @@ test("rejects a reviewer signature timestamp outside the configured key validity
     now: "2026-10-31T03:02:00.000Z",
   }), /outside the trusted reviewer key validity window/i);
 });
+
+
+test("production environment cannot opt back into legacy reviewer key arrays", () => {
+  const previous = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  try {
+    const pair = makeKeys();
+    assert.throws(
+      () => parseTrustedReconstructionReviewerKeys(
+        [{ reviewerId: "reviewer-01", publicKeyPem: pair.publicKeyPem }],
+        { allowLegacy: true, now: "2026-10-31T03:00:00.000Z" },
+      ),
+      /production requires a versioned.*registry/i,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
+  }
+});

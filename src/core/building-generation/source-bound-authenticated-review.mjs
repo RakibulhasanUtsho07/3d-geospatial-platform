@@ -666,7 +666,7 @@ function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) 
   const trustedMatches = reviewerKeys.filter((item) => item.reviewerId === submission.reviewerId);
   if (trustedMatches.length !== 1) {
     throw new Error(trustedMatches.length === 0
-      ? "reviewerId has no currently active key in the server-configured trusted reviewer key registry."
+      ? "reviewerId is not present in the server-configured trusted reviewer key registry as a currently active key."
       : "reviewerId maps to multiple active keys; the registry must be corrected.");
   }
   const trusted = trustedMatches[0];
@@ -919,6 +919,11 @@ export async function recordSourceBoundAuthenticatedReview({
       reviewerId: signature.reviewerId,
       reviewerKeyId: signature.keyId,
       reviewerRegistryId: signature.registryId,
+      reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
+      reviewerKeyValidFromUtc: signature.validFromUtc,
+      reviewerKeyValidUntilUtc: signature.validUntilUtc,
+      reviewerRegistryIssuedAtUtc: signature.registryIssuedAtUtc,
+      reviewerRegistryExpiresAtUtc: signature.registryExpiresAtUtc,
       decision: normalizedSubmission.decision,
     },
   });
