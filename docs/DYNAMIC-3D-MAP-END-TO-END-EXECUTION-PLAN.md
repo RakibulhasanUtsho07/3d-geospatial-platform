@@ -1,0 +1,875 @@
+# Dynamic 3D Map — End-to-End Building Reconstruction Execution Plan
+
+**Created:** 2026-10-30  
+**Planning baseline:** `development` at `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`  
+**Current integration baseline:** see [Full Repository Gap Audit](./ENGINE-FULL-REPOSITORY-GAP-AUDIT.md)  
+**Parent roadmap:** [Engine Integration and Production Roadmap](./ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md)  
+**Status:** Planned work. This document does not certify that the end-to-end workflow currently works.
+
+---
+
+## 1. Goal
+
+Deliver one coherent workflow in the existing Cesium map:
+
+1. An operator selects a building or supplies its identity and known information.
+2. The operator uploads one or more rights-cleared building images, or a permitted video/capture set.
+3. The platform validates and records the exact source assets.
+4. The engine selects a reconstruction method that is appropriate for the available evidence.
+5. A 3D building candidate is generated, checked, and presented for review.
+6. Scale, orientation, horizontal position, and vertical reference are established from evidence rather than guessed.
+7. A reviewer accepts or rejects the exact candidate version.
+8. An approved, versioned model becomes available in the existing Dhaka map at its verified location.
+9. The model and job history remain available after page refresh and deployment restart.
+
+The intended user experience is simple. The engineering contract behind it must distinguish what was observed, measured, inferred, and left unknown.
+
+## 2. What counts as complete
+
+The feature is complete only when a new building can pass through the same traceable workflow from intake to map display, without a developer manually copying a GLB or typing placement values into the development preview.
+
+A successful GLB export alone is not completion. A successful Cesium load alone is not completion. A green CI run alone is not completion.
+
+The minimum end-to-end acceptance run must prove all of the following against the exact model and source hashes:
+
+- source rights and permitted operations were checked;
+- source files are bound to a building identity and the intended views;
+- the selected reconstruction route actually executed;
+- the GLB contains supported geometry and valid materials/textures;
+- dimensions and scale were compared with independent evidence;
+- horizontal position and vertical datum were separately checked;
+- reviewer decisions refer to the exact candidate hash;
+- publication creates an immutable version and a traceable placement record;
+- the existing map loads the active version from the published service/catalog;
+- reload, version change, failed replacement, and rollback behave correctly.
+
+## 3. Current baseline: what exists and what remains disconnected
+
+The status labels below describe the inspected repository baseline. They are not completion percentages.
+
+| Area | Baseline status | Existing foundation | Remaining gap |
+|---|---|---|---|
+| Existing Dhaka map | Implemented foundation | Cesium map, Overture building layer, viewport loading, search, picking, and map controls | Generated-building lifecycle must be integrated into the ordinary map data flow and tested with real published assets |
+| Generated GLB loader | Implemented foundation | `GeneratedModelLayer` supports load/update/show/hide/remove and geographic transforms | Placement is supplied to the layer; it is not inferred automatically |
+| Procedural generation | Implemented, limited | BuildingSpec can produce parametric GLB geometry | Input images do not change procedural geometry; the result is not a photogrammetric model |
+| Single-image route | Partial | TripoSR worker integration exists | External Python/model runner/compute setup; single-view output is approximate and has unknown hidden surfaces, scale, and georeference |
+| Multi-view route | Partial | COLMAP worker, dense mesh/texture conversion, diagnostics, and GLB output exist | External COLMAP runtime, view coverage, camera/scale evidence, and accepted georeferencing still need a proven end-to-end run |
+| Media intake/upload | Partial | Private media intake, source hashes, rights metadata, and an upload API exist | Upload UI and job submission must be connected; upload currently remains unreviewed until rights review |
+| Generation queue/worker | Partial | Authenticated endpoints and a local file-backed queue/worker exist | Shared durable storage, multi-user authorization, production worker operations, and completed-job-to-map integration |
+| Geometry and visual QA | Partial | GLB geometry extraction, topology/texture checks, render review, and accuracy tooling exist | One unified gate must bind fresh reports and human review to the exact candidate |
+| Ground-control registration | Partial | Registration/metric validation components exist | A repeatable independently evidenced coordinate and vertical-datum workflow is not yet accepted for a real Dhaka building |
+| Review/publishing | Partial | Review APIs, approved-job publisher, versioned manifest, checksum validation, and CLI publication exist | Operator-facing review and publication UX; secure persistent asset storage; no automatic map insertion after approval |
+| Published catalog map UI | Implemented foundation | The map panel can fetch the static catalog and manually load an active model | It is a manual/session workflow; page refresh does not restore the in-memory model automatically |
+| End-to-end user workflow | Not established | Components exist across multiple modules | A browser-tested upload → process → review → publish → map-load flow is still required |
+
+### Important implementation facts
+
+- The default generation route is procedural from BuildingSpec. It does not automatically interpret the supplied images.
+- The photogrammetry route requires explicit source selection and review confirmations; the COLMAP worker produces a review candidate and does not claim WGS84 ground-control registration.
+- The single-image route explicitly marks scale and georeference as unsolved and requires human review.
+- Generation jobs deliberately retain fail-closed values such as `mapReady=false` and `publicationEligible=false`.
+- The current published-model workflow is based on a static manifest plus local CLI publication. It is not yet a complete authenticated Admin publication service.
+- The map loader requires explicit geographic placement metadata. Do not claim that it discovers exact coordinates or metric scale from an ordinary photograph.
+
+## 4. Product and data contract to agree before implementation
+
+Create one versioned contract shared by upload UI, API, worker, review, publisher, and map loader. Avoid separate loosely related JSON shapes for each phase.
+
+### 4.1 Building record
+
+At minimum:
+
+- stable building ID and display name;
+- selected map feature ID or independently reviewed building identity;
+- source footprint and its CRS/provenance;
+- address or locality where available;
+- building use/type where known;
+- known dimensions and their source, units, uncertainty, and evidence tier;
+- horizontal coordinate frame and vertical datum state;
+- status: draft, intake, processing, candidate, review-required, approved, published, rejected, or failed.
+
+### 4.2 Source asset record
+
+At minimum:
+
+- stable source ID, exact byte size, SHA-256, media type, dimensions, and safe storage key;
+- source/building/view linkage and capture side/viewpoint when known;
+- creator/rights-holder, licence or permission record, attribution, permitted operations, expiry/territory where applicable;
+- EXIF/capture time/location only where present and permitted;
+- quality/occlusion/duplicate assessment;
+- explicit review state: unreviewed, approved-for-specific-operations, rejected, expired, or unknown.
+
+A hash establishes byte identity, not copyright permission or building identity.
+
+### 4.3 Reconstruction job record
+
+At minimum:
+
+- job ID, building ID, immutable input manifest hash, selected strategy, configuration hash, model/tool versions;
+- stage state, progress, timestamps, retries, worker identity, cancellation state, and structured failure reason;
+- exact candidate GLB hash and all QA/render report hashes;
+- separate confidence and evidence state for geometry, scale, horizontal position, vertical position, texture, and source rights;
+- explicit readiness fields: `candidateGenerated`, `geometryValidated`, `metricValidated`, `humanReviewed`, `publicationEligible`, and `mapReady`.
+
+Do not collapse these independent gates into one generic `completed` status.
+
+### 4.4 Published model record
+
+At minimum:
+
+- stable building/model ID and immutable version ID;
+- content-addressed GLB URL/storage key and SHA-256;
+- longitude/latitude/height, heading/pitch/roll, model scale and axis conventions;
+- horizontal CRS, vertical datum, placement evidence ID, and uncertainty;
+- reviewer, timestamp, decision, evidence-package hash, and all required review checks;
+- active/retired state and rollback target.
+
+The map must consume this published record rather than accept untrusted arbitrary client URLs or unverified placement values.
+
+## 5. Dependency-ordered execution phases
+
+Each phase must be implemented in a focused PR with exact-head tests. A phase is not done because its files exist; close it only when its acceptance evidence is attached.
+
+### D3M-00 — Reconcile integration branches and PR dependencies
+
+**Priority:** P0 · **Status:** IN PROGRESS — live branch/PR inventory captured; reconciliation and clean-base ports remain open · **Dependencies:** none
+
+**Purpose:** Establish one safe source of truth before connecting more components.
+
+**Tasks**
+- [x] Re-read current `main`, `development`, and `rakibul-hasan` SHAs (snapshot below; refresh before each write/merge).
+- [x] Compare selected pipeline-critical PR base/head SHAs, changed paths, and exact-head CI; record unresolved ancestry below.
+- [x] Map the currently identified map UX, BRF-05/06, generated-model-layer, 3D Tiles and floor-plan PRs to this plan.
+- [x] Identify the #274/#196 duplicate overlap and the old-base #277/#278 ports by exact changed paths/patch comparison.
+- [ ] Finish the `main`/`development` ancestry and content reconciliation, clean-port old-base work, and close only PRs proven redundant.
+- [ ] Agree the canonical integration base for each work package; preserve the `rakibul-hasan → development → main` promotion policy where ancestry permits.
+- [ ] Do not bulk-merge stale branches or force-push user work.
+
+**Likely files:** GitHub branch/PR metadata; `docs/ENGINE-FULL-REPOSITORY-GAP-AUDIT.md`; `docs/ENGINE-INTEGRATION-AND-PRODUCTION-ROADMAP.md`.
+
+**Acceptance**
+- [ ] A dependency matrix records PR number, base, head SHA, merge base, CI state, owner, and decision.
+- [ ] No unreviewed conflict or unexplained divergent commit remains in the selected path.
+- [ ] The next implementation branch is based on the verified integration head.
+
+### D3M-01 — Freeze the workflow contract and stage state machine
+
+**Priority:** P0 · **Status:** Not established end-to-end · **Dependencies:** D3M-00
+
+**Tasks**
+- [ ] Define versioned schemas for Building, SourceAsset, GenerationJob, Candidate, ReviewDecision, PlacementEvidence, and PublishedModel.
+- [ ] Define state transitions and legal transitions, including cancellation, retry, stale candidate, rejected review, superseded version, and rollback.
+- [ ] Define idempotency keys for uploads, enqueue requests, worker stages, review submissions, and publication.
+- [ ] Bind each stage to input/output hashes, configuration version, tool/model versions, and timestamps.
+- [ ] Define explicit unknown/estimated/observed/independently-measured values; never silently fill missing dimensions or coordinates.
+- [ ] Define the API contract and the boundary between public map-readable metadata and private source/review files.
+
+**Likely files:** `src/core/building-generation/` schemas and state modules; `src/app/api/building-generation/`; generation and publication docs.
+
+**Acceptance**
+- [ ] Schema validation rejects missing IDs, invalid state transitions, stale hashes, and cross-building references.
+- [ ] Contract tests cover request/response compatibility between API, worker, review, and publisher.
+- [ ] Existing generation and publication flows can be migrated without weakening fail-closed flags.
+
+### D3M-02 — Build the actual map-facing building intake experience
+
+**Priority:** P1 · **Status:** Gap · **Dependencies:** D3M-01
+
+**Tasks**
+- [ ] Add an intake action to the existing map, attached to a selected building or an explicit “add building” workflow.
+- [ ] Allow building identity/information entry and one or more image/video uploads.
+- [ ] Show per-file upload progress, validation errors, rights/attribution fields, and source-view labels.
+- [ ] Require the user to choose the intended building on the map or provide enough identity evidence before intake is accepted.
+- [ ] Show upload completion separately from rights approval and reconstruction readiness.
+- [ ] Create a generation job only after required metadata and explicit source-operation confirmations pass.
+- [ ] Keep original assets private; never put unreviewed source media or private evidence under public static paths.
+
+**Likely files:** `src/features/map/components/`; `src/app/map/page.tsx`; `src/app/api/building-generation/uploads/route.ts`; `src/app/api/building-generation/jobs/route.ts`; `src/core/building-generation/generation-media-upload.mjs`.
+
+**Acceptance**
+- [ ] Browser test uploads valid, oversized, corrupt, duplicate, and unsupported files.
+- [ ] A refresh or network interruption does not create duplicate jobs or lose the upload/job association.
+- [ ] Unreviewed media cannot be submitted to reconstruction.
+- [ ] Keyboard, mobile viewport, and accessible error states are covered.
+
+### D3M-03 — Complete rights-aware intake and source provenance continuity
+
+**Priority:** P0 · **Status:** Partial · **Dependencies:** D3M-01, D3M-02
+
+**Tasks**
+- [ ] Bind exact file bytes to the rights record and source identity.
+- [ ] Enforce permitted operations separately for storage, display, image quality analysis, segmentation, frame extraction, photogrammetry, single-image inference, derivative creation, review export, and publication.
+- [ ] Revalidate rights when a job starts, resumes, reuses a cached output, or publishes.
+- [ ] Carry source hashes and transformation provenance through video frames, masks, observations, meshes, textures, and evidence packages.
+- [ ] Handle expiry, revocation, attribution duties, territory, and derivative-use restrictions.
+- [ ] Keep unknown or conflicting rights blocked.
+
+**Likely files:** `src/core/building-generation/media-intake.mjs`; `source-workflow.mjs`; `source-operation-scopes.mjs`; BRF-38/45/46 modules and tests.
+
+**Acceptance**
+- [ ] Positive and negative tests exist for every permitted operation.
+- [ ] Mutated bytes, revoked permissions, expired permissions, scope mismatch, and cached-output replay are rejected.
+- [ ] The evidence bundle can trace every published derivative back to the exact approved source set.
+
+### D3M-04 — Establish building identity, map target, footprint, and location evidence
+
+**Priority:** P0 · **Status:** Partial / external evidence required · **Dependencies:** D3M-01, D3M-02
+
+**Tasks**
+- [ ] Support selecting an existing Overture/map building and binding its stable source feature ID to the reconstruction job.
+- [ ] Support a separately reviewed new-building footprint when no suitable map feature exists.
+- [ ] Store the footprint CRS, source, timestamp, geometry hash, and identity-review decision.
+- [ ] Distinguish a building identity match from a nearby or visually similar building.
+- [ ] Accept surveyed control points or another documented independent location source.
+- [ ] Define what happens when the image has no trustworthy location: ask for map selection/address/control evidence and mark location unresolved.
+- [ ] Do not treat an ordinary street photograph or an EXIF coordinate as proof of the building footprint or exact facade location.
+
+**Likely files:** `src/app/api/geospatial/overture-buildings/`; `src/core/building-generation/brf35-building-linkage.mjs`; footprint/linkage and ground-control modules.
+
+**Acceptance**
+- [ ] Wrong-building, duplicate-building, adjacent-building, and mismatched-footprint tests fail safely.
+- [ ] Identity, footprint, and location provenance are separately reported.
+- [ ] No exact placement is asserted without accepted coordinate evidence.
+
+### D3M-05 — Integrate image quality, view coverage, masks, observations, and camera calibration
+
+**Priority:** P0 · **Status:** Partial · **Dependencies:** D3M-03, D3M-04
+
+**Tasks**
+- [ ] Normalize image orientation and preserve original pixel dimensions and crop/resize transforms.
+- [ ] Detect blur, clipping, near-duplicates, severe occlusion, and unusable views; record per-view decisions.
+- [ ] Bind each image to front/rear/left/right/roof/corner or an explicit unknown viewpoint.
+- [ ] Connect BRF-05 manual masks and BRF-06 architectural observations into one hash-bound bundle.
+- [ ] Record camera intrinsics, distortion, pose, uncertainty, coordinate frame, and calibration source—or explicitly mark each unknown.
+- [ ] Estimate overlap and camera coverage; distinguish “same building” confirmation from image overlap.
+- [ ] Link observations such as corners, rooflines, floor bands, windows, arches, columns, and balconies to source pixels and review history.
+
+**Likely files:** `image-quality-preflight.mjs`; `media-quality-preflight.mjs`; `building-mask-provider.mjs`; `architectural-observation-schema.mjs`; `architectural-feature-proposals.mjs`; BRF-05/06/07 work.
+
+**Acceptance**
+- [ ] Combined mask/observation export and re-import preserve source IDs, bytes, dimensions, and pixel coordinates.
+- [ ] Stale source hashes, mismatched dimensions, unsupported crop transforms, and dangling observations are rejected.
+- [ ] Camera calibration state and coverage uncertainty are visible to the route selector.
+- [ ] A browser review test covers mask and observation correction.
+
+### D3M-06 — Make reconstruction strategy selection evidence-driven
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-03, D3M-05
+
+**Tasks**
+- [ ] Define an explicit route policy using number of usable views, overlap, camera calibration, rights scope, source quality, scale evidence, and compute availability.
+- [ ] Route a single image to an AI-proposed preview only when the operator explicitly accepts single-view inference and its limitations.
+- [ ] Route sufficient same-building overlapping views to COLMAP only after all required rights, identity, overlap, and axis checks pass.
+- [ ] Use procedural BuildingSpec generation only as a clearly labelled parametric estimate or as a supported prior—not as image reconstruction.
+- [ ] Refuse unsupported routes and explain the missing evidence instead of silently falling back to a misleading model.
+- [ ] Record why a route was selected or blocked and which external tool/model version was used.
+
+**Likely files:** `generation-engine.mjs`; `generation-pipeline.mjs`; `media-to-model-workflow.mjs`; `colmap-worker.mjs`; `single-image-3d-worker.mjs`.
+
+**Acceptance**
+- [ ] Tests cover one image, two images, adequate multi-view, duplicate views, wrong-building views, low overlap, missing rights, missing runtime, and unsupported formats.
+- [ ] The job report distinguishes procedural, single-image AI, and photogrammetry output and never calls them equivalent evidence tiers.
+- [ ] Actual worker execution is proven on at least one controlled sample for each route claimed as supported.
+
+### D3M-07 — Produce and refine building geometry from the selected route
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-05, D3M-06
+
+**Tasks**
+- [ ] Convert the selected route output into a documented local metric frame.
+- [ ] Bind each reconstructed component/surface to supporting views or mark it inferred/unknown.
+- [ ] Combine independently measured footprint/dimensions with photo-derived visible surfaces only where coordinate/calibration evidence supports the fusion.
+- [ ] Integrate reviewed architectural masks/observations with the geometry workflow; corrections must change the candidate geometry, not only create review tasks.
+- [ ] Preserve source meshes and every repair/correction as immutable candidate versions.
+- [ ] Separate geometry creation from texture projection so texture cannot hide incorrect massing or openings.
+
+**Likely files:** `colmap-worker.mjs`; `wireframe-to-mesh.mjs`; `multi-view-wireframe-registration.mjs`; `confidence-aware-wireframe-fusion.mjs`; `architectural-geometry-workflow.mjs`; `textured-glb-export.mjs`.
+
+**Acceptance**
+- [ ] A candidate is generated from the declared input route and exact source hashes.
+- [ ] A fixed review camera set exposes all available sides and marks unsupported/occluded sides.
+- [ ] Correction tests prove that a geometry correction changes the GLB hash and improves its declared metric or render comparison.
+- [ ] No missing facade/roof is represented as measured truth.
+
+### D3M-08 — Unify GLB, topology, dimension, and texture quality gates
+
+**Priority:** P0 for publication · **Status:** Partial · **Dependencies:** D3M-07
+
+**Tasks**
+- [ ] Run actual GLB byte parsing and geometry extraction on the exact candidate file.
+- [ ] Check primitive counts, vertex/triangle bounds, degenerate faces, normals, open/non-manifold boundaries, connected components, extreme edges, and invalid transforms.
+- [ ] Check units, axes, bounds, footprint shape, and independent dimensions separately.
+- [ ] Check material references, texture presence, UV coverage, stretch, seams, resolution, and background/occluder contamination.
+- [ ] Bind geometry QA, texture QA, review renders, and correction reports to the same candidate hash.
+- [ ] Define warning and hard-fail thresholds by model class; do not allow a clean container check to imply visual fidelity.
+
+**Likely files:** `glb-geometry-extraction.mjs`; `glb-geometry-qa.mjs`; `mesh-topology-qa.mjs`; texture QA modules; release-readiness modules.
+
+**Acceptance**
+- [ ] Adversarial fixtures exist for every hard-fail condition.
+- [ ] Stale or mismatched report hashes are rejected.
+- [ ] Missing texture or missing geometry evidence cannot be interpreted as a pass.
+- [ ] Candidate review packet includes geometry, texture, and fixed-camera visual evidence.
+
+### D3M-09 — Establish independent metric scale and geographic registration
+
+**Priority:** P0 · **Status:** Partial / external survey dependency · **Dependencies:** D3M-04, D3M-07, D3M-08
+
+**Tasks**
+- [ ] Define the model-local frame, units, axis order, handedness, and heading convention.
+- [ ] Calibrate metric scale from independent measurements, not from the generated model itself.
+- [ ] Register horizontal placement from at least three suitable non-collinear control points where the selected method requires a 2D rigid/similarity fit.
+- [ ] Keep fitting controls separate from held-out check points.
+- [ ] Record source CRS, target CRS, pinned coordinate-operation pipeline/version, axis order, grids, units, and transformation evidence.
+- [ ] Record vertical CRS/datum separately from horizontal WGS84; distinguish ellipsoidal height, orthometric height, terrain elevation, building base, and relative roof height.
+- [ ] Store residuals, uncertainty, evidence IDs, and unresolved values.
+- [ ] Require map footprint overlay and independent reviewer acceptance before placement approval.
+
+**Likely files:** `ground-control-registration.mjs`; `reference-dimension-validation.mjs`; `brf37-proj-operation-executor.mjs`; `brf35-building-linkage.mjs`; placement policy/types.
+
+**Acceptance**
+- [ ] Synthetic known-transform tests cover axis swap, wrong units, mirrored model, bad controls, outliers, and vertical-datum mismatch.
+- [ ] Real building placement report binds the exact GLB hash and independent control source hashes.
+- [ ] Held-out residuals are reported separately from fit residuals.
+- [ ] Unknown height datum or missing independent scale blocks metric/map-ready claims.
+
+### D3M-10 — Add an operator review and correction experience
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-08, D3M-09
+
+**Tasks**
+- [ ] Show source images, selected views, masks/observations, candidate GLB, and fixed review renders side by side.
+- [ ] Show geometry/texture QA, dimensions, control-point residuals, source rights, confidence, and unresolved warnings.
+- [ ] Allow accept, reject, request-correction, and annotate decisions with reviewer identity and timestamp.
+- [ ] Bind every decision to exact GLB, source-manifest, QA-report, and placement-evidence hashes.
+- [ ] Invalidate approvals when the candidate, source, rights, calibration, QA, or placement changes.
+- [ ] Keep operator, reviewer, administrator, and publisher permissions separate.
+
+**Likely files:** `src/features/map/components/GeneratedModelPanel.tsx`; Admin/review components; `generation-job-review.mjs`; review API routes; evidence package modules.
+
+**Acceptance**
+- [ ] Browser tests cover approve, reject, correction, stale approval, and unauthorized user paths.
+- [ ] The reviewer cannot approve a different GLB than the one shown.
+- [ ] Approval history is immutable and auditable.
+
+### D3M-11 — Publish approved versions and integrate automatic map loading
+
+**Priority:** P1 · **Status:** Partial · **Dependencies:** D3M-09, D3M-10
+
+**Tasks**
+- [ ] Replace local-only publication assumptions with a server-side publisher authorized by the role model.
+- [ ] Store immutable GLB bytes in private/object storage until approval; expose only approved map assets through authorized or intentionally public delivery.
+- [ ] Publish model metadata and placement as one atomic versioned record.
+- [ ] Make map initialization or a generated-model catalog service discover active models for the current viewport.
+- [ ] Load only models intersecting the viewport/selected area; avoid loading every published GLB globally.
+- [ ] Restore active models after page reload and reconcile visibility/version changes.
+- [ ] Add version rollback, asset retirement, cache invalidation, and integrity checks.
+- [ ] Keep manual preview as a development-only path, visibly separate from production publishing.
+
+**Likely files:** `published-model-catalog.mjs`; `published-model-catalog-reader.mjs`; `publish-approved-generation-job.mjs`; `generated-model-layer.ts`; `GeneratedModelPanel.tsx`; `MapCanvas.tsx`; `map-engine.ts`.
+
+**Acceptance**
+- [ ] A fully approved job is published without manual file copying or editing a public manifest.
+- [ ] The map loads the published model using verified placement metadata.
+- [ ] A hard refresh restores the active model; a retired/rolled-back version is not loaded.
+- [ ] Wrong hashes, invalid placement, unauthorized publication, duplicate model IDs, and failed asset fetches fail safely.
+- [ ] Existing Overture buildings, roads, map selection, and viewport performance do not regress.
+
+### D3M-12 — Make the workflow production-safe and operable
+
+**Priority:** P0 before production · **Status:** Partial · **Dependencies:** D3M-02, D3M-03, D3M-11
+
+**Tasks**
+- [ ] Replace local-only job/result assumptions with durable database state and private shared object storage.
+- [ ] Define authentication, RBAC, project/building isolation, token rotation, rate limits, quotas, and audit identity.
+- [ ] Add worker leases, concurrency control, heartbeat, retries, dead-letter handling, cancellation, and safe restart/recovery.
+- [ ] Scan/validate uploads, enforce per-media size limits, isolate parsers/processes, and restrict outbound/network access.
+- [ ] Define retention, user deletion, backup/restore, encryption, monitoring, alerting, and operational runbooks.
+- [ ] Measure job latency/resource consumption and map model-load latency separately.
+- [ ] Prevent private inputs, review images, tokens, and internal paths from appearing in public responses/logs.
+
+**Likely files:** generation API/auth/queue/worker modules; storage adapter; deployment configuration; operational tests and docs.
+
+**Acceptance**
+- [ ] Multi-user authorization and cross-project isolation tests pass.
+- [ ] Concurrent worker, process crash, retry, cancellation, and recovery tests pass.
+- [ ] Backup/restore and deletion workflows are demonstrated.
+- [ ] Upload/parser security, quota, and retention checks are documented and tested.
+- [ ] Operational dashboards/runbooks report queue depth, stage failures, worker health, storage, and map loading.
+
+### D3M-13 — Prove the complete workflow with independent buildings
+
+**Priority:** P0 release gate · **Status:** Not established · **Dependencies:** D3M-00 through D3M-12
+
+**Tasks**
+- [ ] Select a bounded validation set containing an ordinary residential/commercial building, an irregular building, and a complex landmark; verify rights and identity first.
+- [ ] Obtain independent dimensions, horizontal controls, vertical datum, and held-out checkpoints.
+- [ ] Run the entire browser-to-worker-to-review-to-publish-to-map flow on exact pinned commits.
+- [ ] Capture source images, input hashes, worker logs, candidate GLB hashes, review renders, QA reports, placement residuals, reviewer decisions, published version IDs, and browser screenshots.
+- [ ] Test single-image preview and multi-view reconstruction as separate evidence tiers.
+- [ ] Test missing data, bad images, wrong-building match, low overlap, insufficient controls, failed workers, unauthorized review/publish, stale hashes, rollback, page reload, and viewport changes.
+- [ ] Report success/failure per building and per metric; record all unknown and occluded surfaces.
+- [ ] Run cold/warm map-load and multi-building viewport checks on documented browser/device/network conditions.
+
+**Acceptance**
+- [ ] At least three independent buildings have complete, rights-cleared, hash-bound evidence; any unavailable external survey/rights data remains explicitly blocked.
+- [ ] Each building has separate geometry, dimension, texture, horizontal placement, vertical reference, and human visual-review outcomes.
+- [ ] Held-out checkpoints are not used for fitting or correction.
+- [ ] The same approved model version loads in the map after refresh and can be rolled back.
+- [ ] Exact-head CI, API tests, browser tests, and relevant specialized workflows pass.
+- [ ] No universal 90% accuracy claim is made unless a preregistered metric, independent holdout set, uncertainty, and sample size support it.
+
+## 6. Dependency graph
+
+```mermaid
+flowchart TD
+  M00[D3M-00 Branch and PR reconciliation] --> M01[D3M-01 Shared workflow contract]
+  M01 --> M02[D3M-02 Map intake UI and upload]
+  M01 --> M03[D3M-03 Rights and provenance]
+  M02 --> M03
+  M02 --> M04[D3M-04 Building identity and location]
+  M03 --> M05[D3M-05 Image understanding and calibration]
+  M04 --> M05
+  M03 --> M06[D3M-06 Evidence-driven route selection]
+  M05 --> M06
+  M06 --> M07[D3M-07 Geometry generation and refinement]
+  M07 --> M08[D3M-08 GLB and texture QA]
+  M04 --> M09[D3M-09 Metric and geospatial registration]
+  M08 --> M09
+  M08 --> M10[D3M-10 Review and correction]
+  M09 --> M10
+  M10 --> M11[D3M-11 Publish and map integration]
+  M02 --> M12[D3M-12 Production operations]
+  M03 --> M12
+  M11 --> M12
+  M12 --> M13[D3M-13 Independent end-to-end acceptance]
+  M11 --> M13
+```
+
+## 7. Existing test commands to reuse
+
+Run only the suites relevant to the changed work package, then the complete required CI matrix for the exact PR head. These commands are present in the inspected package scripts at the planning baseline; re-check current package scripts before execution.
+
+| Area | Existing command(s) |
+|---|---|
+| BuildingSpec/procedural generator | `npm run test:building-generation` |
+| Media intake and pipeline | `npm run test:building-media`; `npm run test:media-to-model-workflow` |
+| Single-image route | `npm run test:single-image-3d` |
+| COLMAP route | `npm run test:colmap-worker` |
+| Queue and worker | `npm run test:generation-queue` |
+| Upload/API | `npm run test:generation-media-upload` |
+| Review API | `npm run test:generation-review` |
+| GLB geometry/topology | `npm run test:glb-geometry-qa` |
+| Metric and dimension evidence | `npm run test:reference-dimension-validation`; `npm run test:building-accuracy-benchmark` |
+| Release-readiness evidence | `npm run test:building-release-readiness` |
+| Generated model policy/layer | `npm run test:generated-model-policy`; `npm run test:generated-model-layer-boundary` |
+| Published catalog/publisher | `npm run test:published-model-catalog`; `npm run test:publish-approved-generation-job` |
+| Map browser integration | `npm run test:map-browser` |
+| Build quality | `npm run lint`; `npm run build` |
+
+Add new tests where the current suites stop at module boundaries. In particular, add one Playwright test that drives a real test upload through job status, review, publication, map load, page reload, and rollback using deterministic local fixtures.
+
+## 8. Release gates that must remain false until independently satisfied
+
+Do not enable any of these merely because a worker returned exit code zero or a GLB file exists:
+
+- `rightsApproved`
+- `sourceIdentityVerified`
+- `geometryValidated`
+- `metricValidated`
+- `horizontalGeoreferenceVerified`
+- `verticalDatumVerified`
+- `humanReviewed`
+- `acceptanceEligible`
+- `publicationEligible`
+- `mapReady`
+- `automaticApproval`
+
+A human attestation must refer to the exact candidate and evidence hashes. The attestation mechanism verifies recorded fields and file hashes; it does not independently authenticate the reviewer, rights grant, survey, or architectural truth.
+
+## 9. Execution board and update protocol
+
+The first implementation task is **D3M-00**. Do not jump to later phases while branch dependencies or source evidence are unresolved.
+
+For every completed D3M task, update this board and record:
+
+- exact D3M ID, branch, base SHA, head SHA, and PR;
+- changed files and API/schema version impact;
+- exact test commands and workflow run URLs on the head SHA;
+- candidate/source/evidence hashes where relevant;
+- pass/fail/blocked result and unresolved external dependency;
+- impact on each fail-closed release flag;
+- exactly one next task.
+
+Status meanings:
+
+- **PLANNED:** not started.
+- **IN PROGRESS:** implementation underway on a focused branch/PR.
+- **IMPLEMENTED:** code exists but required evidence may still be pending.
+- **VERIFIED:** exact tests/evidence pass for the declared scope.
+- **BLOCKED:** external evidence, rights, survey, credentials, or infrastructure is missing.
+- **ACCEPTED:** required technical and human acceptance gates have passed.
+
+Never upgrade a task to VERIFIED or ACCEPTED from code presence, documentation, a synthetic fixture, or an unrelated green CI run.
+
+
+---
+
+## 10. D3M-00 live execution log — 2026-10-30
+
+**Status:** IN PROGRESS. The repository snapshot and a first critical-PR dependency map are recorded. Branch divergence is not reconciled, old-base BRF work has not yet been ported, and no PR has been merged or closed.
+
+### 10.1 Exact branch baseline
+
+| Ref | Exact SHA observed | Finding |
+|---|---|---|
+| \`main\` | \`7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b\` | Default branch |
+| \`development\` | \`98b2fa56f387c2bdbf4dad5c24e6f131dd66d076\` | Current integration candidate |
+| \`rakibul-hasan\` | \`01fc0caf4f08b1aa1dc8c1fdced1667c8d7fcb91\` | Stale relative to development |
+| \`docs/full-repository-gap-audit-20261030\` | \`3a77866039c575bf01b782e479618ba4fde86d8c\` before this log update | Documentation-only continuation branch |
+
+The branch inventory was paged to completion and returned 244 branch names. The counts below are point-in-time Git ancestry counts, not file-equivalence claims:
+
+- \`development\` compared with \`main\`: **86 ahead / 4 behind**, diverged, merge base \`e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c\`.
+- \`rakibul-hasan\` compared with \`development\`: **10 ahead / 89 behind**, diverged. Its ten unique commits include floor-plan raster-trace work and BRF-05–07 evidence work; the old branch history must not be merged wholesale.
+- The four commits reachable only from the inspected \`main\` head include a documentation status change, an earlier development-promotion preparation, the previous release merge, and PR #205's BRF-05–07 integration. These are ancestry/content reconciliation items, not automatic merge instructions.
+
+### 10.2 Pipeline-critical PR decision matrix
+
+CI states below are GitHub Actions results observed for the exact listed head at audit time. A green run proves only its declared test matrix on that commit; it does not replace source-rights, survey, visual, reviewer, or deployment acceptance.
+
+| PR | Base → head (short SHA) | Exact-head CI / evidence observed | D3M decision |
+|---|---|---|---|
+| [#228](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/228) | \`main@7d90b76\` → \`development@98b2fa5\` | CI #2282 and BRF-05–07 #187 passed on development SHA \`98b2fa5\` | HOLD release promotion. Resolve the 4 main-only ancestry/content commits and obtain review on the exact merge candidate before promotion. |
+| [#279](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/279) | \`development@98b2fa5\` → \`docs/...@3a77866\` | CI #2508 was in progress when checked | Keep Draft; documentation-only. This log is added on this branch; re-check exact-head CI after the new commit. |
+| [#274](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/274) | \`development@98b2fa5\` → \`feat/p3-4-map-ux-imagery-diagnostics-dev-20261029@439e5c8\` | CI #2285 and Real-Dhaka Browser Baseline #45 passed on exact head | Canonical map-UX candidate for review. Keep Draft/unmerged until human diff and screenshot/evidence review. |
+| [#196](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/196) | \`development@98b2fa5\` → \`fix/map-viewport-ux-current-base-20261026@f307d57\` | CI #1855 passed on exact head | Duplicate/superseded candidate: 23 paths overlap #274; 21 common file patches are byte-identical, and the two remaining differences are package/workflow placement/order. #274 additionally contains the real-Dhaka baseline workflow. Do not close #196 until #274 is reviewed and its unique value is confirmed. |
+| [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277) | \`rakibul-hasan@01fc0caf\` → \`feat/brf05-07-manual-mask-review@df684a4\` | CI #2495 passed on exact head | Do not merge this old-base branch. Clean-port only its mask-editor/report/browser-test delta onto a branch created from the current development head, then rerun focused and full CI. |
+| [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278) | \`rakibul-hasan@01fc0caf\` → \`feat/brf06-architectural-observation-review-studio@22be966\` | CI #2503 passed on exact head | Do not merge this old-base branch. Port separately after the mask-editor work; reconcile its observation-schema change and shared BRF report update against the new development head. |
+| [#275](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/275) | \`development@98b2fa5\` → \`feat/p3-6-multibuilding-tiles-package@36a2e5f\` | CI #2501 and P3.6 package workflow #188 passed on exact head | Keep Draft for review. This validates a bounded footprint-extrusion/tiles path; synthetic 8 m heights and footprint baselines are not image-derived facade reconstruction or independent survey truth. |
+| [#276](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/276) | \`development@98b2fa5\` → \`feat/p3-7-floor-plan-vector-calibration@0e907de\` | CI #2424 and P3.7 workflow #20 passed on exact head | Keep as a separate interior/floor-plan workstream; it is not a prerequisite for the first exterior-building map workflow. |
+| [#193](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/193) | old \`rakibul-hasan\` base \`fa08cb5\` → \`integration/generated-model-layer-current-head@ddcbc33\` | No new exact-head CI was relied on in this audit | Likely functionally superseded on development: \`generated-model-layer.ts\` has the exact same blob SHA \`40f79953cf2202dab79200134643432232920ab3\`, and current \`cesium-adapter.ts\` already instantiates the layer and delegates add/update/remove. Do not close until the remaining PR-specific diff/docs/tests are checked. |
+
+### 10.3 Concrete reconciliation conclusions
+
+1. **Do not merge #228 yet.** The PR is open and mergeable according to GitHub metadata, but it promotes 86 commits across 204 files and the base has four commits not reachable from development. A clean mergeability signal does not explain these historical/content differences. Review the merge-base delta and run acceptance checks on the final candidate.
+2. **Use #274 as the map-UX review candidate; hold #196 as a duplicate.** Patch-level comparison found 21 exact common patches out of 23 shared files; #274's extra baseline workflow makes it the stronger candidate. Do not close either PR before reviewing #274's current diff/evidence.
+3. **Port #277 and #278 from the current development base.** Both source PRs target the old \`rakibul-hasan\` head, and development is 89 commits ahead of that base. The PR-specific changes are small enough to port selectively; preserve each original PR as evidence until its replacement is validated. #277 and #278 both update the same BRF report, so port them sequentially rather than in parallel.
+4. **Keep #275 and #276 isolated.** Their exact-head CI is green, but their acceptance scope is distinct; tile footprint/placement checks must not be described as photo-to-3D reconstruction or survey accuracy, and floor-plan calibration is a separate interior workflow.
+5. **Do not re-port #193 blindly.** The generated model layer file is byte-identical on development and its Cesium adapter already delegates the public lifecycle methods. Finish reviewing PR-only doc/test changes before deciding it is fully superseded.
+6. **No branch refs, code, release flags, or PR states were changed by this audit.** No application tests were run locally in this documentation pass; CI states above are remote GitHub workflow records.
+
+### 10.4 D3M-00 checklist status
+
+- [x] Read exact branch heads for main, development, rakibul-hasan, and the docs continuation branch.
+- [x] Enumerate the repository branch names (244 returned across paged results).
+- [x] Inspect the principal map UX, BRF-05/06, 3D Tiles, floor-plan, generated-model-layer, docs, and release PR metadata.
+- [x] Compare #274/#196 at patch level and identify duplicate ownership.
+- [x] Compare old-base BRF branches with development and identify why whole-branch merges are unsafe.
+- [ ] Reconcile the four main-only commits and final #228 merge candidate.
+- [x] Clean-port #277 onto a new clean-base branch (#280); exact-head CI #2513 passed. Human review/acceptance remains pending.
+- [x] Clean-port #278 sequentially into the combined candidate (#281), stacked on #280. Current head has expanded unit coverage; exact-head CI #2530 is still running. Human review/acceptance remains pending.
+- [ ] Review #274 and decide whether #196 can be closed as duplicate.
+- [ ] Finish #193 PR-only diff review before marking superseded.
+- [ ] Re-check all critical PRs, review threads, and CI after each branch changes; do not mark D3M-00 complete until the selected integration path has no unresolved ancestry or duplicate ownership.
+
+### 10.5 Next task — exact continuation pointer
+
+**Continue from the canonical combined PR #281**, not from the original #277/#278 branch histories or duplicate PR #282.
+
+1. Check CI #2530 for exact head `04b62ceb910b6c63986703ec1587846a1676bc85` and fix any failure.
+2. Keep #281 Draft until human review. It contains the #280 mask-editor parent plus #278 observation-review work; do not merge #280 independently.
+3. After the combined BRF candidate is reviewed and merged, continue the remaining D3M-00 items in Section 10.9.
+### 10.6 D3M-00.B — BRF-05 manual mask editor clean-base port (2026-10-30)
+
+**Implementation status: VERIFIED by exact-head CI; human review and acceptance pending.**
+
+- **Source:** old-base PR [#277](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/277), base `rakibul-hasan@01fc0caf`, source head `df684a4d36f36133609839bfa2b751d25205b924`.
+- **Clean branch:** `feat/brf05-07-manual-mask-review-dev-20261030`; exact parent `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`; branch head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`.
+- **PR:** [#280](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/280), Draft/open, mergeable at last check, no review submissions. Four paths, 428 additions, zero deletions.
+- **Port paths:** `public/experimental/building-mask-review.html`, `public/experimental/building-mask-review.js`, `tests/browser/building-mask-review.spec.ts`, and the additive BRF-05–07 evidence-report section.
+- **Port strategy:** selected source files and additive documentation only; no cherry-pick of the stale six-commit history; no API/schema/package-script/workflow changes.
+- **Contract review:** output `result` matches the existing `building-mask-provider-v1` contract: source ID/hash, provider identity/version/config hash, mask digest/bytes/dimensions/encoding/pixel convention and assessment status/confidence/reviewer.
+- **Exact-head CI:** [CI #2513 / run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) completed successfully on head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. All job steps succeeded, including lint, unit/contract suites, production build, Chromium installation, production-server viewport API/browser integration and evidence uploads.
+- **Acceptance boundary:** CI does not verify real mask visual quality, reviewer identity, source rights, building identity or metric/survey truth. All release flags remain false.
+- **Disposition:** #280 is retained as the verified parent commit of the combined PR #281. Do not merge #280 independently because #281 contains the full parent history and the BRF-06 extension.
+
+### 10.7 D3M-00.C — canonical BRF-06 clean-base port (2026-10-30)
+
+**Status: IMPLEMENTED; first exact-head CI passed, updated exact-head CI in progress; human review pending.**
+
+- **Original source PR:** [#278](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/278), old base `rakibul-hasan`; its history was not cherry-picked.
+- **Canonical integration PR:** [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), branch `feat/brf06-observation-review-dev-20261030`, open Draft, target `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- **Canonical head:** `04b62ceb910b6c63986703ec1587846a1676bc85`; branch compare reports 11 commits ahead, 0 behind, 9 changed paths relative to development. The nine paths combine four BRF-05 mask-editor paths from #280 and six BRF-06/report/test paths (the report is shared).
+- **Parent dependency:** #281 descends from #280 exact head `09a52828e78f853c3a19a8f60c5bd32b3ccc73fd`. #280 exact-head CI #2513 / [run 40997949731](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40997949731) succeeded, including browser/API integration.
+- **Canonical exact-head CI:** first full run #2519 / [run 40998801920](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40998801920) succeeded on an earlier head. A subsequent unit-test round-trip regression update produced current head `04b62ceb910b6c63986703ec1587846a1676bc85`; updated CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) is **in progress**. Do not reuse the earlier success as proof for the new head.
+- **Duplicate port:** [PR #282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282) was closed on 2026-10-30 after discovering #281 already contained the same six BRF-06 paths plus the #280 prerequisite. Its duplicate branch must not be merged. Keep #281 as the only canonical integration candidate.
+- **Implementation:** local-only source-bound observation studio; Point/LineString/BoundingBox/Polygon source-pixel annotations; explicit visibility states; review/reject/reopen with original proposal and append-only review history; M07 normalizer validates and preserves provenance/history; unit and browser regressions cover lifecycle, import/export, null-geometry visibility and tamper cases.
+- **Remaining integration gap:** observation studio still exports `mask: null`; it is not yet linked to the #280 mask editor. D3M-01/WP-01 must define a shared bundle contract binding both artifacts to identical source ID/hash/dimensions and exact mask SHA-256, with cross-artifact tests.
+- **Safety boundary:** reviewer identifiers are operator-supplied, not independently authenticated. No rights, physical identity, camera calibration, metric dimensions or survey truth are established. `groundTruth`, `publicationEligible`, `publishable`, `acceptanceEligible`, `mapReady`, and `automaticApproval` remain false.
+- **Merge policy:** #281 is the combined 9-path candidate; do not merge #280 independently and then also merge the same cumulative changes. Keep both Draft until #281 current-head CI #2530 and human review are complete. If accepted, merge #281 once; close #280 as subsumed. Do not merge old-base #278.
+### 10.8 Duplicate PR reconciliation
+
+- PR [#282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/282) was created during a second pass but was proven redundant: its observation HTML/JS/schema/browser files matched #281 by SHA; it carried the same six-path BRF-06 delta and the same #280 parent. #281's shared report and branch log were more complete.
+- The one test-file difference was reconciled by copying the fuller source unit-test file into #281, adding the rejected-review round-trip assertions. #281's current head is now `04b62ceb910b6c63986703ec1587846a1676bc85`, with CI #2530 running.
+- PR #282 was closed as duplicate (not merged) with a comment linking to canonical PR #281. No source code is lost; canonical #281 now contains the fuller test file.
+
+### 10.9 Current continuation pointer
+
+1. Check CI #2530 / run `41000920752` on exact head `04b62ceb910b6c63986703ec1587846a1676bc85`; fix any failure and record a new exact head/run.
+2. Keep canonical PR #281 Draft until updated full CI and human review are complete. Treat #282 as closed duplicate; do not reopen or merge it.
+3. Resolve the combined #281/#280 merge decision exactly once. If #281 is accepted as the cumulative nine-path candidate, merge #281 once and close #280 as subsumed; never merge both cumulative branches.
+4. Then continue D3M-00 remaining ancestry/duplicate work (#274/#196, #193, and main-only commit reconciliation for #228).
+5. Only after D3M-00 is complete begin D3M-01: define and test the shared mask + architectural-observation evidence bundle before connecting either to automatic reconstruction.
+
+**Live CI checkpoint (2026-10-30 10:11 +06):** updated run #2530 is still `in_progress` on exact head `04b62ceb910b6c63986703ec1587846a1676bc85`. All unit/contract test steps—including `Test evidence-linked architectural observation schema and review history`, `Test bounded per-view feature proposals and reviewed comparison`, and `Test integrated BRF-05–07 visual evidence package and fail-closed real-world gates`—have completed successfully. Chromium installation and production build have also succeeded. `Verify viewport API against the production server` remains in progress; evidence-upload steps are pending. Therefore full CI is **not yet complete** and PR #281 remains Draft.
+
+
+### 10.10 D3M-00.C exact-head CI completion — 2026-10-30
+
+**Status: exact-head CI PASS; PR review and merge decision still pending.**
+
+- Canonical PR: [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), exact head `04b62ceb910b6c63986703ec1587846a1676bc85`, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- Exact-head CI #2530 / [run 41000920752](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41000920752) completed with conclusion **success** on this exact SHA. The single workflow job `Lint and production build` completed successfully.
+- Verified completed steps include ESLint; all unit/contract suites (including architectural observation schema/history, per-view proposals/comparison, integrated BRF-05–07 fail-closed evidence package); production build; Chromium installation; production-server viewport API/browser integration; and uploads of P2.3, P2.4, P2.5 and P2.6 evidence/diagnostics. Every step in the job reports `completed/success`.
+- This closes the CI checkpoint only. PR #281 remains **open, Draft, unmerged**; human review is still required. #280 remains the parent prerequisite and must not be merged independently if #281 is accepted as the cumulative candidate. #282 remains closed duplicate; old-base #278 is not mergeable evidence.
+- No release gate is enabled: `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, and `automaticApproval` remain false.
+- **Next:** complete D3M-00 ancestry/duplicate reconciliation (#274/#196, #193, #228) while awaiting human review on #281. Then D3M-01/WP-01 must specify and test one source-bound evidence bundle linking mask and architectural observations; the observation editor currently emits `mask: null`. Do not begin automatic reconstruction or assert real-building accuracy from these manual annotations.
+
+
+### 10.11 D3M-00 viewport and map-engine branch reconciliation — 2026-10-30
+
+**P3.4 canonical candidate:** [PR #274](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/274), branch `feat/p3-4-map-ux-imagery-diagnostics-dev-20261029`, exact head `439e5c8ee26f263471b060a35296d681e0add182`, base development `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`. It is a clean 3-commit/24-path port, not stale-branch history.
+
+- Exact-head CI #2285 / [run 40747778627](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40747778627) succeeded. Real-Dhaka Browser Baseline #45 / [run 40747778776](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40747778776) succeeded. All 11 workflows returned for the exact head completed successfully, including BRF-05–07, BRF-14, BRF-29, BRF-35–38, BRF-45 and BRF-46.
+- PR #274 remains Draft/open/unmerged pending human visual review of its six-sample real-Dhaka evidence. Red-pixel/tile-error metrics are diagnostic signals, not proof of cause or proof the anomaly is fixed.
+- Duplicate [PR #196](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/196) was closed without merge as superseded. Its 23 changed paths' implementation patches match #274; #274 additionally adds `.github/workflows/real-dhaka-baseline.yml` and is based on current development. Do not reopen/merge #196.
+- Old-base [PR #193](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/193) was closed without merge after confirming the generated-model layer implementation, adapter delegation and boundary test are already byte-identical on development; the CI step and package test script are also present there. Its architecture note was preserved as `docs/MAP-ENGINE-MODULARIZATION.md` on this documentation branch. No code was dropped.
+- Main promotion PR [#228](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/228) remains open and unmerged. Current compare: development `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` is 86 commits ahead and 4 commits behind main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` (diverged; merge base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c`, 204 changed paths). Development CI #2282 passed, but that does not resolve the four main-only commits. Do not merge #228 or promote to main until those four commits are individually inspected and the combined tree is revalidated.
+- D3M-00 remains in progress: remaining release-ancestry task is inspect the four main-only commits and confirm whether any are required fixes/security/release metadata; then reconcile safely without blind merge. PR #281 remains Draft pending human review; PR #274 remains Draft pending visual review. D3M-01 still requires the shared mask+observation bundle contract. All release gates remain false.
+
+
+### Main ancestry check — 2026-10-30
+
+A direct compare of main `7d90b76dadaf9eebd91b9aeb13cf12dcefb5086b` against its exact merge-base `e4fd7ddfedd4fbd2faa6cdd185deeddc81dbce1c` reports 4 commits ahead, 0 behind, but **zero changed paths**. Thus the four main-only ancestry commits introduce no net tree difference relative to the merge base; the 204-path delta in PR #228 is the development-side work. Do not cherry-pick those four commits or describe them as missing code. Keep PR #228 unmerged until exact-head promotion CI/review is checked and the current development tree is intentionally approved for main. This resolves the content-loss concern, not the release authorization.
+
+
+### 10.12 D3M-01.A — shared mask + observation evidence bundle (2026-10-30)
+
+**Status: IMPLEMENTED ON PR #281; exact-head CI pending. Not yet merged or accepted.**
+
+- Added `src/core/building-generation/source-bound-visual-evidence-bundle.mjs`. It hashes actual source bytes, mask PNG bytes, mask-manifest bytes and observation-export bytes; checks decoded source/mask dimensions supplied by the decoder; requires exact source ID/SHA-256/dimensions across artifacts; checks mask encoding/size/hash; rejects conflicting observation mask hashes; normalizes the observation batch and inserts the exact mask SHA-256 into its batch-level mask reference.
+- Added local browser wizard `/experimental/source-bound-evidence-bundle.html` + `.js`. User selects original source image, mask PNG, mask-review JSON and observation JSON. Browser hashes all bytes, decodes both images, verifies binary white-foreground mask pixels and emits a single manifest with the normalized observation batch. The files are not uploaded; original source/mask/manifest/export files must be retained alongside the bundle.
+- Added core regression tests for valid linkage, source-byte tampering, mask-byte tampering, decoded dimension mismatch, source mismatch, conflicting mask references, per-observation mask hash mismatch, release-gate tampering, review-state consistency and malformed/missing files. Added local-wizard static contract tests and a Chromium end-to-end browser spec that creates source/mask fixtures, exports observations from the existing editor, builds the bundle and rejects a mask-byte mismatch.
+- Registered `test:source-bound-visual-evidence-bundle` in `package.json` and added it to `.github/workflows/ci.yml`; browser spec is picked up by the Playwright browser suite.
+- Canonical implementation remains on [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), branch `feat/brf06-observation-review-dev-20261030`, exact head `ee76e33135174b67fac35c2f75e4c6c38ebaaf11`. Compare to development: 22 commits ahead, 0 behind, 17 changed paths. Exact-head CI #2557 / [run 41002994374](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41002994374) is pending at this checkpoint; do not claim test success until it completes.
+- **Acceptance boundary:** this joins artifacts by exact bytes and provenance; it does not validate semantic mask correctness, independently authenticate reviewers, grant rights, establish building identity, calibrate a camera, provide surveyed dimensions or prove model accuracy. Bundle and all release flags remain false. The observation editor still exports its standalone original with `mask: null`; the new wizard creates a separate normalized batch with the exact mask reference rather than mutating the source export.
+- **Next:** poll exact-head CI #2557. If it passes, inspect the browser artifact and add any needed regression fixes. Then extend the bundle contract to bind rights/camera/ground-control evidence only when those inputs exist; never synthesize missing evidence or turn this bundle into automatic publication.
+
+
+**D3M-01.A validation hardening checkpoint (2026-10-30):** browser bundle wizard now also validates observation IDs/categories/methods/status/visibility/confidence, geometry bounds, original-proposal source/view provenance and append-only review-history consistency before emitting the bundle. Static UI contract test covers the validation entry point. Latest PR #281 head is `598b2eb3e54d0e15fa2e9113910ab8ea546001b7` (17 paths, 1,633 additions vs development); exact-head CI #2563 / [run 41003170124](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41003170124) is pending. Earlier run #2557 was started on an earlier head and must not be used as validation for this SHA.
+
+
+**Latest exact-head checkpoint (2026-10-30):** browser end-to-end fixture was corrected to use a valid but hash-mismatched binary mask, and the wizard now validates observation batch ID/timestamp as well. Canonical PR #281 head is now `db3603b7f9280ba7e8aa9139c0dc9669d57295c5`, 17 changed paths / 1,635 additions against development. Exact-head CI #2569 / [run 41003359778](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41003359778) is pending; earlier run #2563 was cancelled after the head changed and cannot validate this SHA.
+
+
+### 10.13 D3M-01.B — rights, camera and ground-control evidence linkage (2026-10-30)
+
+**Status: implementation committed on canonical PR #281; exact-head CI pending. Not merged; not a release gate.**
+
+- Added `src/core/building-generation/source-bound-reconstruction-evidence.mjs` to link the per-view visual bundle to BRF-45 exact-asset rights records, camera calibration evidence and WGS84 ground-control evidence for one exact building/source/candidate-GLB tuple.
+- Rights linkage hashes the raw BRF-14 source manifest, BRF-45 rights register and BRF-45 validator report; checks source-manifest digest and exact source ID/SHA-256 across source view, rights row and validator report. It explicitly records that the rights validator report is linked but not recomputed by this module and does not authenticate grantor authority or legal permission.
+- Camera linkage verifies actual calibration-evidence bytes against declared SHA-256/size, binds each camera's calibration evidence ID/hash to the same building/source image and candidate GLB hash, and recomputes existing camera matrix/image-bounds/reprojection validation through `validateCameraProjectionEvidence`. Unverified calibration remains review-required.
+- Ground-control linkage verifies actual survey-evidence bytes, exact source-image and candidate-GLB hashes, requires each control point to reference a byte-verified evidence asset, and recomputes the existing WGS84 similarity registration through `registerModelToWgs84`. It retains the existing explicit limitation that vertical datum is not solved.
+- Added `tests/source-bound-reconstruction-evidence.test.mjs` for a valid synthetic linkage, stale rights-source-manifest hash, tampered camera evidence bytes, tampered survey evidence bytes, unaudited camera calibration and release-flag promotion attempts. Registered `test:source-bound-reconstruction-evidence` in package scripts and CI.
+- Canonical PR #281 branch `feat/brf06-observation-review-dev-20261030`, latest exact head `a89e0a0b6a3edb14a8d6fb7362ce7aa79c6b6e37`, 19 changed paths. CI for this exact head has not yet appeared at the time of this documentation update; do not infer success from the previous commit's green run.
+- The extension is a linkage/recomputation and review-preparation artifact only. It does not read or validate the GLB bytes, prove building identity, verify survey authority, authenticate human reviewers, solve vertical datum, establish architecture accuracy or authorize map placement/publication. Every policy/release flag remains false.
+- **Next:** wait for exact-head CI and fix any failing contract. Then define the explicit human review record and immutable decision flow; do not promote release flags. Afterward proceed to D3M-02 upload/intake UX only when the evidence contract is stable.
+
+
+**D3M-01.B exact-head CI correction checkpoint (2026-10-30):** first integration run [CI #2576](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072030603) failed only in the newly added evidence-linkage tests. The log identified a fixture variable typo (`groundControlManifestBytes` was not defined); the test was corrected to use the declared `groundManifestBytes`. The stale rights-report test was also corrected to assert a fail-closed blocked result rather than expecting an exception, and the unaudited-camera fixture now retains its byte-linked calibration artifact while asserting review-required status. Latest code head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; a fresh exact-head CI run has not appeared yet. Do not treat #2576 as passed.
+
+### 10.14 D3M-01.C — immutable candidate evidence hand-off planning (2026-10-30)
+
+**Tracking:** [Issue #283 — immutable evidence-bound candidate hand-off](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/283).
+
+**Dependency:** canonical implementation PR [#281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281), exact code head `21ad424b0f611b0274693c4a3c4f633b7548bedc). Exact-head CI #2581 / [run 41072445284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) was still **in progress** at the production-server viewport API/browser integration step (step 172); the source-bound reconstruction evidence unit test and all preceding steps were successful, but no full CI pass is claimed. PR #281 remains Draft/open/unmerged. Its parent mask-editor and observation changes must be reviewed as one combined candidate.
+
+**Architecture finding that governs the next implementation:** `runMediaToModelWorkflow()` creates the candidate at its `model-generation` stage and only then knows the actual GLB bytes/hash; `report-finalization` follows. D3M-01.B requires the candidate GLB SHA-256 in the camera and ground-control evidence. Therefore the evidence hand-off must bind *after* candidate creation and before downstream human review, geometry acceptance or placement. Do not attempt to pre-authorize a GLB that does not yet exist, and do not treat the linkage bundle as worker-dispatch permission.
+
+**D3M-01.C planned contract:** add a versioned, immutable candidate-evidence hand-off that recomputes the visual bundle, rights/camera/GCP evidence bundle, candidate GLB and QA report hashes from safe workspace files; cross-check exact building/job/source identities and upstream job artifacts; record an explicit review-only disposition; and fail closed on missing, stale or inconsistent inputs. The existing reconstruction job state already supports immutable stage artifacts and upstream artifact references, which should be reused rather than creating a parallel job store.
+
+**Trust boundary:** BRF-45 rights status remains human-review-required; calibration/GCP evidence needs independent review; vertical datum is not solved; a GLB container/hash check is not architectural accuracy. The hand-off must not create rights approval, human acceptance, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady` or `automaticApproval`. No code implementation, merge or branch promotion is included in this planning checkpoint.
+
+### 10.15 D3M-01.C — immutable candidate hand-off implementation and exact-head validation (2026-10-30)
+
+**Status: IMPLEMENTED ON STACKED DRAFT PR #284; exact-head CI PASS. Not merged; not human-accepted; not map-ready.**
+
+- Canonical code PR: [#284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/284), branch `feat/d3m01c-candidate-evidence-handoff-20261030`, exact head `dc326af772dce95484cd2565d581ed5f99744369`. It is stacked on parent PR #281's exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`; PR #281 exact-head CI #2581 / [run 41072445284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41072445284) passed. Both PRs remain Draft/open/unmerged.
+- Added `source-bound-reconstruction-handoff.mjs`, a versioned two-stage immutable child-job workflow. It reads only a completed media-to-model job and verifies its model-generation and report-finalization artifacts. It then recomputes exact bytes/hashes for the visual evidence bundle, D3M-01.B reconstruction evidence bundle, candidate GLB and QA report; cross-binds building/source/candidate/report identities; validates the GLB 2.0 container and requires the QA report to remain `completed-requires-review`.
+- The hand-off uses the existing reconstruction-job state/artifact mechanism, pins upstream artifact IDs and hashes, fingerprints inputs, reuses identical immutable outputs, and creates a distinct deterministic hand-off job identity when inputs differ. It rejects unsafe relative paths, symlink files and symlinked parent directories, malformed or oversized files, changed GLB/report bytes, unselected source views and invalid candidate structure.
+- Added CLI `prepare:source-bound-reconstruction-handoff`; registered the focused test and CI step. Exact-head [CI #41076263050](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41076263050) passed on the exact PR #284 head `dc326af772dce95484cd2565d581ed5f99744369`: 181/181 workflow steps successful. The focused hand-off suite recorded **11 tests, 11 passed, 0 failed**; lint, production build, full test chain and production-server/browser viewport integration also passed. P2.3–P2.6 and multi-tile viewport workflow artifacts were uploaded.
+- The prior initial PR run #41075856187 failed 3 focused test assertions. The failure causes were repaired (resume helper return value, mutate valid GLB JSON while preserving container, correct traversal/symlink rejection assertions); the subsequent exact-head run above is the validation result. Do not use the earlier failure as the final status or confuse it with the passing exact head.
+- **Security/accuracy boundary:** this validates byte identity/provenance and GLB container structure only; it does not establish geometry validity, physical building identity or architectural accuracy. Rights stay BRF-45 human-review-required; camera calibration and GCP physical correspondence/survey authority need human review; vertical datum remains unresolved. No worker dispatch, automatic approval, publication, activation or map insertion occurs. All truth/release flags plus `dispatchAllowed` remain false.
+- **Next:** human review of the complete PR #281 → #284 → #286 stack; provision and verify the trusted reviewer public-key registry and service token through deployment secrets; then implement D3M-01.E to make independent geometry/truth evaluation consume the signed review receipt without changing acceptance/publication gates.
+
+### 10.16 D3M-01.D — trusted-signer human review and candidate geometry evidence (2026-10-30)
+
+**Status: IMPLEMENTED; exact-head full CI PASS (182/182 workflow steps). PR #286 remains Draft/unmerged; no human acceptance or release promotion.**
+
+- Tracking: [Issue #285](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/285). Code: [PR #286](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/286), branch `feat/d3m01d-authenticated-geometry-review-20261030`, exact head `3e92b4be02d8f6bad6baec274887c148359ad8f7`. It is stacked on D3M-01.C PR #284 exact base `dc326af772dce95484cd2565d581ed5f99744369`; #284 itself depends on PR #281 exact head `21ad424b0f611b0274693c4a3c4f633b7548bedc`. All three code PRs remain Draft/open/unmerged.
+- Added `source-bound-authenticated-review.mjs`: reads the immutable D3M-01.C candidate hand-off, checks its active artifact and required source/candidate/report integrity checks, re-hashes the exact candidate GLB, and runs existing `analyzeGlbQuality()` under explicit file/vertex limits. It emits a deterministic geometry report hash bound to hand-off artifact SHA-256 and exact candidate SHA-256/byte count.
+- Added canonical Ed25519 review payload verification against a server-configured `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry. Registry accepts only unique reviewer IDs and unique Ed25519 public-key fingerprints; request bodies cannot provide/override trust keys. Reviewers sign canonical JSON bytes outside the server; the record states its identity assurance is possession of the private key mapped to a server-trusted reviewer ID, not proof of civil identity.
+- Added immutable two-stage authenticated-review child jobs storing the exact signed submission, signature, reviewer key fingerprint, source/handoff/candidate/geometry report hashes and reviewer decision. Identical signed re-submission reuses its immutable job; changed signed bytes create a distinct review record.
+- Decisions: `continue-to-independent-validation`, `changes-requested`, `hold`, `reject`. Continue is fail-closed unless all rights, same-building, camera, GCP, metric scale, vertical datum, geometry topology and source-camera checks are positively signed, GLB geometry QA is valid, and the D3M-01.C hand-off integrity/evidence checks are complete. It means only the next independent truth/geometry evaluation may proceed, not model acceptance or publication.
+- Added bounded authenticated API at `/api/building-generation/handoffs/[buildingId]/[handoffJobId]/review` with separate server token `GENERATION_EVIDENCE_REVIEW_API_TOKEN` and trusted public-key registry `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`; GET returns exact report + unsigned template, POST verifies signed payload. Added local packet CLI `prepare:source-bound-geometry-review`.
+- Exact-head CI: [run #41082811923](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41082811923), code head `3e92b4be02d8f6bad6baec274887c148359ad8f7` — **182/182 steps passed**. The focused D3M-01.D tests, ESLint, production build, Chromium installation and production-server viewport/browser integration all passed. Workflow artifacts were uploaded: multi-tile viewport workload, P2.3 camera-alignment evidence, P2.4 render-performance evidence, P2.5 repeatability evidence, P2.6 dynamic-map workload and Ahsan Manzil generated GLB. The prior TypeScript failure and focused-test corrections were fixed before this exact head.
+- **Security / claim boundary:** all output flags including `candidateGeometryValidated`, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain false. Geometry QA does not prove architectural fidelity, same-building identity, metric dimensions, survey or camera authority, WGS84 placement or held-out accuracy. A signature authenticates possession of a private key under the provisioned public-key trust registry only.
+- **Deployment prerequisite:** configure the dedicated API bearer token and reviewer public-key registry in server secrets/configuration. No reviewer private key belongs in this repository or server environment. A production reviewer registry is not yet provisioned/verified by this CI run.
+- **Next:** review the complete PR #281 → #284 → #286 → #288 stack and verify production provisioning/rotation of the reviewer public-key registry and service token. Keep all release gates closed until actual independent survey/reference evidence and human acceptance exist.
+
+
+### D3M-01.E — cryptographically re-verified review receipt as BRF-25 authorization (2026-10-30)
+
+Implementation is on stacked Draft [PR #288](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/288), [Issue #287](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/287), branch `feat/d3m01e-brf25-authenticated-review-gate-20261030`, current exact head `8bd2bc4c74bc57cd0375a256e9d97a31ab8baf7f`. Base is D3M-01.D PR #286 exact parent `3e92b4be02d8f6bad6baec274887c148359ad8f7`; PR #288 remains Draft/unmerged.
+
+- BRF-25 CLI now requires `--building-id` and `--review-job-id` plus the server-controlled `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry. Before candidate extraction or independent-truth evaluation it reads the immutable D3M-01.D review child job, revalidates the active artifact/job metadata, recomputes the D3M-01.C hand-off and geometry report from workspace bytes, reconstructs the signed canonical submission and verifies its Ed25519 signature against the current registry.
+- It accepts only `continue-to-independent-validation`. Missing receipt, unknown/rotated key, invalid signature, mismatched building / hand-off / candidate / geometry-report hash, incomplete job metadata, and all non-continue dispositions block before the prepared geometry manifest and evaluation report are produced.
+- The recomputed receipt and artifact hashes are included in the BRF-25 report. Continue authorizes independent evaluation only. It does not make independent references trustworthy, certify held-out checkpoints, pass an accuracy threshold or approve a model.
+- Regressions cover valid receipt, missing receipt, current-key rotation and signed `hold` at the runner boundary, plus receipt re-verification / wrong candidate / wrong building at the module boundary. The current code head is under full CI [run #41094817059](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41094817059); this run is in progress as of this documentation commit. Earlier exact-head attempts exposed and corrected a missing duplicate signature-hash assumption and a negative-test expectation for the missing-job path. Do not record D3M-01.E as CI-passed until a terminal success run for the final head is linked.
+- **Claim boundary:** all candidateGeometryValidated, independentReferenceVerified, heldOutCheckpointAccuracyVerified, groundTruth, acceptanceEligible, publicationEligible, publishable, mapReady, automaticApproval and dispatchAllowed flags remain false. CI test keys are ephemeral synthetic fixtures. No production reviewer registry, actual human signature, independent survey checkpoint or building-accuracy result is claimed.
+
+**Next:** complete exact-head CI, fix any regressions, record the terminal run, then verify all evaluator entry points (not only the CLI) cannot bypass this authorization gate. Keep #281 → #284 → #286 → #288 Draft/unmerged pending review.
+
+
+### D3M-01.E hardening — standalone evaluator entry point (2026-10-31)
+
+The first D3M-01.E implementation protected `scripts/run-brf25-geometry-validation.mjs`, but the repository also exposed `scripts/evaluate-independent-building-truth.mjs` directly through `npm run evaluate:independent-building-truth`. That direct CLI could create a metric report without going through BRF-25. This was identified as an authorization bypass and closed in the current PR #288 head.
+
+- The standalone evaluator CLI now requires `--workspace`, `--building-id`, `--review-job-id` and the server-controlled `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry. It verifies the immutable D3M-01.D job/artifact and signature against the actual candidate GLB SHA before source replay or metric computation. Missing/invalid receipt writes a blocked, metrics-withheld report and exits non-zero.
+- BRF-25 propagates the same workspace/building/review-job binding to its evaluator subprocess; the evaluator independently re-verifies the receipt rather than trusting its parent runner's success string.
+- The exported `evaluateIndependentBuildingTruth()` remains a low-level pure in-memory metric kernel, not a source-authenticated workflow entry point. Its documentation and output explicitly keep geometry/truth/held-out/release flags false; only the source-bound CLI performs reviewer authentication and source-byte replay before calling it.
+- The new CLI regressions cover valid signed receipt, missing receipt, current key rotation, building mismatch and a candidate whose bytes no longer match the signed hand-off. BRF-25 runner regressions continue to cover missing receipt, key rotation and non-continue decisions before extraction.
+- Exact code head: `4d69948d32dec9c01b6a9482dc605b5feb2fe46d`; full CI [run #41159581178](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41159581178) was in progress at this documentation update. Do not mark the bypass hardening CI-passed until a terminal success for this exact head.
+- All candidate geometry validation, independent-reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready and dispatch flags remain false. No production reviewer registry or real human signature is claimed.
+
+**Next:** finish exact-head CI, inspect the test logs for both direct evaluator and BRF-25 caller paths, then audit all other commands that can write an independent-truth report. Keep #281 → #284 → #286 → #288 Draft/unmerged.
+
+
+### D3M-01.E extraction-entrypoint hardening follow-up (2026-10-31)
+
+The independent-truth preparation CLI `scripts/prepare-independent-building-truth-manifest.mjs` is also a direct GLB geometry-extraction entry point. It now independently requires the same D3M-01.D signed reviewer receipt, building ID, review job ID, workspace and current trusted-key registry before extracting candidate geometry. The BRF-25 runner passes the verified context to both the preparer and the evaluator subprocess; each subprocess re-verifies the immutable receipt rather than relying on a parent-process Boolean. Tests in the geometry-preparation CLI fixture now create synthetic signed D3M-01.D records and cover missing receipt and rotated-key rejection. Current code head: `5c4886630279b2d6684dd19c61b261f416c6b58a`; exact-head CI [#41159947313](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41159947313) was still in progress at the time of this documentation commit, during dependency installation. No new CI pass is claimed. All truth/accuracy/acceptance/publication/map-ready/dispatch flags remain false.
+
+
+### D3M-01.E — direct GLB-preparation entry point secured (2026-10-31)
+
+A further bypass was found after gating the standalone evaluator: `scripts/prepare-independent-building-truth-manifest.mjs` can itself extract GLB geometry and write a prepared truth manifest. It now enforces the exact workspace/building/D3M-01.D review-job context and re-verifies the immutable signed reviewer decision against the current trusted-key registry before geometry extraction. BRF-25 passes the same receipt context to both the preparation CLI and the evaluator CLI; each subprocess verifies independently.
+
+The direct preparation CLI regression fixture now stages the real signer/job-state/handoff/geometry-QA modules and tests missing receipts and current-key rotation. A duplicate config/building ID declaration found while enabling this gate was removed by distinguishing the caller-bound building ID from the config ID. The evaluator blocked-report newline and stale-candidate tests were also corrected to reflect authorization being checked before replay.
+
+Latest code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64`; exact-head CI [#41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951) is in progress. Earlier attempts failed or were superseded; do not claim the current hardening passed until that exact-head run completes successfully. All geometry/truth/held-out/release flags remain false.
+
+
+### D3M-01.E direct-entrypoint hardening — exact-head CI validated (2026-10-31)
+
+The signed-review authorization requirement now covers all three executable workflow entry points discovered in the repository audit: the BRF-25 parent runner, the standalone GLB preparation CLI, and the standalone independent-truth evaluation CLI. The BRF-25 runner passes the exact workspace/building/review-job context to both child commands; each child independently verifies the immutable D3M-01.D decision, candidate binding and Ed25519 signature against the current trusted-key registry. The low-level in-memory metric function is explicitly a non-authorizing kernel.
+
+Regression coverage verifies missing receipts, trusted-key rotation, wrong building identity, stale candidate bytes, replay mismatch and non-continue reviewer decisions. **Exact code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64` passed CI run [#41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951): 182/182 workflow steps successful, zero failures.** This includes independent-truth metrics/replay, D3M-01.E authorization tests, BRF-25 runner CLI, standalone evaluator CLI, production build and production-server viewport verification.
+
+The successful run validates test and workflow behaviour only. It does not provision a production reviewer key registry, prove an actual human's civil identity or legal authority, establish survey rights/accuracy, validate the candidate building geometry, or approve publication. All candidate geometry validation, independent reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags remain false.
+
+**Remaining:** obtain a real governed reviewer trust registry and a real source/measurement-backed review; continue held-out building accuracy and visual validation. Keep PR #288 and docs PR #279 Draft/unmerged pending human review.
+
+
+### D3M-01.F — governed production reviewer-key registry (2026-10-31)
+
+Implementation is on stacked Draft [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290), tracked by [Issue #289](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/289). The new code branch is \`feat/d3m01f-governed-reviewer-registry-20261031\`; latest implementation commit at this documentation update is \`89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0\`. PR #290 is based on D3M-01.E PR #288 exact parent \`03c8f4fcf213c7f1201d55a55cee6802fec9bd64\`. No merge or branch promotion is performed.
+
+- Production parsing requires a versioned \`reconstruction-trusted-reviewer-key-registry\` envelope. The old reviewerId/publicKeyPem array remains available only outside production.
+- Registry and key timestamps use canonical UTC milliseconds. Registry lifetime is capped at 90 days; active key windows must currently be valid and cannot outlive the registry.
+- Key records have unique IDs, explicit active/revoked states and SHA-256 fingerprints. Exactly one active key per reviewer is allowed. A replacement must name a prior revoked key for the same reviewer and cannot activate before revocation.
+- Revoked records are retained in the registry but excluded from verifier keys. An all-revoked registry produces zero verifier keys as an emergency lockout. The signed review timestamp must be within the signing key's validity window.
+- Registry/key IDs, fingerprints, validity windows and registry provenance are bound into immutable review job metadata and the D3M-01.E verification receipt. The signed review payload remains unchanged.
+- Added \`building-generation-trusted-reviewer-registry.schema.json\`, the \`test:source-bound-authenticated-review\` suite extension and a dedicated CI step. The schema contains public-key fields only.
+
+Operator lifecycle, secret-manager handling, onboarding, rotation, emergency revocation, renewal and limitations are documented in [D3M-01.F Trusted Reviewer Registry Operations](./D3M-01F-TRUSTED-REVIEWER-REGISTRY-OPERATIONS.md).
+
+**Validation:** code head \`89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0\` has been pushed to the Draft PR branch. Exact-head CI is required; do not mark it passed until the current run is terminal success. Docs PR #279 must also receive exact-head CI for this update.
+
+**Not claimed:** no real reviewer identity/authority, production secret, public key or private key is provisioned. Synthetic fixture keys are test-only. Production deployment configuration is an external operator dependency. All candidate geometry, independent reference, held-out checkpoint, ground truth, acceptance, publication, map-ready, automatic approval and dispatch flags remain false.
+
+**Next:** complete exact-head CI, then have the deployment operator provision a real public-key-only registry through the production secret manager and independently verify its reviewer onboarding/rotation procedures. A governed registry alone does not establish building accuracy; held-out survey controls and visual review remain separate.
+
+
+**D3M-01.F CI correction checkpoint (2026-10-31):** The first exact-head run [#41163003092](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163003092) on `6ef7524814cc7cc7386160eaec89ada75b46b54f` failed one existing compatibility assertion because the unknown-reviewer message wording had changed; 29/30 signed-review/registry tests passed, including the registry lifecycle tests. The old error-message contract is now preserved, the production-only legacy-format rejection has a direct regression, and reviewer fingerprint/key/registry validity provenance is included in the immutable decision-stage fingerprint. Corrected code head is `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`; exact-head full CI [#41163305030](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163305030) is running. No pass is claimed pending terminal result.
+
+
+**D3M-01.F schema contract correction (2026-10-31):** A further contract audit found the published JSON Schema's canonical UTC timestamp regex had an extra escape, even though the runtime parser enforced canonical UTC timestamps correctly. The schema regex now matches exactly one literal decimal point, and `tests/trusted-reviewer-registry.test.mjs` loads the published schema and verifies canonical and malformed timestamp examples. Latest code head is `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`; exact-head CI run [#41163682609](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163682609) has been queued. No overall CI pass is claimed until it completes.
+
+
+## D3M-01.F — terminal exact-head validation and next external gates (2026-10-31)
+
+**Terminal CI correction:** the earlier note above that described run #41163682609 as queued is superseded. GitHub now reports [run #41163682609](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163682609) as **completed / success** on the exact D3M-01.F code head `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`. All workflow jobs and steps completed successfully, including the dedicated signed-review/trusted-reviewer-registry tests, independent-truth and BRF-25 validation suites, production build, production-server viewport verification and evidence uploads.
+
+The documentation candidate at the then-current head `30153db0c743cd900c78b02802fb64c06e17b367` also passed [docs CI run #41163793071](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41163793071). This note is a new documentation change, so the updated docs head must receive its own exact-head CI result before this docs PR can be considered validated.
+
+**Stack / branch state observed on 2026-10-31:**
+- #281 (BRF-05/06 and D3M-01.B) remains Draft/open/unmerged on `development`.
+- #284 (D3M-01.C) is stacked on #281; #286 (D3M-01.D) is stacked on #284; #288 (D3M-01.E) is stacked on #286; #290 (D3M-01.F) is stacked on #288.
+- #290 base is exactly #288 head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64`; #290 exact head is `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`.
+- All of these PRs remain Draft/open/unmerged. No promotion to `development` or `main` is authorized by CI success. Do not merge child PRs independently of their parent stack.
+
+**Production trust anchor — not provisioned:** implementation and operator runbook exist, but no real reviewer has been onboarded and no production `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` deployment secret has been created or verified. The deployment operator must independently verify the reviewer's identity, role and authority; the reviewer retains their private Ed25519 key; only the public-key registry is supplied through the production secret manager. Do not create synthetic production identities, place private keys in Git/CI, or log the registry secret. The runbook remains the authoritative operator procedure.
+
+**Independent measurement — not run:** no exact rights-cleared same-building source pairing, independently authenticated survey/reference geometry, confirmed evaluation frame/vertical datum, platform-generated candidate GLB, or genuinely held-out checkpoint pack has been admitted for a real-building accuracy result. The evaluator and receipt-protected CLI paths are software-validated only. Do not convert synthetic fixtures, photogrammetric source-to-source comparisons, or generated reference models into a real accuracy claim.
+
+**Next execution order:**
+1. Deployment operator completes reviewer identity/authority checks and provisions the versioned public-key-only registry out of band; verify only non-secret registry/key IDs and public-key fingerprints.
+2. Resolve exact asset-level rights and same-physical-building linkage for a candidate benchmark; reconcile the GT-LOD3 README vs Gold Coast STAC licence discrepancy and the blank TUM2TWIN/Zenodo licence field before using those files for commercial product validation.
+3. Obtain independent metric reference geometry, documented horizontal/vertical frame and uncertainty, separate fit controls, and at least six genuinely held-out checkpoints.
+4. Generate and hash the candidate through this platform's own reconstruction path, then run the signed-review-gated preparation and independent-truth evaluation CLIs and human-review the exact evidence report.
+
+Until those external inputs and reviews pass, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain false.
+
+## D3M-01.G — secret-safe reviewer registry preflight (2026-10-31)
+
+The implementation is in stacked Draft [PR #292](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/292) / [Issue #291](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/291), based on the D3M-01.F code head `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`.
+
+The preflight reads only `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`, requires production mode, rejects legacy/malformed/oversized registry input, suppresses parser details and all reviewer identity/private-key/PEM/raw-registry output, and has deterministic exit codes (0 valid active registry, 2 invalid or missing configuration, 3 valid all-revoked lockout). It reports only non-secret registry/key identifiers, counts, validity and public-key fingerprints. Eight subprocess cases cover valid, command-line-secret rejection, lockout, missing input, non-production, malformed/legacy, oversize and private-key redaction.
+
+**Exact code-head validation:** [PR CI run #41168856857](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168856857) completed successfully on `027734fcb37a0a6a19faed9dcc9ff34848a8382c`. The full CI job passed, including both D3M-01.G test/help steps, lint, production build, benchmark/evidence gate regressions and production-server viewport verification.
+
+**Documentation and intake baseline:** the documentation PR's previous exact head `c3b24555de2717f851e5ee54d532c4019bfe9ff4` passed [docs CI #41168886817](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168886817) and [BRF-14 source-byte intake #41168886816](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168886816). The BRF-14 run's 16 pinned candidate-view download/verification job succeeded. Any follow-up documentation commit requires its own exact-head CI.
+
+**Still external / not provisioned:** no production secret-manager value, genuine reviewer identity/authority verification or actual reviewer onboarding was performed. The CLI is a local/deployment-operator preflight only; it cannot read or configure a hosted secret store. Do not paste production registry data into chat, Git, CI logs or issue comments. Keep all ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
+
+**Next:** deployment operator completes the out-of-band reviewer identity/authority check and provisions the public-key-only registry through the production secret manager; run the preflight in that deployment environment and record only its sanitized output. Independently, BRF-29 exact-asset licensing and same-building/independent-survey admission remain blocked; no dataset reuse or building-accuracy claim is authorized by these CI results.
+
+
+## BRF-14 — immutable image-data revision pin (2026-10-31)
+
+Tracking: [Issue #293](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/293) · [Draft PR #294](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/294).
+
+The BRF-14 sixteen-view sample no longer points at mutable Hugging Face `resolve/main` URLs. It now declares a separate immutable Hugging Face data revision `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f`; the GitHub metadata/inventory/checksum/COLMAP repository remains independently pinned at `19b3ce9cccf3e8fd414ff705f75d0f2105846fc1`. BRF-45 carries both identities and its validator rejects data-revision drift at source-manifest and per-asset level. BRF-42 private intake checks that the prior verification report and fresh byte rehash carry the same data revision.
+
+**Exact code head:** `3897523a88bd6a868e90deef0339aa0c985ca3e5` (branch `feat/brf14-pin-hf-revision-20261031`, based on `development` `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`).
+
+**Dedicated workflow evidence on that head:**
+- [BRF-14 run #41170936404](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936404): success; 16/16 image downloads matched actual byte sizes and SHA-256 hashes at the immutable data revision; BRF-42 private intake/quality tests and downstream private intake step passed.
+- [BRF-45 run #41170936394](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936394): success; actual sample remains blocked because each asset's scoped grant evidence is still pending.
+- [BRF-16 run #41170936442](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936442) and [BRF-18 run #41170936439](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936439): success.
+
+**Full CI:** [run #41170936398](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936398) is still in progress on this exact head; do not claim a terminal pass until its conclusion is `success`. PR #294 remains Draft/open/unmerged. Do not promote to `development` or `main` without exact-head full CI and human review.
+
+This source-stage validates immutable provenance and source bytes only. It does not authenticate an exact-asset rights grant or provide independent surveyed truth. The upstream AprilTag scale bar belongs to the source reconstruction and is not independent held-out geometry truth. Keep ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
+
+
+## BRF-47 — cross-role source/candidate asset identity (2026-10-31)
+
+Tracking: [Issue #295](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/295) · [Draft PR #296](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/296).
+
+A targeted BRF-35 audit found that source asset IDs were unique only within some individual role lists, while candidate GLB byte identity was compared to the CityGML reference alone. The new gate requires globally unique valid asset IDs across CityGML, image frames, ULS crop and survey controls; it also requires the platform candidate GLB asset ID and SHA-256 to differ from every source/reference asset.
+
+Exact code head: `70044847e0c0f84db6991c8bce20726ba3a65870`, branch `feat/brf47-cross-role-asset-identity-20261031`, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`. Focused BRF-35 workflow [#41172052374](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41172052374) passed 8/8 steps. Full CI [#41172052362](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41172052362) is still running at production build; no terminal pass is claimed yet.
+
+Real BRF-35 manifest remains blocked: zero image frames, no ULS crop, no survey controls, rights pending, no approved vertical frame/operation, no platform candidate GLB. This code only removes asset-identity ambiguity; it does not create or approve any real evidence. PR #296 remains Draft/open/unmerged. Keep all acceptance/publication/map-ready/automatic-approval gates false.
