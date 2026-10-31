@@ -47,7 +47,7 @@ function run(script,root,args){return spawnSync(process.execPath,[script,...args
 test("prepares a manifest from exact GLB bytes and independently supplied reference JSON",async t=>{
   const {root}=await setup(t);
   const prepared=run(prepSource,root,["configs/evaluation.json","prepared.json"]);
-  assert.equal(prepared.status,0,prepared.stderr);
+  assert.equal(prepared.status,0,JSON.stringify({stderr:prepared.stderr,stdout:prepared.stdout},null,2));
   const manifest=JSON.parse(await readFile(path.join(root,"prepared.json"),"utf8"));
   assert.equal(manifest.candidate.glbSha256,hash(await readFile(path.join(root,"evidence/candidate.glb"))));
   assert.equal(manifest.candidate.geometryExtractionSummary.sourceVertexCount,8);
