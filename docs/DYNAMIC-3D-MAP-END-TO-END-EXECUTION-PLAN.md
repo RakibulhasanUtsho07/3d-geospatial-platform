@@ -779,3 +779,23 @@ Regression coverage verifies missing receipts, trusted-key rotation, wrong build
 The successful run validates test and workflow behaviour only. It does not provision a production reviewer key registry, prove an actual human's civil identity or legal authority, establish survey rights/accuracy, validate the candidate building geometry, or approve publication. All candidate geometry validation, independent reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags remain false.
 
 **Remaining:** obtain a real governed reviewer trust registry and a real source/measurement-backed review; continue held-out building accuracy and visual validation. Keep PR #288 and docs PR #279 Draft/unmerged pending human review.
+
+
+### D3M-01.F — governed production reviewer-key registry (2026-10-31)
+
+Implementation is on stacked Draft [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290), tracked by [Issue #289](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/289). The new code branch is \`feat/d3m01f-governed-reviewer-registry-20261031\`; latest implementation commit at this documentation update is \`6ef7524814cc7cc7386160eaec89ada75b46b54f\`. PR #290 is based on D3M-01.E PR #288 exact parent \`03c8f4fcf213c7f1201d55a55cee6802fec9bd64\`. No merge or branch promotion is performed.
+
+- Production parsing requires a versioned \`reconstruction-trusted-reviewer-key-registry\` envelope. The old reviewerId/publicKeyPem array remains available only outside production.
+- Registry and key timestamps use canonical UTC milliseconds. Registry lifetime is capped at 90 days; active key windows must currently be valid and cannot outlive the registry.
+- Key records have unique IDs, explicit active/revoked states and SHA-256 fingerprints. Exactly one active key per reviewer is allowed. A replacement must name a prior revoked key for the same reviewer and cannot activate before revocation.
+- Revoked records are retained in the registry but excluded from verifier keys. An all-revoked registry produces zero verifier keys as an emergency lockout. The signed review timestamp must be within the signing key's validity window.
+- Registry/key IDs, fingerprints, validity windows and registry provenance are bound into immutable review job metadata and the D3M-01.E verification receipt. The signed review payload remains unchanged.
+- Added \`building-generation-trusted-reviewer-registry.schema.json\`, the \`test:source-bound-authenticated-review\` suite extension and a dedicated CI step. The schema contains public-key fields only.
+
+Operator lifecycle, secret-manager handling, onboarding, rotation, emergency revocation, renewal and limitations are documented in [D3M-01.F Trusted Reviewer Registry Operations](./D3M-01F-TRUSTED-REVIEWER-REGISTRY-OPERATIONS.md).
+
+**Validation:** code head \`6ef7524814cc7cc7386160eaec89ada75b46b54f\` has been pushed to the Draft PR branch. Exact-head CI is required; do not mark it passed until the current run is terminal success. Docs PR #279 must also receive exact-head CI for this update.
+
+**Not claimed:** no real reviewer identity/authority, production secret, public key or private key is provisioned. Synthetic fixture keys are test-only. Production deployment configuration is an external operator dependency. All candidate geometry, independent reference, held-out checkpoint, ground truth, acceptance, publication, map-ready, automatic approval and dispatch flags remain false.
+
+**Next:** complete exact-head CI, then have the deployment operator provision a real public-key-only registry through the production secret manager and independently verify its reviewer onboarding/rotation procedures. A governed registry alone does not establish building accuracy; held-out survey controls and visual review remain separate.

@@ -418,3 +418,12 @@ The previously discovered direct-entrypoint gaps are closed in code: BRF-25, the
 Test coverage includes missing receipt, changed trusted key, wrong building, stale GLB, altered inline geometry and deterministic source-replay failure, plus non-continue review decisions. **Exact code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64` is CI-green: [run #41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951), 182/182 successful steps, zero failures.** The passing run includes the four relevant test suites, production build and production-server viewport verification.
 
 Limitations remain: this does not configure a real production trust registry or authenticate a signer's civil identity/legal authority; it does not prove survey rights, source truth, held-out accuracy or visual model correctness. All truth and release gates remain false. Next work is real governed reviewer onboarding and independent, measurement-backed held-out validation.
+
+
+## D3M-01.F — production reviewer trust registry operations (2026-10-31)
+
+The D3M-01.F implementation is in stacked Draft [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290) / [Issue #289](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/289). It hardens the server-side Ed25519 reviewer registry with a versioned schema, bounded registry/key validity, explicit revocation, unique key IDs/fingerprints, single-active-key enforcement and auditable replacement lineage. Production rejects the legacy array format; local development/test compatibility remains.
+
+The code now supports a zero-active-key emergency lockout, but signing and receipt verification fail closed when no active key exists. The signed submission format is unchanged. Registry/key IDs and validity provenance are bound to immutable review records. See [D3M-01.F Operations](./D3M-01F-TRUSTED-REVIEWER-REGISTRY-OPERATIONS.md) for onboarding, rotation, emergency revocation, renewal and secret-manager handling.
+
+**External dependency:** a deployment operator must provision the real registry and confirm reviewer identity/authority out of band. No real key, secret, personal identity or reviewer has been created in this code task. Exact-head CI on PR #290 is still required. No geometry/truth/release flags change.

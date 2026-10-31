@@ -343,3 +343,12 @@ All identified executable paths that can prepare geometry or compute independent
 Regression coverage includes absent receipt, rotated/replaced reviewer key, building mismatch, stale candidate bytes, source-to-geometry replay mismatch, and hold/changes-requested denial. **Exact code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64` passed [CI #41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951): 182/182 steps passed, 0 failures.** Independent-truth/replay, D3M-01.E authorization, BRF-25 CLI, direct evaluator CLI, production build, and production-server viewport verification all completed successfully.
 
 This CI pass is not a real building-accuracy result or production security deployment. No production signer registry/identity proof, rights determination, reference-survey authentication or real human signature is claimed. Geometry/truth/held-out/acceptance/publication/map-ready/automatic-approval/dispatch flags all remain false. Next: governed production trust-anchor setup plus real independent survey and held-out checkpoints. PR #288 remains Draft/unmerged.
+
+
+## D3M-01.F — production reviewer trust registry operations (2026-10-31)
+
+The D3M-01.F implementation is in stacked Draft [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290) / [Issue #289](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/289). It hardens the server-side Ed25519 reviewer registry with a versioned schema, bounded registry/key validity, explicit revocation, unique key IDs/fingerprints, single-active-key enforcement and auditable replacement lineage. Production rejects the legacy array format; local development/test compatibility remains.
+
+The code now supports a zero-active-key emergency lockout, but signing and receipt verification fail closed when no active key exists. The signed submission format is unchanged. Registry/key IDs and validity provenance are bound to immutable review records. See [D3M-01.F Operations](./D3M-01F-TRUSTED-REVIEWER-REGISTRY-OPERATIONS.md) for onboarding, rotation, emergency revocation, renewal and secret-manager handling.
+
+**External dependency:** a deployment operator must provision the real registry and confirm reviewer identity/authority out of band. No real key, secret, personal identity or reviewer has been created in this code task. Exact-head CI on PR #290 is still required. No geometry/truth/release flags change.
