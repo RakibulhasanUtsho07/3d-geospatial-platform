@@ -24,6 +24,18 @@ async function setup(t){
     await readFile(fileURLToPath(new URL("../src/core/building-generation/independent-reference-geometry-adapter.mjs",import.meta.url))));
   await writeFile(path.join(root,"src/core/building-generation/geometry-extraction-provenance.mjs"),
     await readFile(fileURLToPath(new URL("../src/core/building-generation/geometry-extraction-provenance.mjs",import.meta.url))));
+  for (const name of [
+    "source-bound-authenticated-review.mjs",
+    "reconstruction-job-state.mjs",
+    "source-bound-reconstruction-handoff.mjs",
+    "glb-geometry-qa.mjs",
+    "mesh-topology-qa.mjs",
+  ]) {
+    await writeFile(
+      path.join(root,"src/core/building-generation",name),
+      await readFile(fileURLToPath(new URL("../src/core/building-generation/"+name,import.meta.url))),
+    );
+  }
   const glb=createBuildingGlb(),reference=Buffer.from(JSON.stringify(
     surveyGeometryDocument({coordinateFrameId:"survey-local-frame-v1",localCoordinates:true}),null,2)+"\n");
   await writeFile(path.join(root,"evidence/candidate.glb"),glb);await writeFile(path.join(root,"evidence/survey.json"),reference);
