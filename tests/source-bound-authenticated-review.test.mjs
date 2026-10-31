@@ -573,3 +573,40 @@ test("does not allow hold or changes-requested receipts to authorize BRF-25", as
     trustedReviewerKeys: registry,
   }), /requires a signed continue-to-independent-validation decision/);
 });
+
+
+test("rejects a reviewer signature timestamp outside the configured key validity window", async (t) => {
+  const root = await workspace(t);
+  await createHandoff(root);
+  const keys = makeKeys();
+  const { submission } = await prepareSubmission(root, {
+    reviewedAtUtc: "2026-10-30T15:05:00.000Z",
+  });
+  const registry = parseTrustedReconstructionReviewerKeys({
+    schemaVersion: "1.0.0",
+    recordType: "reconstruction-trusted-reviewer-key-registry",
+    registryId: "production-reviewers-test",
+    issuedAtUtc: "2026-10-31T03:00:00.000Z",
+    expiresAtUtc: "2026-11-30T03:00:00.000Z",
+    entries: [{
+      reviewerId: "reviewer-01",
+      keyId: "key-valid-after-review",
+      status: "active",
+      publicKeyPem: keys.publicKeyPem,
+      validFromUtc: "2026-10-31T03:00:00.000Z",
+      validUntilUtc: "2026-11-30T03:00:00.000Z",
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  }, { now: "2026-10-31T03:01:00.000Z", allowLegacy: false });
+
+  await assert.rejects(recordSourceBoundAuthenticatedReview({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    handoffJobId: "handoff-test-01",
+    submission,
+    signatureBase64: signSubmission(submission, keys.privateKey),
+    trustedReviewerKeys: registry,
+    now: "2026-10-31T03:02:00.000Z",
+  }), /outside the trusted reviewer key validity window/i);
+});

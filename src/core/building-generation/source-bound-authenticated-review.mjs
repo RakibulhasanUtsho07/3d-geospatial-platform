@@ -362,7 +362,7 @@ export async function prepareSourceBoundGeometryReview({ workspaceRoot, building
 export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
   const now = options.now === undefined ? new Date() : new Date(options.now);
   if (!Number.isFinite(now.getTime())) throw new TypeError("Trusted reviewer registry validation time must be a valid date.");
-  const allowLegacy = options.allowLegacy ?? process.env.NODE_ENV !== "production";
+  const allowLegacy = process.env.NODE_ENV === "production" ? false : options.allowLegacy !== false;
   let registry = input;
   if (typeof input === "string") {
     try {
@@ -409,6 +409,8 @@ export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
         registryId: "development-legacy-array",
         validFromUtc: null,
         validUntilUtc: null,
+        registryIssuedAtUtc: null,
+        registryExpiresAtUtc: null,
         publicKey,
         publicKeyFingerprintSha256: fingerprint,
       });
@@ -559,6 +561,8 @@ export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
       registryId: registry.registryId,
       validFromUtc: registry.entries.find((item) => item.keyId === entry.keyId).validFromUtc,
       validUntilUtc: registry.entries.find((item) => item.keyId === entry.keyId).validUntilUtc,
+      registryIssuedAtUtc: registry.issuedAtUtc,
+      registryExpiresAtUtc: registry.expiresAtUtc,
       publicKey: entry.publicKey,
       publicKeyFingerprintSha256: entry.publicKeyFingerprintSha256,
     }));
@@ -667,6 +671,14 @@ function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) 
       : "reviewerId maps to multiple active keys; the registry must be corrected.");
   }
   const trusted = trustedMatches[0];
+  if (trusted.validFromUtc && trusted.validUntilUtc) {
+    const reviewedAt = Date.parse(submission.reviewedAtUtc);
+    if (!Number.isFinite(reviewedAt) ||
+        reviewedAt < Date.parse(trusted.validFromUtc) ||
+        reviewedAt >= Date.parse(trusted.validUntilUtc)) {
+      throw new Error("reviewedAtUtc is outside the trusted reviewer key validity window.");
+    }
+  }
 
   const payloadBytes = canonicalSourceBoundReviewSubmissionBytes(submission);
   let signatureValid = false;
@@ -688,6 +700,8 @@ function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) 
     registryId: trusted.registryId ?? "development-legacy-array",
     validFromUtc: trusted.validFromUtc ?? null,
     validUntilUtc: trusted.validUntilUtc ?? null,
+    registryIssuedAtUtc: trusted.registryIssuedAtUtc ?? null,
+    registryExpiresAtUtc: trusted.registryExpiresAtUtc ?? null,
     publicKeyFingerprintSha256: trusted.publicKeyFingerprintSha256,
   };
 }
@@ -782,6 +796,8 @@ export async function recordSourceBoundAuthenticatedReview({
     reviewerRegistryId: signature.registryId,
     reviewerKeyValidFromUtc: signature.validFromUtc,
     reviewerKeyValidUntilUtc: signature.validUntilUtc,
+    reviewerRegistryIssuedAtUtc: signature.registryIssuedAtUtc,
+    reviewerRegistryExpiresAtUtc: signature.registryExpiresAtUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     signedPayloadSha256: signature.payloadSha256,
     signatureSha256: signature.signatureSha256,
@@ -793,6 +809,7 @@ export async function recordSourceBoundAuthenticatedReview({
     reviewerKeyId: signature.keyId,
     reviewerRegistryId: signature.registryId,
     reviewerKeyValidUntilUtc: signature.validUntilUtc,
+    reviewerRegistryExpiresAtUtc: signature.registryExpiresAtUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     candidateGeometryValidated: false,
     groundTruth: false,
@@ -865,6 +882,8 @@ export async function recordSourceBoundAuthenticatedReview({
       reviewerRegistryId: signature.registryId,
       reviewerKeyValidFromUtc: signature.validFromUtc,
       reviewerKeyValidUntilUtc: signature.validUntilUtc,
+      reviewerRegistryIssuedAtUtc: signature.registryIssuedAtUtc,
+      reviewerRegistryExpiresAtUtc: signature.registryExpiresAtUtc,
       reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
       signedPayloadSha256: signature.payloadSha256,
       signatureAlgorithm: "Ed25519",
@@ -1049,6 +1068,8 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   requireMetadata("source-manifest-registry-id", sourceManifest?.reviewerRegistryId === authentication?.reviewerRegistryId);
   requireMetadata("source-manifest-key-valid-from", sourceManifest?.reviewerKeyValidFromUtc === authentication?.reviewerKeyValidFromUtc);
   requireMetadata("source-manifest-key-valid-until", sourceManifest?.reviewerKeyValidUntilUtc === authentication?.reviewerKeyValidUntilUtc);
+  requireMetadata("source-manifest-registry-issued-at", sourceManifest?.reviewerRegistryIssuedAtUtc === authentication?.reviewerRegistryIssuedAtUtc);
+  requireMetadata("source-manifest-registry-expires-at", sourceManifest?.reviewerRegistryExpiresAtUtc === authentication?.reviewerRegistryExpiresAtUtc);
   requireMetadata("source-manifest-key-fingerprint", sourceManifest?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
   requireMetadata("source-manifest-signed-payload-hash", sourceManifest?.signedPayloadSha256 === authentication?.signedPayloadSha256);
   requireMetadata("job-config-review-contract", jobConfig?.reviewContractVersion === REVIEW_SCHEMA_VERSION);
@@ -1057,6 +1078,7 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   requireMetadata("job-config-key-id", jobConfig?.reviewerKeyId === authentication?.reviewerKeyId);
   requireMetadata("job-config-registry-id", jobConfig?.reviewerRegistryId === authentication?.reviewerRegistryId);
   requireMetadata("job-config-key-valid-until", jobConfig?.reviewerKeyValidUntilUtc === authentication?.reviewerKeyValidUntilUtc);
+  requireMetadata("job-config-registry-expires-at", jobConfig?.reviewerRegistryExpiresAtUtc === authentication?.reviewerRegistryExpiresAtUtc);
   requireMetadata("job-config-key-fingerprint", jobConfig?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
   for (const flag of ["candidateGeometryValidated", "groundTruth", "acceptanceEligible", "publicationEligible", "publishable", "mapReady", "automaticApproval", "dispatchAllowed"]) {
     requireMetadata("job-config-" + flag + "-false", jobConfig?.[flag] === false);
@@ -1133,6 +1155,8 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
     reviewerRegistryId: signature.registryId,
     reviewerKeyValidFromUtc: signature.validFromUtc,
     reviewerKeyValidUntilUtc: signature.validUntilUtc,
+    reviewerRegistryIssuedAtUtc: signature.registryIssuedAtUtc,
+    reviewerRegistryExpiresAtUtc: signature.registryExpiresAtUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     signedPayloadSha256: signature.payloadSha256,
     signatureSha256: signature.signatureSha256,
