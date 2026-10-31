@@ -740,3 +740,17 @@ Implementation is on stacked Draft [PR #288](https://github.com/RakibulhasanUtsh
 - **Claim boundary:** all candidateGeometryValidated, independentReferenceVerified, heldOutCheckpointAccuracyVerified, groundTruth, acceptanceEligible, publicationEligible, publishable, mapReady, automaticApproval and dispatchAllowed flags remain false. CI test keys are ephemeral synthetic fixtures. No production reviewer registry, actual human signature, independent survey checkpoint or building-accuracy result is claimed.
 
 **Next:** complete exact-head CI, fix any regressions, record the terminal run, then verify all evaluator entry points (not only the CLI) cannot bypass this authorization gate. Keep #281 → #284 → #286 → #288 Draft/unmerged pending review.
+
+
+### D3M-01.E hardening — standalone evaluator entry point (2026-10-31)
+
+The first D3M-01.E implementation protected `scripts/run-brf25-geometry-validation.mjs`, but the repository also exposed `scripts/evaluate-independent-building-truth.mjs` directly through `npm run evaluate:independent-building-truth`. That direct CLI could create a metric report without going through BRF-25. This was identified as an authorization bypass and closed in the current PR #288 head.
+
+- The standalone evaluator CLI now requires `--workspace`, `--building-id`, `--review-job-id` and the server-controlled `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` registry. It verifies the immutable D3M-01.D job/artifact and signature against the actual candidate GLB SHA before source replay or metric computation. Missing/invalid receipt writes a blocked, metrics-withheld report and exits non-zero.
+- BRF-25 propagates the same workspace/building/review-job binding to its evaluator subprocess; the evaluator independently re-verifies the receipt rather than trusting its parent runner's success string.
+- The exported `evaluateIndependentBuildingTruth()` remains a low-level pure in-memory metric kernel, not a source-authenticated workflow entry point. Its documentation and output explicitly keep geometry/truth/held-out/release flags false; only the source-bound CLI performs reviewer authentication and source-byte replay before calling it.
+- The new CLI regressions cover valid signed receipt, missing receipt, current key rotation, building mismatch and a candidate whose bytes no longer match the signed hand-off. BRF-25 runner regressions continue to cover missing receipt, key rotation and non-continue decisions before extraction.
+- Exact code head: `4d69948d32dec9c01b6a9482dc605b5feb2fe46d`; full CI [run #41159581178](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41159581178) was in progress at this documentation update. Do not mark the bypass hardening CI-passed until a terminal success for this exact head.
+- All candidate geometry validation, independent-reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready and dispatch flags remain false. No production reviewer registry or real human signature is claimed.
+
+**Next:** finish exact-head CI, inspect the test logs for both direct evaluator and BRF-25 caller paths, then audit all other commands that can write an independent-truth report. Keep #281 → #284 → #286 → #288 Draft/unmerged.
