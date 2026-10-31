@@ -218,3 +218,15 @@ test("development/test compatibility still accepts the legacy public-key array",
   assert.equal(parsed[0].registryId, "development-legacy-array");
   assert.match(parsed[0].keyId, /^legacy-/);
 });
+
+
+test("permits an all-revoked emergency lockout registry but exposes no verification key", () => {
+  const pair = keyPair();
+  const parsed = parseTrustedReconstructionReviewerKeys(registry([
+    activeEntry(pair.publicKeyPem, {
+      status: "revoked",
+      revokedAtUtc: "2026-10-31T02:00:00.000Z",
+    }),
+  ]), { now: NOW, allowLegacy: false });
+  assert.deepEqual(parsed, []);
+});

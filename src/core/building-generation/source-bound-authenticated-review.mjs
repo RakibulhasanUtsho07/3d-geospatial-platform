@@ -533,9 +533,8 @@ export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
       throw new TypeError("Reviewer " + reviewerId + " must have exactly one active key during registry validity.");
     }
   }
-  if (activeByReviewer.size < 1) {
-    throw new TypeError("Trusted reviewer registry must contain at least one currently active reviewer key.");
-  }
+  // An all-revoked registry is a valid emergency lockout state. It yields
+  // zero verifier keys; signing and receipt verification then fail closed.
 
   const keysById = new Map(parsedEntries.map((entry) => [entry.keyId, entry]));
   const replacedKeyIds = new Set();
