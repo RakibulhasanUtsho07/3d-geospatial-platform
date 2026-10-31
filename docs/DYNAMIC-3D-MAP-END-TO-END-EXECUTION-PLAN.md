@@ -830,3 +830,4 @@ The documentation candidate at the then-current head `30153db0c743cd900c78b02802
 4. Generate and hash the candidate through this platform's own reconstruction path, then run the signed-review-gated preparation and independent-truth evaluation CLIs and human-review the exact evidence report.
 
 Until those external inputs and reviews pass, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain false.
+undefined
