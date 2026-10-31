@@ -830,4 +830,17 @@ The documentation candidate at the then-current head `30153db0c743cd900c78b02802
 4. Generate and hash the candidate through this platform's own reconstruction path, then run the signed-review-gated preparation and independent-truth evaluation CLIs and human-review the exact evidence report.
 
 Until those external inputs and reviews pass, `groundTruth`, `acceptanceEligible`, `publicationEligible`, `publishable`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain false.
-undefined
+
+## D3M-01.G — secret-safe reviewer registry preflight (2026-10-31)
+
+The implementation is in stacked Draft [PR #292](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/292) / [Issue #291](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/291), based on the D3M-01.F code head `89f3f11a14d65b924ca56f00fe53eeeb56ecd0c0`.
+
+The preflight reads only `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`, requires production mode, rejects legacy/malformed/oversized registry input, suppresses parser details and all reviewer identity/private-key/PEM/raw-registry output, and has deterministic exit codes (0 valid active registry, 2 invalid or missing configuration, 3 valid all-revoked lockout). It reports only non-secret registry/key identifiers, counts, validity and public-key fingerprints. Eight subprocess cases cover valid, command-line-secret rejection, lockout, missing input, non-production, malformed/legacy, oversize and private-key redaction.
+
+**Exact code-head validation:** [PR CI run #41168856857](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168856857) completed successfully on `027734fcb37a0a6a19faed9dcc9ff34848a8382c`. The full CI job passed, including both D3M-01.G test/help steps, lint, production build, benchmark/evidence gate regressions and production-server viewport verification.
+
+**Documentation and intake baseline:** the documentation PR's previous exact head `c3b24555de2717f851e5ee54d532c4019bfe9ff4` passed [docs CI #41168886817](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168886817) and [BRF-14 source-byte intake #41168886816](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41168886816). The BRF-14 run's 16 pinned candidate-view download/verification job succeeded. Any follow-up documentation commit requires its own exact-head CI.
+
+**Still external / not provisioned:** no production secret-manager value, genuine reviewer identity/authority verification or actual reviewer onboarding was performed. The CLI is a local/deployment-operator preflight only; it cannot read or configure a hosted secret store. Do not paste production registry data into chat, Git, CI logs or issue comments. Keep all ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
+
+**Next:** deployment operator completes the out-of-band reviewer identity/authority check and provisions the public-key-only registry through the production secret manager; run the preflight in that deployment environment and record only its sanitized output. Independently, BRF-29 exact-asset licensing and same-building/independent-survey admission remain blocked; no dataset reuse or building-accuracy claim is authorized by these CI results.
