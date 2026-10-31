@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseTrustedReconstructionReviewerKeys } from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
@@ -229,4 +230,26 @@ test("permits an all-revoked emergency lockout registry but exposes no verificat
     }),
   ]), { now: NOW, allowLegacy: false });
   assert.deepEqual(parsed, []);
+});
+
+
+test("published JSON Schema timestamp patterns accept only canonical UTC millisecond timestamps", async () => {
+  const schema = JSON.parse(await readFile(new URL(
+    "../building-generation-trusted-reviewer-registry.schema.json",
+    import.meta.url,
+  ), "utf8"));
+  const patterns = [
+    schema.properties.issuedAtUtc.pattern,
+    schema.properties.expiresAtUtc.pattern,
+    schema.properties.entries.items.properties.validFromUtc.pattern,
+    schema.properties.entries.items.properties.validUntilUtc.pattern,
+    schema.properties.entries.items.properties.revokedAtUtc.anyOf[1].pattern,
+  ];
+  for (const pattern of patterns) {
+    const expression = new RegExp(pattern);
+    assert.equal(expression.test("2026-10-31T03:00:00.000Z"), true);
+    assert.equal(expression.test("2026-10-31T03:00:00Z"), false);
+    assert.equal(expression.test("2026-10-31T03:00:00.0000Z"), false);
+    assert.equal(expression.test("2026-10-31T03:00:00x000Z"), false);
+  }
 });
