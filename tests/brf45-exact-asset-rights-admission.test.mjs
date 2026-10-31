@@ -9,6 +9,7 @@ import { validateBrf45ExactAssetRightsAdmission } from "../src/core/building-gen
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const EVALUATED_AT = "2026-10-28T00:00:00.000Z";
 const SOURCE_COMMIT = "source-commit-fixture-001";
+const DATA_REPOSITORY_REVISION = "data-repository-revision-fixture-001";
 const REQUIRED = ["inspect-source", "use-for-validation", "derive-model"];
 
 async function setup(t, count = 3) {
@@ -36,6 +37,7 @@ async function setup(t, count = 3) {
     evaluationStage: "multiview-source-byte-intake-only",
     dataset: {
       sourceRepositoryCommit: SOURCE_COMMIT,
+      dataRepositoryRevision: DATA_REPOSITORY_REVISION,
       license: "SOURCE-DECLARED-ONLY",
       licenseScope: "Synthetic fixture only.",
       rightsStatus: "source-authority-not-authenticated",
@@ -52,6 +54,7 @@ async function setup(t, count = 3) {
       sourceManifestFilename: "brf-14-multiview-source.json",
       sampleId: sourceManifest.sampleId,
       sourceRepositoryCommit: SOURCE_COMMIT,
+      dataRepositoryRevision: DATA_REPOSITORY_REVISION,
       declaredLicense: sourceManifest.dataset.license,
       licenseScope: sourceManifest.dataset.licenseScope,
       rightsStatus: sourceManifest.dataset.rightsStatus,
@@ -70,6 +73,7 @@ async function setup(t, count = 3) {
       filename: view.filename,
       sourceUrl: view.sourceUrl,
       sourceRepositoryCommit: SOURCE_COMMIT,
+      dataRepositoryRevision: DATA_REPOSITORY_REVISION,
       byteSize: view.expectedByteSize,
       sha256: view.expectedSha256,
       requestedScopes: [...REQUIRED],
@@ -153,6 +157,7 @@ test("exact filename, URL, source hash, size and commit are mandatory", async t 
     row => { row.sha256 = "f".repeat(64); },
     row => { row.byteSize += 1; },
     row => { row.sourceRepositoryCommit = "different-commit"; },
+    row => { row.dataRepositoryRevision = "different-data-revision"; },
   ]) {
     const f = await setup(t);
     await approveAll(f);
@@ -164,6 +169,19 @@ test("exact filename, URL, source hash, size and commit are mandatory", async t 
     assert.equal(report.status, "blocked");
     assert.ok(report.blockers.some(value => value.includes("-exact-source-binding")));
   }
+});
+
+test("rights source binding rejects a missing or mismatched data repository revision", async t => {
+  const f = await setup(t);
+  await approveAll(f);
+
+  f.manifest.sourceBinding.dataRepositoryRevision = "different-data-revision";
+  const report = await validateBrf45ExactAssetRightsAdmission(f.manifest, {
+    sourceManifest: f.sourceManifest,
+    evidenceRoot: f.evidenceRoot,
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("source-manifest-binding"));
 });
 
 test("missing requested scopes, expired or revoked rights and absent explicit grant block admission", async t => {

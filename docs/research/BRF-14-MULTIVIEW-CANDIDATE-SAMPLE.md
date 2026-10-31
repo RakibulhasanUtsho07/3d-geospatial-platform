@@ -15,6 +15,8 @@ The sample uses source-reported capture metadata and a pose-aware azimuth-spread
 - Dataset card: https://huggingface.co/datasets/Matt1up/drone-building-scans
 - Upstream repository: https://github.com/Matt1Up/drone-building-scans-dataset
 - Metadata commit: `19b3ce9cccf3e8fd414ff705f75d0f2105846fc1`
+- **Hugging Face image-data revision:** `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f` (full immutable commit SHA used in all selected image URLs)
+- The metadata commit above belongs to the GitHub inventory/checksum/COLMAP repository; it is a different repository and must not be treated as the image-data revision.
 - Image inventory: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/images.csv
 - Image checksum list: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/checksums.sha256
 - COLMAP camera poses: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/poses/flat-roof/colmap/images.txt
@@ -24,6 +26,13 @@ The sample uses source-reported capture metadata and a pose-aware azimuth-spread
 - Upstream reports 951 aligned images for this capture, but this intake downloads only the selected sixteen.
 
 The source README declares CC BY 4.0 and states the licence covers imagery. The stored rights status is explicitly source-declared and not independently authenticated. This intake does not assume that the separate reference GLB/OBJ, visible trademarks or signage use the same licence.
+
+
+## Immutable image revision and metadata provenance
+
+As checked on 31 October 2026, the Hugging Face dataset snapshot `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f` exposes the `flat-roof/images` directory. The BRF-14 manifest now uses this full revision in every image `sourceUrl`; mutable `resolve/main` paths are rejected by the verifier and dedicated workflow allowlist. The workflow must still download all sixteen selected images at this exact revision and prove that each actual byte count and SHA-256 matches the manifest before the intake is considered passed.
+
+Two separate upstream identities are retained deliberately: `dataset.dataRepositoryRevision` pins the Hugging Face binary image repository, while `dataset.sourceRepositoryCommit` / `upstreamFiles.metadataCommit` pin the GitHub repository containing the inventory, checksums and COLMAP pose metadata. BRF-45 carries both identities and rejects a rights row whose declared data revision differs from BRF-14. The expected SHA-256/byte-size checks remain necessary even with immutable URLs.
 
 ## Coordinate-frame handling
 
