@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {createHash} from "node:crypto";
+import {createHash,generateKeyPairSync} from "node:crypto";
 import {mkdir,mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawnSync} from "node:child_process";
 import {readFileSync} from "node:fs";
@@ -142,8 +142,8 @@ test("blocks direct geometry preparation when no signed D3M-01.D receipt is prov
 });
 
 test("blocks direct geometry preparation when the current trusted key no longer verifies",async t=>{
-  const {root,review}=await setup(t);
-  const replacement=(await import("node:crypto")).generateKeyPairSync("ed25519");
+  const {root}=await setup(t);
+  const replacement=generateKeyPairSync("ed25519");
   const replacementPem=replacement.publicKey.export({type:"spki",format:"pem"}).toString();
   const registryJson=JSON.stringify([{reviewerId:"reviewer-fixture",publicKeyPem:replacementPem}]);
   const prepared=run(prepSource,root,["configs/evaluation.json","rotated-key-prepared.json"],{registryJson});
