@@ -108,6 +108,35 @@ test("complete synthetic cross-modal evidence still requires human release revie
   assert.equal(report.accuracyPassed, false);
 });
 
+test("source asset IDs must be globally unique across CityGML, image, ULS and survey roles", () => {
+  const manifest = completeSyntheticManifest();
+  manifest.assets.ulsCrop.assetId = manifest.assets.imageFrames[0].assetId;
+  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+  assert.ok(report.blockers.includes("source-asset-ids-globally-unique"));
+  assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("candidate GLB identity and bytes must be distinct from every source role", () => {
+  const duplicateIds = completeSyntheticManifest();
+  duplicateIds.candidateGlb.assetId = duplicateIds.assets.imageFrames[0].assetId;
+  const idReport = validateBrf35BuildingLinkage(duplicateIds, sourceReport);
+  assert.ok(idReport.blockers.includes("candidate-glb-distinct-from-all-source-assets"));
+  assert.deepEqual(idReport.releaseFlags, FLAGS);
+
+  for (const sourceAsset of [
+    completeSyntheticManifest().assets.imageFrames[0],
+    completeSyntheticManifest().assets.ulsCrop,
+    completeSyntheticManifest().assets.surveyControls[0],
+  ]) {
+    const manifest = completeSyntheticManifest();
+    manifest.candidateGlb.sha256 = sourceAsset.sha256;
+    manifest.accuracy.candidateGlbSha256 = sourceAsset.sha256;
+    const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+    assert.ok(report.blockers.includes("candidate-glb-distinct-from-all-source-assets"));
+    assert.deepEqual(report.releaseFlags, FLAGS);
+  }
+});
+
 test("wrong in-file Building GML ID is rejected", () => {
   const manifest = completeSyntheticManifest();
   manifest.sourceModel.buildingGmlId = "DEBY_LOD3_4959323";
