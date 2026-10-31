@@ -89,7 +89,7 @@ async function main(){
   const root=await realpath(path.resolve(rootArg?rootArg.slice("--root=".length):process.cwd()));
   const configFile=await safeRead(root,pos[0],"extraction config"),config=JSON.parse(configFile.bytes.toString("utf8"));
   if(!object(config)||config.schemaVersion!=="1.0.0")throw new TypeError("Config schemaVersion must be 1.0.0.");
-  const evaluationId=requireId(config.evaluationId,"evaluationId"),buildingId=requireId(config.buildingId,"buildingId");
+  const evaluationId=requireId(config.evaluationId,"evaluationId"),configBuildingId=requireId(config.buildingId,"buildingId");
   const generatedAt=timestamp(config.generatedAt,"generatedAt"),commitSha=config.extractorCommitSha;
   if(typeof commitSha!=="string"||!/^[a-f0-9]{7,64}$/i.test(commitSha))throw new TypeError("extractorCommitSha must pin the source commit.");
   if(!object(config.candidate)||!object(config.reference)||!object(config.tolerances))throw new TypeError("candidate, reference and tolerances objects are required.");
@@ -105,7 +105,7 @@ async function main(){
   if(!workspaceRaw||!buildingId||!reviewJobId){
     throw new TypeError("--workspace, --building-id and --review-job-id are required before candidate geometry extraction.");
   }
-  if(buildingId!==config.buildingId){
+  if(buildingId!==configBuildingId){
     throw new TypeError("Geometry-preparation config buildingId must match the authenticated-review buildingId.");
   }
   const workspaceRoot=await realpath(path.resolve(root,workspaceRaw));
@@ -162,7 +162,7 @@ async function main(){
     implementation.relative,implementationHash,commitSha,generatedAt);
   reference.geometryExtractionProvenance=provenance("reference",referenceSha,reference,configFile.relative,configHash,
     referenceImplementation.relative,referenceImplementationHash,commitSha,generatedAt);
-  const manifest={schemaVersion:"1.0.0",evaluationId,buildingId,generatedAt,candidate,reference,tolerances:config.tolerances,
+  const manifest={schemaVersion:"1.0.0",evaluationId,buildingId:configBuildingId,generatedAt,candidate,reference,tolerances:config.tolerances,
     preparation:{method:"brf-09-actual-glb-and-independent-reference-adapter-v1",configPath:configFile.relative,configSha256:configHash,
       exactCandidateGlbSha256:candidateSha,candidateHashPinnedBeforeRun:candidatePinned,
       exactReferenceSourceSha256:referenceSha,referenceHashPinnedBeforeRun:referencePinned,
