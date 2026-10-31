@@ -68,6 +68,7 @@ on:
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01e-brf25-authenticated-review-gate-20261030
       - feat/d3m01f-governed-reviewer-registry-20261031
+      - feat/d3m01g-registry-preflight-20261031
   pull_request:
     branches:
       - main
@@ -111,6 +112,7 @@ on:
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
       - development
+      - feat/d3m01f-governed-reviewer-registry-20261031
 
 permissions:
   contents: read
