@@ -5,6 +5,10 @@ import path from "node:path";
 import { extractGlbGeometry, validateAffineMatrix4x4 } from "../src/core/building-generation/glb-geometry-extraction.mjs";
 import { geometryPayloadSha256 } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
 import { adaptIndependentReferenceGeometry } from "../src/core/building-generation/independent-reference-geometry-adapter.mjs";
+import {
+  parseTrustedReconstructionReviewerKeys,
+  verifySourceBoundAuthenticatedReviewForIndependentValidation,
+} from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const SHA256=/^[a-f0-9]{64}$/i, ID=/^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const IMPLEMENTATION="src/core/building-generation/glb-geometry-extraction.mjs";
@@ -68,9 +72,18 @@ function provenance(role,sourceHash,geometry,configPath,configHash,artifactPath,
       configurationPath:configPath,configurationSha256:configHash}};
 }
 async function main(){
-  const argv=process.argv.slice(2),rootArg=argv.find(a=>a.startsWith("--root=")),pos=argv.filter(a=>!a.startsWith("--root="));
+  const argv=process.argv.slice(2);
+  const rootArg=argv.find(a=>a.startsWith("--root="));
+  const workspaceArg=argv.find(a=>a.startsWith("--workspace="));
+  const buildingArg=argv.find(a=>a.startsWith("--building-id="));
+  const reviewArg=argv.find(a=>a.startsWith("--review-job-id="));
+  const workspaceRaw=workspaceArg?.slice("--workspace=".length)??"";
+  const buildingId=buildingArg?.slice("--building-id=".length)??"";
+  const reviewJobId=reviewArg?.slice("--review-job-id=".length)??"";
+  const pos=argv.filter(a=>!a.startsWith("--root=")&&!a.startsWith("--workspace=")&&
+    !a.startsWith("--building-id=")&&!a.startsWith("--review-job-id="));
   if(process.argv.includes("--help")||!pos[0]||pos.length>2){
-    console.log("Usage: node scripts/prepare-independent-building-truth-manifest.mjs <config.json> [output-manifest.json] [--root=project-root]\nExtracts static GLB mesh geometry and imports reviewed reference geometry in the same metric frame. It writes evidence only; it does not approve a model.");
+    console.log("Usage: node scripts/prepare-independent-building-truth-manifest.mjs <config.json> [output-manifest.json] --workspace=<workspace-root> --building-id=<buildingId> --review-job-id=<D3M-01.D-reviewJobId> [--root=project-root]\\nRe-verifies the signed D3M-01.D reviewer receipt before extracting candidate geometry or preparing an independent-truth manifest.");
     process.exitCode=process.argv.includes("--help")?0:2;return;
   }
   const root=await realpath(path.resolve(rootArg?rootArg.slice("--root=".length):process.cwd()));
@@ -86,6 +99,31 @@ async function main(){
   if(config.candidate.checkPointBindings!==undefined&&!Array.isArray(config.candidate.checkPointBindings))throw new TypeError("candidate.checkPointBindings must be an array.");
   const registration=validateAffineMatrix4x4(config.candidate.modelToEvaluationFrameMatrix4x4);
   const candidateFile=await safeRead(root,config.candidate.glbPath,"candidate GLB"),candidateSha=sha256(candidateFile.bytes);
+
+  // This preparer is a direct GLB-extraction entry point. Require the same
+  // immutable signed reviewer decision as BRF-25 before extracting geometry.
+  if(!workspaceRaw||!buildingId||!reviewJobId){
+    throw new TypeError("--workspace, --building-id and --review-job-id are required before candidate geometry extraction.");
+  }
+  if(buildingId!==config.buildingId){
+    throw new TypeError("Geometry-preparation config buildingId must match the authenticated-review buildingId.");
+  }
+  const workspaceRoot=await realpath(path.resolve(root,workspaceRaw));
+  const workspaceRelative=path.relative(root,workspaceRoot);
+  if(workspaceRelative===".."||workspaceRelative.startsWith(".."+path.sep)||path.isAbsolute(workspaceRelative)){
+    throw new TypeError("Authenticated-review workspace must resolve inside the project root.");
+  }
+  const trustedReviewerKeys=parseTrustedReconstructionReviewerKeys(
+    process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON??""
+  );
+  await verifySourceBoundAuthenticatedReviewForIndependentValidation({
+    workspaceRoot,
+    buildingId,
+    reviewJobId,
+    expectedCandidateGlbSha256:candidateSha,
+    trustedReviewerKeys,
+  });
+
   const candidatePinned=expectedHash(config.candidate.expectedGlbSha256,candidateSha,"candidate.expectedGlbSha256");
   const referenceFile=await safeRead(root,config.reference.sourcePath,"independent reference geometry"),referenceSha=sha256(referenceFile.bytes);
   const referencePinned=expectedHash(config.reference.expectedSourceSha256,referenceSha,"reference.expectedSourceSha256");
