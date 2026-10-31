@@ -7,7 +7,8 @@ import test from "node:test";
 import { verifyBrf14MultiviewSource } from "../scripts/verify-brf14-multiview-source.mjs";
 
 const fixturePath = new URL("../benchmarks/building-reconstruction/brf-14-multiview-source.json", import.meta.url);
-const sourcePrefix = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/";
+const DATA_REPOSITORY_REVISION = "fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f";
+const sourcePrefix = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/" + DATA_REPOSITORY_REVISION + "/flat-roof/images/";
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 async function makeFixture(t) {
@@ -122,6 +123,22 @@ test("rejects malformed manifests, duplicate IDs, unpinned source URLs and false
   const falseReady = structuredClone(manifest);
   falseReady.mapReady = true;
   await assert.rejects(() => verifyBrf14MultiviewSource(falseReady, assetRoot), /flags false/);
+});
+
+test("rejects mutable or mismatched Hugging Face dataset revisions", async (t) => {
+  const { assetRoot, manifest } = await makeFixture(t);
+
+  const mutable = structuredClone(manifest);
+  mutable.views[0].sourceUrl = mutable.views[0].sourceUrl.replace(DATA_REPOSITORY_REVISION, "main");
+  await assert.rejects(() => verifyBrf14MultiviewSource(mutable, assetRoot), /exact URL/);
+
+  const mismatchedDeclaration = structuredClone(manifest);
+  mismatchedDeclaration.dataset.dataRepositoryRevision = "a".repeat(40);
+  await assert.rejects(() => verifyBrf14MultiviewSource(mismatchedDeclaration, assetRoot), /Pinned dataset identity/);
+
+  const mismatchedAsset = structuredClone(manifest);
+  mismatchedAsset.views[0].sourceUrl = mismatchedAsset.views[0].sourceUrl.replace(DATA_REPOSITORY_REVISION, "b".repeat(40));
+  await assert.rejects(() => verifyBrf14MultiviewSource(mismatchedAsset, assetRoot), /exact URL/);
 });
 
 test("rejects a symlinked asset root", async (t) => {
