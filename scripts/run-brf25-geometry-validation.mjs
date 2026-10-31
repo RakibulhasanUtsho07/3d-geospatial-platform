@@ -213,7 +213,14 @@ async function main() {
   }
 
   const prepareScript = await resolveInside(root, "scripts/prepare-independent-building-truth-manifest.mjs", "Geometry preparation CLI");
-  const prepareRun = runNode(prepareScript, [positional[1], preparedRel, "--root=" + root], root);
+  const prepareRun = runNode(prepareScript, [
+    positional[1],
+    preparedRel,
+    "--root=" + root,
+    "--workspace=" + workspaceRoot,
+    "--building-id=" + buildingId,
+    "--review-job-id=" + reviewJobId,
+  ], root);
   report.steps = [{ id: "actual-glb-extraction-and-reference-adaptation", ...prepareRun }];
   if (prepareRun.exitCode !== 0) {
     report.status = "geometry-extraction-failed";
