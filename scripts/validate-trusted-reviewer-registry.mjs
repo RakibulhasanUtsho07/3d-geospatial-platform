@@ -2,7 +2,7 @@
 import { parseTrustedReconstructionReviewerKeys } from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const ENV_NAME = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
-const MAX_REGISTRY_BYTES = 2 * 1024 * 1024;
+const MAX_REGISTRY_BYTES = 64 * 1024;
 
 class PreflightError extends Error {
   constructor(errorCode, exitCode = 2) {
