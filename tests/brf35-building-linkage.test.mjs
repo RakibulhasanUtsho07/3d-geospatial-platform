@@ -108,12 +108,22 @@ test("complete synthetic cross-modal evidence still requires human release revie
   assert.equal(report.accuracyPassed, false);
 });
 
-test("source asset IDs must be globally unique across CityGML, image, ULS and survey roles", () => {
-  const manifest = completeSyntheticManifest();
-  manifest.assets.ulsCrop.assetId = manifest.assets.imageFrames[0].assetId;
-  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
-  assert.ok(report.blockers.includes("source-asset-ids-globally-unique"));
-  assert.deepEqual(report.releaseFlags, FLAGS);
+test("source asset IDs must be globally unique across every pair of source roles", () => {
+  const collisions = [
+    manifest => { manifest.assets.imageFrames[0].assetId = manifest.sourceModel.assetId; },
+    manifest => { manifest.assets.ulsCrop.assetId = manifest.sourceModel.assetId; },
+    manifest => { manifest.assets.surveyControls[0].assetId = manifest.sourceModel.assetId; },
+    manifest => { manifest.assets.ulsCrop.assetId = manifest.assets.imageFrames[0].assetId; },
+    manifest => { manifest.assets.surveyControls[0].assetId = manifest.assets.imageFrames[0].assetId; },
+    manifest => { manifest.assets.surveyControls[0].assetId = manifest.assets.ulsCrop.assetId; },
+  ];
+  for (const collide of collisions) {
+    const manifest = completeSyntheticManifest();
+    collide(manifest);
+    const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+    assert.ok(report.blockers.includes("source-asset-ids-globally-unique"));
+    assert.deepEqual(report.releaseFlags, FLAGS);
+  }
 });
 
 test("candidate GLB identity and bytes must be distinct from every source role", () => {
