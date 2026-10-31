@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://3d-geospatial-platform.invalid/schemas/reconstruction-trusted-reviewer-registry.schema.json",
+  "$id": "urn:3d-geospatial-platform:schema:reconstruction-trusted-reviewer-registry:1.0.0",
   "title": "Reconstruction trusted reviewer public-key registry",
   "description": "Public-key-only production registry. Private signing keys and personal identity data must never be stored here.",
   "type": "object",
