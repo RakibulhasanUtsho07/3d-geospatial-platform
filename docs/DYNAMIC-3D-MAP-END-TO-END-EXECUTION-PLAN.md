@@ -862,3 +862,14 @@ The BRF-14 sixteen-view sample no longer points at mutable Hugging Face `resolve
 **Full CI:** [run #41170936398](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41170936398) is still in progress on this exact head; do not claim a terminal pass until its conclusion is `success`. PR #294 remains Draft/open/unmerged. Do not promote to `development` or `main` without exact-head full CI and human review.
 
 This source-stage validates immutable provenance and source bytes only. It does not authenticate an exact-asset rights grant or provide independent surveyed truth. The upstream AprilTag scale bar belongs to the source reconstruction and is not independent held-out geometry truth. Keep ground-truth, acceptance, publication, map-ready and automatic-approval gates false.
+
+
+## BRF-47 — cross-role source/candidate asset identity (2026-10-31)
+
+Tracking: [Issue #295](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/295) · [Draft PR #296](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/296).
+
+A targeted BRF-35 audit found that source asset IDs were unique only within some individual role lists, while candidate GLB byte identity was compared to the CityGML reference alone. The new gate requires globally unique valid asset IDs across CityGML, image frames, ULS crop and survey controls; it also requires the platform candidate GLB asset ID and SHA-256 to differ from every source/reference asset.
+
+Exact code head: `70044847e0c0f84db6991c8bce20726ba3a65870`, branch `feat/brf47-cross-role-asset-identity-20261031`, base `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`. Focused BRF-35 workflow [#41172052374](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41172052374) passed 8/8 steps. Full CI [#41172052362](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41172052362) is still running at production build; no terminal pass is claimed yet.
+
+Real BRF-35 manifest remains blocked: zero image frames, no ULS crop, no survey controls, rights pending, no approved vertical frame/operation, no platform candidate GLB. This code only removes asset-identity ambiguity; it does not create or approve any real evidence. PR #296 remains Draft/open/unmerged. Keep all acceptance/publication/map-ready/automatic-approval gates false.
