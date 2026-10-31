@@ -389,3 +389,13 @@ The code now supports a zero-active-key emergency lockout, but signing and recei
 - BRF-16 #41170936442 and BRF-18 #41170936439 passed.
 - Full repository CI #41170936398 is still running on this exact head. No merge or branch promotion until terminal success and review. PR #294 remains Draft.
 - This is not a reconstruction accuracy pass. Source imagery rights are scope-limited; no reference GLB/OBJ rights, independent survey or held-out checkpoints have been admitted. Keep all real-world and release gates false.
+
+
+## 2026-10-31 — BRF-47 cross-role asset identity hardening
+
+- [Issue #295](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/295) / Draft [PR #296](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/296), branch `feat/brf47-cross-role-asset-identity-20261031`.
+- Exact code head: `70044847e0c0f84db6991c8bce20726ba3a65870`, base development SHA `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- Validator now enforces global unique source asset IDs across CityGML, images, ULS and survey roles; candidate GLB ID and SHA must differ from every source asset. Regression tests cover all six pairwise collisions among source roles and candidate ID/hash collisions against image, ULS and survey assets.
+- Dedicated BRF-35 workflow #41172052374 passed (8/8).
+- Full repository CI #41172052362 remains in progress at production build; wait for exact-head terminal success before review or promotion.
+- The real BRF-35 manifest stays blocked because it has no matched image frames/ULS crop/survey controls or approved rights/vertical frame. All release flags remain false. No raw source files were downloaded or committed.
