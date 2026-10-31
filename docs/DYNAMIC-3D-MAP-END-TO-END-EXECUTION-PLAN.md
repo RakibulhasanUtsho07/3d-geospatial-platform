@@ -768,3 +768,14 @@ A further bypass was found after gating the standalone evaluator: `scripts/prepa
 The direct preparation CLI regression fixture now stages the real signer/job-state/handoff/geometry-QA modules and tests missing receipts and current-key rotation. A duplicate config/building ID declaration found while enabling this gate was removed by distinguishing the caller-bound building ID from the config ID. The evaluator blocked-report newline and stale-candidate tests were also corrected to reflect authorization being checked before replay.
 
 Latest code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64`; exact-head CI [#41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951) is in progress. Earlier attempts failed or were superseded; do not claim the current hardening passed until that exact-head run completes successfully. All geometry/truth/held-out/release flags remain false.
+
+
+### D3M-01.E direct-entrypoint hardening — exact-head CI validated (2026-10-31)
+
+The signed-review authorization requirement now covers all three executable workflow entry points discovered in the repository audit: the BRF-25 parent runner, the standalone GLB preparation CLI, and the standalone independent-truth evaluation CLI. The BRF-25 runner passes the exact workspace/building/review-job context to both child commands; each child independently verifies the immutable D3M-01.D decision, candidate binding and Ed25519 signature against the current trusted-key registry. The low-level in-memory metric function is explicitly a non-authorizing kernel.
+
+Regression coverage verifies missing receipts, trusted-key rotation, wrong building identity, stale candidate bytes, replay mismatch and non-continue reviewer decisions. **Exact code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64` passed CI run [#41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951): 182/182 workflow steps successful, zero failures.** This includes independent-truth metrics/replay, D3M-01.E authorization tests, BRF-25 runner CLI, standalone evaluator CLI, production build and production-server viewport verification.
+
+The successful run validates test and workflow behaviour only. It does not provision a production reviewer key registry, prove an actual human's civil identity or legal authority, establish survey rights/accuracy, validate the candidate building geometry, or approve publication. All candidate geometry validation, independent reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags remain false.
+
+**Remaining:** obtain a real governed reviewer trust registry and a real source/measurement-backed review; continue held-out building accuracy and visual validation. Keep PR #288 and docs PR #279 Draft/unmerged pending human review.

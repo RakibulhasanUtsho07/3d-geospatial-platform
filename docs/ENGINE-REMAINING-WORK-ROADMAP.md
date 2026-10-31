@@ -334,3 +334,12 @@ Repository audit found a second direct route in `scripts/prepare-independent-bui
 Tests now exercise the real verifier dependency graph in the isolated CLI fixture, including no receipt and rotated-key denial. The config/caller building-ID variable collision and blocked evaluator report newline have been fixed; stale-candidate assertions expect a pre-replay authorization block with metrics withheld.
 
 Code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64`; [exact-head CI #41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951) is in progress at this documentation update. There is no current-head pass claim. All geometry validation, reference truth, held-out accuracy, ground truth, acceptance, publication, map-ready and dispatch flags remain false.
+
+
+## D3M-01.E direct evaluator + preparation entry-point hardening — validated
+
+All identified executable paths that can prepare geometry or compute independent truth now require a freshly verified, immutable D3M-01.D signed decision: (1) BRF-25 parent runner, (2) `scripts/prepare-independent-building-truth-manifest.mjs`, and (3) `scripts/evaluate-independent-building-truth.mjs`. The parent passes exact workspace/building/review-job identity to each child, and each child independently recomputes the linked candidate binding and verifies the Ed25519 signature against the current trusted key registry. The in-memory `evaluateIndependentBuildingTruth()` function remains a non-authorizing metric kernel.
+
+Regression coverage includes absent receipt, rotated/replaced reviewer key, building mismatch, stale candidate bytes, source-to-geometry replay mismatch, and hold/changes-requested denial. **Exact code head `03c8f4fcf213c7f1201d55a55cee6802fec9bd64` passed [CI #41160633951](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41160633951): 182/182 steps passed, 0 failures.** Independent-truth/replay, D3M-01.E authorization, BRF-25 CLI, direct evaluator CLI, production build, and production-server viewport verification all completed successfully.
+
+This CI pass is not a real building-accuracy result or production security deployment. No production signer registry/identity proof, rights determination, reference-survey authentication or real human signature is claimed. Geometry/truth/held-out/acceptance/publication/map-ready/automatic-approval/dispatch flags all remain false. Next: governed production trust-anchor setup plus real independent survey and held-out checkpoints. PR #288 remains Draft/unmerged.
