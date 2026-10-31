@@ -114,7 +114,7 @@ test("rejects hash-pinned GLB/reference changes and coordinate-frame disagreemen
   const {root}=await setup(t);
   await writeFile(path.join(root,"evidence/candidate.glb"),Buffer.from("modified"));
   const stale=run(prepSource,root,["configs/evaluation.json","stale.json"]);
-  assert.equal(stale.status,1);assert.match(stale.stderr,/differs from actual source bytes/);
+  assert.equal(stale.status,1);assert.match(stale.stderr,/Candidate GLB bytes no longer match the immutable hand-off identity/);
   const freshRoot=await setup(t);t.after(()=>rm(freshRoot.root,{recursive:true,force:true}));
   const truth=JSON.parse((await readFile(path.join(freshRoot.root,"evidence/survey.json"))).toString("utf8"));
   truth.coordinateFrameId="wrong-frame";
