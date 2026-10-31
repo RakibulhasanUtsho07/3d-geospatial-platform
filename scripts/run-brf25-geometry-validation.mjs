@@ -237,7 +237,14 @@ async function main() {
     extractedHeldOutCheckpointCount: prepared.value.preparation.extractedHeldOutCheckPointCount ?? null };
 
   const evaluateScript = await resolveInside(root, "scripts/evaluate-independent-building-truth.mjs", "Independent-truth evaluator CLI");
-  const evaluateRun = runNode(evaluateScript, [preparedRel, evalRel, "--root=" + root], root);
+  const evaluateRun = runNode(evaluateScript, [
+    preparedRel,
+    evalRel,
+    "--root=" + root,
+    "--workspace=" + workspaceRoot,
+    "--building-id=" + buildingId,
+    "--review-job-id=" + reviewJobId,
+  ], root);
   report.steps.push({ id: "independent-truth-evaluation", ...evaluateRun });
   if (![0, 1, 2].includes(evaluateRun.exitCode)) {
     report.status = "independent-evaluation-failed";
