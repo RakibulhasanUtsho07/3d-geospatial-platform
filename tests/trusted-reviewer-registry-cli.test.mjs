@@ -130,7 +130,7 @@ test("redacts malformed registry content and legacy array values from errors", (
 });
 
 test("rejects oversized registry values without echoing their contents", () => {
-  const oversized = "x".repeat(2 * 1024 * 1024 + 1);
+  const oversized = "x".repeat(64 * 1024 + 1);
   const result = runCli({ [ENV_NAME]: oversized });
   assert.equal(result.status, 2);
   assert.equal(JSON.parse(result.stderr).errorCode, "registry-secret-exceeds-size-limit");
