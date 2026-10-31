@@ -6,6 +6,10 @@ import { evaluateIndependentBuildingTruth } from "../src/core/building-generatio
 import { extractGlbGeometry } from "../src/core/building-generation/glb-geometry-extraction.mjs";
 import { adaptIndependentReferenceGeometry } from "../src/core/building-generation/independent-reference-geometry-adapter.mjs";
 import { geometryPayloadSha256, validateGeometryExtractionProvenance } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
+import {
+  parseTrustedReconstructionReviewerKeys,
+  verifySourceBoundAuthenticatedReviewForIndependentValidation,
+} from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/i;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -246,9 +250,17 @@ function createMetricWithheldReport(manifest, prerequisites, reason) {
 async function main() {
   const argv = process.argv.slice(2);
   const rootFlag = argv.find((arg) => arg.startsWith("--root="));
-  const positional = argv.filter((arg) => !arg.startsWith("--root="));
+  const workspaceFlag = argv.find((arg) => arg.startsWith("--workspace="));
+  const buildingFlag = argv.find((arg) => arg.startsWith("--building-id="));
+  const reviewFlag = argv.find((arg) => arg.startsWith("--review-job-id="));
+  const workspaceRaw = workspaceFlag?.slice("--workspace=".length) ?? "";
+  const buildingId = buildingFlag?.slice("--building-id=".length) ?? "";
+  const reviewJobId = reviewFlag?.slice("--review-job-id=".length) ?? "";
+  const positional = argv.filter((arg) => !arg.startsWith("--root=") &&
+    !arg.startsWith("--workspace=") && !arg.startsWith("--building-id=") &&
+    !arg.startsWith("--review-job-id="));
   if (process.argv.includes("--help") || !positional[0] || positional.length > 2) {
-    console.log("Usage: node scripts/evaluate-independent-building-truth.mjs <evaluation-manifest.json> [report.json] [--root=project-root]\nChecks candidate GLB, independent truth source, extractor source/configuration bytes, and deterministic geometry-payload provenance before computing footprint, dimension, checkpoint and optional mesh-distance metrics. This does not approve a model.");
+    console.log("Usage: node scripts/evaluate-independent-building-truth.mjs <evaluation-manifest.json> [report.json] --workspace=<workspace-root> --building-id=<buildingId> --review-job-id=<D3M-01.D-reviewJobId> [--root=project-root]\\nRe-verifies the immutable signed D3M-01.D reviewer receipt with the current RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON registry before computing any independent-truth metrics. This does not approve a model.");
     process.exitCode = process.argv.includes("--help") ? 0 : 2;
     return;
   }
@@ -261,6 +273,109 @@ async function main() {
   const actualCandidateSha256 = sha256(candidateAsset.bytes);
   const candidateHashMatches = SHA256.test(manifest.candidate?.glbSha256 ?? "") &&
     actualCandidateSha256.toLowerCase() === manifest.candidate.glbSha256.toLowerCase();
+
+  // The standalone evaluator is an independent entry point. Require the same
+  // immutable D3M-01.D receipt as the BRF-25 parent runner before replay or metrics.
+  let authenticatedReviewReceipt = null;
+  let reviewAuthorizationError = null;
+  try {
+    if (!workspaceRaw || !buildingId || !reviewJobId) {
+      throw new TypeError("--workspace, --building-id and --review-job-id are required before independent-truth evaluation.");
+    }
+    if (manifest.buildingId !== buildingId) {
+      throw new TypeError("Evaluation manifest buildingId must match the authenticated-review buildingId.");
+    }
+    const workspaceRoot = await realpath(path.resolve(root, workspaceRaw));
+    const workspaceRelative = path.relative(root, workspaceRoot);
+    if (workspaceRelative === ".." || workspaceRelative.startsWith(".." + path.sep) || path.isAbsolute(workspaceRelative)) {
+      throw new TypeError("Authenticated-review workspace must resolve inside the project root.");
+    }
+    const trustedReviewerKeys = parseTrustedReconstructionReviewerKeys(
+      process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON ?? "",
+    );
+    const verifiedReview = await verifySourceBoundAuthenticatedReviewForIndependentValidation({
+      workspaceRoot,
+      buildingId,
+      reviewJobId,
+      expectedCandidateGlbSha256: actualCandidateSha256,
+      trustedReviewerKeys,
+    });
+    authenticatedReviewReceipt = verifiedReview.receipt;
+  } catch (error) {
+    reviewAuthorizationError = error instanceof Error ? error.message : String(error);
+  }
+
+  if (reviewAuthorizationError) {
+    const reason = reviewAuthorizationError.slice(0, 1200);
+    const reportRelative = positional[1] ??
+      path.join("artifacts", "independent-building-truth", (manifest.evaluationId ?? "blocked") + "-authorization-blocked.json").split(path.sep).join("/");
+    const reportPath = await safeOutputPath(root, reportRelative);
+    const blockedReport = {
+      schemaVersion: "1.0.0",
+      engine: "independent-building-truth-evaluator-v1",
+      evaluationId: manifest.evaluationId ?? "invalid-evaluation",
+      buildingId: manifest.buildingId ?? null,
+      generatedAt: manifest.generatedAt ?? null,
+      status: "benchmark-incomplete",
+      candidate: {
+        glbSha256: actualCandidateSha256,
+        coordinateFrameId: manifest.candidate?.coordinateFrameId ?? null,
+        units: manifest.candidate?.units ?? null,
+      },
+      reference: {
+        sourceId: manifest.reference?.sourceId ?? null,
+        sourceSha256: manifest.reference?.sourceSha256 ?? null,
+        evidenceBasis: manifest.reference?.evidenceBasis ?? "unknown",
+        reviewedBy: manifest.reference?.reviewedBy ?? null,
+        reviewedAt: manifest.reference?.reviewedAt ?? null,
+        independentlyAuthenticated: false,
+      },
+      metrics: null,
+      metricComputation: {
+        status: "withheld",
+        reason: "Independent-truth metrics were not computed because the authenticated D3M-01.D review authorization did not verify.",
+        prerequisites: [{ id: "authenticated-review-receipt", status: "failed" }],
+      },
+      authenticatedReview: {
+        status: "blocked",
+        buildingId,
+        reviewJobId: reviewJobId || null,
+        reason,
+      },
+      checks: [{ id: "authenticated-review-receipt", status: "failed", detail: reason }],
+      warnings: [],
+      failures: [{ id: "authenticated-review-required-before-metrics", detail: reason }],
+      counts: { passed: 0, warnings: 0, failures: 1 },
+      policy: {
+        candidateGeometryValidated: false,
+        independentReferenceVerified: false,
+        heldOutCheckpointAccuracyVerified: false,
+        groundTruth: false,
+        acceptanceEligible: false,
+        publicationEligible: false,
+        mapReady: false,
+        automaticApproval: false,
+        dispatchAllowed: false,
+      },
+      limitations: [
+        "No geometry extraction replay or independent-truth metric computation was started because the signed review receipt was absent or invalid.",
+        "A blocked report is not evidence that the candidate is accurate or inaccurate.",
+      ],
+      evaluationManifestSha256: manifestSha256,
+    };
+    await writeFile(reportPath, JSON.stringify(blockedReport, null, 2) + "\\n", { flag: "wx", mode: 0o600 });
+    console.log(JSON.stringify({
+      reportPath: path.relative(root, reportPath).split(path.sep).join("/"),
+      status: blockedReport.status,
+      authenticatedReview: "blocked",
+      acceptanceEligible: false,
+      publicationEligible: false,
+      mapReady: false,
+    }, null, 2));
+    process.exitCode = 2;
+    return;
+  }
+
   let preparationConfig = null;
   let preparationConfigResult = {
     status: "incomplete",
@@ -338,6 +453,12 @@ async function main() {
   report.metricComputation = metricGatePassed
     ? { status: "computed-after-source-replay", reason: "Candidate and reference source bytes and both deterministic geometry replays passed before metric computation.", prerequisites: metricPrerequisites }
     : report.metricComputation;
+  report.authenticatedReview = authenticatedReviewReceipt;
+  report.checks.push({
+    id: "authenticated-review-receipt",
+    status: "passed",
+    detail: "The immutable D3M-01.D receipt and Ed25519 signature were re-verified against the current trusted reviewer registry before evaluator execution.",
+  });
   report.evaluationManifestSha256 = manifestSha256;
   const artifactIntegrity = [];
   if (!metricGatePassed) {
