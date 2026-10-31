@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://3d-geospatial-platform.invalid/schemas/reconstruction-trusted-reviewer-registry.schema.json",
+  "title": "Reconstruction trusted reviewer public-key registry",
+  "description": "Public-key-only production registry. Private signing keys and personal identity data must never be stored here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "recordType",
+    "registryId",
+    "issuedAtUtc",
+    "expiresAtUtc",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "recordType": {
+      "const": "reconstruction-trusted-reviewer-key-registry"
+    },
+    "registryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "issuedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reviewerId",
+          "keyId",
+          "status",
+          "publicKeyPem",
+          "validFromUtc",
+          "validUntilUtc",
+          "revokedAtUtc",
+          "replacesKeyId"
+        ],
+        "properties": {
+          "reviewerId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "keyId": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ]
+          },
+          "publicKeyPem": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 16384
+          },
+          "validFromUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntilUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAtUtc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "replacesKeyId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -359,54 +359,222 @@ export async function prepareSourceBoundGeometryReview({ workspaceRoot, building
  * Parse the server-controlled reviewer trust anchors. The request body must never
  * carry or override these public keys. The registry contains public keys only.
  */
-export function parseTrustedReconstructionReviewerKeys(input) {
-  let entries = input;
+export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
+  const now = options.now === undefined ? new Date() : new Date(options.now);
+  if (!Number.isFinite(now.getTime())) throw new TypeError("Trusted reviewer registry validation time must be a valid date.");
+  const allowLegacy = options.allowLegacy ?? process.env.NODE_ENV !== "production";
+  let registry = input;
   if (typeof input === "string") {
     try {
-      entries = JSON.parse(input);
+      registry = JSON.parse(input);
     } catch {
       throw new TypeError("RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON must be valid JSON.");
     }
   }
-  if (!Array.isArray(entries) || entries.length < 1 || entries.length > MAX_REVIEWER_KEYS) {
-    throw new TypeError("Trusted reviewer key registry must contain 1–100 entries.");
+
+  // The original array format is retained only for local development and
+  // deterministic legacy unit fixtures. It has no expiry or revocation model
+  // and is deliberately rejected by production runtimes.
+  if (Array.isArray(registry)) {
+    if (!allowLegacy) {
+      throw new TypeError("Production requires a versioned reconstruction trusted-reviewer registry; legacy key arrays are not accepted.");
+    }
+    if (registry.length < 1 || registry.length > MAX_REVIEWER_KEYS) {
+      throw new TypeError("Legacy trusted reviewer key array must contain 1–100 entries.");
+    }
+    const seenIds = new Set();
+    const seenFingerprints = new Set();
+    return registry.map((entry, index) => {
+      if (!isObject(entry) ||
+          Object.keys(entry).some((key) => !["reviewerId", "publicKeyPem"].includes(key)) ||
+          typeof entry.reviewerId !== "string" ||
+          !SAFE_ID.test(entry.reviewerId) ||
+          typeof entry.publicKeyPem !== "string" ||
+          entry.publicKeyPem.length < 64 ||
+          entry.publicKeyPem.length > 16 * 1024 ||
+          /PRIVATE KEY/.test(entry.publicKeyPem)) {
+        throw new TypeError("Legacy trusted reviewer key entry " + index + " must contain only a safe reviewerId and an Ed25519 public key PEM.");
+      }
+      if (seenIds.has(entry.reviewerId)) throw new TypeError("Trusted reviewer IDs must be unique in a legacy registry.");
+      seenIds.add(entry.reviewerId);
+      const publicKey = parseEd25519PublicKey(entry.publicKeyPem, entry.reviewerId);
+      const fingerprint = sha256(publicKey.export({ type: "spki", format: "der" }));
+      if (seenFingerprints.has(fingerprint)) {
+        throw new TypeError("Trusted reviewer public-key fingerprints must be unique.");
+      }
+      seenFingerprints.add(fingerprint);
+      return Object.freeze({
+        reviewerId: entry.reviewerId,
+        keyId: "legacy-" + fingerprint.slice(0, 16),
+        registryId: "development-legacy-array",
+        validFromUtc: null,
+        validUntilUtc: null,
+        publicKey,
+        publicKeyFingerprintSha256: fingerprint,
+      });
+    });
   }
 
-  const seenIds = new Set();
+  const registryKeys = ["schemaVersion", "recordType", "registryId", "issuedAtUtc", "expiresAtUtc", "entries"];
+  if (!isObject(registry) ||
+      Object.keys(registry).length !== registryKeys.length ||
+      Object.keys(registry).some((key) => !registryKeys.includes(key)) ||
+      registryKeys.some((key) => !Object.prototype.hasOwnProperty.call(registry, key))) {
+    throw new TypeError("Trusted reviewer registry must be a versioned JSON object with the documented envelope fields.");
+  }
+  if (registry.schemaVersion !== "1.0.0" ||
+      registry.recordType !== "reconstruction-trusted-reviewer-key-registry") {
+    throw new TypeError("Trusted reviewer registry schemaVersion or recordType is unsupported.");
+  }
+  safeId(registry.registryId, "registryId");
+  if (!isCanonicalUtcTimestamp(registry.issuedAtUtc) ||
+      !isCanonicalUtcTimestamp(registry.expiresAtUtc)) {
+    throw new TypeError("Trusted reviewer registry issuedAtUtc and expiresAtUtc must be canonical UTC timestamps.");
+  }
+  const issuedAt = Date.parse(registry.issuedAtUtc);
+  const expiresAt = Date.parse(registry.expiresAtUtc);
+  const nowMs = now.getTime();
+  if (expiresAt <= issuedAt || expiresAt - issuedAt > 90 * 24 * 60 * 60 * 1000) {
+    throw new TypeError("Trusted reviewer registry validity must be positive and no longer than 90 days.");
+  }
+  if (nowMs < issuedAt) throw new Error("Trusted reviewer registry is not yet valid.");
+  if (nowMs >= expiresAt) throw new Error("Trusted reviewer registry has expired; renew it through the deployment operator.");
+
+  if (!Array.isArray(registry.entries) ||
+      registry.entries.length < 1 ||
+      registry.entries.length > MAX_REVIEWER_KEYS) {
+    throw new TypeError("Trusted reviewer registry entries must contain 1–100 historical/current key records.");
+  }
+
+  const entryKeys = [
+    "reviewerId", "keyId", "status", "publicKeyPem",
+    "validFromUtc", "validUntilUtc", "revokedAtUtc", "replacesKeyId",
+  ];
+  const seenKeyIds = new Set();
   const seenFingerprints = new Set();
-  return entries.map((entry, index) => {
+  const parsedEntries = [];
+  const activeByReviewer = new Map();
+
+  for (const [index, entry] of registry.entries.entries()) {
     if (!isObject(entry) ||
-        Object.keys(entry).some((key) => !["reviewerId", "publicKeyPem"].includes(key)) ||
-        typeof entry.reviewerId !== "string" ||
-        !SAFE_ID.test(entry.reviewerId) ||
-        typeof entry.publicKeyPem !== "string" ||
+        Object.keys(entry).length !== entryKeys.length ||
+        Object.keys(entry).some((key) => !entryKeys.includes(key)) ||
+        entryKeys.some((key) => !Object.prototype.hasOwnProperty.call(entry, key))) {
+      throw new TypeError("Trusted reviewer registry entry " + index + " must contain exactly the documented key lifecycle fields.");
+    }
+    safeId(entry.reviewerId, "reviewerId");
+    safeId(entry.keyId, "keyId");
+    if (!["active", "revoked"].includes(entry.status)) {
+      throw new TypeError("Trusted reviewer key " + entry.keyId + " status must be active or revoked.");
+    }
+    if (typeof entry.publicKeyPem !== "string" ||
         entry.publicKeyPem.length < 64 ||
         entry.publicKeyPem.length > 16 * 1024 ||
         /PRIVATE KEY/.test(entry.publicKeyPem)) {
-      throw new TypeError("Trusted reviewer key entry " + index + " must contain only a safe reviewerId and an Ed25519 public key PEM.");
+      throw new TypeError("Trusted reviewer key " + entry.keyId + " must contain public-key PEM only.");
     }
-    if (seenIds.has(entry.reviewerId)) throw new TypeError("Trusted reviewer IDs must be unique.");
-    seenIds.add(entry.reviewerId);
-    let publicKey;
-    try {
-      publicKey = createPublicKey(entry.publicKeyPem);
-    } catch {
-      throw new TypeError("Trusted reviewer key " + entry.reviewerId + " is not a valid public key.");
+    if (!isCanonicalUtcTimestamp(entry.validFromUtc) ||
+        !isCanonicalUtcTimestamp(entry.validUntilUtc) ||
+        Date.parse(entry.validUntilUtc) <= Date.parse(entry.validFromUtc)) {
+      throw new TypeError("Trusted reviewer key " + entry.keyId + " must have a valid canonical UTC validity window.");
     }
-    if (publicKey.asymmetricKeyType !== "ed25519") {
-      throw new TypeError("Trusted reviewer key " + entry.reviewerId + " must use Ed25519.");
-    }
+    if (entry.replacesKeyId !== null) safeId(entry.replacesKeyId, "replacesKeyId");
+    if (seenKeyIds.has(entry.keyId)) throw new TypeError("Trusted reviewer key IDs must be globally unique.");
+    seenKeyIds.add(entry.keyId);
+
+    const publicKey = parseEd25519PublicKey(entry.publicKeyPem, entry.keyId);
     const fingerprint = sha256(publicKey.export({ type: "spki", format: "der" }));
     if (seenFingerprints.has(fingerprint)) {
-      throw new TypeError("Trusted reviewer public-key fingerprints must be unique.");
+      throw new TypeError("Trusted reviewer public-key fingerprints must be unique across active and revoked records.");
     }
     seenFingerprints.add(fingerprint);
-    return Object.freeze({
+
+    const validFrom = Date.parse(entry.validFromUtc);
+    const validUntil = Date.parse(entry.validUntilUtc);
+    let revokedAt = null;
+    if (entry.status === "active") {
+      if (entry.revokedAtUtc !== null) {
+        throw new TypeError("Active reviewer key " + entry.keyId + " must have revokedAtUtc set to null.");
+      }
+      if (validFrom > nowMs || validUntil <= nowMs) {
+        throw new Error("Active reviewer key " + entry.keyId + " is outside its validity window.");
+      }
+      if (validUntil > expiresAt) {
+        throw new TypeError("Active reviewer key " + entry.keyId + " must not outlive its registry envelope.");
+      }
+      activeByReviewer.set(entry.reviewerId, (activeByReviewer.get(entry.reviewerId) ?? 0) + 1);
+    } else {
+      if (!isCanonicalUtcTimestamp(entry.revokedAtUtc)) {
+        throw new TypeError("Revoked reviewer key " + entry.keyId + " must have a canonical revokedAtUtc timestamp.");
+      }
+      revokedAt = Date.parse(entry.revokedAtUtc);
+      if (revokedAt < validFrom || revokedAt > nowMs) {
+        throw new TypeError("Revoked reviewer key " + entry.keyId + " must be revoked after activation and not in the future.");
+      }
+    }
+
+    parsedEntries.push({
       reviewerId: entry.reviewerId,
+      keyId: entry.keyId,
+      status: entry.status,
+      replacesKeyId: entry.replacesKeyId,
+      revokedAt,
+      validFrom,
+      validUntil,
       publicKey,
       publicKeyFingerprintSha256: fingerprint,
     });
-  });
+  }
+
+  for (const [reviewerId, count] of activeByReviewer) {
+    if (count !== 1) {
+      throw new TypeError("Reviewer " + reviewerId + " must have exactly one active key during registry validity.");
+    }
+  }
+  if (activeByReviewer.size < 1) {
+    throw new TypeError("Trusted reviewer registry must contain at least one currently active reviewer key.");
+  }
+
+  const keysById = new Map(parsedEntries.map((entry) => [entry.keyId, entry]));
+  const replacedKeyIds = new Set();
+  for (const entry of parsedEntries) {
+    if (entry.replacesKeyId === null) continue;
+    const previous = keysById.get(entry.replacesKeyId);
+    if (!previous ||
+        previous.reviewerId !== entry.reviewerId ||
+        previous.status !== "revoked" ||
+        previous.revokedAt === null ||
+        previous.revokedAt > entry.validFrom ||
+        replacedKeyIds.has(previous.keyId)) {
+      throw new TypeError("Reviewer key " + entry.keyId + " must replace one prior revoked key for the same reviewer.");
+    }
+    replacedKeyIds.add(previous.keyId);
+  }
+
+  return parsedEntries
+    .filter((entry) => entry.status === "active")
+    .map((entry) => Object.freeze({
+      reviewerId: entry.reviewerId,
+      keyId: entry.keyId,
+      registryId: registry.registryId,
+      validFromUtc: registry.entries.find((item) => item.keyId === entry.keyId).validFromUtc,
+      validUntilUtc: registry.entries.find((item) => item.keyId === entry.keyId).validUntilUtc,
+      publicKey: entry.publicKey,
+      publicKeyFingerprintSha256: entry.publicKeyFingerprintSha256,
+    }));
+}
+
+function parseEd25519PublicKey(publicKeyPem, keyId) {
+  let publicKey;
+  try {
+    publicKey = createPublicKey(publicKeyPem);
+  } catch {
+    throw new TypeError("Trusted reviewer key " + keyId + " is not a valid public key.");
+  }
+  if (publicKey.asymmetricKeyType !== "ed25519") {
+    throw new TypeError("Trusted reviewer key " + keyId + " must use Ed25519.");
+  }
+  return publicKey;
 }
 
 function validateSubmission(submission, prepared) {
@@ -492,8 +660,13 @@ function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) 
   if (signature.length !== 64 || signature.toString("base64") !== signatureBase64) {
     throw new TypeError("signatureBase64 must decode to exactly 64 canonical Ed25519 signature bytes.");
   }
-  const trusted = reviewerKeys.find((item) => item.reviewerId === submission.reviewerId);
-  if (!trusted) throw new Error("reviewerId is not present in the server-configured trusted reviewer key registry.");
+  const trustedMatches = reviewerKeys.filter((item) => item.reviewerId === submission.reviewerId);
+  if (trustedMatches.length !== 1) {
+    throw new Error(trustedMatches.length === 0
+      ? "reviewerId has no currently active key in the server-configured trusted reviewer key registry."
+      : "reviewerId maps to multiple active keys; the registry must be corrected.");
+  }
+  const trusted = trustedMatches[0];
 
   const payloadBytes = canonicalSourceBoundReviewSubmissionBytes(submission);
   let signatureValid = false;
@@ -511,6 +684,10 @@ function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) 
     signatureBytes: signature,
     signatureSha256: sha256(signature),
     reviewerId: trusted.reviewerId,
+    keyId: trusted.keyId ?? "legacy-" + trusted.publicKeyFingerprintSha256.slice(0, 16),
+    registryId: trusted.registryId ?? "development-legacy-array",
+    validFromUtc: trusted.validFromUtc ?? null,
+    validUntilUtc: trusted.validUntilUtc ?? null,
     publicKeyFingerprintSha256: trusted.publicKeyFingerprintSha256,
   };
 }
@@ -601,6 +778,10 @@ export async function recordSourceBoundAuthenticatedReview({
     candidateGlbSha256: prepared.candidateSha256,
     geometryReportSha256: prepared.geometryReportSha256,
     reviewerId: signature.reviewerId,
+    reviewerKeyId: signature.keyId,
+    reviewerRegistryId: signature.registryId,
+    reviewerKeyValidFromUtc: signature.validFromUtc,
+    reviewerKeyValidUntilUtc: signature.validUntilUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     signedPayloadSha256: signature.payloadSha256,
     signatureSha256: signature.signatureSha256,
@@ -609,6 +790,9 @@ export async function recordSourceBoundAuthenticatedReview({
     reviewContractVersion: REVIEW_SCHEMA_VERSION,
     decision: normalizedSubmission.decision,
     reviewerId: signature.reviewerId,
+    reviewerKeyId: signature.keyId,
+    reviewerRegistryId: signature.registryId,
+    reviewerKeyValidUntilUtc: signature.validUntilUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     candidateGeometryValidated: false,
     groundTruth: false,
@@ -677,6 +861,10 @@ export async function recordSourceBoundAuthenticatedReview({
       method: "ed25519-signature-over-canonical-review-payload",
       status: "signature-verified-against-server-trusted-reviewer-key",
       reviewerId: signature.reviewerId,
+      reviewerKeyId: signature.keyId,
+      reviewerRegistryId: signature.registryId,
+      reviewerKeyValidFromUtc: signature.validFromUtc,
+      reviewerKeyValidUntilUtc: signature.validUntilUtc,
       reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
       signedPayloadSha256: signature.payloadSha256,
       signatureAlgorithm: "Ed25519",
@@ -711,7 +899,8 @@ export async function recordSourceBoundAuthenticatedReview({
     },
     parameters: {
       reviewerId: signature.reviewerId,
-      reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
+      reviewerKeyId: signature.keyId,
+      reviewerRegistryId: signature.registryId,
       decision: normalizedSubmission.decision,
     },
   });
@@ -856,11 +1045,18 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
   requireMetadata("source-manifest-candidate-hash", sourceManifest?.candidateGlbSha256 === prepared.candidateSha256);
   requireMetadata("source-manifest-geometry-report-hash", sourceManifest?.geometryReportSha256 === prepared.geometryReportSha256);
   requireMetadata("source-manifest-reviewer-id", sourceManifest?.reviewerId === authentication?.reviewerId);
+  requireMetadata("source-manifest-key-id", sourceManifest?.reviewerKeyId === authentication?.reviewerKeyId);
+  requireMetadata("source-manifest-registry-id", sourceManifest?.reviewerRegistryId === authentication?.reviewerRegistryId);
+  requireMetadata("source-manifest-key-valid-from", sourceManifest?.reviewerKeyValidFromUtc === authentication?.reviewerKeyValidFromUtc);
+  requireMetadata("source-manifest-key-valid-until", sourceManifest?.reviewerKeyValidUntilUtc === authentication?.reviewerKeyValidUntilUtc);
   requireMetadata("source-manifest-key-fingerprint", sourceManifest?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
   requireMetadata("source-manifest-signed-payload-hash", sourceManifest?.signedPayloadSha256 === authentication?.signedPayloadSha256);
   requireMetadata("job-config-review-contract", jobConfig?.reviewContractVersion === REVIEW_SCHEMA_VERSION);
   requireMetadata("job-config-decision", jobConfig?.decision === decisionRecord.decision);
   requireMetadata("job-config-reviewer-id", jobConfig?.reviewerId === authentication?.reviewerId);
+  requireMetadata("job-config-key-id", jobConfig?.reviewerKeyId === authentication?.reviewerKeyId);
+  requireMetadata("job-config-registry-id", jobConfig?.reviewerRegistryId === authentication?.reviewerRegistryId);
+  requireMetadata("job-config-key-valid-until", jobConfig?.reviewerKeyValidUntilUtc === authentication?.reviewerKeyValidUntilUtc);
   requireMetadata("job-config-key-fingerprint", jobConfig?.reviewerPublicKeyFingerprintSha256 === authentication?.reviewerPublicKeyFingerprintSha256);
   for (const flag of ["candidateGeometryValidated", "groundTruth", "acceptanceEligible", "publicationEligible", "publishable", "mapReady", "automaticApproval", "dispatchAllowed"]) {
     requireMetadata("job-config-" + flag + "-false", jobConfig?.[flag] === false);
@@ -933,6 +1129,10 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
     candidateGlbSha256: prepared.candidateSha256,
     geometryReportSha256: prepared.geometryReportSha256,
     reviewerId: signature.reviewerId,
+    reviewerKeyId: signature.keyId,
+    reviewerRegistryId: signature.registryId,
+    reviewerKeyValidFromUtc: signature.validFromUtc,
+    reviewerKeyValidUntilUtc: signature.validUntilUtc,
     reviewerPublicKeyFingerprintSha256: signature.publicKeyFingerprintSha256,
     signedPayloadSha256: signature.payloadSha256,
     signatureSha256: signature.signatureSha256,
