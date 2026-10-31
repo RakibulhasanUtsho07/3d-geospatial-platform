@@ -377,3 +377,15 @@ The code now supports a zero-active-key emergency lockout, but signing and recei
 - PR #292 remains Draft/open/unmerged and stacked on D3M-01.F PR #290. No child-stack merge or promotion to `development`/`main`.
 - **Operator action still required:** production reviewer identity/authority verification and secret-manager provisioning have not occurred. Run the new CLI inside the actual deployment environment after provisioning; record only sanitized IDs/counts/fingerprints, never secret values or reviewer identity data.
 - **Accuracy is still unproven:** rights-cleared asset pairing, same-building linkage, independent survey geometry/frame and six held-out checkpoints are missing. No ground-truth, acceptance, publication, map-ready or automatic-approval flag may be enabled on the basis of CI success.
+
+
+## 2026-10-31 — BRF-14 immutable Hugging Face revision pin
+
+- [Issue #293](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/293) / Draft [PR #294](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/294), branch `feat/brf14-pin-hf-revision-20261031`.
+- Exact head `3897523a88bd6a868e90deef0339aa0c985ca3e5`; base `development` head `98b2fa56f387c2bdbf4dad5c24e6f131dd66d076`.
+- BRF-14's 16 image URLs are pinned to Hugging Face data revision `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f`; GitHub inventory/checksum/COLMAP metadata is separately pinned to `19b3ce9cccf3e8fd414ff705f75d0f2105846fc1`. Mutable `resolve/main` is rejected.
+- BRF-14/BRF-42 workflow #41170936404 passed: 16/16 actual image bytes and SHA-256 values verified; private intake and quality preflight pass.
+- BRF-45 workflow #41170936394 passed, while confirming all real exact-asset rights rows remain blocked pending grant evidence.
+- BRF-16 #41170936442 and BRF-18 #41170936439 passed.
+- Full repository CI #41170936398 is still running on this exact head. No merge or branch promotion until terminal success and review. PR #294 remains Draft.
+- This is not a reconstruction accuracy pass. Source imagery rights are scope-limited; no reference GLB/OBJ rights, independent survey or held-out checkpoints have been admitted. Keep all real-world and release gates false.
