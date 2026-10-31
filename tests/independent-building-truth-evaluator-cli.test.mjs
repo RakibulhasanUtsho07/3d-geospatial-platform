@@ -309,7 +309,7 @@ test("replay catches a caller changing candidate geometry even after refreshing 
   assert.equal(report.geometryReplay.candidate.status, "failed");
   assert.equal(report.metrics, null);
   assert.equal(report.metricComputation.status, "withheld");
-  assert.ok(report.failures.some((check) => check.id === "authenticated-review-required-before-metrics"));
+  assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "candidate-geometry-replay-from-source-bytes"));
 });
 
@@ -399,9 +399,9 @@ test("withholds metrics when candidate GLB bytes differ from the pinned source h
   assert.equal(report.authenticatedReview.status, "blocked");
   assert.equal(report.metrics, null);
   assert.equal(report.metricComputation.status, "withheld");
-  assert.match(report.authenticatedReview.reason, /does not bind the exact BRF-25/);
+  assert.match(report.authenticatedReview.reason, /Candidate GLB bytes no longer match the immutable hand-off identity/);
   assert.ok(report.failures.some((check) =>
-    check.id === "geometry-metrics-withheld-until-source-replay-passes"));
+    check.id === "authenticated-review-required-before-metrics"));
   assert.ok(Object.values(report.policy).every((value) => value === false));
 });
 
