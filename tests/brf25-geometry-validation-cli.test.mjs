@@ -183,6 +183,11 @@ const copyMap = [
   ["src/core/building-generation/independent-reference-geometry-adapter.mjs", "../src/core/building-generation/independent-reference-geometry-adapter.mjs"],
   ["src/core/building-generation/geometry-extraction-provenance.mjs", "../src/core/building-generation/geometry-extraction-provenance.mjs"],
   ["src/core/building-generation/independent-building-truth-evaluator.mjs", "../src/core/building-generation/independent-building-truth-evaluator.mjs"],
+  ["src/core/building-generation/source-bound-authenticated-review.mjs", "../src/core/building-generation/source-bound-authenticated-review.mjs"],
+  ["src/core/building-generation/source-bound-reconstruction-handoff.mjs", "../src/core/building-generation/source-bound-reconstruction-handoff.mjs"],
+  ["src/core/building-generation/reconstruction-job-state.mjs", "../src/core/building-generation/reconstruction-job-state.mjs"],
+  ["src/core/building-generation/glb-geometry-qa.mjs", "../src/core/building-generation/glb-geometry-qa.mjs"],
+  ["src/core/building-generation/mesh-topology-qa.mjs", "../src/core/building-generation/mesh-topology-qa.mjs"],
 ];
 
 async function setup(t, { staleConfigHash = false, reviewDecision = "continue-to-independent-validation" } = {}) {
