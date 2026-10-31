@@ -754,3 +754,8 @@ The first D3M-01.E implementation protected `scripts/run-brf25-geometry-validati
 - All candidate geometry validation, independent-reference verification, held-out checkpoint accuracy, ground-truth, acceptance, publication, map-ready and dispatch flags remain false. No production reviewer registry or real human signature is claimed.
 
 **Next:** finish exact-head CI, inspect the test logs for both direct evaluator and BRF-25 caller paths, then audit all other commands that can write an independent-truth report. Keep #281 → #284 → #286 → #288 Draft/unmerged.
+
+
+### D3M-01.E extraction-entrypoint hardening follow-up (2026-10-31)
+
+The independent-truth preparation CLI `scripts/prepare-independent-building-truth-manifest.mjs` is also a direct GLB geometry-extraction entry point. It now independently requires the same D3M-01.D signed reviewer receipt, building ID, review job ID, workspace and current trusted-key registry before extracting candidate geometry. The BRF-25 runner passes the verified context to both the preparer and the evaluator subprocess; each subprocess re-verifies the immutable receipt rather than relying on a parent-process Boolean. Tests in the geometry-preparation CLI fixture now create synthetic signed D3M-01.D records and cover missing receipt and rotated-key rejection. Current code head: `5c4886630279b2d6684dd19c61b261f416c6b58a`; exact-head CI [#41159947313](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41159947313) was still in progress at the time of this documentation commit, during dependency installation. No new CI pass is claimed. All truth/accuracy/acceptance/publication/map-ready/dispatch flags remain false.
