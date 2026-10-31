@@ -363,7 +363,7 @@ async function main() {
       ],
       evaluationManifestSha256: manifestSha256,
     };
-    await writeFile(reportPath, JSON.stringify(blockedReport, null, 2) + "\\n", { flag: "wx", mode: 0o600 });
+    await writeFile(reportPath, JSON.stringify(blockedReport, null, 2) + "\n", { flag: "wx", mode: 0o600 });
     console.log(JSON.stringify({
       reportPath: path.relative(root, reportPath).split(path.sep).join("/"),
       status: blockedReport.status,
