@@ -399,7 +399,7 @@ test("withholds metrics when candidate GLB bytes differ from the pinned source h
   assert.equal(report.authenticatedReview.status, "blocked");
   assert.equal(report.metrics, null);
   assert.equal(report.metricComputation.status, "withheld");
-  assert.match(report.authenticatedReview.reason, /does not bind the exact BRF-25/);
+  assert.match(report.authenticatedReview.reason, /Candidate GLB bytes no longer match/);
   assert.ok(report.failures.some((check) =>
     check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(Object.values(report.policy).every((value) => value === false));
