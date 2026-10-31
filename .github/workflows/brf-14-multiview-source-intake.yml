@@ -96,7 +96,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/brf14/images" artifacts/brf-14
           while IFS=$'\t' read -r filename url; do
             [[ "$filename" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Unsafe filename in manifest"; exit 1; }
-            [[ "$url" == https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/* ]] || { echo "Source URL is not allowlisted"; exit 1; }
+            [[ "$url" == https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f/flat-roof/images/* ]] || { echo "Source URL is not allowlisted"; exit 1; }
             curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
               --connect-timeout 20 --max-time 180 \
               "$url" --output "$RUNNER_TEMP/brf14/images/$filename"
