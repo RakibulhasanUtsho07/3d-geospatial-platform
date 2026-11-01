@@ -137,6 +137,9 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.equal(sourceHeight.unclampedHeightMeters, 18.5);
   assert.equal(sourceHeight.heightWasClamped, false);
   assert.equal(sourceHeight.reportedMinHeightMeters, 1.2);
+  assert.equal(sourceHeight.reportedMinFloor, null);
+  assert.equal(sourceHeight.baseHeightSource, "overture-min-height");
+  assert.equal(sourceHeight.baseHeightEstimated, false);
   assert.equal(sourceHeight.baseHeightMeters, 1.2);
   assert.equal(sourceHeight.unclampedBaseHeightMeters, 1.2);
   assert.equal(sourceHeight.baseHeightWasClamped, false);
@@ -231,7 +234,12 @@ test("builds a real multi-content OGC 3D Tiles 1.1 hierarchy from source footpri
   assert.equal(manifest.releaseFlags.mapReady, false);
   assert.equal(manifest.releaseFlags.automaticApproval, false);
   assert.equal(tileset.asset.extras.heightStatus, "synthetic-test-height");
-  assert.equal(manifest.tiles.every((tile) => tile.heightEvidence.baseHeightMeters === 0 && tile.heightEvidence.topHeightMeters === 8), true);
+  assert.equal(manifest.tiles.every((tile) =>
+    tile.heightEvidence.baseHeightMeters === 0 &&
+    tile.heightEvidence.topHeightMeters === 8 &&
+    tile.heightEvidence.baseHeightSource === "synthetic-test-height" &&
+    tile.heightEvidence.baseHeightEstimated === false
+  ), true);
   assert.ok(manifest.excludedCounts.outsideBounds >= 1);
   assert.ok(manifest.excludedCounts.invalidHoleGeometry >= 1);
   assert.equal(manifest.excludedCounts.interiorRingsUnsupported, undefined);
