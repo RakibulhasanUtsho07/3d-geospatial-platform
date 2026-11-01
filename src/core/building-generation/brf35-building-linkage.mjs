@@ -166,6 +166,13 @@ export function validateBrf35BuildingLinkage(manifest, sourceReport) {
   const identity = object(manifest.identity) ? manifest.identity : {};
   const refs = Array.isArray(identity.evidenceRefs) ? identity.evidenceRefs : [];
   const records = sourceRecords(manifest);
+  const allSourceAssetIds = records.map((asset) => asset.assetId);
+  const sourceAssetIdsUnique = allSourceAssetIds.every(identifier) &&
+    allSourceAssetIds.length === new Set(allSourceAssetIds).size;
+  add(checks, blockers, "source-asset-ids-globally-unique", sourceAssetIdsUnique,
+    sourceAssetIdsUnique
+      ? "CityGML, image, ULS and survey source roles each use a globally unique asset ID."
+      : "Source asset IDs must be valid and unique across CityGML, image, ULS and survey roles.");
   const refsValid = refs.every((ref) => object(ref) && identifier(ref.assetId) &&
     hash(ref.sha256) && nonEmpty(ref.role) && records.some((asset) =>
       asset.assetId === ref.assetId && asset.sha256?.toLowerCase() === ref.sha256.toLowerCase() && asset.role === ref.role));
@@ -203,6 +210,16 @@ export function validateBrf35BuildingLinkage(manifest, sourceReport) {
       "Source/target vertical datum or approved reproducible vertical operation is missing.");
 
   const candidate = object(manifest.candidateGlb) ? manifest.candidateGlb : {};
+  const candidateAssetIdDistinct = identifier(candidate.assetId) &&
+    !records.some((asset) => asset.assetId === candidate.assetId);
+  const candidateShaDistinct = hash(candidate.sha256) &&
+    records.every((asset) => !hash(asset.sha256) ||
+      asset.sha256.toLowerCase() !== candidate.sha256.toLowerCase());
+  const candidateDistinctFromSources = candidateAssetIdDistinct && candidateShaDistinct;
+  add(checks, blockers, "candidate-glb-distinct-from-all-source-assets", candidateDistinctFromSources,
+    candidateDistinctFromSources
+      ? "Candidate GLB has a distinct asset ID and SHA-256 from every source/reference asset."
+      : "Candidate GLB asset ID and SHA-256 must both differ from every CityGML, image, ULS and survey source asset.");
   const candidateOk = candidate.status === "generated" && candidate.role === "platform-reconstruction-candidate" &&
     identifier(candidate.assetId) && hash(candidate.sha256) && nonEmpty(candidate.path) &&
     candidate.pipeline === "platform-reconstruction-pipeline" &&
