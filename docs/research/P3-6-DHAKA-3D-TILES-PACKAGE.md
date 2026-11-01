@@ -225,3 +225,12 @@ The previous exact-head P3.6 run `41319856042` completed all 28 dedicated workfl
 **Branch integration:** the P3.6 branch had been based on `98b2fa56`, five commits behind the updated `development`. Since the only changed paths on the development side were the CI workflow and BRF-35 validator/test, a two-parent merge commit `62520c0d86fab0b57cbfe247e7d96a4457fc6e41` preserves the P3.6 tree while incorporating those exact development versions. The branch is now directly based on `development@f7b2a67`; the compare endpoint reports zero commits behind and GitHub reports the PR mergeable.
 
 The latest merge-synchronized head requires fresh exact-head CI and dedicated P3.6 workflow. The successful run and artifacts above validate the immediately preceding P3.6 code head, not the new merge commit.
+
+
+## P3.7 — source-bound building composition and roof/facade metadata
+
+The P3.6 package now has a follow-on evidence layer. It validates Overture Buildings v2.0.0 metadata fields for building/building_part type, parent IDs, has_parts, facade colors/materials and roof color/material/shape/direction/orientation/height. It also audits building-part parent references across the full input FeatureCollection and records whether linked parent/part records are both selected into the bounded tile package.
+
+Every emitted GLB and manifest tile contains the same source-derived architecture-evidence record. The independent alignment reviewer recomputes that record and the full source composition audit, and verifies source/GLB/manifest/aggregate agreement. A self-consistent GLB+manifest edit that contradicts the source is rejected.
+
+This does **not** yet turn metadata into architecture geometry. The generated GLBs remain footprint extrusions, and the summary explicitly reports zero rendered architectural details. See [P3.7 implementation contract](./P3-7-BUILDING-COMPOSITION-EVIDENCE.md). Facade/roof meshes, parent/part assembly, texture mapping and architectural acceptance remain future work.
