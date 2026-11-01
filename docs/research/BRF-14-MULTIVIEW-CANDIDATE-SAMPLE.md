@@ -134,3 +134,16 @@ BRF-14 revision pinning was retargeted from the previous `development@98b2fa56f3
 The exact-head validation recorded above belongs to PR head `3897523a88bd6a868e90deef0339aa0c985ca3e5` on the prior base. It is useful byte-integrity evidence, but the current-base PR must receive fresh exact-head Full CI and BRF-14/BRF-45 intake checks before promotion.
 
 The retarget does not change the pinned Hugging Face data revision, selected image SHA-256 values, source-declared imagery license status, or any release flag. Rights remain source-declared/pending independent authority review; the reference model and any derived output are outside the imagery-only licence statement.
+
+
+## Current-base exact-head validation — 2026-11-01
+
+The PR was retargeted to `development@f7b2a67fcf0c34623196fa92e719640086e2adce` after BRF-47 was merged. The current PR head `5fbde143c88793a19f283e18758d8bd80c0a1bdb` has completed these exact-head checks successfully:
+
+- Full CI: [run 41313060929](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060929).
+- Immutable BRF-14 source-byte intake: [run 41313060911](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060911).
+- BRF-45 exact-asset rights-admission workflow: [run 41313061024](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313061024).
+- BRF-16 reference inspection: [run 41313060887](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060887).
+- BRF-18 footprint cross-check: [run 41313060901](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060901).
+
+A successful workflow means its automated checks completed; it does not mean that BRF-45 admitted real-world rights. The imagery licence remains source-declared and not independently authenticated. The reference GLB/OBJ, visible trademarks/signage, and derived model outputs are not covered by an assumed extension of the imagery licence. No same-building validation, independent survey/checkpoint match, platform-generated GLB or reconstruction accuracy result is established here. No independent reviewer approval is recorded for PR #294; it remains Draft and unmerged. Keep all acceptance/publication/map/automatic-approval flags false.
