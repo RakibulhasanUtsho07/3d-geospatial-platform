@@ -4,6 +4,8 @@
  * This module validates claims already present on a feature. It deliberately
  * does not infer a roof, facade, part count, or architectural style when a
  * field is absent. Geometry generation remains a separate, reviewed stage.
+ * Field names, value types and enumerations are pinned to Overture Buildings
+ * schema v2.0.0; this is source-shape validation, not human verification.
  */
 export const OVERTURE_BUILDINGS_SCHEMA_VERSION = "2.0.0";
 
@@ -70,7 +72,8 @@ function sourceText(properties, key) {
   if (typeof raw !== "string" || raw.trim() === "") {
     return { status: "invalid", value: null };
   }
-  return { status: "source", value: raw.trim().toLowerCase() };
+  if (raw.trim() !== raw) return { status: "invalid", value: null };
+  return { status: "source", value: raw };
 }
 
 function sourceEnum(properties, key, allowed) {
@@ -91,8 +94,8 @@ function sourceColor(properties, key) {
   return { status: "source", value: color.toLowerCase() };
 }
 
-function sourcePositiveNumber(properties, key, {
-  minimum = 0,
+function sourceNumber(properties, key, {
+  minimum = -Infinity,
   exclusiveMinimum = false,
   maximum = Infinity,
   exclusiveMaximum = false,
@@ -123,10 +126,10 @@ function sourceIdentifier(properties, key) {
     return { status: "absent", value: null };
   }
   const value = properties[key];
-  if ((typeof value !== "string" && typeof value !== "number") || String(value).trim() === "") {
+  if (typeof value !== "string" || value.length === 0 || value.trim() !== value || /\\s/.test(value)) {
     return { status: "invalid", value: null };
   }
-  return { status: "source", value: String(value) };
+  return { status: "source", value };
 }
 
 /**
@@ -149,13 +152,15 @@ export function resolveBuildingArchitectureEvidence(properties) {
   const roofColor = sourceColor(properties, "roof_color");
   const roofMaterial = sourceEnum(properties, "roof_material", ROOF_MATERIALS);
   const roofShape = sourceEnum(properties, "roof_shape", ROOF_SHAPES);
-  const roofDirection = sourcePositiveNumber(properties, "roof_direction", {
+  const roofDirection = sourceNumber(properties, "roof_direction", {
     minimum: 0,
     maximum: 360,
     exclusiveMaximum: true,
   });
   const roofOrientation = sourceEnum(properties, "roof_orientation", ROOF_ORIENTATIONS);
-  const roofHeight = sourcePositiveNumber(properties, "roof_height", { minimum: 0, exclusiveMinimum: true });
+  // Overture v2 declares roof_height as float64 without a positivity bound.
+  // Preserve the finite source value; the mesh stage owns its geometry policy.
+  const roofHeight = sourceNumber(properties, "roof_height");
 
   let compositionStatus = "feature-type-unknown";
   if (featureType.status === "source" && featureType.value === "building_part") {
