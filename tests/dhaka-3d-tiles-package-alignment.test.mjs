@@ -52,6 +52,29 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function rewriteGlbJson(bytes, gltf) {
+  const oldJsonLength = bytes.readUInt32LE(12);
+  const binaryHeaderOffset = 20 + oldJsonLength;
+  const binaryLength = bytes.readUInt32LE(binaryHeaderOffset);
+  const binaryChunkType = bytes.readUInt32LE(binaryHeaderOffset + 4);
+  const binaryChunk = bytes.subarray(binaryHeaderOffset + 8, binaryHeaderOffset + 8 + binaryLength);
+  const jsonBytes = Buffer.from(JSON.stringify(gltf), "utf8");
+  const paddedJson = Buffer.concat([jsonBytes, Buffer.alloc((4 - jsonBytes.length % 4) % 4, 0x20)]);
+  const paddedBinary = Buffer.concat([binaryChunk, Buffer.alloc((4 - binaryChunk.length % 4) % 4)]);
+  const totalLength = 12 + 8 + paddedJson.length + 8 + paddedBinary.length;
+  const header = Buffer.alloc(12);
+  header.write("glTF", 0, "ascii");
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(totalLength, 8);
+  const jsonHeader = Buffer.alloc(8);
+  jsonHeader.writeUInt32LE(paddedJson.length, 0);
+  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
+  const binaryHeader = Buffer.alloc(8);
+  binaryHeader.writeUInt32LE(paddedBinary.length, 0);
+  binaryHeader.writeUInt32LE(binaryChunkType, 4);
+  return Buffer.concat([header, jsonHeader, paddedJson, binaryHeader, paddedBinary]);
+}
+
 before(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), "p3-6-package-alignment-"));
   sourcePath = path.join(root, "source.geojson");
@@ -241,4 +264,49 @@ test("rejects manifest height provenance drift even if the GLB hash is unchanged
   const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
   assert.equal(report.status, "fail");
   assert.ok(report.errors.some((error) => /height provenance does not match/i.test(error)));
+});
+
+test("rejects source-height claims that are self-consistent in GLB and manifest but disagree with source properties", async () => {
+  const sourceDerivedPackage = path.join(root, "source-height-tamper-package");
+  await buildDhaka3DTilesPackage({
+    sourcePath,
+    outputPath: sourceDerivedPackage,
+    maxFeatures: 16,
+  });
+
+  const manifestPath = path.join(sourceDerivedPackage, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const tile = manifest.tiles.find((item) => item.featureId === "alignment-square");
+  assert.ok(tile);
+  const glbPath = path.join(sourceDerivedPackage, tile.contentUri);
+  const glb = await readFile(glbPath);
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength));
+
+  // The source fixture says height=18m and min_height=2.5m. Rebind a forged
+  // 19m/21.5m interval consistently in both GLB and manifest, then rehash it.
+  // The reviewer must still reject it by recomputing from the source feature.
+  gltf.extras.heightMeters = 19;
+  gltf.extras.unclampedHeightMeters = 19;
+  gltf.extras.topHeightMeters = 21.5;
+  tile.heightEvidence.heightMeters = 19;
+  tile.heightEvidence.unclampedHeightMeters = 19;
+  tile.heightEvidence.topHeightMeters = 21.5;
+
+  const forgedGlb = rewriteGlbJson(glb, gltf);
+  await writeFile(glbPath, forgedGlb);
+  const forgedHash = sha256(forgedGlb);
+  tile.contentSha256 = forgedHash;
+  tile.bytes = forgedGlb.length;
+  manifest.files[tile.contentUri] = { sha256: forgedHash, bytes: forgedGlb.length };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({
+    sourcePath,
+    packageDirectory: sourceDerivedPackage,
+  });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) =>
+    /height provenance does not match/i.test(error),
+  ));
 });
