@@ -215,6 +215,12 @@ test("candidate fit-source references reject missing, duplicate, stale, wrong-ro
     manifest => { manifest.accuracy.fitSourceAssetRefs.push({ ...manifest.accuracy.fitSourceAssetRefs[0] }); },
     manifest => { manifest.accuracy.fitSourceAssetRefs[0].sha256 = sha("f"); },
     manifest => { manifest.accuracy.fitSourceAssetRefs[0].role = "uls"; },
+    manifest => {
+      const survey = manifest.assets.surveyControls[0];
+      manifest.accuracy.fitSourceAssetRefs.push({
+        assetId: survey.assetId, sha256: survey.sha256, role: "survey-control"
+      });
+    },
     manifest => { manifest.accuracy.fitSourceAssetRefs[0].assetId = "unknown-fit-source"; },
     manifest => { manifest.accuracy.fitSourceAssetRefs[0] = null; },
   ];
