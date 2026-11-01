@@ -172,12 +172,13 @@ async function ensurePublicCatalogDirectory(outputRoot) {
   }
   return current;
 }
-\nasync function acquireCatalogPublishLock(lockDir) {
+
+async function acquireCatalogPublishLock(lockDir) {
   const ownerPath = path.join(lockDir, "owner");
   const ownerToken = randomUUID();
   try {
     await mkdir(lockDir, { recursive: false, mode: 0o700 });
-    await writeFile(ownerPath, ownerToken + "\\n", { flag: "wx", mode: 0o600 });
+    await writeFile(ownerPath, ownerToken + "\n", { flag: "wx", mode: 0o600 });
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {
       throw new Error("A generated-model catalog publication is already in progress.");
