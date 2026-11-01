@@ -174,7 +174,9 @@ export function resolveBuildingArchitectureEvidence(properties) {
   }
 
   const roofGeometryStatus = roofShape.status === "source" && roofHeight.status === "source"
-    ? "source-roof-shape-and-height-present-geometry-not-yet-generated"
+    ? roofHeight.value > 0
+      ? "source-roof-shape-and-positive-height-present-geometry-not-yet-generated"
+      : "source-roof-height-nonpositive-geometry-not-renderable"
     : roofShape.status === "invalid" || roofHeight.status === "invalid"
       ? "invalid-roof-metadata"
       : roofShape.status === "source"
