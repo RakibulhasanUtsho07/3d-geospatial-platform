@@ -51,3 +51,15 @@ These are metadata and provenance counts, not geometry, legal clearance or corre
 ## Release boundary
 
 No roof/facade mesh, window, door, texture, imagery match or parent/part geometry assembly is generated. This task does not establish physical truth, survey accuracy, imagery rights, architectural likeness or 90% reconstruction accuracy. Keep acceptanceEligible, publicationEligible, mapReady and automaticApproval false.
+
+
+## Final exact-head validation — PASS (2026-11-01)
+
+The P3.8 implementation head `ff8a37b9ba1d75ea62259a7df6364a521fcdefa5` completed the exact-head checks:
+
+- Full CI PR run [#41330328989](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41330328989): **PASS, 182/182 workflow steps; zero failures**. This includes lint, production build, production-server viewport API verification, browser integration and evidence artifact uploads.
+- Dedicated P3.8/P3.6 PR workflow [#41330328994](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41330328994): **PASS, 31/31 steps**. The live Cesium multi-tile selective-fetch and controller lifecycle checks passed on that tested head.
+- The PR #300 base is the P3.7 head `cd3eff7e7b557d2690a9d755bee1aef7d379b8be`; P3.7 Full CI [#41329725567](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41329725567) also completed successfully, 181/181.
+- PR #300 remains Draft. There are no independent reviews or review threads. PR #299 also remains Draft and unreviewed. No merge was performed.
+
+The validation establishes reproducible software/package behavior only. It does not create architectural geometry, prove source rights, confirm a real building's identity, establish survey accuracy, or authorize publication/map readiness. All four release flags remain false. A subsequent documentation-only commit changes the PR head and therefore requires its own exact-head CI before that updated head can be called fully validated.
