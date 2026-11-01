@@ -60,7 +60,7 @@ The route uses the common timing-safe bearer-token verifier with a distinct serv
 - The app's public directory must be writable and persistent for this deployment mode. If the runtime filesystem is read-only/ephemeral, publication must be performed by a deployment pipeline or a separate durable object-store/catalog service instead; do not report a successful live publish in that environment.
 - Before publication, the existing core function rechecks completed job status, approved review decision, queue request checksum and identity, immutable review-record checksum, all required checklist flags, candidate GLB hash, QA-report hash and report status. Workspace-relative files must be regular non-symlink files within the workspace.
 - The existing catalog publisher validates the GLB 2.0 container, evidence checksum, review checks, model identity and placement. It stores a versioned content-addressed asset and atomically replaces the manifest.
-- Catalog manifest updates are serialized by `public/models/generated/.publish.lock`. If a process crashes while holding the lock, an operator must first verify no publisher is active, then remove the stale lock directory before retrying. Do not delete a live lock.
+- Catalog manifest updates are serialized by `.generated-model-catalog.publish.lock`. If a process crashes while holding the lock, an operator must first verify no publisher is active, then remove the stale lock directory before retrying. Do not delete a live lock.
 - The browser never loads the API's returned `assetUrl` directly. It rereads the manifest and requires an exact match for model ID, active version ID, SHA-256 and URL before loading.
 
 ## Trust and release boundary
