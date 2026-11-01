@@ -188,16 +188,44 @@
           throw new Error("Architecture metadata field coverage does not match tile count: " + fieldName);
         }
       }
-      return summary;
+      const composition = build.configuration?.sourceCompositionAuditSummary;
+      if (!composition || composition.schema !== "overture-buildings-2.0.0" ||
+          !Number.isSafeInteger(composition.sourceFeatureCount) ||
+          composition.sourceFeatureCount < tiles.length ||
+          !Number.isSafeInteger(composition.buildingFeatureCount) || composition.buildingFeatureCount < 0 ||
+          !Number.isSafeInteger(composition.buildingPartFeatureCount) || composition.buildingPartFeatureCount < 0 ||
+          !Number.isSafeInteger(composition.linkedPartCount) || composition.linkedPartCount < 0 ||
+          composition.linkedPartCount > composition.buildingPartFeatureCount ||
+          !Number.isSafeInteger(composition.selectedFeatureCount) || composition.selectedFeatureCount !== tiles.length ||
+          !composition.partStatusCounts || typeof composition.partStatusCounts !== "object" ||
+          !composition.parentStatusCounts || typeof composition.parentStatusCounts !== "object") {
+        throw new Error("The package has no valid source-wide parent/part composition audit.");
+      }
+      const partStatusTotal = Object.values(composition.partStatusCounts).reduce((sum, count) => {
+        if (!Number.isSafeInteger(count) || count < 0) throw new Error("Invalid parent/part link status count.");
+        return sum + count;
+      }, 0);
+      if (partStatusTotal !== composition.buildingPartFeatureCount) {
+        throw new Error("Parent/part audit status counts do not cover every source BuildingPart.");
+      }
+      return { ...summary, sourceCompositionAuditSummary: composition };
     }
 
     function describeArchitectureEvidence(summary) {
       const roof = summary.fieldAvailability["roof.shape"];
       const facade = summary.fieldAvailability["facade.material"];
       const parentParts = summary.compositionStatusCounts["parent-declares-associated-parts"] ?? 0;
+      const composition = summary.sourceCompositionAuditSummary;
+      const unresolvedParts = (composition.partStatusCounts["parent-feature-not-in-source-extract"] ?? 0) +
+        (composition.partStatusCounts["missing-or-invalid-parent-id"] ?? 0);
+      const ambiguousParts = composition.partStatusCounts["ambiguous-duplicate-parent-feature-id"] ?? 0;
+      const packagePartLinks = summary.compositionLinkStatusCounts["parent-feature-resolved"] ?? 0;
       return "Source metadata: roof shape " + roof.source + "/" + summary.tileCount +
         " · facade material " + facade.source + "/" + summary.tileCount +
         " · parents declaring parts " + parentParts +
+        " · source parts linked " + composition.linkedPartCount + "/" + composition.buildingPartFeatureCount +
+        " · unresolved/ambiguous parts " + unresolvedParts + "/" + ambiguousParts +
+        " · linked part tiles in package " + packagePartLinks +
         ". Geometry: footprint extrusion only; rendered architectural details: 0.";
     }
 
@@ -453,7 +481,9 @@
         },
         heightEvidence,
         architectureEvidenceSummary,
+        sourceCompositionAuditSummary: architectureEvidenceSummary.sourceCompositionAuditSummary,
         limitations: [
+          "BuildingPart parent references are source-ID audit evidence only; parent and part geometries are not assembled into a single building mesh.",
           heightEvidence.policy === "per-feature-provenance"
             ? "Per-feature height values are Overture source attributes, floor estimates or fallback estimates; none is independent survey truth."
             : "An explicit synthetic test height was used; it is not source height or survey evidence.",
