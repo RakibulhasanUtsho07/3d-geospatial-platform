@@ -187,3 +187,14 @@ The default bounded Dhaka 3D Tiles package now derives each tile's vertical inte
 - Production review-package build and the P3.6 dedicated workflow no longer force a synthetic 8 m override. The 32/64/128 bounded scale profile exercises source-derived per-feature intervals by default.
 
 **Vertical limitation remains:** the source extract has 2D footprints and no verified terrain elevation/vertical datum. The ENU origin remains at WGS84 ellipsoid height zero; `min_height` is only a relative above-ground offset from this unverified plane, and a `min_floor` conversion is an estimate. No surveyed absolute elevations, building accuracy, rights or release readiness are claimed. Exact-head CI and live browser validation are required before this slice is promoted.
+
+
+### P3.6 browser evidence audit — 2026-11-01
+
+- The previous dedicated run `41319856042` passed all 28 steps and uploaded browser, controller, alignment, scale-profile and bounded package artifacts. Its 32-content sample passed every footprint/placement check: max horizontal residual 0.067196 m, max perimeter difference 0.215084 m, max vertical transform residual 0.000032 m, zero degenerate triangles.
+- The 32/64/128 scale samples all passed; per-sample package bytes and phase-boundary RSS are retained in the uploaded profile. RSS is not peak memory and shared-runner timings are not production SLOs.
+- Live Cesium fetched one child GLB on the first viewport and one new GLB after a pan, without fetching the full 32-content package or reporting tile failures.
+- Artifact review caught an outdated browser limitation sentence claiming uniform synthetic heights even though the current build used per-feature provenance. The browser review page and Playwright test were corrected to derive and assert the actual height-policy/source counts from the build manifest.
+- Screenshot review still shows simple cuboid footprint extrusions, not building architecture. Facades, fenestration, roof form, textures and human visual acceptance remain unimplemented/blocked.
+- The 32-tile sample contained 19 fallback estimates and 13 floor-count estimates, and no positive Overture `height` value. The 64/128 samples had only one Overture-provided height. Do not imply complete source height coverage.
+- P3.6 feature branch was synchronized with `development@f7b2a67` using a two-parent merge commit; current branch is no longer behind development. Fresh exact-head Full CI and dedicated workflow are mandatory after this integration and evidence-report fix.
