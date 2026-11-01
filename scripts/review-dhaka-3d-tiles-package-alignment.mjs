@@ -330,8 +330,8 @@ function sourceBoundarySegments(rings, anchorLongitude, anchorLatitude) {
   }
   return segments;
 }
-function recoverMeshBoundarySegments(triangles, height, label) {
-  const tolerance = Math.max(1e-4, height * 1e-6);
+function recoverMeshBoundarySegments(triangles, baseHeight, topHeight, label) {
+  const tolerance = Math.max(1e-4, topHeight * 1e-6);
   const segments = new Map();
   let degenerateTriangleCount = 0;
   for (const triangle of triangles) {
@@ -344,8 +344,8 @@ function recoverMeshBoundarySegments(triangles, height, label) {
       ab[0] * ac[1] - ab[1] * ac[0],
     ];
     if (vectorLength(cross) < 1e-8) degenerateTriangleCount += 1;
-    const ground = triangle.filter((point) => Math.abs(point[1]) <= tolerance);
-    const top = triangle.filter((point) => Math.abs(point[1] - height) <= tolerance);
+    const ground = triangle.filter((point) => Math.abs(point[1] - baseHeight) <= tolerance);
+    const top = triangle.filter((point) => Math.abs(point[1] - topHeight) <= tolerance);
     if (ground.length !== 2 || top.length !== 1) continue;
     const first = [ground[0][0], -ground[0][2]];
     const second = [ground[1][0], -ground[1][2]];
@@ -357,14 +357,14 @@ function recoverMeshBoundarySegments(triangles, height, label) {
   if (segments.size < 3) throw new Error("GLB " + label + " has fewer than three recoverable footprint boundary edges.");
   return { segments: Array.from(segments.values()), degenerateTriangleCount };
 }
-function transformBoundarySegmentsToAnchorPlane(segments, transform, anchorLongitude, anchorLatitude) {
+function transformBoundarySegmentsToAnchorPlane(segments, transform, anchorLongitude, anchorLatitude, baseHeightMeters = 0) {
   const output = [];
   for (const segment of segments) {
     const samplePoints = [];
     for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
       const east = segment[0][0] + (segment[1][0] - segment[0][0]) * fraction;
       const north = segment[0][1] + (segment[1][1] - segment[0][1]) * fraction;
-      const world = ecefToWgs84(transformPoint(transform, [east, 0, -north]));
+      const world = ecefToWgs84(transformPoint(transform, [east, baseHeightMeters, -north]));
       samplePoints.push(projectToAnchorPlane(world, anchorLongitude, anchorLatitude));
     }
     for (let index = 0; index < samplePoints.length - 1; index += 1) {
@@ -472,6 +472,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
     }
     const heightExtras = parsed.gltf.extras ?? {};
     const height = heightExtras.heightMeters;
+    const baseHeight = heightExtras.baseHeightMeters;
+    const topHeight = heightExtras.topHeightMeters;
     const heightStatus = heightExtras.heightStatus;
     const allowedHeightStatuses = new Set([
       "overture-height",
@@ -483,13 +485,19 @@ export async function reviewDhaka3DTilesPackageAlignment({
     const heightEvidenceValid = allowedHeightStatuses.has(heightStatus) &&
       heightExtras.heightSource === heightStatus &&
       Number.isFinite(height) && height > 0 && height <= 300 &&
+      Number.isFinite(baseHeight) && baseHeight >= 0 && baseHeight <= 100 &&
+      Number.isFinite(topHeight) && Math.abs(topHeight - (baseHeight + height)) <= 1e-6 &&
       Number.isFinite(heightExtras.unclampedHeightMeters) && heightExtras.unclampedHeightMeters > 0 &&
       typeof heightExtras.heightWasClamped === "boolean" &&
       (heightExtras.reportedMinHeightMeters === null ||
-        (Number.isFinite(heightExtras.reportedMinHeightMeters) && heightExtras.reportedMinHeightMeters >= 0)) &&
-      typeof heightExtras.minHeightWasClamped === "boolean" &&
+        (Number.isFinite(heightExtras.reportedMinHeightMeters) && heightExtras.reportedMinHeightMeters > 0)) &&
+      Number.isFinite(heightExtras.unclampedBaseHeightMeters) && heightExtras.unclampedBaseHeightMeters >= 0 &&
+      typeof heightExtras.baseHeightWasClamped === "boolean" &&
       heightExtras.groundOffsetAppliedMeters === 0 &&
       heightExtras.groundElevationStatus === "unverified-zero-ellipsoid-anchor" &&
+      heightExtras.minHeightApplication === (heightStatus === "synthetic-test-height"
+        ? "not-applicable-synthetic-test-height"
+        : "source-min-height-applied-as-relative-above-ground-offset") &&
       isRecord(tileHeight) &&
       tileHeight.status === heightStatus &&
       tileHeight.source === heightExtras.heightSource &&
@@ -497,15 +505,20 @@ export async function reviewDhaka3DTilesPackageAlignment({
       tileHeight.unclampedHeightMeters === heightExtras.unclampedHeightMeters &&
       tileHeight.heightWasClamped === heightExtras.heightWasClamped &&
       tileHeight.reportedMinHeightMeters === heightExtras.reportedMinHeightMeters &&
-      tileHeight.minHeightWasClamped === heightExtras.minHeightWasClamped &&
+      tileHeight.baseHeightMeters === baseHeight &&
+      tileHeight.unclampedBaseHeightMeters === heightExtras.unclampedBaseHeightMeters &&
+      tileHeight.baseHeightWasClamped === heightExtras.baseHeightWasClamped &&
+      tileHeight.topHeightMeters === topHeight &&
       tileHeight.groundOffsetAppliedMeters === 0 &&
       tileHeight.groundElevationStatus === heightExtras.groundElevationStatus &&
-      (heightStatus !== "synthetic-test-height" || heightExtras.syntheticHeightMeters === height);
+      tileHeight.minHeightApplication === heightExtras.minHeightApplication &&
+      (heightStatus !== "synthetic-test-height" ||
+        (heightExtras.syntheticHeightMeters === height && baseHeight === 0 && topHeight === height));
     if (!heightEvidenceValid) {
       errors.push("GLB height provenance does not match the build manifest for " + tile.contentUri); continue;
     }
-    const groundLocal = parsed.positions.filter((point) => Math.abs(point[1]) <= 1e-4);
-    const topLocal = parsed.positions.filter((point) => Math.abs(point[1] - height) <= 1e-4);
+    const groundLocal = parsed.positions.filter((point) => Math.abs(point[1] - baseHeight) <= 1e-4);
+    const topLocal = parsed.positions.filter((point) => Math.abs(point[1] - topHeight) <= 1e-4);
     if (groundLocal.length < 3 || topLocal.length < 3) { errors.push("GLB lacks ground or top vertices for " + tile.contentUri); continue; }
 
     const sourceRingsDegrees = sourceRings(feature.geometry);
@@ -534,13 +547,14 @@ export async function reviewDhaka3DTilesPackageAlignment({
     const maxGroundVertexResidual = Math.max(...groundResiduals);
 
     const sourceSegments = sourceBoundarySegments(sourceRingsDegrees, anchorLongitude, anchorLatitude);
-    const recoveredBoundary = recoverMeshBoundarySegments(parsed.triangles, height, tile.contentUri);
+    const recoveredBoundary = recoverMeshBoundarySegments(parsed.triangles, baseHeight, topHeight, tile.contentUri);
     const localBoundary = measureBoundaryResidual(sourceSegments, recoveredBoundary.segments);
     const worldBoundarySegments = transformBoundarySegmentsToAnchorPlane(
       recoveredBoundary.segments,
       child.transform,
       anchorLongitude,
       anchorLatitude,
+      baseHeight,
     );
     const worldBoundary = measureBoundaryResidual(sourceSegments, worldBoundarySegments);
     const maxResidual = Math.max(localBoundary.maximumResidualMeters, worldBoundary.maximumResidualMeters);
@@ -549,8 +563,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
       worldBoundary.perimeterDifferenceMeters,
     );
     const heightResidual = Math.max(
-      ...groundWorld.map((point) => Math.abs(point.ellipsoidHeightMeters)),
-      ...topWorld.map((point) => Math.abs(point.ellipsoidHeightMeters - height)),
+      ...groundWorld.map((point) => Math.abs(point.ellipsoidHeightMeters - baseHeight)),
+      ...topWorld.map((point) => Math.abs(point.ellipsoidHeightMeters - topHeight)),
     );
     const allTileVertices = [...groundWorld, ...topWorld];
     const region = child.boundingVolume?.region;
@@ -572,9 +586,13 @@ export async function reviewDhaka3DTilesPackageAlignment({
         unclampedHeightMeters: heightExtras.unclampedHeightMeters,
         heightWasClamped: heightExtras.heightWasClamped,
         reportedMinHeightMeters: heightExtras.reportedMinHeightMeters,
-        minHeightWasClamped: heightExtras.minHeightWasClamped,
+        baseHeightMeters: baseHeight,
+        unclampedBaseHeightMeters: heightExtras.unclampedBaseHeightMeters,
+        baseHeightWasClamped: heightExtras.baseHeightWasClamped,
+        topHeightMeters: topHeight,
         groundOffsetAppliedMeters: heightExtras.groundOffsetAppliedMeters,
         groundElevationStatus: heightExtras.groundElevationStatus,
+        minHeightApplication: heightExtras.minHeightApplication,
       },
       sourceVertexCount: uniqueSource.length,
       transformedGroundVertexCount: uniqueGround.length,
@@ -600,7 +618,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
       },
       maximumEllipsoidHeightResidualMeters: Number(heightResidual.toFixed(6)),
       transformedEllipsoidHeightRangeMeters: {
-        ground: minMax(groundWorld.map((point) => point.ellipsoidHeightMeters)),
+        base: minMax(groundWorld.map((point) => point.ellipsoidHeightMeters)),
         top: minMax(topWorld.map((point) => point.ellipsoidHeightMeters)),
       },
       allTransformedVerticesInsideDeclaredRegion: inside,
@@ -657,7 +675,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
       "Acceptance uses bidirectional sampled source-perimeter versus GLB base-boundary residuals in both local coordinates and after the ECEF transform; source-vertex nearest-vertex distances are diagnostic because collinear source vertices can be simplified away.",
       "The reviewer checks indexed GLB triangles, degenerate triangles, transform axis orthonormality/handedness, source-anchor translation, vertical consistency and child-region containment. It is not rendered-pixel comparison or architectural accuracy.",
       "Source input has 2D footprints; vertical checks validate the ellipsoid transform and the disclosed source-provided/estimated extrusion metadata, not independent surveyed elevations.",
-      "The ground anchor remains WGS84 ellipsoid height zero because no verified terrain elevation or vertical datum is bound; source min_height metadata is not applied to world placement.",
+      "The local ENU transform is anchored at WGS84 ellipsoid height zero because no verified terrain elevation or vertical datum is bound; source min_height is applied only as a relative vertical offset above that unverified ground plane.",
       "A pass is placement-plumbing evidence, not surveyed height, source-rights approval or production readiness.",
     ],
     releaseFlags,
