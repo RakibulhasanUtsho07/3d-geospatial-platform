@@ -15,6 +15,8 @@ on:
       - "scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs"
       - "src/core/map-engine/dhaka-3d-tiles-pilot-controller.mjs"
       - "src/core/buildings/building-height.mjs"
+      - "src/core/buildings/building-architecture-evidence.mjs"
+      - "tests/building-architecture-evidence.test.mjs"
       - "src/core/buildings/building-height.d.mts"
       - "tests/building-height.test.mjs"
       - "src/core/geospatial/tileset-package-integrity.mjs"
@@ -65,6 +67,9 @@ jobs:
 
       - name: Test strict source-height parsing and estimate provenance
         run: npm run test:building-height
+
+      - name: Test Overture building composition and architectural metadata evidence
+        run: npm run test:building-architecture-evidence
 
       - name: Run deterministic synthetic and source-height package/failure-injection tests
         run: npm run test:dhaka-3d-tiles-package
