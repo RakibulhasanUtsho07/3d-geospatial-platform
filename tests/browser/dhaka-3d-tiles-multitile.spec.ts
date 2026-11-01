@@ -9,6 +9,18 @@ const OUTPUT_DIRECTORY = path.resolve(
   process.env.P3_6_MULTITILE_EVIDENCE_DIR ?? "artifacts/p3.6-multitile-browser",
 );
 
+type CompositionAuditSummary = {
+  schema: "overture-buildings-2.0.0";
+  sourceFeatureCount: number;
+  buildingFeatureCount: number;
+  buildingPartFeatureCount: number;
+  linkedPartCount: number;
+  partStatusCounts: Record<string, number>;
+  parentStatusCounts: Record<string, number>;
+  duplicateParentIdCount: number;
+  selectedFeatureCount: number;
+};
+
 type MultiTileReview = {
   schemaVersion: number;
   evidenceType: string;
@@ -47,21 +59,9 @@ type MultiTileReview = {
     compositionLinkStatusCounts: Record<string, number>;
     geometryCompleteness: "footprint-extrusion-only";
     renderedArchitecturalDetailCount: number;
-    sourceCompositionAuditSummary: {
-      schema: "overture-buildings-2.0.0";
-      sourceFeatureCount: number;
-      buildingFeatureCount: number;
-      buildingPartFeatureCount: number;
-      linkedPartCount: number;
-      partStatusCounts: Record<string, number>;
-      parentStatusCounts: Record<string, number>;
-      duplicateParentIdCount: number;
-      selectedFeatureCount: number;
-    };
+    sourceCompositionAuditSummary: CompositionAuditSummary;
   };
-  sourceCompositionAuditSummary?: MultiTileReview["architectureEvidenceSummary"] extends infer T
-    ? T extends { sourceCompositionAuditSummary: infer S } ? S : never
-    : never;
+  sourceCompositionAuditSummary?: CompositionAuditSummary;
   targetPair?: {
     distanceMeters: number;
     first: { featureId: string; contentUri: string; center: { longitude: number; latitude: number }; cameraAltitudeMeters: number };
