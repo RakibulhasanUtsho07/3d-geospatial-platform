@@ -552,6 +552,51 @@ export function parseTrustedReconstructionReviewerKeys(input, options = {}) {
     replacedKeyIds.add(previous.keyId);
   }
 
+  // Every reviewer history must be one complete, explicit key-replacement
+  // chain. Without this check, an operator could omit replacesKeyId on a new
+  // key and leave a revoked predecessor as an unrelated root record.
+  const entriesByReviewer = new Map();
+  for (const entry of parsedEntries) {
+    const entries = entriesByReviewer.get(entry.reviewerId) ?? [];
+    entries.push(entry);
+    entriesByReviewer.set(entry.reviewerId, entries);
+  }
+
+  for (const [reviewerId, entries] of entriesByReviewer) {
+    const roots = entries.filter((entry) => entry.replacesKeyId === null);
+    if (roots.length !== 1) {
+      throw new TypeError("Reviewer " + reviewerId + " key history must form one explicit replacement chain with exactly one initial key.");
+    }
+
+    const successorByKeyId = new Map();
+    for (const entry of entries) {
+      if (entry.replacesKeyId === null) continue;
+      if (successorByKeyId.has(entry.replacesKeyId)) {
+        throw new TypeError("Reviewer " + reviewerId + " key history cannot fork from a prior key.");
+      }
+      successorByKeyId.set(entry.replacesKeyId, entry);
+    }
+
+    const visited = new Set();
+    let latest = roots[0];
+    while (latest) {
+      if (visited.has(latest.keyId)) {
+        throw new TypeError("Reviewer " + reviewerId + " key history cannot contain a replacement cycle.");
+      }
+      visited.add(latest.keyId);
+      latest = successorByKeyId.get(latest.keyId) ?? null;
+    }
+
+    if (visited.size !== entries.length) {
+      throw new TypeError("Reviewer " + reviewerId + " key history contains an orphaned key record without a complete replacement chain.");
+    }
+
+    const active = entries.find((entry) => entry.status === "active");
+    if (active && !visited.has(active.keyId)) {
+      throw new TypeError("Reviewer " + reviewerId + " active key must belong to its complete replacement chain.");
+    }
+  }
+
   return parsedEntries
     .filter((entry) => entry.status === "active")
     .map((entry) => Object.freeze({
