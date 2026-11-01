@@ -149,15 +149,15 @@ test("publishes the validated GLB and catalog into a separate application public
 
 test("refuses a second publication while the model catalog lock is held", async (t) => {
   const setup = await makeApprovedJob(t);
-  const catalogDirectory = path.join(setup.workspaceRoot, "public", "models", "generated");
-  await mkdir(path.join(catalogDirectory, ".publish.lock"), { recursive: true });
+  const catalogLockDirectory = path.join(setup.workspaceRoot, ".generated-model-catalog.publish.lock");
+  await mkdir(catalogLockDirectory, { recursive: true });
 
   await assert.rejects(
     publishApprovedGenerationJob({ ...setup, placement }),
     /publication is already in progress/,
   );
   await assert.rejects(
-    readFile(path.join(catalogDirectory, "manifest.json")),
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
     { code: "ENOENT" },
   );
 });
