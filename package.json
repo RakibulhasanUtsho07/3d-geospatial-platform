@@ -32,6 +32,7 @@
     "test:building-search": "node --test tests/building-search.test.mjs",
     "test:footprint-area": "node --test tests/footprint-area.test.mjs",
     "test:building-height": "node --test tests/building-height.test.mjs",
+    "test:building-architecture-evidence": "node --test tests/building-architecture-evidence.test.mjs",
     "test:nearby-places": "node --test tests/nearby-places.test.mjs",
     "test:property-listings": "node --test tests/property-listings.test.mjs",
     "test:street-imagery": "node --test tests/street-imagery.test.mjs",
