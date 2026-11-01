@@ -283,9 +283,13 @@ function resolveHeightEvidence(properties, syntheticHeightMeters) {
       unclampedHeightMeters: syntheticHeightMeters,
       heightWasClamped: false,
       reportedMinHeightMeters: null,
-      minHeightWasClamped: false,
+      baseHeightMeters: 0,
+      unclampedBaseHeightMeters: 0,
+      baseHeightWasClamped: false,
+      topHeightMeters: syntheticHeightMeters,
       groundOffsetAppliedMeters: 0,
       groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+      minHeightApplication: "not-applicable-synthetic-test-height",
     };
   }
 
@@ -296,15 +300,21 @@ function resolveHeightEvidence(properties, syntheticHeightMeters) {
     heightMeters: resolved.meters,
     unclampedHeightMeters: resolved.unclampedMeters,
     heightWasClamped: resolved.heightWasClamped,
-    reportedMinHeightMeters: resolved.unclampedBaseHeight,
-    minHeightWasClamped: resolved.baseHeightWasClamped,
+    reportedMinHeightMeters: resolved.unclampedBaseHeight > 0 ? resolved.unclampedBaseHeight : null,
+    baseHeightMeters: resolved.baseHeight,
+    unclampedBaseHeightMeters: resolved.unclampedBaseHeight,
+    baseHeightWasClamped: resolved.baseHeightWasClamped,
+    topHeightMeters: resolved.baseHeight + resolved.meters,
     groundOffsetAppliedMeters: 0,
     groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+    minHeightApplication: "source-min-height-applied-as-relative-above-ground-offset",
   };
 }
 
 function createGlb(polygons, longitude, latitude, heightEvidence, featureId, featureSha256) {
   const heightMeters = heightEvidence.heightMeters;
+  const baseHeightMeters = heightEvidence.baseHeightMeters;
+  const topHeightMeters = heightEvidence.topHeightMeters;
   const positions=[],normals=[],indices=[];
   function addTriangle(first,second,third,desiredNormalY=null) {
     let a=first,b=second,c=third;
@@ -326,7 +336,7 @@ function createGlb(polygons, longitude, latitude, heightEvidence, featureId, fea
   for(const rawPolygon of polygons){
     const projectedRings=rawPolygon.map((rawRing,ringIndex)=>projectRing(rawRing,longitude,latitude,ringIndex===0?1:-1));
     const {points,indices:roofIndices}=triangulatePolygon(projectedRings);
-    const bottom=points.map(p=>[p.x,0,-p.north]),top=points.map(p=>[p.x,heightMeters,-p.north]);
+    const bottom=points.map(p=>[p.x,baseHeightMeters,-p.north]),top=points.map(p=>[p.x,topHeightMeters,-p.north]);
     for(let i=0;i<roofIndices.length;i+=3){
       const a=roofIndices[i],b=roofIndices[i+1],c=roofIndices[i+2];
       addTriangle(top[a],top[b],top[c],1);addTriangle(bottom[c],bottom[b],bottom[a],-1);
@@ -375,9 +385,13 @@ function createGlb(polygons, longitude, latitude, heightEvidence, featureId, fea
       unclampedHeightMeters:heightEvidence.unclampedHeightMeters,
       heightWasClamped:heightEvidence.heightWasClamped,
       reportedMinHeightMeters:heightEvidence.reportedMinHeightMeters,
-      minHeightWasClamped:heightEvidence.minHeightWasClamped,
+      baseHeightMeters:heightEvidence.baseHeightMeters,
+      unclampedBaseHeightMeters:heightEvidence.unclampedBaseHeightMeters,
+      baseHeightWasClamped:heightEvidence.baseHeightWasClamped,
+      topHeightMeters:heightEvidence.topHeightMeters,
       groundOffsetAppliedMeters:heightEvidence.groundOffsetAppliedMeters,
       groundElevationStatus:heightEvidence.groundElevationStatus,
+      minHeightApplication:heightEvidence.minHeightApplication,
       ...(heightEvidence.status === "synthetic-test-height" ? { syntheticHeightMeters: heightMeters } : {}),
       interiorRingCount:polygons.reduce((sum,polygon)=>sum+polygon.length-1,0)
     }
@@ -609,7 +623,8 @@ export async function buildDhaka3DTilesPackage({
     METERS_PER_LONGITUDE_DEGREE * Math.cos(((combinedBounds.south + combinedBounds.north) / 2) * Math.PI / 180);
   const rootDepthMeters = (combinedBounds.north - combinedBounds.south) * METERS_PER_LATITUDE_DEGREE;
   const rootError = Math.max(1, rootWidthMeters, rootDepthMeters);
-  const maximumTileHeightMeters = Math.max(...tiles.map((tile) => tile.heightEvidence.heightMeters));
+  const minimumTileBaseHeightMeters = Math.min(...tiles.map((tile) => tile.heightEvidence.baseHeightMeters));
+  const maximumTileTopHeightMeters = Math.max(...tiles.map((tile) => tile.heightEvidence.topHeightMeters));
   const heightSourceCounts = tiles.reduce((counts, tile) => {
     const source = tile.heightEvidence.source;
     counts[source] = (counts[source] ?? 0) + 1;
@@ -632,10 +647,14 @@ export async function buildDhaka3DTilesPackage({
           ? "Use positive Overture height attributes first, then floor-count estimate, then an explicitly labelled 9 m fallback estimate."
           : "Explicit synthetic test override; not representative of source building height.",
         syntheticHeightMeters,
-        groundElevationStatus: "unverified-zero-ellipsoid-anchor; reported min_height is retained as metadata but not applied without a verified terrain/vertical reference",
+        groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+        minHeightApplication: syntheticHeightMeters === null
+          ? "source min_height is applied as a relative above-ground bottom offset; this is not an absolute terrain/vertical-datum elevation"
+          : "not-applicable-synthetic-test-height",
         limitations: [
+          "Overture height is the distance from the lowest point to the highest point; source min_height separately offsets the bottom above ground.",
           "Overture height attributes are source-provided values, not independently surveyed heights; floor-count and fallback values are estimates.",
-          "The footprint is anchored at WGS84 ellipsoid height zero because no verified terrain/vertical datum is bound; reported min_height is retained but not applied.",
+          "The footprint anchor remains WGS84 ellipsoid height zero because no terrain elevation or vertical datum is bound. min_height is applied only as a relative above-ground offset.",
           "Interior rings are triangulated as courtyard holes with vertical boundary walls; malformed, overlapping or out-of-exterior holes are rejected.",
           "No facade reconstruction, roof reconstruction, imagery texture or photogrammetric accuracy claim.",
         ],
@@ -643,11 +662,23 @@ export async function buildDhaka3DTilesPackage({
     },
     geometricError: rootError,
     root: {
-      boundingVolume: { region: boundsToRegion(combinedBounds, -0.25, maximumTileHeightMeters + 0.25) },
+      boundingVolume: {
+        region: boundsToRegion(
+          combinedBounds,
+          minimumTileBaseHeightMeters - 0.25,
+          maximumTileTopHeightMeters + 0.25,
+        ),
+      },
       geometricError: rootError,
       refine: "REPLACE",
       children: tiles.map((tile) => ({
-        boundingVolume: { region: boundsToRegion(tile.boundsDegrees, -0.25, tile.heightEvidence.heightMeters + 0.25) },
+        boundingVolume: {
+          region: boundsToRegion(
+            tile.boundsDegrees,
+            tile.heightEvidence.baseHeightMeters - 0.25,
+            tile.heightEvidence.topHeightMeters + 0.25,
+          ),
+        },
         geometricError: 0,
         refine: "REPLACE",
         transform: localEnuToEcefTransform(tile.longitude, tile.latitude),
@@ -692,6 +723,11 @@ export async function buildDhaka3DTilesPackage({
       heightPolicy: syntheticHeightMeters === null ? "per-feature-provenance" : "synthetic-test-override",
       heightSourceCounts,
       groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+      minHeightApplication: syntheticHeightMeters === null
+        ? "source-min-height-applied-as-relative-above-ground-offset"
+        : "not-applicable-synthetic-test-height",
+      minimumTileBaseHeightMeters,
+      maximumTileTopHeightMeters,
       coordinateSystems: { geographic: "EPSG:4979", globalCartesian: "EPSG:4978" },
       tileContentFormat: "glTF 2.0 binary (GLB) in OGC 3D Tiles 1.1",
     },
