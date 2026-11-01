@@ -216,6 +216,146 @@ export function resolveBuildingArchitectureEvidence(properties) {
 }
 
 /**
+ * Audit Overture's parent/building_part composition references across the
+ * complete source FeatureCollection, not just the bounded set selected for
+ * tile output. Parent resolution is ID-based and fail-closed.
+ *
+ * selectedFeatureIds, when supplied, is the exact feature-ID set emitted into
+ * the package. A source relationship and package co-selection are reported
+ * separately: a valid parent in the source extract may be outside the tile
+ * subset.
+ */
+export function auditBuildingPartComposition(features, { selectedFeatureIds = null } = {}) {
+  if (!Array.isArray(features)) {
+    throw new TypeError("Building composition audit requires a source feature array.");
+  }
+  if (selectedFeatureIds !== null && !(selectedFeatureIds instanceof Set)) {
+    throw new TypeError("selectedFeatureIds must be a Set or null.");
+  }
+
+  const getFeatureId = (feature) => {
+    const id = isRecord(feature) ? feature.id : null;
+    return typeof id === "string" && id.length > 0 && id.trim() === id && !/\\s/.test(id)
+      ? id
+      : null;
+  };
+  const parentRecords = [];
+  const partRecords = [];
+  for (const feature of features) {
+    if (!isRecord(feature) || !isRecord(feature.properties)) continue;
+    const featureId = getFeatureId(feature);
+    if (feature.properties.type === "building") {
+      parentRecords.push({ featureId, properties: feature.properties });
+    } else if (feature.properties.type === "building_part") {
+      partRecords.push({ featureId, properties: feature.properties });
+    }
+  }
+
+  const parentsById = new Map();
+  for (const parent of parentRecords) {
+    if (!parent.featureId) continue;
+    const records = parentsById.get(parent.featureId) ?? [];
+    records.push(parent);
+    parentsById.set(parent.featureId, records);
+  }
+
+  const partsByParentId = new Map();
+  const partLinks = partRecords.map((part) => {
+    const id = sourceIdentifier(part.properties, "building_id");
+    const parents = id.status === "source" ? parentsById.get(id.value) ?? [] : [];
+    const status = id.status !== "source"
+      ? "missing-or-invalid-parent-id"
+      : parents.length === 0
+        ? "parent-feature-not-in-source-extract"
+        : parents.length > 1
+          ? "ambiguous-duplicate-parent-feature-id"
+          : "parent-feature-resolved";
+    if (id.status === "source") {
+      const linked = partsByParentId.get(id.value) ?? [];
+      linked.push(part);
+      partsByParentId.set(id.value, linked);
+    }
+    const parent = parents.length === 1 ? parents[0] : null;
+    return {
+      partFeatureId: part.featureId,
+      parentBuildingId: id.value,
+      status,
+      parentHasPartsClaim: parent ? sourceBoolean(parent.properties, "has_parts") : { status: "unavailable", value: null },
+      parentSelectedInPackage: parent && selectedFeatureIds
+        ? selectedFeatureIds.has(parent.featureId)
+        : null,
+      partSelectedInPackage: selectedFeatureIds && part.featureId
+        ? selectedFeatureIds.has(part.featureId)
+        : null,
+    };
+  });
+
+  const byFeatureId = {};
+  const parentStatusCounts = {};
+  for (const parent of parentRecords) {
+    if (!parent.featureId) continue;
+    const associatedParts = partsByParentId.get(parent.featureId) ?? [];
+    const hasParts = sourceBoolean(parent.properties, "has_parts");
+    const duplicateId = (parentsById.get(parent.featureId) ?? []).length > 1;
+    const status = duplicateId
+      ? "ambiguous-duplicate-parent-feature-id"
+      : associatedParts.length > 0
+        ? hasParts.status === "source" && hasParts.value === false
+          ? "parts-found-despite-false-has-parts-claim"
+          : hasParts.status === "source" && hasParts.value === true
+            ? "parts-found-and-declared"
+            : "parts-found-has-parts-claim-unavailable"
+        : hasParts.status === "source" && hasParts.value === true
+          ? "parts-declared-but-none-in-source-extract"
+          : hasParts.status === "source" && hasParts.value === false
+            ? "no-parts-declared"
+            : "part-association-unknown";
+    parentStatusCounts[status] = (parentStatusCounts[status] ?? 0) + 1;
+    byFeatureId[parent.featureId] = {
+      featureType: "building",
+      status,
+      hasPartsClaim: hasParts,
+      associatedPartFeatureIds: associatedParts.map((part) => part.featureId),
+      associatedPartCount: associatedParts.length,
+      associatedPartsSelectedInPackageCount: selectedFeatureIds
+        ? associatedParts.filter((part) => part.featureId && selectedFeatureIds.has(part.featureId)).length
+        : null,
+      selectedInPackage: selectedFeatureIds
+        ? selectedFeatureIds.has(parent.featureId)
+        : null,
+    };
+  }
+
+  const partStatusCounts = {};
+  for (const link of partLinks) {
+    partStatusCounts[link.status] = (partStatusCounts[link.status] ?? 0) + 1;
+    if (link.partFeatureId) {
+      byFeatureId[link.partFeatureId] = {
+        featureType: "building_part",
+        status: link.status,
+        parentBuildingId: link.parentBuildingId,
+        parentHasPartsClaim: link.parentHasPartsClaim,
+        parentSelectedInPackage: link.parentSelectedInPackage,
+        partSelectedInPackage: link.partSelectedInPackage,
+      };
+    }
+  }
+
+  const summary = {
+    schema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
+    sourceFeatureCount: features.length,
+    buildingFeatureCount: parentRecords.length,
+    buildingPartFeatureCount: partRecords.length,
+    linkedPartCount: partStatusCounts["parent-feature-resolved"] ?? 0,
+    partStatusCounts,
+    parentStatusCounts,
+    duplicateParentIdCount: [...parentsById.values()].filter((records) => records.length > 1).length,
+    selectedFeatureCount: selectedFeatureIds ? selectedFeatureIds.size : null,
+  };
+  return { schemaVersion: 1, byFeatureId, partLinks, summary };
+}
+
+/**
  * Aggregate only source-bound metadata states from the already-resolved
  * per-feature records. This summary is derived data and is recomputed by the
  * independent package reviewer before it is accepted.
@@ -268,6 +408,7 @@ export function summarizeBuildingArchitectureEvidence(evidenceItems) {
     compositionStatusCounts: countValues((item) => item.compositionStatus),
     roofGeometryStatusCounts: countValues((item) => item.roof?.geometryStatus),
     facadeStyleStatusCounts: countValues((item) => item.facade?.status),
+    compositionLinkStatusCounts: countValues((item) => item.compositionLink?.status),
     fieldAvailability,
     geometryCompleteness: "footprint-extrusion-only",
     renderedArchitecturalDetailCount: 0,
