@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
 import {
+  auditBuildingPartComposition,
   resolveBuildingArchitectureEvidence,
   summarizeBuildingArchitectureEvidence,
 } from "../src/core/buildings/building-architecture-evidence.mjs";
@@ -430,6 +431,13 @@ export async function reviewDhaka3DTilesPackageAlignment({
     throw new Error("All package release flags must remain explicitly false.");
   }
 
+  const selectedFeatureIds = new Set(manifest.tiles.map((tile) => tile?.featureId).filter((id) => typeof id === "string"));
+  const sourceCompositionAudit = auditBuildingPartComposition(source.features, { selectedFeatureIds });
+  if (JSON.stringify(manifest.configuration?.sourceCompositionAuditSummary) !== JSON.stringify(sourceCompositionAudit.summary) ||
+      JSON.stringify(tileset.asset.extras?.sourceCompositionAuditSummary) !== JSON.stringify(sourceCompositionAudit.summary)) {
+    errors.push("Source building-part composition audit does not match the complete source FeatureCollection.");
+  }
+
   const byId = new Map();
   for (const feature of source.features) {
     if (!isRecord(feature) || feature.type !== "Feature" || !isRecord(feature.geometry)) continue;
@@ -490,9 +498,14 @@ export async function reviewDhaka3DTilesPackageAlignment({
     if (parsed.gltf.extras?.sourceFeatureId !== tile.featureId || parsed.gltf.extras?.sourceFeatureSha256 !== tile.featureSha256) {
       errors.push("GLB source identity extras mismatch for " + tile.contentUri); continue;
     }
-    const architectureEvidence = resolveBuildingArchitectureEvidence(
-      isRecord(feature.properties) ? feature.properties : {},
-    );
+    const architectureEvidence = {
+      ...resolveBuildingArchitectureEvidence(isRecord(feature.properties) ? feature.properties : {}),
+      compositionLink: sourceCompositionAudit.byFeatureId[tile.featureId] ?? {
+        featureType: null,
+        status: "feature-id-not-resolved-in-composition-audit",
+        selectedInPackage: selectedFeatureIds.has(tile.featureId),
+      },
+    };
     const manifestArchitectureEvidence = tile.architectureEvidence;
     const glbArchitectureEvidence = parsed.gltf.extras?.architectureEvidence;
     const architectureEvidenceValid =
@@ -731,6 +744,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
       heightPolicy: manifest.configuration?.heightPolicy ?? null,
       heightSourceCounts: manifest.configuration?.heightSourceCounts ?? null,
       architectureEvidenceSummary: expectedArchitectureSummary,
+      sourceCompositionAuditSummary: sourceCompositionAudit.summary,
       syntheticHeightMeters: manifest.configuration?.syntheticHeightMeters ?? null,
     },
     thresholds: {
