@@ -8,7 +8,7 @@ This feature connects the existing media-to-model workflow to a persistent local
 - Exposes authenticated enqueue/list/status endpoints.
 - Runs the existing `runMediaToModelWorkflow` in a single local worker, recording attempts, last errors, heartbeats and a bounded retry policy.
 - Recovers interrupted jobs when the worker starts, after obtaining the single-worker lock.
-- Writes the generated GLB and workflow report to the configured workspace; it does **not** add the model to the map catalog.
+- Writes the generated GLB and workflow report to the configured private workspace. A completed job is not added to the public map catalog automatically; the separate operator-only publication route described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md) performs that explicit hand-off after review.
 
 Every completed result keeps `mapReady=false` and `publicationEligible=false`. A reviewer must inspect the model, architecture, dimensions, horizontal and vertical reference, provenance and usage rights before using the separate reviewed-model publishing workflow.
 
@@ -17,7 +17,7 @@ Every completed result keeps `mapReady=false` and `publicationEligible=false`. A
 Set these server-side environment variables:
 
 - `GENERATION_API_TOKEN`: a secret bearer token of at least 32 characters for creating/listing generation jobs. Never expose it to browser JavaScript or commit it to Git.
-- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.
+- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.\n- `GENERATION_PUBLISH_API_TOKEN`: a third, separate secret bearer token of at least 32 characters for publishing an already approved job into the application's public model catalog. Do not reuse either other token.
 - `BUILDING_ENGINE_WORKSPACE`: an existing, writable directory shared by the Next.js server and generation worker. Keep this workspace private.
 - Optional worker settings: `BUILDING_ENGINE_QUALITY` (`LOW`, `MEDIUM`, `HIGH` or `EXTREME`), `BUILDING_ENGINE_COLMAP_PATH`, `BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT`, `BUILDING_ENGINE_PYTHON_EXECUTABLE`, and `BUILDING_ENGINE_DEVICE`.
 
@@ -30,7 +30,7 @@ All routes require `Authorization: Bearer <GENERATION_API_TOKEN>`. If the secret
 - `POST /api/building-generation/jobs` — enqueue a JSON request and return HTTP 202.
 - `GET /api/building-generation/jobs?limit=20` — list up to 100 recent jobs.
 - `GET /api/building-generation/jobs/<jobId>` — retrieve status/result/error/review summary for a job.
-- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.
+- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.\n- `POST /api/building-generation/jobs/<jobId>/publish` — publish an already approved job using explicit map placement. This route requires `GENERATION_PUBLISH_API_TOKEN` and is described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md).
 
 Example request:
 
@@ -103,7 +103,7 @@ Send a review decision only after inspecting the GLB candidate and its QA report
 
 Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
 
-The review API writes an audit record under the private job workspace and returns its hash. It deliberately **does not** set `mapReady` or `publicationEligible` to true, and it does not publish. The separate publication CLI still requires a catalog placement and its own evidence-backed attestation. The `reviewer` value is an operator-supplied label, not an identity-provider-verified account; the review token grants review permission to anyone who holds it.
+The review API writes an audit record under the private job workspace and returns its hash. It deliberately **does not** set `mapReady` or `publicationEligible` to true, and it does not publish. Publication is a separate explicit operator action: use the D3M-02 map panel/API or the existing publication CLI after review and placement checks. The `reviewer` value is an operator-supplied label, not an identity-provider-verified account; the review token grants review permission to anyone who holds it.
 
 
 ## Run the worker
