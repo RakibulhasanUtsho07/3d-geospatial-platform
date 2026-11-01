@@ -253,3 +253,53 @@ test("published JSON Schema timestamp patterns accept only canonical UTC millise
     assert.equal(expression.test("2026-10-31T03:00:00x000Z"), false);
   }
 });
+
+
+test("requires one complete explicit key-replacement chain per reviewer", () => {
+  const oldPair = keyPair();
+  const newPair = keyPair();
+  const orphanPair = keyPair();
+
+  const missingLink = [
+    activeEntry(oldPair.publicKeyPem, {
+      keyId: "key-old",
+      status: "revoked",
+      revokedAtUtc: "2026-10-31T02:00:00.000Z",
+    }),
+    activeEntry(newPair.publicKeyPem, {
+      keyId: "key-new",
+      validFromUtc: "2026-10-31T02:00:00.000Z",
+      // Deliberately omit replacesKeyId: an active successor must not be
+      // allowed to hide the revoked predecessor from the audit chain.
+      replacesKeyId: null,
+    }),
+  ];
+  assert.throws(
+    () => parseTrustedReconstructionReviewerKeys(registry(missingLink), { now: NOW, allowLegacy: false }),
+    /one explicit replacement chain/i,
+  );
+
+  const orphanedHistory = [
+    activeEntry(oldPair.publicKeyPem, {
+      keyId: "key-old",
+      status: "revoked",
+      revokedAtUtc: "2026-10-31T02:00:00.000Z",
+    }),
+    activeEntry(newPair.publicKeyPem, {
+      keyId: "key-new",
+      validFromUtc: "2026-10-31T02:00:00.000Z",
+      replacesKeyId: "key-old",
+    }),
+    activeEntry(orphanPair.publicKeyPem, {
+      reviewerId: "reviewer-01",
+      keyId: "key-orphan",
+      status: "revoked",
+      revokedAtUtc: "2026-10-30T04:00:00.000Z",
+      replacesKeyId: null,
+    }),
+  ];
+  assert.throws(
+    () => parseTrustedReconstructionReviewerKeys(registry(orphanedHistory), { now: NOW, allowLegacy: false }),
+    /one explicit replacement chain/i,
+  );
+});
