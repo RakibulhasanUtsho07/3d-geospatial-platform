@@ -495,6 +495,9 @@ export async function reviewDhaka3DTilesPackageAlignment({
         baseHeight === 0 &&
         topHeight === height &&
         heightExtras.reportedMinHeightMeters === null &&
+        heightExtras.reportedMinFloor === null &&
+        heightExtras.baseHeightSource === "synthetic-test-height" &&
+        heightExtras.baseHeightEstimated === false &&
         heightExtras.unclampedBaseHeightMeters === 0 &&
         heightExtras.baseHeightWasClamped === false
       : manifest.configuration?.heightPolicy === "per-feature-provenance" &&
@@ -504,11 +507,12 @@ export async function reviewDhaka3DTilesPackageAlignment({
         expectedSourceHeight.unclampedMeters === heightExtras.unclampedHeightMeters &&
         expectedSourceHeight.heightWasClamped === heightExtras.heightWasClamped &&
         expectedSourceHeight.baseHeight === baseHeight &&
+        expectedSourceHeight.baseHeightSource === heightExtras.baseHeightSource &&
+        expectedSourceHeight.baseHeightEstimated === heightExtras.baseHeightEstimated &&
+        expectedSourceHeight.reportedMinHeight === heightExtras.reportedMinHeightMeters &&
+        expectedSourceHeight.reportedMinFloor === heightExtras.reportedMinFloor &&
         expectedSourceHeight.unclampedBaseHeight === heightExtras.unclampedBaseHeightMeters &&
         expectedSourceHeight.baseHeightWasClamped === heightExtras.baseHeightWasClamped &&
-        (expectedSourceHeight.unclampedBaseHeight > 0
-          ? expectedSourceHeight.unclampedBaseHeight
-          : null) === heightExtras.reportedMinHeightMeters &&
         expectedSourceHeight.baseHeight + expectedSourceHeight.meters === topHeight;
     const heightEvidenceValid = sourceHeightMatches && allowedHeightStatuses.has(heightStatus) &&
       heightExtras.heightSource === heightStatus &&
@@ -520,6 +524,11 @@ export async function reviewDhaka3DTilesPackageAlignment({
       (heightExtras.reportedMinHeightMeters === null ||
         (Number.isFinite(heightExtras.reportedMinHeightMeters) && heightExtras.reportedMinHeightMeters > 0)) &&
       Number.isFinite(heightExtras.unclampedBaseHeightMeters) && heightExtras.unclampedBaseHeightMeters >= 0 &&
+      ["overture-min-height", "min-floor-estimate", "ground-zero-default", "synthetic-test-height"].includes(heightExtras.baseHeightSource) &&
+      typeof heightExtras.baseHeightEstimated === "boolean" &&
+      (heightExtras.baseHeightSource === "min-floor-estimate") === heightExtras.baseHeightEstimated &&
+      (heightExtras.reportedMinFloor === null ||
+        (Number.isInteger(heightExtras.reportedMinFloor) && heightExtras.reportedMinFloor > 0)) &&
       typeof heightExtras.baseHeightWasClamped === "boolean" &&
       heightExtras.groundOffsetAppliedMeters === 0 &&
       heightExtras.groundElevationStatus === "unverified-zero-ellipsoid-anchor" &&
@@ -533,6 +542,9 @@ export async function reviewDhaka3DTilesPackageAlignment({
       tileHeight.unclampedHeightMeters === heightExtras.unclampedHeightMeters &&
       tileHeight.heightWasClamped === heightExtras.heightWasClamped &&
       tileHeight.reportedMinHeightMeters === heightExtras.reportedMinHeightMeters &&
+      tileHeight.reportedMinFloor === heightExtras.reportedMinFloor &&
+      tileHeight.baseHeightSource === heightExtras.baseHeightSource &&
+      tileHeight.baseHeightEstimated === heightExtras.baseHeightEstimated &&
       tileHeight.baseHeightMeters === baseHeight &&
       tileHeight.unclampedBaseHeightMeters === heightExtras.unclampedBaseHeightMeters &&
       tileHeight.baseHeightWasClamped === heightExtras.baseHeightWasClamped &&
@@ -614,6 +626,9 @@ export async function reviewDhaka3DTilesPackageAlignment({
         unclampedHeightMeters: heightExtras.unclampedHeightMeters,
         heightWasClamped: heightExtras.heightWasClamped,
         reportedMinHeightMeters: heightExtras.reportedMinHeightMeters,
+        reportedMinFloor: heightExtras.reportedMinFloor,
+        baseHeightSource: heightExtras.baseHeightSource,
+        baseHeightEstimated: heightExtras.baseHeightEstimated,
         baseHeightMeters: baseHeight,
         unclampedBaseHeightMeters: heightExtras.unclampedBaseHeightMeters,
         baseHeightWasClamped: heightExtras.baseHeightWasClamped,
