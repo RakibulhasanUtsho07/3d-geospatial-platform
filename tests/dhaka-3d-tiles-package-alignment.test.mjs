@@ -14,7 +14,19 @@ const sourceData = {
     {
       type: "Feature",
       id: "alignment-square",
-      properties: { class: "building", height: 18, min_height: 2.5 },
+      properties: {
+        type: "building",
+        has_parts: true,
+        class: "building",
+        height: 18,
+        min_height: 2.5,
+        facade_material: "brick",
+        facade_color: "#a53",
+        roof_shape: "gabled",
+        roof_height: 2.5,
+        roof_direction: 0,
+        roof_orientation: "along",
+      },
       geometry: { type: "Polygon", coordinates: [[
         [90.4100, 23.7800], [90.41005, 23.7800], [90.4101, 23.7800], [90.4101, 23.7801],
         [90.4100, 23.7801], [90.4100, 23.7800]
@@ -254,6 +266,11 @@ test("aligns the source footprint with a non-zero Overture min_height base and t
   const tile = report.tiles.find((item) => item.featureId === "alignment-square");
   assert.ok(tile);
   assert.equal(tile.heightProvenance.heightMeters, 18);
+  assert.equal(tile.architectureEvidence.sourceSchema, "overture-buildings-2.0.0");
+  assert.equal(tile.architectureEvidence.compositionStatus, "parent-declares-associated-parts");
+  assert.deepEqual(tile.architectureEvidence.facade.material, { status: "source", value: "brick" });
+  assert.deepEqual(tile.architectureEvidence.roof.shape, { status: "source", value: "gabled" });
+  assert.equal(tile.architectureEvidence.roof.geometryStatus, "source-roof-shape-and-height-present-geometry-not-yet-generated");
   assert.equal(tile.heightProvenance.baseHeightMeters, 2.5);
   assert.equal(tile.heightProvenance.topHeightMeters, 20.5);
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 2.49);
@@ -281,6 +298,45 @@ test("resolves min_floor as a labelled base-height estimate and verifies it in w
   assert.equal(tile.heightProvenance.minHeightApplication, "min-floor-proxy-applied-as-relative-above-ground-offset");
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 5.99);
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.top.maximum <= 22.01);
+});
+
+test("rejects architecture metadata drift between the source feature, GLB and build manifest", async () => {
+  const damagedPath = path.join(root, "architecture-evidence-drift-package");
+  await cp(packagePath, damagedPath, { recursive: true });
+  const manifestPath = path.join(damagedPath, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.tiles[0].architectureEvidence.roof.shape.value = "flat";
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) => /architecture evidence does not match/i.test(error)));
+});
+
+test("rejects architecture metadata consistently rebound in GLB and manifest when source disagrees", async () => {
+  const damagedPath = path.join(root, "architecture-source-tamper-package");
+  await cp(packagePath, damagedPath, { recursive: true });
+  const manifestPath = path.join(damagedPath, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const tile = manifest.tiles.find((item) => item.featureId === "alignment-square");
+  assert.ok(tile);
+  const glbPath = path.join(damagedPath, tile.contentUri);
+  const glb = await readFile(glbPath);
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength));
+  gltf.extras.architectureEvidence.roof.shape.value = "flat";
+  tile.architectureEvidence.roof.shape.value = "flat";
+  const forgedGlb = rewriteGlbJson(glb, gltf);
+  await writeFile(glbPath, forgedGlb);
+  const forgedHash = sha256(forgedGlb);
+  tile.contentSha256 = forgedHash;
+  tile.bytes = forgedGlb.length;
+  manifest.files[tile.contentUri] = { sha256: forgedHash, bytes: forgedGlb.length };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) => /architecture evidence does not match/i.test(error)));
 });
 
 test("rejects manifest height provenance drift even if the GLB hash is unchanged", async () => {
