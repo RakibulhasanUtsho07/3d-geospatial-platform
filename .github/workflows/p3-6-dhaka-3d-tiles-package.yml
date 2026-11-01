@@ -33,6 +33,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "docs/research/P3-6-DHAKA-3D-TILES-PACKAGE.md"
+      - "docs/research/P3-7-BUILDING-COMPOSITION-EVIDENCE.md"
+      - "docs/ENGINE-REMAINING-WORK-ROADMAP.md"
       - "public/experimental/dhaka-3d-tiles-multibuilding-review.html"
       - "public/experimental/dhaka-3d-tiles-controller-lifecycle-review.html"
       - "tests/browser/dhaka-3d-tiles-multitile.spec.ts"
