@@ -103,3 +103,16 @@ Exit codes:
 - `3`: registry is structurally valid but all keys are revoked; this is an emergency lockout, not signing readiness.
 
 The input is capped at 64 KiB to keep environment-based deployment configuration within common process-environment limits. This is only a configuration preflight; it does not verify the live deployment has loaded the same revision after restart, prove reviewer identity/authority, or authorize any building. Deployment operators must separately verify their release revision and onboarding records without exposing the secret.
+
+
+## Key-history lineage hardening — 2026-11-01
+
+The parser now requires each reviewer's key records to form exactly one complete linear replacement chain:
+
+- Each reviewer must have exactly one initial record with `replacesKeyId: null`.
+- Every subsequent key record must explicitly identify the preceding revoked key through `replacesKeyId`.
+- A reviewer history with multiple roots, a missing replacement link, a fork, a cycle, or an orphaned record is rejected.
+- The existing checks still require the replaced key to belong to the same reviewer, be revoked, and have been revoked no later than the successor key's validity start.
+- A chain whose final record is revoked and has no active successor remains a valid emergency lockout; it returns no verifier key.
+
+This closes an auditability gap where a newly active key could previously omit `replacesKeyId` while an older revoked key remained in the registry. The negative regression test covers both an unlinked active successor and an orphaned revoked record. CI must pass on the updated exact head; earlier green runs do not validate this new code.
