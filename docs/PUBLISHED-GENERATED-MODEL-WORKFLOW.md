@@ -47,7 +47,7 @@ The API invokes the existing approved-job publisher. It re-verifies the request,
 
 The publish token is entered in the panel and retained only in component memory; it is not stored in localStorage. Publication is explicit and makes the GLB publicly fetchable. The API does not change the generation job's `mapReady` or `publicationEligible` flags, and the map load is not proof of model accuracy or independent survey acceptance.
 
-Catalog writes are serialized with `public/models/generated/.publish.lock`. If a process crashes, verify that no publisher is running before manually removing a stale lock directory. Do not remove an active lock.
+Catalog writes are serialized with `.generated-model-catalog.publish.lock`. If a process crashes, verify that no publisher is running before manually removing a stale lock directory. Do not remove an active lock.
 
 ## Review attestation format
 
