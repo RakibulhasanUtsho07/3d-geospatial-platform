@@ -89,6 +89,7 @@ export default function GenerationJobPublishPanel({
     }
 
     setBusy(true);
+    let catalogVersionVerified = false;
     try {
       const placement = {
         position: {
@@ -150,6 +151,7 @@ export default function GenerationJobPublishPanel({
       if (!exactVersion) {
         throw new Error("The model was published, but the active catalog version/hash did not match the publication response. It was not loaded.");
       }
+      catalogVersionVerified = true;
 
       setToken("");
       await onPublished(exactVersion.definition);
@@ -159,7 +161,10 @@ export default function GenerationJobPublishPanel({
         "… The generation job's mapReady and publicationEligible flags remain false.",
       );
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : "Could not publish the approved generation job.");
+      const detail = cause instanceof Error ? cause.message : "Unknown error.";
+      setError(catalogVersionVerified
+        ? "The job was published and the catalog version/hash was verified, but the current map session could not load it: " + detail + " The published version remains available in the catalog; remove any older session model and load it from the catalog."
+        : detail);
     } finally {
       setBusy(false);
     }
