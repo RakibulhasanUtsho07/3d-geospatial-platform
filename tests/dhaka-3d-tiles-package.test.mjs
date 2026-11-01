@@ -51,7 +51,22 @@ function sampleSource() {
   return {
     type: "FeatureCollection",
     features: [
-      polygon("building-a", square(90.410, 23.780), { class: "building", height: 18.5, num_floors: 10, min_height: 1.2 }),
+      polygon("building-a", square(90.410, 23.780), {
+        type: "building",
+        has_parts: false,
+        class: "building",
+        height: 18.5,
+        num_floors: 10,
+        min_height: 1.2,
+        facade_color: "#ABC",
+        facade_material: "brick",
+        roof_color: "#223344",
+        roof_material: "roof_tiles",
+        roof_shape: "gabled",
+        roof_direction: 90,
+        roof_orientation: "along",
+        roof_height: 2.5,
+      }),
       polygon("building-b", concave, { class: "building", num_floors: 4 }),
       {
         type: "Feature",
@@ -130,6 +145,16 @@ test("uses source height, then floor estimates, then a labelled fallback when no
 
   const manifest = JSON.parse(await readFile(path.join(sourceDerivedPackage, "build-manifest.json"), "utf8"));
   const tilesById = new Map(manifest.tiles.map((tile) => [tile.featureId, tile]));
+  const sourceArchitecture = tilesById.get("building-a").architectureEvidence;
+  assert.equal(sourceArchitecture.sourceSchema, "overture-buildings-2.0.0");
+  assert.equal(sourceArchitecture.compositionStatus, "parent-reports-no-associated-parts");
+  assert.deepEqual(sourceArchitecture.facade.color, { status: "source", value: "#aabbcc" });
+  assert.deepEqual(sourceArchitecture.facade.material, { status: "source", value: "brick" });
+  assert.deepEqual(sourceArchitecture.roof.shape, { status: "source", value: "gabled" });
+  assert.deepEqual(sourceArchitecture.roof.heightMeters, { status: "source", value: 2.5 });
+  assert.equal(sourceArchitecture.roof.geometryStatus, "source-roof-shape-and-height-present-geometry-not-yet-generated");
+  assert.equal(sourceArchitecture.geometryCompleteness, "footprint-extrusion-only");
+
   const sourceHeight = tilesById.get("building-a").heightEvidence;
   assert.equal(sourceHeight.status, "overture-height");
   assert.equal(sourceHeight.source, "overture-height");
@@ -158,6 +183,12 @@ test("uses source height, then floor estimates, then a labelled fallback when no
 
   assert.equal(manifest.configuration.heightPolicy, "per-feature-provenance");
   assert.equal(manifest.configuration.syntheticHeightMeters, null);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.schema, "overture-buildings-2.0.0");
+  assert.equal(manifest.configuration.architectureEvidenceSummary.tileCount, manifest.tiles.length);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.featureTypeCounts.building, 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.roofGeometryStatusCounts["source-roof-shape-and-height-present-geometry-not-yet-generated"], 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.renderedArchitecturalDetailCount, 0);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.geometryCompleteness, "footprint-extrusion-only");
   assert.deepEqual(manifest.configuration.heightSourceCounts, {
     "overture-height": 1,
     "floor-estimate": 1,
@@ -175,6 +206,7 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   const glb = await readFile(path.join(sourceDerivedPackage, sourceTile.contentUri));
   const jsonLength = glb.readUInt32LE(12);
   const gltf = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength));
+  assert.deepEqual(gltf.extras.architectureEvidence, sourceArchitecture);
   assert.equal(gltf.extras.heightStatus, "overture-height");
   assert.equal(gltf.extras.heightMeters, 18.5);
   assert.equal(gltf.extras.reportedMinHeightMeters, 1.2);
