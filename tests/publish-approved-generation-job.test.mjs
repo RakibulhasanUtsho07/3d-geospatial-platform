@@ -138,7 +138,7 @@ test("publishes the validated GLB and catalog into a separate application public
   assert.equal(active.definition.id, fixture.id);
   assert.equal(active.versionId, result.versionId);
   assert.equal(active.sha256, result.modelSha256);
-  assert.equal(hash(await readFile(path.join(applicationRoot, "public", result.assetUrl.slice(1))), result.modelSha256);
+  assert.equal(hash(await readFile(path.join(applicationRoot, "public", result.assetUrl.slice(1)))), result.modelSha256);
   await assert.rejects(
     readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
     { code: "ENOENT" },
