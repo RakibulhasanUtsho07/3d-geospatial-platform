@@ -36,7 +36,7 @@ test("preserves valid Overture facade and roof fields without claiming geometry 
   assert.deepEqual(evidence.roof.heightMeters, { status: "source", value: 3.25 });
   assert.equal(
     evidence.roof.geometryStatus,
-    "source-roof-shape-and-height-present-geometry-not-yet-generated",
+    "source-roof-shape-and-positive-height-present-geometry-not-yet-generated",
   );
   assert.equal(
     evidence.facade.status,
@@ -102,22 +102,40 @@ test("rejects schema-invalid enum, color and numeric roof values without coercio
   assert.equal(evidence.facade.status, "invalid-facade-metadata");
 });
 
-test("rejects roof direction outside [0, 360) and non-positive roof height", () => {
-  for (const properties of [
-    { roof_direction: -0.1, roof_height: 2 },
-    { roof_direction: 360, roof_height: 2 },
-    { roof_direction: 20, roof_height: 0 },
-    { roof_direction: 20, roof_height: -1 },
-    { roof_direction: 20, roof_height: Infinity },
-  ]) {
-    const evidence = resolveBuildingArchitectureEvidence(properties);
-    if (Object.hasOwn(properties, "roof_direction")) {
-      assert.equal(evidence.roof.directionDegrees.status, "invalid");
-    }
-    if (Object.hasOwn(properties, "roof_height")) {
-      assert.equal(evidence.roof.heightMeters.status, "invalid");
-    }
+test("enforces roof direction range while preserving finite roof_height values as supplied", () => {
+  for (const direction of [-0.1, 360]) {
+    const evidence = resolveBuildingArchitectureEvidence({ roof_direction: direction });
+    assert.equal(evidence.roof.directionDegrees.status, "invalid");
   }
+
+  const zeroRoof = resolveBuildingArchitectureEvidence({
+    roof_shape: "flat",
+    roof_height: 0,
+  });
+  assert.deepEqual(zeroRoof.roof.heightMeters, { status: "source", value: 0 });
+  assert.equal(zeroRoof.roof.geometryStatus, "source-roof-height-nonpositive-geometry-not-renderable");
+
+  const negativeRoof = resolveBuildingArchitectureEvidence({ roof_height: -1 });
+  assert.deepEqual(negativeRoof.roof.heightMeters, { status: "source", value: -1 });
+
+  const nonNumericRoof = resolveBuildingArchitectureEvidence({ roof_height: "4" });
+  assert.deepEqual(nonNumericRoof.roof.heightMeters, { status: "invalid", value: null });
+
+  const nonFiniteRoof = resolveBuildingArchitectureEvidence({ roof_height: Infinity });
+  assert.deepEqual(nonFiniteRoof.roof.heightMeters, { status: "invalid", value: null });
+});
+
+test("does not coerce enum casing or whitespace and requires string parent IDs", () => {
+  const evidence = resolveBuildingArchitectureEvidence({
+    type: "Building",
+    facade_material: " brick",
+    roof_shape: "GABLED",
+    building_id: 42,
+  });
+  assert.deepEqual(evidence.featureType, { status: "invalid", value: null });
+  assert.deepEqual(evidence.facade.material, { status: "invalid", value: null });
+  assert.deepEqual(evidence.roof.shape, { status: "invalid", value: null });
+  assert.deepEqual(evidence.buildingId, { status: "invalid", value: null });
 });
 
 test("rejects malformed feature properties and invalid parent identifiers", () => {
