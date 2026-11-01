@@ -62,6 +62,7 @@ on:
       - development
       - feat/brf46-source-operation-scope-gate
       - feat/brf47-cross-role-asset-identity-20261031
+      - feat/brf48-six-disjoint-heldout-checkpoints-20261101
   pull_request:
     branches:
       - main
@@ -104,6 +105,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - feat/brf46-source-operation-scope-gate
       - development
+      - feat/brf47-cross-role-asset-identity-20261031
 
 permissions:
   contents: read
