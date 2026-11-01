@@ -44,7 +44,7 @@ const sourceData = {
     {
       type: "Feature",
       id: "alignment-concave",
-      properties: { class: "building" },
+      properties: { type: "building_part", building_id: "alignment-square", class: "building" },
       geometry: { type: "Polygon", coordinates: [[
         [90.4110, 23.7800], [90.4113, 23.7800], [90.4113, 23.7803],
         [90.41115, 23.78012], [90.4110, 23.7803], [90.4110, 23.7800]
@@ -268,6 +268,12 @@ test("aligns the source footprint with a non-zero Overture min_height base and t
   assert.equal(tile.heightProvenance.heightMeters, 18);
   assert.equal(tile.architectureEvidence.sourceSchema, "overture-buildings-2.0.0");
   assert.equal(tile.architectureEvidence.compositionStatus, "parent-declares-associated-parts");
+  assert.equal(tile.architectureEvidence.compositionLink.status, "parts-found-and-declared");
+  assert.equal(tile.architectureEvidence.compositionLink.associatedPartCount, 1);
+  const partTile = report.tiles.find((item) => item.featureId === "alignment-concave");
+  assert.equal(partTile.architectureEvidence.compositionLink.status, "parent-feature-resolved");
+  assert.equal(partTile.architectureEvidence.compositionLink.parentBuildingId, "alignment-square");
+  assert.equal(report.package.sourceCompositionAuditSummary.linkedPartCount, 1);
   assert.deepEqual(tile.architectureEvidence.facade.material, { status: "source", value: "brick" });
   assert.deepEqual(tile.architectureEvidence.roof.shape, { status: "source", value: "gabled" });
   assert.equal(tile.architectureEvidence.roof.geometryStatus, "source-roof-shape-and-positive-height-present-geometry-not-yet-generated");
