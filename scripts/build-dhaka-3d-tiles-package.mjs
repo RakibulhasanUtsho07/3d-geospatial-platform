@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateTilesetManifest } from "../src/core/geospatial/tileset-manifest-validation.mjs";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
+import { resolveBuildingArchitectureEvidence } from "../src/core/buildings/building-architecture-evidence.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
@@ -321,7 +322,7 @@ function resolveHeightEvidence(properties, syntheticHeightMeters) {
   };
 }
 
-function createGlb(polygons, longitude, latitude, heightEvidence, featureId, featureSha256) {
+function createGlb(polygons, longitude, latitude, heightEvidence, architectureEvidence, featureId, featureSha256) {
   const heightMeters = heightEvidence.heightMeters;
   const baseHeightMeters = heightEvidence.baseHeightMeters;
   const topHeightMeters = heightEvidence.topHeightMeters;
@@ -405,6 +406,7 @@ function createGlb(polygons, longitude, latitude, heightEvidence, featureId, fea
       groundOffsetAppliedMeters:heightEvidence.groundOffsetAppliedMeters,
       groundElevationStatus:heightEvidence.groundElevationStatus,
       minHeightApplication:heightEvidence.minHeightApplication,
+      architectureEvidence,
       ...(heightEvidence.status === "synthetic-test-height" ? { syntheticHeightMeters: heightMeters } : {}),
       interiorRingCount:polygons.reduce((sum,polygon)=>sum+polygon.length-1,0)
     }
@@ -428,6 +430,54 @@ function padBounds(bounds, latitude, paddingMeters = BOUNDS_PADDING_METERS) {
     south: Math.max(-90, bounds.south - latitudeDelta),
     east: Math.min(180, bounds.east + longitudeDelta),
     north: Math.min(90, bounds.north + latitudeDelta),
+  };
+}
+
+function summarizeArchitectureEvidence(tiles) {
+  const fieldNames = [
+    "featureType",
+    "hasParts",
+    "buildingId",
+    "facade.color",
+    "facade.material",
+    "roof.color",
+    "roof.material",
+    "roof.shape",
+    "roof.directionDegrees",
+    "roof.orientation",
+    "roof.heightMeters",
+  ];
+  const field = (evidence, name) => {
+    let value = evidence;
+    for (const part of name.split(".")) value = value?.[part];
+    return value;
+  };
+  const fieldAvailability = Object.fromEntries(fieldNames.map((name) => [
+    name,
+    tiles.reduce((counts, tile) => {
+      const status = field(tile.architectureEvidence, name)?.status;
+      const key = status === "source" || status === "absent" || status === "invalid"
+        ? status
+        : "missing-evidence";
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
+    }, { source: 0, absent: 0, invalid: 0, "missing-evidence": 0 }),
+  ]));
+  const countValues = (selector) => tiles.reduce((counts, tile) => {
+    const value = selector(tile.architectureEvidence);
+    if (typeof value === "string" && value) counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
+  return {
+    schema: "overture-buildings-2.0.0",
+    tileCount: tiles.length,
+    featureTypeCounts: countValues((item) => item.featureType?.value),
+    compositionStatusCounts: countValues((item) => item.compositionStatus),
+    roofGeometryStatusCounts: countValues((item) => item.roof?.geometryStatus),
+    facadeStyleStatusCounts: countValues((item) => item.facade?.status),
+    fieldAvailability,
+    geometryCompleteness: "footprint-extrusion-only",
+    renderedArchitecturalDetailCount: 0,
   };
 }
 
@@ -577,6 +627,7 @@ export async function buildDhaka3DTilesPackage({
       depthMeters,
       featureSha256: sha256(Buffer.from(JSON.stringify(feature), "utf8")),
       heightEvidence: resolveHeightEvidence(feature.properties, syntheticHeightMeters),
+      architectureEvidence: resolveBuildingArchitectureEvidence(isRecord(feature.properties) ? feature.properties : {}),
     });
   }
 
@@ -592,6 +643,7 @@ export async function buildDhaka3DTilesPackage({
         candidate.longitude,
         candidate.latitude,
         candidate.heightEvidence,
+        candidate.architectureEvidence,
         candidate.id,
         candidate.featureSha256,
       );
@@ -620,6 +672,7 @@ export async function buildDhaka3DTilesPackage({
       widthMeters: candidate.widthMeters,
       depthMeters: candidate.depthMeters,
       heightEvidence: candidate.heightEvidence,
+      architectureEvidence: candidate.architectureEvidence,
     });
   }
   if (tiles.length === 0) {
@@ -643,6 +696,7 @@ export async function buildDhaka3DTilesPackage({
     counts[source] = (counts[source] ?? 0) + 1;
     return counts;
   }, {});
+  const architectureEvidenceSummary = summarizeArchitectureEvidence(tiles);
   const tileset = {
     asset: {
       version: "1.1",
@@ -656,6 +710,7 @@ export async function buildDhaka3DTilesPackage({
         footprintGeometry: "source Polygon/MultiPolygon exterior and interior rings",
         heightStatus: syntheticHeightMeters === null ? "per-feature-height-provenance" : "synthetic-test-height",
         heightSourceCounts,
+        architectureEvidenceSummary,
         heightPolicy: syntheticHeightMeters === null
           ? "Use positive Overture height attributes first, then floor-count estimate, then an explicitly labelled 9 m fallback estimate."
           : "Explicit synthetic test override; not representative of source building height.",
@@ -735,6 +790,7 @@ export async function buildDhaka3DTilesPackage({
       syntheticHeightMeters,
       heightPolicy: syntheticHeightMeters === null ? "per-feature-provenance" : "synthetic-test-override",
       heightSourceCounts,
+      architectureEvidenceSummary,
       groundElevationStatus: "unverified-zero-ellipsoid-anchor",
       minHeightApplication: syntheticHeightMeters === null
         ? "source-min-height-applied-as-relative-above-ground-offset"
@@ -756,6 +812,7 @@ export async function buildDhaka3DTilesPackage({
       widthMeters: Number(tile.widthMeters.toFixed(3)),
       depthMeters: Number(tile.depthMeters.toFixed(3)),
       heightEvidence: tile.heightEvidence,
+      architectureEvidence: tile.architectureEvidence,
     })),
     files: fileRecords,
     validation: {
