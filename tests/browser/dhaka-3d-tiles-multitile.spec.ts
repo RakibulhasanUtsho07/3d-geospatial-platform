@@ -34,6 +34,18 @@ type MultiTileReview = {
     surveyStatus: "not-surveyed";
     groundElevationStatus: string;
   };
+  architectureEvidenceSummary?: {
+    schema: "overture-buildings-2.0.0";
+    tileCount: number;
+    fieldAvailability: Record<string, {
+      source: number;
+      absent: number;
+      invalid: number;
+      "missing-evidence": number;
+    }>;
+    geometryCompleteness: "footprint-extrusion-only";
+    renderedArchitecturalDetailCount: number;
+  };
   targetPair?: {
     distanceMeters: number;
     first: { featureId: string; contentUri: string; center: { longitude: number; latitude: number }; cameraAltitudeMeters: number };
@@ -128,6 +140,21 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     "Every tile must be represented in the per-feature source-height counts.",
   );
   assert.ok(Object.keys(review.heightEvidence.baseSourceCounts).length > 0);
+  assert.ok(review.architectureEvidenceSummary, "The browser evidence must include schema-bound architecture field coverage.");
+  assert.equal(review.architectureEvidenceSummary.schema, "overture-buildings-2.0.0");
+  assert.equal(review.architectureEvidenceSummary.tileCount, review.input?.contentCount);
+  assert.equal(review.architectureEvidenceSummary.geometryCompleteness, "footprint-extrusion-only");
+  assert.equal(review.architectureEvidenceSummary.renderedArchitecturalDetailCount, 0);
+  for (const [fieldName, counts] of Object.entries(review.architectureEvidenceSummary.fieldAvailability)) {
+    assert.equal(
+      counts.source + counts.absent + counts.invalid + counts["missing-evidence"],
+      review.architectureEvidenceSummary.tileCount,
+      "Architecture metadata coverage must account for every tile: " + fieldName,
+    );
+  }
+  const visibleArchitectureSummary = await page.locator("#architecture-provenance").textContent();
+  assert.match(visibleArchitectureSummary ?? "", /footprint extrusion only/i);
+  assert.match(visibleArchitectureSummary ?? "", /rendered architectural details: 0/i);
   assert.ok(
     review.limitations?.some((item) => /survey truth/i.test(item)),
     "The machine-readable limitations must explicitly distinguish source/estimated heights from survey truth.",
