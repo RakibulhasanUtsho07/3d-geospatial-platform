@@ -193,10 +193,22 @@
           !Number.isSafeInteger(composition.sourceFeatureCount) ||
           composition.sourceFeatureCount < tiles.length ||
           !Number.isSafeInteger(composition.buildingFeatureCount) || composition.buildingFeatureCount < 0 ||
+          !Number.isSafeInteger(composition.regularBuildingFeatureCount) || composition.regularBuildingFeatureCount < 0 ||
+          !Number.isSafeInteger(composition.buildingParentFeatureCount) || composition.buildingParentFeatureCount < 0 ||
+          composition.regularBuildingFeatureCount + composition.buildingParentFeatureCount !== composition.buildingFeatureCount ||
           !Number.isSafeInteger(composition.buildingPartFeatureCount) || composition.buildingPartFeatureCount < 0 ||
           !Number.isSafeInteger(composition.linkedPartCount) || composition.linkedPartCount < 0 ||
           composition.linkedPartCount > composition.buildingPartFeatureCount ||
+          !Number.isSafeInteger(composition.parentLinkedWithoutExtractorConflictCount) ||
+          !Number.isSafeInteger(composition.extractorParentIdConflictCount) ||
           !Number.isSafeInteger(composition.selectedFeatureCount) || composition.selectedFeatureCount !== tiles.length ||
+          !Number.isSafeInteger(composition.selectedParentCount) || composition.selectedParentCount > tiles.length ||
+          !Number.isSafeInteger(composition.selectedBuildingPartCount) || composition.selectedBuildingPartCount > tiles.length ||
+          !Number.isSafeInteger(composition.coSelectedParentPartLinkCount) ||
+          !Number.isSafeInteger(composition.partSelectedWithoutParentCount) ||
+          !Number.isSafeInteger(composition.parentSelectedWithoutPartCount) ||
+          !composition.roleDetectionCounts || typeof composition.roleDetectionCounts !== "object" ||
+          !composition.parentRoleCounts || typeof composition.parentRoleCounts !== "object" ||
           !composition.partStatusCounts || typeof composition.partStatusCounts !== "object" ||
           !composition.parentStatusCounts || typeof composition.parentStatusCounts !== "object") {
         throw new Error("The package has no valid source-wide parent/part composition audit.");
@@ -218,13 +230,18 @@
       const composition = summary.sourceCompositionAuditSummary;
       const unresolvedParts = (composition.partStatusCounts["parent-feature-not-in-source-extract"] ?? 0) +
         (composition.partStatusCounts["missing-or-invalid-parent-id"] ?? 0);
-      const ambiguousParts = composition.partStatusCounts["ambiguous-duplicate-parent-feature-id"] ?? 0;
+      const ambiguousParts = (composition.partStatusCounts["ambiguous-duplicate-parent-feature-id"] ?? 0) +
+        composition.extractorParentIdConflictCount;
       const packagePartLinks = summary.compositionLinkStatusCounts["parent-feature-resolved"] ?? 0;
       return "Source metadata: roof shape " + roof.source + "/" + summary.tileCount +
         " · facade material " + facade.source + "/" + summary.tileCount +
+        " · parent roles " + composition.regularBuildingFeatureCount + " building + " +
+        composition.buildingParentFeatureCount + " building_parent" +
         " · parents declaring parts " + parentParts +
-        " · source parts linked " + composition.linkedPartCount + "/" + composition.buildingPartFeatureCount +
-        " · unresolved/ambiguous parts " + unresolvedParts + "/" + ambiguousParts +
+        " · source parts linked " + composition.parentLinkedWithoutExtractorConflictCount + "/" + composition.buildingPartFeatureCount +
+        " · unresolved/ambiguous/conflicting parts " + unresolvedParts + "/" + ambiguousParts +
+        " · selected parent/part pairs " + composition.coSelectedParentPartLinkCount +
+        " · parts selected without parent " + composition.partSelectedWithoutParentCount +
         " · linked part tiles in package " + packagePartLinks +
         ". Geometry: footprint extrusion only; rendered architectural details: 0.";
     }
