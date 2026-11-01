@@ -198,3 +198,17 @@ The default bounded Dhaka 3D Tiles package now derives each tile's vertical inte
 - Screenshot review still shows simple cuboid footprint extrusions, not building architecture. Facades, fenestration, roof form, textures and human visual acceptance remain unimplemented/blocked.
 - The 32-tile sample contained 19 fallback estimates and 13 floor-count estimates, and no positive Overture `height` value. The 64/128 samples had only one Overture-provided height. Do not imply complete source height coverage.
 - P3.6 feature branch was synchronized with `development@f7b2a67` using a two-parent merge commit; current branch is no longer behind development. Fresh exact-head Full CI and dedicated workflow are mandatory after this integration and evidence-report fix.
+
+
+## P3.7 — Overture building composition and architecture evidence (metadata gate)
+
+A follow-on branch to the P3.6 footprint/height pilot adds a typed, source-bound architecture metadata layer.
+
+- The resolver pins supported fields/enums to Overture Buildings schema v2.0.0: `type`, `building_id`, `has_parts`, facade color/material, roof color/material/shape/direction/orientation/height.
+- Every field is explicitly `source`, `absent`, or `invalid`; numeric values are not coerced, colors must match Overture hex syntax, and unknown enum values are not mapped to a plausible style.
+- Each GLB and build-manifest tile carries the same architecture-evidence object. A manifest/tileset aggregate reports per-field availability and parent/part declaration states.
+- The independent alignment reviewer recomputes the object from the exact source feature and verifies GLB + manifest + summary binding. Regression cases rebind both GLB and manifest to a false roof shape and require the source-bound reviewer to reject it.
+- The browser review page displays actual roof/facade metadata coverage and explicitly reports `footprint-extrusion-only` with zero generated architectural details.
+- Parent `has_parts=true` and part `building_id` are evidence only. They do not mean that parent/part geometry is joined or that the building is assembled.
+
+**Not implemented by P3.7:** roof meshes, facade components, windows/doors, balcony/arch geometry, textures or parent/part assembly. No source metadata is invented to fill absent fields. The next geometry stage must first join and validate parent/part records by `building_id`, then generate only geometry supported by source metadata or independently reviewed images. Keep the acceptance/publication/map-ready/automatic-approval flags false.
