@@ -204,7 +204,7 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.equal(manifest.configuration.architectureEvidenceSummary.compositionLinkStatusCounts["parent-feature-resolved"], 1);
   assert.equal(manifest.configuration.sourceCompositionAuditSummary.linkedPartCount, 1);
   assert.equal(manifest.configuration.sourceCompositionAuditSummary.parentStatusCounts["parts-found-and-declared"], 1);
-  assert.equal(manifest.configuration.architectureEvidenceSummary.roofGeometryStatusCounts["source-roof-shape-and-height-present-geometry-not-yet-generated"], 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.roofGeometryStatusCounts["source-roof-shape-and-positive-height-present-geometry-not-yet-generated"], 1);
   assert.equal(manifest.configuration.architectureEvidenceSummary.renderedArchitecturalDetailCount, 0);
   assert.equal(manifest.configuration.architectureEvidenceSummary.geometryCompleteness, "footprint-extrusion-only");
   assert.deepEqual(manifest.configuration.heightSourceCounts, {
