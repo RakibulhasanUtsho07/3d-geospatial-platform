@@ -108,6 +108,7 @@ on:
       - feat/brf46-source-operation-scope-gate
       - development
       - feat/p3-6-multibuilding-tiles-package
+      - feat/p3-7-building-composition-evidence-20261102
 
 permissions:
   contents: read
