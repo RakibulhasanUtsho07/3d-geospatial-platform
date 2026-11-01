@@ -313,7 +313,11 @@ function resolveHeightEvidence(properties, syntheticHeightMeters) {
     topHeightMeters: resolved.baseHeight + resolved.meters,
     groundOffsetAppliedMeters: 0,
     groundElevationStatus: "unverified-zero-ellipsoid-anchor",
-    minHeightApplication: "source-min-height-applied-as-relative-above-ground-offset",
+    minHeightApplication: resolved.baseHeightSource === "overture-min-height"
+      ? "source-min-height-applied-as-relative-above-ground-offset"
+      : resolved.baseHeightSource === "min-floor-estimate"
+        ? "min-floor-proxy-applied-as-relative-above-ground-offset"
+        : "no-base-offset-ground-zero-default",
   };
 }
 
@@ -658,7 +662,7 @@ export async function buildDhaka3DTilesPackage({
         syntheticHeightMeters,
         groundElevationStatus: "unverified-zero-ellipsoid-anchor",
         minHeightApplication: syntheticHeightMeters === null
-          ? "source min_height is applied as a relative above-ground bottom offset; this is not an absolute terrain/vertical-datum elevation"
+          ? "Use source min_height when present; otherwise use integer min_floor as a labelled 3 m-per-floor relative base-offset estimate; neither is an absolute terrain/vertical-datum elevation."
           : "not-applicable-synthetic-test-height",
         limitations: [
           "Overture height is the distance from the lowest point to the highest point; source min_height separately offsets the bottom above ground.",
