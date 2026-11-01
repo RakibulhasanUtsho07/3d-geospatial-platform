@@ -137,7 +137,12 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.equal(sourceHeight.unclampedHeightMeters, 18.5);
   assert.equal(sourceHeight.heightWasClamped, false);
   assert.equal(sourceHeight.reportedMinHeightMeters, 1.2);
+  assert.equal(sourceHeight.baseHeightMeters, 1.2);
+  assert.equal(sourceHeight.unclampedBaseHeightMeters, 1.2);
+  assert.equal(sourceHeight.baseHeightWasClamped, false);
+  assert.equal(sourceHeight.topHeightMeters, 19.7);
   assert.equal(sourceHeight.groundOffsetAppliedMeters, 0);
+  assert.equal(sourceHeight.minHeightApplication, "source-min-height-applied-as-relative-above-ground-offset");
 
   const floorEstimate = tilesById.get("building-b").heightEvidence;
   assert.equal(floorEstimate.status, "floor-estimate");
@@ -159,7 +164,9 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   const tileset = JSON.parse(await readFile(path.join(sourceDerivedPackage, "tileset.json"), "utf8"));
   assert.equal(tileset.asset.extras.heightStatus, "per-feature-height-provenance");
   assert.equal(tileset.asset.extras.groundElevationStatus, "unverified-zero-ellipsoid-anchor");
-  assert.ok(tileset.root.boundingVolume.region[5] >= 18.75);
+  assert.equal(tileset.asset.extras.minHeightApplication, "source min_height is applied as a relative above-ground bottom offset; this is not an absolute terrain/vertical-datum elevation");
+  assert.ok(tileset.root.boundingVolume.region[4] <= 0.95);
+  assert.ok(tileset.root.boundingVolume.region[5] >= 19.95);
 
   const sourceTile = tilesById.get("building-a");
   const glb = await readFile(path.join(sourceDerivedPackage, sourceTile.contentUri));
@@ -168,12 +175,18 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.equal(gltf.extras.heightStatus, "overture-height");
   assert.equal(gltf.extras.heightMeters, 18.5);
   assert.equal(gltf.extras.reportedMinHeightMeters, 1.2);
+  assert.equal(gltf.extras.baseHeightMeters, 1.2);
+  assert.equal(gltf.extras.topHeightMeters, 19.7);
   assert.equal(gltf.extras.groundOffsetAppliedMeters, 0);
   assert.equal(gltf.extras.groundElevationStatus, "unverified-zero-ellipsoid-anchor");
+  assert.equal(gltf.extras.minHeightApplication, "source-min-height-applied-as-relative-above-ground-offset");
   assert.equal(gltf.extras.syntheticHeightMeters, undefined);
+  assert.equal(gltf.accessors[0].min[1], 1.2);
+  assert.equal(gltf.accessors[0].max[1], 19.7);
 
   const sourceChild = tileset.root.children.find((child) => child.extras.sourceFeatureId === "building-a");
-  assert.ok(sourceChild.boundingVolume.region[5] >= 18.75);
+  assert.ok(sourceChild.boundingVolume.region[4] <= 0.95);
+  assert.ok(sourceChild.boundingVolume.region[5] >= 19.95);
   const integrity = await verifyTilesetPackage({ directory: sourceDerivedPackage, expectedSourceSha256: sha256(sourceBytes) });
   assert.equal(integrity.valid, true, integrity.errors.join("; "));
 });
@@ -183,7 +196,7 @@ test("caps source heights and retains the unclamped value as provenance", async 
   const overheightOutputPath = path.join(temporaryDirectory, "overheight-package");
   const overheightSource = {
     type: "FeatureCollection",
-    features: [polygon("overheight", square(90.410, 23.780), { class: "building", height: 450 })],
+    features: [polygon("overheight", square(90.410, 23.780), { class: "building", height: 450, min_height: 250 })],
   };
   await writeFile(overheightSourcePath, JSON.stringify(overheightSource) + "\n");
   await buildDhaka3DTilesPackage({
@@ -195,8 +208,13 @@ test("caps source heights and retains the unclamped value as provenance", async 
   assert.equal(manifest.tiles[0].heightEvidence.heightMeters, 300);
   assert.equal(manifest.tiles[0].heightEvidence.unclampedHeightMeters, 450);
   assert.equal(manifest.tiles[0].heightEvidence.heightWasClamped, true);
+  assert.equal(manifest.tiles[0].heightEvidence.baseHeightMeters, 100);
+  assert.equal(manifest.tiles[0].heightEvidence.unclampedBaseHeightMeters, 250);
+  assert.equal(manifest.tiles[0].heightEvidence.baseHeightWasClamped, true);
+  assert.equal(manifest.tiles[0].heightEvidence.topHeightMeters, 400);
   const tileset = JSON.parse(await readFile(path.join(overheightOutputPath, "tileset.json"), "utf8"));
-  assert.ok(tileset.root.children[0].boundingVolume.region[5] >= 300.25);
+  assert.ok(tileset.root.children[0].boundingVolume.region[4] <= 99.75);
+  assert.ok(tileset.root.children[0].boundingVolume.region[5] >= 400.25);
 });
 
 test("builds a real multi-content OGC 3D Tiles 1.1 hierarchy from source footprints", async () => {
@@ -213,6 +231,7 @@ test("builds a real multi-content OGC 3D Tiles 1.1 hierarchy from source footpri
   assert.equal(manifest.releaseFlags.mapReady, false);
   assert.equal(manifest.releaseFlags.automaticApproval, false);
   assert.equal(tileset.asset.extras.heightStatus, "synthetic-test-height");
+  assert.equal(manifest.tiles.every((tile) => tile.heightEvidence.baseHeightMeters === 0 && tile.heightEvidence.topHeightMeters === 8), true);
   assert.ok(manifest.excludedCounts.outsideBounds >= 1);
   assert.ok(manifest.excludedCounts.invalidHoleGeometry >= 1);
   assert.equal(manifest.excludedCounts.interiorRingsUnsupported, undefined);
