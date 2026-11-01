@@ -53,7 +53,7 @@ function sampleSource() {
     features: [
       polygon("building-a", square(90.410, 23.780), {
         type: "building",
-        has_parts: false,
+        has_parts: true,
         class: "building",
         height: 18.5,
         num_floors: 10,
@@ -67,7 +67,12 @@ function sampleSource() {
         roof_orientation: "along",
         roof_height: 2.5,
       }),
-      polygon("building-b", concave, { class: "building", num_floors: 4 }),
+      polygon("building-b", concave, {
+        type: "building_part",
+        building_id: "building-a",
+        class: "building",
+        num_floors: 4,
+      }),
       {
         type: "Feature",
         id: "building-c-multipolygon",
@@ -147,7 +152,15 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   const tilesById = new Map(manifest.tiles.map((tile) => [tile.featureId, tile]));
   const sourceArchitecture = tilesById.get("building-a").architectureEvidence;
   assert.equal(sourceArchitecture.sourceSchema, "overture-buildings-2.0.0");
-  assert.equal(sourceArchitecture.compositionStatus, "parent-reports-no-associated-parts");
+  assert.equal(sourceArchitecture.compositionStatus, "parent-declares-associated-parts");
+  assert.equal(sourceArchitecture.compositionLink.status, "parts-found-and-declared");
+  assert.equal(sourceArchitecture.compositionLink.associatedPartCount, 1);
+  assert.equal(sourceArchitecture.compositionLink.associatedPartsSelectedInPackageCount, 1);
+  const partArchitecture = tilesById.get("building-b").architectureEvidence;
+  assert.equal(partArchitecture.featureType.value, "building_part");
+  assert.equal(partArchitecture.compositionLink.status, "parent-feature-resolved");
+  assert.equal(partArchitecture.compositionLink.parentBuildingId, "building-a");
+  assert.equal(partArchitecture.compositionLink.parentSelectedInPackage, true);
   assert.deepEqual(sourceArchitecture.facade.color, { status: "source", value: "#aabbcc" });
   assert.deepEqual(sourceArchitecture.facade.material, { status: "source", value: "brick" });
   assert.deepEqual(sourceArchitecture.roof.shape, { status: "source", value: "gabled" });
@@ -186,6 +199,11 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.equal(manifest.configuration.architectureEvidenceSummary.schema, "overture-buildings-2.0.0");
   assert.equal(manifest.configuration.architectureEvidenceSummary.tileCount, manifest.tiles.length);
   assert.equal(manifest.configuration.architectureEvidenceSummary.featureTypeCounts.building, 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.featureTypeCounts.building_part, 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.compositionLinkStatusCounts["parts-found-and-declared"], 1);
+  assert.equal(manifest.configuration.architectureEvidenceSummary.compositionLinkStatusCounts["parent-feature-resolved"], 1);
+  assert.equal(manifest.configuration.sourceCompositionAuditSummary.linkedPartCount, 1);
+  assert.equal(manifest.configuration.sourceCompositionAuditSummary.parentStatusCounts["parts-found-and-declared"], 1);
   assert.equal(manifest.configuration.architectureEvidenceSummary.roofGeometryStatusCounts["source-roof-shape-and-height-present-geometry-not-yet-generated"], 1);
   assert.equal(manifest.configuration.architectureEvidenceSummary.renderedArchitecturalDetailCount, 0);
   assert.equal(manifest.configuration.architectureEvidenceSummary.geometryCompleteness, "footprint-extrusion-only");
