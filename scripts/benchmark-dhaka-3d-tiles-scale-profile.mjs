@@ -268,6 +268,9 @@ export async function runDhaka3DTilesScaleProfile({
         sample.heightPolicy = manifest.configuration?.heightPolicy ?? null;
         sample.maxResolvedHeightMeters = Math.max(...manifest.tiles.map((tile) => tile.heightEvidence?.heightMeters ?? 0));
         sample.minResolvedHeightMeters = Math.min(...manifest.tiles.map((tile) => tile.heightEvidence?.heightMeters ?? Infinity));
+        sample.minimumAppliedBaseHeightMeters = Math.min(...manifest.tiles.map((tile) => tile.heightEvidence?.baseHeightMeters ?? Infinity));
+        sample.maximumAppliedBaseHeightMeters = Math.max(...manifest.tiles.map((tile) => tile.heightEvidence?.baseHeightMeters ?? 0));
+        sample.maximumResolvedTopHeightMeters = Math.max(...manifest.tiles.map((tile) => tile.heightEvidence?.topHeightMeters ?? 0));
         const glbSizes = manifest.tiles.map((tile) => tile.bytes).filter(Number.isFinite);
         sample.glbBytes = {
           min: Math.min(...glbSizes),
@@ -323,7 +326,7 @@ export async function runDhaka3DTilesScaleProfile({
         : "An explicit synthetic-height override was used; it is not real building height or vertical accuracy evidence.",
       "The profile records per-feature height source/counts and clamping but does not measure live browser/GPU latency or prove city-scale readiness.",
       "RSS readings are phase-boundary observations, not peak memory; shared CI-runner timings are comparative engineering evidence, not deployment service-level guarantees.",
-      "A passing alignment gate compares the 2D source footprint with emitted geometry and ellipsoid transform, not independent surveyed ground/top elevations.",
+      "A passing alignment gate compares the 2D source footprint with emitted geometry and the applied relative base/top offsets; the zero ellipsoid ground anchor is not independent surveyed ground elevation.",
       "Source rights, same-building independent truth and human architectural acceptance remain separate gates.",
     ],
   };
