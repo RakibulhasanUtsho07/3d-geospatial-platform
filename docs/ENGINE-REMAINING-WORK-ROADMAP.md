@@ -142,3 +142,19 @@ The codebase still needs real-data validation and product-level completion. The 
 - Missing inputs or unpinned hashes stay incomplete; hash mismatches and explicit geometry/view/model-binding failures are not silently downgraded. No combined accuracy percentage is produced and publication/automatic approval remain disabled.
 - Added focused regression tests and a runbook/template. Tests validate policy and evidence linkage only; they do not establish the accuracy of a specific real building.
 - **Acceptance still pending:** no actual 2–3 building source/reference pack with independently verified dimensions, checked permissions, surveyed controls and human-reviewed renders was available in this session. Do not mark the models accurate until those inputs are supplied and the evidence report passes review.
+
+
+## D3M-02 — approved generation job to Cesium map publication (implementation candidate)
+
+**Tracking issue:** [#301](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/301)  
+**Implementation branch:** `feat/d3m02-generation-job-map-publish-20261101`  
+**Runbook:** [D3M-02 Generation Job to Map Publication](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md)
+
+- Added an operator-token-protected `POST /api/building-generation/jobs/{jobId}/publish` route with an independent `GENERATION_PUBLISH_API_TOKEN`.
+- Kept generation candidates and immutable review records in the private workspace while targeting the application's `process.cwd()/public` directory for the published content-addressed GLB and catalog.
+- Added a catalog publication lock around manifest read/modify/atomic-write so concurrent publishers cannot silently overwrite each other's model versions.
+- Added a map dialog panel for explicit job ID, placement, orientation, scale and public-asset confirmation. After publishing, it re-reads the catalog and checks exact model/version/hash/URL before loading and focusing the model in the current Cesium session.
+- Added regression cases for a separate public root and a busy catalog lock.
+- **Validation pending:** exact-head GitHub Actions, lint/build and reviewer inspection must pass before this milestone is called validated or merged.
+- **Limits:** existing development review remains shared-token/operator-attested, not cryptographic reviewer identity. Placement remains an explicit operator input. Job release flags remain false; this does not prove image-based architectural accuracy, rights, survey truth or automatic approval.
+
