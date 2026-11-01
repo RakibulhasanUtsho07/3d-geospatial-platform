@@ -204,11 +204,15 @@ The default bounded Dhaka 3D Tiles package now derives each tile's vertical inte
 
 A follow-on branch to the P3.6 footprint/height pilot adds a typed, source-bound architecture metadata layer.
 
-- The resolver pins supported fields/enums to Overture Buildings schema v2.0.0: `type`, `building_id`, `has_parts`, facade color/material, roof color/material/shape/direction/orientation/height.
-- Every field is explicitly `source`, `absent`, or `invalid`; numeric values are not coerced, colors must match Overture hex syntax, and unknown enum values are not mapped to a plausible style.
-- Each GLB and build-manifest tile carries the same architecture-evidence object. A manifest/tileset aggregate reports per-field availability and parent/part declaration states.
-- The independent alignment reviewer recomputes the object from the exact source feature and verifies GLB + manifest + summary binding. Regression cases rebind both GLB and manifest to a false roof shape and require the source-bound reviewer to reject it.
+- The resolver pins supported fields/enums to Overture Buildings schema v2.0.0: `type`, `building_id`, `has_parts`, facade color/material, roof color/material/shape/direction/orientation/height. Enum values/types were checked against the pinned official schema source.
+- Every field is explicitly `source`, `absent`, or `invalid`; numeric values are not coerced, colors must match Overture hex syntax, identifiers must be non-empty whitespace-free strings, and unknown enum values are not mapped to a plausible style.
+- A full-source composition audit resolves every `building_part.building_id` against parent `building` feature IDs, distinguishes missing/ambiguous parent links, checks part records against `has_parts` claims, and separately records whether parent and parts are both selected in the bounded tile package.
+- Each GLB and build-manifest tile carries the same architecture-evidence object, including its composition link. Manifest/tileset aggregates report per-field availability, parent/part statuses and whole-source linkage counts.
+- The independent alignment reviewer recomputes the architecture object and complete composition audit from the hash-matched FeatureCollection, then verifies source + GLB + manifest + aggregate agreement. Regression cases tamper both GLB and manifest to a false roof shape and require the source-bound reviewer to reject them.
 - The browser review page displays actual roof/facade metadata coverage and explicitly reports `footprint-extrusion-only` with zero generated architectural details.
-- Parent `has_parts=true` and part `building_id` are evidence only. They do not mean that parent/part geometry is joined or that the building is assembled.
+- Parent `has_parts=true` and part `building_id` are evidence only. The composition audit reports whether part records resolve to one parent, whether the parent claim agrees, and whether both were emitted; it does not merge their geometries or mean that a building is assembled.
 
 **Not implemented by P3.7:** roof meshes, facade components, windows/doors, balcony/arch geometry, textures or parent/part assembly. No source metadata is invented to fill absent fields. The next geometry stage must first join and validate parent/part records by `building_id`, then generate only geometry supported by source metadata or independently reviewed images. Keep the acceptance/publication/map-ready/automatic-approval flags false.
+
+
+Implementation contract and pinned schema references: [P3.7 Building Composition Evidence](./research/P3-7-BUILDING-COMPOSITION-EVIDENCE.md).
