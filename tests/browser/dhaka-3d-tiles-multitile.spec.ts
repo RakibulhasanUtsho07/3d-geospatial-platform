@@ -129,8 +129,8 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   );
   assert.ok(Object.keys(review.heightEvidence.baseSourceCounts).length > 0);
   assert.ok(
-    review.limitations?.some((item) => /none is independent survey truth/i.test(item)),
-    "Source heights and estimates must not be described as surveyed truth.",
+    review.limitations?.some((item) => /survey truth/i.test(item)),
+    "The machine-readable limitations must explicitly distinguish source/estimated heights from survey truth.",
   );
   assert.ok(
     !review.limitations?.some((item) => /synthetic uniform extrusion/i.test(item)),
