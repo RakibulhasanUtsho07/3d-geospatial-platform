@@ -22,6 +22,15 @@ const sourceData = {
     },
     {
       type: "Feature",
+      id: "alignment-min-floor",
+      properties: { class: "building", height: 16, min_floor: 2 },
+      geometry: { type: "Polygon", coordinates: [[
+        [90.4140, 23.7800], [90.4142, 23.7800], [90.4142, 23.7802],
+        [90.4140, 23.7802], [90.4140, 23.7800]
+      ]] }
+    },
+    {
+      type: "Feature",
       id: "alignment-concave",
       properties: { class: "building" },
       geometry: { type: "Polygon", coordinates: [[
@@ -250,6 +259,27 @@ test("aligns the source footprint with a non-zero Overture min_height base and t
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 2.49);
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.top.maximum <= 20.51);
   assert.equal(tile.allTransformedVerticesInsideDeclaredRegion, true);
+});
+
+test("resolves min_floor as a labelled base-height estimate and verifies it in world space", async () => {
+  const sourceDerivedPackage = path.join(root, "min-floor-source-derived-package");
+  await buildDhaka3DTilesPackage({ sourcePath, outputPath: sourceDerivedPackage, maxFeatures: 16 });
+  const report = await reviewDhaka3DTilesPackageAlignment({
+    sourcePath,
+    packageDirectory: sourceDerivedPackage,
+  });
+  assert.equal(report.status, "pass", report.errors.join("; "));
+  const tile = report.tiles.find((item) => item.featureId === "alignment-min-floor");
+  assert.ok(tile);
+  assert.equal(tile.heightProvenance.heightMeters, 16);
+  assert.equal(tile.heightProvenance.baseHeightMeters, 6);
+  assert.equal(tile.heightProvenance.topHeightMeters, 22);
+  assert.equal(tile.heightProvenance.baseHeightSource, "min-floor-estimate");
+  assert.equal(tile.heightProvenance.baseHeightEstimated, true);
+  assert.equal(tile.heightProvenance.reportedMinFloor, 2);
+  assert.equal(tile.heightProvenance.reportedMinHeightMeters, null);
+  assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 5.99);
+  assert.ok(tile.transformedEllipsoidHeightRangeMeters.top.maximum <= 22.01);
 });
 
 test("rejects manifest height provenance drift even if the GLB hash is unchanged", async () => {
