@@ -255,6 +255,7 @@ test("rejects feature IDs and parent IDs containing internal whitespace", () => 
     { type: "Feature", id: "part-1", properties: { _renderRole: "building_part", building_id: "parent with whitespace" } },
   ]);
   assert.equal(audit.summary.buildingFeatureCount, 0);
+  assert.equal(audit.summary.invalidParentFeatureIdCount, 1);
   assert.equal(audit.summary.partStatusCounts["missing-or-invalid-parent-id"], 1);
 });
 
