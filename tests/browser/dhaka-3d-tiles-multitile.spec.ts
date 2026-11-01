@@ -183,7 +183,7 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   assert.match(visibleArchitectureSummary ?? "", /footprint extrusion only/i);
   assert.match(visibleArchitectureSummary ?? "", /rendered architectural details: 0/i);
   assert.match(visibleArchitectureSummary ?? "", /source parts linked/i);
-  assert.match(visibleArchitectureSummary ?? "", /unresolved\/ambiguous\/conflicting parts/i);
+  assert.match(visibleArchitectureSummary ?? "", /unresolved\/ambiguous parts/i);
   assert.ok(
     review.limitations?.some((item) => /survey truth/i.test(item)),
     "The machine-readable limitations must explicitly distinguish source/estimated heights from survey truth.",
