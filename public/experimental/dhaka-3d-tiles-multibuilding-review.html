@@ -15,6 +15,7 @@
     h1 { margin: 0; font-size: 15px; font-weight: 650; }
     p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: #b4c2d4; }
     #review-status { margin-top: 8px; font-size: 12px; color: #a7f3d0; overflow-wrap: anywhere; }
+    #height-provenance { margin-top: 7px; color: #cbd5e1; }
     #review-result { display: none; }
   </style>
   <script>window.CESIUM_BASE_URL = "/cesium/";</script>
@@ -25,6 +26,7 @@
     <h1>P3.6 · Multi-tile viewport fetch validation</h1>
     <p>The camera visits two separated Dhaka footprint targets. This page records child-content requests and runtime tile events; it does not certify real building height or architectural accuracy.</p>
     <div id="review-status" role="status">Verifying package manifest…</div>
+    <p id="height-provenance">Checking per-feature height provenance…</p>
   </header>
   <div id="review-map" aria-label="Experimental multi-building 3D Tiles review"></div>
   <pre id="review-result" aria-hidden="true"></pre>
@@ -35,6 +37,7 @@
     const TILESET_URL = PACKAGE_ROOT + "tileset.json";
     const BUILD_URL = PACKAGE_ROOT + "build-manifest.json";
     const statusNode = document.getElementById("review-status");
+    const heightNode = document.getElementById("height-provenance");
     const resultNode = document.getElementById("review-result");
 
     function setStatus(status, message) {
@@ -98,6 +101,71 @@
         }
       }
       return Array.from(seenUris);
+    }
+
+    function summarizeHeightEvidence(build) {
+      const configuration = build.configuration ?? {};
+      const policy = configuration.heightPolicy;
+      const tiles = build.tiles;
+      if (policy === "per-feature-provenance") {
+        const sourceCounts = configuration.heightSourceCounts;
+        if (!sourceCounts || typeof sourceCounts !== "object" || Array.isArray(sourceCounts)) {
+          throw new Error("Per-feature height policy has no source-count summary.");
+        }
+        const declaredTotal = Object.values(sourceCounts).reduce((sum, count) => {
+          if (!Number.isSafeInteger(count) || count < 0) throw new Error("Invalid per-feature height source count.");
+          return sum + count;
+        }, 0);
+        if (declaredTotal !== tiles.length) {
+          throw new Error("Per-feature height source counts do not cover every tile.");
+        }
+        const baseSourceCounts = {};
+        for (const tile of tiles) {
+          const evidence = tile.heightEvidence;
+          if (!evidence || typeof evidence.baseHeightSource !== "string" ||
+              typeof evidence.baseHeightEstimated !== "boolean" ||
+              !Number.isFinite(evidence.heightMeters) ||
+              !Number.isFinite(evidence.baseHeightMeters) ||
+              !Number.isFinite(evidence.topHeightMeters)) {
+            throw new Error("A tile has incomplete per-feature height provenance.");
+          }
+          baseSourceCounts[evidence.baseHeightSource] = (baseSourceCounts[evidence.baseHeightSource] ?? 0) + 1;
+        }
+        return {
+          policy,
+          sourceCounts,
+          baseSourceCounts,
+          syntheticHeightMeters: null,
+          surveyStatus: "not-surveyed",
+          groundElevationStatus: configuration.groundElevationStatus ?? "unverified-zero-ellipsoid-anchor"
+        };
+      }
+      if (policy === "synthetic-test-override" &&
+          Number.isFinite(configuration.syntheticHeightMeters) &&
+          configuration.syntheticHeightMeters > 0) {
+        return {
+          policy,
+          sourceCounts: { "synthetic-test-height": tiles.length },
+          baseSourceCounts: { "synthetic-test-height": tiles.length },
+          syntheticHeightMeters: configuration.syntheticHeightMeters,
+          surveyStatus: "not-surveyed",
+          groundElevationStatus: configuration.groundElevationStatus ?? "unverified-zero-ellipsoid-anchor"
+        };
+      }
+      throw new Error("The package uses an unsupported or missing height policy.");
+    }
+
+    function describeHeightEvidence(heightEvidence) {
+      if (heightEvidence.policy === "synthetic-test-override") {
+        return "Synthetic test override: " + heightEvidence.syntheticHeightMeters +
+          " m. Not source height or survey evidence.";
+      }
+      const labels = Object.entries(heightEvidence.sourceCounts)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([source, count]) => count + " " + source)
+        .join(" · ");
+      return "Per-feature heights: " + labels +
+        ". Heights are source attributes or labelled estimates, not independent survey truth.";
     }
 
     function centerOf(bounds) {
@@ -242,6 +310,10 @@
       const tilesetSha256 = await sha256Hex(tilesetBytes);
       const buildManifestSha256 = await sha256Hex(buildBytes);
       const contentUris = validatePackageContract(tileset, build);
+      const heightEvidence = summarizeHeightEvidence(build);
+      heightNode.textContent = describeHeightEvidence(heightEvidence) +
+        " Ground/vertical datum: " + heightEvidence.groundElevationStatus +
+        "; absolute elevation is not survey-verified.";
       const pair = chooseSeparatedTargets(build.tiles);
       const firstTarget = { tile: pair.first, center: pair.firstCenter };
       const secondTarget = { tile: pair.second, center: pair.secondCenter };
@@ -344,9 +416,13 @@
           tileFailed: diagnostics.tileFailed.slice(0, 5),
           tilesLoadedAtCapture: tilesetRuntime.tilesLoaded === true
         },
+        heightEvidence,
         limitations: [
-          "Building heights are a synthetic uniform extrusion, not sourced or surveyed.",
-          "This validates Cesium loading, selective content fetch and package placement plumbing; it does not measure facade/roof accuracy or survey-grade geometry.",
+          heightEvidence.policy === "per-feature-provenance"
+            ? "Per-feature height values are Overture source attributes, floor estimates or fallback estimates; none is independent survey truth."
+            : "An explicit synthetic test height was used; it is not source height or survey evidence.",
+          "The local vertical origin and terrain elevation are not survey-verified; height offsets do not establish absolute ground or top elevation.",
+          "The emitted geometry is footprint extrusion, not facade/roof reconstruction; the browser frame does not establish architectural fidelity.",
           "Browser resource timing identifies content resources requested by this viewport; this is not a city-scale performance benchmark."
         ],
         releaseFlags: build.releaseFlags
