@@ -26,6 +26,14 @@ type MultiTileReview = {
     contentCount: number;
     hierarchyChildCount: number;
   };
+  heightEvidence?: {
+    policy: "per-feature-provenance" | "synthetic-test-override";
+    sourceCounts: Record<string, number>;
+    baseSourceCounts: Record<string, number>;
+    syntheticHeightMeters: number | null;
+    surveyStatus: "not-surveyed";
+    groundElevationStatus: string;
+  };
   targetPair?: {
     distanceMeters: number;
     first: { featureId: string; contentUri: string; center: { longitude: number; latitude: number }; cameraAltitudeMeters: number };
@@ -109,6 +117,28 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   assert.match(review.input?.buildManifestSha256 ?? "", /^[a-f0-9]{64}$/);
   assert.ok((review.input?.contentCount ?? 0) >= 2, "The source package must have multiple child contents.");
   assert.equal(review.input?.contentCount, review.input?.hierarchyChildCount);
+  assert.ok(review.heightEvidence, "The browser evidence must describe the actual generated height policy.");
+  assert.equal(review.heightEvidence.policy, "per-feature-provenance");
+  assert.equal(review.heightEvidence.syntheticHeightMeters, null);
+  assert.equal(review.heightEvidence.surveyStatus, "not-surveyed");
+  assert.ok(review.heightEvidence.groundElevationStatus.includes("unverified"));
+  assert.equal(
+    Object.values(review.heightEvidence.sourceCounts).reduce((sum, count) => sum + count, 0),
+    review.input?.contentCount,
+    "Every tile must be represented in the per-feature source-height counts.",
+  );
+  assert.ok(Object.keys(review.heightEvidence.baseSourceCounts).length > 0);
+  assert.ok(
+    review.limitations?.some((item) => /not independent survey truth/i.test(item)),
+    "Source heights and estimates must not be described as surveyed truth.",
+  );
+  assert.ok(
+    !review.limitations?.some((item) => /synthetic uniform extrusion/i.test(item)),
+    "The browser report must not claim a synthetic uniform extrusion for source-driven packages.",
+  );
+  const visibleHeightSummary = await page.locator("#height-provenance").textContent();
+  assert.match(visibleHeightSummary ?? "", /Per-feature heights:/);
+  assert.match(visibleHeightSummary ?? "", /not survey-verified/i);
   assert.ok((review.runtime?.viewport.width ?? 0) >= 640);
   assert.ok((review.runtime?.viewport.height ?? 0) >= 400);
   assert.ok((review.runtime?.viewport.cssWidth ?? 0) >= 640);
