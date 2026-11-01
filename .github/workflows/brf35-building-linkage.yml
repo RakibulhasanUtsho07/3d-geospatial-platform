@@ -2,7 +2,9 @@ name: BRF-35 same-building linkage and metric-frame gate
 
 on:
   push:
-    branches: [development]
+    branches:
+      - development
+      - feat/brf48-six-disjoint-heldout-checkpoints-20261101
     paths:
       - ".github/workflows/brf35-building-linkage.yml"
       - "src/core/building-generation/brf35-building-linkage.mjs"
@@ -13,7 +15,9 @@ on:
       - "docs/research/BRF-35-BUILDING-LINKAGE-AND-METRIC-FRAME.md"
       - "package.json"
   pull_request:
-    branches: [development]
+    branches:
+      - development
+      - feat/brf47-cross-role-asset-identity-20261031
     paths:
       - ".github/workflows/brf35-building-linkage.yml"
       - "src/core/building-generation/brf35-building-linkage.mjs"
