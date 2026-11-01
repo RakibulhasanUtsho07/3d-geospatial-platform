@@ -285,6 +285,7 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
   const partRecords = [];
   const roleDetectionCounts = {};
   const parentRoleCounts = {};
+  let invalidParentFeatureIdCount = 0;
   for (const feature of features) {
     if (!isRecord(feature) || !isRecord(feature.properties)) continue;
     const featureId = getFeatureId(feature);
@@ -292,8 +293,12 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     const key = roleEvidence.status + ":" + roleEvidence.origin + ":" + (roleEvidence.value ?? "unknown");
     roleDetectionCounts[key] = (roleDetectionCounts[key] ?? 0) + 1;
     if (roleEvidence.roleKind === "parent") {
-      parentRoleCounts[roleEvidence.value] = (parentRoleCounts[roleEvidence.value] ?? 0) + 1;
-      parentRecords.push({ featureId, properties: feature.properties, roleEvidence });
+      if (featureId) {
+        parentRoleCounts[roleEvidence.value] = (parentRoleCounts[roleEvidence.value] ?? 0) + 1;
+        parentRecords.push({ featureId, properties: feature.properties, roleEvidence });
+      } else {
+        invalidParentFeatureIdCount += 1;
+      }
     } else if (roleEvidence.roleKind === "part") {
       partRecords.push({ featureId, properties: feature.properties, roleEvidence });
     }
@@ -427,7 +432,8 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     : null;
   const partSelectedWithoutParentCount = selectedFeatureIds
     ? partLinks.filter((link) =>
-      link.status === "parent-feature-resolved" &&
+      (link.status === "parent-feature-resolved" ||
+        link.status === "extractor-parent-id-disagrees-with-building-id") &&
       link.partSelectedInPackage === true &&
       link.parentSelectedInPackage === false
     ).length
@@ -456,6 +462,7 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     partStatusCounts,
     parentStatusCounts,
     duplicateParentIdCount: [...parentsById.values()].filter((records) => records.length > 1).length,
+    invalidParentFeatureIdCount,
     selectedFeatureCount: selectedFeatureIds ? selectedFeatureIds.size : null,
     selectedParentCount: selectedFeatureIds ? selectedParents.length : null,
     selectedBuildingPartCount: selectedFeatureIds ? selectedParts.length : null,
