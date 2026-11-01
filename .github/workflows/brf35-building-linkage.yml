@@ -59,7 +59,7 @@ jobs:
           if (report.status !== "blocked-missing-or-invalid-evidence") throw new Error("Real-world candidate unexpectedly left the blocked state.");
           if (report.blockingCount < 1) throw new Error("Candidate has no recorded blockers.");
           if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must all remain false.");
-          for (const required of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed", "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present", "held-out-checkpoints-independent"]) {
+          for (const required of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed", "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present", "candidate-fit-source-refs-hash-bound", "held-out-checkpoints-independent", "held-out-checkpoints-disjoint-from-fit-sources"]) {
             if (!report.blockers.includes(required)) throw new Error("Expected blocker not preserved: " + required);
           }
           console.log("BRF-35 remains fail-closed; " + report.blockingCount + " blockers recorded.");
