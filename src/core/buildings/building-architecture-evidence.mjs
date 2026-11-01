@@ -58,6 +58,46 @@ const ROOF_SHAPES = new Set([
 ]);
 
 const ROOF_ORIENTATIONS = new Set(["along", "across"]);
+const EXTRACTOR_RENDER_ROLES = new Set(["building", "building_parent", "building_part"]);
+
+function resolveCompositionRole(properties) {
+  const overtureType = sourceEnum(properties, "type", new Set(["building", "building_part"]));
+  const extractorRole = sourceEnum(properties, "_renderRole", EXTRACTOR_RENDER_ROLES);
+
+  if (overtureType.status === "source") {
+    return {
+      status: "source",
+      value: overtureType.value,
+      roleKind: overtureType.value === "building_part" ? "part" : "parent",
+      origin: "overture-properties-type",
+    };
+  }
+
+  if (overtureType.status === "invalid") {
+    return {
+      status: "invalid",
+      value: null,
+      roleKind: "unknown",
+      origin: "overture-properties-type",
+    };
+  }
+
+  if (extractorRole.status === "source") {
+    return {
+      status: "extractor-derived",
+      value: extractorRole.value,
+      roleKind: extractorRole.value === "building_part" ? "part" : "parent",
+      origin: "extractor-render-role",
+    };
+  }
+
+  return {
+    status: extractorRole.status === "invalid" ? "invalid" : "absent",
+    value: null,
+    roleKind: "unknown",
+    origin: extractorRole.status === "invalid" ? "extractor-render-role" : "none",
+  };
+}
 const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function isRecord(value) {
@@ -126,7 +166,7 @@ function sourceIdentifier(properties, key) {
     return { status: "absent", value: null };
   }
   const value = properties[key];
-  if (typeof value !== "string" || value.length === 0 || value.trim() !== value || /\\s/.test(value)) {
+  if (typeof value !== "string" || value.length === 0 || value.trim() !== value || /\s/.test(value)) {
     return { status: "invalid", value: null };
   }
   return { status: "source", value };
@@ -145,6 +185,7 @@ export function resolveBuildingArchitectureEvidence(properties) {
   }
 
   const featureType = sourceEnum(properties, "type", new Set(["building", "building_part"]));
+  const compositionRole = resolveCompositionRole(properties);
   const hasParts = sourceBoolean(properties, "has_parts");
   const buildingId = sourceIdentifier(properties, "building_id");
   const facadeColor = sourceColor(properties, "facade_color");
@@ -163,11 +204,11 @@ export function resolveBuildingArchitectureEvidence(properties) {
   const roofHeight = sourceNumber(properties, "roof_height");
 
   let compositionStatus = "feature-type-unknown";
-  if (featureType.status === "source" && featureType.value === "building_part") {
+  if (compositionRole.roleKind === "part") {
     compositionStatus = buildingId.status === "source"
       ? "building-part-parent-join-required"
       : "building-part-parent-id-missing";
-  } else if (featureType.status === "source" && featureType.value === "building") {
+  } else if (compositionRole.roleKind === "parent") {
     compositionStatus = hasParts.status === "source"
       ? hasParts.value ? "parent-declares-associated-parts" : "parent-reports-no-associated-parts"
       : "parent-part-status-unknown";
@@ -193,6 +234,7 @@ export function resolveBuildingArchitectureEvidence(properties) {
     schemaVersion: 1,
     sourceSchema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
     featureType,
+    compositionRole,
     buildingId,
     hasParts,
     compositionStatus,
@@ -235,19 +277,25 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
 
   const getFeatureId = (feature) => {
     const id = isRecord(feature) ? feature.id : null;
-    return typeof id === "string" && id.length > 0 && id.trim() === id && !/\\s/.test(id)
+    return typeof id === "string" && id.length > 0 && id.trim() === id && !/\s/.test(id)
       ? id
       : null;
   };
   const parentRecords = [];
   const partRecords = [];
+  const roleDetectionCounts = {};
+  const parentRoleCounts = {};
   for (const feature of features) {
     if (!isRecord(feature) || !isRecord(feature.properties)) continue;
     const featureId = getFeatureId(feature);
-    if (feature.properties.type === "building") {
-      parentRecords.push({ featureId, properties: feature.properties });
-    } else if (feature.properties.type === "building_part") {
-      partRecords.push({ featureId, properties: feature.properties });
+    const roleEvidence = resolveCompositionRole(feature.properties);
+    const key = roleEvidence.status + ":" + roleEvidence.origin + ":" + (roleEvidence.value ?? "unknown");
+    roleDetectionCounts[key] = (roleDetectionCounts[key] ?? 0) + 1;
+    if (roleEvidence.roleKind === "parent") {
+      parentRoleCounts[roleEvidence.value] = (parentRoleCounts[roleEvidence.value] ?? 0) + 1;
+      parentRecords.push({ featureId, properties: feature.properties, roleEvidence });
+    } else if (roleEvidence.roleKind === "part") {
+      partRecords.push({ featureId, properties: feature.properties, roleEvidence });
     }
   }
 
@@ -280,6 +328,12 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
       partFeatureId: part.featureId,
       parentBuildingId: id.value,
       status,
+      roleEvidence: part.roleEvidence,
+      extractorParentId: sourceIdentifier(part.properties, "_parentBuildingId"),
+      extractorParentIdMatchesBuildingId: Object.hasOwn(part.properties, "_parentBuildingId")
+        ? part.properties._parentBuildingId === id.value
+        : null,
+      parentRoleEvidence: parent?.roleEvidence ?? { status: "unavailable", value: null, origin: "none" },
       parentHasPartsClaim: parent ? sourceBoolean(parent.properties, "has_parts") : { status: "unavailable", value: null },
       parentSelectedInPackage: parent && selectedFeatureIds
         ? selectedFeatureIds.has(parent.featureId)
@@ -313,6 +367,7 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     parentStatusCounts[status] = (parentStatusCounts[status] ?? 0) + 1;
     byFeatureId[parent.featureId] = {
       featureType: "building",
+      roleEvidence: parent.roleEvidence,
       status,
       hasPartsClaim: hasParts,
       associatedPartFeatureIds: associatedParts.map((part) => part.featureId),
@@ -332,8 +387,11 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     if (link.partFeatureId) {
       byFeatureId[link.partFeatureId] = {
         featureType: "building_part",
+        roleEvidence: link.roleEvidence,
         status: link.status,
         parentBuildingId: link.parentBuildingId,
+        extractorParentIdMatchesBuildingId: link.extractorParentIdMatchesBuildingId,
+        parentRoleEvidence: link.parentRoleEvidence,
         parentHasPartsClaim: link.parentHasPartsClaim,
         parentSelectedInPackage: link.parentSelectedInPackage,
         partSelectedInPackage: link.partSelectedInPackage,
@@ -345,8 +403,12 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     schema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
     sourceFeatureCount: features.length,
     buildingFeatureCount: parentRecords.length,
+    regularBuildingFeatureCount: parentRoleCounts.building ?? 0,
+    buildingParentFeatureCount: parentRoleCounts.building_parent ?? 0,
     buildingPartFeatureCount: partRecords.length,
     linkedPartCount: partStatusCounts["parent-feature-resolved"] ?? 0,
+    roleDetectionCounts,
+    parentRoleCounts,
     partStatusCounts,
     parentStatusCounts,
     duplicateParentIdCount: [...parentsById.values()].filter((records) => records.length > 1).length,
@@ -405,6 +467,8 @@ export function summarizeBuildingArchitectureEvidence(evidenceItems) {
     schema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
     tileCount: evidenceItems.length,
     featureTypeCounts: countValues((item) => item.featureType?.value),
+    compositionRoleCounts: countValues((item) => item.compositionRole?.value),
+    compositionRoleOriginCounts: countValues((item) => item.compositionRole?.origin),
     compositionStatusCounts: countValues((item) => item.compositionStatus),
     roofGeometryStatusCounts: countValues((item) => item.roof?.geometryStatus),
     facadeStyleStatusCounts: countValues((item) => item.facade?.status),
