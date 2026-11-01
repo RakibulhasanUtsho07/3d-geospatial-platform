@@ -169,13 +169,13 @@ export default function GeneratedModelPanel({
 
   async function handlePublishedJobLoad(definition: GeneratedModelDefinition) {
     setError(null);
+    setCatalogRefreshKey((current) => current + 1);
     if (models.some((item) => item.definition.id === definition.id)) {
-      throw new Error("This model is already loaded in the current map session. Remove the existing version before loading the newly published version.");
+      throw new Error("The catalog was refreshed, but this model ID is already loaded in the current map session. Remove the existing version, then load the new active catalog version.");
     }
     await onAdd(definition);
     setModels((current) => [...current, { definition, visible: true }]);
     onFocus(definition);
-    setCatalogRefreshKey((current) => current + 1);
     setMessage((definition.name ?? definition.id) + " was loaded from its newly published catalog version.");
   }
 
