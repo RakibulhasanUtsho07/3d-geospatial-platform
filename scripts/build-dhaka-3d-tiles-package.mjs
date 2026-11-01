@@ -10,6 +10,7 @@ import { validateTilesetManifest } from "../src/core/geospatial/tileset-manifest
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
 import {
+  auditBuildingPartComposition,
   resolveBuildingArchitectureEvidence,
   summarizeBuildingArchitectureEvidence,
 } from "../src/core/buildings/building-architecture-evidence.mjs";
@@ -588,6 +589,18 @@ export async function buildDhaka3DTilesPackage({
 
   candidates.sort((left, right) => left.id.localeCompare(right.id));
   if (candidates.length > maxFeatures) excludedCounts.featureLimit = candidates.length - maxFeatures;
+  const selectedFeatureIds = new Set(candidates.slice(0, maxFeatures).map((candidate) => candidate.id));
+  const sourceCompositionAudit = auditBuildingPartComposition(source.features, { selectedFeatureIds });
+  for (const candidate of candidates) {
+    candidate.architectureEvidence = {
+      ...candidate.architectureEvidence,
+      compositionLink: sourceCompositionAudit.byFeatureId[candidate.id] ?? {
+        featureType: null,
+        status: "feature-id-not-resolved-in-composition-audit",
+        selectedInPackage: selectedFeatureIds.has(candidate.id),
+      },
+    };
+  }
   const tiles = [];
   for (const candidate of candidates) {
     if (tiles.length >= maxFeatures) break;
@@ -668,6 +681,7 @@ export async function buildDhaka3DTilesPackage({
         heightStatus: syntheticHeightMeters === null ? "per-feature-height-provenance" : "synthetic-test-height",
         heightSourceCounts,
         architectureEvidenceSummary,
+        sourceCompositionAuditSummary: sourceCompositionAudit.summary,
         heightPolicy: syntheticHeightMeters === null
           ? "Use positive Overture height attributes first, then floor-count estimate, then an explicitly labelled 9 m fallback estimate."
           : "Explicit synthetic test override; not representative of source building height.",
@@ -748,6 +762,7 @@ export async function buildDhaka3DTilesPackage({
       heightPolicy: syntheticHeightMeters === null ? "per-feature-provenance" : "synthetic-test-override",
       heightSourceCounts,
       architectureEvidenceSummary,
+      sourceCompositionAuditSummary: sourceCompositionAudit.summary,
       groundElevationStatus: "unverified-zero-ellipsoid-anchor",
       minHeightApplication: syntheticHeightMeters === null
         ? "source-min-height-applied-as-relative-above-ground-offset"
