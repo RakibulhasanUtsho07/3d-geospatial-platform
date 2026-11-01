@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateTilesetManifest } from "../src/core/geospatial/tileset-manifest-validation.mjs";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
+import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
@@ -273,7 +274,37 @@ function localEnuToEcefTransform(longitude, latitude) {
   ];
 }
 
-function createGlb(polygons, longitude, latitude, heightMeters, featureId, featureSha256) {
+function resolveHeightEvidence(properties, syntheticHeightMeters) {
+  if (syntheticHeightMeters !== null) {
+    return {
+      status: "synthetic-test-height",
+      source: "synthetic-test-height",
+      heightMeters: syntheticHeightMeters,
+      unclampedHeightMeters: syntheticHeightMeters,
+      heightWasClamped: false,
+      reportedMinHeightMeters: null,
+      minHeightWasClamped: false,
+      groundOffsetAppliedMeters: 0,
+      groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+    };
+  }
+
+  const resolved = resolveBuildingHeight(isRecord(properties) ? properties : {});
+  return {
+    status: resolved.source,
+    source: resolved.source,
+    heightMeters: resolved.meters,
+    unclampedHeightMeters: resolved.unclampedMeters,
+    heightWasClamped: resolved.heightWasClamped,
+    reportedMinHeightMeters: resolved.unclampedBaseHeight,
+    minHeightWasClamped: resolved.baseHeightWasClamped,
+    groundOffsetAppliedMeters: 0,
+    groundElevationStatus: "unverified-zero-ellipsoid-anchor",
+  };
+}
+
+function createGlb(polygons, longitude, latitude, heightEvidence, featureId, featureSha256) {
+  const heightMeters = heightEvidence.heightMeters;
   const positions=[],normals=[],indices=[];
   function addTriangle(first,second,third,desiredNormalY=null) {
     let a=first,b=second,c=third;
@@ -322,7 +353,7 @@ function createGlb(polygons, longitude, latitude, heightMeters, featureId, featu
   const gltf={
     asset:{version:"2.0",generator:"3d-geospatial-platform P3.6 footprint tile pilot"},
     scene:0,scenes:[{nodes:[0]}],nodes:[{name:`Footprint extrusion ${featureId}`,mesh:0}],
-    meshes:[{name:"Extruded source footprint; synthetic height",primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]}],
+    meshes:[{name:"Extruded source footprint; height provenance retained",primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]}],
     materials:[{name:"Neutral validation material",doubleSided:true,pbrMetallicRoughness:{baseColorFactor:[0.42,0.62,0.78,1],metallicFactor:0,roughnessFactor:0.9}}],
     buffers:[{byteLength:binary.length}],
     bufferViews:[
@@ -335,8 +366,21 @@ function createGlb(polygons, longitude, latitude, heightMeters, featureId, featu
       {bufferView:1,componentType:5126,count:normals.length/3,type:"VEC3"},
       {bufferView:2,componentType:5125,count:indices.length,type:"SCALAR",min:[0],max:[positions.length/3-1]}
     ],
-    extras:{sourceFeatureId:featureId,sourceFeatureSha256:featureSha256,heightStatus:"synthetic-test-height",
-      syntheticHeightMeters:heightMeters,interiorRingCount:polygons.reduce((sum,polygon)=>sum+polygon.length-1,0)}
+    extras:{
+      sourceFeatureId:featureId,
+      sourceFeatureSha256:featureSha256,
+      heightStatus:heightEvidence.status,
+      heightSource:heightEvidence.source,
+      heightMeters:heightEvidence.heightMeters,
+      unclampedHeightMeters:heightEvidence.unclampedHeightMeters,
+      heightWasClamped:heightEvidence.heightWasClamped,
+      reportedMinHeightMeters:heightEvidence.reportedMinHeightMeters,
+      minHeightWasClamped:heightEvidence.minHeightWasClamped,
+      groundOffsetAppliedMeters:heightEvidence.groundOffsetAppliedMeters,
+      groundElevationStatus:heightEvidence.groundElevationStatus,
+      ...(heightEvidence.status === "synthetic-test-height" ? { syntheticHeightMeters: heightMeters } : {}),
+      interiorRingCount:polygons.reduce((sum,polygon)=>sum+polygon.length-1,0)
+    }
   };
   const jsonBytes=Buffer.from(JSON.stringify(gltf),"utf8");
   const paddedJson=Buffer.concat([jsonBytes,Buffer.alloc((4-jsonBytes.length%4)%4,0x20)]);
@@ -376,7 +420,7 @@ function parseArgs(argv) {
     source: DEFAULT_SOURCE,
     output: DEFAULT_OUTPUT,
     maxFeatures: 32,
-    heightMeters: 8,
+    heightMeters: null,
     bounds: { ...DEFAULT_BOUNDS },
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -386,7 +430,7 @@ function parseArgs(argv) {
     if (flag === "--source") args.source = path.resolve(value);
     else if (flag === "--output") args.output = path.resolve(value);
     else if (flag === "--max-features") args.maxFeatures = Number(value);
-    else if (flag === "--height-meters") args.heightMeters = Number(value);
+    else if (flag === "--synthetic-height-meters") args.heightMeters = Number(value);
     else if (flag === "--bbox") {
       const parts = value.split(",").map(Number);
       if (parts.length !== 4 || !parts.every(Number.isFinite)) throw new Error("--bbox must be west,south,east,north.");
@@ -401,7 +445,7 @@ export async function buildDhaka3DTilesPackage({
   sourcePath = DEFAULT_SOURCE,
   outputPath = DEFAULT_OUTPUT,
   maxFeatures = 32,
-  syntheticHeightMeters = 8,
+  syntheticHeightMeters = null,
   bounds = DEFAULT_BOUNDS,
 } = {}) {
   const normalizedSource = path.resolve(sourcePath);
@@ -415,8 +459,9 @@ export async function buildDhaka3DTilesPackage({
   if (!Number.isInteger(maxFeatures) || maxFeatures < 1 || maxFeatures > MAX_FEATURES) {
     throw new Error(`maxFeatures must be an integer from 1 to ${MAX_FEATURES}.`);
   }
-  if (!Number.isFinite(syntheticHeightMeters) || syntheticHeightMeters <= 0 || syntheticHeightMeters > 250) {
-    throw new Error("syntheticHeightMeters must be finite and in the range (0, 250].");
+  if (syntheticHeightMeters !== null &&
+      (!Number.isFinite(syntheticHeightMeters) || syntheticHeightMeters <= 0 || syntheticHeightMeters > 250)) {
+    throw new Error("syntheticHeightMeters must be null or finite and in the range (0, 250].");
   }
   if (!isRecord(bounds) || ![bounds.west, bounds.south, bounds.east, bounds.north].every(Number.isFinite) ||
       bounds.west < -180 || bounds.east > 180 || bounds.south < -90 || bounds.north > 90 ||
@@ -504,6 +549,7 @@ export async function buildDhaka3DTilesPackage({
       widthMeters,
       depthMeters,
       featureSha256: sha256(Buffer.from(JSON.stringify(feature), "utf8")),
+      heightEvidence: resolveHeightEvidence(feature.properties, syntheticHeightMeters),
     });
   }
 
@@ -518,7 +564,7 @@ export async function buildDhaka3DTilesPackage({
         candidate.polygons,
         candidate.longitude,
         candidate.latitude,
-        syntheticHeightMeters,
+        candidate.heightEvidence,
         candidate.id,
         candidate.featureSha256,
       );
@@ -546,6 +592,7 @@ export async function buildDhaka3DTilesPackage({
       latitude: candidate.latitude,
       widthMeters: candidate.widthMeters,
       depthMeters: candidate.depthMeters,
+      heightEvidence: candidate.heightEvidence,
     });
   }
   if (tiles.length === 0) {
@@ -562,6 +609,12 @@ export async function buildDhaka3DTilesPackage({
     METERS_PER_LONGITUDE_DEGREE * Math.cos(((combinedBounds.south + combinedBounds.north) / 2) * Math.PI / 180);
   const rootDepthMeters = (combinedBounds.north - combinedBounds.south) * METERS_PER_LATITUDE_DEGREE;
   const rootError = Math.max(1, rootWidthMeters, rootDepthMeters);
+  const maximumTileHeightMeters = Math.max(...tiles.map((tile) => tile.heightEvidence.heightMeters));
+  const heightSourceCounts = tiles.reduce((counts, tile) => {
+    const source = tile.heightEvidence.source;
+    counts[source] = (counts[source] ?? 0) + 1;
+    return counts;
+  }, {});
   const tileset = {
     asset: {
       version: "1.1",
@@ -573,10 +626,16 @@ export async function buildDhaka3DTilesPackage({
         attribution: ATTRIBUTION,
         coordinateSystems: { geographic: "EPSG:4979", globalCartesian: "EPSG:4978" },
         footprintGeometry: "source Polygon/MultiPolygon exterior and interior rings",
-        heightStatus: "synthetic-test-height",
+        heightStatus: syntheticHeightMeters === null ? "per-feature-height-provenance" : "synthetic-test-height",
+        heightSourceCounts,
+        heightPolicy: syntheticHeightMeters === null
+          ? "Use positive Overture height attributes first, then floor-count estimate, then an explicitly labelled 9 m fallback estimate."
+          : "Explicit synthetic test override; not representative of source building height.",
         syntheticHeightMeters,
+        groundElevationStatus: "unverified-zero-ellipsoid-anchor; reported min_height is retained as metadata but not applied without a verified terrain/vertical reference",
         limitations: [
-          "Synthetic extrusion height; not a surveyed building height.",
+          "Overture height attributes are source-provided values, not independently surveyed heights; floor-count and fallback values are estimates.",
+          "The footprint is anchored at WGS84 ellipsoid height zero because no verified terrain/vertical datum is bound; reported min_height is retained but not applied.",
           "Interior rings are triangulated as courtyard holes with vertical boundary walls; malformed, overlapping or out-of-exterior holes are rejected.",
           "No facade reconstruction, roof reconstruction, imagery texture or photogrammetric accuracy claim.",
         ],
@@ -584,11 +643,11 @@ export async function buildDhaka3DTilesPackage({
     },
     geometricError: rootError,
     root: {
-      boundingVolume: { region: boundsToRegion(combinedBounds, -0.25, syntheticHeightMeters + 0.25) },
+      boundingVolume: { region: boundsToRegion(combinedBounds, -0.25, maximumTileHeightMeters + 0.25) },
       geometricError: rootError,
       refine: "REPLACE",
       children: tiles.map((tile) => ({
-        boundingVolume: { region: boundsToRegion(tile.boundsDegrees, -0.25, syntheticHeightMeters + 0.25) },
+        boundingVolume: { region: boundsToRegion(tile.boundsDegrees, -0.25, tile.heightEvidence.heightMeters + 0.25) },
         geometricError: 0,
         refine: "REPLACE",
         transform: localEnuToEcefTransform(tile.longitude, tile.latitude),
@@ -630,6 +689,9 @@ export async function buildDhaka3DTilesPackage({
       maxFeatures,
       emittedFeatures: tiles.length,
       syntheticHeightMeters,
+      heightPolicy: syntheticHeightMeters === null ? "per-feature-provenance" : "synthetic-test-override",
+      heightSourceCounts,
+      groundElevationStatus: "unverified-zero-ellipsoid-anchor",
       coordinateSystems: { geographic: "EPSG:4979", globalCartesian: "EPSG:4978" },
       tileContentFormat: "glTF 2.0 binary (GLB) in OGC 3D Tiles 1.1",
     },
@@ -644,6 +706,7 @@ export async function buildDhaka3DTilesPackage({
       tileBoundsDegrees: tile.boundsDegrees,
       widthMeters: Number(tile.widthMeters.toFixed(3)),
       depthMeters: Number(tile.depthMeters.toFixed(3)),
+      heightEvidence: tile.heightEvidence,
     })),
     files: fileRecords,
     validation: {
@@ -655,7 +718,8 @@ export async function buildDhaka3DTilesPackage({
     },
     limitations: [
       "This is a bounded format/placement pilot, not a production-ready city-wide tiling system.",
-      "Extrusion height is synthetic and must not be used as real building height.",
+      "Overture height attributes are source-provided but not independently surveyed; floor-count and fallback heights are estimates.",
+      "The model bottom is anchored at WGS84 ellipsoid height zero; a verified terrain elevation/vertical datum is not yet bound. Reported min_height is retained but not applied.",
       "Polygon and MultiPolygon interior rings are preserved as holes; invalid hole topology is excluded fail-closed.",
       "No independent survey, roof/facade reconstruction, texture, rights determination or visual review is implied.",
     ],
