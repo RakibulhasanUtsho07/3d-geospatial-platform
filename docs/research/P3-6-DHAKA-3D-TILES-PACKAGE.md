@@ -18,7 +18,7 @@ Supported options:
 - `--source`: local GeoJSON FeatureCollection.
 - `--output`: package directory. Writes are restricted to a child path under `data/overture`, `public/experimental`, or the operating-system temporary directory.
 - `--max-features`: bounded integer from 1 to 128 (default 32).
-- `--height-meters`: explicitly synthetic extrusion height, greater than 0 and at most 250 m (default 8 m).
+- Default: resolve each feature's height from its Overture properties and record the source/clamping provenance. Use `--synthetic-height-meters` only for explicitly synthetic tests (greater than 0 and at most 250 m).
 - `--bbox`: WGS84 extent as `west,south,east,north`.
 
 ## Package contract
@@ -32,7 +32,7 @@ Supported options:
 
 Only GeoJSON Polygon/MultiPolygon building footprints with simple exterior rings are emitted. Features outside the specified pilot extent, invalid coordinates/degenerate footprints, footprints outside the bounded size range, duplicate IDs, unsupported geometries and polygons with interior rings/holes are excluded and counted. An ear-clipping/mesh-generation failure is fail-closed for that candidate rather than replaced by a bounding-box building.
 
-The selected height is synthetic and uniform for this pilot. Source footprints are preserved as polygon outlines, but this output does not reconstruct facade details, openings, roofs, textures or surveyed elevation. The horizontal projection uses a local east/north approximation around each feature anchor and a WGS84 ECEF transform for global placement. The pilot must not be scaled city-wide without a metric projection strategy, more thorough geometry repair and independent placement review.
+The height used by the default source-driven build is no longer a single synthetic constant: each feature resolves a source height, a labelled floor-count estimate, or a labelled fallback. An explicit `--synthetic-height-meters` override remains available for controlled tests. Source footprints are preserved as polygon outlines, but this output does not reconstruct facade details, openings, roofs, textures or surveyed elevation. The horizontal projection uses a local east/north approximation around each feature anchor and a WGS84 ECEF transform for global placement. The pilot must not be scaled city-wide without a metric projection strategy, more thorough geometry repair and independent placement review.
 
 ## Integrity gate
 
@@ -176,3 +176,34 @@ The package builder now preserves valid GeoJSON Polygon/MultiPolygon interior ri
 ### Release decision
 
 PR #275 remains Draft and unmerged. Keep `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` explicitly false. The successful workflows validate this implementation checkpoint only; they do not override the blocked real-height, rights, independent-accuracy or human-review gates. Any documentation-only commit created to record this checkpoint must itself receive fresh exact-head CI before it is called validated.
+
+
+## Per-building height provenance and vertical interval correction — 2026-11-01
+
+This section supersedes earlier statements that the default P3.6 package always uses a uniform synthetic 8 m extrusion.
+
+### Source semantics
+
+The builder follows the current [Overture Building schema](https://docs.overturemaps.org/schema/reference/buildings/building/) and [BuildingPart schema](https://docs.overturemaps.org/schema/reference/buildings/building_part/):
+
+- `height` is the distance from the feature's lowest point to its highest point.
+- `min_height` is the above-ground altitude at which the bottom of the building/building part starts.
+- `num_floors` represents above-ground floors. When no positive source height is available, the current renderer policy estimates 3 m per floor; if neither is available, it uses an explicitly labelled 9 m fallback.
+- A supplied `min_height` is applied as the bottom offset; it is not added to the height field itself. The GLB vertical interval is `[baseHeightMeters, baseHeightMeters + heightMeters]`.
+
+### Implementation and evidence binding
+
+- Default build and the production review package now use per-feature provenance rather than an unconditional synthetic 8 m height.
+- `resolveBuildingHeight` uses strict numeric parsing. Values such as `"18.5m"` are not partially parsed as metres. It retains original/unclamped height and base values and records safety-cap decisions.
+- Each tile GLB, build manifest and tileset region now bind `heightStatus`, `heightSource`, `heightMeters`, `baseHeightMeters`, `topHeightMeters`, unclamped inputs, clamp flags and the min-height application policy.
+- The mesh's bottom vertices are emitted at `baseHeightMeters`; top vertices are emitted at `topHeightMeters`. Root and child `boundingVolume.region` vertical intervals cover the actual per-tile base and top range.
+- The alignment reviewer independently reads the GLB vertical planes, checks the manifest/GLB height-provenance cross-binding, recovers the footprint boundary at the non-zero base plane and checks base/top ECEF heights against the declared child region. A changed manifest height record cannot silently pass while the GLB stays unchanged.
+- Dedicated package tests cover explicit source height + non-zero `min_height`, floor estimate, fallback estimate, synthetic override, height/base clamping, and a corrupted height-provenance record.
+
+### Vertical reference limitation — still blocked
+
+The ENU-to-ECEF transform is anchored at WGS84 ellipsoid height zero because the 2D Overture footprint extract does not supply a verified terrain elevation or a named vertical datum. The source `min_height` is therefore applied as a relative above-ground offset from that unverified local ground plane. It does **not** establish absolute building elevation, surveyed ground level, or an independently measured top elevation.
+
+Overture-provided `height` is source data, not independent survey truth. Floor-count and fallback values are estimates. The alignment check confirms internal geometry/provenance and transform consistency only. It does not confirm real-world vertical accuracy, architectural fidelity, source rights, or production readiness.
+
+Use `--synthetic-height-meters` only to create an explicitly synthetic test package. The regular CI package build and scale profile now exercise default per-feature height resolution. All release flags remain false.
