@@ -61,6 +61,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
       - feat/brf46-source-operation-scope-gate
+      - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
       - main
