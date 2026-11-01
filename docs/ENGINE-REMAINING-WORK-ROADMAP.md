@@ -173,3 +173,17 @@ The codebase still needs real-data validation and product-level completion. The 
 - Missing inputs or unpinned hashes stay incomplete; hash mismatches and explicit geometry/view/model-binding failures are not silently downgraded. No combined accuracy percentage is produced and publication/automatic approval remain disabled.
 - Added focused regression tests and a runbook/template. Tests validate policy and evidence linkage only; they do not establish the accuracy of a specific real building.
 - **Acceptance still pending:** no actual 2–3 building source/reference pack with independently verified dimensions, checked permissions, surveyed controls and human-reviewed renders was available in this session. Do not mark the models accurate until those inputs are supplied and the evidence report passes review.
+
+
+## P3.6 height-provenance implementation slice — 2026-11-01
+
+The default bounded Dhaka 3D Tiles package now derives each tile's vertical interval from feature properties instead of applying a uniform synthetic 8 m height.
+
+- Overture `height` is used as the vertical distance from lowest to highest point; `min_height` is applied as the relative above-ground bottom offset. GLB vertices, tileset root/child vertical regions, build-manifest records, and the alignment reviewer now use the same `baseHeightMeters` / `topHeightMeters` interval.
+- Height provenance is preserved in the GLB and build manifest: source category, source/unclamped height, clamping, reported/applied min-height, base and top values, and the ground/vertical-reference limitation.
+- Floor-count conversion and the 9 m fallback remain explicitly labelled estimates. Overture-provided height is source data, not independent survey truth.
+- Strict numeric parsing rejects partial values such as `"18.5m"` rather than accepting the numeric prefix.
+- The alignment reviewer checks height metadata cross-binding and base/top positions after ECEF transformation. Synthetic test packages remain available only through an explicit `--synthetic-height-meters` override.
+- Production review-package build and the P3.6 dedicated workflow no longer force a synthetic 8 m override. The 32/64/128 bounded scale profile exercises source-derived per-feature intervals by default.
+
+**Vertical limitation remains:** the source extract has 2D footprints and no verified terrain elevation/vertical datum. The ENU origin remains at WGS84 ellipsoid height zero; `min_height` is only a relative above-ground offset from this unverified plane. No surveyed absolute elevations, building accuracy, rights or release readiness are claimed. Exact-head CI and live browser validation are required before this slice is promoted.
