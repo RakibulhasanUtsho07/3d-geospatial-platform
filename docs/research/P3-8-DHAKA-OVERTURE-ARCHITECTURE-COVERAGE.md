@@ -35,7 +35,18 @@ Initial metadata inspection across all 17,008 features found:
 - roof_orientation: 0 features
 - roof_height: 1 feature
 
-These are metadata presence counts, not geometry or correctness counts. The dedicated CI workflow uploads the complete machine-generated report; its byte hash and report hash are authoritative for the tested extract revision. If the source extract changes, regenerate the report before using the counts.
+These are metadata presence counts, not geometry or correctness counts. The exact dedicated-workflow artifact for this revision records:
+
+- Source SHA-256: `f05f14b1cf983c823adf605dc3131f2cf3029afd8ac873d54017155d22fe5f90`
+- Source bytes: `10,111,710`
+- Report SHA-256: `c198c1ca00ba3f57f32bfac1a8c7fb9ab8182e3563a90bdb6cc78ce66b536b1f`
+- Facade style (color or material present): 2,495 / 17,008 (14.6696%)
+- Roof shape plus positive roof height: 1 / 17,008 (0.0059%)
+- Feature IDs missing/invalid: 0; duplicate IDs: 0; source parent/part links: 15/15; extractor parent-ID conflicts: 0.
+- Source provenance records: 17,008 across OpenStreetMap (15,657), Google Open Buildings (1,140) and Microsoft ML Buildings (211).
+- A license value is present on 15,868 source records; 1,140 records have no license value in this extract. A source or provider record without a license value does not establish reuse permission.
+
+These are metadata and provenance counts, not geometry, legal clearance or correctness counts. The dedicated CI workflow uploads the complete machine-generated report; its byte hash and report hash are authoritative for the tested extract revision. If the source extract changes, regenerate the report before using the counts.
 
 ## Release boundary
 
