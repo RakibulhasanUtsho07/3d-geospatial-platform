@@ -71,6 +71,14 @@ test("profiles small packages with integrity/alignment evidence and false releas
     assert.equal(report.samples.length, 2);
     assert.deepEqual(report.samples.map((sample) => sample.requestedMaxFeatures), [1, 2]);
     assert.deepEqual(report.samples.map((sample) => sample.emittedFeatureCount), [1, 2]);
+    assert.equal(report.samples[0].heightSourceCounts["overture-height"], 1);
+    assert.equal(report.samples[0].minimumAppliedBaseHeightMeters, 1.5);
+    assert.equal(report.samples[0].maximumResolvedTopHeightMeters, 13.5);
+    assert.equal(report.samples[1].heightSourceCounts["overture-height"], 1);
+    assert.equal(report.samples[1].heightSourceCounts["floor-estimate"], 1);
+    assert.equal(report.samples[1].minimumAppliedBaseHeightMeters, 0);
+    assert.equal(report.samples[1].maximumAppliedBaseHeightMeters, 1.5);
+    assert.equal(report.samples[1].maximumResolvedTopHeightMeters, 13.5);
     for (const sample of report.samples) {
       assert.equal(sample.status, "pass");
       assert.equal(sample.buildIntegrityStatus, "pass");
