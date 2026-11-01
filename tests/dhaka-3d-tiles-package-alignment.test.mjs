@@ -14,7 +14,7 @@ const sourceData = {
     {
       type: "Feature",
       id: "alignment-square",
-      properties: { class: "building" },
+      properties: { class: "building", height: 18, min_height: 2.5 },
       geometry: { type: "Polygon", coordinates: [[
         [90.4100, 23.7800], [90.41005, 23.7800], [90.4101, 23.7800], [90.4101, 23.7801],
         [90.4100, 23.7801], [90.4100, 23.7800]
@@ -205,4 +205,40 @@ test("rejects a wrong source dataset before producing an alignment pass", async 
     reviewDhaka3DTilesPackageAlignment({ sourcePath: wrongSourcePath, packageDirectory: packagePath }),
     /Source dataset SHA-256 does not match/
   );
+});
+
+test("aligns the source footprint with a non-zero Overture min_height base and top", async () => {
+  const sourceDerivedPackage = path.join(root, "source-derived-package");
+  await buildDhaka3DTilesPackage({
+    sourcePath,
+    outputPath: sourceDerivedPackage,
+    maxFeatures: 16,
+  });
+  const report = await reviewDhaka3DTilesPackageAlignment({
+    sourcePath,
+    packageDirectory: sourceDerivedPackage,
+  });
+  assert.equal(report.status, "pass", report.errors.join("; "));
+  const tile = report.tiles.find((item) => item.featureId === "alignment-square");
+  assert.ok(tile);
+  assert.equal(tile.heightProvenance.heightMeters, 18);
+  assert.equal(tile.heightProvenance.baseHeightMeters, 2.5);
+  assert.equal(tile.heightProvenance.topHeightMeters, 20.5);
+  assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 2.49);
+  assert.ok(tile.transformedEllipsoidHeightRangeMeters.top.maximum <= 20.51);
+  assert.equal(tile.allTransformedVerticesInsideDeclaredRegion, true);
+});
+
+test("rejects manifest height provenance drift even if the GLB hash is unchanged", async () => {
+  const damagedPath = path.join(root, "height-provenance-drift-package");
+  await cp(packagePath, damagedPath, { recursive: true });
+  const manifestPath = path.join(damagedPath, "build-manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.tiles[0].heightEvidence.baseHeightMeters = 1;
+  manifest.tiles[0].heightEvidence.topHeightMeters = 9;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+
+  const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
+  assert.equal(report.status, "fail");
+  assert.ok(report.errors.some((error) => /height provenance does not match/i.test(error)));
 });
