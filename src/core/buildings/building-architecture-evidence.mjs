@@ -310,14 +310,23 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
   const partsByParentId = new Map();
   const partLinks = partRecords.map((part) => {
     const id = sourceIdentifier(part.properties, "building_id");
+    const extractorParentId = sourceIdentifier(part.properties, "_parentBuildingId");
     const parents = id.status === "source" ? parentsById.get(id.value) ?? [] : [];
-    const status = id.status !== "source"
+    const resolvedStatus = id.status !== "source"
       ? "missing-or-invalid-parent-id"
       : parents.length === 0
         ? "parent-feature-not-in-source-extract"
         : parents.length > 1
           ? "ambiguous-duplicate-parent-feature-id"
           : "parent-feature-resolved";
+    const extractorParentIdMatchesBuildingId = extractorParentId.status === "absent"
+      ? null
+      : extractorParentId.status === "source" && id.status === "source" &&
+        extractorParentId.value === id.value;
+    const status = resolvedStatus === "parent-feature-resolved" &&
+      extractorParentIdMatchesBuildingId === false
+      ? "extractor-parent-id-disagrees-with-building-id"
+      : resolvedStatus;
     if (id.status === "source") {
       const linked = partsByParentId.get(id.value) ?? [];
       linked.push(part);
@@ -329,10 +338,8 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
       parentBuildingId: id.value,
       status,
       roleEvidence: part.roleEvidence,
-      extractorParentId: sourceIdentifier(part.properties, "_parentBuildingId"),
-      extractorParentIdMatchesBuildingId: Object.hasOwn(part.properties, "_parentBuildingId")
-        ? part.properties._parentBuildingId === id.value
-        : null,
+      extractorParentId,
+      extractorParentIdMatchesBuildingId,
       parentRoleEvidence: parent?.roleEvidence ?? { status: "unavailable", value: null, origin: "none" },
       parentHasPartsClaim: parent ? sourceBoolean(parent.properties, "has_parts") : { status: "unavailable", value: null },
       parentSelectedInPackage: parent && selectedFeatureIds
@@ -351,22 +358,28 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     const associatedParts = partsByParentId.get(parent.featureId) ?? [];
     const hasParts = sourceBoolean(parent.properties, "has_parts");
     const duplicateId = (parentsById.get(parent.featureId) ?? []).length > 1;
+    const extractorParentConflict = associatedParts.some((part) =>
+      part.properties._parentBuildingId !== undefined &&
+      part.properties._parentBuildingId !== part.properties.building_id
+    );
     const status = duplicateId
       ? "ambiguous-duplicate-parent-feature-id"
-      : associatedParts.length > 0
-        ? hasParts.status === "source" && hasParts.value === false
-          ? "parts-found-despite-false-has-parts-claim"
+      : extractorParentConflict
+        ? "extractor-parent-id-disagrees-with-building-id"
+        : associatedParts.length > 0
+          ? hasParts.status === "source" && hasParts.value === false
+            ? "parts-found-despite-false-has-parts-claim"
+            : hasParts.status === "source" && hasParts.value === true
+              ? "parts-found-and-declared"
+              : "parts-found-has-parts-claim-unavailable"
           : hasParts.status === "source" && hasParts.value === true
-            ? "parts-found-and-declared"
-            : "parts-found-has-parts-claim-unavailable"
-        : hasParts.status === "source" && hasParts.value === true
-          ? "parts-declared-but-none-in-source-extract"
-          : hasParts.status === "source" && hasParts.value === false
-            ? "no-parts-declared"
-            : "part-association-unknown";
+            ? "parts-declared-but-none-in-source-extract"
+            : hasParts.status === "source" && hasParts.value === false
+              ? "no-parts-declared"
+              : "part-association-unknown";
     parentStatusCounts[status] = (parentStatusCounts[status] ?? 0) + 1;
     byFeatureId[parent.featureId] = {
-      featureType: "building",
+      featureType: parent.roleEvidence.value,
       roleEvidence: parent.roleEvidence,
       status,
       hasPartsClaim: hasParts,
@@ -406,7 +419,10 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     regularBuildingFeatureCount: parentRoleCounts.building ?? 0,
     buildingParentFeatureCount: parentRoleCounts.building_parent ?? 0,
     buildingPartFeatureCount: partRecords.length,
-    linkedPartCount: partStatusCounts["parent-feature-resolved"] ?? 0,
+    linkedPartCount: (partStatusCounts["parent-feature-resolved"] ?? 0) +
+      (partStatusCounts["extractor-parent-id-disagrees-with-building-id"] ?? 0),
+    parentLinkedWithoutExtractorConflictCount: partStatusCounts["parent-feature-resolved"] ?? 0,
+    extractorParentIdConflictCount: partStatusCounts["extractor-parent-id-disagrees-with-building-id"] ?? 0,
     roleDetectionCounts,
     parentRoleCounts,
     partStatusCounts,
