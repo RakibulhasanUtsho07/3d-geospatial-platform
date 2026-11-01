@@ -470,9 +470,39 @@ export async function reviewDhaka3DTilesPackageAlignment({
     if (parsed.gltf.extras?.sourceFeatureId !== tile.featureId || parsed.gltf.extras?.sourceFeatureSha256 !== tile.featureSha256) {
       errors.push("GLB source identity extras mismatch for " + tile.contentUri); continue;
     }
-    const height = parsed.gltf.extras?.syntheticHeightMeters;
-    if (parsed.gltf.extras?.heightStatus !== "synthetic-test-height" || !Number.isFinite(height) || height <= 0 || height > 250) {
-      errors.push("GLB lacks valid explicit synthetic-height metadata for " + tile.contentUri); continue;
+    const heightExtras = parsed.gltf.extras ?? {};
+    const height = heightExtras.heightMeters;
+    const heightStatus = heightExtras.heightStatus;
+    const allowedHeightStatuses = new Set([
+      "overture-height",
+      "floor-estimate",
+      "fallback-estimate",
+      "synthetic-test-height",
+    ]);
+    const tileHeight = tile.heightEvidence;
+    const heightEvidenceValid = allowedHeightStatuses.has(heightStatus) &&
+      heightExtras.heightSource === heightStatus &&
+      Number.isFinite(height) && height > 0 && height <= 300 &&
+      Number.isFinite(heightExtras.unclampedHeightMeters) && heightExtras.unclampedHeightMeters > 0 &&
+      typeof heightExtras.heightWasClamped === "boolean" &&
+      (heightExtras.reportedMinHeightMeters === null ||
+        (Number.isFinite(heightExtras.reportedMinHeightMeters) && heightExtras.reportedMinHeightMeters >= 0)) &&
+      typeof heightExtras.minHeightWasClamped === "boolean" &&
+      heightExtras.groundOffsetAppliedMeters === 0 &&
+      heightExtras.groundElevationStatus === "unverified-zero-ellipsoid-anchor" &&
+      isRecord(tileHeight) &&
+      tileHeight.status === heightStatus &&
+      tileHeight.source === heightExtras.heightSource &&
+      tileHeight.heightMeters === height &&
+      tileHeight.unclampedHeightMeters === heightExtras.unclampedHeightMeters &&
+      tileHeight.heightWasClamped === heightExtras.heightWasClamped &&
+      tileHeight.reportedMinHeightMeters === heightExtras.reportedMinHeightMeters &&
+      tileHeight.minHeightWasClamped === heightExtras.minHeightWasClamped &&
+      tileHeight.groundOffsetAppliedMeters === 0 &&
+      tileHeight.groundElevationStatus === heightExtras.groundElevationStatus &&
+      (heightStatus !== "synthetic-test-height" || heightExtras.syntheticHeightMeters === height);
+    if (!heightEvidenceValid) {
+      errors.push("GLB height provenance does not match the build manifest for " + tile.contentUri); continue;
     }
     const groundLocal = parsed.positions.filter((point) => Math.abs(point[1]) <= 1e-4);
     const topLocal = parsed.positions.filter((point) => Math.abs(point[1] - height) <= 1e-4);
@@ -535,6 +565,17 @@ export async function reviewDhaka3DTilesPackageAlignment({
       contentUri: tile.contentUri,
       sourceFeatureSha256: tile.featureSha256,
       contentSha256: tile.contentSha256,
+      heightProvenance: {
+        status: heightStatus,
+        source: heightExtras.heightSource,
+        heightMeters: height,
+        unclampedHeightMeters: heightExtras.unclampedHeightMeters,
+        heightWasClamped: heightExtras.heightWasClamped,
+        reportedMinHeightMeters: heightExtras.reportedMinHeightMeters,
+        minHeightWasClamped: heightExtras.minHeightWasClamped,
+        groundOffsetAppliedMeters: heightExtras.groundOffsetAppliedMeters,
+        groundElevationStatus: heightExtras.groundElevationStatus,
+      },
       sourceVertexCount: uniqueSource.length,
       transformedGroundVertexCount: uniqueGround.length,
       transformedTopVertexCount: uniquePoints(topWorld.map((point) => [point.longitudeDegrees, point.latitudeDegrees]), 7).length,
@@ -589,6 +630,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
       buildManifestSha256: sha256(manifestBytes),
       integrityStatus: "pass",
       bytesVerified: integrity.bytesVerified,
+      heightPolicy: manifest.configuration?.heightPolicy ?? null,
+      heightSourceCounts: manifest.configuration?.heightSourceCounts ?? null,
       syntheticHeightMeters: manifest.configuration?.syntheticHeightMeters ?? null,
     },
     thresholds: {
@@ -613,7 +656,8 @@ export async function reviewDhaka3DTilesPackageAlignment({
     limitations: [
       "Acceptance uses bidirectional sampled source-perimeter versus GLB base-boundary residuals in both local coordinates and after the ECEF transform; source-vertex nearest-vertex distances are diagnostic because collinear source vertices can be simplified away.",
       "The reviewer checks indexed GLB triangles, degenerate triangles, transform axis orthonormality/handedness, source-anchor translation, vertical consistency and child-region containment. It is not rendered-pixel comparison or architectural accuracy.",
-      "Source input has 2D footprints; vertical checks only validate ellipsoid transform and explicitly synthetic extrusion height.",
+      "Source input has 2D footprints; vertical checks validate the ellipsoid transform and the disclosed source-provided/estimated extrusion metadata, not independent surveyed elevations.",
+      "The ground anchor remains WGS84 ellipsoid height zero because no verified terrain elevation or vertical datum is bound; source min_height metadata is not applied to world placement.",
       "A pass is placement-plumbing evidence, not surveyed height, source-rights approval or production readiness.",
     ],
     releaseFlags,
