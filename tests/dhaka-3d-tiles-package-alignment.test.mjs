@@ -270,7 +270,7 @@ test("aligns the source footprint with a non-zero Overture min_height base and t
   assert.equal(tile.architectureEvidence.compositionStatus, "parent-declares-associated-parts");
   assert.deepEqual(tile.architectureEvidence.facade.material, { status: "source", value: "brick" });
   assert.deepEqual(tile.architectureEvidence.roof.shape, { status: "source", value: "gabled" });
-  assert.equal(tile.architectureEvidence.roof.geometryStatus, "source-roof-shape-and-height-present-geometry-not-yet-generated");
+  assert.equal(tile.architectureEvidence.roof.geometryStatus, "source-roof-shape-and-positive-height-present-geometry-not-yet-generated");
   assert.equal(tile.heightProvenance.baseHeightMeters, 2.5);
   assert.equal(tile.heightProvenance.topHeightMeters, 20.5);
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 2.49);
