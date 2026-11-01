@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
+import { resolveBuildingArchitectureEvidence } from "../src/core/buildings/building-architecture-evidence.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SOURCE = path.join(ROOT, "data/overture/dhaka-buildings-3d-pilot.geojson");
@@ -471,6 +472,19 @@ export async function reviewDhaka3DTilesPackageAlignment({
     if (parsed.gltf.extras?.sourceFeatureId !== tile.featureId || parsed.gltf.extras?.sourceFeatureSha256 !== tile.featureSha256) {
       errors.push("GLB source identity extras mismatch for " + tile.contentUri); continue;
     }
+    const architectureEvidence = resolveBuildingArchitectureEvidence(
+      isRecord(feature.properties) ? feature.properties : {},
+    );
+    const manifestArchitectureEvidence = tile.architectureEvidence;
+    const glbArchitectureEvidence = parsed.gltf.extras?.architectureEvidence;
+    const architectureEvidenceValid =
+      JSON.stringify(manifestArchitectureEvidence) === JSON.stringify(architectureEvidence) &&
+      JSON.stringify(glbArchitectureEvidence) === JSON.stringify(architectureEvidence);
+    if (!architectureEvidenceValid) {
+      errors.push("GLB architecture evidence does not match the hash-bound source feature and manifest for " + tile.contentUri);
+      continue;
+    }
+
     const heightExtras = parsed.gltf.extras ?? {};
     const height = heightExtras.heightMeters;
     const baseHeight = heightExtras.baseHeightMeters;
@@ -623,6 +637,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
       contentUri: tile.contentUri,
       sourceFeatureSha256: tile.featureSha256,
       contentSha256: tile.contentSha256,
+      architectureEvidence,
       heightProvenance: {
         status: heightStatus,
         source: heightExtras.heightSource,
