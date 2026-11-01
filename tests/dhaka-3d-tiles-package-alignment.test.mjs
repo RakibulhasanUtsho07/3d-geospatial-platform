@@ -106,8 +106,8 @@ test("checks every emitted GLB footprint after its child ECEF transform", async 
   assert.equal(report.status, "pass", report.errors.join("; "));
   assert.equal(report.evidenceType, "dhaka-3d-tiles-per-tile-footprint-placement-residual");
   assert.equal(report.package.integrityStatus, "pass");
-  assert.equal(report.summary.tileCount, 4);
-  assert.equal(report.tiles.length, 4);
+  assert.equal(report.summary.tileCount, 5);
+  assert.equal(report.tiles.length, 5);
   assert.equal(report.summary.allTransformedVerticesInsideDeclaredRegions, true);
   assert.ok(report.summary.maximumHorizontalResidualMeters <= report.thresholds.maximumHorizontalResidualMeters);
   assert.ok(report.summary.maximumFootprintPerimeterDifferenceMeters <= report.thresholds.maximumHorizontalResidualMeters);
