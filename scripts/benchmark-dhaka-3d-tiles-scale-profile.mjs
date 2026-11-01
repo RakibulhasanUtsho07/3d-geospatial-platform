@@ -175,13 +175,14 @@ async function writeReport(outputPath, report) {
 export async function runDhaka3DTilesScaleProfile({
   sourcePath = DEFAULT_SOURCE,
   featureCounts = DEFAULT_COUNTS,
-  syntheticHeightMeters = 8,
+  syntheticHeightMeters = null,
   toleranceMeters = 0.5,
   reportPath = null,
 } = {}) {
   const counts = validateFeatureCounts(featureCounts);
-  if (!Number.isFinite(syntheticHeightMeters) || syntheticHeightMeters <= 0 || syntheticHeightMeters > 250) {
-    throw new TypeError("syntheticHeightMeters must be finite and in the range (0, 250].");
+  if (syntheticHeightMeters !== null &&
+      (!Number.isFinite(syntheticHeightMeters) || syntheticHeightMeters <= 0 || syntheticHeightMeters > 250)) {
+    throw new TypeError("syntheticHeightMeters must be null or finite and in the range (0, 250].");
   }
   if (!Number.isFinite(toleranceMeters) || toleranceMeters <= 0 || toleranceMeters > 5) {
     throw new TypeError("toleranceMeters must be finite and in the range (0, 5].");
@@ -263,6 +264,10 @@ export async function runDhaka3DTilesScaleProfile({
         sample.packageBytes = packageFiles.totalBytes;
         sample.packageFileCount = packageFiles.fileCount;
         const manifest = JSON.parse(await readFile(path.join(packagePath, "build-manifest.json"), "utf8"));
+        sample.heightSourceCounts = manifest.configuration?.heightSourceCounts ?? {};
+        sample.heightPolicy = manifest.configuration?.heightPolicy ?? null;
+        sample.maxResolvedHeightMeters = Math.max(...manifest.tiles.map((tile) => tile.heightEvidence?.heightMeters ?? 0));
+        sample.minResolvedHeightMeters = Math.min(...manifest.tiles.map((tile) => tile.heightEvidence?.heightMeters ?? Infinity));
         const glbSizes = manifest.tiles.map((tile) => tile.bytes).filter(Number.isFinite);
         sample.glbBytes = {
           min: Math.min(...glbSizes),
@@ -313,8 +318,10 @@ export async function runDhaka3DTilesScaleProfile({
     samples,
     releaseFlags: { ...RELEASE_FLAGS },
     limitations: [
-      "The 8 m extrusion is synthetic and is not real building height or vertical accuracy evidence.",
-      "This profile measures bounded package generation, integrity verification and footprint/placement review; it does not measure live browser/GPU latency or prove city-scale readiness.",
+      syntheticHeightMeters === null
+        ? "Height values use source-provided Overture attributes, floor-count estimates, or an explicitly labelled 9 m fallback; none is independent survey truth."
+        : "An explicit synthetic-height override was used; it is not real building height or vertical accuracy evidence.",
+      "The profile records per-feature height source/counts and clamping but does not measure live browser/GPU latency or prove city-scale readiness.",
       "RSS readings are phase-boundary observations, not peak memory; shared CI-runner timings are comparative engineering evidence, not deployment service-level guarantees.",
       "A passing alignment gate compares the 2D source footprint with emitted geometry and ellipsoid transform, not independent surveyed ground/top elevations.",
       "Source rights, same-building independent truth and human architectural acceptance remain separate gates.",
@@ -329,7 +336,7 @@ function parseArgs(argv) {
   const args = {
     sourcePath: DEFAULT_SOURCE,
     featureCounts: [...DEFAULT_COUNTS],
-    syntheticHeightMeters: 8,
+    syntheticHeightMeters: null,
     toleranceMeters: 0.5,
     reportPath: null,
   };
@@ -339,7 +346,7 @@ function parseArgs(argv) {
     if (!value || value.startsWith("--")) throw new TypeError("Missing value for " + flag + ".");
     if (flag === "--source") args.sourcePath = path.resolve(value);
     else if (flag === "--feature-counts") args.featureCounts = parseFeatureCounts(value);
-    else if (flag === "--height-meters") args.syntheticHeightMeters = parsePositiveNumber(value, "height-meters", 250);
+    else if (flag === "--synthetic-height-meters") args.syntheticHeightMeters = parsePositiveNumber(value, "synthetic-height-meters", 250);
     else if (flag === "--tolerance-meters") args.toleranceMeters = parsePositiveNumber(value, "tolerance-meters", 5);
     else if (flag === "--report") args.reportPath = path.resolve(value);
     else throw new TypeError("Unknown argument: " + flag);
