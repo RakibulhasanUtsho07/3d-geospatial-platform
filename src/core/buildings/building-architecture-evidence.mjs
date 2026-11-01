@@ -412,6 +412,34 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     }
   }
 
+  const selectedParents = selectedFeatureIds
+    ? parentRecords.filter((parent) => parent.featureId && selectedFeatureIds.has(parent.featureId))
+    : [];
+  const selectedParts = selectedFeatureIds
+    ? partRecords.filter((part) => part.featureId && selectedFeatureIds.has(part.featureId))
+    : [];
+  const coSelectedParentPartLinkCount = selectedFeatureIds
+    ? partLinks.filter((link) =>
+      link.status === "parent-feature-resolved" &&
+      link.parentSelectedInPackage === true &&
+      link.partSelectedInPackage === true
+    ).length
+    : null;
+  const partSelectedWithoutParentCount = selectedFeatureIds
+    ? partLinks.filter((link) =>
+      link.status === "parent-feature-resolved" &&
+      link.partSelectedInPackage === true &&
+      link.parentSelectedInPackage === false
+    ).length
+    : null;
+  const parentSelectedWithoutPartCount = selectedFeatureIds
+    ? selectedParents.filter((parent) => {
+      const linked = partsByParentId.get(parent.featureId) ?? [];
+      return linked.length > 0 && !linked.some((part) =>
+        part.featureId && selectedFeatureIds.has(part.featureId)
+      );
+    }).length
+    : null;
   const summary = {
     schema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
     sourceFeatureCount: features.length,
@@ -429,6 +457,11 @@ export function auditBuildingPartComposition(features, { selectedFeatureIds = nu
     parentStatusCounts,
     duplicateParentIdCount: [...parentsById.values()].filter((records) => records.length > 1).length,
     selectedFeatureCount: selectedFeatureIds ? selectedFeatureIds.size : null,
+    selectedParentCount: selectedFeatureIds ? selectedParents.length : null,
+    selectedBuildingPartCount: selectedFeatureIds ? selectedParts.length : null,
+    coSelectedParentPartLinkCount,
+    partSelectedWithoutParentCount,
+    parentSelectedWithoutPartCount,
   };
   return { schemaVersion: 1, byFeatureId, partLinks, summary };
 }
