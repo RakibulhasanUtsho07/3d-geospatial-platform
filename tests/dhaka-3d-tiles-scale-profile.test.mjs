@@ -32,8 +32,14 @@ function sourceFixture() {
   return {
     type: "FeatureCollection",
     features: [
-      squareFeature("scale-test-01", 90.4100, 23.7800),
-      squareFeature("scale-test-02", 90.4105, 23.7805),
+      {
+        ...squareFeature("scale-test-01", 90.4100, 23.7800),
+        properties: { class: "building", height: 12, min_height: 1.5 },
+      },
+      {
+        ...squareFeature("scale-test-02", 90.4105, 23.7805),
+        properties: { class: "building", num_floors: 4 },
+      },
       squareFeature("scale-test-03", 90.4110, 23.7810),
       squareFeature("scale-test-04", 90.4115, 23.7815),
     ],
@@ -77,6 +83,11 @@ test("profiles small packages with integrity/alignment evidence and false releas
       assert.ok(sample.wallTimeMs.standaloneIntegrity >= 0);
       assert.ok(sample.wallTimeMs.alignment >= 0);
       assert.equal(sample.alignment.degenerateTriangleCountMaximumAcrossTiles, 0);
+      assert.ok(sample.heightSourceCounts["overture-height"] >= 1);
+      assert.ok(sample.heightPolicy);
+      assert.ok(Number.isFinite(sample.minimumAppliedBaseHeightMeters));
+      assert.ok(sample.maximumAppliedBaseHeightMeters >= sample.minimumAppliedBaseHeightMeters);
+      assert.ok(sample.maximumResolvedTopHeightMeters >= sample.maximumAppliedBaseHeightMeters);
     }
     assert.deepEqual(report.releaseFlags, {
       acceptanceEligible: false,
