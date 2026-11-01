@@ -62,6 +62,35 @@ test("distinguishes parent-declared building parts from a complete assembled mod
   assert.notEqual(part.compositionStatus, "assembled-complete-building");
 });
 
+test("keeps Overture type separate from extractor-derived building roles", () => {
+  const parent = resolveBuildingArchitectureEvidence({
+    _renderRole: "building_parent",
+    has_parts: true,
+  });
+  const building = resolveBuildingArchitectureEvidence({
+    _renderRole: "building",
+    has_parts: false,
+  });
+  const part = resolveBuildingArchitectureEvidence({
+    _renderRole: "building_part",
+    building_id: "parent-id",
+  });
+
+  assert.deepEqual(parent.featureType, { status: "absent", value: null });
+  assert.deepEqual(parent.compositionRole, {
+    status: "extractor-derived",
+    value: "building_parent",
+    roleKind: "parent",
+    origin: "extractor-render-role",
+  });
+  assert.equal(parent.compositionStatus, "parent-declares-associated-parts");
+  assert.equal(building.compositionRole.roleKind, "parent");
+  assert.equal(building.compositionStatus, "parent-reports-no-associated-parts");
+  assert.equal(part.featureType.status, "absent");
+  assert.equal(part.compositionRole.roleKind, "part");
+  assert.equal(part.compositionStatus, "building-part-parent-join-required");
+});
+
 test("keeps missing architecture metadata explicitly absent and does not infer roof or facade details", () => {
   const evidence = resolveBuildingArchitectureEvidence({ class: "residential" });
 
@@ -182,6 +211,51 @@ test("resolves building_part parent references against the complete source extra
   assert.equal(audit.byFeatureId["part-b"].parentSelectedInPackage, false);
   assert.equal(audit.byFeatureId["part-b"].partSelectedInPackage, true);
   assert.equal(audit.byFeatureId["part-c"].status, "parent-feature-not-in-source-extract");
+});
+
+test("audits extractor-derived parent and part roles while keeping Overture type absent", () => {
+  const sourceFeatures = [
+    { type: "Feature", id: "parent-a", properties: { _renderRole: "building_parent", has_parts: true } },
+    { type: "Feature", id: "part-a1", properties: { _renderRole: "building_part", building_id: "parent-a", _parentBuildingId: "parent-a" } },
+    { type: "Feature", id: "part-a2", properties: { _renderRole: "building_part", building_id: "parent-a", _parentBuildingId: "parent-a" } },
+    { type: "Feature", id: "parent-b", properties: { _renderRole: "building", has_parts: true } },
+    { type: "Feature", id: "part-b", properties: { _renderRole: "building_part", building_id: "parent-b", _parentBuildingId: "wrong-parent" } },
+    { type: "Feature", id: "missing-part", properties: { _renderRole: "building_part", building_id: "missing-parent" } },
+  ];
+  const audit = auditBuildingPartComposition(sourceFeatures, {
+    selectedFeatureIds: new Set(["parent-a", "part-a1", "part-a2", "part-b"]),
+  });
+
+  assert.equal(audit.summary.buildingFeatureCount, 2);
+  assert.equal(audit.summary.regularBuildingFeatureCount, 1);
+  assert.equal(audit.summary.buildingParentFeatureCount, 1);
+  assert.equal(audit.summary.buildingPartFeatureCount, 4);
+  assert.equal(audit.summary.linkedPartCount, 3);
+  assert.equal(audit.summary.parentLinkedWithoutExtractorConflictCount, 2);
+  assert.equal(audit.summary.extractorParentIdConflictCount, 1);
+  assert.equal(audit.summary.parentRoleCounts.building_parent, 1);
+  assert.equal(audit.summary.coSelectedParentPartLinkCount, 2);
+  assert.equal(audit.summary.partSelectedWithoutParentCount, 1);
+  assert.equal(audit.byFeatureId["parent-a"].roleEvidence.status, "extractor-derived");
+  assert.equal(audit.byFeatureId["part-a1"].roleEvidence.status, "extractor-derived");
+  assert.equal(audit.byFeatureId["part-a1"].status, "parent-feature-resolved");
+  assert.equal(audit.byFeatureId["part-b"].status, "extractor-parent-id-disagrees-with-building-id");
+  assert.equal(audit.byFeatureId["part-b"].extractorParentIdMatchesBuildingId, false);
+});
+
+test("rejects feature IDs and parent IDs containing internal whitespace", () => {
+  const evidence = resolveBuildingArchitectureEvidence({
+    _renderRole: "building_part",
+    building_id: "parent with whitespace",
+  });
+  assert.deepEqual(evidence.buildingId, { status: "invalid", value: null });
+
+  const audit = auditBuildingPartComposition([
+    { type: "Feature", id: "parent with whitespace", properties: { _renderRole: "building_parent", has_parts: true } },
+    { type: "Feature", id: "part-1", properties: { _renderRole: "building_part", building_id: "parent with whitespace" } },
+  ]);
+  assert.equal(audit.summary.buildingFeatureCount, 0);
+  assert.equal(audit.summary.partStatusCounts["missing-or-invalid-parent-id"], 1);
 });
 
 test("distinguishes duplicate parent IDs and parts whose parent is outside the package subset", () => {
