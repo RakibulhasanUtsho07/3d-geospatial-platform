@@ -167,7 +167,7 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   const tileset = JSON.parse(await readFile(path.join(sourceDerivedPackage, "tileset.json"), "utf8"));
   assert.equal(tileset.asset.extras.heightStatus, "per-feature-height-provenance");
   assert.equal(tileset.asset.extras.groundElevationStatus, "unverified-zero-ellipsoid-anchor");
-  assert.equal(tileset.asset.extras.minHeightApplication, "source min_height is applied as a relative above-ground bottom offset; this is not an absolute terrain/vertical-datum elevation");
+  assert.equal(tileset.asset.extras.minHeightApplication, "Use source min_height when present; otherwise use integer min_floor as a labelled 3 m-per-floor relative base-offset estimate; neither is an absolute terrain/vertical-datum elevation.");
   assert.ok(tileset.root.boundingVolume.region[4] <= 0.95);
   assert.ok(tileset.root.boundingVolume.region[5] >= 19.95);
 
