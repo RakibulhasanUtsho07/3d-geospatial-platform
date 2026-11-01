@@ -172,8 +172,7 @@ async function ensurePublicCatalogDirectory(outputRoot) {
   }
   return current;
 }
-\nasync function acquireCatalogPublishLock(catalogDir) {
-  const lockDir = path.join(catalogDir, ".publish.lock");
+\nasync function acquireCatalogPublishLock(lockDir) {
   const ownerPath = path.join(lockDir, "owner");
   const ownerToken = randomUUID();
   try {
@@ -242,7 +241,7 @@ export async function publishReviewedBuildingModel({
   const outputRootInfo = await stat(outputRoot);
   if (!outputRootInfo.isDirectory()) throw new TypeError("publicRoot must be an existing application directory.");
   const catalogDir = await ensurePublicCatalogDirectory(outputRoot);
-  const releaseCatalogLock = await acquireCatalogPublishLock(catalogDir);
+  const releaseCatalogLock = await acquireCatalogPublishLock(path.join(outputRoot, ".generated-model-catalog.publish.lock"));
   try {
   const manifestPath = path.join(catalogDir, "manifest.json");
   let catalog = { schemaVersion: PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, models: [] };
