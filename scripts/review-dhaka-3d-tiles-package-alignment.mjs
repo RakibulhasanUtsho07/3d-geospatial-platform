@@ -7,7 +7,10 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
-import { resolveBuildingArchitectureEvidence } from "../src/core/buildings/building-architecture-evidence.mjs";
+import {
+  resolveBuildingArchitectureEvidence,
+  summarizeBuildingArchitectureEvidence,
+} from "../src/core/buildings/building-architecture-evidence.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SOURCE = path.join(ROOT, "data/overture/dhaka-buildings-3d-pilot.geojson");
@@ -437,6 +440,14 @@ export async function reviewDhaka3DTilesPackageAlignment({
   const children = new Map(tileset.root.children.map((child) => [child?.content?.uri, child]));
   const emitted = [];
   const errors = [];
+  const expectedArchitectureSummary = Array.isArray(manifest.tiles) && manifest.tiles.length > 0
+    ? summarizeBuildingArchitectureEvidence(manifest.tiles.map((tile) => tile?.architectureEvidence))
+    : null;
+  if (!expectedArchitectureSummary ||
+      JSON.stringify(manifest.configuration?.architectureEvidenceSummary) !== JSON.stringify(expectedArchitectureSummary) ||
+      JSON.stringify(tileset.asset.extras?.architectureEvidenceSummary) !== JSON.stringify(expectedArchitectureSummary)) {
+    errors.push("Architecture evidence summary does not match per-tile source-bound metadata.");
+  }
   let totalSourceVertices = 0, totalGroundVertices = 0, totalWorldVertices = 0;
   let globalMaxResidual = 0, globalMaxHeightResidual = 0, globalMaxPerimeterDifference = 0, globalDegenerateTriangleCount = 0, allInside = true;
 
