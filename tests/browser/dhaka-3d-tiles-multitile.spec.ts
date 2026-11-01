@@ -43,9 +43,25 @@ type MultiTileReview = {
       invalid: number;
       "missing-evidence": number;
     }>;
+    compositionStatusCounts: Record<string, number>;
+    compositionLinkStatusCounts: Record<string, number>;
     geometryCompleteness: "footprint-extrusion-only";
     renderedArchitecturalDetailCount: number;
+    sourceCompositionAuditSummary: {
+      schema: "overture-buildings-2.0.0";
+      sourceFeatureCount: number;
+      buildingFeatureCount: number;
+      buildingPartFeatureCount: number;
+      linkedPartCount: number;
+      partStatusCounts: Record<string, number>;
+      parentStatusCounts: Record<string, number>;
+      duplicateParentIdCount: number;
+      selectedFeatureCount: number;
+    };
   };
+  sourceCompositionAuditSummary?: MultiTileReview["architectureEvidenceSummary"] extends infer T
+    ? T extends { sourceCompositionAuditSummary: infer S } ? S : never
+    : never;
   targetPair?: {
     distanceMeters: number;
     first: { featureId: string; contentUri: string; center: { longitude: number; latitude: number }; cameraAltitudeMeters: number };
@@ -145,6 +161,17 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   assert.equal(review.architectureEvidenceSummary.tileCount, review.input?.contentCount);
   assert.equal(review.architectureEvidenceSummary.geometryCompleteness, "footprint-extrusion-only");
   assert.equal(review.architectureEvidenceSummary.renderedArchitecturalDetailCount, 0);
+  const composition = review.sourceCompositionAuditSummary;
+  assert.ok(composition, "The browser report must expose the source-wide BuildingPart audit.");
+  assert.equal(composition.schema, "overture-buildings-2.0.0");
+  assert.ok(composition.sourceFeatureCount >= (review.input?.contentCount ?? 0));
+  assert.equal(composition.selectedFeatureCount, review.input?.contentCount);
+  assert.ok(composition.linkedPartCount <= composition.buildingPartFeatureCount);
+  assert.equal(
+    Object.values(composition.partStatusCounts).reduce((sum, count) => sum + count, 0),
+    composition.buildingPartFeatureCount,
+    "Every source BuildingPart must have exactly one parent-link audit status.",
+  );
   for (const [fieldName, counts] of Object.entries(review.architectureEvidenceSummary.fieldAvailability)) {
     assert.equal(
       counts.source + counts.absent + counts.invalid + counts["missing-evidence"],
@@ -155,6 +182,8 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
   const visibleArchitectureSummary = await page.locator("#architecture-provenance").textContent();
   assert.match(visibleArchitectureSummary ?? "", /footprint extrusion only/i);
   assert.match(visibleArchitectureSummary ?? "", /rendered architectural details: 0/i);
+  assert.match(visibleArchitectureSummary ?? "", /source parts linked/i);
+  assert.match(visibleArchitectureSummary ?? "", /unresolved\/ambiguous parts/i);
   assert.ok(
     review.limitations?.some((item) => /survey truth/i.test(item)),
     "The machine-readable limitations must explicitly distinguish source/estimated heights from survey truth.",
