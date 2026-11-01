@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   OVERTURE_BUILDINGS_SCHEMA_VERSION,
+  auditBuildingPartComposition,
   resolveBuildingArchitectureEvidence,
   summarizeBuildingArchitectureEvidence,
 } from "../src/core/buildings/building-architecture-evidence.mjs";
@@ -151,6 +152,63 @@ test("rejects malformed feature properties and invalid parent identifiers", () =
   assert.deepEqual(evidence.buildingId, { status: "invalid", value: null });
 });
 
+
+test("resolves building_part parent references against the complete source extract and package subset", () => {
+  const sourceFeatures = [
+    { type: "Feature", id: "parent-a", properties: { type: "building", has_parts: true } },
+    { type: "Feature", id: "part-a", properties: { type: "building_part", building_id: "parent-a" } },
+    { type: "Feature", id: "parent-b", properties: { type: "building", has_parts: false } },
+    { type: "Feature", id: "part-b", properties: { type: "building_part", building_id: "parent-b" } },
+    { type: "Feature", id: "part-c", properties: { type: "building_part", building_id: "missing-parent" } },
+    { type: "Feature", id: "part-d", properties: { type: "building_part" } },
+  ];
+  const audit = auditBuildingPartComposition(sourceFeatures, {
+    selectedFeatureIds: new Set(["parent-a", "part-a", "part-b"]),
+  });
+
+  assert.equal(audit.summary.sourceFeatureCount, 6);
+  assert.equal(audit.summary.buildingFeatureCount, 2);
+  assert.equal(audit.summary.buildingPartFeatureCount, 4);
+  assert.equal(audit.summary.linkedPartCount, 2);
+  assert.equal(audit.summary.partStatusCounts["parent-feature-not-in-source-extract"], 1);
+  assert.equal(audit.summary.partStatusCounts["missing-or-invalid-parent-id"], 1);
+  assert.equal(audit.summary.parentStatusCounts["parts-found-and-declared"], 1);
+  assert.equal(audit.summary.parentStatusCounts["parts-found-despite-false-has-parts-claim"], 1);
+
+  assert.equal(audit.byFeatureId["parent-a"].associatedPartCount, 1);
+  assert.equal(audit.byFeatureId["parent-a"].associatedPartsSelectedInPackageCount, 1);
+  assert.equal(audit.byFeatureId["part-a"].status, "parent-feature-resolved");
+  assert.equal(audit.byFeatureId["part-a"].parentSelectedInPackage, true);
+  assert.equal(audit.byFeatureId["part-b"].parentSelectedInPackage, true);
+  assert.equal(audit.byFeatureId["part-c"].status, "parent-feature-not-in-source-extract");
+});
+
+test("distinguishes duplicate parent IDs and parts whose parent is outside the package subset", () => {
+  const sourceFeatures = [
+    { type: "Feature", id: "duplicate-parent", properties: { type: "building", has_parts: true } },
+    { type: "Feature", id: "duplicate-parent", properties: { type: "building", has_parts: true } },
+    { type: "Feature", id: "child", properties: { type: "building_part", building_id: "duplicate-parent" } },
+    { type: "Feature", id: "parent-outside", properties: { type: "building", has_parts: true } },
+    { type: "Feature", id: "part-outside", properties: { type: "building_part", building_id: "parent-outside" } },
+  ];
+  const audit = auditBuildingPartComposition(sourceFeatures, {
+    selectedFeatureIds: new Set(["part-outside"]),
+  });
+
+  assert.equal(audit.summary.duplicateParentIdCount, 1);
+  assert.equal(audit.byFeatureId.child.status, "ambiguous-duplicate-parent-feature-id");
+  assert.equal(audit.byFeatureId["part-outside"].status, "parent-feature-resolved");
+  assert.equal(audit.byFeatureId["part-outside"].parentSelectedInPackage, false);
+  assert.equal(audit.byFeatureId["part-outside"].partSelectedInPackage, true);
+});
+
+test("rejects invalid source feature arrays and package selections", () => {
+  assert.throws(() => auditBuildingPartComposition(null), /source feature array/);
+  assert.throws(
+    () => auditBuildingPartComposition([], { selectedFeatureIds: [] }),
+    /must be a Set or null/,
+  );
+});
 
 test("aggregates schema-bound source coverage without converting missing fields into defaults", () => {
   const records = [
