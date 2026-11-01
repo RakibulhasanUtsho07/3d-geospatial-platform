@@ -112,7 +112,7 @@ test("fails closed on malformed source data and invalid profile bounds", async (
     );
     await assert.rejects(
       runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [1], syntheticHeightMeters: 0 }),
-      /syntheticHeightMeters must be finite/,
+      /syntheticHeightMeters must be null or finite/,
     );
     await assert.rejects(
       runDhaka3DTilesScaleProfile({ sourcePath: validPath, featureCounts: [1], toleranceMeters: 6 }),
