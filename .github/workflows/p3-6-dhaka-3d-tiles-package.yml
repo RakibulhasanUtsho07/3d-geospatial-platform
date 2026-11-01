@@ -5,12 +5,17 @@ on:
     branches:
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
+      - feat/p3-8-overture-source-coverage-20261101
   pull_request:
     branches:
       - development
       - feat/p3-6-multibuilding-tiles-package
+      - feat/p3-7-building-composition-evidence-20261102
     paths:
       - "scripts/build-dhaka-3d-tiles-package.mjs"
+      - "scripts/audit-dhaka-overture-architecture-coverage.mjs"
+      - "tests/dhaka-overture-architecture-coverage.test.mjs"
+      - "docs/research/P3-8-DHAKA-OVERTURE-ARCHITECTURE-COVERAGE.md"
       - "scripts/verify-dhaka-3d-tiles-package.mjs"
       - "scripts/build-dhaka-3d-tiles-pilot-browser-module.mjs"
       - "scripts/review-dhaka-3d-tiles-package-alignment.mjs"
@@ -74,6 +79,15 @@ jobs:
 
       - name: Test Overture building composition and architectural metadata evidence
         run: npm run test:building-architecture-evidence
+
+      - name: Test full Dhaka Overture architecture coverage audit
+        run: npm run test:dhaka-overture-architecture-coverage
+
+      - name: Audit complete Dhaka extract architecture metadata coverage
+        run: >-
+          npm run audit:dhaka-overture-architecture-coverage --
+          --source data/overture/dhaka-buildings-3d-pilot.geojson
+          --output /tmp/dhaka-overture-architecture-coverage.json
 
       - name: Run deterministic synthetic and source-height package/failure-injection tests
         run: npm run test:dhaka-3d-tiles-package
@@ -223,5 +237,14 @@ jobs:
         with:
           name: p3-6-dhaka-multibuilding-3d-tiles-pilot
           path: /tmp/dhaka-3d-tiles-multibuilding-pilot/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload full Dhaka Overture architecture coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-8-dhaka-overture-architecture-coverage
+          path: /tmp/dhaka-overture-architecture-coverage.json
           if-no-files-found: warn
           retention-days: 14
