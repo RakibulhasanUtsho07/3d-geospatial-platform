@@ -119,3 +119,45 @@ test("refuses publication if QA report changed since review", async (t) => {
   await writeFile(path.join(setup.workspaceRoot, job.result.reportPath), JSON.stringify({ status: "completed-requires-review", mapReady: false, publicationEligible: false, output: { modelSha256: job.result.modelSha256 } }));
   await assert.rejects(publishApprovedGenerationJob({ ...setup, placement }), /QA report changed after approval/);
 });
+
+
+test("publishes the validated GLB and catalog into a separate application public root", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const applicationRoot = await mkdtemp(path.join(os.tmpdir(), "publish-approved-app-root-"));
+  t.after(() => rm(applicationRoot, { recursive: true, force: true }));
+
+  const result = await publishApprovedGenerationJob({
+    ...setup,
+    placement,
+    publicRoot: applicationRoot,
+  });
+  const manifestPath = path.join(applicationRoot, "public", "models", "generated", "manifest.json");
+  const catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
+  const active = getActivePublishedModels(catalog)[0];
+
+  assert.equal(active.definition.id, fixture.id);
+  assert.equal(active.versionId, result.versionId);
+  assert.equal(active.sha256, result.modelSha256);
+  assert.equal(hash(await readFile(path.join(applicationRoot, "public", result.assetUrl.slice(1))), result.modelSha256);
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+  assert.equal(result.mapReady, false);
+  assert.equal(result.publicationEligible, false);
+});
+
+test("refuses a second publication while the model catalog lock is held", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const catalogDirectory = path.join(setup.workspaceRoot, "public", "models", "generated");
+  await mkdir(path.join(catalogDirectory, ".publish.lock"), { recursive: true });
+
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /publication is already in progress/,
+  );
+  await assert.rejects(
+    readFile(path.join(catalogDirectory, "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
