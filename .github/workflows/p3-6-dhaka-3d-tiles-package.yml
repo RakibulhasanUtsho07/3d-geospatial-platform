@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run deterministic synthetic-package and failure-injection tests
+      - name: Run deterministic synthetic and source-height package/failure-injection tests
         run: npm run test:dhaka-3d-tiles-package
 
       - name: Test lifecycle races, bounded retry and explicit fallback
@@ -81,7 +81,6 @@ jobs:
           --source data/overture/dhaka-buildings-3d-pilot.geojson
           --output "$TILE_PACKAGE_DIR"
           --max-features 32
-          --height-meters 8
 
       - name: Verify all generated source, tileset and GLB integrity records
         run: npm run verify:dhaka-3d-tiles-package -- --package "$TILE_PACKAGE_DIR"
@@ -100,7 +99,6 @@ jobs:
           npm run benchmark:dhaka-3d-tiles-scale-profile --
           --source data/overture/dhaka-buildings-3d-pilot.geojson
           --feature-counts 32,64,128
-          --height-meters 8
           --tolerance-meters 0.5
           --report /tmp/p3-6-dhaka-scale-profile.json
 
