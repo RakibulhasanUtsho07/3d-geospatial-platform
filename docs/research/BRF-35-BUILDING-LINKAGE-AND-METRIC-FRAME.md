@@ -14,6 +14,20 @@
 
 The candidate manifest preserves the real source pins but intentionally records no claimed image/ULS match. Validation is expected to remain blocked.
 
+
+## BRF-47 / BRF-48 provenance and held-out hardening
+
+The validator additionally enforces cross-role source/candidate identity and the following accuracy-evidence contract:
+
+- Every populated source role (CityGML, image, ULS and survey-control) uses one globally unique, syntactically valid asset ID.
+- The platform candidate GLB has an asset ID and SHA-256 distinct from every pinned source asset, not only the CityGML reference.
+- `accuracy.fitSourceAssetRefs` must contain at least one unique, valid reference. Each reference must match a declared source asset's exact asset ID, SHA-256 and role. The only permitted fit-input roles are `image` and `uls`.
+- At least six unique held-out checkpoint IDs are required. Each point must be hash-linked to a declared survey-control asset and use the approved evaluation frame.
+- A held-out checkpoint source asset must be disjoint from all declared candidate fit-input assets. A survey-control asset cannot be listed as a candidate-fitting input.
+- Synthetic positive fixtures prove schema/completeness behavior only. They do not prove that a real survey curator withheld the observations from fitting; a curator must inspect the actual data split and processing history.
+
+Regression coverage includes cross-role ID collisions, candidate ID/hash reuse, three- and five-point under-counts, duplicate/stale/unknown/wrong-role fit references, prohibited survey-control fitting, fit/holdout source overlap, and a valid six-point synthetic case. The real candidate is expected to remain blocked, with all release flags false.
+
 ## What the gate checks
 
 1. CityGML, image, ULS and survey/control records have evidence-backed rights metadata bound to each exact asset hash.
@@ -21,8 +35,10 @@ The candidate manifest preserves the real source pins but intentionally records 
 3. Source axis order and units have a reviewed, hash-bound decision.
 4. Horizontal and vertical coordinate operations include definitions, accuracy, area of use, software version and evidence.
 5. A platform reconstruction candidate GLB is distinct from source-reference geometry.
-6. At least three unique held-out controls bind to a hash-pinned survey source and the approved coordinate frame.
-7. Accuracy report, threshold policy, candidate/reference hashes and fixed-view visual review are linked.
+6. At least six unique held-out checkpoints bind to hash-pinned survey-control source assets and the approved evaluation frame. Each checkpoint carries its own identifier, source asset ID, source SHA-256, XYZ coordinate, and uncertainty.
+7. Candidate fitting inputs are explicitly enumerated in `accuracy.fitSourceAssetRefs` by asset ID, exact SHA-256 and source role. Only `image` and `uls` roles are permitted as fitting inputs; `survey-control` assets are not allowed in this list.
+8. No held-out checkpoint's `sourceAssetId` may appear in the candidate fit-source set. The machine-checkable rule enforces asset-level separation; an independent curator must still verify that the actual point observations were not used for registration, fitting, tuning or correction.
+9. Accuracy report, threshold policy, candidate/reference hashes and fixed-view visual review are linked.
 
 ## Run
 
