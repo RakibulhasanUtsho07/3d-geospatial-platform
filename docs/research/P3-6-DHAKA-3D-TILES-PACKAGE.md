@@ -196,9 +196,9 @@ The builder follows the current [Overture Building schema](https://docs.overture
 
 - Default build and the production review package now use per-feature provenance rather than an unconditional synthetic 8 m height.
 - `resolveBuildingHeight` uses strict numeric parsing. Values such as `"18.5m"` are not partially parsed as metres. It retains original/unclamped height and base values and records safety-cap decisions.
-- Each tile GLB, build manifest and tileset region now bind `heightStatus`, `heightSource`, `heightMeters`, `baseHeightSource`, `baseHeightEstimated`, `reportedMinHeightMeters`, `reportedMinFloor`, `baseHeightMeters`, `topHeightMeters`, unclamped inputs, clamp flags and the vertical-offset policy.
+- Each tile GLB, build manifest and tileset region now bind `heightStatus`, `heightSource`, `heightMeters`, `baseHeightSource`, `baseHeightEstimated`, `reportedMinHeightMeters`, `reportedMinFloor`, `baseHeightMeters`, `topHeightMeters`, unclamped inputs, clamp flags and the selected base-offset application policy.
 - The mesh's bottom vertices are emitted at `baseHeightMeters`; top vertices are emitted at `topHeightMeters`. Root and child `boundingVolume.region` vertical intervals cover the actual per-tile base and top range.
-- The alignment reviewer independently reads the GLB vertical planes, checks the manifest/GLB height-provenance cross-binding, recovers the footprint boundary at the non-zero base plane and checks base/top ECEF heights against the declared child region. A changed manifest height record cannot silently pass while the GLB stays unchanged.
+- The alignment reviewer independently re-resolves height and base-offset source from the matching GeoJSON feature properties, checks the source/manifest/GLB cross-binding, recovers the footprint boundary at the non-zero base plane and checks base/top ECEF heights against the declared child region. A forged height value cannot pass merely because GLB and manifest hashes are consistently rebound.
 - Dedicated package tests cover explicit source height + non-zero `min_height`, the `min_floor` estimate and its precedence rules, floor-height estimate, fallback estimate, synthetic override, height/base clamping, source-to-GLB provenance drift, and corrupted manifest records.
 
 ### Vertical reference limitation — still blocked
