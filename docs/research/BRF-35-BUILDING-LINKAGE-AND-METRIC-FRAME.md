@@ -57,3 +57,14 @@ A blocked report is the expected result for the current real candidate. The vali
 This validator is not a license authority, survey verifier, CRS engine, accuracy adjudicator or release approver. HTTPS links and human-entered review fields still need independent inspection; manifest strings alone cannot prove that a remote page grants rights. Do not infer same-building identity from filename suffixes or broad envelope overlap, and do not fit a coordinate transform merely to make a model overlap visually.
 
 Even a complete synthetic fixture produces evidence-complete-human-release-review-required, not a pass. All release flags remain false. A real release must pass the existing independent review workflow separately.
+
+
+## Integration validation — 2026-11-01
+
+BRF-47 was integrated into `development` at base commit `f7b2a67fcf0c34623196fa92e719640086e2adce`. The BRF-48 change was validated against that exact base at PR head `44e9c7c96b5a2d05966adbf6f7ab63e17488b78b`:
+
+- Full CI: [run 41312726994](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41312726994) — success.
+- BRF-35 same-building linkage and metric-frame gate: [run 41312726975](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41312726975) — success.
+- The merged BRF-47 base's post-merge Full CI: [run 41312647009](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41312647009) — success.
+
+These are exact-commit software/workflow results. They do not establish that the synthetic held-out observations are genuinely independent, authenticate any source rights, prove a same-building match, validate a real coordinate transform, or assess a platform-generated building model. No independent reviewer approval is recorded for PR #298. The PR remains Draft pending independent review. The real candidate and every release flag remain blocked/false.
