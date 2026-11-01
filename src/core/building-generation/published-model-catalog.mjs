@@ -155,7 +155,13 @@ async function ensurePublicCatalogDirectory(outputRoot) {
       if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
         throw error;
       }
-      await mkdir(next, { mode: 0o755 });
+      try {
+        await mkdir(next, { mode: 0o755 });
+      } catch (createError) {
+        if (!createError || typeof createError !== "object" || !("code" in createError) || createError.code !== "EEXIST") {
+          throw createError;
+        }
+      }
       const info = await lstat(next);
       if (info.isSymbolicLink() || !info.isDirectory()) {
         throw new TypeError("Public catalog path components must be real directories.");
