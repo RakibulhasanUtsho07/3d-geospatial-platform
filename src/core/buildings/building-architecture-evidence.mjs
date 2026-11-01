@@ -91,13 +91,19 @@ function sourceColor(properties, key) {
   return { status: "source", value: color.toLowerCase() };
 }
 
-function sourcePositiveNumber(properties, key, { minimum = 0, exclusiveMinimum = false, maximum = Infinity } = {}) {
+function sourcePositiveNumber(properties, key, {
+  minimum = 0,
+  exclusiveMinimum = false,
+  maximum = Infinity,
+  exclusiveMaximum = false,
+} = {}) {
   if (!Object.hasOwn(properties, key) || properties[key] === null || properties[key] === undefined) {
     return { status: "absent", value: null };
   }
   const value = properties[key];
   const valid = typeof value === "number" && Number.isFinite(value) &&
-    (exclusiveMinimum ? value > minimum : value >= minimum) && value <= maximum;
+    (exclusiveMinimum ? value > minimum : value >= minimum) &&
+    (exclusiveMaximum ? value < maximum : value <= maximum);
   return valid
     ? { status: "source", value }
     : { status: "invalid", value: null };
@@ -143,7 +149,11 @@ export function resolveBuildingArchitectureEvidence(properties) {
   const roofColor = sourceColor(properties, "roof_color");
   const roofMaterial = sourceEnum(properties, "roof_material", ROOF_MATERIALS);
   const roofShape = sourceEnum(properties, "roof_shape", ROOF_SHAPES);
-  const roofDirection = sourcePositiveNumber(properties, "roof_direction", { minimum: 0, maximum: 360 - Number.EPSILON });
+  const roofDirection = sourcePositiveNumber(properties, "roof_direction", {
+    minimum: 0,
+    maximum: 360,
+    exclusiveMaximum: true,
+  });
   const roofOrientation = sourceEnum(properties, "roof_orientation", ROOF_ORIENTATIONS);
   const roofHeight = sourcePositiveNumber(properties, "roof_height", { minimum: 0, exclusiveMinimum: true });
 
@@ -195,5 +205,64 @@ export function resolveBuildingArchitectureEvidence(properties) {
     },
     geometryCompleteness: "footprint-extrusion-only",
     verificationStatus: "source-metadata-validated-not-human-verified",
+  };
+}
+
+/**
+ * Aggregate only source-bound metadata states from the already-resolved
+ * per-feature records. This summary is derived data and is recomputed by the
+ * independent package reviewer before it is accepted.
+ */
+export function summarizeBuildingArchitectureEvidence(evidenceItems) {
+  if (!Array.isArray(evidenceItems) || evidenceItems.length === 0 ||
+      evidenceItems.some((item) => !isRecord(item))) {
+    throw new TypeError("Architecture evidence summary requires a non-empty evidence array.");
+  }
+
+  const fieldNames = [
+    "featureType",
+    "hasParts",
+    "buildingId",
+    "facade.color",
+    "facade.material",
+    "roof.color",
+    "roof.material",
+    "roof.shape",
+    "roof.directionDegrees",
+    "roof.orientation",
+    "roof.heightMeters",
+  ];
+  const field = (evidence, name) => {
+    let value = evidence;
+    for (const part of name.split(".")) value = value?.[part];
+    return value;
+  };
+  const fieldAvailability = Object.fromEntries(fieldNames.map((name) => [
+    name,
+    evidenceItems.reduce((counts, evidence) => {
+      const status = field(evidence, name)?.status;
+      const key = status === "source" || status === "absent" || status === "invalid"
+        ? status
+        : "missing-evidence";
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
+    }, { source: 0, absent: 0, invalid: 0, "missing-evidence": 0 }),
+  ]));
+  const countValues = (selector) => evidenceItems.reduce((counts, evidence) => {
+    const value = selector(evidence);
+    if (typeof value === "string" && value) counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  return {
+    schema: `overture-buildings-${OVERTURE_BUILDINGS_SCHEMA_VERSION}`,
+    tileCount: evidenceItems.length,
+    featureTypeCounts: countValues((item) => item.featureType?.value),
+    compositionStatusCounts: countValues((item) => item.compositionStatus),
+    roofGeometryStatusCounts: countValues((item) => item.roof?.geometryStatus),
+    facadeStyleStatusCounts: countValues((item) => item.facade?.status),
+    fieldAvailability,
+    geometryCompleteness: "footprint-extrusion-only",
+    renderedArchitecturalDetailCount: 0,
   };
 }
