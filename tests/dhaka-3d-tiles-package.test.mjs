@@ -152,7 +152,7 @@ test("uses source height, then floor estimates, then a labelled fallback when no
   assert.deepEqual(sourceArchitecture.facade.material, { status: "source", value: "brick" });
   assert.deepEqual(sourceArchitecture.roof.shape, { status: "source", value: "gabled" });
   assert.deepEqual(sourceArchitecture.roof.heightMeters, { status: "source", value: 2.5 });
-  assert.equal(sourceArchitecture.roof.geometryStatus, "source-roof-shape-and-height-present-geometry-not-yet-generated");
+  assert.equal(sourceArchitecture.roof.geometryStatus, "source-roof-shape-and-positive-height-present-geometry-not-yet-generated");
   assert.equal(sourceArchitecture.geometryCompleteness, "footprint-extrusion-only");
 
   const sourceHeight = tilesById.get("building-a").heightEvidence;
