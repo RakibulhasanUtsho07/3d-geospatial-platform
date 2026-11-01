@@ -97,7 +97,8 @@ test("real candidate template remains blocked and every release flag is false", 
   assert.ok(report.blockingCount > 0);
   for (const id of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed",
     "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present",
-    "held-out-checkpoints-independent"]) assert.ok(report.blockers.includes(id), id);
+    "candidate-fit-source-refs-hash-bound", "held-out-checkpoints-independent",
+    "held-out-checkpoints-disjoint-from-fit-sources"]) assert.ok(report.blockers.includes(id), id);
   assert.deepEqual(report.releaseFlags, FLAGS);
   assert.equal(report.candidateSelected, false);
   assert.equal(report.accuracyPassed, false);
