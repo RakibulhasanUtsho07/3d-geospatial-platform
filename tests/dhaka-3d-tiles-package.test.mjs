@@ -406,7 +406,7 @@ test("refuses unsafe feature counts, invalid heights and a source with no accept
   );
   await assert.rejects(
     buildDhaka3DTilesPackage({ sourcePath, outputPath: path.join(temporaryDirectory, "invalid"), syntheticHeightMeters: 0 }),
-    /syntheticHeightMeters must be finite/,
+    /syntheticHeightMeters must be null or finite/,
   );
   const emptyPath = path.join(temporaryDirectory, "empty.geojson");
   await writeFile(emptyPath, JSON.stringify({ type: "FeatureCollection", features: [] }));
