@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   OVERTURE_BUILDINGS_SCHEMA_VERSION,
   resolveBuildingArchitectureEvidence,
+  summarizeBuildingArchitectureEvidence,
 } from "../src/core/buildings/building-architecture-evidence.mjs";
 
 test("preserves valid Overture facade and roof fields without claiming geometry was generated", () => {
@@ -130,4 +131,37 @@ test("rejects malformed feature properties and invalid parent identifiers", () =
   });
   assert.equal(evidence.compositionStatus, "building-part-parent-id-missing");
   assert.deepEqual(evidence.buildingId, { status: "invalid", value: null });
+});
+
+
+test("aggregates schema-bound source coverage without converting missing fields into defaults", () => {
+  const records = [
+    resolveBuildingArchitectureEvidence({
+      type: "building",
+      has_parts: true,
+      facade_material: "brick",
+      roof_shape: "gabled",
+      roof_height: 2.5,
+    }),
+    resolveBuildingArchitectureEvidence({
+      type: "building_part",
+      building_id: "parent-1",
+      roof_shape: "flat",
+    }),
+  ];
+  const summary = summarizeBuildingArchitectureEvidence(records);
+  assert.equal(summary.schema, "overture-buildings-2.0.0");
+  assert.equal(summary.tileCount, 2);
+  assert.deepEqual(summary.featureTypeCounts, { building: 1, building_part: 1 });
+  assert.equal(summary.compositionStatusCounts["parent-declares-associated-parts"], 1);
+  assert.equal(summary.compositionStatusCounts["building-part-parent-join-required"], 1);
+  assert.equal(summary.fieldAvailability["roof.shape"].source, 2);
+  assert.equal(summary.fieldAvailability["roof.color"].absent, 2);
+  assert.equal(summary.renderedArchitecturalDetailCount, 0);
+  assert.equal(summary.geometryCompleteness, "footprint-extrusion-only");
+});
+
+test("refuses summaries with missing evidence records", () => {
+  assert.throws(() => summarizeBuildingArchitectureEvidence([]), /non-empty evidence array/);
+  assert.throws(() => summarizeBuildingArchitectureEvidence([{ schemaVersion: 1 }, null]), /non-empty evidence array/);
 });
