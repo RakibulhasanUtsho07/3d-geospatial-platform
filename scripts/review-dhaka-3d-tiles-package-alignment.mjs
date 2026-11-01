@@ -534,7 +534,11 @@ export async function reviewDhaka3DTilesPackageAlignment({
       heightExtras.groundElevationStatus === "unverified-zero-ellipsoid-anchor" &&
       heightExtras.minHeightApplication === (heightStatus === "synthetic-test-height"
         ? "not-applicable-synthetic-test-height"
-        : "source-min-height-applied-as-relative-above-ground-offset") &&
+        : heightExtras.baseHeightSource === "overture-min-height"
+          ? "source-min-height-applied-as-relative-above-ground-offset"
+          : heightExtras.baseHeightSource === "min-floor-estimate"
+            ? "min-floor-proxy-applied-as-relative-above-ground-offset"
+            : "no-base-offset-ground-zero-default") &&
       isRecord(tileHeight) &&
       tileHeight.status === heightStatus &&
       tileHeight.source === heightExtras.heightSource &&
