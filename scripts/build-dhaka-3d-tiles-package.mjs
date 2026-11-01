@@ -9,7 +9,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { validateTilesetManifest } from "../src/core/geospatial/tileset-manifest-validation.mjs";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
 import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
-import { resolveBuildingArchitectureEvidence } from "../src/core/buildings/building-architecture-evidence.mjs";
+import {
+  resolveBuildingArchitectureEvidence,
+  summarizeBuildingArchitectureEvidence,
+} from "../src/core/buildings/building-architecture-evidence.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
@@ -433,54 +436,6 @@ function padBounds(bounds, latitude, paddingMeters = BOUNDS_PADDING_METERS) {
   };
 }
 
-function summarizeArchitectureEvidence(tiles) {
-  const fieldNames = [
-    "featureType",
-    "hasParts",
-    "buildingId",
-    "facade.color",
-    "facade.material",
-    "roof.color",
-    "roof.material",
-    "roof.shape",
-    "roof.directionDegrees",
-    "roof.orientation",
-    "roof.heightMeters",
-  ];
-  const field = (evidence, name) => {
-    let value = evidence;
-    for (const part of name.split(".")) value = value?.[part];
-    return value;
-  };
-  const fieldAvailability = Object.fromEntries(fieldNames.map((name) => [
-    name,
-    tiles.reduce((counts, tile) => {
-      const status = field(tile.architectureEvidence, name)?.status;
-      const key = status === "source" || status === "absent" || status === "invalid"
-        ? status
-        : "missing-evidence";
-      counts[key] = (counts[key] ?? 0) + 1;
-      return counts;
-    }, { source: 0, absent: 0, invalid: 0, "missing-evidence": 0 }),
-  ]));
-  const countValues = (selector) => tiles.reduce((counts, tile) => {
-    const value = selector(tile.architectureEvidence);
-    if (typeof value === "string" && value) counts[value] = (counts[value] ?? 0) + 1;
-    return counts;
-  }, {});
-  return {
-    schema: "overture-buildings-2.0.0",
-    tileCount: tiles.length,
-    featureTypeCounts: countValues((item) => item.featureType?.value),
-    compositionStatusCounts: countValues((item) => item.compositionStatus),
-    roofGeometryStatusCounts: countValues((item) => item.roof?.geometryStatus),
-    facadeStyleStatusCounts: countValues((item) => item.facade?.status),
-    fieldAvailability,
-    geometryCompleteness: "footprint-extrusion-only",
-    renderedArchitecturalDetailCount: 0,
-  };
-}
-
 function boundsToRegion(bounds, minHeight = -0.25, maxHeight = 8.25) {
   return [
     bounds.west * Math.PI / 180,
@@ -696,7 +651,9 @@ export async function buildDhaka3DTilesPackage({
     counts[source] = (counts[source] ?? 0) + 1;
     return counts;
   }, {});
-  const architectureEvidenceSummary = summarizeArchitectureEvidence(tiles);
+  const architectureEvidenceSummary = summarizeBuildingArchitectureEvidence(
+    tiles.map((tile) => tile.architectureEvidence),
+  );
   const tileset = {
     asset: {
       version: "1.1",
