@@ -232,7 +232,7 @@ export function validateBrf35BuildingLinkage(manifest, sourceReport) {
   const accuracy = object(manifest.accuracy) ? manifest.accuracy : {};
   const fitRefs = Array.isArray(accuracy.fitSourceAssetRefs) ? accuracy.fitSourceAssetRefs : [];
   const fitSourceIds = new Set();
-  const allowedFitRoles = new Set(["image", "uls", "survey-control"]);
+  const allowedFitRoles = new Set(["image", "uls"]);
   const fitSourceRefsOk = fitRefs.length > 0 && fitRefs.every((ref) => {
     if (!object(ref) || !identifier(ref.assetId) || !hash(ref.sha256) ||
         !allowedFitRoles.has(ref.role) || fitSourceIds.has(ref.assetId)) return false;
@@ -245,7 +245,7 @@ export function validateBrf35BuildingLinkage(manifest, sourceReport) {
   add(checks, blockers, "candidate-fit-source-refs-hash-bound", fitSourceRefsOk,
     fitSourceRefsOk
       ? "Candidate fitting inputs are enumerated with unique asset IDs, exact SHA-256 values and source roles."
-      : "At least one candidate fit input must be uniquely declared and hash/role-bound to an image, ULS or survey source asset.");
+      : "At least one candidate fit input must be uniquely declared and hash/role-bound to an image or ULS source asset.");
 
   const points = Array.isArray(accuracy.heldOutCheckpoints) ? accuracy.heldOutCheckpoints : [];
   const pointIds = new Set();
