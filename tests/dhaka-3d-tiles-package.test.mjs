@@ -51,8 +51,8 @@ function sampleSource() {
   return {
     type: "FeatureCollection",
     features: [
-      polygon("building-a", square(90.410, 23.780), { class: "building" }),
-      polygon("building-b", concave, { class: "building" }),
+      polygon("building-a", square(90.410, 23.780), { class: "building", height: 18.5, num_floors: 10, min_height: 1.2 }),
+      polygon("building-b", concave, { class: "building", num_floors: 4 }),
       {
         type: "Feature",
         id: "building-c-multipolygon",
@@ -117,6 +117,86 @@ before(async () => {
 
 after(async () => {
   if (temporaryDirectory) await rm(temporaryDirectory, { recursive: true, force: true });
+});
+
+test("uses source height, then floor estimates, then a labelled fallback when no synthetic override is supplied", async () => {
+  const sourceDerivedPackage = path.join(temporaryDirectory, "package-source-derived");
+  const build = await buildDhaka3DTilesPackage({
+    sourcePath,
+    outputPath: sourceDerivedPackage,
+    maxFeatures: 16,
+  });
+  assert.equal(build.emittedFeatureCount, 4);
+
+  const manifest = JSON.parse(await readFile(path.join(sourceDerivedPackage, "build-manifest.json"), "utf8"));
+  const tilesById = new Map(manifest.tiles.map((tile) => [tile.featureId, tile]));
+  const sourceHeight = tilesById.get("building-a").heightEvidence;
+  assert.equal(sourceHeight.status, "overture-height");
+  assert.equal(sourceHeight.source, "overture-height");
+  assert.equal(sourceHeight.heightMeters, 18.5);
+  assert.equal(sourceHeight.unclampedHeightMeters, 18.5);
+  assert.equal(sourceHeight.heightWasClamped, false);
+  assert.equal(sourceHeight.reportedMinHeightMeters, 1.2);
+  assert.equal(sourceHeight.groundOffsetAppliedMeters, 0);
+
+  const floorEstimate = tilesById.get("building-b").heightEvidence;
+  assert.equal(floorEstimate.status, "floor-estimate");
+  assert.equal(floorEstimate.heightMeters, 12);
+  assert.equal(floorEstimate.unclampedHeightMeters, 12);
+
+  const fallback = tilesById.get("building-c-multipolygon").heightEvidence;
+  assert.equal(fallback.status, "fallback-estimate");
+  assert.equal(fallback.heightMeters, 9);
+
+  assert.equal(manifest.configuration.heightPolicy, "per-feature-provenance");
+  assert.equal(manifest.configuration.syntheticHeightMeters, null);
+  assert.deepEqual(manifest.configuration.heightSourceCounts, {
+    "overture-height": 1,
+    "floor-estimate": 1,
+    "fallback-estimate": 2,
+  });
+
+  const tileset = JSON.parse(await readFile(path.join(sourceDerivedPackage, "tileset.json"), "utf8"));
+  assert.equal(tileset.asset.extras.heightStatus, "per-feature-height-provenance");
+  assert.equal(tileset.asset.extras.groundElevationStatus, "unverified-zero-ellipsoid-anchor");
+  assert.ok(tileset.root.boundingVolume.region[5] >= 18.75);
+
+  const sourceTile = tilesById.get("building-a");
+  const glb = await readFile(path.join(sourceDerivedPackage, sourceTile.contentUri));
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.toString("utf8", 20, 20 + jsonLength));
+  assert.equal(gltf.extras.heightStatus, "overture-height");
+  assert.equal(gltf.extras.heightMeters, 18.5);
+  assert.equal(gltf.extras.reportedMinHeightMeters, 1.2);
+  assert.equal(gltf.extras.groundOffsetAppliedMeters, 0);
+  assert.equal(gltf.extras.groundElevationStatus, "unverified-zero-ellipsoid-anchor");
+  assert.equal(gltf.extras.syntheticHeightMeters, undefined);
+
+  const sourceChild = tileset.root.children.find((child) => child.extras.sourceFeatureId === "building-a");
+  assert.ok(sourceChild.boundingVolume.region[5] >= 18.75);
+  const integrity = await verifyTilesetPackage({ directory: sourceDerivedPackage, expectedSourceSha256: sha256(sourceBytes) });
+  assert.equal(integrity.valid, true, integrity.errors.join("; "));
+});
+
+test("caps source heights and retains the unclamped value as provenance", async () => {
+  const overheightSourcePath = path.join(temporaryDirectory, "overheight-source.geojson");
+  const overheightOutputPath = path.join(temporaryDirectory, "overheight-package");
+  const overheightSource = {
+    type: "FeatureCollection",
+    features: [polygon("overheight", square(90.410, 23.780), { class: "building", height: 450 })],
+  };
+  await writeFile(overheightSourcePath, JSON.stringify(overheightSource) + "\n");
+  await buildDhaka3DTilesPackage({
+    sourcePath: overheightSourcePath,
+    outputPath: overheightOutputPath,
+    maxFeatures: 1,
+  });
+  const manifest = JSON.parse(await readFile(path.join(overheightOutputPath, "build-manifest.json"), "utf8"));
+  assert.equal(manifest.tiles[0].heightEvidence.heightMeters, 300);
+  assert.equal(manifest.tiles[0].heightEvidence.unclampedHeightMeters, 450);
+  assert.equal(manifest.tiles[0].heightEvidence.heightWasClamped, true);
+  const tileset = JSON.parse(await readFile(path.join(overheightOutputPath, "tileset.json"), "utf8"));
+  assert.ok(tileset.root.children[0].boundingVolume.region[5] >= 300.25);
 });
 
 test("builds a real multi-content OGC 3D Tiles 1.1 hierarchy from source footprints", async () => {
