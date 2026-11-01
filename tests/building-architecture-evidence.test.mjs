@@ -179,7 +179,8 @@ test("resolves building_part parent references against the complete source extra
   assert.equal(audit.byFeatureId["parent-a"].associatedPartsSelectedInPackageCount, 1);
   assert.equal(audit.byFeatureId["part-a"].status, "parent-feature-resolved");
   assert.equal(audit.byFeatureId["part-a"].parentSelectedInPackage, true);
-  assert.equal(audit.byFeatureId["part-b"].parentSelectedInPackage, true);
+  assert.equal(audit.byFeatureId["part-b"].parentSelectedInPackage, false);
+  assert.equal(audit.byFeatureId["part-b"].partSelectedInPackage, true);
   assert.equal(audit.byFeatureId["part-c"].status, "parent-feature-not-in-source-extract");
 });
 
