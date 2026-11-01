@@ -306,7 +306,7 @@ test("rejects architecture metadata drift between the source feature, GLB and bu
   const manifestPath = path.join(damagedPath, "build-manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   manifest.tiles[0].architectureEvidence.roof.shape.value = "flat";
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
   const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
   assert.equal(report.status, "fail");
@@ -332,7 +332,7 @@ test("rejects architecture metadata consistently rebound in GLB and manifest whe
   tile.contentSha256 = forgedHash;
   tile.bytes = forgedGlb.length;
   manifest.files[tile.contentUri] = { sha256: forgedHash, bytes: forgedGlb.length };
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n", "utf8");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
   const report = await reviewDhaka3DTilesPackageAlignment({ sourcePath, packageDirectory: damagedPath });
   assert.equal(report.status, "fail");
