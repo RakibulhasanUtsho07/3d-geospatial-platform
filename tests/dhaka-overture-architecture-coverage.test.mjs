@@ -82,6 +82,7 @@ testCase("reports Overture fields separately from extractor-derived render roles
 testCase("counts absent and invalid field states without coercion", () => {
   const source = fixture();
   source.features[0].properties.roof_height = "3m";
+  source.features[2].properties.roof_height = "4m";
   source.features[2].properties.building_id = "parent a";
   source.features[2].properties._parentBuildingId = "parent a";
   const report = buildDhakaOvertureArchitectureCoverage(source);
