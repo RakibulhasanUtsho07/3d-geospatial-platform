@@ -293,7 +293,14 @@ export async function publishReviewedBuildingModel({
     }
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      await writeFile(destination, candidateBytes, { flag: "wx" });
+      const temporaryAssetPath = path.join(catalogDir, "." + assetName + ".tmp-" + randomUUID());
+      try {
+        await writeFile(temporaryAssetPath, candidateBytes, { flag: "wx" });
+        await rename(temporaryAssetPath, destination);
+      } catch (writeError) {
+        await rm(temporaryAssetPath, { force: true }).catch(() => {});
+        throw writeError;
+      }
     } else {
       throw error;
     }
