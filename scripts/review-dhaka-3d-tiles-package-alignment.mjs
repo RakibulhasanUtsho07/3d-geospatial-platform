@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { verifyTilesetPackage } from "../src/core/geospatial/tileset-package-integrity.mjs";
+import { resolveBuildingHeight } from "../src/core/buildings/building-height.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SOURCE = path.join(ROOT, "data/overture/dhaka-buildings-3d-pilot.geojson");
@@ -482,7 +483,34 @@ export async function reviewDhaka3DTilesPackageAlignment({
       "synthetic-test-height",
     ]);
     const tileHeight = tile.heightEvidence;
-    const heightEvidenceValid = allowedHeightStatuses.has(heightStatus) &&
+    const syntheticOverride = heightStatus === "synthetic-test-height";
+    const expectedSourceHeight = syntheticOverride
+      ? null
+      : resolveBuildingHeight(isRecord(feature.properties) ? feature.properties : {});
+    const sourceHeightMatches = syntheticOverride
+      ? manifest.configuration?.heightPolicy === "synthetic-test-override" &&
+        manifest.configuration?.syntheticHeightMeters === height &&
+        heightExtras.heightSource === "synthetic-test-height" &&
+        height === heightExtras.unclampedHeightMeters &&
+        baseHeight === 0 &&
+        topHeight === height &&
+        heightExtras.reportedMinHeightMeters === null &&
+        heightExtras.unclampedBaseHeightMeters === 0 &&
+        heightExtras.baseHeightWasClamped === false
+      : manifest.configuration?.heightPolicy === "per-feature-provenance" &&
+        manifest.configuration?.syntheticHeightMeters === null &&
+        expectedSourceHeight.source === heightStatus &&
+        expectedSourceHeight.meters === height &&
+        expectedSourceHeight.unclampedMeters === heightExtras.unclampedHeightMeters &&
+        expectedSourceHeight.heightWasClamped === heightExtras.heightWasClamped &&
+        expectedSourceHeight.baseHeight === baseHeight &&
+        expectedSourceHeight.unclampedBaseHeight === heightExtras.unclampedBaseHeightMeters &&
+        expectedSourceHeight.baseHeightWasClamped === heightExtras.baseHeightWasClamped &&
+        (expectedSourceHeight.unclampedBaseHeight > 0
+          ? expectedSourceHeight.unclampedBaseHeight
+          : null) === heightExtras.reportedMinHeightMeters &&
+        expectedSourceHeight.baseHeight + expectedSourceHeight.meters === topHeight;
+    const heightEvidenceValid = sourceHeightMatches && allowedHeightStatuses.has(heightStatus) &&
       heightExtras.heightSource === heightStatus &&
       Number.isFinite(height) && height > 0 && height <= 300 &&
       Number.isFinite(baseHeight) && baseHeight >= 0 && baseHeight <= 100 &&
