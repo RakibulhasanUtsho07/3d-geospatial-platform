@@ -278,6 +278,7 @@ test("resolves min_floor as a labelled base-height estimate and verifies it in w
   assert.equal(tile.heightProvenance.baseHeightEstimated, true);
   assert.equal(tile.heightProvenance.reportedMinFloor, 2);
   assert.equal(tile.heightProvenance.reportedMinHeightMeters, null);
+  assert.equal(tile.heightProvenance.minHeightApplication, "min-floor-proxy-applied-as-relative-above-ground-offset");
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.base.minimum >= 5.99);
   assert.ok(tile.transformedEllipsoidHeightRangeMeters.top.maximum <= 22.01);
 });
