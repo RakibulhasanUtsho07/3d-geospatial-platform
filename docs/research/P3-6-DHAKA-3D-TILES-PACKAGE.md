@@ -208,3 +208,20 @@ The ENU-to-ECEF transform is anchored at WGS84 ellipsoid height zero because the
 Overture-provided `height` and `min_height` are source data, not independent survey truth. `min_floor`, floor-count and fallback conversions are estimates. The alignment check confirms internal geometry/provenance and transform consistency only. It does not confirm real-world vertical accuracy, architectural fidelity, source rights, or production readiness.
 
 Use `--synthetic-height-meters` only to create an explicitly synthetic test package. The regular CI package build and scale profile now exercise default per-feature height resolution. All release flags remain false.
+
+
+## Browser evidence audit and merge-base synchronization — 2026-11-01
+
+The previous exact-head P3.6 run `41319856042` completed all 28 dedicated workflow steps successfully on `6750c2839f03ff6550700ba50cc453d0589825c0`. Its retained artifacts were inspected directly:
+
+- The 32-tile alignment report passed all 32 tiles; maximum horizontal residual was 0.067196 m, maximum perimeter difference was 0.215084 m, maximum ECEF/geodetic height residual was 0.000032 m, degenerate triangles were zero, and all transformed vertices were within their declared regions.
+- The 32/64/128-content scale profile passed all three bounded samples. Package sizes were 184,756 / 366,901 / 718,186 bytes. Phase-boundary RSS after alignment was 266,158,080 / 375,197,696 / 483,860,480 bytes; these are not peak-memory measurements or production SLOs.
+- The 32-tile source sample used 19 labelled fallback-height estimates and 13 floor-count estimates; it contained no positive Overture `height` source value. Larger samples contained a small number of source-height values. Source availability must be reported per sample, not assumed.
+- Live Cesium fetched one GLB for the first viewport and one new GLB after a pan approximately 2,056 m away; it did not fetch all 32 contents, and no child tile failed.
+- Browser screenshot inspection shows simple footprint extrusions/cuboids only. They are not accepted architectural building models; facades, windows, roofs, textures and human visual approval remain blocked.
+
+**Evidence-report correction:** the earlier browser JSON incorrectly retained a stale limitation string saying all building heights were synthetic uniform extrusions. This contradicted the build manifest and alignment evidence. The review page now reads the actual package height policy and per-feature source/base counts from the build manifest, renders that provenance visibly, and emits accurate limitations distinguishing source attributes and estimates from surveyed truth. A Playwright regression now requires the browser report and visible UI to agree with the manifest and rejects the stale synthetic-uniform statement.
+
+**Branch integration:** the P3.6 branch had been based on `98b2fa56`, five commits behind the updated `development`. Since the only changed paths on the development side were the CI workflow and BRF-35 validator/test, a two-parent merge commit `62520c0d86fab0b57cbfe247e7d96a4457fc6e41` preserves the P3.6 tree while incorporating those exact development versions. The branch is now directly based on `development@f7b2a67`; the compare endpoint reports zero commits behind and GitHub reports the PR mergeable.
+
+The latest merge-synchronized head requires fresh exact-head CI and dedicated P3.6 workflow. The successful run and artifacts above validate the immediately preceding P3.6 code head, not the new merge commit.
