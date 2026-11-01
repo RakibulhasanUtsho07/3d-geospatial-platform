@@ -158,3 +158,17 @@ test("valid reference reports are usable only when no actual rendered height is 
   );
   assert.equal(resolveRenderedHeightForDisplay({}), null);
 });
+
+test("rejects partially numeric strings instead of parsing unit-suffixed values", () => {
+  const invalidHeight = resolveBuildingHeight({ height: "18.5m" });
+  assert.equal(invalidHeight.source, "fallback-estimate");
+  assert.equal(invalidHeight.meters, 9);
+
+  const validFloorFallback = resolveBuildingHeight({ height_m: "18.5 metres", num_floors: "4" });
+  assert.equal(validFloorFallback.source, "floor-estimate");
+  assert.equal(validFloorFallback.meters, 12);
+
+  const invalidMinHeight = resolveBuildingHeight({ height: 20, min_height: "1.2m" });
+  assert.equal(invalidMinHeight.baseHeight, 0);
+  assert.equal(invalidMinHeight.unclampedBaseHeight, 0);
+});
