@@ -440,9 +440,16 @@ export async function reviewDhaka3DTilesPackageAlignment({
   const children = new Map(tileset.root.children.map((child) => [child?.content?.uri, child]));
   const emitted = [];
   const errors = [];
-  const expectedArchitectureSummary = Array.isArray(manifest.tiles) && manifest.tiles.length > 0
-    ? summarizeBuildingArchitectureEvidence(manifest.tiles.map((tile) => tile?.architectureEvidence))
-    : null;
+  let expectedArchitectureSummary = null;
+  try {
+    if (Array.isArray(manifest.tiles) && manifest.tiles.length > 0) {
+      expectedArchitectureSummary = summarizeBuildingArchitectureEvidence(
+        manifest.tiles.map((tile) => tile?.architectureEvidence),
+      );
+    }
+  } catch {
+    expectedArchitectureSummary = null;
+  }
   if (!expectedArchitectureSummary ||
       JSON.stringify(manifest.configuration?.architectureEvidenceSummary) !== JSON.stringify(expectedArchitectureSummary) ||
       JSON.stringify(tileset.asset.extras?.architectureEvidenceSummary) !== JSON.stringify(expectedArchitectureSummary)) {
