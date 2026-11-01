@@ -230,16 +230,39 @@ export function validateBrf35BuildingLinkage(manifest, sourceReport) {
       "Distinct platform-generated candidate GLB is missing; a source-reference GLB cannot replace it.");
 
   const accuracy = object(manifest.accuracy) ? manifest.accuracy : {};
+  const fitRefs = Array.isArray(accuracy.fitSourceAssetRefs) ? accuracy.fitSourceAssetRefs : [];
+  const fitSourceIds = new Set();
+  const allowedFitRoles = new Set(["image", "uls", "survey-control"]);
+  const fitSourceRefsOk = fitRefs.length > 0 && fitRefs.every((ref) => {
+    if (!object(ref) || !identifier(ref.assetId) || !hash(ref.sha256) ||
+        !allowedFitRoles.has(ref.role) || fitSourceIds.has(ref.assetId)) return false;
+    const source = records.find((asset) => asset.assetId === ref.assetId);
+    const matches = Boolean(source && source.role === ref.role && hash(source.sha256) &&
+      source.sha256.toLowerCase() === ref.sha256.toLowerCase());
+    if (matches) fitSourceIds.add(ref.assetId);
+    return matches;
+  });
+  add(checks, blockers, "candidate-fit-source-refs-hash-bound", fitSourceRefsOk,
+    fitSourceRefsOk
+      ? "Candidate fitting inputs are enumerated with unique asset IDs, exact SHA-256 values and source roles."
+      : "At least one candidate fit input must be uniquely declared and hash/role-bound to an image, ULS or survey source asset.");
+
   const points = Array.isArray(accuracy.heldOutCheckpoints) ? accuracy.heldOutCheckpoints : [];
   const pointIds = new Set();
-  const pointsOk = points.length >= 3 && points.every((point) => {
+  const pointsOk = points.length >= 6 && points.every((point) => {
     const ok = validCheckpoint(point, surveys, frameId) && !pointIds.has(point.id);
     if (identifier(point?.id)) pointIds.add(point.id);
     return ok;
   });
   add(checks, blockers, "held-out-checkpoints-independent", pointsOk,
-    pointsOk ? "At least three unique controls are hash-linked, same-frame and independent of fitting." :
-      "At least three unique hash-linked survey checkpoints independent of fitting are required.");
+    pointsOk ? "At least six unique controls are hash-linked, same-frame and individually declared independent of fitting." :
+      "At least six unique hash-linked survey checkpoints independent of fitting are required.");
+  const checkpointSourcesDisjoint = fitSourceRefsOk &&
+    points.every((point) => object(point) && !fitSourceIds.has(point.sourceAssetId));
+  add(checks, blockers, "held-out-checkpoints-disjoint-from-fit-sources", checkpointSourcesDisjoint,
+    checkpointSourcesDisjoint
+      ? "No held-out checkpoint source asset is declared among the candidate fitting inputs."
+      : "Held-out checkpoint source assets must be disjoint from every declared candidate fitting input.");
 
   const accuracyOk = accuracy.status === "reviewed" &&
     accuracy.candidateGlbSha256?.toLowerCase() === candidate.sha256?.toLowerCase() &&
