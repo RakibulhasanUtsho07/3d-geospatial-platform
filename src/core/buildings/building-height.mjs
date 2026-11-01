@@ -1,6 +1,8 @@
 /**
  * Resolve a building's rendered height while retaining source/estimate provenance.
  *
+ * Overture height is the vertical distance from the feature's lowest point
+ * to its highest point. min_height is a separate above-ground bottom offset.
  * Floor-height conversion and the 9m fallback are rendering estimates, not
  * survey measurements. Safety caps are surfaced to the caller rather than
  * being silently represented as the original requested value.
@@ -12,7 +14,7 @@ function getPositiveNumber(properties, keys) {
       typeof value === "number"
         ? value
         : typeof value === "string"
-          ? Number.parseFloat(value)
+          ? (value.trim() === "" ? Number.NaN : Number(value.trim()))
           : Number.NaN;
 
     if (Number.isFinite(numeric) && numeric > 0) {
