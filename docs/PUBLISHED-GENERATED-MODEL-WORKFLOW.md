@@ -1,6 +1,6 @@
 # Reviewed Generated Model Publication
 
-Status: explicit local publication command, static versioned catalog, SHA-256 checks, and version rollback are implemented. This is not a hosted admin service or an automatic approval system.
+Status: explicit CLI publication, a separately token-authenticated generation-job publication API, static versioned catalog, SHA-256 checks, and version rollback are implemented on the development integration line. This is not an automatic approval system or a multi-user role-management service.
 
 ## Workflow
 
@@ -38,6 +38,16 @@ Replace the sample coordinates with the surveyed position for this exact model. 
 Successful publication writes the content-addressed GLB and updates `public/models/generated/manifest.json`. The review audit remains private. The publication action is explicit and does not mutate the completed queue job into a different status: `mapReady=false` and `publicationEligible=false` remain fail-closed in that job record. This means “approved review” and “published catalog version” are deliberately separate states.
 
 `npm run publish:approved-generation-job` is an operator CLI, not a public endpoint. Do not expose it to untrusted requests or deploy the workspace as static content.
+
+## Map-side publication from an approved generation job
+
+The Generated models dialog now includes **Publish an approved generation job to this map**. It calls `POST /api/building-generation/jobs/<jobId>/publish` with a distinct `GENERATION_PUBLISH_API_TOKEN`, explicit WGS84 position, height, orientation, scale and GLB axes. See [D3M-02 — Generation Job to Cesium Map Publication](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md) for the exact contract and deployment requirements.
+
+The API invokes the existing approved-job publisher. It re-verifies the request, approved review record, candidate GLB and QA report from the private workspace; it writes only the content-addressed GLB and manifest under the application public root (`process.cwd()/public/models/generated/`). The application public directory must be writable and persistent. The UI then rereads the catalog and checks the exact model ID, active version ID, SHA-256 and asset URL before loading the catalog definition into the current Cesium session.
+
+The publish token is entered in the panel and retained only in component memory; it is not stored in localStorage. Publication is explicit and makes the GLB publicly fetchable. The API does not change the generation job's `mapReady` or `publicationEligible` flags, and the map load is not proof of model accuracy or independent survey acceptance.
+
+Catalog writes are serialized with `public/models/generated/.publish.lock`. If a process crashes, verify that no publisher is running before manually removing a stale lock directory. Do not remove an active lock.
 
 ## Review attestation format
 
@@ -92,7 +102,7 @@ The sample coordinates, names, IDs, notes and hashes are placeholders, not verif
 
 ## Important limitations
 
-- This is a local command and a public static JSON catalog, not authenticated multi-user publishing, role-based approvals, durable server jobs or private object storage.
+- The job publication endpoint is operator-token protected, but it is not a multi-user identity-provider or role-based approval service. The catalog remains a public static JSON catalog, not private object storage.
 - Review booleans are human-supplied attestations. The command checks that they are explicit and that files match hashes; it cannot independently prove copyright permission, building identity, architectural fidelity, metric scale, surveyed coordinates or vertical-datum correctness.
 - The catalog uses WGS84 longitude/latitude plus height in the map's configured reference. Verify the height datum and local axes before publication.
 - An asset under \`public/models/generated/\` is publicly served when the site is deployed. Do not publish private, licensed-restricted or personally identifying evidence.
