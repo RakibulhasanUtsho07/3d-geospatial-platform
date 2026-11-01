@@ -4,9 +4,9 @@ export type BuildingHeightSource =
   | "fallback-estimate";
 
 export type BuildingHeight = {
-  /** Extrusion height actually used by the renderer, in metres. */
+  /** Vertical distance from the feature's lowest point to highest point, in metres. */
   meters: number;
-  /** Base/minimum height actually used by the renderer, in metres. */
+  /** Relative above-ground offset at which the feature's bottom starts, in metres. */
   baseHeight: number;
   /** Measurement source or explicit estimate category. */
   source: BuildingHeightSource;
