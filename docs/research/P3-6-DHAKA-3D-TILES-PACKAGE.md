@@ -188,22 +188,23 @@ The builder follows the current [Overture Building schema](https://docs.overture
 
 - `height` is the distance from the feature's lowest point to its highest point.
 - `min_height` is the above-ground altitude at which the bottom of the building/building part starts.
+- `min_floor` is the integer start floor of a floating building part. When `min_height` is missing, it may be used as an explicitly estimated proxy at 3 m per floor. Explicit `min_height` takes precedence when both are present.
 - `num_floors` represents above-ground floors. When no positive source height is available, the current renderer policy estimates 3 m per floor; if neither is available, it uses an explicitly labelled 9 m fallback.
-- A supplied `min_height` is applied as the bottom offset; it is not added to the height field itself. The GLB vertical interval is `[baseHeightMeters, baseHeightMeters + heightMeters]`.
+- A supplied `min_height` or estimated `min_floor` base offset is not added to the source `height` span. The GLB vertical interval is `[baseHeightMeters, baseHeightMeters + heightMeters]`.
 
 ### Implementation and evidence binding
 
 - Default build and the production review package now use per-feature provenance rather than an unconditional synthetic 8 m height.
 - `resolveBuildingHeight` uses strict numeric parsing. Values such as `"18.5m"` are not partially parsed as metres. It retains original/unclamped height and base values and records safety-cap decisions.
-- Each tile GLB, build manifest and tileset region now bind `heightStatus`, `heightSource`, `heightMeters`, `baseHeightMeters`, `topHeightMeters`, unclamped inputs, clamp flags and the min-height application policy.
+- Each tile GLB, build manifest and tileset region now bind `heightStatus`, `heightSource`, `heightMeters`, `baseHeightSource`, `baseHeightEstimated`, `reportedMinHeightMeters`, `reportedMinFloor`, `baseHeightMeters`, `topHeightMeters`, unclamped inputs, clamp flags and the vertical-offset policy.
 - The mesh's bottom vertices are emitted at `baseHeightMeters`; top vertices are emitted at `topHeightMeters`. Root and child `boundingVolume.region` vertical intervals cover the actual per-tile base and top range.
 - The alignment reviewer independently reads the GLB vertical planes, checks the manifest/GLB height-provenance cross-binding, recovers the footprint boundary at the non-zero base plane and checks base/top ECEF heights against the declared child region. A changed manifest height record cannot silently pass while the GLB stays unchanged.
-- Dedicated package tests cover explicit source height + non-zero `min_height`, floor estimate, fallback estimate, synthetic override, height/base clamping, and a corrupted height-provenance record.
+- Dedicated package tests cover explicit source height + non-zero `min_height`, the `min_floor` estimate and its precedence rules, floor-height estimate, fallback estimate, synthetic override, height/base clamping, source-to-GLB provenance drift, and corrupted manifest records.
 
 ### Vertical reference limitation — still blocked
 
-The ENU-to-ECEF transform is anchored at WGS84 ellipsoid height zero because the 2D Overture footprint extract does not supply a verified terrain elevation or a named vertical datum. The source `min_height` is therefore applied as a relative above-ground offset from that unverified local ground plane. It does **not** establish absolute building elevation, surveyed ground level, or an independently measured top elevation.
+The ENU-to-ECEF transform is anchored at WGS84 ellipsoid height zero because the 2D Overture footprint extract does not supply a verified terrain elevation or a named vertical datum. The source `min_height` is applied as a relative above-ground offset from that unverified local ground plane; `min_floor` may supply a separately labelled 3 m-per-floor estimate when `min_height` is absent. Neither establishes absolute building elevation, surveyed ground level, or an independently measured top elevation.
 
-Overture-provided `height` is source data, not independent survey truth. Floor-count and fallback values are estimates. The alignment check confirms internal geometry/provenance and transform consistency only. It does not confirm real-world vertical accuracy, architectural fidelity, source rights, or production readiness.
+Overture-provided `height` and `min_height` are source data, not independent survey truth. `min_floor`, floor-count and fallback conversions are estimates. The alignment check confirms internal geometry/provenance and transform consistency only. It does not confirm real-world vertical accuracy, architectural fidelity, source rights, or production readiness.
 
 Use `--synthetic-height-meters` only to create an explicitly synthetic test package. The regular CI package build and scale profile now exercise default per-feature height resolution. All release flags remain false.
