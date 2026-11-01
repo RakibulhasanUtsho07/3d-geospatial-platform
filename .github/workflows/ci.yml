@@ -64,6 +64,7 @@ on:
       - feat/brf47-cross-role-asset-identity-20261031
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
+      - feat/p3-8-overture-source-coverage-20261101
   pull_request:
     branches:
       - main
@@ -622,6 +623,9 @@ jobs:
 
       - name: Test Overture building composition and architectural metadata evidence
         run: npm run test:building-architecture-evidence
+
+      - name: Test full Dhaka Overture architecture coverage audit
+        run: npm run test:dhaka-overture-architecture-coverage
 
       - name: Test nearby-place query and normalization
         run: npm run test:nearby-places

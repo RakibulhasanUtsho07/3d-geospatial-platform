@@ -240,7 +240,9 @@
     "review:dhaka-3d-tiles-package-alignment": "node scripts/review-dhaka-3d-tiles-package-alignment.mjs",
     "test:dhaka-3d-tiles-package-alignment": "node --test tests/dhaka-3d-tiles-package-alignment.test.mjs",
     "benchmark:dhaka-3d-tiles-scale-profile": "node scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs",
-    "test:dhaka-3d-tiles-scale-profile": "node --test tests/dhaka-3d-tiles-scale-profile.test.mjs"
+    "test:dhaka-3d-tiles-scale-profile": "node --test tests/dhaka-3d-tiles-scale-profile.test.mjs",
+    "audit:dhaka-overture-architecture-coverage": "node scripts/audit-dhaka-overture-architecture-coverage.mjs",
+    "test:dhaka-overture-architecture-coverage": "node --test tests/dhaka-overture-architecture-coverage.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
