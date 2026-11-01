@@ -730,6 +730,7 @@ export async function reviewDhaka3DTilesPackageAlignment({
       bytesVerified: integrity.bytesVerified,
       heightPolicy: manifest.configuration?.heightPolicy ?? null,
       heightSourceCounts: manifest.configuration?.heightSourceCounts ?? null,
+      architectureEvidenceSummary: expectedArchitectureSummary,
       syntheticHeightMeters: manifest.configuration?.syntheticHeightMeters ?? null,
     },
     thresholds: {
