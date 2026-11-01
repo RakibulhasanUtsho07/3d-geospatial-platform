@@ -68,3 +68,16 @@ BRF-47 was integrated into `development` at base commit `f7b2a67fcf0c34623196fa9
 - The merged BRF-47 base's post-merge Full CI: [run 41312647009](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41312647009) — success.
 
 These are exact-commit software/workflow results. They do not establish that the synthetic held-out observations are genuinely independent, authenticate any source rights, prove a same-building match, validate a real coordinate transform, or assess a platform-generated building model. No independent reviewer approval is recorded for PR #298. The PR remains Draft pending independent review. The real candidate and every release flag remain blocked/false.
+
+
+## BRF-48 byte-level holdout hardening — 2026-11-01
+
+A review of the current-development implementation found that checking only `sourceAssetId` could miss the same source bytes being registered under a different ID in a different role. The validator now also compares lowercase exact SHA-256 values:
+
+- Candidate fit-source references must be unique by asset ID **and** SHA-256, and must still match a declared `image` or `uls` source record by exact ID, hash and role.
+- Held-out checkpoint sources must differ from every candidate fit input by both `sourceAssetId` and `sourceSha256`. A copied/aliased file under a second role cannot make a held-out source appear independent.
+- Added regressions for a survey asset that aliases the exact bytes of an image fit input under a different asset ID, duplicate fit bytes under different IDs, and duplicate checkpoint IDs in an otherwise six-point fixture.
+
+The prior exact-head validation on `fbdcdedb4c0d7e23a01d0064430697c03b602a5e` passed Full CI [#41315017462](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41315017462) (**178/178**) and the dedicated BRF-35 workflow [#41315017373](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41315017373) (**8/8**). Those runs predate this byte-level follow-up. The new code/test/documentation head must pass its own exact-head CI before this hardening is considered validated.
+
+This remains a completeness gate, not evidence that an independent curator actually kept real observations out of fitting. The real candidate stays blocked and every release flag remains false.
