@@ -141,7 +141,32 @@ async function writeCatalogAtomically(manifestPath, catalog) {
 }
 
 
-async function acquireCatalogPublishLock(catalogDir) {
+
+async function ensurePublicCatalogDirectory(outputRoot) {
+  let current = outputRoot;
+  for (const segment of ["public", "models", "generated"]) {
+    const next = path.join(current, segment);
+    try {
+      const info = await lstat(next);
+      if (info.isSymbolicLink() || !info.isDirectory()) {
+        throw new TypeError("Public catalog path components must be real directories.");
+      }
+    } catch (error) {
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+      await mkdir(next, { mode: 0o755 });
+      const info = await lstat(next);
+      if (info.isSymbolicLink() || !info.isDirectory()) {
+        throw new TypeError("Public catalog path components must be real directories.");
+      }
+    }
+    current = await realpath(next);
+    assertInside(outputRoot, current, "public catalog directory");
+  }
+  return current;
+}
+\nasync function acquireCatalogPublishLock(catalogDir) {
   const lockDir = path.join(catalogDir, ".publish.lock");
   const ownerPath = path.join(lockDir, "owner");
   const ownerToken = randomUUID();
@@ -210,13 +235,16 @@ export async function publishReviewedBuildingModel({
   const outputRoot = await realpath(path.resolve(publicRoot));
   const outputRootInfo = await stat(outputRoot);
   if (!outputRootInfo.isDirectory()) throw new TypeError("publicRoot must be an existing application directory.");
-  const catalogDir = path.join(outputRoot, "public", "models", "generated");
-  await mkdir(catalogDir, { recursive: true });
+  const catalogDir = await ensurePublicCatalogDirectory(outputRoot);
   const releaseCatalogLock = await acquireCatalogPublishLock(catalogDir);
   try {
   const manifestPath = path.join(catalogDir, "manifest.json");
   let catalog = { schemaVersion: PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, models: [] };
   try {
+    const manifestInfo = await lstat(manifestPath);
+    if (manifestInfo.isSymbolicLink() || !manifestInfo.isFile()) {
+      throw new TypeError("Existing published model manifest must be a regular non-symlink file.");
+    }
     catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
