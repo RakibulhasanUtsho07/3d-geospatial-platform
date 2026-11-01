@@ -126,3 +126,11 @@ Edit the generated multiview-human-review-decision-template.json only after insp
     python3 scripts/brf21_human_review.py validate --artifact-root path/to/brf-14-artifacts --decision review-decision.json
 
 The artifact root must contain the unchanged brf-14-multiview-source.json, multiview-source-byte-verification.json, multiview-review-manifest.json, pairwise-overlap-report.json, multiview-contact-sheet.png, camera-angle-coverage.png and pairwise-overlap-graph.png. The commands reject modified/stale inputs, unknown views/pairs, path traversal, symlink inputs, missing review fields and attempts to enable release flags. A pending template is not a valid completed review. A complete record only confirms schema and evidence binding; it does not authenticate the reviewer, legal rights or accuracy, and it does not execute COLMAP or publish a GLB. The real sample remains pending human review and independent survey/checkpoint evidence.
+
+## Integration addendum — 2026-11-01
+
+BRF-14 revision pinning was retargeted from the previous `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` base to current `development@f7b2a67fcf0c34623196fa92e719640086e2adce` after BRF-47 was merged.
+
+The exact-head validation recorded above belongs to PR head `3897523a88bd6a868e90deef0339aa0c985ca3e5` on the prior base. It is useful byte-integrity evidence, but the current-base PR must receive fresh exact-head Full CI and BRF-14/BRF-45 intake checks before promotion.
+
+The retarget does not change the pinned Hugging Face data revision, selected image SHA-256 values, source-declared imagery license status, or any release flag. Rights remain source-declared/pending independent authority review; the reference model and any derived output are outside the imagery-only licence statement.
