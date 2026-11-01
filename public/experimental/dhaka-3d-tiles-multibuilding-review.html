@@ -16,6 +16,7 @@
     p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: #b4c2d4; }
     #review-status { margin-top: 8px; font-size: 12px; color: #a7f3d0; overflow-wrap: anywhere; }
     #height-provenance { margin-top: 7px; color: #cbd5e1; }
+    #architecture-provenance { margin-top: 7px; color: #cbd5e1; }
     #review-result { display: none; }
   </style>
   <script>window.CESIUM_BASE_URL = "/cesium/";</script>
@@ -27,6 +28,7 @@
     <p>The camera visits two separated Dhaka footprint targets. This page records child-content requests and runtime tile events; it does not certify real building height or architectural accuracy.</p>
     <div id="review-status" role="status">Verifying package manifest…</div>
     <p id="height-provenance">Checking per-feature height provenance…</p>
+    <p id="architecture-provenance">Checking source roof/facade/part metadata…</p>
   </header>
   <div id="review-map" aria-label="Experimental multi-building 3D Tiles review"></div>
   <pre id="review-result" aria-hidden="true"></pre>
@@ -38,6 +40,7 @@
     const BUILD_URL = PACKAGE_ROOT + "build-manifest.json";
     const statusNode = document.getElementById("review-status");
     const heightNode = document.getElementById("height-provenance");
+    const architectureNode = document.getElementById("architecture-provenance");
     const resultNode = document.getElementById("review-result");
 
     function setStatus(status, message) {
@@ -166,6 +169,36 @@
         .join(" · ");
       return "Per-feature heights: " + labels +
         ". Heights are source attributes or labelled estimates, not independent survey truth.";
+    }
+
+    function summarizeArchitectureEvidence(build) {
+      const summary = build.configuration?.architectureEvidenceSummary;
+      const tiles = build.tiles;
+      if (!summary || summary.schema !== "overture-buildings-2.0.0" ||
+          summary.tileCount !== tiles.length ||
+          summary.geometryCompleteness !== "footprint-extrusion-only" ||
+          summary.renderedArchitecturalDetailCount !== 0 ||
+          !summary.fieldAvailability || typeof summary.fieldAvailability !== "object") {
+        throw new Error("The package has no valid Overture architecture-evidence summary.");
+      }
+      for (const [fieldName, counts] of Object.entries(summary.fieldAvailability)) {
+        if (!counts || !["source", "absent", "invalid", "missing-evidence"].every((key) =>
+          Number.isSafeInteger(counts[key]) && counts[key] >= 0) ||
+          counts.source + counts.absent + counts.invalid + counts["missing-evidence"] !== tiles.length) {
+          throw new Error("Architecture metadata field coverage does not match tile count: " + fieldName);
+        }
+      }
+      return summary;
+    }
+
+    function describeArchitectureEvidence(summary) {
+      const roof = summary.fieldAvailability["roof.shape"];
+      const facade = summary.fieldAvailability["facade.material"];
+      const parentParts = summary.compositionStatusCounts["parent-declares-associated-parts"] ?? 0;
+      return "Source metadata: roof shape " + roof.source + "/" + summary.tileCount +
+        " · facade material " + facade.source + "/" + summary.tileCount +
+        " · parents declaring parts " + parentParts +
+        ". Geometry: footprint extrusion only; rendered architectural details: 0.";
     }
 
     function centerOf(bounds) {
@@ -314,6 +347,8 @@
       heightNode.textContent = describeHeightEvidence(heightEvidence) +
         " Ground/vertical datum: " + heightEvidence.groundElevationStatus +
         "; absolute elevation is not survey-verified.";
+      const architectureEvidenceSummary = summarizeArchitectureEvidence(build);
+      architectureNode.textContent = describeArchitectureEvidence(architectureEvidenceSummary);
       const pair = chooseSeparatedTargets(build.tiles);
       const firstTarget = { tile: pair.first, center: pair.firstCenter };
       const secondTarget = { tile: pair.second, center: pair.secondCenter };
@@ -417,6 +452,7 @@
           tilesLoadedAtCapture: tilesetRuntime.tilesLoaded === true
         },
         heightEvidence,
+        architectureEvidenceSummary,
         limitations: [
           heightEvidence.policy === "per-feature-provenance"
             ? "Per-feature height values are Overture source attributes, floor estimates or fallback estimates; none is independent survey truth."
