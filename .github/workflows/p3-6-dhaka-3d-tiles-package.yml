@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - feat/p3-6-multibuilding-tiles-package
+      - feat/p3-7-building-composition-evidence-20261102
   pull_request:
     branches:
       - development
+      - feat/p3-6-multibuilding-tiles-package
     paths:
       - "scripts/build-dhaka-3d-tiles-package.mjs"
       - "scripts/verify-dhaka-3d-tiles-package.mjs"
