@@ -310,3 +310,24 @@ Remaining:
 Canonical D3M numbering: D3M-00 is the execution baseline / BRF-05/06 visual-review integration; D3M-01.A–G is the source-bound evidence and trusted-review chain; D3M-02 is approved-job map publication; D3M-03 is map-side intake/job tracking; D3M-04 is TripoSR/rembg cache readiness; D3M-05 is the offline real-inference smoke contract; D3M-06 binds reviewed placement; D3M-07 is the scoped non-inference worker preflight. Use this mapping in continuation work instead of the stale mapping from older plan text.
 
 Do not confuse CI success with deployment or accuracy acceptance. Real worker-host preflight/inference, source and model-weight permissions, production operator/publisher credentials, a production trusted reviewer registry, independent metric/survey/vertical-datum truth, human GLB review, and deployed map reload/rollback remain external gates. Keep all ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags false.
+
+
+## 2026-11-02 — final CI status correction after exact-head recheck
+
+This correction supersedes the older sentence above that stated D3M-01.C–G all had PR + Push CI success. Live GitHub status shows:
+
+| PR | Latest checked head | PR CI | Push CI |
+|---:|---|---|---|
+| #281 | `daa02d5aa0d7c7ba4c0de6860fe1678160682998` | success | success |
+| #284 | `cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc` | success | success |
+| #286 | `310eba45a4b57444009651d1d5e0371a79bb6a8f` | success | success |
+| #288 | `5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5` | success | success |
+| #290 | `236c02b54a353780baa360d9833058c2bab8264c` | in progress | in progress |
+| #292 | `54d4c6d040726bc0cf8edda34e97f3f185877e87` | in progress | in progress |
+| #312 | `2bcb5490a46fe7229927b5fbaf186444ee8dd8d1` | in progress | in progress |
+
+The in-progress jobs were at “Verify viewport API against the production server” (30-minute step timeout). This check starts two local production servers and exercises the actual built map viewport endpoint. Keep it enabled. Do not report CI success until the exact-head runs finish with success. Previous green runs on superseded hashes are not valid substitutes.
+
+The current D3M-01 branch ancestry remains synchronized (0 commits behind at each parent-child boundary), and D3M-02→D3M-07 code heads previously passed exact-head PR and Push CI. However, the latest documentation commit changed D3M-07 PR #312 to the head above, so that new head needs fresh exact-head CI too.
+
+**Remaining exact-head checks:** #290 PR/Push, #292 PR/Push, and #312 PR/Push. All associated feature PRs remain Draft; no code promotion to `development` or `main` was performed. Real worker-host smoke/inference, source/model rights, production reviewer/operator/publisher provisioning, survey/vertical datum, held-out accuracy, human GLB review and deployed map reload/rollback remain external gates. All release/approval flags stay false.
