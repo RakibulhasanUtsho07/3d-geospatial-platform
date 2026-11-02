@@ -36,3 +36,12 @@ The first passing P3.4 exact-head PR Full CI and Push CI runs confirmed the resp
 A manifest binds the captures to `GITHUB_SHA` and records their purpose and limitations. CI uploads them as `p3-4-map-panel-occlusion-visual-evidence`. The images use deterministic API fixtures and transparent tile stubs; they are evidence of panel placement and unobstructed canvas area only, not live imagery, building fidelity, or a diagnosis of the red imagery anomaly.
 
 The screenshot-enabled head requires fresh exact-head PR Full CI and Push CI. Human visual inspection remains a separate acceptance activity; the screenshots do not self-approve the layout.
+
+
+## Follow-up: real-Dhaka imagery anomaly diagnostics
+
+A separate diagnostic slice is now included in the P3.4 candidate. It records bounded, URL-redacted Cesium OSM imagery-provider errors and exposes a development-only readiness probe. The real-Dhaka benchmark waits for stable imagery for at least 750 ms, captures the Cesium canvas separately from the page screenshot, calculates a saturated-red pixel signal and flags an isolated outlier relative to the six cold/warm samples.
+
+A flagged sample is a request for human review, not proof of a bad raster tile and not a reason to hide or mask a layer. The original `cold-01` outlier remains unresolved until a fresh real-Dhaka artifact is inspected and, if necessary, fixed-camera layer isolation identifies its producing layer. The current P3.4 branch now triggers that capture workflow on pushes.
+
+The feature remains Draft/unmerged. Automated diagnostics do not establish the anomaly root cause, general map visual fidelity, or surveyed building accuracy.

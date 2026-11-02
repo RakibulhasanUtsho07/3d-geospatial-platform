@@ -112,7 +112,8 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Refined baseline artifact [run #40170572692](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40170572692) on SHA `2b93cb4d7f51cb09f726fe958cdcf974e763ce73`: 3/3 cold and 3/3 warm; 3,000 buildings staged and 478 offline road entities rendered in every sample; no upstream road attempts or pending road requests. Dataset hashes and six screenshot hashes are embedded in the report.
 - [x] Visual review recorded the defects above. The report says `gitWorkingTreeDirty: true` because the benchmark starts the app through `predev` build hooks; the exact post-build changed-file list is not preserved by this report, so treat the capture as a measured candidate and keep that reproducibility caveat visible.
 - [x] Focused/full source-branch CI [run #40170572728](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40170572728) passed 118/118 checks. The capture workflow and strict acceptance validator passed on the same candidate SHA.
-- [ ] P3.4 visual-quality correction: fix/review the side-panel map occlusion and investigate the red imagery/overlay anomaly; improve building/roof detail only where source evidence supports it. Re-run comparable baseline after changes.
+- [x] P3.4 default side-panel occlusion correction implemented and reviewed on PR #320 exact head `49229ca0c543478c0c961fce7574cc1bafb9e52f`; PR Full CI #41478233661 and Push CI #41478223420 passed, and desktop/mobile layout screenshots were inspected. These fixture screenshots validate panel placement only.
+- [ ] P3.4 red imagery/overlay anomaly root cause and visual correction remain open. The new diagnostics port is measurement/containment only; rerun the six-sample real-Dhaka baseline and inspect every screenshot before closing.
 - [ ] Phase 2 onward: remaining implementation phases above.
 - [x] P3.3 candidate correction and deterministic 13-view QA workflow added on `rakibul-hasan`; render workflow [run #40174015784](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40174015784) passed build, heritage-model tests, geometry/texture report generation, Blender rendering, contact-sheet creation, and SHA-256 recording. Candidate model SHA-256: `689b3fb6b1aa28a8649f34317aa539439e4e6b9d40db5db9625e5e673213e17e`; render manifest SHA-256: `d49f0acb3556895f189924bd9f64c25302c7f6e84aada984e2d9cccbacb9dd13`. The artifact has 13 unique PNGs whose hashes match the manifest.
 - [x] Exact latest PR-head CI passed on `5ccaa5883b3b76104b12d05df1b9a8657d168c9f`: [push CI #40174491755](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40174491755) and [PR CI #40174494505](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40174494505). These passes establish code/automation checks, not real-world model accuracy.
@@ -157,3 +158,15 @@ The first P3.4 CI attempt exposed a timing-sensitive P2.6 dynamic-workload asser
 ### P3.4 visual-review evidence follow-up — screenshot export
 
 The browser layout regression now exports desktop (1440×900) and mobile (390×844) default-state screenshots plus a SHA-bound manifest to the `p3-4-map-panel-occlusion-visual-evidence` CI artifact. These captures use deterministic browser-test API fixtures and transparent tile stubs; they support panel-placement review only and do not prove live map imagery or building accuracy. The screenshot-enabled commit must pass fresh exact-head PR Full CI and Push CI, then receive human visual review before P3.4 is accepted.
+
+
+## P3.4.5 — Real-Dhaka imagery anomaly diagnostics (2026-11-02)
+
+- [x] Port Cesium OSM imagery-provider error telemetry with URL/query redaction, bounded recent records, monotonic totals, tile coordinates/retry metadata and explicit listener teardown.
+- [x] Expose a development-only Cesium render-readiness probe and require loaded imagery to remain stable for at least 750 ms before baseline screenshots.
+- [x] Capture a canvas-only saturated-red pixel signal and flag outliers against the six cold/warm peer samples as **manual-review required**. The signal cannot identify the producing layer and is not an automatic pass/fail classifier.
+- [x] Add strict validator and unit-test coverage for readiness, malformed/bounded diagnostics, redaction, image-signal validity and review-required outlier status.
+- [x] Trigger the real-Dhaka six-sample workflow on the current P3.4 feature branch so fresh source-bound evidence can be produced alongside Full CI.
+- [ ] Re-run the six-sample real-Dhaka baseline on the exact current P3.4 head and inspect all six page screenshots, canvas-only images/signals, provider errors and tile retry details.
+- [ ] If a red outlier recurs with zero provider errors, perform fixed-camera layer-isolation captures before changing raster imagery, roads or building rendering.
+- [ ] Keep PR #320 Draft and do not promote to `development` or `main` until the refreshed real-data capture and human visual review are recorded.
