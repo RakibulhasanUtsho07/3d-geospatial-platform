@@ -170,6 +170,6 @@ export function authorizeGenerationOperatorRequest(request, env = process.env) {
   }
   const bearer = authorizeGenerationApiRequest(request, env);
   if (bearer.allowed) return bearer;
-  if (bearer.status === 503 && session.status === 401) return bearer;
-  return session.status === 503 ? session : bearer;
+  if (bearer.status === 503) return session.status === 503 ? bearer : session;
+  return bearer;
 }
