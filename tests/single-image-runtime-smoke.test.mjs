@@ -279,6 +279,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(JSON.stringify(saved).includes(root), false);
   const fileStat = await stat(result.reportPath);
   assert.equal(fileStat.mode & 0o777, 0o600);
+  const evidenceDirectoryStat = await stat(path.dirname(result.reportPath));
+  if (process.platform !== "win32") assert.equal(evidenceDirectoryStat.mode & 0o777, 0o700);
   assert.equal(saved.networkPolicy.pythonSocketConnectionsBlocked, true);
   assert.equal(saved.networkPolicy.kernelNetworkIsolation, "not-enforced-by-this-command");
 
