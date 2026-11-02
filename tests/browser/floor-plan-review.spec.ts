@@ -104,6 +104,43 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
   await page.getByRole("button", { name: "Reject line", exact: true }).click();
   await page.getByPlaceholder("Why is this not a wall?").fill("False line from a dimension annotation.");
 
+  // Openings must be visible at their wall-relative positions, and overlap is blocked immediately.
+  await page.getByRole("button", { name: /line-0002/ }).click();
+  await page.getByRole("button", { name: "Accept as wall", exact: true }).click();
+  await page.getByLabel("Opening type").selectOption("door");
+  await page.getByLabel("Offset along wall (px)").fill("50");
+  await page.getByLabel("Width (px)").fill("30");
+  await page.getByLabel("Opening height (m)").fill("2.1");
+  await page.getByLabel("Sill height (m)").fill("0");
+  await page.getByRole("button", { name: "Add reviewed opening", exact: true }).click();
+  const doorMarker = page.getByTestId("opening-marker-opening-2-1");
+  const doorSegment = page.getByTestId("opening-segment-opening-2-1");
+  await expect(doorMarker).toBeVisible();
+  await expect(doorSegment).toHaveAttribute("x1", "300");
+  await expect(doorSegment).toHaveAttribute("y1", "150");
+  await expect(doorSegment).toHaveAttribute("x2", "300");
+  await expect(doorSegment).toHaveAttribute("y2", "180");
+
+  await page.getByLabel("Offset along wall (px)").fill("60");
+  await page.getByLabel("Width (px)").fill("30");
+  await page.getByLabel("Opening height (m)").fill("2.1");
+  await page.getByLabel("Sill height (m)").fill("0");
+  await page.getByRole("button", { name: "Add reviewed opening", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("Opening overlaps another opening on this wall.");
+  await expect(doorMarker).toBeVisible();
+
+  await page.getByLabel("Opening type").selectOption("window");
+  await page.getByLabel("Offset along wall (px)").fill("100");
+  await page.getByLabel("Width (px)").fill("30");
+  await page.getByLabel("Opening height (m)").fill("1.2");
+  await page.getByLabel("Sill height (m)").fill("0.8");
+  await page.getByRole("button", { name: "Add reviewed opening", exact: true }).click();
+  const windowSegment = page.getByTestId("opening-segment-opening-2-2");
+  await expect(windowSegment).toHaveAttribute("x1", "300");
+  await expect(windowSegment).toHaveAttribute("y1", "200");
+  await expect(windowSegment).toHaveAttribute("x2", "300");
+  await expect(windowSegment).toHaveAttribute("y2", "230");
+
   await page.getByRole("button", { name: "Draw room", exact: true }).click();
   await page.getByLabel("Room ID").fill("room-demo");
   await page.getByLabel("Room name").fill("Reviewed room");
@@ -148,6 +185,9 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
     reason: "False line from a dimension annotation.",
   });
   expect(payload.walls).toHaveLength(4);
+  const eastWall = payload.walls.find((wall: { id: string }) => wall.id === "wall-2");
+  expect(eastWall.openings).toHaveLength(2);
+  expect(eastWall.openings.map((opening: { type: string }) => opening.type)).toEqual(["door", "window"]);
   expect(payload.rooms).toHaveLength(1);
   expect(payload.rooms[0].reviewed).toBe(true);
   expect(apiRequests).toEqual([]);
