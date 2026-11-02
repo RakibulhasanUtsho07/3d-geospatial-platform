@@ -162,8 +162,10 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       !HASH.test(report.source.sha256 ?? "")) {
     throw new TypeError("Smoke report source evidence is invalid.");
   }
-  if (report.model?.licenceReview !== "operator-attested-not-independently-verified") {
-    throw new TypeError("Smoke report is missing the model-licence review attestation.");
+  if (report.model?.licenceReview !== "operator-attested-not-independently-verified" ||
+      typeof report.model.triposrLicenceReview !== "string" || !report.model.triposrLicenceReview.trim() ||
+      typeof report.model.rembgLicenceReview !== "string" || !report.model.rembgLicenceReview.trim()) {
+    throw new TypeError("Smoke report is missing the separate TripoSR/rembg model-licence review basis.");
   }
   if (!report.output || !HASH.test(report.output.sha256 ?? "") ||
       !Number.isSafeInteger(report.output.bytes) || report.output.bytes <= 0) {
