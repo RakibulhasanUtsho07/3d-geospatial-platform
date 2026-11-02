@@ -397,7 +397,7 @@ test("requires four independent operator confirmations", async (t) => {
   );
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, { triposrLicenceReview: "" })),
-    /TripoSR code/checkpoint licence review/,
+    /TripoSR code\/checkpoint licence review/,
   );
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, { rembgLicenceReview: "" })),
