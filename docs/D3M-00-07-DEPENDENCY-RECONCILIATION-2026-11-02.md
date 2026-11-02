@@ -331,3 +331,21 @@ Do not substitute a prior-head green run for any of the in-progress checks. All 
 - Keep groundTruth, acceptanceEligible, publicationEligible, publishable, mapReady, automaticApproval and worker dispatch/publication authorization false.
 
 **Conclusion:** branch ancestry and CI event coverage are now reconciled at the listed SHAs. The D3M-01 child PR checks still in progress at this checkpoint must reach terminal success before that stack can be called CI-complete; real-worker and real-building acceptance gates remain open.
+
+
+## 14. Latest terminal-status correction — 2026-11-02
+
+This section supersedes the status table in §13.2 where runs have since reached a newer terminal state, and supersedes any older reference to the D3M-07 code-only head as the current PR head.
+
+- D3M-01.A/B PR #281 on `daa02d5aa0d7c7ba4c0de6860fe1678160682998`: Push #41461160231 and PR #41461174767 both **success**.
+- D3M-01.C PR #284 on `cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc`: Push #41461401395 and PR #41461409064 both **success**.
+- D3M-01.D PR #286 on `310eba45a4b57444009651d1d5e0371a79bb6a8f`: Push #41461920651 and PR #41461924513 both **success**.
+- D3M-01.E PR #288 on `5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5`: Push #41462360896 and PR #41462368236 both **success**.
+- D3M-01.F PR #290 on `236c02b54a353780baa360d9833058c2bab8264c`: Push #41462663993 and PR #41462671163 were still **in progress** at last live inspection. Both jobs were inside the 30-minute “Verify viewport API against the production server” step; no pass is claimed.
+- D3M-01.G PR #292 on `54d4c6d040726bc0cf8edda34e97f3f185877e87`: Push #41462774252 and PR #41462785232 were still **in progress** at last live inspection, at the same viewport verification step; no pass is claimed.
+- D3M-07 PR #312 has since advanced due to documentation updates. Its current head at this check was `2bcb5490a46fe7229927b5fbaf186444ee8dd8d1`, not the earlier code head `761f6e01...`. Current-head Push #41463110850 and PR #41463119697 were **in progress** at the same viewport verification step. The earlier `761f6e01...` green runs do not validate this later documentation head.
+- The viewport verification step is intentionally retained in Full CI. It starts two separate production Next.js processes and exercises the real built viewport API. Do not remove or skip it just to obtain a green status. If it reaches its 30-minute timeout, inspect the captured primary/repeat server logs and fix the underlying test/runtime issue.
+
+The D3M-01 ancestry remains 0-behind for every parent/child pair at the SHAs in §13.1. No feature PR was promoted or merged into `development`/ `main`; only branch-to-branch sync commits were applied. The working code paths remain Draft.
+
+**Remaining completion gate:** obtain terminal-success exact-head PR and Push CI for #290, #292 and the newest #312 documentation head. Then re-check the PR heads have not moved, re-run the 0-behind ancestry comparisons, and update this audit again. Real worker-host inference, licensed source/model use, production reviewer provisioning, independent survey/accuracy review and map publication/rollback remain separate external gates.
