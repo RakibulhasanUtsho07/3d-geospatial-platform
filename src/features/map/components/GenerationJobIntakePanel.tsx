@@ -169,6 +169,12 @@ export default function GenerationJobIntakePanel() {
           timer = null;
           return;
         }
+        if (jobResponse.status === 404) {
+          if (alive) setStatusError("Generation job was not found. Check the exact job ID.");
+          if (timer) clearInterval(timer);
+          timer = null;
+          return;
+        }
         const [jobPayload, workerPayload] = await Promise.all([
           responseObject(jobResponse),
           responseObject(workerResponse),
@@ -567,7 +573,7 @@ export default function GenerationJobIntakePanel() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="block text-xs font-medium text-zinc-300">
-              Licence / permission basis
+              Licence / permission basis (applies to every selected image)
               <input value={licence} onChange={(event) => setLicence(event.target.value)} required maxLength={300} placeholder="e.g. CC BY 4.0 / owner permission" className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60" />
             </label>
             <label className="block text-xs font-medium text-zinc-300">
@@ -579,6 +585,7 @@ export default function GenerationJobIntakePanel() {
               <input value={attribution} onChange={(event) => setAttribution(event.target.value)} maxLength={500} className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60" />
             </label>
           </div>
+          <p className="text-[11px] leading-5 text-zinc-500">Use this batch only when the same permission/licence basis applies to every selected image. Split mixed-rights material into separate jobs.</p>
 
           <label className="block text-xs font-medium text-zinc-300">
             Generation strategy
