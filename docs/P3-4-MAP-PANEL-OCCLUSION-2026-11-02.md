@@ -19,7 +19,7 @@ The map canvas had multiple panels mounted open over it at the same time: the pr
 
 ## Validation status
 
-This is an implementation candidate. Exact-head Full CI, Push CI, and the browser viewport assertions must complete successfully before this work is considered validated. No map imagery provider or red-tile behavior was changed: the reported red imagery/overlay anomaly still requires a separate evidence-led investigation and must not be claimed fixed by this layout change.
+This is an implementation candidate. Exact-head Full CI, Push CI, and the browser viewport assertions must complete successfully before this work is considered validated. The dynamic viewport workload now waits for the initial building stage to settle and then deliberately holds a fresh viewport response while a second production camera intent is delivered through the benchmark-only camera hook; it verifies the manager's AbortController event and the browser-observed AbortError. This avoids relying on timing-sensitive zoom coalescing to prove cancellation. No map imagery provider or red-tile behavior was changed: the reported red imagery/overlay anomaly still requires a separate evidence-led investigation and must not be claimed fixed by this layout change.
 
 ## Non-goals and remaining P3.4 evidence
 
