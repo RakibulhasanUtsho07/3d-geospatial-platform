@@ -8,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { runSingleImageRuntimeSmoke } from "../src/core/building-generation/single-image-runtime-smoke.mjs";
+import { verifySingleImageRuntimeSmoke } from "../src/core/building-generation/verify-single-image-runtime-smoke.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 
@@ -242,6 +243,15 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(JSON.stringify(saved).includes(root), false);
   const fileStat = await stat(result.reportPath);
   assert.equal(fileStat.mode & 0o777, 0o600);
+  assert.equal(saved.networkPolicy.pythonSocketConnectionsBlocked, true);
+  assert.equal(saved.networkPolicy.kernelNetworkIsolation, "not-enforced-by-this-command");
+
+  const verified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(verified.verified, true);
+  assert.equal(verified.source.sha256, source.sha256);
+  assert.equal(verified.model.sha256, result.report.output.sha256);
+  assert.equal(verified.mapReady, false);
+  assert.equal(verified.publicationEligible, false);
 });
 
 test("blocks before workflow execution when rembg cache is missing", async (t) => {
@@ -376,5 +386,50 @@ test("refuses to overwrite an existing smoke evidence record", async (t) => {
       runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
     })),
     /already exists|EEXIST/,
+  );
+});
+
+
+test("independent verifier detects a source file changed after the smoke report was written", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  assert.equal(result.report.status, "passed");
+
+  await writeFile(path.join(root, ...source.relativePath.split("/")), Buffer.from("changed source"));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /source image signature, byte count or SHA-256/i,
+  );
+});
+
+test("independent verifier detects a GLB changed after the smoke report was written", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  const outputPath = path.join(root, ...result.report.output.relativePath.split("/"));
+  await writeFile(outputPath, Buffer.from("not the original GLB"));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /Smoke GLB is not a valid GLB 2.0 binary|GLB byte count/i,
+  );
+});
+
+test("independent verifier refuses a report that enables a release flag", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  const report = JSON.parse(await readFile(result.reportPath, "utf8"));
+  report.mapReady = true;
+  await writeFile(result.reportPath, JSON.stringify(report, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /fail-closed publication contract/i,
   );
 });
