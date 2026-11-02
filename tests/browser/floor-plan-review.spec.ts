@@ -175,6 +175,8 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
   await page.getByLabel("Origin height (m)").fill("3.5");
   await page.getByLabel("Heading (degrees)").fill("0");
   await page.getByLabel("Level elevation (m)").fill("0");
+  await expect(page.getByLabel("Wall height override (m)")).toHaveAttribute("placeholder", "Use level height");
+  await expect(page.getByLabel("Wall thickness override (m)")).toHaveAttribute("placeholder", "Use level thickness");
   await page.getByLabel("Wall height (m)").fill("3");
   await page.getByLabel("Wall thickness (m)").fill("0.15");
   await page.getByLabel("Floor thickness (m)").fill("0.12");

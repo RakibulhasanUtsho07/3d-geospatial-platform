@@ -476,8 +476,8 @@ export default function FloorPlanReviewPage() {
                   </div>
                   <label className="block text-sm font-medium">Correction reason (needed if moved over 25 px)<textarea className={field} rows={2} value={selectedReview.correctionReason} onChange={(e) => updateSelected({ correctionReason: e.target.value })} placeholder="Explain substantial endpoint changes." /></label>
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="text-sm font-medium">Wall height (m)<input className={field} type="number" min="2" max="8" step="0.01" value={selectedReview.heightM} onChange={(e) => updateSelected({ heightM: e.target.value })} placeholder="Use level height" /></label>
-                    <label className="text-sm font-medium">Wall thickness (m)<input className={field} type="number" min="0.05" max="0.75" step="0.01" value={selectedReview.thicknessM} onChange={(e) => updateSelected({ thicknessM: e.target.value })} placeholder="Use level thickness" /></label>
+                    <label className="text-sm font-medium">Wall height override (m)<input className={field} type="number" min="2" max="8" step="0.01" value={selectedReview.heightM} onChange={(e) => updateSelected({ heightM: e.target.value })} placeholder="Use level height" /></label>
+                    <label className="text-sm font-medium">Wall thickness override (m)<input className={field} type="number" min="0.05" max="0.75" step="0.01" value={selectedReview.thicknessM} onChange={(e) => updateSelected({ thicknessM: e.target.value })} placeholder="Use level thickness" /></label>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-3">
                     <h3 className="text-sm font-semibold">Doors and windows</h3>
