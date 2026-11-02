@@ -194,3 +194,24 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Run and record Full CI against the final D3M-04 exact head; keep PR #306 Draft until exact-head checks and independent review pass.
 - **Important licensing limit:** rembg package licensing is separate from model-weight licensing. Current upstream rembg documentation identifies `bria-rmbg` as its default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Deployment must deliberately choose a model and verify applicable rights before commercial use.
 - **No accuracy claim:** readiness does not prove that a real TripoSR run succeeds, that the output matches a building, that scale/georeferencing is correct, or that the candidate is map-ready. Release flags remain fail-closed.
+
+
+## D3M-05 — Offline single-image runtime smoke (implementation candidate)
+
+**Tracking issue:** [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307)  
+**Dependency:** D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Implementation branch:** `feat/d3m05-single-image-runtime-smoke-20261102`  
+**Runbook:** [D3M-05 Single-image Runtime Smoke](D3M-05-SINGLE-IMAGE-RUNTIME-SMOKE.md)
+
+- [x] Added an operator-invoked CLI and orchestration wrapper that reuses the same `runMediaToModelWorkflow` path as the durable queue worker; no second TripoSR inference implementation was added.
+- [x] Require three separate operator confirmations: selected source rights, single-view inference and TripoSR/rembg model-licence review.
+- [x] Re-run D3M-04 readiness immediately before workflow execution; missing/unknown TripoSR or rembg weights block before inference.
+- [x] Add offline Hugging Face/Transformers flags and a temporary Python `sitecustomize.py` socket guard for the probe/inference subprocesses. This is application-level Python socket blocking, not kernel/OS network isolation; the runbook explicitly requires host/network isolation when strict no-egress is required.
+- [x] Bind the private smoke evidence to the exact source SHA-256, workflow/job/building IDs, model ID/device/resolution, GLB SHA-256/bytes/mesh count and sanitized geometry-QA output. Re-check the source record, private output directory, GLB header and hash chain before a smoke can report pass.
+- [x] Keep `mapReady`, `publicationEligible` and `automaticApproval` false. The report labels the output as an AI-proposed candidate requiring human review.
+- [x] Add fake-workflow contract tests for model-cache blocking, input signatures, offline socket policy, required confirmations, output hash binding, failure sanitization and immutable evidence; add the test command to Full CI.
+- [x] Add the D3M-05 operator runbook, prerequisites, licence cautions, exit codes and review checklist.
+- [ ] Run the focused D3M-05 tests, lint and production build; fix any failures before promoting the branch.
+- [ ] Record exact-head Full CI for the final D3M-05 PR head. Do not treat fixture/fake CI as proof of real inference.
+- [ ] Operator-run one real inference on the provisioned worker host with model licences, source rights, runtime/device and local cache checked; retain the private smoke report and independently review the GLB.
+- **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. No PR in the D3M-02 → D3M-05 stack is merged by this milestone.
