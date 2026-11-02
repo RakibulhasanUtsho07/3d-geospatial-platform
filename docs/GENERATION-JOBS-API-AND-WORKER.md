@@ -133,7 +133,7 @@ $env:BUILDING_ENGINE_WORKSPACE = "E:\\building-engine-workspace"
 node scripts/run-generation-worker.mjs --once
 ```
 
-The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. For single-image AI, the probe also verifies that TripoSR's `config.yaml` and `model.ckpt` are present in the local Hugging Face cache; the worker claims AI jobs only when those files are cached. Jobs for unavailable strategies remain queued without consuming retry attempts. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md) for the cache prefetch command and probe limitations. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
+The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. For single-image AI, the probe also imports ONNX Runtime and rembg, verifies TripoSR's `config.yaml` and `model.ckpt` in the local Hugging Face cache, discovers the installed rembg default session model, and verifies that model's local cache entry through the package resolver. Both model caches must be present before the worker claims AI jobs; unknown model/cache layouts fail closed. These probes do not construct an inference session or download weights. Jobs for unavailable strategies remain queued without consuming retry attempts. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md) for cache preparation and licensing notes. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
 
 ## Local outputs and review
 

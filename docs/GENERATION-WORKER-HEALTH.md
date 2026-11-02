@@ -13,15 +13,23 @@ Startup probes record:
 |---|---|---|
 | Procedural | `ready` | In-process parametric generator; no external ML runtime |
 | Photogrammetry | `ready` / `blocked` | COLMAP executable plus `automatic_reconstructor`, `model_analyzer`, `model_converter`, and `mesh_texturer` help probes |
-| Single-image AI | `ready` / `configured` / `blocked` | TripoSR runner file, Python runner imports, PyTorch import, configured CPU/CUDA/MPS availability, and presence of both `stabilityai/TripoSR` `config.yaml` and `model.ckpt` in the local Hugging Face cache |
+| Single-image AI | `ready` / `configured` / `blocked` | TripoSR runner file, Python/PyTorch/ONNX Runtime/rembg imports, configured CPU/CUDA/MPS availability, both `stabilityai/TripoSR` files in the local Hugging Face cache, and the installed rembg `new_session()` default model in its local cache |
 
-Single-image AI is `ready` only when the runtime/device probe succeeds and both primary TripoSR model files are already cached. It is `configured` when Python/PyTorch/device are available but either model file is missing; the worker will not claim AI jobs in that state. Cache the files with:
+Single-image AI is `ready` only when the runtime/device/package probe succeeds, both primary TripoSR model files are cached, and the installed rembg default model is cached. The probe reads the installed `rembg.new_session()` default model name, resolves its registered session class, and calls that class' read-only `resolve_existing("<model-name>.onnx")` cache lookup. It does not construct a session, initiate a download, or expose a cache path. The installed model name is reported as a safe identifier. Missing or unknown rembg cache state keeps AI jobs unclaimable. Cache the TripoSR files with:
 
 ```bash
 python -c "from huggingface_hub import hf_hub_download; hf_hub_download('stabilityai/TripoSR', 'config.yaml'); hf_hub_download('stabilityai/TripoSR', 'model.ckpt')"
 ```
 
-The cache check uses Hugging Face's local-only `try_to_load_from_cache` helper and makes no network request. Model-cache readiness is not a proof that actual inference will succeed: the TripoSR background-removal model/cache, real CUDA kernels, GPU memory, image preprocessing and end-to-end GLB export are exercised only by a real job. A COLMAP command probe likewise does not prove image overlap, reconstruction quality, GPU acceleration or survey registration. Human review remains mandatory.
+The TripoSR cache check uses Hugging Face's local-only `try_to_load_from_cache` helper. Both TripoSR and rembg readiness checks make no network request. To pre-cache the default rembg model in the same Python environment used by the worker, inspect the installed default model name and initialize that session deliberately:
+
+```bash
+python -c "import inspect; from rembg import new_session; model=inspect.signature(new_session).parameters['model_name'].default; print(model); new_session(model)"
+```
+
+This preparation command may download model weights. Check the effective model's separate licence before using it; the rembg package licence does not grant rights to its model weights. Current rembg documentation identifies `bria-rmbg` as the default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Cache roots follow the installed rembg package's `U2NET_HOME` / `REMBG_HOME` / `XDG_DATA_HOME` settings. See [rembg environment variables and cache layout](https://github.com/danielgatis/rembg#environment-variables) and the [BRIA RMBG 2.0 model terms](https://huggingface.co/briaai/RMBG-2.0).
+
+Model-cache readiness is not proof that inference will succeed: it does not instantiate ONNX Runtime sessions, validate model compatibility, exercise GPU kernels, measure GPU memory, or verify image preprocessing and end-to-end GLB quality. A COLMAP command probe likewise does not prove image overlap, reconstruction quality, GPU acceleration or survey registration. Human review remains mandatory.
 
 The worker claims only compatible strategies. Unsupported jobs remain `queued` and do not consume retry attempts; `auto` maps to the procedural path. Probes run at worker startup, so restart after changing executable, Python, runner, cache or device configuration.
 

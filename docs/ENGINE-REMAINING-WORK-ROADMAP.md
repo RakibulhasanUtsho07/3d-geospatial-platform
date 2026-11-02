@@ -173,8 +173,23 @@ The codebase still needs real-data validation and product-level completion. The 
 - Added retry reuse of exact uploaded-source records while the dialog remains mounted and job/worker status polling with terminal-state stop.
 - Added short-lived HttpOnly operator sessions. A distinct login token is exchanged once for a 30-minute SameSite=Strict cookie; the server-only HMAC signing secret and legacy generation bearer token are never embedded in the browser bundle.
 - Added metric-geometry/strategy helper regression tests and a CI step.
-- [x] Baseline exact-head Full CI passed on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb`: [run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751), 179/179 steps. This validates automated code/build checks, not an actual TripoSR/COLMAP reconstruction, image quality, survey registration or accuracy.
+- [x] Baseline exact-head Full CI passed on `e8860543277132008f2b8641f06d15fee90a6b1d`: [run #41399692306](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41399692306), 179/179 steps. This validates automated code/build checks, not an actual TripoSR/COLMAP reconstruction, image quality, survey registration or accuracy.
 - Added local Hugging Face cache checks for TripoSR `config.yaml` and `model.ckpt`; single-image AI is claimable only when both files are cached. Any commit added after the cited SHA needs its own exact-head checks.
 - D3M-03 remains Draft and depends on D3M-02 PR #302; neither has been merged to development/main.
 - **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. WebP is not a valid selected input for the current single-image AI or COLMAP photogrammetry worker; it is rejected at UI and queue preflight for those strategies. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
 
+
+
+## D3M-04 — TripoSR background-removal runtime readiness
+
+**Tracking issue:** [#305](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/305)  
+**Dependency:** D3M-03 PR #304; implementation is stacked on `feat/d3m03-map-generation-intake-20261102`  
+**Implementation branch:** `feat/d3m04-triposr-background-cache-readiness-20261102`
+
+- [x] Audit confirmed that the worker launches TripoSR without `--no-remove-bg`; upstream TripoSR therefore creates `rembg.new_session()` by default. The effective default model depends on the installed rembg version.
+- [ ] Import ONNX Runtime/rembg during the bounded worker startup probe; identify the installed default rembg model and resolve its local model file without initializing a session or making a network request.
+- [ ] Keep single-image AI unclaimable until both TripoSR weights and the active rembg model weights are cached; unknown package/cache layouts fail closed.
+- [ ] Surface missing/unknown background-removal cache state in the operator panel and persist only sanitized model identifiers/state, never cache paths or process output.
+- [ ] Validate cached/missing/unknown cache states, legacy worker status compatibility, queue non-consumption and exact-head CI.
+- **Important licensing limit:** rembg package licensing is separate from model-weight licensing. Current upstream rembg documentation identifies `bria-rmbg` as its default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Deployment must deliberately choose a model and verify applicable rights before commercial use.
+- **No accuracy claim:** readiness does not prove that a real TripoSR run succeeds, that the output matches a building, that scale/georeferencing is correct, or that the candidate is map-ready. Release flags remain fail-closed.

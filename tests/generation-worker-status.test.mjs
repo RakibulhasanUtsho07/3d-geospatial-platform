@@ -41,7 +41,10 @@ test("writes a bounded running heartbeat and reports active job information", as
       strategies: {
         procedural: { status: "ready", blockers: [], caveats: ["local generator"] },
         photogrammetry: { status: "blocked", blockers: ["COLMAP unavailable"], caveats: [] },
-        "single-image-ai": { status: "configured", blockers: [], caveats: ["weights unchecked"], modelWeights: "missing" },
+        "single-image-ai": {
+          status: "configured", blockers: [], caveats: ["weights unchecked"],
+          modelWeights: "missing", backgroundRemovalWeights: "cached", backgroundRemovalModel: "u2net",
+        },
       },
     },
     now,
@@ -55,6 +58,8 @@ test("writes a bounded running heartbeat and reports active job information", as
   assert.equal(result.capabilities.strategies.procedural.status, "ready");
   assert.equal(result.capabilities.strategies.photogrammetry.status, "blocked");
   assert.equal(result.capabilities.strategies["single-image-ai"].modelWeights, "missing");
+  assert.equal(result.capabilities.strategies["single-image-ai"].backgroundRemovalWeights, "cached");
+  assert.equal(result.capabilities.strategies["single-image-ai"].backgroundRemovalModel, "u2net");
   assert.ok(result.heartbeatAgeMs <= DEFAULT_WORKER_STATUS_STALE_AFTER_MS);
 
   const statusFile = path.join(root, ".building-engine", "generation-queue", "worker-status.json");
