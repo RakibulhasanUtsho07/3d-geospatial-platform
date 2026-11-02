@@ -15,7 +15,7 @@ The command does not introduce a second TripoSR implementation, does not auto-do
 <workspaceRoot>/.building-engine/runtime-smokes/<jobId>.json
 ~~~
 
-A successful result means only that this one input completed one inference/export on the selected host with the recorded settings. Geometry warnings still require review. It is not a representative building benchmark and does not establish architectural accuracy, measured scale, front orientation, surveyed WGS84 placement, vertical datum or release readiness.
+A successful result means only that this one input completed one inference/export on the selected host with the recorded settings. The smoke must observe the TripoSR child process's `spawn` event, and the independent verifier requires both runner-launch evidence flags. A process-spawn event proves that the operating-system process started; it does not by itself prove model quality or architectural accuracy. Geometry warnings still require review. It is not a representative building benchmark and does not establish architectural accuracy, measured scale, front orientation, surveyed WGS84 placement, vertical datum or release readiness.
 
 ## Required host prerequisites
 
@@ -55,8 +55,14 @@ Exit codes:
 | Code | Meaning |
 |---:|---|
 | 0 | One inference/export completed and the output/evidence checks passed. Human review is still required. |
-| 1 | Inference, GLB export or post-run evidence validation failed. |
+| 1 | The TripoSR runner started and generation/export/evidence validation failed, or the workflow failed before the runner process started. The evidence report distinguishes these cases. |
 | 2 | Input/configuration/readiness was blocked; inference did not start, or required operator confirmation was missing. |
+
+## Failure classification
+
+- If source intake, provenance, selected-view checks or another workflow stage fails before TripoSR launch, the report records `inference.status=not-started` and `runnerLaunchAttempted=false`.
+- If the workflow attempts to launch TripoSR but the operating-system process emits an error before the `spawn` event, the report records `inference.status=not-started`, `runnerLaunchAttempted=true` and `runnerProcessStarted=false`.
+- Only after the TripoSR child emits `spawn` can a later workflow/export/evidence failure be recorded as `inference.status=failed`. A passed report and its independent verification both require `runnerLaunchAttempted=true` and `runnerProcessStarted=true`.
 
 ## Offline and data-handling boundaries
 
@@ -100,6 +106,6 @@ The verifier independently reads the report, rejects symlinked/out-of-workspace 
 
 ## Automated test scope
 
-npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
+npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, simulated TripoSR child-process spawn evidence, pre-runner and failed-spawn classification, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
 
-Full CI still needs to pass on the exact final PR head before D3M-05 can be considered validated. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.
+Full CI must pass on the exact current D3M-05 PR head; a green result from an earlier commit does not validate later changes. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.

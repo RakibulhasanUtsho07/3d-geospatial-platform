@@ -141,8 +141,10 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
     throw new TypeError("Smoke report violates the fail-closed publication contract.");
   }
   if (report.inference?.status !== "completed" ||
-      !Number.isFinite(report.inference.durationMs) || report.inference.durationMs < 0) {
-    throw new TypeError("Smoke report does not contain a completed inference record.");
+      !Number.isFinite(report.inference.durationMs) || report.inference.durationMs < 0 ||
+      report.inference.runnerLaunchAttempted !== true ||
+      report.inference.runnerProcessStarted !== true) {
+    throw new TypeError("Smoke report does not contain a completed TripoSR runner launch and inference record.");
   }
   if (report.networkPolicy?.huggingFaceOffline !== true ||
       report.networkPolicy?.transformersOffline !== true ||

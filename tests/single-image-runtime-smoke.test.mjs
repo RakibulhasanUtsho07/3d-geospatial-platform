@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -65,6 +66,21 @@ async function workspace(t) {
   return root;
 }
 
+async function startFakeRunner(options) {
+  const child = options.spawnImpl(
+    options.pythonPath,
+    [options.runnerScript, "--fixture-smoke"],
+    {},
+  );
+  if (!child || typeof child.once !== "function") {
+    throw new TypeError("Fake TripoSR runner must return an EventEmitter child.");
+  }
+  await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("spawn", resolve);
+  });
+}
+
 async function writeInput(root, relativePath = "uploads/front.jpg", bytes = Buffer.from([0xff, 0xd8, 0xff, 0x01, 0x02])) {
   await writeFile(path.join(root, ...relativePath.split("/")), bytes);
   return { relativePath, bytes, sha256: hash(bytes) };
@@ -101,10 +117,7 @@ async function fakeWorkflowResult(options, root, source) {
     "single-image-ai-reconstruction",
   ]);
 
-  options.spawnImpl("python-fixture", ["--version"], {});
-  // The wrapper is tested in its injected spawn implementation below; this fake
-  // workflow validates that the same offline-wrapped spawn reaches model execution.
-  assert.equal(typeof options.spawnImpl, "function");
+  await startFakeRunner(options);
 
   const glb = makeGlb();
   const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
@@ -162,7 +175,11 @@ async function fakeWorkflowResult(options, root, source) {
 }
 
 function makeOptions(root, source, overrides = {}) {
-  const spawnImpl = overrides.spawnImpl ?? ((_executable, _args, options) => ({ fake: true, options }));
+  const spawnImpl = overrides.spawnImpl ?? (() => {
+    const child = new EventEmitter();
+    queueMicrotask(() => child.emit("spawn"));
+    return child;
+  });
   return {
     spawnImpl,
     workspaceRoot: root,
@@ -226,7 +243,9 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
       "    raise SystemExit('Python DNS lookup was not blocked')",
     ].join("\n")], { env: options.env, encoding: "utf8", timeout: 5000 });
     assert.equal(offlineProbe.status, 0, offlineProbe.stderr || offlineProbe.stdout);
-    return { fake: true };
+    const child = new EventEmitter();
+    queueMicrotask(() => child.emit("spawn"));
+    return child;
   };
   let workflowCalls = 0;
 
@@ -241,6 +260,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
+  assert.equal(result.report.inference.runnerLaunchAttempted, true);
+  assert.equal(result.report.inference.runnerProcessStarted, true);
   assert.equal(result.report.readiness.status, "ready");
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
   assert.equal(result.report.source.sha256, source.sha256);
@@ -357,7 +378,8 @@ test("writes a sanitized failure report when actual inference or export fails", 
   const root = await workspace(t);
   const source = await writeInput(root);
   const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
-    runWorkflow: async () => {
+    runWorkflow: async (workflowOptions) => {
+      await startFakeRunner(workflowOptions);
       const error = new Error("private path /srv/models/weights/model.ckpt leaked from runtime");
       error.name = "InferenceFailure";
       throw error;
@@ -372,6 +394,50 @@ test("writes a sanitized failure report when actual inference or export fails", 
   assert.equal(JSON.stringify(result.report).includes("/srv/models"), false);
   assert.equal(result.report.mapReady, false);
   assert.equal(result.report.publicationEligible, false);
+});
+
+test("keeps inference not-started when the workflow fails before launching TripoSR", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async () => {
+      throw new Error("Source provenance validation failed before model generation.");
+    },
+  }));
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.equal(result.report.inference.status, "not-started");
+  assert.equal(result.report.inference.runnerLaunchAttempted, false);
+  assert.equal(result.report.inference.runnerProcessStarted, false);
+  assert.match(result.report.failure.summary, /before attempting to launch.*inference was not started/i);
+});
+
+test("keeps inference not-started when the TripoSR process cannot be spawned", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const runnerPath = path.join(root, "triposr", "run.py");
+  const spawnImpl = (_executable, args) => {
+    const child = new EventEmitter();
+    if (args?.[0] === runnerPath) {
+      queueMicrotask(() => child.emit("error", Object.assign(
+        new Error("fixture executable could not be started"),
+        { code: "ENOENT" },
+      )));
+    }
+    return child;
+  };
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    spawnImpl,
+    runWorkflow: async (workflowOptions) => startFakeRunner(workflowOptions),
+  }));
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.equal(result.report.inference.status, "not-started");
+  assert.equal(result.report.inference.runnerLaunchAttempted, true);
+  assert.equal(result.report.inference.runnerProcessStarted, false);
+  assert.match(result.report.failure.summary, /process never started; inference was not started/i);
 });
 
 test("requires four independent operator confirmations", async (t) => {
@@ -467,6 +533,22 @@ test("independent verifier detects a GLB changed after the smoke report was writ
   await assert.rejects(
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /Smoke GLB is not a valid GLB 2.0 binary|GLB byte count/i,
+  );
+});
+
+test("independent verifier requires evidence that the TripoSR child process actually spawned", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  const report = JSON.parse(await readFile(result.reportPath, "utf8"));
+  report.inference.runnerProcessStarted = false;
+  await writeFile(result.reportPath, JSON.stringify(report, null, 2) + "\n");
+
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /completed TripoSR runner launch and inference record/i,
   );
 });
 

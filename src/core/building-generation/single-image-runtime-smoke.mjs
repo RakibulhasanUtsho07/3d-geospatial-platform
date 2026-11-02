@@ -274,20 +274,37 @@ function qualitySummary(modelQuality) {
   };
 }
 
-function offlineSpawn(spawnImpl, offlinePythonDirectory) {
-  return (executable, args, options = {}) => spawnImpl(executable, args, {
-    ...options,
-    env: {
-      ...process.env,
-      ...(options.env ?? {}),
-      PYTHONPATH: [
-        offlinePythonDirectory,
-        options.env?.PYTHONPATH,
-        process.env.PYTHONPATH,
-      ].filter(Boolean).join(path.delimiter),
-      ...OFFLINE_ENV,
-    },
-  });
+function offlineSpawn(spawnImpl, offlinePythonDirectory, {
+  pythonPath,
+  runnerScript,
+  onRunnerLaunchAttempt,
+  onRunnerProcessStarted,
+} = {}) {
+  return (executable, args, options = {}) => {
+    const isRunnerInvocation = executable === pythonPath &&
+      Array.isArray(args) &&
+      typeof args[0] === "string" &&
+      path.resolve(args[0]) === runnerScript;
+    if (isRunnerInvocation) onRunnerLaunchAttempt?.();
+
+    const child = spawnImpl(executable, args, {
+      ...options,
+      env: {
+        ...process.env,
+        ...(options.env ?? {}),
+        PYTHONPATH: [
+          offlinePythonDirectory,
+          options.env?.PYTHONPATH,
+          process.env.PYTHONPATH,
+        ].filter(Boolean).join(path.delimiter),
+        ...OFFLINE_ENV,
+      },
+    });
+    if (isRunnerInvocation && typeof child?.once === "function") {
+      child.once("spawn", () => onRunnerProcessStarted?.());
+    }
+    return child;
+  };
 }
 
 function readinessBlockers(capabilities) {
@@ -420,7 +437,12 @@ export async function runSingleImageRuntimeSmoke(options) {
       triposrLicenceReview: options.triposrLicenceReview.trim(),
       rembgLicenceReview: options.rembgLicenceReview.trim(),
     },
-    inference: { status: "not-started", durationMs: null },
+    inference: {
+      status: "not-started",
+      durationMs: null,
+      runnerLaunchAttempted: false,
+      runnerProcessStarted: false,
+    },
     output: null,
     geometryQa: { status: "not-run" },
     candidateDisposition: "requires-human-review",
@@ -448,9 +470,19 @@ export async function runSingleImageRuntimeSmoke(options) {
     await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
-  const spawnOffline = offlineSpawn(spawnImpl, offlinePythonDirectory);
-
   let workflowStarted = false;
+  let runnerLaunchAttempted = false;
+  let runnerProcessStarted = false;
+  const spawnOffline = offlineSpawn(spawnImpl, offlinePythonDirectory, {
+    pythonPath,
+    runnerScript,
+    onRunnerLaunchAttempt: () => {
+      runnerLaunchAttempted = true;
+    },
+    onRunnerProcessStarted: () => {
+      runnerProcessStarted = true;
+    },
+  });
   try {
     const capabilities = await (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
       env,
@@ -503,6 +535,10 @@ export async function runSingleImageRuntimeSmoke(options) {
       singleImageTimeoutMs: timeoutMs,
       spawnImpl: spawnOffline,
     });
+
+    if (!runnerProcessStarted) {
+      throw new TypeError("TripoSR runner did not emit a process-spawn event; runtime inference cannot be confirmed.");
+    }
 
     const workflowReport = workflow?.report;
     if (!workflowReport || workflowReport.jobId !== jobId ||
@@ -571,6 +607,8 @@ export async function runSingleImageRuntimeSmoke(options) {
     report.inference = {
       status: "completed",
       durationMs: Number.isFinite(modelReport.durationMs) ? modelReport.durationMs : null,
+      runnerLaunchAttempted,
+      runnerProcessStarted,
     };
     report.output = {
       relativePath: modelRelativePath,
@@ -592,14 +630,20 @@ export async function runSingleImageRuntimeSmoke(options) {
     report.status = workflowStarted ? "failed" : "blocked";
     report.completedAt = new Date().toISOString();
     report.inference = {
-      status: workflowStarted ? "failed" : "not-started",
+      status: runnerProcessStarted ? "failed" : "not-started",
       durationMs: null,
+      runnerLaunchAttempted,
+      runnerProcessStarted,
     };
     report.failure = {
       code: error instanceof Error && SAFE_ID.test(error.name) ? error.name : "RuntimeSmokeError",
-      summary: workflowStarted
-        ? "Inference, GLB export or evidence integrity validation failed; inspect the private workflow report for diagnostics."
-        : "Readiness probe failed; no inference was started.",
+      summary: !workflowStarted
+        ? "Readiness probe failed; no inference was started."
+        : runnerProcessStarted
+          ? "The TripoSR runner process started, but model generation, GLB export or evidence validation failed; inspect the private workflow report for diagnostics."
+          : runnerLaunchAttempted
+            ? "The workflow attempted to launch TripoSR, but the operating-system process never started; inference was not started."
+            : "The workflow failed before attempting to launch the TripoSR runner; inference was not started.",
     };
     report.mapReady = false;
     report.publicationEligible = false;
