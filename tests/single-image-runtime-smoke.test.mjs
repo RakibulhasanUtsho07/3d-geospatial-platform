@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -74,7 +75,6 @@ async function fakeWorkflowResult(options, root, source) {
     "single-image-ai-reconstruction",
   ]);
 
-  let childOptions;
   options.spawnImpl("python-fixture", ["--version"], {});
   // The wrapper is tested in its injected spawn implementation below; this fake
   // workflow validates that the same offline-wrapped spawn reaches model execution.
@@ -90,7 +90,7 @@ async function fakeWorkflowResult(options, root, source) {
   return {
     workflowDir: path.dirname(absoluteModelPath),
     modelPath: absoluteModelPath,
-    reportPath: path.join(root, ".building-engine", "jobs", "smoke-building", "smoke-job-workflow", "workflow-report.json"),
+    reportPath: path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow", "workflow-report.json"),
     report: {
       jobId: "smoke-job",
       buildingId: fixture.id,
@@ -139,7 +139,9 @@ async function fakeWorkflowResult(options, root, source) {
 }
 
 function makeOptions(root, source, overrides = {}) {
+  const spawnImpl = overrides.spawnImpl ?? ((_executable, _args, options) => ({ fake: true, options }));
   return {
+    spawnImpl,
     workspaceRoot: root,
     buildingSpec: fixture,
     jobId: "smoke-job",
@@ -171,6 +173,12 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   const spawnEnvironments = [];
   const spawnImpl = (_executable, _args, options) => {
     spawnEnvironments.push(options.env);
+    const pythonPath = options.env.PYTHONPATH.split(path.delimiter)[0];
+    const siteCustomize = readFileSync(path.join(pythonPath, "sitecustomize.py"), "utf8");
+    assert.match(siteCustomize, /socket\.socket\.connect = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.socket\.connect_ex = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.socket\.sendto = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.create_connection = _deny_runtime_network/);
     return { fake: true };
   };
   let workflowCalls = 0;
