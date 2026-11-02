@@ -29,20 +29,27 @@ async function assertOutputAbsent(filePath, label) {
   }
 }
 
+async function removePrivateFileIfUnchanged(filePath, identity) {
+  if (!identity) return;
+  const currentFile = await lstat(filePath).catch(() => null);
+  if (currentFile?.isFile() && currentFile.dev === identity.dev && currentFile.ino === identity.ino) {
+    await rm(filePath, { force: true });
+  }
+}
+
 async function writePrivateNewFile(filePath, bytes) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const handle = await open(filePath, "wx", 0o600);
   const createdFile = await handle.stat();
+  const identity = { dev: createdFile.dev, ino: createdFile.ino };
   try {
     await handle.writeFile(bytes);
     await handle.sync();
     await handle.close();
+    return identity;
   } catch (error) {
     await handle.close().catch(() => {});
-    const currentFile = await lstat(filePath).catch(() => null);
-    if (currentFile && currentFile.dev === createdFile.dev && currentFile.ino === createdFile.ino) {
-      await rm(filePath, { force: true });
-    }
+    await removePrivateFileIfUnchanged(filePath, identity).catch(() => {});
     throw error;
   }
 }
@@ -81,14 +88,13 @@ async function main() {
   const result = calibrateFloorPlanRasterVectors({ proposalReport, review, sourceBytes });
   const geometryBytes = Buffer.from(JSON.stringify(result.floorPlan, null, 2) + "\n", "utf8");
   const auditBytes = Buffer.from(JSON.stringify(result.audit, null, 2) + "\n", "utf8");
-  let wroteGeometry = false;
+  let geometryFileIdentity = null;
   try {
-    await writePrivateNewFile(geometryPath, geometryBytes);
-    wroteGeometry = true;
+    geometryFileIdentity = await writePrivateNewFile(geometryPath, geometryBytes);
     await writePrivateNewFile(auditPath, auditBytes);
   } catch (error) {
-    // The second writer cleans up only an inode it created. Never unlink a competing path.
-    if (wroteGeometry) await rm(geometryPath, { force: true }).catch(() => {});
+    // Roll back only the exact geometry file created by this invocation.
+    await removePrivateFileIfUnchanged(geometryPath, geometryFileIdentity).catch(() => {});
     throw error;
   }
   process.stdout.write(JSON.stringify({
