@@ -319,7 +319,15 @@ export async function runSingleImageRuntimeSmoke(options) {
     throw new TypeError("confirmSingleViewInference must be true for single-view AI inference.");
   }
   if (options.confirmModelLicences !== true) {
-    throw new TypeError("confirmModelLicences must be true after checking TripoSR and rembg model-weight licences.");
+    throw new TypeError("confirmModelLicences must be true after checking TripoSR code/checkpoint and rembg model-weight licences.");
+  }
+  for (const [key, label] of [
+    ["triposrLicenceReview", "TripoSR code/checkpoint licence review"],
+    ["rembgLicenceReview", "rembg model-weight licence review"],
+  ]) {
+    if (typeof options[key] !== "string" || !options[key].trim() || options[key].trim().length > 500) {
+      throw new TypeError(label + " must be a non-empty statement of at most 500 characters.");
+    }
   }
 
   const jobId = safeId(options.jobId, "jobId");
@@ -401,6 +409,8 @@ export async function runSingleImageRuntimeSmoke(options) {
       mcResolution,
       backgroundRemoval: true,
       licenceReview: "operator-attested-not-independently-verified",
+      triposrLicenceReview: options.triposrLicenceReview.trim(),
+      rembgLicenceReview: options.rembgLicenceReview.trim(),
     },
     inference: { status: "not-started", durationMs: null },
     output: null,
