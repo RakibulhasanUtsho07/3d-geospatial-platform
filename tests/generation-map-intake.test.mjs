@@ -60,7 +60,9 @@ test("builds a procedural job while making source rights confirmation explicit",
   });
   assert.equal(request.strategy, "procedural");
   assert.equal(request.sources[0].relativePath, ".building-engine/media/b1/assets/a.jpg");
+  assert.equal(request.sources[0].permittedOperations.includes("procedural-model-derivation"), true);
   assert.equal(request.confirmRights, true);
+  assert.equal(request.confirmOperationScopes, true);
   assert.equal("viewSourceIds" in request, false);
 });
 
