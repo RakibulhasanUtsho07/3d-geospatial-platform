@@ -141,6 +141,17 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
   await expect(windowSegment).toHaveAttribute("x2", "300");
   await expect(windowSegment).toHaveAttribute("y2", "230");
 
+  // Removing an earlier opening must not cause the next generated ID to collide.
+  await page.getByRole("button", { name: "Remove", exact: true }).first().click();
+  await expect(doorMarker).toHaveCount(0);
+  await page.getByLabel("Opening type").selectOption("door");
+  await page.getByLabel("Offset along wall (px)").fill("140");
+  await page.getByLabel("Width (px)").fill("20");
+  await page.getByLabel("Opening height (m)").fill("2.1");
+  await page.getByLabel("Sill height (m)").fill("0");
+  await page.getByRole("button", { name: "Add reviewed opening", exact: true }).click();
+  await expect(page.getByTestId("opening-marker-opening-2-3")).toBeVisible();
+
   await page.getByRole("button", { name: "Draw room", exact: true }).click();
   await page.getByLabel("Room ID").fill("room-demo");
   await page.getByLabel("Room name").fill("Reviewed room");
@@ -187,7 +198,8 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
   expect(payload.walls).toHaveLength(4);
   const eastWall = payload.walls.find((wall: { id: string }) => wall.id === "wall-2");
   expect(eastWall.openings).toHaveLength(2);
-  expect(eastWall.openings.map((opening: { type: string }) => opening.type)).toEqual(["door", "window"]);
+  expect(eastWall.openings.map((opening: { type: string }) => opening.type).sort()).toEqual(["door", "window"]);
+  expect(eastWall.openings.map((opening: { id: string }) => opening.id)).toEqual(["opening-2-2", "opening-2-3"]);
   expect(payload.rooms).toHaveLength(1);
   expect(payload.rooms[0].reviewed).toBe(true);
   expect(apiRequests).toEqual([]);
