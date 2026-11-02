@@ -40,8 +40,9 @@ export async function runSingleImageWorkerPreflight({
       "TripoSR and rembg model caches must both be verified as cached before a real smoke run.",
     ],
     caveats: [
-      "This is a read-only package, device and local-cache preflight; it does not run inference or download model weights.",
+      "This is a non-inference package, device and local-cache check. It does not invoke a model-download API or execute the configured TripoSR runner.",
       "The configured TripoSR run.py is syntax-compiled in memory but never executed; its --help handler is intentionally not invoked.",
+      "Python package imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic or OS-sandboxed read-only guarantee.",
       "A ready result does not establish model licence compliance, GPU memory sufficiency, building accuracy or map readiness.",
       "Only a fresh D3M-05 smoke followed by independent GLB verification and human inspection can validate an actual inference run.",
     ],
