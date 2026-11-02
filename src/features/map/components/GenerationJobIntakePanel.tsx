@@ -456,7 +456,7 @@ export default function GenerationJobIntakePanel() {
 
       <div className="mt-2 space-y-4">
         <p className="text-xs leading-5 text-zinc-400">
-          Upload supported facade images to the private generation workspace, then create a durable job. The service token is used only from this browser session and is never written to localStorage.
+          Connect with the server-configured operator login token to receive a 30-minute HttpOnly session cookie. The login token is cleared after connection; the browser never receives the server-side GENERATION_API_TOKEN or session-signing secret.
         </p>
 
         <form onSubmit={submitGeneration} className="space-y-3">
