@@ -232,6 +232,7 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Require publication to match the exact normalized placement and digest from both review sources; reject legacy/missing placement records.
 - [x] Add regression cases for malformed height reference/axes/coordinates, transform changes, legacy approvals and tampered job-summary placement digests.
 - [x] Update the CLI to use the same fixed WGS84 ellipsoid-height reference as the authenticated API and update the D3M-02, generation jobs and published-model runbooks.
+- [x] Add an operator CLI end-to-end regression that publishes a synthetic approved job using the exact stored placement digest and WGS84 ellipsoid height reference.
 - [ ] Run focused review/publication tests, lint and production build on this branch.
 - [ ] Record exact-head Push CI and PR CI before any promotion.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.

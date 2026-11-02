@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -229,6 +230,44 @@ test("publishes the validated GLB and catalog into a separate application public
   );
   assert.equal(result.mapReady, false);
   assert.equal(result.publicationEligible, false);
+});
+
+test("publishes an approved review through the operator CLI with the same WGS84 ellipsoid placement binding", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const cliPath = path.resolve(process.cwd(), "scripts/publish-approved-generation-job.mjs");
+  const args = [
+    cliPath,
+    setup.workspaceRoot,
+    setup.jobId,
+    "--longitude", String(placement.position.longitude),
+    "--latitude", String(placement.position.latitude),
+    "--height", String(placement.position.height),
+    "--heading", String(placement.headingDegrees),
+    "--pitch", String(placement.pitchDegrees),
+    "--roll", String(placement.rollDegrees),
+    "--scale", String(placement.scale),
+    "--up-axis", placement.upAxis,
+    "--forward-axis", placement.forwardAxis,
+  ];
+  const run = spawnSync(process.execPath, args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  const payload = JSON.parse(run.stdout);
+  assert.equal(payload.status, "published-reviewed-version");
+  assert.equal(payload.placementHeightReference, "WGS84-ellipsoid");
+  assert.equal(payload.placementSha256, setup.reviewed.review.placementSha256);
+  assert.equal(payload.placement.longitude, placement.position.longitude);
+  assert.equal(payload.placement.latitude, placement.position.latitude);
+  assert.equal(payload.placement.height, placement.position.height);
+  assert.equal(payload.mapReady, false);
+  assert.equal(payload.publicationEligible, false);
+  const catalogPath = path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json");
+  const active = getActivePublishedModels(JSON.parse(await readFile(catalogPath, "utf8")))[0];
+  assert.equal(active.sha256, payload.modelSha256);
 });
 
 test("refuses a second publication while the model catalog lock is held", async (t) => {
