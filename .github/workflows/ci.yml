@@ -105,6 +105,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - feat/brf46-source-operation-scope-gate
       - development
+      - feat/brf06-observation-review-dev-20261030
 
 permissions:
   contents: read
