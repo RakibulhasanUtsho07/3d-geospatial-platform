@@ -13,6 +13,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 export const GENERATION_QUEUE_SCHEMA_VERSION = "1.0.0";
 export const GENERATION_QUEUE_STATUSES = Object.freeze(["queued", "running", "completed", "failed"]);
@@ -20,6 +21,12 @@ const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SAFE_SOURCE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const STRATEGIES = new Set(["auto", "procedural", "photogrammetry", "single-image-ai"]);
+const REQUIRED_SOURCE_SCOPES_BY_STRATEGY = Object.freeze({
+  auto: ["private-media-ingestion", "procedural-model-derivation"],
+  procedural: ["private-media-ingestion", "procedural-model-derivation"],
+  "single-image-ai": ["private-media-ingestion", "single-image-ai-reconstruction"],
+  photogrammetry: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"],
+});
 const MAX_SOURCES = 100;
 const MAX_ATTEMPTS = 2;
 const MAX_SPEC_BYTES = 1024 * 1024;
@@ -87,11 +94,19 @@ function normalizeSources(value) {
     if (!isKnownLicence(source.licence)) {
       throw new TypeError(label + ".licence must record a known permission/licence basis.");
     }
+    const permittedOperations = normalizeSourceOperationScopes(
+      source.permittedOperations,
+      label + ".permittedOperations",
+    );
+    if (!permittedOperations.includes("private-media-ingestion")) {
+      throw new Error(label + ".permittedOperations must include private-media-ingestion.");
+    }
     const result = {
       sourceId,
       relativePath,
       licence: source.licence.trim().slice(0, 300),
       kind: source.kind ?? "auto",
+      permittedOperations,
     };
     for (const key of ["author", "attribution", "sourceUrl", "capturedAt", "description"]) {
       if (source[key] !== undefined) {
@@ -125,6 +140,13 @@ function normalizeRequest(raw) {
     throw new TypeError("strategy must be auto, procedural, photogrammetry or single-image-ai.");
   }
   const sources = normalizeSources(raw.sources);
+  const requiredOperationScopes = REQUIRED_SOURCE_SCOPES_BY_STRATEGY[strategy === "auto" ? "auto" : strategy];
+  for (const source of sources) {
+    const missingScopes = requiredOperationScopes.filter((scope) => !source.permittedOperations.includes(scope));
+    if (missingScopes.length) {
+      throw new Error("Source '" + source.sourceId + "' lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
+    }
+  }
   const confirmRights = raw.confirmRights === true;
   if (sources.length && !confirmRights) {
     throw new Error("confirmRights must be true after the operator has checked source rights.");
