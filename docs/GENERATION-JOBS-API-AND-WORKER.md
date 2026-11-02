@@ -133,7 +133,7 @@ $env:BUILDING_ENGINE_WORKSPACE = "E:\\building-engine-workspace"
 node scripts/run-generation-worker.mjs --once
 ```
 
-The procedural strategy is the deterministic smoke-test path. Photogrammetry requires the relevant COLMAP setup, and single-image inference requires the separately installed AI worker/dependencies configured for this deployment. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
+The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. The worker claims only strategies supported by the snapshot; unsupported jobs remain queued without consuming retry attempts. Single-image AI is reported as runtime-configured, not fully ready, because pretrained weights/cache are not verified by the probe. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md). The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
 
 ## Local outputs and review
 
