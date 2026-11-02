@@ -240,6 +240,9 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(saved.status, "passed");
   assert.equal(saved.output.sha256, result.report.output.sha256);
   assert.equal(saved.model.licenceReview, "operator-attested-not-independently-verified");
+  assert.equal(saved.source.licence, "CC BY 4.0");
+  assert.equal(saved.networkPolicy.pythonSocketConnectionsBlocked, true);
+  assert.equal(saved.networkPolicy.kernelNetworkIsolation, "not-enforced-by-this-command");
   assert.equal(JSON.stringify(saved).includes(root), false);
   const fileStat = await stat(result.reportPath);
   assert.equal(fileStat.mode & 0o777, 0o600);
