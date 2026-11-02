@@ -518,3 +518,23 @@ test("refuses to reuse an existing source record under the same source ID", asyn
   );
   assert.equal(probeCalls, 0);
 });
+
+
+test("refuses to resume an existing reconstruction-job state directory", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const previousState = path.join(root, ".building-engine", "reconstruction-jobs", fixture.id, "smoke-job");
+  await mkdir(previousState, { recursive: true });
+  let probeCalls = 0;
+
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, {
+      probeCapabilities: async () => {
+        probeCalls += 1;
+        return readyCapabilities();
+      },
+    })),
+    /Smoke resumable reconstruction state already exists/,
+  );
+  assert.equal(probeCalls, 0);
+});
