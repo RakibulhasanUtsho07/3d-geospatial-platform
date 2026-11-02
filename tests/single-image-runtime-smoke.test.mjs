@@ -199,7 +199,8 @@ function makeOptions(root, source, overrides = {}) {
     confirmOperationScopes: true,
     confirmSingleViewInference: true,
     confirmModelLicences: true,
-    probeCapabilities: async ({ env, spawnImpl }) => {
+    probeCapabilities: async ({ env, spawnImpl, strategies }) => {
+      assert.deepEqual(strategies, ["single-image-ai"]);
       assert.equal(env.HF_HUB_OFFLINE, "1");
       assert.equal(env.TRANSFORMERS_OFFLINE, "1");
       assert.equal(env.HF_DATASETS_OFFLINE, "1");
