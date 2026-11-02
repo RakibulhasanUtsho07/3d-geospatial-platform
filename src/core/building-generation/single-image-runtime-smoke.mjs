@@ -11,6 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { spawn as nodeSpawn } from "node:child_process";
 
 import { normalizeBuildingSpec } from "./building-spec.mjs";
@@ -35,8 +36,14 @@ const OFFLINE_SITE_CUSTOMIZE = [
   "    raise OSError('network access is disabled by the single-image runtime smoke')",
   "socket.socket.connect = _deny_runtime_network",
   "socket.socket.connect_ex = _deny_runtime_network",
+  "socket.socket.send = _deny_runtime_network",
+  "socket.socket.sendall = _deny_runtime_network",
   "socket.socket.sendto = _deny_runtime_network",
+  "socket.socket.sendmsg = _deny_runtime_network",
   "socket.create_connection = _deny_runtime_network",
+  "socket.getaddrinfo = _deny_runtime_network",
+  "socket.gethostbyname = _deny_runtime_network",
+  "socket.gethostbyname_ex = _deny_runtime_network",
   "",
 ].join("\n");
 
@@ -347,7 +354,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       kernelNetworkIsolation: "not-enforced-by-this-command",
     },
   };
-  const offlinePythonDirectory = await mkdtemp(path.join(process.env.TMPDIR || process.env.TEMP || process.cwd(), "single-image-offline-"));
+  const offlinePythonDirectory = await mkdtemp(path.join(os.tmpdir(), "single-image-offline-"));
   try {
     await writeFile(path.join(offlinePythonDirectory, "sitecustomize.py"), OFFLINE_SITE_CUSTOMIZE, {
       flag: "wx",
