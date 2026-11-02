@@ -1,8 +1,19 @@
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 const EARTH_RADIUS_M = 6378137;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const STRATEGIES = new Set(["procedural", "single-image-ai", "photogrammetry"]);
+const OPERATION_SCOPES_BY_STRATEGY = Object.freeze({
+  procedural: ["private-media-ingestion", "procedural-model-derivation"],
+  "single-image-ai": ["private-media-ingestion", "single-image-ai-reconstruction"],
+  photogrammetry: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"],
+});
+
+export function getMapGenerationOperationScopes(strategy) {
+  if (!STRATEGIES.has(strategy)) throw new TypeError("Unsupported map generation strategy.");
+  return [...OPERATION_SCOPES_BY_STRATEGY[strategy]];
+}
 
 function finite(value, label, minimum, maximum) {
   if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
@@ -114,6 +125,7 @@ export function buildMapGenerationJobInput({
   strategy,
   uploadedSources,
   confirmRights,
+  confirmOperationScopes,
   selectedViewSourceIds,
   confirmSingleViewInference = false,
   confirmSameBuilding = false,
@@ -130,7 +142,11 @@ export function buildMapGenerationJobInput({
   if (uploadedSources.length > 0 && confirmRights !== true) {
     throw new Error("Confirm source rights before queueing generation.");
   }
+  if (uploadedSources.length > 0 && confirmOperationScopes !== true) {
+    throw new Error("Confirm that every uploaded source permits the selected generation operation(s).");
+  }
 
+  const requiredOperationScopes = OPERATION_SCOPES_BY_STRATEGY[strategy];
   const seen = new Set();
   const sources = uploadedSources.map((source, index) => {
     if (!source || typeof source !== "object" || Array.isArray(source)) {
@@ -149,11 +165,20 @@ export function buildMapGenerationJobInput({
       throw new TypeError("Uploaded source " + sourceId + " needs a known licence/permission basis.");
     }
     if (source.kind !== "image") throw new TypeError("Map image intake only accepts image sources.");
+    const permittedOperations = normalizeSourceOperationScopes(
+      source.permittedOperations,
+      "Uploaded source " + sourceId + " permittedOperations",
+    );
+    const missingScopes = requiredOperationScopes.filter((scope) => !permittedOperations.includes(scope));
+    if (missingScopes.length) {
+      throw new Error("Uploaded source " + sourceId + " lacks the selected strategy's required operation permission(s): " + missingScopes.join(", "));
+    }
     return {
       sourceId,
       relativePath: source.relativePath,
       kind: "image",
       licence: source.licence.trim().slice(0, 300),
+      permittedOperations,
       ...(typeof source.author === "string" && source.author.trim() ? { author: source.author.trim().slice(0, 500) } : {}),
       ...(typeof source.attribution === "string" && source.attribution.trim() ? { attribution: source.attribution.trim().slice(0, 500) } : {}),
       ...(typeof source.sourceUrl === "string" && source.sourceUrl.trim() ? { sourceUrl: source.sourceUrl.trim().slice(0, 2000) } : {}),
