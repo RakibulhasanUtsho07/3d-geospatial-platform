@@ -389,7 +389,9 @@ export async function runSingleImageRuntimeSmoke(options) {
     });
 
     const workflowReport = workflow?.report;
-    if (!workflowReport || workflowReport.status !== "completed-requires-review" ||
+    if (!workflowReport || workflowReport.jobId !== jobId ||
+        workflowReport.buildingId !== buildingId ||
+        workflowReport.status !== "completed-requires-review" ||
         workflowReport.mode !== "single-image-ai" ||
         workflowReport.mapReady !== false ||
         workflowReport.publicationEligible !== false ||
@@ -404,11 +406,17 @@ export async function runSingleImageRuntimeSmoke(options) {
     }
     const ingestedSource = workflowReport.inputs.mediaRecords?.find((item) => item.id === sourceId);
     if (!ingestedSource || ingestedSource.sha256 !== source.sha256 ||
+        ingestedSource.usageStatus !== "approved" ||
+        ingestedSource.licence !== options.licence.trim() ||
         !["image/jpeg", "image/png"].includes(ingestedSource.mimeType)) {
       throw new TypeError("Media-to-model workflow source record does not match the requested input image.");
     }
 
     const modelRelativePath = safeRelativePath(workflowReport.output.modelPath, "workflow output modelPath");
+    const expectedModelPrefix = ".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow/";
+    if (!modelRelativePath.startsWith(expectedModelPrefix)) {
+      throw new TypeError("Workflow model output is not inside this smoke job's private artifact directory.");
+    }
     const modelAbsolutePath = path.resolve(workspaceRoot, ...modelRelativePath.split("/"));
     if (!inside(workspaceRoot, modelAbsolutePath)) throw new TypeError("Workflow model output escapes workspaceRoot.");
     const modelEntry = await lstat(modelAbsolutePath);
@@ -430,6 +438,11 @@ export async function runSingleImageRuntimeSmoke(options) {
     const modelReport = workflowReport.modelReport;
     if (!modelReport || modelReport.status !== "ai-proposed-requires-review" ||
         modelReport.confidence !== "ai-proposed" ||
+        modelReport.modelParameters?.modelId !== MODEL_ID ||
+        modelReport.modelParameters?.device !== device ||
+        modelReport.modelParameters?.mcResolution !== mcResolution ||
+        modelReport.modelParameters?.backgroundRemoval !== true ||
+        modelReport.source?.sha256 !== source.sha256 ||
         modelReport.mapReady !== false || modelReport.publicationEligible !== false) {
       throw new TypeError("TripoSR report does not preserve the AI-proposed fail-closed status.");
     }
@@ -459,6 +472,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     await replaceReportAtomically(reportPath, report);
     return { report, reportPath, exitCode: 0 };
   } catch (error) {
+    if (!workflowStarted) report.readiness.blockers = ["single-image-readiness-probe-failed"];
     report.status = workflowStarted ? "failed" : "blocked";
     report.completedAt = new Date().toISOString();
     report.inference = {
