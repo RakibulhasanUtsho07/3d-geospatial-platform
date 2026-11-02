@@ -59,9 +59,9 @@ The helper also builds strategy-specific queue requests and mirrors the server-s
 The UI consumes:
 
 - `GET /api/building-generation/jobs/<jobId>` for queue state, phase, attempts and candidate status.
-- `GET /api/building-generation/worker-status` for online/offline/stale worker health and heartbeat age.
+- `GET /api/building-generation/worker-status` for online/offline/stale heartbeat and sanitized per-strategy readiness (procedural, COLMAP, and single-image AI).
 
-A worker may run on a separate host, but it must access the exact same persistent private workspace. If it is offline or stale, a job remains queued; a queued response is not proof that reconstruction has begun.
+A worker may run on a separate host, but it must access the exact same persistent private workspace. If it is offline or stale, a job remains queued; a queued response is not proof that reconstruction has begun. When a worker is online but a strategy is blocked, that job also stays queued without incrementing its attempt count until a compatible worker is available. The status panel displays the probe blockers.
 
 The UI does not display private filesystem paths, mark any job publication-ready, or auto-place a candidate into Cesium. D3M-02 remains the separate review-approved publication hand-off.
 
