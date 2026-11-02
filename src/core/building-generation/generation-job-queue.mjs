@@ -514,8 +514,15 @@ export async function updateGenerationJob({ workspaceRoot, jobId, update }) {
   return { job: getGenerationJobView(state), request, result };
 }
 
-export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker" }) {
+export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker", supportedStrategies }) {
   safeId(workerId, "workerId");
+  let supported = null;
+  if (supportedStrategies !== undefined) {
+    if (!Array.isArray(supportedStrategies) || !supportedStrategies.every((strategy) => STRATEGIES.has(strategy))) {
+      throw new TypeError("supportedStrategies must be an array of known generation strategies.");
+    }
+    supported = new Set(supportedStrategies);
+  }
   const root = await workspaceRootPath(workspaceRoot);
   const jobsDirectory = await ensureDirectory(root, JOBS_SEGMENTS);
   const entries = await readdir(jobsDirectory, { withFileTypes: true });
@@ -525,7 +532,8 @@ export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker
     const directory = path.join(jobsDirectory, entry.name);
     try {
       const state = await readJobState(directory);
-      if (state.status === "queued" && Date.parse(state.nextAttemptAt ?? state.createdAt) <= Date.now()) {
+      if (state.status === "queued" && (!supported || supported.has(state.strategy)) &&
+          Date.parse(state.nextAttemptAt ?? state.createdAt) <= Date.now()) {
         candidates.push({ directory, state });
       }
     } catch {
