@@ -3,7 +3,7 @@
 **Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
 **Dependency:** [D3M-02 PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302)  
 **Implementation branch:** `feat/d3m03-map-generation-intake-20261102`  
-**Status:** Implementation candidate; exact-head Full CI passed on `3e4aba47126e585f39ff91a0cc55dc91d38ada78`; strategy-format compatibility fix added afterward and awaiting its own exact-head CI
+**Status:** Implementation candidate; WebP compatibility and worker-readiness baseline passed exact-head Full CI on `51ea64e4cce35059af14bd33587cbf7965004a12`; model-cache readiness gate added afterward and awaits its own exact-head CI
 
 ## User flow
 
@@ -19,7 +19,7 @@
    
    Both the rights attestation and operation-scope authorization are required. The helper and server queue record the exact least-privilege scope list for the chosen strategy; the worker's rights-review stage writes that reviewed scope into the source provenance.
 7. Select **Upload images and create generation job**. After every upload succeeds, the UI sends the exact returned file paths to `POST /api/building-generation/jobs`. The existing durable queue performs its own path, file-size, licence, strategy and selected-view image-signature checks before creating the job.
-8. The UI polls the job status and worker health every 5 seconds while the job is queued/running. Polling stops on completed or failed status. An existing job can be tracked by job ID while an operator session is active.
+8. While the panel is open, worker health/readiness refreshes every 15 seconds; the active job status refreshes every 5 seconds. Job polling stops on completed or failed status. An existing job can be tracked by job ID while an operator session is active.
 9. A completed job is only a candidate. Inspect the GLB and QA report, record the separate review, and use D3M-02's publication panel only after review and explicit placement.
 
 ## Operator session configuration
@@ -59,7 +59,7 @@ The helper also builds strategy-specific queue requests and mirrors the server-s
 The UI consumes:
 
 - `GET /api/building-generation/jobs/<jobId>` for queue state, phase, attempts and candidate status.
-- `GET /api/building-generation/worker-status` for online/offline/stale heartbeat and sanitized per-strategy readiness (procedural, COLMAP, and single-image AI).
+- `GET /api/building-generation/worker-status` for online/offline/stale heartbeat and sanitized per-strategy readiness (procedural, COLMAP, and single-image AI), including the primary TripoSR model-cache state.
 
 A worker may run on a separate host, but it must access the exact same persistent private workspace. If it is offline or stale, a job remains queued; a queued response is not proof that reconstruction has begun. When a worker is online but a strategy is blocked, that job also stays queued without incrementing its attempt count until a compatible worker is available. The status panel displays the probe blockers.
 
