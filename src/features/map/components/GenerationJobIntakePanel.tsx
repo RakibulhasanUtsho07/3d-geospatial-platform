@@ -98,6 +98,8 @@ function workerLabel(status: WorkerStatus["availability"]): string {
 export default function GenerationJobIntakePanel() {
   const [expanded, setExpanded] = useState(false);
   const [token, setToken] = useState("");
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionBusy, setSessionBusy] = useState(false);
   const [buildingId, setBuildingId] = useState("new-building-01");
   const [buildingName, setBuildingName] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -131,21 +133,42 @@ export default function GenerationJobIntakePanel() {
   const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!activeJobId || token.length < 32) return;
+    if (!expanded || sessionActive) return;
+    let alive = true;
+    fetch("/api/building-generation/operator-session", {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    }).then((response) => response.json()).then((payload: unknown) => {
+      if (alive && isRecord(payload) && payload.authenticated === true) setSessionActive(true);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [expanded, sessionActive]);
+
+  useEffect(() => {
+    if (!activeJobId || !sessionActive) return;
     let alive = true;
     let timer: ReturnType<typeof setInterval> | null = null;
-    const headers = { Authorization: "Bearer " + token };
 
     async function poll() {
       try {
         const [jobResponse, workerResponse] = await Promise.all([
           fetch("/api/building-generation/jobs/" + encodeURIComponent(activeJobId), {
-            headers, cache: "no-store",
+            credentials: "same-origin", cache: "no-store",
           }),
           fetch("/api/building-generation/worker-status", {
-            headers, cache: "no-store",
+            credentials: "same-origin", cache: "no-store",
           }),
         ]);
+        if (jobResponse.status === 401 || workerResponse.status === 401) {
+          if (alive) {
+            setSessionActive(false);
+            setStatusError("Operator session expired. Connect again to keep tracking this job.");
+          }
+          if (timer) clearInterval(timer);
+          timer = null;
+          return;
+        }
         const [jobPayload, workerPayload] = await Promise.all([
           responseObject(jobResponse),
           responseObject(workerResponse),
@@ -173,7 +196,7 @@ export default function GenerationJobIntakePanel() {
       alive = false;
       if (timer) clearInterval(timer);
     };
-  }, [activeJobId, token]);
+  }, [activeJobId, sessionActive]);
 
   function handleFilesChange(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.currentTarget.files ?? []);
@@ -198,9 +221,49 @@ export default function GenerationJobIntakePanel() {
       return;
     }
     setFiles(selected);
-    setUploadedSources([]);
     setConfirmRights(false);
     setMessage(selected.length + " image(s) selected. Rights and source identity still require operator review.");
+  }
+
+  async function connectOperatorSession() {
+    setError(null);
+    setMessage(null);
+    if (token.length < 32) {
+      setError("Enter the configured operator login token (at least 32 characters).");
+      return;
+    }
+    setSessionBusy(true);
+    try {
+      const response = await fetch("/api/building-generation/operator-session", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const payload = await responseObject(response);
+      if (payload.authenticated !== true) throw new Error("The server did not establish an operator session.");
+      setSessionActive(true);
+      setToken("");
+      setMessage("Operator session connected. The server stores the session in a short-lived HttpOnly cookie; the login token was cleared from this UI.");
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Could not connect the operator session.");
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function disconnectOperatorSession() {
+    try {
+      await fetch("/api/building-generation/operator-session", {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+    } finally {
+      setSessionActive(false);
+      setActiveJobId("");
+      setJob(null);
+      setWorker(null);
+    }
   }
 
   async function uploadOne(
@@ -232,7 +295,7 @@ export default function GenerationJobIntakePanel() {
     setUploadProgress("Uploading image " + (index + 1) + " of " + total + "…");
     const response = await fetch("/api/building-generation/uploads", {
       method: "POST",
-      headers: { Authorization: "Bearer " + token },
+      credentials: "same-origin",
       body: form,
     });
     const payload = await responseObject(response);
@@ -259,8 +322,8 @@ export default function GenerationJobIntakePanel() {
     event.preventDefault();
     setError(null);
     setMessage(null);
-    if (token.length < 32) {
-      setError("Enter the configured generation API token (at least 32 characters).");
+    if (!sessionActive) {
+      setError("Connect an operator session before uploading images or queueing a job.");
       return;
     }
     if (!files.length) {
@@ -338,10 +401,8 @@ export default function GenerationJobIntakePanel() {
 
       const response = await fetch("/api/building-generation/jobs", {
         method: "POST",
-        headers: {
-          Authorization: "Bearer " + token,
-          "Content-Type": "application/json",
-        },
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
       const payload = await responseObject(response);
@@ -369,8 +430,8 @@ export default function GenerationJobIntakePanel() {
     event.preventDefault();
     setError(null);
     setStatusError(null);
-    if (token.length < 32) {
-      setError("Enter the generation API token before looking up a job.");
+    if (!sessionActive) {
+      setError("Connect an operator session before looking up a job.");
       return;
     }
     const id = lookupJobId.trim();
@@ -399,19 +460,38 @@ export default function GenerationJobIntakePanel() {
         </p>
 
         <form onSubmit={submitGeneration} className="space-y-3">
-          <label className="block text-xs font-medium text-zinc-300">
-            Generation API bearer token
-            <input
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              autoComplete="off"
-              maxLength={4096}
-              required
-              placeholder="GENERATION_API_TOKEN"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60"
-            />
-          </label>
+          <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-zinc-200">Operator session</p>
+              {sessionActive
+                ? <span className="rounded-full bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-200">Connected · HttpOnly cookie</span>
+                : <span className="rounded-full bg-amber-300/10 px-2 py-1 text-[10px] text-amber-100">Not connected</span>}
+            </div>
+            {!sessionActive ? (
+              <>
+                <label className="mt-2 block text-xs font-medium text-zinc-300">
+                  Operator login token
+                  <input
+                    type="password"
+                    value={token}
+                    onChange={(event) => setToken(event.target.value)}
+                    autoComplete="off"
+                    maxLength={4096}
+                    placeholder="GENERATION_OPERATOR_LOGIN_TOKEN"
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60"
+                  />
+                </label>
+                <button type="button" onClick={() => void connectOperatorSession()} disabled={sessionBusy || busy || token.length < 32} className="mt-2 w-full rounded-lg bg-cyan-300 px-3 py-2.5 text-xs font-semibold text-zinc-950 disabled:opacity-40">
+                  {sessionBusy ? "Connecting…" : "Connect operator session"}
+                </button>
+              </>
+            ) : (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] leading-5 text-zinc-500">Session expires after 30 minutes. Login token was cleared; the cookie is HttpOnly, SameSite=Strict and scoped to generation APIs.</p>
+                <button type="button" onClick={() => void disconnectOperatorSession()} disabled={busy} className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] text-zinc-300 hover:bg-white/10">Disconnect</button>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block text-xs font-medium text-zinc-300">
@@ -536,7 +616,7 @@ export default function GenerationJobIntakePanel() {
           {error && <p role="alert" className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-200">{error}</p>}
           {message && <p role="status" className="rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs leading-5 text-emerald-200">{message}</p>}
 
-          <button type="submit" disabled={busy} className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-50">
+          <button type="submit" disabled={busy || !sessionActive} className="w-full rounded-xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-50">
             {busy ? "Uploading and queuing…" : "Upload images and create generation job"}
           </button>
         </form>
@@ -551,7 +631,7 @@ export default function GenerationJobIntakePanel() {
           <h3 className="text-sm font-semibold text-zinc-200">Track an existing generation job</h3>
           <form onSubmit={loadExistingJob} className="mt-2 flex flex-col gap-2 sm:flex-row">
             <input value={lookupJobId} onChange={(event) => setLookupJobId(event.target.value)} maxLength={80} placeholder="gen-..." className="min-w-0 flex-1 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-300/60" />
-            <button type="submit" disabled={!token || busy} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10 disabled:opacity-40">Track job</button>
+            <button type="submit" disabled={!sessionActive || busy} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/10 disabled:opacity-40">Track job</button>
           </form>
         </div>
 
