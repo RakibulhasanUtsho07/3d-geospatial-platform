@@ -65,6 +65,7 @@ Exit codes:
 - This is application-level Python socket blocking, **not** operating-system or kernel network isolation. Run the smoke on a host/network policy that already prevents outbound access when strict isolation is required. The report explicitly records that boundary.
 - The readiness preflight uses local-only model-cache resolution. It does not instantiate a rembg session or request weights.
 - Source and model artifacts remain inside the private workflow directory. The smoke report contains only relative paths, safe model identifiers, source/output hashes, byte counts, the selected device and sanitized QA summary. It does not copy cache paths, API secrets, or raw subprocess output into the smoke evidence.
+- On POSIX hosts, the runtime-smokes evidence directory is enforced as owner-only (0700) and report files are written owner-only (0600). On Windows, Node's mode bits do not provide equivalent ACL isolation; provision the worker workspace with a Windows ACL that grants access only to the worker/operator identities that need the evidence.
 - The source-rights and operation-scope confirmations are separate operator attestations. The command also requires separate text records describing the TripoSR code/checkpoint licence terms and the installed rembg model-weight terms reviewed by the operator. These statements are not independent legal verification or proof of a commercial grant.
 
 ## Output review checklist
