@@ -131,9 +131,9 @@ After the smoke exits, run the independent verifier against the same private wor
 - Both runs use CI fakes/fixtures for the inference workflow. **No real TripoSR/rembg inference, CUDA/MPS execution or building-quality result is claimed.**
 - **Remaining operational blocker:** an operator must run this command on the provisioned worker host with the authorized source image and verified model-weight terms, then independently verify and inspect the resulting private GLB. Until that happens, D3M-05 remains a runtime-smoke implementation candidate, not a passed real inference.
 
-## D3M-07 read-only worker preflight
+## D3M-07 non-inference worker preflight
 
-Before collecting rights attestations or invoking a real smoke, run the dedicated read-only preflight from the repository root:
+Before collecting rights attestations or invoking a real smoke, run the dedicated non-inference readiness preflight from the repository root:
 
 ~~~powershell
 npm run preflight:single-image-worker -- --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --runner-script "D:\AI\TripoSR\run.py" --device cuda:0
@@ -145,10 +145,10 @@ Replace both paths with the actual worker environment. Use `--device cpu` or `--
 npm run preflight:single-image-worker -- --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cpu --json
 ~~~
 
-The command returns exit code `0` only when the installed runtime/device probe succeeds and **both** TripoSR and the installed rembg default model weights are verified as cached. A missing, unknown or merely configured cache state returns exit code `2`. It does not download weights, create a rembg session, run inference or publish anything. Its report deliberately excludes environment variables, executable paths, cache paths and credentials.
+The command returns exit code `0` only when the installed runtime/device probe succeeds and **both** TripoSR and the installed rembg default model weights are verified as cached. A missing, unknown or merely configured cache state returns exit code `2`. It does not call a model-download API, create a rembg session, run inference or publish anything. Its report deliberately excludes environment variables, executable paths, cache paths and credentials.
 
 The D3M-05 smoke repeats the same single-image-only capability check immediately before inference; neither command launches the unrelated COLMAP `--help` checks. The D3M-05 run still performs the actual TripoSR runner launch through the workflow after all operator/source/model-rights gates pass.
 
-The preflight requests only the `single-image-ai` strategy; it does not launch the unrelated COLMAP `--help` checks. The configured TripoSR `run.py` is opened and syntax-compiled in memory, but its top-level code and `--help` handler are never executed. The Python subprocess disables bytecode writes and sets Hugging Face offline/telemetry flags while checking packages and local cache metadata. This is an application-level preflight, not an OS sandbox or network firewall; package imports still occur.
+The preflight requests only the `single-image-ai` strategy; it does not launch the unrelated COLMAP `--help` checks. The configured TripoSR `run.py` is opened and syntax-compiled in memory, but its top-level code and `--help` handler are never executed. The Python subprocess disables bytecode writes and sets Hugging Face offline/telemetry flags while checking packages and local cache metadata. Package imports still execute installed package initialization code and may have package-specific side effects; the preflight is not a hermetic read-only environment, OS sandbox or network firewall. Apply host/network egress controls when strict no-egress or no-write guarantees are required.
 
 A `ready` result is only a precondition. It does not prove that the runner will complete inference, that model terms permit the intended use, that sufficient GPU memory is available, or that the resulting building geometry is accurate. Continue with the D3M-05 smoke only after source rights and both model licences have been reviewed; then run the independent evidence verifier and human GLB inspection.
