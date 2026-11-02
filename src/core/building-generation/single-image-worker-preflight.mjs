@@ -41,6 +41,7 @@ export async function runSingleImageWorkerPreflight({
     ],
     caveats: [
       "This is a read-only package, device and local-cache preflight; it does not run inference or download model weights.",
+      "The configured TripoSR run.py is syntax-compiled in memory but never executed; its --help handler is intentionally not invoked.",
       "A ready result does not establish model licence compliance, GPU memory sufficiency, building accuracy or map readiness.",
       "Only a fresh D3M-05 smoke followed by independent GLB verification and human inspection can validate an actual inference run.",
     ],
