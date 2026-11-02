@@ -135,7 +135,7 @@
     "test:architectural-geometry-workflow": "node --test tests/architectural-geometry-workflow.test.mjs",
     "test:textured-glb-export": "node --test tests/textured-glb-export.test.mjs",
     "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
-    "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs tests/generation-worker-status.test.mjs",
+    "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs tests/generation-worker-status.test.mjs tests/generation-worker-capabilities.test.mjs",
     "test:generation-review": "node --test tests/generation-job-review.test.mjs tests/generation-api-auth.test.mjs",
     "run:generation-worker": "node scripts/run-generation-worker.mjs",
     "test:published-model-catalog": "node --test tests/published-model-catalog.test.mjs",
@@ -227,7 +227,8 @@
     "test:brf45-rights-admission": "node --test tests/brf45-exact-asset-rights-admission.test.mjs tests/brf45-exact-asset-rights-admission-cli.test.mjs",
     "validate:brf45-rights-admission": "node scripts/validate-brf45-exact-asset-rights-admission.mjs benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json --source-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json --evidence-root .",
     "validate:brf26-evidence-bundle": "node scripts/build-brf26-evidence-bundle.mjs",
-    "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs"
+    "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs",
+    "test:generation-map-intake": "node --test tests/generation-map-intake.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

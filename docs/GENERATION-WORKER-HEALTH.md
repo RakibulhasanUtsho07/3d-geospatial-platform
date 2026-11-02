@@ -1,16 +1,28 @@
-# Generation worker health status
+# Generation worker health and strategy readiness
 
-The persistent file-backed worker writes an operational heartbeat to:
+The file-backed worker writes status to `.building-engine/generation-queue/worker-status.json`. The authenticated `GET /api/building-generation/worker-status` endpoint distinguishes process liveness from per-strategy runtime readiness.
 
-`.building-engine/generation-queue/worker-status.json`
+- `online`: heartbeat is recent (within 90 seconds).
+- `stale`: last running heartbeat is older than 90 seconds.
+- `stopped`: worker last exited cleanly.
+- `offline`: no worker status exists in this shared workspace.
 
-The authenticated endpoint `GET /api/building-generation/worker-status` returns a sanitized status:
+Startup probes record:
 
-- `online`: the worker heartbeat is recent.
-- `stale`: the last `running` heartbeat is older than 90 seconds; the process may have stopped unexpectedly.
-- `stopped`: the worker last exited cleanly.
-- `offline`: the worker has not written a status record in this workspace.
+| Strategy | Reported state | What is checked |
+|---|---|---|
+| Procedural | `ready` | In-process parametric generator; no external ML runtime |
+| Photogrammetry | `ready` / `blocked` | COLMAP executable plus `automatic_reconstructor`, `model_analyzer`, `model_converter`, and `mesh_texturer` help probes |
+| Single-image AI | `ready` / `configured` / `blocked` | TripoSR runner file, Python runner imports, PyTorch import, configured CPU/CUDA/MPS availability, and presence of both `stabilityai/TripoSR` `config.yaml` and `model.ckpt` in the local Hugging Face cache |
 
-The response includes phase (`starting`, `idle`, `processing`, `stopped`), heartbeat time, worker ID and current job ID when present. The status API uses `GENERATION_API_TOKEN` and `BUILDING_ENGINE_WORKSPACE`; it never returns tokens or file paths. Set `Cache-Control: no-store` is applied to the response.
+Single-image AI is `ready` only when the runtime/device probe succeeds and both primary TripoSR model files are already cached. It is `configured` when Python/PyTorch/device are available but either model file is missing; the worker will not claim AI jobs in that state. Cache the files with:
 
-The status record is monitoring telemetry only; it does not change generation job state and must not be treated as proof that the worker can complete a particular ML job. It uses the same persistent workspace as the file-backed queue, so it is not suitable for deployment architectures where API instances and workers do not share durable storage.
+```bash
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('stabilityai/TripoSR', 'config.yaml'); hf_hub_download('stabilityai/TripoSR', 'model.ckpt')"
+```
+
+The cache check uses Hugging Face's local-only `try_to_load_from_cache` helper and makes no network request. Model-cache readiness is not a proof that actual inference will succeed: the TripoSR background-removal model/cache, real CUDA kernels, GPU memory, image preprocessing and end-to-end GLB export are exercised only by a real job. A COLMAP command probe likewise does not prove image overlap, reconstruction quality, GPU acceleration or survey registration. Human review remains mandatory.
+
+The worker claims only compatible strategies. Unsupported jobs remain `queued` and do not consume retry attempts; `auto` maps to the procedural path. Probes run at worker startup, so restart after changing executable, Python, runner, cache or device configuration.
+
+The status endpoint returns the check timestamp, strategy state and bounded blocker/caveat descriptions. It does not expose executable paths, environment values, secrets, raw process output or model files. The status API uses `GENERATION_API_TOKEN` and `BUILDING_ENGINE_WORKSPACE`, sets `Cache-Control: no-store`, and shares the queue's persistent-workspace deployment constraint.

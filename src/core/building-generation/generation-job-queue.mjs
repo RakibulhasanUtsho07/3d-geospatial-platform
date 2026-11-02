@@ -2,6 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   realpath,
@@ -13,6 +14,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 export const GENERATION_QUEUE_SCHEMA_VERSION = "1.0.0";
 export const GENERATION_QUEUE_STATUSES = Object.freeze(["queued", "running", "completed", "failed"]);
@@ -20,6 +22,12 @@ const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SAFE_SOURCE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const STRATEGIES = new Set(["auto", "procedural", "photogrammetry", "single-image-ai"]);
+const REQUIRED_SOURCE_SCOPES_BY_STRATEGY = Object.freeze({
+  auto: ["private-media-ingestion", "procedural-model-derivation"],
+  procedural: ["private-media-ingestion", "procedural-model-derivation"],
+  "single-image-ai": ["private-media-ingestion", "single-image-ai-reconstruction"],
+  photogrammetry: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"],
+});
 const MAX_SOURCES = 100;
 const MAX_ATTEMPTS = 2;
 const MAX_SPEC_BYTES = 1024 * 1024;
@@ -87,11 +95,19 @@ function normalizeSources(value) {
     if (!isKnownLicence(source.licence)) {
       throw new TypeError(label + ".licence must record a known permission/licence basis.");
     }
+    const permittedOperations = normalizeSourceOperationScopes(
+      source.permittedOperations,
+      label + ".permittedOperations",
+    );
+    if (!permittedOperations.includes("private-media-ingestion")) {
+      throw new Error(label + ".permittedOperations must include private-media-ingestion.");
+    }
     const result = {
       sourceId,
       relativePath,
       licence: source.licence.trim().slice(0, 300),
       kind: source.kind ?? "auto",
+      permittedOperations,
     };
     for (const key of ["author", "attribution", "sourceUrl", "capturedAt", "description"]) {
       if (source[key] !== undefined) {
@@ -125,9 +141,20 @@ function normalizeRequest(raw) {
     throw new TypeError("strategy must be auto, procedural, photogrammetry or single-image-ai.");
   }
   const sources = normalizeSources(raw.sources);
+  const requiredOperationScopes = REQUIRED_SOURCE_SCOPES_BY_STRATEGY[strategy === "auto" ? "auto" : strategy];
+  for (const source of sources) {
+    const missingScopes = requiredOperationScopes.filter((scope) => !source.permittedOperations.includes(scope));
+    if (missingScopes.length) {
+      throw new Error("Source '" + source.sourceId + "' lacks explicit operation permission scope(s) required by strategy " + strategy + ": " + missingScopes.join(", "));
+    }
+  }
   const confirmRights = raw.confirmRights === true;
   if (sources.length && !confirmRights) {
     throw new Error("confirmRights must be true after the operator has checked source rights.");
+  }
+  const confirmOperationScopes = raw.confirmOperationScopes === true;
+  if (sources.length && !confirmOperationScopes) {
+    throw new Error("confirmOperationScopes must be true after the operator authorizes the required media operation scopes.");
   }
   const viewSourceIds = raw.viewSourceIds === undefined ? undefined : raw.viewSourceIds;
   if (viewSourceIds !== undefined) {
@@ -311,7 +338,24 @@ const MAX_SOURCE_BYTES_BY_KIND = Object.freeze({
   auto: 500 * 1024 * 1024,
 });
 
-async function preflightGenerationSources(root, sources) {
+function detectImageMimeType(header) {
+  if (header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (header.length >= 8 && header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return "image/png";
+  }
+  if (header.length >= 12 && header.toString("ascii", 0, 4) === "RIFF" &&
+      header.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  return "unknown image format";
+}
+
+async function preflightGenerationSources(root, request) {
+  const { sources, strategy, viewSourceIds = [] } = request;
+  const rasterReconstruction = strategy === "single-image-ai" || strategy === "photogrammetry";
+  const selectedViewIds = new Set(viewSourceIds);
   for (const source of sources) {
     const candidate = path.resolve(root, ...source.relativePath.split("/"));
     if (!inside(root, candidate)) {
@@ -361,13 +405,33 @@ async function preflightGenerationSources(root, sources) {
         "Source '" + source.sourceId + "' exceeds the " + maximum + "-byte " + kind + " intake limit.",
       );
     }
+
+    if (rasterReconstruction && selectedViewIds.has(source.sourceId)) {
+      const file = await open(current, "r");
+      let header;
+      try {
+        header = Buffer.alloc(12);
+        const { bytesRead } = await file.read(header, 0, header.length, 0);
+        header = header.subarray(0, bytesRead);
+      } finally {
+        await file.close();
+      }
+      const detectedMime = detectImageMimeType(header);
+      if (detectedMime !== "image/jpeg" && detectedMime !== "image/png") {
+        throw new TypeError(
+          "Selected source '" + source.sourceId + "' has " + detectedMime + " bytes; " +
+          strategy + " reconstruction currently supports JPEG or PNG image signatures only. " +
+          "Convert the image before queueing; changing its file extension is not conversion.",
+        );
+      }
+    }
   }
 }
 
 export async function enqueueGenerationJob({ workspaceRoot, input, now = new Date() }) {
   const root = await workspaceRootPath(workspaceRoot);
   const normalized = normalizeRequest(input);
-  await preflightGenerationSources(root, normalized.sources);
+  await preflightGenerationSources(root, normalized);
   const timestamp = new Date(now).toISOString();
   if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("now must be a valid timestamp.");
   const jobId = "gen-" + randomUUID();
@@ -450,8 +514,15 @@ export async function updateGenerationJob({ workspaceRoot, jobId, update }) {
   return { job: getGenerationJobView(state), request, result };
 }
 
-export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker" }) {
+export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker", supportedStrategies }) {
   safeId(workerId, "workerId");
+  let supported = null;
+  if (supportedStrategies !== undefined) {
+    if (!Array.isArray(supportedStrategies) || !supportedStrategies.every((strategy) => STRATEGIES.has(strategy))) {
+      throw new TypeError("supportedStrategies must be an array of known generation strategies.");
+    }
+    supported = new Set(supportedStrategies);
+  }
   const root = await workspaceRootPath(workspaceRoot);
   const jobsDirectory = await ensureDirectory(root, JOBS_SEGMENTS);
   const entries = await readdir(jobsDirectory, { withFileTypes: true });
@@ -461,7 +532,8 @@ export async function claimNextGenerationJob({ workspaceRoot, workerId = "worker
     const directory = path.join(jobsDirectory, entry.name);
     try {
       const state = await readJobState(directory);
-      if (state.status === "queued" && Date.parse(state.nextAttemptAt ?? state.createdAt) <= Date.now()) {
+      if (state.status === "queued" && (!supported || supported.has(state.strategy)) &&
+          Date.parse(state.nextAttemptAt ?? state.createdAt) <= Date.now()) {
         candidates.push({ directory, state });
       }
     } catch {

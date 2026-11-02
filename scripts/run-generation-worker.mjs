@@ -14,6 +14,10 @@ import {
 } from "../src/core/building-generation/generation-job-queue.mjs";
 import { runMediaToModelWorkflow } from "../src/core/building-generation/media-to-model-workflow.mjs";
 import { writeGenerationWorkerStatus } from "../src/core/building-generation/generation-worker-status.mjs";
+import {
+  getClaimableGenerationStrategies,
+  probeGenerationWorkerCapabilities,
+} from "../src/core/building-generation/generation-worker-capabilities.mjs";
 
 function asError(error) {
   return error instanceof Error ? error : new Error(String(error));
@@ -32,7 +36,7 @@ function delay(ms, signal) {
   });
 }
 
-async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIntervalMs, workerStartedAt }) {
+async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIntervalMs, workerStartedAt, capabilities }) {
   const request = validateGenerationJobRequest(claimed.request);
   const jobId = claimed.job.jobId;
   let stoppingHeartbeats = false;
@@ -51,6 +55,7 @@ async function executeClaimedJob({ workspaceRoot, claimed, workerId, heartbeatIn
         phase: "processing",
         currentJobId: jobId,
         startedAt: workerStartedAt,
+        capabilities,
       });
     }).catch((error) => {
       heartbeatFailure = asError(error);
@@ -118,6 +123,8 @@ export async function runGenerationWorker({
   pollIntervalMs = 1000,
   heartbeatIntervalMs = 30_000,
   signal,
+  probeCapabilities = probeGenerationWorkerCapabilities,
+  env = process.env,
 } = {}) {
   if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
     throw new TypeError("Set BUILDING_ENGINE_WORKSPACE or pass --workspace-root.");
@@ -131,9 +138,11 @@ export async function runGenerationWorker({
 
   const lock = await acquireGenerationWorkerLock({ workspaceRoot });
   const workerStartedAt = new Date().toISOString();
+  let capabilities = null;
+  let claimableStrategies = ["auto", "procedural"];
   let lastWorkerStatusWriteAt = 0;
   let lastError = null;
-  const summary = { workerId: lock.workerId, recoveredJobIds: [], processed: [] };
+  const summary = { workerId: lock.workerId, recoveredJobIds: [], processed: [], capabilities: null, claimableStrategies };
 
   async function publishWorkerStatus({ phase, currentJobId = null, status = "running" }) {
     try {
@@ -145,6 +154,7 @@ export async function runGenerationWorker({
         currentJobId,
         startedAt: workerStartedAt,
         lastError,
+        capabilities,
       });
       lastWorkerStatusWriteAt = Date.now();
     } catch (error) {
@@ -155,10 +165,17 @@ export async function runGenerationWorker({
 
   try {
     await publishWorkerStatus({ phase: "starting" });
+    capabilities = await probeCapabilities({ env });
+    claimableStrategies = getClaimableGenerationStrategies(capabilities);
+    summary.capabilities = capabilities;
+    summary.claimableStrategies = claimableStrategies;
+    await publishWorkerStatus({ phase: "starting" });
     summary.recoveredJobIds = await recoverInterruptedGenerationJobs({ workspaceRoot });
     await publishWorkerStatus({ phase: "idle" });
     while (!signal?.aborted) {
-      const claimed = await claimNextGenerationJob({ workspaceRoot, workerId: lock.workerId });
+      const claimed = await claimNextGenerationJob({
+        workspaceRoot, workerId: lock.workerId, supportedStrategies: claimableStrategies,
+      });
       if (!claimed) {
         if (once) break;
         if (Date.now() - lastWorkerStatusWriteAt >= heartbeatIntervalMs) {
@@ -175,6 +192,7 @@ export async function runGenerationWorker({
         workerId: lock.workerId,
         heartbeatIntervalMs,
         workerStartedAt,
+        capabilities,
       });
       lastError = outcome.error ?? null;
       summary.processed.push(outcome);

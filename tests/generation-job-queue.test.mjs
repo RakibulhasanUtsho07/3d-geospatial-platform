@@ -44,30 +44,130 @@ test("persists generation requests and lists only bounded, validated queue state
 
 test("rejects source path traversal, unknown licence, and missing rights attestation", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
-  const source = { sourceId: "front", relativePath: "../secret.png", licence: "CC BY 4.0" };
-  await assert.rejects(enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }), /parent path segments/);
+  const source = {
+    sourceId: "front",
+    relativePath: "../secret.png",
+    licence: "CC BY 4.0",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
+  await assert.rejects(enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }), /parent path segments/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png", licence: "unknown" }], confirmRights: true }),
+    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png", licence: "unknown" }], confirmRights: true, confirmOperationScopes: true }),
   }), /known permission\/licence/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png" }] }),
+    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png" }], confirmOperationScopes: true }),
   }), /confirmRights/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0" }], confirmRights: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
+    input: basicInput({
+      sources: [{ ...source, relativePath: "uploads/front.png" }],
+      confirmRights: true,
+    }),
+  }), /confirmOperationScopes/);
+  await assert.rejects(enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", permittedOperations: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"] }], confirmRights: true, confirmOperationScopes: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
   }), /at least three selected/);
 });
 
 test("rejects missing source media before creating a queue job", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /does not exist in workspaceRoot/,
   );
   assert.deepEqual(await listGenerationJobs({ workspaceRoot, limit: 5 }), []);
+});
+
+test("rejects WebP selected views for single-image AI and photogrammetry before queue creation", async (t) => {
+  const webp = Buffer.from("RIFFxxxxWEBP", "ascii");
+
+  const singleWorkspace = await makeWorkspace(t);
+  await mkdir(path.join(singleWorkspace, "uploads"), { recursive: true });
+  await writeFile(path.join(singleWorkspace, "uploads", "view.webp"), webp);
+  const singleSource = {
+    sourceId: "view-1",
+    relativePath: "uploads/view.webp",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+  };
+  await assert.rejects(enqueueGenerationJob({
+    workspaceRoot: singleWorkspace,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [singleSource],
+      viewSourceIds: ["view-1"],
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  }), /image.*webp.*supports JPEG or PNG/i);
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot: singleWorkspace, limit: 5 }), []);
+
+  const photoWorkspace = await makeWorkspace(t);
+  await mkdir(path.join(photoWorkspace, "uploads"), { recursive: true });
+  const photoSources = ["front", "side", "rear"].map((sourceId) => ({
+    sourceId,
+    relativePath: "uploads/" + sourceId + ".webp",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"],
+  }));
+  for (const source of photoSources) {
+    await writeFile(path.join(photoWorkspace, source.relativePath), webp);
+  }
+  await assert.rejects(enqueueGenerationJob({
+    workspaceRoot: photoWorkspace,
+    input: basicInput({
+      strategy: "photogrammetry",
+      sources: photoSources,
+      viewSourceIds: photoSources.map((source) => source.sourceId),
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSameBuilding: true,
+      confirmOverlapReviewed: true,
+      confirmUpAxisReviewed: true,
+      upAxis: "Y",
+    }),
+  }), /image.*webp.*supports JPEG or PNG/i);
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot: photoWorkspace, limit: 5 }), []);
+});
+
+test("accepts a PNG-signature selected view for single-image AI at queue preflight", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  await writeFile(
+    path.join(workspaceRoot, "uploads", "view.png"),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  const job = await enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [{
+        sourceId: "view-1",
+        relativePath: "uploads/view.png",
+        licence: "CC BY 4.0",
+        kind: "image",
+        permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+      }],
+      viewSourceIds: ["view-1"],
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  });
+  assert.equal(job.status, "queued");
 });
 
 test("rejects symlinked sources and sources that are not regular files", async (t) => {
@@ -76,9 +176,15 @@ test("rejects symlinked sources and sources that are not regular files", async (
   const outside = path.join(workspaceRoot, "outside.png");
   await writeFile(outside, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
   await symlink(outside, path.join(workspaceRoot, "uploads", "front.png"));
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /symbolic links/,
   );
   await rm(path.join(workspaceRoot, "uploads", "front.png"));
@@ -88,6 +194,7 @@ test("rejects symlinked sources and sources that are not regular files", async (
       input: basicInput({
         sources: [{ ...source, relativePath: "uploads" }],
         confirmRights: true,
+        confirmOperationScopes: true,
       }),
     }),
     /regular file/,
@@ -100,10 +207,16 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
   await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
   const filePath = path.join(workspaceRoot, "uploads", "front.png");
   await writeFile(filePath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   const job = await enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [source], confirmRights: true }),
+    input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }),
   });
   assert.equal(job.status, "queued");
 
@@ -115,6 +228,7 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
       input: basicInput({
         sources: [{ ...source, sourceId: "empty", relativePath: "uploads/empty.png" }],
         confirmRights: true,
+        confirmOperationScopes: true,
       }),
     }),
     /is empty/,
@@ -122,7 +236,7 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
 
   await truncate(filePath, 20 * 1024 * 1024 + 1);
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /exceeds the 20971520-byte image intake limit/,
   );
   assert.equal((await listGenerationJobs({ workspaceRoot, limit: 5 })).length, 1);
@@ -146,6 +260,32 @@ test("claims, completes and records a fail-closed review candidate", async (t) =
   await assert.rejects(completeGenerationJob({
     workspaceRoot, jobId: queued.jobId, result: {},
   }), /Only running jobs/);
+});
+
+test("claim filter skips older queued jobs for unsupported strategies", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  await writeFile(path.join(workspaceRoot, "uploads", "view.jpg"), Buffer.from([0xff, 0xd8, 0xff, 0x00]));
+  const ai = await enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [{
+        sourceId: "ai-view", relativePath: "uploads/view.jpg", kind: "image",
+        licence: "CC BY 4.0",
+        permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+      }],
+      viewSourceIds: ["ai-view"], confirmRights: true, confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  });
+  const procedural = await enqueueGenerationJob({ workspaceRoot, input: basicInput() });
+  const claimed = await claimNextGenerationJob({
+    workspaceRoot, workerId: "procedural-worker", supportedStrategies: ["procedural", "auto"],
+  });
+  assert.equal(claimed.job.jobId, procedural.jobId);
+  assert.equal((await getGenerationJob({ workspaceRoot, jobId: ai.jobId })).status, "queued");
+  assert.equal((await getGenerationJob({ workspaceRoot, jobId: ai.jobId })).attempt, 0);
 });
 
 test("recovers interrupted work into a retryable queued job and enforces the retry ceiling", async (t) => {

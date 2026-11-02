@@ -25,7 +25,7 @@ test("source cannot be approved without explicit rights attestation and a known 
 test("review records explicit licence, attribution and capture metadata after hash verification",async t=>{
   const root=await workspace(t);const ingested=await intake(root,"photo-a");
   const result=await reviewBuildingSource({workspaceRoot:root,buildingId:fixture.id,sourceId:"photo-a",licence:"CC BY 4.0",permittedOperations:["private-media-ingestion","procedural-model-derivation"],confirmRights:true,author:"Sample photographer",attribution:"Sample photographer / source page",sourceUrl:"https://example.org/photo",captureLocation:{longitude:90.406,latitude:23.709,headingDegrees:182}});
-  assert.equal(result.record.usageStatus,"approved");assert.equal(result.record.licence,"CC BY 4.0");assert.equal(result.record.author,"Sample photographer");
+  assert.equal(result.record.usageStatus,"approved");assert.equal(result.record.rightsReviewMethod,"explicit-cli-attestation");assert.equal(result.record.licence,"CC BY 4.0");assert.equal(result.record.author,"Sample photographer");
   assert.equal(result.record.location.headingDegrees,182);assert.equal(result.assetSha256,ingested.record.sha256);assert.ok(result.record.rightsReviewedAt);
 });
 test("source review requires explicit recognized per-operation permission scopes",async t=>{
