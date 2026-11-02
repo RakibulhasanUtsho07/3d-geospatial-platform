@@ -199,7 +199,6 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   const root = await workspace(t);
   const source = await writeInput(root);
   const spawnEnvironments = [];
-  let capturedFailure = null;
   const spawnImpl = (_executable, _args, options) => {
     spawnEnvironments.push(options.env);
     const pythonPath = options.env.PYTHONPATH.split(path.delimiter)[0];
@@ -239,11 +238,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
       workflowCalls += 1;
       return fakeWorkflowResult(options, root, source);
     },
-    onFailureForTest: (error) => { capturedFailure = error; },
   }));
 
   assert.equal(workflowCalls, 1);
-  assert.equal(result.exitCode, 0, capturedFailure?.stack ?? JSON.stringify(result.report));
+  assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
   assert.equal(result.report.readiness.status, "ready");
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
