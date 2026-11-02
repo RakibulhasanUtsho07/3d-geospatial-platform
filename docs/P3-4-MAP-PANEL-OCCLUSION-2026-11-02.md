@@ -24,3 +24,15 @@ This is an implementation candidate. Exact-head Full CI, Push CI, and the browse
 ## Non-goals and remaining P3.4 evidence
 
 This change reduces default UI occlusion; it does not prove the visual fidelity of the buildings, eliminate the side panel when a user intentionally opens it, or diagnose raster imagery artifacts. The follow-up baseline must still compare equivalent camera/data/device captures and confirm the usable canvas area after the layout change.
+
+
+## Automated layout screenshots — pending exact-head run
+
+The first passing P3.4 exact-head PR Full CI and Push CI runs confirmed the responsive layout assertions, but those runs did not export standalone screenshots for human inspection. The browser test now writes two captures to `artifacts/p3-4-map-panel-occlusion/`:
+
+- `desktop-default-1440x900.png`
+- `mobile-default-390x844.png`
+
+A manifest binds the captures to `GITHUB_SHA` and records their purpose and limitations. CI uploads them as `p3-4-map-panel-occlusion-visual-evidence`. The images use deterministic API fixtures and transparent tile stubs; they are evidence of panel placement and unobstructed canvas area only, not live imagery, building fidelity, or a diagnosis of the red imagery anomaly.
+
+The screenshot-enabled head requires fresh exact-head PR Full CI and Push CI. Human visual inspection remains a separate acceptance activity; the screenshots do not self-approve the layout.

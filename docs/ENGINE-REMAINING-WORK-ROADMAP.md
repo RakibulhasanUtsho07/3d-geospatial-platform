@@ -152,3 +152,8 @@ The property-search, map-layer and camera-control docks now default to collapsed
 ### P3.4 validation follow-up — deterministic cancellation fixture
 
 The first P3.4 CI attempt exposed a timing-sensitive P2.6 dynamic-workload assertion: the initial camera preset could coalesce the rapid zoom actions before a request was active, so the test observed multiple unique bounds but no cancellation. The workload now waits for its initial stage, holds one new viewport response, calls the benchmark-only production camera-intent handler with changed bounds, and requires both the real AbortController event and browser AbortError before continuing pan/zoom and render/memory assertions. This is a test-fixture determinism fix, not a relaxation of the cancellation requirement. Exact-head CI must still pass before P3.4 is validated.
+
+
+### P3.4 visual-review evidence follow-up — screenshot export
+
+The browser layout regression now exports desktop (1440×900) and mobile (390×844) default-state screenshots plus a SHA-bound manifest to the `p3-4-map-panel-occlusion-visual-evidence` CI artifact. These captures use deterministic browser-test API fixtures and transparent tile stubs; they support panel-placement review only and do not prove live map imagery or building accuracy. The screenshot-enabled commit must pass fresh exact-head PR Full CI and Push CI, then receive human visual review before P3.4 is accepted.

@@ -925,3 +925,12 @@ jobs:
           path: artifacts/p2.6-dynamic-map-workload/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Upload P3.4 map panel layout visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-4-map-panel-occlusion-visual-evidence
+          path: artifacts/p3-4-map-panel-occlusion/
+          if-no-files-found: warn
+          retention-days: 14

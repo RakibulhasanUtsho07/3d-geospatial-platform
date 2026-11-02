@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 type ObservedRequests = {
   buildings: URL[];
@@ -196,6 +198,17 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
   await expectNotOverlapping(properties, controls);
   await expectNotOverlapping(layers, generatedModels);
 
+  // Keep visual evidence separate from the performance artifacts. Map imagery
+  // and API data are deterministic stubs in this test, so these captures are
+  // strictly for overlay geometry/readability, not production imagery review.
+  const visualEvidenceDirectory = resolve(process.cwd(), "artifacts/p3-4-map-panel-occlusion");
+  await mkdir(visualEvidenceDirectory, { recursive: true });
+  await page.screenshot({
+    path: resolve(visualEvidenceDirectory, "desktop-default-1440x900.png"),
+    fullPage: false,
+    animations: "disabled",
+  });
+
   await openMapLayers(page);
   await expect(page.getByRole("checkbox", { name: "Street map imagery" })).toBeVisible();
   await layers.click();
@@ -213,6 +226,30 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
   await expectNotOverlapping(properties, controls);
   await expectNotOverlapping(controls, page.getByRole("complementary", { name: "Nearby places" }));
   await expectNotOverlapping(layers, generatedModels);
+  await page.screenshot({
+    path: resolve(visualEvidenceDirectory, "mobile-default-390x844.png"),
+    fullPage: false,
+    animations: "disabled",
+  });
+
+  await writeFile(
+    resolve(visualEvidenceDirectory, "manifest.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      purpose: "P3.4 map-panel overlay layout visual evidence",
+      branch: process.env.GITHUB_REF_NAME ?? null,
+      commitSha: process.env.GITHUB_SHA ?? null,
+      captures: [
+        { file: "desktop-default-1440x900.png", width: 1440, height: 900, state: "default collapsed panels" },
+        { file: "mobile-default-390x844.png", width: 390, height: 844, state: "default collapsed panels" },
+      ],
+      limitations: [
+        "Map API and tile imagery are deterministic browser-test stubs.",
+        "These screenshots validate panel placement and canvas occlusion only; they do not validate live Dhaka imagery, building fidelity, or the red imagery anomaly.",
+      ],
+    }, null, 2) + "\\n",
+    "utf8",
+  );
 });
 
 test("3D map initializes and imagery/building layer switches remain in sync", async ({ page }) => {
