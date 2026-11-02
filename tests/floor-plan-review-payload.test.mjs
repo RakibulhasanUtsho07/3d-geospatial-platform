@@ -144,6 +144,26 @@ test("converts candidate review decisions and retains explicit door/window dimen
   });
 });
 
+test("rejects overlapping openings but permits intervals that meet exactly", () => {
+  const overlap = fixture();
+  overlap.candidateReviews[0].openings = [
+    { id: "door-a", type: "door", offsetPx: 40, widthPx: 30, heightM: 2.1, sillHeightM: 0 },
+    { id: "window-b", type: "window", offsetPx: 69, widthPx: 25, heightM: 1.2, sillHeightM: 0.8 },
+  ];
+  assert.throws(
+    () => buildFloorPlanRasterReviewPayload(overlap),
+    (error) => error.code === "OPENINGS_OVERLAP",
+  );
+
+  const adjacent = fixture();
+  adjacent.candidateReviews[0].openings = [
+    { id: "door-a", type: "door", offsetPx: 40, widthPx: 30, heightM: 2.1, sillHeightM: 0 },
+    { id: "window-b", type: "window", offsetPx: 70, widthPx: 25, heightM: 1.2, sillHeightM: 0.8 },
+  ];
+  const payload = buildFloorPlanRasterReviewPayload(adjacent);
+  assert.equal(payload.walls[0].openings.length, 2);
+});
+
 test("rejects a room boundary with no reviewed wall vector along one edge", () => {
   const input = fixture();
   input.candidateReviews[3] = {
