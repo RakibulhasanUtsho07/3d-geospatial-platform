@@ -106,6 +106,7 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - feat/brf46-source-operation-scope-gate
       - development
+      - feat/d3m02-generation-job-map-publish-20261101
 
 permissions:
   contents: read
