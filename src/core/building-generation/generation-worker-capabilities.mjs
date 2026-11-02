@@ -5,10 +5,10 @@ import path from "node:path";
 export const GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION = "1.0.0";
 const REQUIRED_COLMAP_COMMANDS = ["automatic_reconstructor", "model_analyzer", "model_converter", "mesh_texturer"];
 
-function runProbe(executable, args, { cwd, timeoutMs = 10_000, spawnImpl = nodeSpawn } = {}) {
+function runProbe(executable, args, { cwd, env, timeoutMs = 10_000, spawnImpl = nodeSpawn } = {}) {
   return new Promise((resolve) => {
     let child;
-    try { child = spawnImpl(executable, args, { ...(cwd ? { cwd } : {}), stdio: ["ignore", "pipe", "pipe"], windowsHide: true }); }
+    try { child = spawnImpl(executable, args, { ...(cwd ? { cwd } : {}), ...(env ? { env } : {}), stdio: ["ignore", "pipe", "pipe"], windowsHide: true }); }
     catch { resolve({ ok: false, reason: "spawn-error" }); return; }
     let settled = false, stdout = "", stderr = "", killTimer = null;
     const finish = (result) => {
@@ -75,7 +75,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   let probeResult = null;
   if (runner && !blockers.length) {
     const script = [
-      "import inspect, os, re, runpy, sys",
+      "import inspect, os, re",
       "import onnxruntime, rembg, torch",
       "from huggingface_hub import try_to_load_from_cache",
       "from rembg.sessions import sessions_class",
@@ -103,16 +103,28 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       "        model_path = os.fspath(model_path) if model_path is not None else ''",
       "        model_cached = bool(model_path) and os.path.isfile(model_path) and os.path.getsize(model_path) > 0",
       "        rembg_cache_state = 'REMBG_MODEL_WEIGHTS_CACHED' if model_cached else 'REMBG_MODEL_WEIGHTS_MISSING'",
-      "sys.argv = [" + JSON.stringify(runner) + ", '--help']",
-      "try:",
-      "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
-      "except SystemExit as error:",
-      "    if error.code not in (None, 0): raise",
+      "runner_path = " + JSON.stringify(runner),
+      "with open(runner_path, 'rb') as runner_file:",
+      "    runner_source = runner_file.read()",
+      "compile(runner_source, runner_path, 'exec', dont_inherit=True)",
       "print(tripo_cache_state, flush=True)",
       "if rembg_model_name is not None: print('REMBG_MODEL_NAME:' + rembg_model_name, flush=True)",
       "print(rembg_cache_state, flush=True)",
     ].join("\n");
-    probeResult = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
+    probeResult = await runProbe(python, ["-c", script], {
+      cwd: path.dirname(runner),
+      env: {
+        ...process.env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        HF_HUB_OFFLINE: "1",
+        HUGGINGFACE_HUB_OFFLINE: "1",
+        TRANSFORMERS_OFFLINE: "1",
+        HF_DATASETS_OFFLINE: "1",
+        HF_HUB_DISABLE_TELEMETRY: "1",
+      },
+      timeoutMs: Math.max(timeoutMs, 15_000),
+      spawnImpl,
+    });
     if (!probeResult.ok) {
       blockers.push(probeResult.reason === "spawn-error"
         ? "Configured Python executable could not be started; check BUILDING_ENGINE_PYTHON_EXECUTABLE."
@@ -137,7 +149,8 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
     status: blockers.length ? "blocked" : allModelsCached ? "ready" : "configured",
     blockers,
     caveats: [
-      "Runner imports, PyTorch, ONNX Runtime, rembg and configured device are checked without generating a model or constructing a rembg session.",
+      "The Python process imports PyTorch, ONNX Runtime and rembg and checks the configured device. The configured TripoSR runner is syntax-compiled in memory but is never executed.",
+      "The preflight deliberately does not invoke the runner's --help handler because a configured script could perform arbitrary side effects. Actual runner behavior is checked only by the D3M-05 smoke.",
       modelWeights === "cached"
         ? "The configured TripoSR config.yaml and model.ckpt files are present in the local Hugging Face cache."
         : modelWeights === "missing"
