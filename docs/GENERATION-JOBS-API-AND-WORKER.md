@@ -17,7 +17,10 @@ Every completed result keeps `mapReady=false` and `publicationEligible=false`. A
 Set these server-side environment variables:
 
 - `GENERATION_API_TOKEN`: a secret bearer token of at least 32 characters for creating/listing generation jobs. Never expose it to browser JavaScript or commit it to Git.
-- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.\n- `GENERATION_PUBLISH_API_TOKEN`: a third, separate secret bearer token of at least 32 characters for publishing an already approved job into the application's public model catalog. Do not reuse either other token.
+- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.
+- `GENERATION_PUBLISH_API_TOKEN`: a third, separate secret bearer token of at least 32 characters for publishing an already approved job into the application's public model catalog. Do not reuse either other token.
+- `GENERATION_OPERATOR_LOGIN_TOKEN`: a separate operator passphrase of at least 32 characters used only to establish the map UI's short-lived HttpOnly session. Do not reuse any API bearer token.
+- `GENERATION_OPERATOR_SESSION_SECRET`: a different server-only secret of at least 32 characters used to HMAC-sign the 30-minute HttpOnly session cookie. Never expose it to browser JavaScript.
 - `BUILDING_ENGINE_WORKSPACE`: an existing, writable directory shared by the Next.js server and generation worker. Keep this workspace private.
 - Optional worker settings: `BUILDING_ENGINE_QUALITY` (`LOW`, `MEDIUM`, `HIGH` or `EXTREME`), `BUILDING_ENGINE_COLMAP_PATH`, `BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT`, `BUILDING_ENGINE_PYTHON_EXECUTABLE`, and `BUILDING_ENGINE_DEVICE`.
 
@@ -30,7 +33,9 @@ All routes require `Authorization: Bearer <GENERATION_API_TOKEN>`. If the secret
 - `POST /api/building-generation/jobs` — enqueue a JSON request and return HTTP 202.
 - `GET /api/building-generation/jobs?limit=20` — list up to 100 recent jobs.
 - `GET /api/building-generation/jobs/<jobId>` — retrieve status/result/error/review summary for a job.
-- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.\n- `POST /api/building-generation/jobs/<jobId>/publish` — publish an already approved job using explicit map placement. This route requires `GENERATION_PUBLISH_API_TOKEN` and is described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md).
+- `POST /api/building-generation/operator-session` — exchange the separate operator login token for a 30-minute HttpOnly, SameSite=Strict cookie used by the map-side intake UI. Details are in [D3M-03](D3M-03-MAP-IMAGE-INTAKE-AND-JOB-TRACKING.md).
+- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.
+- `POST /api/building-generation/jobs/<jobId>/publish` — publish an already approved job using explicit map placement. This route requires `GENERATION_PUBLISH_API_TOKEN` and is described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md).
 
 Example request:
 
