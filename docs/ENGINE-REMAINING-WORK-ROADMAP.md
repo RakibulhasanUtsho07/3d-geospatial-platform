@@ -257,3 +257,16 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
 - [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
 - **Safety boundary:** the preflight does not execute the configured TripoSR runner or call model-download/inference APIs. Python imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic read-only environment, OS sandbox or host firewall. Apply host/network egress and filesystem controls when strict guarantees are required.
+
+
+## 2026-11-02 — D3M-00 → D3M-07 dependency/evidence reconciliation
+
+The canonical current work-package mapping and branch/CI blockers are recorded in [D3M-00–07 Dependency Reconciliation](./D3M-00-07-DEPENDENCY-RECONCILIATION-2026-11-02.md).
+
+Key closeout findings:
+- D3M-01.A/B PR #281 is based on an old development head (35 ahead / 5 behind current development); exact-head CI passed, but it still needs rebase/retarget and revalidation.
+- D3M-01.G PR #292 is based on D3M-01.F at 89f3f11a..., while current parent PR #290 is ab50f062...; rebase #292 and rerun PR + Push CI.
+- D3M-03 current head has Push CI success but no exact-head PR CI run; rerun PR CI after stack rebase/retarget.
+- D3M-06 current head has PR CI success but no exact-head Push CI; D3M-06 was added to the Push branch filter by the reconciliation update, but a same-head run is still required after safely updating/revalidating the branch.
+- D3M-07 prior head af287278... had both exact-head PR + Push CI success (184/184 each). The current reconciliation commit adds schema/timestamp validation and therefore requires fresh exact-head CI.
+- Real D3M-05 inference, independent GLB inspection, source rights, surveyed scale/georeferencing, production reviewer provisioning and deployed map publication remain external acceptance gates. Do not promote release flags.
