@@ -116,7 +116,6 @@ test("refuses any publication transform that differs from the immutable approved
     { scale: 1.01 },
     { upAxis: "X" },
     { forwardAxis: "X" },
-    { heightReference: "EGM96" },
   ];
   for (const patch of variants) {
     const candidate = {
@@ -177,6 +176,13 @@ test("refuses a legacy approved review record with no placement binding", async 
   await assert.rejects(
     publishApprovedGenerationJob({ ...setup, placement }),
     /missing a valid immutable placement binding/i,
+  );
+  await assert.rejects(
+    publishApprovedGenerationJob({
+      ...setup,
+      placement: { ...placement, heightReference: "EGM96" },
+    }),
+    /heightReference must be WGS84-ellipsoid/i,
   );
   await assert.rejects(
     readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
