@@ -46,6 +46,13 @@ type GenerationJob = {
   publicationEligible: false;
 };
 
+type StrategyCapability = {
+  status: "ready" | "configured" | "blocked";
+  blockers: string[];
+  caveats: string[];
+  modelWeights?: "not-checked" | "unknown";
+};
+
 type WorkerStatus = {
   availability: "online" | "offline" | "stale" | "stopped";
   phase: string;
@@ -53,6 +60,10 @@ type WorkerStatus = {
   heartbeatAgeMs?: number;
   currentJobId: string | null;
   lastError: string | null;
+  capabilities: {
+    checkedAt: string;
+    strategies: Record<"procedural" | "photogrammetry" | "single-image-ai", StrategyCapability>;
+  } | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -155,24 +166,57 @@ export default function GenerationJobIntakePanel() {
   }, [expanded, sessionActive]);
 
   useEffect(() => {
-    if (!activeJobId || !sessionActive) return;
+    if (!expanded || !sessionActive) return;
     let alive = true;
     let timer: ReturnType<typeof setInterval> | null = null;
-
     let pollInFlight = false;
-    async function poll() {
+    async function pollWorker() {
       if (pollInFlight) return;
       pollInFlight = true;
       try {
-        const [jobResponse, workerResponse] = await Promise.all([
-          fetch("/api/building-generation/jobs/" + encodeURIComponent(activeJobId), {
-            credentials: "same-origin", cache: "no-store",
-          }),
-          fetch("/api/building-generation/worker-status", {
-            credentials: "same-origin", cache: "no-store",
-          }),
-        ]);
-        if (jobResponse.status === 401 || workerResponse.status === 401) {
+        const response = await fetch("/api/building-generation/worker-status", {
+          credentials: "same-origin", cache: "no-store",
+        });
+        if (response.status === 401) {
+          if (alive) {
+            setSessionActive(false);
+            setStatusError("Operator session expired. Connect again to view worker readiness.");
+          }
+          if (timer) clearInterval(timer);
+          timer = null;
+          return;
+        }
+        const payload = await responseObject(response);
+        if (!alive) return;
+        setWorker(payload as unknown as WorkerStatus);
+        setStatusError(null);
+      } catch (cause: unknown) {
+        if (alive) setStatusError(cause instanceof Error ? cause.message : "Could not refresh worker readiness.");
+      } finally {
+        pollInFlight = false;
+      }
+    }
+    void pollWorker();
+    timer = setInterval(() => { void pollWorker(); }, 15_000);
+    return () => {
+      alive = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [expanded, sessionActive]);
+
+  useEffect(() => {
+    if (!activeJobId || !sessionActive) return;
+    let alive = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let pollInFlight = false;
+    async function pollJob() {
+      if (pollInFlight) return;
+      pollInFlight = true;
+      try {
+        const response = await fetch("/api/building-generation/jobs/" + encodeURIComponent(activeJobId), {
+          credentials: "same-origin", cache: "no-store",
+        });
+        if (response.status === 401) {
           if (alive) {
             setSessionActive(false);
             setStatusError("Operator session expired. Connect again to keep tracking this job.");
@@ -181,24 +225,19 @@ export default function GenerationJobIntakePanel() {
           timer = null;
           return;
         }
-        if (jobResponse.status === 404) {
+        if (response.status === 404) {
           if (alive) setStatusError("Generation job was not found. Check the exact job ID.");
           if (timer) clearInterval(timer);
           timer = null;
           return;
         }
-        const [jobPayload, workerPayload] = await Promise.all([
-          responseObject(jobResponse),
-          responseObject(workerResponse),
-        ]);
+        const payload = await responseObject(response);
         if (!alive) return;
-        if (!isRecord(jobPayload.job) || typeof jobPayload.job.jobId !== "string") {
+        if (!isRecord(payload.job) || typeof payload.job.jobId !== "string") {
           throw new Error("Job status response is missing the job record.");
         }
-        setJob(jobPayload.job as unknown as GenerationJob);
-        setWorker(workerPayload as unknown as WorkerStatus);
-        setStatusError(null);
-        const nextStatus = jobPayload.job.status;
+        setJob(payload.job as unknown as GenerationJob);
+        const nextStatus = payload.job.status;
         if (nextStatus === "completed" || nextStatus === "failed") {
           if (timer) clearInterval(timer);
           timer = null;
@@ -209,9 +248,8 @@ export default function GenerationJobIntakePanel() {
         pollInFlight = false;
       }
     }
-
-    void poll();
-    timer = setInterval(() => { void poll(); }, POLL_INTERVAL_MS);
+    void pollJob();
+    timer = setInterval(() => { void pollJob(); }, POLL_INTERVAL_MS);
     return () => {
       alive = false;
       if (timer) clearInterval(timer);
@@ -350,6 +388,11 @@ export default function GenerationJobIntakePanel() {
     setMessage(null);
     if (!sessionActive) {
       setError("Connect an operator session before uploading images or queueing a job.");
+      return;
+    }
+    const strategyCapability = worker?.capabilities?.strategies[strategy];
+    if (worker?.availability === "online" && strategyCapability?.status === "blocked") {
+      setError("The active worker cannot run " + strategy + ": " + (strategyCapability.blockers.join(" ") || "runtime prerequisites are unavailable."));
       return;
     }
     if (!files.length) {
@@ -725,11 +768,36 @@ export default function GenerationJobIntakePanel() {
               </div>
             )}
             {worker && (
-              <p className="mt-2 text-[11px] leading-5 text-zinc-500">
-                {worker.availability === "online"
-                  ? "Worker heartbeat age: " + Math.round((worker.heartbeatAgeMs ?? 0) / 1000) + "s."
-                  : "A queued job will remain queued until a worker with access to the same persistent workspace is started."}
-              </p>
+              <>
+                <p className="mt-2 text-[11px] leading-5 text-zinc-500">
+                  {worker.availability === "online"
+                    ? "Worker heartbeat age: " + Math.round((worker.heartbeatAgeMs ?? 0) / 1000) + "s."
+                    : "A queued job will remain queued until a worker with access to the same persistent workspace is started."}
+                </p>
+                {worker.capabilities && (
+                  <div className="mt-2 space-y-1 text-[11px]">
+                    <p className="font-semibold text-zinc-300">Strategy runtime readiness · checked {new Date(worker.capabilities.checkedAt).toLocaleString()}</p>
+                    {(["procedural", "photogrammetry", "single-image-ai"] as const).map((key) => {
+                      const capability = worker.capabilities?.strategies[key];
+                      if (!capability) return null;
+                      const label = key === "procedural" ? "Procedural" : key === "photogrammetry" ? "COLMAP photogrammetry" : "Single-image AI";
+                      const readiness = capability.status === "ready" ? "Ready" : capability.status === "configured" ? "Runtime configured" : "Blocked";
+                      return (
+                        <div key={key} className="flex flex-wrap gap-x-2">
+                          <span className="text-zinc-300">{label}:</span>
+                          <span className={capability.status === "blocked" ? "text-amber-200" : "text-emerald-200"}>{readiness}</span>
+                          {capability.status === "blocked" && capability.blockers.length > 0 && (
+                            <span className="basis-full text-zinc-500">{capability.blockers.join(" ")}</span>
+                          )}
+                          {key === "single-image-ai" && capability.status === "configured" && (
+                            <span className="basis-full text-zinc-500">Pretrained weights/cache are not checked by this probe; checked when a job starts.</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
             {statusError && <p role="alert" className="mt-2 text-xs text-amber-100">{statusError}</p>}
             {job && <p className="mt-2 text-[11px] text-zinc-500">mapReady=false · publicationEligible=false. Generation completion does not establish reconstruction accuracy.</p>}
