@@ -50,18 +50,18 @@ test("rejects source path traversal, unknown licence, and missing rights attesta
     licence: "CC BY 4.0",
     permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
   };
-  await assert.rejects(enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }), /parent path segments/);
+  await assert.rejects(enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }), /parent path segments/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png", licence: "unknown" }], confirmRights: true }),
+    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png", licence: "unknown" }], confirmRights: true, confirmOperationScopes: true }),
   }), /known permission\/licence/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png" }] }),
+    input: basicInput({ sources: [{ ...source, relativePath: "uploads/front.png" }], confirmOperationScopes: true }),
   }), /confirmRights/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", permittedOperations: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"] }], confirmRights: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
+    input: basicInput({ sources: [{ sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", permittedOperations: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"] }], confirmRights: true, confirmOperationScopes: true, strategy: "photogrammetry", viewSourceIds: ["front"], upAxis: "Z", confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true }),
   }), /at least three selected/);
 });
 
@@ -75,7 +75,7 @@ test("rejects missing source media before creating a queue job", async (t) => {
     permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
   };
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /does not exist in workspaceRoot/,
   );
   assert.deepEqual(await listGenerationJobs({ workspaceRoot, limit: 5 }), []);
@@ -95,7 +95,7 @@ test("rejects symlinked sources and sources that are not regular files", async (
     permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
   };
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /symbolic links/,
   );
   await rm(path.join(workspaceRoot, "uploads", "front.png"));
@@ -105,6 +105,7 @@ test("rejects symlinked sources and sources that are not regular files", async (
       input: basicInput({
         sources: [{ ...source, relativePath: "uploads" }],
         confirmRights: true,
+        confirmOperationScopes: true,
       }),
     }),
     /regular file/,
@@ -126,7 +127,7 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
   };
   const job = await enqueueGenerationJob({
     workspaceRoot,
-    input: basicInput({ sources: [source], confirmRights: true }),
+    input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }),
   });
   assert.equal(job.status, "queued");
 
@@ -138,6 +139,7 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
       input: basicInput({
         sources: [{ ...source, sourceId: "empty", relativePath: "uploads/empty.png" }],
         confirmRights: true,
+        confirmOperationScopes: true,
       }),
     }),
     /is empty/,
@@ -145,7 +147,7 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
 
   await truncate(filePath, 20 * 1024 * 1024 + 1);
   await assert.rejects(
-    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
+    enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true, confirmOperationScopes: true }) }),
     /exceeds the 20971520-byte image intake limit/,
   );
   assert.equal((await listGenerationJobs({ workspaceRoot, limit: 5 })).length, 1);
