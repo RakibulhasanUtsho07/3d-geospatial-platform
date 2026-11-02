@@ -229,3 +229,35 @@ For D3M-06 merged head 08344f6..., the Full CI job had completed lint, productio
 The repository-side CI/ancestry work does not provision production credentials, a trusted reviewer registry or worker host. A real operator must still verify private durable workspace/storage, operator and publisher credentials, worker supervision, Python/PyTorch/ONNX/rembg/TripoSR compatibility, both model caches, host-level network egress controls, and a real source image with reviewed operation rights and model licences. Run D3M-07 preflight and D3M-05 inference on that actual host, independently re-hash and visually inspect the GLB, then obtain independent survey/metric-scale/vertical-datum evidence and human review. Until those gates pass, keep all ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags false.
 
 The repository development and main refs remain diverged (91 commits ahead / 6 behind in the latest comparison; 204 changed paths). No merge to main or broad promotion was performed. This requires a separate explicit release plan and review.
+
+## 14. Post-sync closeout refresh — 2026-11-02
+
+The D3M-05 → D3M-06 and D3M-06 → D3M-07 parent synchronizations have now completed as branch-only merge commits.
+
+- PR #313 merged D3M-05 head 3ed68591ab133acef70f0fedd45fab0f54aee34a into the D3M-06 feature branch. The resulting D3M-06 head is 08344f681210da213261dfa7444b687dcb89796a.
+- Both exact-head D3M-06 checks on 08344f6... are now terminal-success: PR Full CI #41452436484 and Push CI #41452430526.
+- PR #315 merged D3M-06 head 08344f6... into the D3M-07 feature branch. The resulting D3M-07 head is f1991cea20b3533e407c7982edcda9690e485b53.
+- The current compare from D3M-06 08344f6... to D3M-07 f1991ce... is 51 commits ahead / 0 behind, with 13 changed paths in the PR view. This confirms the child contains its latest parent.
+- Fresh exact-head D3M-07 PR CI #41453732972 and Push CI #41453723478 were queued/pending on f1991ce... when this document update was prepared. A later doc-only commit changes the head again; use the final branch SHA and its own event runs, not these pre-doc-edit pending runs.
+- PR #314 remains open, Draft and mergeable. It is only a proposed development-to-D3M-01.A/B branch sync and has not been merged or validated on a new feature-branch SHA. D3M-01.A/B #281 remains 36 ahead / 5 behind current development. Do not mark this drift resolved.
+
+### Work-package numbering reference
+
+Use the repository issue/PR contracts rather than the stale pre-reconciliation numbering in older execution-plan paragraphs:
+
+| Work package | Verified scope |
+|---|---|
+| D3M-00 | Dynamic 3D Map execution baseline and BRF-05/BRF-06 visual annotation/review integration and audit documentation |
+| D3M-01.A–G | Source-bound evidence, rights/camera/GCP linkage, immutable candidate hand-off, trusted human geometry review, signed receipt, governed reviewer-key registry and registry preflight |
+| D3M-02 | Approved generation-job publication into the Cesium model catalog/map |
+| D3M-03 | Map-side image intake, operation-scope checks and generation-job tracking |
+| D3M-04 | TripoSR plus rembg worker/model-cache readiness |
+| D3M-05 | Authorized offline single-image inference smoke and independent artifact verifier |
+| D3M-06 | Bind the reviewed placement transform to the map-publication record |
+| D3M-07 | Scoped non-inference worker preflight using the authoritative capability probe |
+
+### Current status after dependency sync
+
+D3M-02 through D3M-06 each have PR-triggered and Push-triggered terminal success on the current recorded code head. D3M-07 now includes its latest parent, but its new head still needs fresh exact-head PR and Push CI after all final documentation updates. D3M-01.C–G are currently contiguous in the parent-child compare checks and have exact-head PR + Push success; D3M-01.A/B is the unresolved parent-base issue tracked by #314.
+
+No sync PR merged into development or main. No feature PR was marked ready for review. All release flags remain false.
