@@ -514,7 +514,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   ).toBe(true);
 
   const movementStartedAtMs = performance.now();
-  const movementActions: string[] = [];
+  const movementActions: string[] = ["controlled-obsolete-request-cancellation"];
   for (let index = 0; index < 4; index += 1) {
     await page.getByRole("button", { name: "Zoom out" }).click();
     movementActions.push("zoom-out");
@@ -649,7 +649,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   assert.ok(uniqueBuildingBounds.size >= 2, "Workload must request at least two unique building viewport bounds.");
   assert.ok(uniqueRoadBounds.size >= 2, "Workload must request at least two unique road viewport bounds.");
   assert.ok(cancelledFetches.length + renderEvents.filter((event) => event.kind === "building-cancelled").length >= 1,
-    "Rapid camera movement must exercise at least one obsolete-request cancellation.");
+    "The controlled production camera-intent probe must exercise an obsolete-request cancellation.");
   assert.ok(lastBuildingStart, "At least one building fetch must be observed.");
   assert.ok(finalBuildingStage, "The latest viewport must be staged to Cesium.");
   assert.ok(finalRoadStage, "A road viewport must render after camera movement.");
