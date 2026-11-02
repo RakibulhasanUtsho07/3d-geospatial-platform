@@ -540,6 +540,12 @@ jobs:
       - name: Test offline single-image runtime smoke contract
         run: npm run test:single-image-runtime-smoke
 
+      - name: Validate single-image runtime smoke CLI
+        run: npm run smoke:single-image-runtime -- --help
+
+      - name: Validate single-image smoke evidence verifier CLI
+        run: npm run verify:single-image-runtime-smoke -- --help
+
       - name: Test video-frame operation-scope inheritance and cache invalidation
         run: npm run test:video-frame-operation-scopes
 
