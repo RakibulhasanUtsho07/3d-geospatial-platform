@@ -60,6 +60,7 @@ on:
       - feat/p2-19-geometry-cache-eviction-validation
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
+      - feat/brf06-observation-review-dev-20261030
       - feat/brf46-source-operation-scope-gate
   pull_request:
     branches:
