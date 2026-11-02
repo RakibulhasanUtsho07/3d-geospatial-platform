@@ -489,6 +489,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       spawnImpl: spawnOffline,
       now: checkedAt,
       commandTimeoutMs: options.commandTimeoutMs ?? 10_000,
+      strategies: ["single-image-ai"],
     });
     report.checkedAt = capabilities?.checkedAt ?? checkedAt;
     const blockers = readinessBlockers(capabilities);
