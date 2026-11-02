@@ -13,6 +13,7 @@ import {
   loadFloorPlanModelCandidate,
 } from "../src/core/building-generation/floor-plan-model-job.mjs";
 import { hashFloorPlanRasterProposalReport } from "../src/core/building-generation/floor-plan-raster-vector-calibration.mjs";
+import { canonicalFloorPlanReviewJson } from "../src/core/building-generation/floor-plan-review-payload.mjs";
 
 function hash(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -133,11 +134,39 @@ test("CLI binds source bytes and writes private vector and audit JSON without ov
     usageStatus: "unreviewed",
   });
   assert.equal(ingested.record.sha256, geometry.source.sha256);
-  const storedCandidate = await createFloorPlanModelCandidate({ workspaceRoot: root, floorPlan: geometry });
+  const alteredGeometry = structuredClone(geometry);
+  alteredGeometry.name = "Tampered floor-plan geometry";
+  await assert.rejects(
+    createFloorPlanModelCandidate({
+      workspaceRoot: root,
+      floorPlan: alteredGeometry,
+      calibrationEvidence: { proposalReport: files.proposalReport, review: files.review },
+    }),
+    (error) => error.code === "CALIBRATED_GEOMETRY_MISMATCH",
+  );
+  await assert.rejects(
+    stat(path.join(root, ".building-engine", "floor-plan-candidates", geometry.buildingId)),
+    { code: "ENOENT" },
+  );
+
+  const storedCandidate = await createFloorPlanModelCandidate({
+    workspaceRoot: root,
+    floorPlan: geometry,
+    calibrationEvidence: {
+      proposalReport: files.proposalReport,
+      review: files.review,
+    },
+  });
   assert.equal(storedCandidate.modelSha256, audit.vector.generatedPreviewGlbSha256);
   assert.equal(storedCandidate.sourceSha256, ingested.record.sha256);
   assert.equal(storedCandidate.report.input.sourceEvidenceVerified, true);
   assert.equal(storedCandidate.report.input.sourceUsageStatus, "unreviewed");
+  assert.equal(storedCandidate.calibrationEvidenceVerified, true);
+  assert.equal(storedCandidate.report.input.calibrationEvidence.engine, "floor-plan-raster-vector-calibration-v1");
+  assert.equal(storedCandidate.report.input.calibrationEvidence.proposalReportCanonicalSha256,
+    hashFloorPlanRasterProposalReport(files.proposalReport));
+  assert.equal(storedCandidate.report.input.calibrationEvidence.reviewCanonicalSha256,
+    hash(Buffer.from(canonicalFloorPlanReviewJson(files.review), "utf8")));
   assert.equal(storedCandidate.mapReady, false);
   assert.equal(storedCandidate.publicationEligible, false);
 
@@ -149,11 +178,33 @@ test("CLI binds source bytes and writes private vector and audit JSON without ov
   assert.equal(loadedCandidate.modelSha256, audit.vector.generatedPreviewGlbSha256);
   assert.equal(loadedCandidate.plan.walls[1].openings.length, 2);
   assert.equal(loadedCandidate.report.input.verifiedSourceSha256, ingested.record.sha256);
+  assert.equal(loadedCandidate.calibrationEvidenceVerified, true);
   const storedCandidateDir = path.join(
     root, ".building-engine", "floor-plan-candidates", geometry.buildingId, storedCandidate.candidateId,
   );
   assert.equal((await stat(path.join(storedCandidateDir, "model.glb"))).mode & 0o777, 0o600);
+  assert.equal((await stat(path.join(storedCandidateDir, "proposal-report.json"))).mode & 0o777, 0o600);
+  assert.equal((await stat(path.join(storedCandidateDir, "floor-plan-review.json"))).mode & 0o777, 0o600);
+  assert.equal((await stat(path.join(storedCandidateDir, "calibration-audit.json"))).mode & 0o777, 0o600);
   assert.equal((await stat(storedCandidateDir)).mode & 0o077, 0);
+  const provenance = storedCandidate.report.input.calibrationEvidence;
+  assert.equal(hash(await readFile(path.join(storedCandidateDir, "proposal-report.json"))),
+    provenance.artifacts.proposalReport.sha256);
+  assert.equal(hash(await readFile(path.join(storedCandidateDir, "floor-plan-review.json"))),
+    provenance.artifacts.review.sha256);
+  assert.equal(hash(await readFile(path.join(storedCandidateDir, "calibration-audit.json"))),
+    provenance.artifacts.audit.sha256);
+  const mutatedReviewBytes = Buffer.from(await readFile(path.join(storedCandidateDir, "floor-plan-review.json")));
+  mutatedReviewBytes[mutatedReviewBytes.length - 2] ^= 1;
+  await writeFile(path.join(storedCandidateDir, "floor-plan-review.json"), mutatedReviewBytes);
+  await assert.rejects(
+    loadFloorPlanModelCandidate({
+      workspaceRoot: root,
+      buildingId: geometry.buildingId,
+      candidateId: storedCandidate.candidateId,
+    }),
+    /calibration artifact checksum does not match/i,
+  );
 
   const secondRun = spawnSync(process.execPath, [scriptPath, proposalPath, reviewPath, sourcePath, geometryPath, auditPath], { encoding: "utf8" });
   assert.notEqual(secondRun.status, 0);

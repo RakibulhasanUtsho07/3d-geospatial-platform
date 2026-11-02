@@ -13,6 +13,11 @@ import path from "node:path";
 import { loadVerifiedSource } from "./source-workflow.mjs";
 import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 import { generateFloorPlanGlb } from "./floor-plan-model.mjs";
+import { canonicalFloorPlanReviewJson } from "./floor-plan-review-payload.mjs";
+import {
+  calibrateFloorPlanRasterVectors,
+  hashFloorPlanRasterProposalReport,
+} from "./floor-plan-raster-vector-calibration.mjs";
 
 function inside(root, candidate) {
   const relative = path.relative(root, candidate);
@@ -25,6 +30,18 @@ function inside(root, candidate) {
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function jsonBytes(value) {
+  return Buffer.from(JSON.stringify(value, null, 2) + "\n", "utf8");
+}
+
+function canonicalSha256(value) {
+  return sha256(Buffer.from(canonicalFloorPlanReviewJson(value), "utf8"));
+}
+
+function canonicalJsonBytes(value) {
+  return Buffer.from(canonicalFloorPlanReviewJson(value), "utf8");
 }
 
 function safeId(value, label) {
@@ -105,7 +122,7 @@ async function writeAtomically(filePath, bytes) {
  * source was already ingested through the protected media-intake pipeline.
  * This does not publish the result or assert that its geometry is accurate.
  */
-export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }) {
+export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, calibrationEvidence }) {
   if (!floorPlan || typeof floorPlan !== "object" || Array.isArray(floorPlan)) {
     throw new TypeError("floorPlan must be a JSON object.");
   }
@@ -133,7 +150,58 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     throw error;
   }
 
+  let calibrationResult = null;
+  let calibrationSidecars = null;
+  if (calibrationEvidence !== undefined) {
+    if (!calibrationEvidence || typeof calibrationEvidence !== "object" || Array.isArray(calibrationEvidence) ||
+        !calibrationEvidence.proposalReport || typeof calibrationEvidence.proposalReport !== "object" ||
+        Array.isArray(calibrationEvidence.proposalReport) ||
+        !calibrationEvidence.review || typeof calibrationEvidence.review !== "object" ||
+        Array.isArray(calibrationEvidence.review)) {
+      throw new TypeError("calibrationEvidence must contain the original proposalReport and completed review objects.");
+    }
+    const sourceBytes = await readFile(loadedSource.assetPath);
+    if (sourceBytes.length !== loadedSource.bytes || sha256(sourceBytes) !== loadedSource.sha256) {
+      const error = new Error("Uploaded floor-plan source bytes changed while the calibration candidate was being prepared.");
+      error.code = "SOURCE_CHECKSUM_MISMATCH";
+      throw error;
+    }
+    try {
+      calibrationResult = calibrateFloorPlanRasterVectors({
+        proposalReport: calibrationEvidence.proposalReport,
+        review: calibrationEvidence.review,
+        sourceBytes,
+      });
+    } catch (cause) {
+      const error = new Error("Calibration evidence could not be independently revalidated against the uploaded source bytes.");
+      error.code = "CALIBRATION_EVIDENCE_INVALID";
+      error.cause = cause;
+      throw error;
+    }
+    if (canonicalFloorPlanReviewJson(calibrationResult.floorPlan) !== canonicalFloorPlanReviewJson(floorPlan)) {
+      const error = new Error("Submitted floorPlan does not exactly match the vectors recomputed from its source-bound proposal and review.");
+      error.code = "CALIBRATED_GEOMETRY_MISMATCH";
+      throw error;
+    }
+    calibrationSidecars = {
+      proposalReport: canonicalJsonBytes(calibrationEvidence.proposalReport),
+      review: canonicalJsonBytes(calibrationEvidence.review),
+      audit: jsonBytes(calibrationResult.audit),
+    };
+    const sidecarLimits = { proposalReport: 10, review: 5, audit: 20 };
+    for (const [key, bytes] of Object.entries(calibrationSidecars)) {
+      if (bytes.length < 1 || bytes.length > sidecarLimits[key] * 1024 * 1024) {
+        throw new RangeError("Calibration evidence sidecar exceeds the supported " + key + " size limit.");
+      }
+    }
+  }
+
   const generated = generateFloorPlanGlb(floorPlan);
+  if (calibrationResult && generated.report.output.sha256 !== calibrationResult.audit.vector.generatedPreviewGlbSha256) {
+    const error = new Error("Persisted candidate GLB does not match the independently recomputed calibration preview.");
+    error.code = "CALIBRATED_MODEL_MISMATCH";
+    throw error;
+  }
   const normalizedPlanBytes = Buffer.from(JSON.stringify(generated.plan, null, 2) + "\n", "utf8");
   const geometrySha256 = sha256(normalizedPlanBytes);
   generated.report.input.sourceEvidenceVerified = true;
@@ -144,6 +212,38 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     ? []
     : normalizeSourceOperationScopes(loadedSource.record.permittedOperations, "source " + sourceId + " permittedOperations");
   generated.report.input.normalizedGeometrySha256 = geometrySha256;
+  let calibrationBinding = null;
+  if (calibrationResult && calibrationSidecars) {
+    calibrationBinding = {
+      schemaVersion: "1.0.0",
+      engine: "floor-plan-raster-vector-calibration-v1",
+      sourceId,
+      sourceSha256: loadedSource.sha256,
+      proposalReportCanonicalSha256: hashFloorPlanRasterProposalReport(calibrationEvidence.proposalReport),
+      reviewCanonicalSha256: canonicalSha256(calibrationEvidence.review),
+      floorPlanCanonicalSha256: canonicalSha256(calibrationResult.floorPlan),
+      previewGlbSha256: calibrationResult.audit.vector.generatedPreviewGlbSha256,
+      artifacts: {
+        proposalReport: {
+          file: "proposal-report.json",
+          sha256: sha256(calibrationSidecars.proposalReport),
+          bytes: calibrationSidecars.proposalReport.length,
+        },
+        review: {
+          file: "floor-plan-review.json",
+          sha256: sha256(calibrationSidecars.review),
+          bytes: calibrationSidecars.review.length,
+        },
+        audit: {
+          file: "calibration-audit.json",
+          sha256: sha256(calibrationSidecars.audit),
+          bytes: calibrationSidecars.audit.length,
+        },
+      },
+    };
+    generated.report.input.calibrationEvidence = calibrationBinding;
+    generated.report.input.calibrationEvidenceRevalidated = true;
+  }
   generated.report.warnings = generated.report.warnings.filter(
     (warning) => !warning.startsWith("A source SHA-256 is metadata"),
   );
@@ -174,10 +274,15 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     throw new TypeError("Candidate output directory resolves outside its private building directory.");
   }
 
-  const reportBytes = Buffer.from(JSON.stringify(generated.report, null, 2) + "\n", "utf8");
+  const reportBytes = jsonBytes(generated.report);
   try {
     await writeAtomically(path.join(realCandidateDirectory, "floor-plan.json"), normalizedPlanBytes);
     await writeAtomically(path.join(realCandidateDirectory, "model.glb"), generated.glb);
+    if (calibrationSidecars) {
+      await writeAtomically(path.join(realCandidateDirectory, "proposal-report.json"), calibrationSidecars.proposalReport);
+      await writeAtomically(path.join(realCandidateDirectory, "floor-plan-review.json"), calibrationSidecars.review);
+      await writeAtomically(path.join(realCandidateDirectory, "calibration-audit.json"), calibrationSidecars.audit);
+    }
     await writeAtomically(path.join(realCandidateDirectory, "report.json"), reportBytes);
   } catch (error) {
     await rm(realCandidateDirectory, { recursive: true, force: true }).catch(() => {});
@@ -196,6 +301,10 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     sourceSha256: loadedSource.sha256,
     sourceUsageStatus: generated.report.input.sourceUsageStatus,
     sourcePermittedOperations: generated.report.input.sourcePermittedOperations,
+    ...(calibrationBinding ? {
+      calibrationEvidenceVerified: true,
+      calibrationAuditSha256: calibrationBinding.artifacts.audit.sha256,
+    } : {}),
     candidateUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId,
     modelUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId + "/model",
     mapReady: false,
@@ -269,6 +378,83 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
     error.code = "CANDIDATE_CHECKSUM_MISMATCH";
     throw error;
   }
+
+  let calibrationEvidenceVerified = false;
+  const calibrationBinding = report.input.calibrationEvidence;
+  if (report.input.calibrationEvidenceRevalidated === true && calibrationBinding === undefined) {
+    throw new TypeError("Floor-plan candidate report claims revalidated calibration evidence but has no provenance binding.");
+  }
+  if (calibrationBinding !== undefined) {
+    const validHash = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+    if (!calibrationBinding || typeof calibrationBinding !== "object" ||
+        calibrationBinding.schemaVersion !== "1.0.0" ||
+        calibrationBinding.engine !== "floor-plan-raster-vector-calibration-v1" ||
+        typeof calibrationBinding.sourceId !== "string" ||
+        !validHash(calibrationBinding.sourceSha256) ||
+        !validHash(calibrationBinding.proposalReportCanonicalSha256) ||
+        !validHash(calibrationBinding.reviewCanonicalSha256) ||
+        !validHash(calibrationBinding.floorPlanCanonicalSha256) ||
+        !validHash(calibrationBinding.previewGlbSha256) ||
+        !calibrationBinding.artifacts || typeof calibrationBinding.artifacts !== "object" ||
+        report.input.calibrationEvidenceRevalidated !== true ||
+        report.input.verifiedSourceSha256 !== calibrationBinding.sourceSha256 ||
+        plan.evidence?.sourceId !== calibrationBinding.sourceId) {
+      throw new TypeError("Floor-plan calibration provenance metadata is invalid.");
+    }
+
+    const artifactSpecs = [
+      ["proposalReport", "proposal-report.json", 10 * 1024 * 1024],
+      ["review", "floor-plan-review.json", 5 * 1024 * 1024],
+      ["audit", "calibration-audit.json", 20 * 1024 * 1024],
+    ];
+    const artifactBytes = {};
+    for (const [key, filename, maximumBytes] of artifactSpecs) {
+      const metadata = calibrationBinding.artifacts[key];
+      if (!metadata || metadata.file !== filename ||
+          !validHash(metadata.sha256) || !Number.isSafeInteger(metadata.bytes) ||
+          metadata.bytes < 1 || metadata.bytes > maximumBytes) {
+        throw new TypeError("Floor-plan calibration artifact metadata is invalid: " + key + ".");
+      }
+      const bytes = await readCandidateFile(directory, filename, maximumBytes);
+      if (bytes.length !== metadata.bytes || sha256(bytes) !== metadata.sha256) {
+        const error = new Error("Stored calibration artifact checksum does not match its candidate report: " + key + ".");
+        error.code = "CALIBRATION_ARTIFACT_CHECKSUM_MISMATCH";
+        throw error;
+      }
+      artifactBytes[key] = bytes;
+    }
+
+    const proposalReport = JSON.parse(artifactBytes.proposalReport.toString("utf8"));
+    const review = JSON.parse(artifactBytes.review.toString("utf8"));
+    const savedAudit = JSON.parse(artifactBytes.audit.toString("utf8"));
+    if (hashFloorPlanRasterProposalReport(proposalReport) !== calibrationBinding.proposalReportCanonicalSha256 ||
+        canonicalSha256(review) !== calibrationBinding.reviewCanonicalSha256) {
+      throw new TypeError("Stored floor-plan proposal or review canonical digest does not match its candidate report.");
+    }
+
+    const loadedSource = await loadVerifiedSource(root, bid, calibrationBinding.sourceId);
+    if (loadedSource.record.kind !== "floor-plan" || loadedSource.sha256 !== calibrationBinding.sourceSha256) {
+      throw new TypeError("The source record for this calibrated floor-plan candidate has changed.");
+    }
+    const sourceBytes = await readFile(loadedSource.assetPath);
+    if (sourceBytes.length !== loadedSource.bytes || sha256(sourceBytes) !== calibrationBinding.sourceSha256) {
+      throw new TypeError("The original source bytes for this calibrated floor-plan candidate have changed.");
+    }
+    const recalibrated = calibrateFloorPlanRasterVectors({ proposalReport, review, sourceBytes });
+    const regenerated = generateFloorPlanGlb(recalibrated.floorPlan);
+    if (canonicalSha256(recalibrated.floorPlan) !== calibrationBinding.floorPlanCanonicalSha256 ||
+        canonicalSha256(regenerated.plan) !== canonicalSha256(plan) ||
+        regenerated.report.output.sha256 !== calibrationBinding.previewGlbSha256 ||
+        regenerated.report.output.sha256 !== actualSha256 ||
+        sha256(jsonBytes(recalibrated.audit)) !== calibrationBinding.artifacts.audit.sha256 ||
+        canonicalSha256(savedAudit) !== canonicalSha256(recalibrated.audit)) {
+      const error = new Error("Recomputed calibration, source review, stored geometry and candidate GLB no longer match.");
+      error.code = "CALIBRATION_LINEAGE_MISMATCH";
+      throw error;
+    }
+    calibrationEvidenceVerified = true;
+  }
+
   return {
     candidateId: cid,
     buildingId: bid,
@@ -278,6 +464,7 @@ export async function loadFloorPlanModelCandidate({ workspaceRoot, buildingId, c
     geometrySha256: report.input.normalizedGeometrySha256,
     modelBytes,
     modelSha256: actualSha256,
+    ...(calibrationEvidenceVerified ? { calibrationEvidenceVerified: true } : {}),
     mapReady: false,
     publicationEligible: false,
   };

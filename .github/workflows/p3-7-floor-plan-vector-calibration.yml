@@ -15,6 +15,8 @@ on:
       - "tests/floor-plan-review-payload.test.mjs"
       - "tests/browser/floor-plan-review.spec.ts"
       - "src/core/building-generation/floor-plan-model.mjs"
+      - "src/core/building-generation/floor-plan-model-job.mjs"
+      - "src/app/api/building-generation/floor-plan-models/route.ts"
       - "scripts/calibrate-floor-plan-raster-vectors.mjs"
       - "tests/floor-plan-raster-vector-calibration.test.mjs"
       - "tests/floor-plan-raster-vector-calibration-cli.test.mjs"
@@ -61,9 +63,11 @@ jobs:
 
       - name: Test existing measured floor-plan geometry generator
         run: npm run test:floor-plan-model
+      - name: Test private floor-plan candidate and review lifecycle compatibility
+        run: npm run test:floor-plan-model-api
 
       - name: Test existing raster line extraction and private proposal integrity
         run: npm run test:floor-plan-raster-line-proposals && npm run test:floor-plan-raster-line-job
 
       - name: Lint the P3.7 implementation and regression suite
-        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs src/core/building-generation/floor-plan-review-payload.mjs src/app/experimental/floor-plan-review/page.tsx scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs tests/floor-plan-review-payload.test.mjs tests/browser/floor-plan-review.spec.ts
+        run: npm run lint -- src/core/building-generation/floor-plan-raster-vector-calibration.mjs src/core/building-generation/floor-plan-review-payload.mjs src/core/building-generation/floor-plan-model-job.mjs src/app/api/building-generation/floor-plan-models/route.ts src/app/experimental/floor-plan-review/page.tsx scripts/calibrate-floor-plan-raster-vectors.mjs tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs tests/floor-plan-review-payload.test.mjs tests/browser/floor-plan-review.spec.ts
