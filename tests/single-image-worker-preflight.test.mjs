@@ -107,3 +107,35 @@ test("preflight blocks an unsupported capability schema version", async () => {
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.some((item) => /missing or unsupported schema version/.test(item)));
 });
+
+
+test("preflight sanitizes unsupported model states and untrusted model names", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({
+      ...readyCapabilities,
+      strategies: {
+        "single-image-ai": {
+          status: "ready",
+          blockers: [],
+          modelWeights: "/private/cache/model.ckpt",
+          backgroundRemovalWeights: "cached",
+          backgroundRemovalModel: "/private/cache/secret.onnx",
+        },
+      },
+    }),
+    now: "2026-11-02T12:00:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.equal(report.model.tripoModelWeights, "unknown");
+  assert.equal(report.model.backgroundRemovalModel, undefined);
+  assert.equal(JSON.stringify(report).includes("/private/cache"), false);
+});
+
+test("preflight rejects a capability timestamp that does not match the requested probe time", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({ ...readyCapabilities, checkedAt: "2026-11-02T11:59:59.000Z" }),
+    now: "2026-11-02T12:00:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.equal(report.checkedAt, "2026-11-02T12:00:00.000Z");
+});
