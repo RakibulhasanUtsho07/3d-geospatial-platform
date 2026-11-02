@@ -1,4 +1,4 @@
-import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
+import { GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION, probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
 
 export const SINGLE_IMAGE_WORKER_PREFLIGHT_SCHEMA_VERSION = "1.0.0";
 
@@ -15,18 +15,30 @@ export async function runSingleImageWorkerPreflight({
   const checkedAt = timestamp.toISOString();
   const capabilities = await probe({ env, now: checkedAt, commandTimeoutMs, strategies: ["single-image-ai"] });
   const singleImage = capabilities?.strategies?.["single-image-ai"];
+  const schemaValid = capabilities?.schemaVersion === GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION;
+  const reportedTimestamp = capabilities?.checkedAt;
+  const parsedReportedTimestamp = typeof reportedTimestamp === "string"
+    ? new Date(reportedTimestamp)
+    : null;
+  const capabilityTimestampValid = parsedReportedTimestamp !== null &&
+    Number.isFinite(parsedReportedTimestamp.getTime()) &&
+    parsedReportedTimestamp.toISOString() === reportedTimestamp;
   const blockers = Array.isArray(singleImage?.blockers)
     ? singleImage.blockers.filter((item) => typeof item === "string")
     : ["Single-image worker capability result is missing or malformed."];
+  if (!schemaValid) blockers.push("Worker capability result has a missing or unsupported schema version.");
+  if (!capabilityTimestampValid) blockers.push("Worker capability result timestamp is missing, invalid, or non-canonical.");
   const tripoModelWeights = singleImage?.modelWeights ?? "unknown";
   const backgroundRemovalWeights = singleImage?.backgroundRemovalWeights ?? "unknown";
-  const ready = singleImage?.status === "ready" &&
+  const ready = schemaValid &&
+    capabilityTimestampValid &&
+    singleImage?.status === "ready" &&
     tripoModelWeights === "cached" &&
     backgroundRemovalWeights === "cached" &&
     blockers.length === 0;
   return {
     schemaVersion: SINGLE_IMAGE_WORKER_PREFLIGHT_SCHEMA_VERSION,
-    checkedAt: capabilities?.checkedAt ?? checkedAt,
+    checkedAt: capabilityTimestampValid ? reportedTimestamp : checkedAt,
     status: ready ? "ready" : "blocked",
     strategy: "single-image-ai",
     model: {
