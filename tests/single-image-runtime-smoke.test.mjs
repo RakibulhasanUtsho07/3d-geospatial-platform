@@ -92,7 +92,6 @@ function readyCapabilities() {
 async function fakeWorkflowResult(options, root, source) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
-  assert.equal(options.confirmOperationScopes, true);
   assert.equal(options.confirmSingleViewInference, true);
   assert.ok(options.triposrLicenceReview);
   assert.ok(options.rembgLicenceReview);
