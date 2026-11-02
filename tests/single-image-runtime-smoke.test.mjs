@@ -81,7 +81,7 @@ async function fakeWorkflowResult(options, root, source) {
   assert.equal(typeof options.spawnImpl, "function");
 
   const glb = makeGlb();
-  const relativeModelPath = ".building-engine/jobs/smoke-building/smoke-job-workflow/model.glb";
+  const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
   const absoluteModelPath = path.join(root, ...relativeModelPath.split("/"));
   await mkdir(path.dirname(absoluteModelPath), { recursive: true });
   await writeFile(absoluteModelPath, glb);
@@ -92,6 +92,8 @@ async function fakeWorkflowResult(options, root, source) {
     modelPath: absoluteModelPath,
     reportPath: path.join(root, ".building-engine", "jobs", "smoke-building", "smoke-job-workflow", "workflow-report.json"),
     report: {
+      jobId: "smoke-job",
+      buildingId: fixture.id,
       status: "completed-requires-review",
       mode: "single-image-ai",
       inputs: {
@@ -100,6 +102,8 @@ async function fakeWorkflowResult(options, root, source) {
           id: "facade-photo",
           sha256: source.sha256,
           mimeType: "image/jpeg",
+          licence: "CC BY 4.0",
+          usageStatus: "approved",
         }],
       },
       output: {
@@ -117,6 +121,7 @@ async function fakeWorkflowResult(options, root, source) {
           mcResolution: options.mcResolution,
           backgroundRemoval: true,
         },
+        source: { sha256: source.sha256 },
         outputs: { glb: { sha256: outputHash, bytes: glb.length, meshCount: 1 } },
         modelQuality: {
           warnings: ["synthetic geometry fixture requires human review"],
@@ -184,7 +189,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(result.report.readiness.status, "ready");
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
   assert.equal(result.report.source.sha256, source.sha256);
-  assert.equal(result.report.output.sha256, result.report.output.sha256);
+  const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
+  assert.equal(result.report.output.sha256, hash(await readFile(actualModelPath)));
   assert.equal(result.report.output.meshCount, 1);
   assert.equal(result.report.geometryQa.status, "warnings-require-review");
   assert.equal(result.report.geometryQa.warningCount, 1);
