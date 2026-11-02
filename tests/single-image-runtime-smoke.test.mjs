@@ -554,3 +554,18 @@ test("refuses to resume an existing reconstruction-job state directory", async (
   );
   assert.equal(probeCalls, 0);
 });
+
+
+test("enforces the media-to-model workflow's 60-character job ID limit before creating evidence", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const longJobId = "a".repeat(61);
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, { jobId: longJobId })),
+    /jobId must be a safe identifier no longer than 60 characters/,
+  );
+  await assert.rejects(
+    stat(path.join(root, ".building-engine", "runtime-smokes")),
+    /ENOENT/,
+  );
+});
