@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
+import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+
 export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
@@ -203,10 +205,33 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   );
   const modelHash = sha256(modelBytes);
   const glb = parseGlb(modelBytes);
+  const independentQa = analyzeGlbQuality(modelBytes);
+  const reportedQa = report.geometryQa;
+  const expectedWarnings = independentQa.warnings
+    .filter((item) => typeof item === "string")
+    .slice(0, 40);
+  const reportedCounts = reportedQa.counts;
+  const independentCountKeys = [
+    "triangleCount", "vertexCount", "primitiveCount", "degenerateTriangleCount",
+    "nonManifoldEdgeCount", "openBoundaryEdgeCount",
+  ];
+  const countsMatch = independentCountKeys.every((key) =>
+    reportedCounts[key] === undefined || reportedCounts[key] === independentQa.counts[key]
+  );
+  const expectedQaStatus = expectedWarnings.length
+    ? "warnings-require-review"
+    : "no-reported-warnings-require-review";
   if (modelBytes.length !== report.output.bytes ||
       modelHash !== report.output.sha256 ||
-      glb.meshCount !== report.output.meshCount) {
-    throw new Error("Smoke GLB byte count, SHA-256 or mesh count does not match its report.");
+      glb.meshCount !== report.output.meshCount ||
+      independentQa.valid !== true ||
+      independentQa.status !== reportedQa.sourceStatus ||
+      independentQa.counts.meshCount !== report.output.meshCount ||
+      !countsMatch ||
+      reportedQa.warningCount !== expectedWarnings.length ||
+      JSON.stringify(reportedQa.warnings) !== JSON.stringify(expectedWarnings) ||
+      reportedQa.status !== expectedQaStatus) {
+    throw new Error("Smoke GLB byte/hash/geometry-QA evidence does not match an independent disk analysis.");
   }
 
   return {
