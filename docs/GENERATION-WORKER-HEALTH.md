@@ -1,16 +1,22 @@
-# Generation worker health status
+# Generation worker health and strategy readiness
 
-The persistent file-backed worker writes an operational heartbeat to:
+The file-backed worker writes status to `.building-engine/generation-queue/worker-status.json`. The authenticated `GET /api/building-generation/worker-status` endpoint distinguishes process liveness from per-strategy runtime readiness.
 
-`.building-engine/generation-queue/worker-status.json`
+- `online`: heartbeat is recent (within 90 seconds).
+- `stale`: last running heartbeat is older than 90 seconds.
+- `stopped`: worker last exited cleanly.
+- `offline`: no worker status exists in this shared workspace.
 
-The authenticated endpoint `GET /api/building-generation/worker-status` returns a sanitized status:
+Startup probes record:
 
-- `online`: the worker heartbeat is recent.
-- `stale`: the last `running` heartbeat is older than 90 seconds; the process may have stopped unexpectedly.
-- `stopped`: the worker last exited cleanly.
-- `offline`: the worker has not written a status record in this workspace.
+| Strategy | Reported state | What is checked |
+|---|---|---|
+| Procedural | `ready` | In-process parametric generator; no external ML runtime |
+| Photogrammetry | `ready` / `blocked` | COLMAP executable plus `automatic_reconstructor`, `model_analyzer`, `model_converter`, and `mesh_texturer` help probes |
+| Single-image AI | `configured` / `blocked` | TripoSR runner file, runner imports, PyTorch import, and configured CPU/CUDA/MPS availability |
 
-The response includes phase (`starting`, `idle`, `processing`, `stopped`), heartbeat time, worker ID and current job ID when present. The status API uses `GENERATION_API_TOKEN` and `BUILDING_ENGINE_WORKSPACE`; it never returns tokens or file paths. Set `Cache-Control: no-store` is applied to the response.
+Single-image AI is marked `configured`, not fully ready: pretrained weights/cache and remote model availability are not verified. COLMAP command probes do not prove reconstruction quality, overlap, GPU acceleration or survey accuracy. Runtime failures and human review remain possible.
 
-The status record is monitoring telemetry only; it does not change generation job state and must not be treated as proof that the worker can complete a particular ML job. It uses the same persistent workspace as the file-backed queue, so it is not suitable for deployment architectures where API instances and workers do not share durable storage.
+The worker claims only compatible strategies. Unsupported jobs remain `queued` and do not consume retry attempts; `auto` maps to the procedural path. Probes run at worker startup, so restart after changing executable, Python, runner or device configuration.
+
+The status endpoint returns the check timestamp, strategy state and bounded blocker/caveat descriptions. It does not expose executable paths, environment values, secrets, raw process output or model files. The status API uses `GENERATION_API_TOKEN` and `BUILDING_ENGINE_WORKSPACE`, sets `Cache-Control: no-store`, and shares the queue's persistent-workspace deployment constraint.
