@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { getActivePublishedModels } from "@/core/building-generation/published-model-catalog-reader.mjs";
+import GenerationJobIntakePanel from "./GenerationJobIntakePanel";
 import GenerationJobPublishPanel from "./GenerationJobPublishPanel";
 
 import type { GeneratedModelDefinition } from "@/core/map-engine/types";
@@ -320,6 +321,8 @@ export default function GeneratedModelPanel({
                 Catalog review claims are operator-supplied attestations. Publishing checks the recorded file hashes; it does not independently prove rights, architecture or survey quality.
               </p>
             </section>
+
+            <GenerationJobIntakePanel />
 
             <GenerationJobPublishPanel
               disabled={disabled || busy}
