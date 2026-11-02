@@ -22,16 +22,34 @@ export async function runSingleImageWorkerPreflight({
     : null;
   const capabilityTimestampValid = parsedReportedTimestamp !== null &&
     Number.isFinite(parsedReportedTimestamp.getTime()) &&
-    parsedReportedTimestamp.toISOString() === reportedTimestamp;
+    parsedReportedTimestamp.toISOString() === reportedTimestamp &&
+    reportedTimestamp === checkedAt;
   const blockers = Array.isArray(singleImage?.blockers)
     ? singleImage.blockers.filter((item) => typeof item === "string")
     : ["Single-image worker capability result is missing or malformed."];
   if (!schemaValid) blockers.push("Worker capability result has a missing or unsupported schema version.");
   if (!capabilityTimestampValid) blockers.push("Worker capability result timestamp is missing, invalid, or non-canonical.");
-  const tripoModelWeights = singleImage?.modelWeights ?? "unknown";
-  const backgroundRemovalWeights = singleImage?.backgroundRemovalWeights ?? "unknown";
+  const supportedStatuses = new Set(["ready", "configured", "blocked"]);
+  const supportedModelStates = new Set(["cached", "missing", "unknown"]);
+  const capabilityStatusValid = supportedStatuses.has(singleImage?.status);
+  const tripoModelWeights = supportedModelStates.has(singleImage?.modelWeights)
+    ? singleImage.modelWeights
+    : "unknown";
+  const backgroundRemovalWeights = supportedModelStates.has(singleImage?.backgroundRemovalWeights)
+    ? singleImage.backgroundRemovalWeights
+    : "unknown";
+  if (!capabilityStatusValid) blockers.push("Worker capability result has a missing or unsupported strategy status.");
+  if (tripoModelWeights !== singleImage?.modelWeights ||
+      backgroundRemovalWeights !== singleImage?.backgroundRemovalWeights) {
+    blockers.push("Worker capability result has an unsupported model-cache state.");
+  }
+  const backgroundRemovalModel = typeof singleImage?.backgroundRemovalModel === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(singleImage.backgroundRemovalModel)
+    ? singleImage.backgroundRemovalModel
+    : null;
   const ready = schemaValid &&
     capabilityTimestampValid &&
+    capabilityStatusValid &&
     singleImage?.status === "ready" &&
     tripoModelWeights === "cached" &&
     backgroundRemovalWeights === "cached" &&
@@ -44,9 +62,7 @@ export async function runSingleImageWorkerPreflight({
     model: {
       tripoModelWeights,
       backgroundRemovalWeights,
-      ...(typeof singleImage?.backgroundRemovalModel === "string"
-        ? { backgroundRemovalModel: singleImage.backgroundRemovalModel }
-        : {}),
+      ...(backgroundRemovalModel ? { backgroundRemovalModel } : {}),
     },
     blockers: ready ? [] : blockers.length ? blockers : [
       "TripoSR and rembg model caches must both be verified as cached before a real smoke run.",
