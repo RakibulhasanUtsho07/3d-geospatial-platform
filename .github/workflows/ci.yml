@@ -63,7 +63,7 @@ on:
       - development
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
-  pull_request:
+      - feat/brf47-cross-role-asset-identity-20261031  pull_request:
     branches:
       - main
       - refactor/p1-road-layer-manager-sync
