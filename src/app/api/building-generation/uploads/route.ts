@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authorizeGenerationApiRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
+import { authorizeGenerationOperatorRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
 import {
   ingestUploadedGenerationMedia,
   MAX_GENERATION_MEDIA_UPLOAD_BYTES,
@@ -65,7 +65,7 @@ function responseError(error: unknown) {
 }
 
 export async function POST(request: Request) {
-  const auth = authorizeGenerationApiRequest(request);
+  const auth = authorizeGenerationOperatorRequest(request);
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
