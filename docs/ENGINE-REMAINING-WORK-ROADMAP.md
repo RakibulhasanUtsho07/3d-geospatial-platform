@@ -142,3 +142,8 @@ The codebase still needs real-data validation and product-level completion. The 
 - Missing inputs or unpinned hashes stay incomplete; hash mismatches and explicit geometry/view/model-binding failures are not silently downgraded. No combined accuracy percentage is produced and publication/automatic approval remain disabled.
 - Added focused regression tests and a runbook/template. Tests validate policy and evidence linkage only; they do not establish the accuracy of a specific real building.
 - **Acceptance still pending:** no actual 2–3 building source/reference pack with independently verified dimensions, checked permissions, surveyed controls and human-reviewed renders was available in this session. Do not mark the models accurate until those inputs are supplied and the evidence report passes review.
+
+
+## 2026-11-02 — P3.4 responsive map-panel occlusion candidate
+
+The property-search, map-layer and camera-control docks now default to collapsed disclosures so the Dhaka 3D canvas is less obstructed on first load. Mobile dock positions were separated and a Playwright regression was added for desktop/mobile default layout. See [P3.4 map-panel occlusion checkpoint](./P3-4-MAP-PANEL-OCCLUSION-2026-11-02.md). The implementation remains a candidate until exact-head PR Full CI and Push CI pass. This change does not fix or explain the red imagery/overlay anomaly; that requires separate evidence-led diagnosis.
