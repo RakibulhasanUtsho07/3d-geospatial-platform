@@ -17,6 +17,38 @@ function cookie(value: string, maxAge: number): string {
     "; HttpOnly; SameSite=Strict; Path=/api/building-generation; Max-Age=" + maxAge + secure;
 }
 
+async function readBoundedBody(request: Request): Promise<string> {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    throw new RangeError("Operator login request exceeds its size limit.");
+  }
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      total += result.value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new RangeError("Operator login request exceeds its size limit.");
+      }
+      chunks.push(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 export async function GET(request: Request) {
   const session = verifyGenerationOperatorSession(request);
   if (!session.allowed) {
@@ -35,20 +67,15 @@ export async function POST(request: Request) {
   if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
     return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
   }
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: "Operator login request exceeds its size limit." }, { status: 413 });
-  }
-
   let input: unknown;
   try {
-    const body = await request.text();
-    if (Buffer.byteLength(body, "utf8") > MAX_BODY_BYTES) {
-      return NextResponse.json({ error: "Operator login request exceeds its size limit." }, { status: 413 });
-    }
+    const body = await readBoundedBody(request);
     input = JSON.parse(body) as unknown;
-  } catch {
-    return NextResponse.json({ error: "Operator login request must be valid JSON." }, { status: 400 });
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return NextResponse.json({ error: error.message }, { status: 413 });
+    }
+    return NextResponse.json({ error: "Operator login request must be valid UTF-8 JSON." }, { status: 400 });
   }
   if (!input || typeof input !== "object" || Array.isArray(input) ||
       !("token" in input) || typeof input.token !== "string") {
