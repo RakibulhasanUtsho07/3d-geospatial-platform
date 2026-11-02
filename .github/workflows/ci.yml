@@ -66,8 +66,10 @@ on:
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01e-brf25-authenticated-review-gate-20261030
+      - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
+      - feat/d3m01e-brf25-authenticated-review-gate-20261030
       - main
       - refactor/p1-road-layer-manager-sync
       - refactor/p1-building-viewport-manager-sync
