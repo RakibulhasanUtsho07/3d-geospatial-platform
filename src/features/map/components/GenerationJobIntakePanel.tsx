@@ -356,6 +356,11 @@ export default function GenerationJobIntakePanel() {
       setError("Select at least one facade image.");
       return;
     }
+    if ((strategy === "single-image-ai" || strategy === "photogrammetry") &&
+        files.some((file) => file.type === "image/webp")) {
+      setError("The selected reconstruction worker accepts JPEG or PNG only. Convert WebP images before using single-image AI or photogrammetry; changing the file extension is not conversion.");
+      return;
+    }
     if (!licence.trim() || ["unknown", "n/a", "none"].includes(licence.trim().toLowerCase())) {
       setError("Enter a known licence or permission basis for the selected images.");
       return;

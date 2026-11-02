@@ -88,6 +88,88 @@ test("rejects missing source media before creating a queue job", async (t) => {
   assert.deepEqual(await listGenerationJobs({ workspaceRoot, limit: 5 }), []);
 });
 
+test("rejects WebP selected views for single-image AI and photogrammetry before queue creation", async (t) => {
+  const webp = Buffer.from("RIFFxxxxWEBP", "ascii");
+
+  const singleWorkspace = await makeWorkspace(t);
+  await mkdir(path.join(singleWorkspace, "uploads"), { recursive: true });
+  await writeFile(path.join(singleWorkspace, "uploads", "view.webp"), webp);
+  const singleSource = {
+    sourceId: "view-1",
+    relativePath: "uploads/view.webp",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+  };
+  await assert.rejects(enqueueGenerationJob({
+    workspaceRoot: singleWorkspace,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [singleSource],
+      viewSourceIds: ["view-1"],
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  }), /image\\/webp.*supports JPEG or PNG/i);
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot: singleWorkspace, limit: 5 }), []);
+
+  const photoWorkspace = await makeWorkspace(t);
+  await mkdir(path.join(photoWorkspace, "uploads"), { recursive: true });
+  const photoSources = ["front", "side", "rear"].map((sourceId) => ({
+    sourceId,
+    relativePath: "uploads/" + sourceId + ".webp",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "photogrammetry-reconstruction", "texture-baking"],
+  }));
+  for (const source of photoSources) {
+    await writeFile(path.join(photoWorkspace, source.relativePath), webp);
+  }
+  await assert.rejects(enqueueGenerationJob({
+    workspaceRoot: photoWorkspace,
+    input: basicInput({
+      strategy: "photogrammetry",
+      sources: photoSources,
+      viewSourceIds: photoSources.map((source) => source.sourceId),
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSameBuilding: true,
+      confirmOverlapReviewed: true,
+      confirmUpAxisReviewed: true,
+      upAxis: "Y",
+    }),
+  }), /image\\/webp.*supports JPEG or PNG/i);
+  assert.deepEqual(await listGenerationJobs({ workspaceRoot: photoWorkspace, limit: 5 }), []);
+});
+
+test("accepts a PNG-signature selected view for single-image AI at queue preflight", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  await writeFile(
+    path.join(workspaceRoot, "uploads", "view.png"),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  const job = await enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [{
+        sourceId: "view-1",
+        relativePath: "uploads/view.png",
+        licence: "CC BY 4.0",
+        kind: "image",
+        permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+      }],
+      viewSourceIds: ["view-1"],
+      confirmRights: true,
+      confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  });
+  assert.equal(job.status, "queued");
+});
+
 test("rejects symlinked sources and sources that are not regular files", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
   await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });

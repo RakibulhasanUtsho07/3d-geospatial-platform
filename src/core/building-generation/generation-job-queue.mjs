@@ -2,6 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   lstat,
   mkdir,
+  open,
   readFile,
   readdir,
   realpath,
@@ -337,7 +338,24 @@ const MAX_SOURCE_BYTES_BY_KIND = Object.freeze({
   auto: 500 * 1024 * 1024,
 });
 
-async function preflightGenerationSources(root, sources) {
+function detectImageMimeType(header) {
+  if (header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (header.length >= 8 && header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+    return "image/png";
+  }
+  if (header.length >= 12 && header.toString("ascii", 0, 4) === "RIFF" &&
+      header.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  return "unknown image format";
+}
+
+async function preflightGenerationSources(root, request) {
+  const { sources, strategy, viewSourceIds = [] } = request;
+  const rasterReconstruction = strategy === "single-image-ai" || strategy === "photogrammetry";
+  const selectedViewIds = new Set(viewSourceIds);
   for (const source of sources) {
     const candidate = path.resolve(root, ...source.relativePath.split("/"));
     if (!inside(root, candidate)) {
@@ -387,13 +405,33 @@ async function preflightGenerationSources(root, sources) {
         "Source '" + source.sourceId + "' exceeds the " + maximum + "-byte " + kind + " intake limit.",
       );
     }
+
+    if (rasterReconstruction && selectedViewIds.has(source.sourceId)) {
+      const file = await open(current, "r");
+      let header;
+      try {
+        header = Buffer.alloc(12);
+        const { bytesRead } = await file.read(header, 0, header.length, 0);
+        header = header.subarray(0, bytesRead);
+      } finally {
+        await file.close();
+      }
+      const detectedMime = detectImageMimeType(header);
+      if (detectedMime !== "image/jpeg" && detectedMime !== "image/png") {
+        throw new TypeError(
+          "Selected source '" + source.sourceId + "' has " + detectedMime + " bytes; " +
+          strategy + " reconstruction currently supports JPEG or PNG image signatures only. " +
+          "Convert the image before queueing; changing its file extension is not conversion.",
+        );
+      }
+    }
   }
 }
 
 export async function enqueueGenerationJob({ workspaceRoot, input, now = new Date() }) {
   const root = await workspaceRootPath(workspaceRoot);
   const normalized = normalizeRequest(input);
-  await preflightGenerationSources(root, normalized.sources);
+  await preflightGenerationSources(root, normalized);
   const timestamp = new Date(now).toISOString();
   if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("now must be a valid timestamp.");
   const jobId = "gen-" + randomUUID();

@@ -3,14 +3,14 @@
 **Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
 **Dependency:** [D3M-02 PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302)  
 **Implementation branch:** `feat/d3m03-map-generation-intake-20261102`  
-**Status:** Implementation candidate; exact-head CI and review pending
+**Status:** Implementation candidate; exact-head Full CI passed on `3e4aba47126e585f39ff91a0cc55dc91d38ada78`; strategy-format compatibility fix added afterward and awaiting its own exact-head CI
 
 ## User flow
 
 1. Open **3D Map → Generated models → Upload images and start building generation**.
 2. Connect the operator session using the deployment's `GENERATION_OPERATOR_LOGIN_TOKEN`. The token is sent once to the same-origin session endpoint and cleared from the React component after success. The server returns a 30-minute `HttpOnly; SameSite=Strict` cookie, marked `Secure` in production and scoped to `/api/building-generation`.
 3. Enter the building ID/name, WGS84 center, reference height, footprint width/depth, floor count/floor height and footprint heading. These are explicit operator inputs. The UI converts a metric rectangle to a WGS84 GeoJSON polygon; it does not derive dimensions or coordinates from an image.
-4. Select up to 12 JPEG/PNG/WebP facade images (maximum 20 MiB each). Each file is sent sequentially to the existing `POST /api/building-generation/uploads` endpoint. The server checks the actual file signature, hashes and stores it under the private workspace. The UI uses the exact returned `source.relativePath` and source ID; it does not guess any content-addressed path.
+4. Select up to 12 JPEG/PNG/WebP facade images (maximum 20 MiB each). Each file is sent sequentially to the existing `POST /api/building-generation/uploads` endpoint. The server checks the actual file signature, hashes and stores it under the private workspace. The UI uses the exact returned `source.relativePath` and source ID; it does not guess any content-addressed path. WebP is accepted by general intake/procedural use, but selected views for single-image AI and COLMAP photogrammetry must be JPEG/PNG; the UI and queue both reject WebP for those strategies before job creation.
 5. Enter a non-unknown licence/permission basis, optional author/attribution, and explicitly confirm rights. This checkbox is an operator attestation only. The source record remains `usageStatus=unreviewed` until the existing rights-review workflow records a decision.
 6. Choose a generation strategy and explicitly authorize the required source-operation scopes (separate from copyright/reuse rights):
    - **Single-image AI:** `private-media-ingestion` plus `single-image-ai-reconstruction`; exactly one image plus explicit single-view inference confirmation. Hidden/rear geometry is inferred, not observed. The AI worker/runtime must be installed and configured.
@@ -18,7 +18,7 @@
    - **Procedural:** `private-media-ingestion` plus `procedural-model-derivation`; creates a parameter-driven model from the dimensions/architecture input. It does **not** infer facade geometry from the uploaded images; the images are retained as private source records.
    
    Both the rights attestation and operation-scope authorization are required. The helper and server queue record the exact least-privilege scope list for the chosen strategy; the worker's rights-review stage writes that reviewed scope into the source provenance.
-7. Select **Upload images and create generation job**. After every upload succeeds, the UI sends the exact returned file paths to `POST /api/building-generation/jobs`. The existing durable queue performs its own path, file-size, licence and strategy checks before creating the job.
+7. Select **Upload images and create generation job**. After every upload succeeds, the UI sends the exact returned file paths to `POST /api/building-generation/jobs`. The existing durable queue performs its own path, file-size, licence, strategy and selected-view image-signature checks before creating the job.
 8. The UI polls the job status and worker health every 5 seconds while the job is queued/running. Polling stops on completed or failed status. An existing job can be tracked by job ID while an operator session is active.
 9. A completed job is only a candidate. Inspect the GLB and QA report, record the separate review, and use D3M-02's publication panel only after review and explicit placement.
 
