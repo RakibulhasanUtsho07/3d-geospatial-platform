@@ -187,9 +187,10 @@ The codebase still needs real-data validation and product-level completion. The 
 **Implementation branch:** `feat/d3m04-triposr-background-cache-readiness-20261102`
 
 - [x] Audit confirmed that the worker launches TripoSR without `--no-remove-bg`; upstream TripoSR therefore creates `rembg.new_session()` by default. The effective default model depends on the installed rembg version.
-- [ ] Import ONNX Runtime/rembg during the bounded worker startup probe; identify the installed default rembg model and resolve its local model file without initializing a session or making a network request.
-- [ ] Keep single-image AI unclaimable until both TripoSR weights and the active rembg model weights are cached; unknown package/cache layouts fail closed.
-- [ ] Surface missing/unknown background-removal cache state in the operator panel and persist only sanitized model identifiers/state, never cache paths or process output.
-- [ ] Validate cached/missing/unknown cache states, legacy worker status compatibility, queue non-consumption and exact-head CI.
+- [x] Import ONNX Runtime/rembg during the bounded worker startup probe; identify the installed default rembg model and resolve its local model file without initializing a session or making a network request.
+- [x] Keep single-image AI unclaimable until both TripoSR weights and the active rembg model weights are cached; unknown API/resolver layouts remain `unknown` and fail closed rather than being mislabeled as missing.
+- [x] Surface missing/unknown background-removal cache state in the operator panel and persist only sanitized model identifiers/state, never cache paths or process output.
+- [x] Add executable Python-probe contract tests for cached/missing/unknown states, missing ONNX Runtime import, legacy worker-status compatibility, and worker-level queue non-consumption (attempt remains zero).
+- [ ] Run and record Full CI against the final D3M-04 exact head; keep PR #306 Draft until exact-head checks and independent review pass.
 - **Important licensing limit:** rembg package licensing is separate from model-weight licensing. Current upstream rembg documentation identifies `bria-rmbg` as its default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Deployment must deliberately choose a model and verify applicable rights before commercial use.
 - **No accuracy claim:** readiness does not prove that a real TripoSR run succeeds, that the output matches a building, that scale/georeferencing is correct, or that the candidate is map-ready. Release flags remain fail-closed.
