@@ -68,6 +68,7 @@ function readyCapabilities() {
 async function fakeWorkflowResult(options, root, source) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
+  assert.equal(options.confirmOperationScopes, true);
   assert.equal(options.confirmSingleViewInference, true);
   assert.deepEqual(options.viewSourceIds, ["facade-photo"]);
   assert.equal(options.sources.length, 1);
@@ -156,6 +157,7 @@ function makeOptions(root, source, overrides = {}) {
     mcResolution: 128,
     timeoutMs: 20_000,
     confirmSourceRights: true,
+    confirmOperationScopes: true,
     confirmSingleViewInference: true,
     confirmModelLicences: true,
     probeCapabilities: async ({ env, spawnImpl }) => {
@@ -241,6 +243,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(saved.output.sha256, result.report.output.sha256);
   assert.equal(saved.model.licenceReview, "operator-attested-not-independently-verified");
   assert.equal(saved.source.licence, "CC BY 4.0");
+  assert.deepEqual(saved.source.permittedOperations, ["private-media-ingestion", "single-image-ai-reconstruction"]);
+  assert.equal(saved.source.operationScopeAttestation, "operator-attested-not-independently-verified");
   assert.equal(saved.networkPolicy.pythonSocketConnectionsBlocked, true);
   assert.equal(saved.networkPolicy.kernelNetworkIsolation, "not-enforced-by-this-command");
   assert.equal(JSON.stringify(saved).includes(root), false);
@@ -349,6 +353,10 @@ test("requires the three separate operator confirmations", async (t) => {
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, { confirmSourceRights: false })),
     /confirmSourceRights/,
+  );
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, { confirmOperationScopes: false })),
+    /confirmOperationScopes/,
   );
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, { confirmSingleViewInference: false })),
