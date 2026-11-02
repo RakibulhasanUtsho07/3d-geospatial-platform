@@ -277,3 +277,24 @@ Key closeout findings:
 The D3M-07 preflight now validates capability schema version, canonical/exact probe timestamp, strategy status and allow-listed model cache states. Unexpected model state values and unsafe rembg model identifiers are normalized/omitted instead of being echoed into the preflight report. Added regression coverage for schema, timestamp, stale result, unsupported cache-state and path-injection cases.
 
 Current exact-head PR and Push CI are recorded at [#41443645721](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443645721) and [#41443642326](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443642326) on `8947049cd219474859be5923bde44b5c503ebd6d`. At the time of this update both were queued; do not treat the previous `af287278...` green runs as proof for this new head.
+
+## 2026-11-02 — Latest D3M-00→D3M-07 exact-head recheck
+
+This update supersedes the earlier D3M-00→D3M-07 checkpoint above where run IDs, SHA or status differ.
+
+- D3M-02 #302 head 116453207d517db6db6a8a19f6cc5802f5630be0: PR Full CI #41449228282 and Push CI #41449218404 both succeeded.
+- D3M-03 #304 head dc826ea5fb327cd4772c7725ad8add85e05a1f13: PR Full CI #41449879790 and Push CI #41449860665 both succeeded.
+- D3M-04 #306 head 4028e097f02ebf3e44505c48b4d79424da2aaf27: PR Full CI #41450782703 and Push CI #41450775053 both succeeded.
+- D3M-05 #308 head 3ed68591ab133acef70f0fedd45fab0f54aee34a: PR Full CI #41450939744 and Push CI #41450932957 both succeeded.
+- D3M-06 #310 now includes D3M-05 parent history through merged sync PR #313, producing head 08344f681210da213261dfa7444b687dcb89796a. Exact-head PR run #41452436484 and Push run #41452430526 were still in progress at last check. In the PR job, steps 1–173 were successful; production-server viewport API verification (step 174) remained in progress. Do not check this gate until terminal success.
+- D3M-07 #312 prior head 9956827be12377734ea2ec37c945f643b3a39a99 passed PR #41447645622 and Push #41447633166. Because D3M-06 advanced, synchronization PR #315 was opened (D3M-06 → D3M-07); it is Draft and mergeable, but not merged. Fresh exact-head CI is required after the sync.
+
+D3M-01 chain:
+- #281 current head 086c13f3467ebcbd3d2f46e1e4d45d4365a5d361 has current PR #41449210075 and Push #41449201350 success. Compared with live development, it is 36 commits ahead / 5 behind. Sync PR #314 was opened, Draft/mergeable, with only the current development additions across three paths. It remains unmerged pending review and post-sync validation.
+- #284/#286/#288/#290/#292 each have a current PR-triggered and Push-triggered success on their respective recorded heads. Their current parent-child compares report zero commits behind.
+
+Remaining:
+- Wait for D3M-06 merged-head exact PR + Push runs to reach terminal success, then merge #315 and validate new D3M-07 head on both events.
+- Review #314; if accepted, merge it only into the D3M-01.A/B feature branch and run fresh CI, then recheck child stack ancestry and exact-head CI.
+- Keep PRs Draft until review. Do not promote development to main in this work item; their refs remain divergent (91 ahead / 6 behind).
+- Real worker-host inference, model/source rights, production credentials, independent survey truth, visual accuracy review and release readiness remain external blockers. No accuracy or map-ready claim is made and all release flags remain false.
