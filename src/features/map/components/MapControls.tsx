@@ -99,16 +99,16 @@ export default function MapControls({
               disabled={disabled}
               onClick={onZoomIn}
             />
-    
+
             <ControlButton
               label="Zoom out"
               symbol="−"
               disabled={disabled}
               onClick={onZoomOut}
             />
-    
+
             <div className="mx-1 border-t border-white/10" />
-    
+
             <ControlButton
               label="Go to home view"
               symbol="⌂"
@@ -116,7 +116,7 @@ export default function MapControls({
               onClick={onHome}
             />
           </div>
-    
+
           <div className="rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
             <div className="grid grid-cols-2 gap-1">
               <ControlButton
@@ -125,21 +125,21 @@ export default function MapControls({
                 disabled={disabled}
                 onClick={onRotateLeft}
               />
-    
+
               <ControlButton
                 label="Rotate right"
                 symbol="↷"
                 disabled={disabled}
                 onClick={onRotateRight}
               />
-    
+
               <ControlButton
                 label="Tilt up"
                 symbol="↑"
                 disabled={disabled}
                 onClick={onTiltUp}
               />
-    
+
               <ControlButton
                 label="Tilt down"
                 symbol="↓"
@@ -147,9 +147,9 @@ export default function MapControls({
                 onClick={onTiltDown}
               />
             </div>
-    
+
             <div className="mx-1 border-t border-white/10" />
-    
+
             <ControlButton
               label="Reset orientation"
               symbol="⟲"
@@ -157,7 +157,7 @@ export default function MapControls({
               onClick={onResetOrientation}
             />
           </div>
-    
+
           <button
             type="button"
             aria-label="Fly to Ahsan Manzil"
@@ -168,7 +168,7 @@ export default function MapControls({
           >
             Ahsan Manzil
           </button>
-    
+
           <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
             <button
               type="button"
@@ -191,7 +191,7 @@ export default function MapControls({
               Side
             </button>
           </div>
-    
+
           <button
             type="button"
             aria-label="Show the whole Ahsan Manzil model in 3D"
@@ -202,7 +202,7 @@ export default function MapControls({
           >
             Full model
           </button>
-    
+
           <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl" aria-label="Orbit around Ahsan Manzil">
             <ControlButton
               label="Orbit Ahsan Manzil 45 degrees left"
@@ -218,7 +218,7 @@ export default function MapControls({
               onClick={onOrbitRight}
             />
           </div>
-    
+
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl backdrop-blur-xl">
             <button
               type="button"
