@@ -57,6 +57,8 @@
     "reconstruct:building-media": "node scripts/reconstruct-building-from-media.mjs",
     "test:single-image-3d": "node --test tests/single-image-3d-worker.test.mjs",
     "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs",
+    "test:single-image-worker-preflight": "node --test tests/single-image-worker-preflight.test.mjs",
+    "preflight:single-image-worker": "node scripts/preflight-single-image-worker.mjs",
     "smoke:single-image-runtime": "node scripts/smoke-test-single-image-runtime.mjs",
     "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs",
     "test:video-frame-operation-scopes": "node --test tests/video-frame-extractor-operation-scopes.test.mjs",
