@@ -119,6 +119,30 @@ export function buildMapGenerationBuildingSpec(input) {
 /**
  * Build the durable queue request from exact private intake records.
  * Strategy confirmations are explicit and mirror the server-side queue.
+ *
+ * @param {{
+ *   buildingSpec: Record<string, unknown>,
+ *   strategy: "procedural" | "single-image-ai" | "photogrammetry",
+ *   uploadedSources: Array<{
+ *     sourceId: string,
+ *     relativePath: string,
+ *     kind: "image",
+ *     licence: string,
+ *     permittedOperations: string[],
+ *     author?: string,
+ *     attribution?: string,
+ *     sourceUrl?: string,
+ *     description?: string
+ *   }>,
+ *   confirmRights?: boolean,
+ *   confirmOperationScopes?: boolean,
+ *   selectedViewSourceIds?: string[],
+ *   confirmSingleViewInference?: boolean,
+ *   confirmSameBuilding?: boolean,
+ *   confirmOverlapReviewed?: boolean,
+ *   confirmUpAxisReviewed?: boolean,
+ *   upAxis?: "X" | "Y" | "Z"
+ * }} options
  */
 export function buildMapGenerationJobInput({
   buildingSpec,
