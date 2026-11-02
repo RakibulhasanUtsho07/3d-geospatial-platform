@@ -152,6 +152,11 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   if (!report.source || !SAFE_ID.test(report.source.sourceId ?? "") ||
       report.source.rights !== "operator-attested-not-independently-verified" ||
       typeof report.source.licence !== "string" || !report.source.licence.trim() ||
+      report.source.operationScopeAttestation !== "operator-attested-not-independently-verified" ||
+      JSON.stringify(report.source.permittedOperations) !== JSON.stringify([
+        "private-media-ingestion",
+        "single-image-ai-reconstruction",
+      ]) ||
       !HASH.test(report.source.sha256 ?? "")) {
     throw new TypeError("Smoke report source evidence is invalid.");
   }
