@@ -169,3 +169,63 @@ A final run-metadata pass checked the GitHub Actions `event` field rather than i
 “Not found” means no completed run with the required event and exact head was returned by the branch/commit Actions history during this audit. It is not inferred from an old run, a child branch's workflow file, or another event type. The current D3M-07 remediation head has fresh runs pending; its terminal status is recorded separately after they complete.
 
 This correction supersedes the older row descriptions above wherever they mislabelled a second PR-triggered run as Push CI. Branch filters added in a descendant workflow only affect future pushes after the workflow file itself exists on the pushed branch; they do not retroactively produce historical runs or fix the parent branch.
+
+## 13. Live branch, dependency and exact-head CI recheck — 2026-11-02 (latest)
+
+This section supersedes earlier event/CI statements above wherever the same branch has since advanced. Values below were re-read from live PR metadata, commit comparisons and GitHub Actions run metadata; a successful historical run is not reused for a different SHA.
+
+### Current feature PR heads
+
+| Work package | PR | Current head | Current branch relationship |
+|---|---:|---|---|
+| D3M-01.A/B | #281 | 086c13f3467ebcbd3d2f46e1e4d45d4365a5d361 | 36 commits ahead / 5 behind live development at f7b2a67fcf0c34623196fa92e719640086e2adce |
+| D3M-01.C | #284 | ba65e823750077955366d210cf12b31a5298c1e0 | 19 ahead / 0 behind #281 current head |
+| D3M-01.D | #286 | 5335c4a507fdcc8e3ac5aea1c58ea8c7e00b10c0 | 26 ahead / 0 behind #284 current head |
+| D3M-01.E | #288 | 355308148234b0e73955ccc1e9225e515ac0dfd5 | 34 ahead / 0 behind #286 current head |
+| D3M-01.F | #290 | ff2fdeb4fc73ae926a122de29f30324eb127cb77 | 11 ahead / 0 behind #288 current head |
+| D3M-01.G | #292 | b558508e445c51bfcb8a2421844c167633452da8 | 14 ahead / 0 behind #290 current head |
+| D3M-02 | #302 | 116453207d517db6db6a8a19f6cc5802f5630be0 | 24 ahead / 0 behind current development |
+| D3M-03 | #304 | dc826ea5fb327cd4772c7725ad8add85e05a1f13 | 83 ahead / 0 behind #302 current head |
+| D3M-04 | #306 | 4028e097f02ebf3e44505c48b4d79424da2aaf27 | 11 ahead / 0 behind #304 current head |
+| D3M-05 | #308 | 3ed68591ab133acef70f0fedd45fab0f54aee34a | 64 ahead / 0 behind #306 current head |
+| D3M-06 | #310 | 08344f681210da213261dfa7444b687dcb89796a | D3M-05 parent history was joined by sync PR #313 |
+| D3M-07 | #312 | 9956827be12377734ea2ec37c945f643b3a39a99 | 48 ahead / 6 behind the updated D3M-06 head; sync PR #315 is open and mergeable |
+
+### Current exact-head CI events
+
+| PR | Exact head | PR-triggered CI | Push-triggered CI |
+|---:|---|---|---|
+| #281 | 086c13f... | #41449210075 — success | #41449201350 — success |
+| #284 | ba65e823... | #41449793055 — success | #41449784699 — success |
+| #286 | 5335c4a... | #41450192326 — success | #41450181146 — success |
+| #288 | 3553081... | #41450249825 — success | #41450240811 — success |
+| #290 | ff2fdeb... | #41450285878 — success | #41450275317 — success |
+| #292 | b558508... | #41450749550 — success | #41450740985 — success |
+| #302 | 1164532... | #41449228282 — success | #41449218404 — success |
+| #304 | dc826ea... | #41449879790 — success | #41449860665 — success |
+| #306 | 4028e09... | #41450782703 — success | #41450775053 — success |
+| #308 | 3ed6859... | #41450939744 — success | #41450932957 — success |
+| #310 | 08344f6... | #41452436484 — in progress at last check | #41452430526 — in progress at last check |
+| #312 | 9956827... (pre-sync head) | #41447645622 — success | #41447633166 — success |
+
+For D3M-06 merged head 08344f6..., the Full CI job had completed lint, production build, and steps 1–173 successfully. Step 174, Verify viewport API against the production server, was still in progress; evidence uploads after it were pending. Do not mark this merged head green until the run reports terminal success. The earlier #310 success on 4185a7b... is not substituted for the merged head.
+
+### Dependency-sync PRs created in this audit
+
+- **#313 — D3M-05 → D3M-06:** merged into the D3M-06 feature branch only. Merge commit: 08344f681210da213261dfa7444b687dcb89796a. It did not merge into development or main. Fresh PR + Push CI on that merge commit are still required; see runs above.
+- **#314 — live development → D3M-01.A/B parent branch:** open, Draft, mergeable. Its reviewed diff is limited to three paths: the CI workflow branch filter, BRF-35 global source-asset ID uniqueness, and candidate-GLB/source-asset identity/hash non-collision plus regression tests. It has not been merged; do not imply the D3M-01 base drift is closed.
+- **#315 — D3M-06 → D3M-07:** open, Draft, mergeable, zero changed-file diff (ancestry-only synchronization). Merge only after D3M-06 merged-head PR and Push CI both reach terminal success; then require fresh D3M-07 PR + Push CI on its resulting exact head.
+
+### Corrected closeout status
+
+- D3M-02 through D3M-05 now have both PR and Push CI success on their current recorded feature heads. This closes the prior event-type gaps for those exact SHAs.
+- D3M-06's missing Push trigger was corrected on its branch and both event types ran on the new merged head; terminal outcome was still pending at the last check.
+- D3M-07's previous head had both events pass, but its parent has advanced; the new child head still needs synchronization and fresh validation.
+- D3M-01.C through .G are ancestry-contiguous in the current compare checks and each has PR + Push success on its present head. D3M-01.A/B (#281) still needs the #314 development-sync decision and post-sync validation.
+- All listed implementation PRs remain Draft/open. No release promotion is authorized by these CI results.
+
+### Remaining external acceptance blockers
+
+The repository-side CI/ancestry work does not provision production credentials, a trusted reviewer registry or worker host. A real operator must still verify private durable workspace/storage, operator and publisher credentials, worker supervision, Python/PyTorch/ONNX/rembg/TripoSR compatibility, both model caches, host-level network egress controls, and a real source image with reviewed operation rights and model licences. Run D3M-07 preflight and D3M-05 inference on that actual host, independently re-hash and visually inspect the GLB, then obtain independent survey/metric-scale/vertical-datum evidence and human review. Until those gates pass, keep all ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags false.
+
+The repository development and main refs remain diverged (91 commits ahead / 6 behind in the latest comparison; 204 changed paths). No merge to main or broad promotion was performed. This requires a separate explicit release plan and review.
