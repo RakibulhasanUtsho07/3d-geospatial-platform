@@ -15,6 +15,8 @@ async function main() {
       licence: { type: "string" },
       author: { type: "string" },
       attribution: { type: "string" },
+      "triposr-licence-review": { type: "string" },
+      "rembg-licence-review": { type: "string" },
       "runner-script": { type: "string" },
       python: { type: "string" },
       device: { type: "string", default: "cuda:0" },
@@ -33,6 +35,8 @@ async function main() {
       "  node scripts/smoke-test-single-image-runtime.mjs <workspaceRoot> <buildingSpec.json> <jobId> <sourceId> <workspace-relative-image-path>",
       "    --licence <source-rights-basis>",
       "    --runner-script <TripoSR-repo/run.py>",
+      "    --triposr-licence-review <code/checkpoint licence basis>",
+      "    --rembg-licence-review <rembg weight licence basis>",
       "    --confirm-source-rights",
       "    --confirm-operation-scopes",
       "    --confirm-single-view-inference",
@@ -47,8 +51,9 @@ async function main() {
     return;
   }
 
-  if (positionals.length !== 5 || !values.licence || !values["runner-script"]) {
-    throw new TypeError("Five positionals, --licence and --runner-script are required. Run with --help for usage.");
+  if (positionals.length !== 5 || !values.licence || !values["runner-script"] ||
+      !values["triposr-licence-review"] || !values["rembg-licence-review"]) {
+    throw new TypeError("Five positionals, --licence, --runner-script and both model-licence review statements are required. Run with --help for usage.");
   }
 
   const [workspaceRoot, specPath, jobId, sourceId, sourceRelativePath] = positionals;
@@ -68,6 +73,8 @@ async function main() {
     licence: values.licence,
     author: values.author,
     attribution: values.attribution,
+    triposrLicenceReview: values["triposr-licence-review"],
+    rembgLicenceReview: values["rembg-licence-review"],
     runnerScript: values["runner-script"],
     pythonPath: values.python,
     device: values.device,
