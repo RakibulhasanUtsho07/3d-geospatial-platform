@@ -270,3 +270,10 @@ Key closeout findings:
 - D3M-06 current head has PR CI success but no exact-head Push CI; D3M-06 was added to the Push branch filter by the reconciliation update, but a same-head run is still required after safely updating/revalidating the branch.
 - D3M-07 prior head af287278... had both exact-head PR + Push CI success (184/184 each). The current reconciliation commit adds schema/timestamp validation and therefore requires fresh exact-head CI.
 - Real D3M-05 inference, independent GLB inspection, source rights, surveyed scale/georeferencing, production reviewer provisioning and deployed map publication remain external acceptance gates. Do not promote release flags.
+
+
+## 2026-11-02 — D3M-07 fail-closed output hardening follow-up
+
+The D3M-07 preflight now validates capability schema version, canonical/exact probe timestamp, strategy status and allow-listed model cache states. Unexpected model state values and unsafe rembg model identifiers are normalized/omitted instead of being echoed into the preflight report. Added regression coverage for schema, timestamp, stale result, unsupported cache-state and path-injection cases.
+
+Current exact-head PR and Push CI are recorded at [#41443645721](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443645721) and [#41443642326](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443642326) on `8947049cd219474859be5923bde44b5c503ebd6d`. At the time of this update both were queued; do not treat the previous `af287278...` green runs as proof for this new head.
