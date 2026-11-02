@@ -61,7 +61,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   if (!runner) blockers.push("Set BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT to an existing, non-empty TripoSR run.py file.");
   const python = env.BUILDING_ENGINE_PYTHON_EXECUTABLE || env.TRIPOSR_PYTHON || "python";
   const device = env.BUILDING_ENGINE_DEVICE || "cuda:0";
-  if (!["cpu", "mps"].includes(device) && !/^cuda:\\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
+  if (!["cpu", "mps"].includes(device) && !/^cuda:\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
   if (runner && !blockers.length) {
     const script = [
       "import runpy, sys", "import torch", "device = " + JSON.stringify(device),
@@ -73,7 +73,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       "sys.argv = [" + JSON.stringify(runner) + ", '--help']",
       "try:", "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
       "except SystemExit as error:", "    if error.code not in (None, 0): raise",
-    ].join("\\n");
+    ].join("\n");
     const result = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
     if (!result.ok) {
       blockers.push(result.reason === "spawn-error"
