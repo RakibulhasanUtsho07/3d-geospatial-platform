@@ -44,7 +44,12 @@ test("persists generation requests and lists only bounded, validated queue state
 
 test("rejects source path traversal, unknown licence, and missing rights attestation", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
-  const source = { sourceId: "front", relativePath: "../secret.png", licence: "CC BY 4.0" };
+  const source = {
+    sourceId: "front",
+    relativePath: "../secret.png",
+    licence: "CC BY 4.0",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   await assert.rejects(enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }), /parent path segments/);
   await assert.rejects(enqueueGenerationJob({
     workspaceRoot,
@@ -62,7 +67,13 @@ test("rejects source path traversal, unknown licence, and missing rights attesta
 
 test("rejects missing source media before creating a queue job", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   await assert.rejects(
     enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
     /does not exist in workspaceRoot/,
@@ -76,7 +87,13 @@ test("rejects symlinked sources and sources that are not regular files", async (
   const outside = path.join(workspaceRoot, "outside.png");
   await writeFile(outside, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
   await symlink(outside, path.join(workspaceRoot, "uploads", "front.png"));
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   await assert.rejects(
     enqueueGenerationJob({ workspaceRoot, input: basicInput({ sources: [source], confirmRights: true }) }),
     /symbolic links/,
@@ -100,7 +117,13 @@ test("accepts existing media files and rejects empty or oversized sources", asyn
   await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
   const filePath = path.join(workspaceRoot, "uploads", "front.png");
   await writeFile(filePath, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
-  const source = { sourceId: "front", relativePath: "uploads/front.png", licence: "CC BY 4.0", kind: "image" };
+  const source = {
+    sourceId: "front",
+    relativePath: "uploads/front.png",
+    licence: "CC BY 4.0",
+    kind: "image",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
+  };
   const job = await enqueueGenerationJob({
     workspaceRoot,
     input: basicInput({ sources: [source], confirmRights: true }),
