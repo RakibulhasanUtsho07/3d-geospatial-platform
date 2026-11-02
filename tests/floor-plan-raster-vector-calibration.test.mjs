@@ -163,6 +163,18 @@ test("rejects implausible scale and unreviewed room semantics", () => {
   assert.throws(() => calibrateFloorPlanRasterVectors(room), (error) => error.code === "ROOM_REVIEW_REQUIRED");
 });
 
+test("rejects overlapping pixel opening intervals during vector calibration", () => {
+  const input = fixture();
+  input.review.walls[0].openings = [
+    { id: "door-a", type: "door", offsetPx: 40, widthPx: 30, heightM: 2.1, sillHeightM: 0 },
+    { id: "window-b", type: "window", offsetPx: 69, widthPx: 25, heightM: 1.2, sillHeightM: 0.8 },
+  ];
+  assert.throws(
+    () => calibrateFloorPlanRasterVectors(input),
+    (error) => error.code === "INVALID_WALL_OPENINGS" && /overlap/.test(error.message),
+  );
+});
+
 test("converts reviewed pixel opening intervals to metres and delegates opening fit to model validation", () => {
   const input = fixture();
   input.review.walls[0].openings = [{
