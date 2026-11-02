@@ -800,6 +800,7 @@ export default function GenerationJobIntakePanel() {
                             ? "Background-removal weights missing"
                             : capability.status === "configured" && (
                               capability.modelWeights === "unknown" ||
+                              capability.modelWeights === "not-checked" ||
                               capability.backgroundRemovalWeights === "unknown" ||
                               capability.backgroundRemovalWeights === "not-checked"
                             )

@@ -39,7 +39,7 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
     spawnImpl: (executable, args) => {
       calls.push({ executable, args });
       return fakeSuccessfulSpawn(executable === "python-fixture"
-        ? "TRIPOSR_WEIGHTS_CACHED\\nREMBG_MODEL_NAME:bria-rmbg\\nREMBG_MODEL_WEIGHTS_CACHED"
+        ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_CACHED"
         : undefined)();
     },
     now: "2026-11-02T04:00:00.000Z",
@@ -68,7 +68,7 @@ test("keeps single-image jobs unclaimable when TripoSR weights are not cached", 
   const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-no-weights-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const runner = path.join(root, "run.py");
-  await writeFile(runner, "print('fixture runner')\\n");
+  await writeFile(runner, "print('fixture runner')\n");
   const result = await probeGenerationWorkerCapabilities({
     env: {
       BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
@@ -76,7 +76,7 @@ test("keeps single-image jobs unclaimable when TripoSR weights are not cached", 
       BUILDING_ENGINE_DEVICE: "cpu",
     },
     spawnImpl: (executable) => fakeSuccessfulSpawn(executable === "python-fixture"
-      ? "TRIPOSR_WEIGHTS_MISSING:model.ckpt\\nREMBG_MODEL_NAME:u2net\\nREMBG_MODEL_WEIGHTS_CACHED"
+      ? "TRIPOSR_WEIGHTS_MISSING:model.ckpt\nREMBG_MODEL_NAME:u2net\nREMBG_MODEL_WEIGHTS_CACHED"
       : undefined)(),
   });
   assert.equal(result.strategies["single-image-ai"].status, "configured");
@@ -148,7 +148,7 @@ test("keeps single-image jobs unclaimable when the effective rembg model is not 
   const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-no-rembg-weights-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const runner = path.join(root, "run.py");
-  await writeFile(runner, "print('fixture runner')\\n");
+  await writeFile(runner, "print('fixture runner')\n");
   const result = await probeGenerationWorkerCapabilities({
     env: {
       BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
@@ -156,7 +156,7 @@ test("keeps single-image jobs unclaimable when the effective rembg model is not 
       BUILDING_ENGINE_DEVICE: "cpu",
     },
     spawnImpl: (executable) => fakeSuccessfulSpawn(executable === "python-fixture"
-      ? "TRIPOSR_WEIGHTS_CACHED\\nREMBG_MODEL_NAME:bria-rmbg\\nREMBG_MODEL_WEIGHTS_MISSING"
+      ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_MISSING"
       : undefined)(),
   });
   assert.equal(result.strategies["single-image-ai"].status, "configured");
@@ -170,7 +170,7 @@ test("fails closed when the rembg model or cache layout cannot be identified", a
   const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-unknown-rembg-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const runner = path.join(root, "run.py");
-  await writeFile(runner, "print('fixture runner')\\n");
+  await writeFile(runner, "print('fixture runner')\n");
   const result = await probeGenerationWorkerCapabilities({
     env: {
       BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
@@ -178,7 +178,7 @@ test("fails closed when the rembg model or cache layout cannot be identified", a
       BUILDING_ENGINE_DEVICE: "cpu",
     },
     spawnImpl: (executable) => fakeSuccessfulSpawn(executable === "python-fixture"
-      ? "TRIPOSR_WEIGHTS_CACHED\\nREMBG_MODEL_WEIGHTS_UNKNOWN"
+      ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_WEIGHTS_UNKNOWN"
       : undefined)(),
   });
   assert.equal(result.strategies["single-image-ai"].status, "configured");

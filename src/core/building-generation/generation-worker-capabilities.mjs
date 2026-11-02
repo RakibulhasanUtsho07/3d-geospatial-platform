@@ -71,7 +71,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   if (!runner) blockers.push("Set BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT to an existing, non-empty TripoSR run.py file.");
   const python = env.BUILDING_ENGINE_PYTHON_EXECUTABLE || env.TRIPOSR_PYTHON || "python";
   const device = env.BUILDING_ENGINE_DEVICE || "cuda:0";
-  if (!["cpu", "mps"].includes(device) && !/^cuda:\\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
+  if (!["cpu", "mps"].includes(device) && !/^cuda:\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
   let probeResult = null;
   if (runner && !blockers.length) {
     const script = [
@@ -90,24 +90,26 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       "for model_file in ('config.yaml', 'model.ckpt'):",
       "    cached_file = try_to_load_from_cache('stabilityai/TripoSR', model_file)",
       "    if not isinstance(cached_file, str) or not os.path.isfile(cached_file) or os.path.getsize(cached_file) <= 0: missing_weights.append(model_file)",
-      "print('TRIPOSR_WEIGHTS_CACHED' if not missing_weights else 'TRIPOSR_WEIGHTS_MISSING:' + ','.join(missing_weights), flush=True)",
+      "tripo_cache_state = 'TRIPOSR_WEIGHTS_CACHED' if not missing_weights else 'TRIPOSR_WEIGHTS_MISSING:' + ','.join(missing_weights)",
       "model_parameter = inspect.signature(rembg.new_session).parameters.get('model_name')",
       "model_name = model_parameter.default if model_parameter else None",
-      "if isinstance(model_name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', model_name):",
-      "    print('REMBG_MODEL_NAME:' + model_name, flush=True)",
-      "    session_class = next((item for item in sessions_class if item.name() == model_name), None)",
+      "rembg_model_name = model_name if isinstance(model_name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', model_name) else None",
+      "rembg_cache_state = 'REMBG_MODEL_WEIGHTS_UNKNOWN'",
+      "if rembg_model_name is not None:",
+      "    session_class = next((item for item in sessions_class if item.name() == rembg_model_name), None)",
       "    resolver = getattr(session_class, 'resolve_existing', None) if session_class is not None else None",
-      "    model_path = resolver(model_name + '.onnx') if resolver is not None else None",
+      "    model_path = resolver(rembg_model_name + '.onnx') if resolver is not None else None",
       "    model_path = os.fspath(model_path) if model_path is not None else ''",
       "    model_cached = bool(model_path) and os.path.isfile(model_path) and os.path.getsize(model_path) > 0",
-      "    print('REMBG_MODEL_WEIGHTS_CACHED' if model_cached else 'REMBG_MODEL_WEIGHTS_MISSING', flush=True)",
-      "else:",
-      "    print('REMBG_MODEL_WEIGHTS_UNKNOWN', flush=True)",
+      "    rembg_cache_state = 'REMBG_MODEL_WEIGHTS_CACHED' if model_cached else 'REMBG_MODEL_WEIGHTS_MISSING'",
       "sys.argv = [" + JSON.stringify(runner) + ", '--help']",
       "try:",
       "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
       "except SystemExit as error:",
       "    if error.code not in (None, 0): raise",
+      "print(tripo_cache_state, flush=True)",
+      "if rembg_model_name is not None: print('REMBG_MODEL_NAME:' + rembg_model_name, flush=True)",
+      "print(rembg_cache_state, flush=True)",
     ].join("\n");
     probeResult = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
     if (!probeResult.ok) {
