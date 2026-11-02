@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { claimNextGenerationJob, completeGenerationJob, enqueueGenerationJob, getGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
+import { claimNextGenerationJob, completeGenerationJob, enqueueGenerationJob, getGenerationJob, updateGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
 import { reviewGenerationJob, REQUIRED_GENERATION_REVIEW_CHECKS } from "../src/core/building-generation/generation-job-review.mjs";
 import { publishApprovedGenerationJob } from "../src/core/building-generation/publish-approved-generation-job.mjs";
 import { getActivePublishedModels, validatePublishedModelCatalog } from "../src/core/building-generation/published-model-catalog-reader.mjs";
@@ -134,9 +134,58 @@ test("refuses any publication transform that differs from the immutable approved
   );
 });
 
+test("refuses publication when the job summary placement digest differs from its immutable review record", async (t) => {
+  const setup = await makeApprovedJob(t);
+  await updateGenerationJob({
+    workspaceRoot: setup.workspaceRoot,
+    jobId: setup.jobId,
+    update: (state) => {
+      state.review.placementSha256 = "0".repeat(64);
+    },
+  });
+
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /exactly match the immutable approved review placement/i,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("refuses a legacy approved review record with no placement binding", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const currentJob = await getGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: setup.jobId });
+  const recordPath = path.join(setup.workspaceRoot, currentJob.review.recordPath);
+  const record = JSON.parse(await readFile(recordPath, "utf8"));
+  delete record.placement;
+  delete record.placementSha256;
+  const legacyBytes = Buffer.from(JSON.stringify(record, null, 2) + "\n");
+  await writeFile(recordPath, legacyBytes);
+  await updateGenerationJob({
+    workspaceRoot: setup.workspaceRoot,
+    jobId: setup.jobId,
+    update: (state) => {
+      state.review.recordSha256 = hash(legacyBytes);
+      delete state.review.placement;
+      delete state.review.placementSha256;
+    },
+  });
+
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /missing a valid immutable placement binding/i,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
 test("refuses publication without placement or without an approved review", async (t) => {
   const setup = await makeApprovedJob(t);
-  await assert.rejects(publishApprovedGenerationJob({ ...setup, placement: {} }), /Explicit model placement/);
+  await assert.rejects(publishApprovedGenerationJob({ ...setup, placement: {} }), /explicit reviewed placement/i);
   const queued = await enqueueGenerationJob({ workspaceRoot: setup.workspaceRoot, input: { buildingSpec: fixture, strategy: "procedural", sources: [] } });
   await assert.rejects(publishApprovedGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: queued.jobId, placement }), /Only completed generation jobs/);
 });

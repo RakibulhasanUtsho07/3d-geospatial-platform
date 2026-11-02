@@ -25,7 +25,7 @@ Activation verifies that the versioned GLB still matches the stored SHA-256 befo
 
 The connected generation queue has a separate review API. Submit the explicit review after inspecting the exact GLB and QA report, using `GENERATION_REVIEW_API_TOKEN` (not `GENERATION_API_TOKEN`). The approved review record is persisted under the private job workspace and its hash is attached to the job status.
 
-The review request must include the exact complete placement object as part of the approval. The immutable review record stores its canonical SHA-256; the publication CLI/API must receive that exact same placement. A legacy approval without the placement binding is rejected. Height is interpreted as WGS84 ellipsoid height; convert other datums before review.
+The review request must include the exact complete placement object as part of the approval. The immutable review record stores its canonical SHA-256; the publication CLI/API must receive that exact same placement. The CLI supplies the fixed `WGS84-ellipsoid` height-reference marker rather than allowing callers to select an arbitrary datum. A legacy approval without the placement binding is rejected. Height is interpreted as WGS84 ellipsoid height; convert other datums before review.
 
 After the job is approved, publish the same reviewed bytes with the exact placement recorded at approval:
 

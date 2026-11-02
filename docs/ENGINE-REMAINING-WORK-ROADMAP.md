@@ -230,8 +230,8 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Define explicit placement approval: WGS84 longitude/latitude, WGS84 ellipsoid height, heading/pitch/roll, uniform scale and distinct GLB axes.
 - [x] Store normalized placement and SHA-256 in the immutable review record and job summary.
 - [x] Require publication to match the exact normalized placement and digest from both review sources; reject legacy/missing placement records.
-- [x] Add regression cases for malformed height reference/axes/coordinates and transform changes.
-- [x] Update the D3M-02, generation jobs and published-model runbooks; keep the placement human-supplied and never inferred from a single image.
+- [x] Add regression cases for malformed height reference/axes/coordinates, transform changes, legacy approvals and tampered job-summary placement digests.
+- [x] Update the CLI to use the same fixed WGS84 ellipsoid-height reference as the authenticated API and update the D3M-02, generation jobs and published-model runbooks.
 - [ ] Run focused review/publication tests, lint and production build on this branch.
 - [ ] Record exact-head Push CI and PR CI before any promotion.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.

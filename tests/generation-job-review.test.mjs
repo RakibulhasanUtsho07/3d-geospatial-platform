@@ -119,6 +119,12 @@ test("approval requires complete WGS84 ellipsoid placement and valid axes", asyn
   );
   await assert.rejects(
     reviewGenerationJob({ ...setup, input: reviewInput({
+      placement: { ...REVIEWED_PLACEMENT, upAxis: undefined },
+    }) }),
+    /upAxis and forwardAxis must be explicitly/i,
+  );
+  await assert.rejects(
+    reviewGenerationJob({ ...setup, input: reviewInput({
       placement: { ...REVIEWED_PLACEMENT, upAxis: "Y", forwardAxis: "Y" },
     }) }),
     /up axis and forward axis must be different/i,

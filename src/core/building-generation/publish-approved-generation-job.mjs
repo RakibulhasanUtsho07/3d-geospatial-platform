@@ -129,8 +129,14 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
   if (!isRecord(record.checks) || REQUIRED_GENERATION_REVIEW_CHECKS.some((key) => record.checks[key] !== true)) {
     throw new Error("Approved review must retain every required review check.");
   }
-  const reviewedPlacement = normalizeGenerationReviewPlacement(record.placement);
-  const reviewedPlacementSha256 = hashGenerationReviewPlacement(reviewedPlacement);
+  let reviewedPlacement;
+  let reviewedPlacementSha256;
+  try {
+    reviewedPlacement = normalizeGenerationReviewPlacement(record.placement);
+    reviewedPlacementSha256 = hashGenerationReviewPlacement(reviewedPlacement);
+  } catch {
+    throw new Error("Approved review record is missing a valid immutable placement binding.");
+  }
   if (record.placementSha256 !== reviewedPlacementSha256 ||
       job.review.placementSha256 !== reviewedPlacementSha256 ||
       JSON.stringify(job.review.placement) !== JSON.stringify(reviewedPlacement) ||

@@ -176,6 +176,10 @@ export function normalizeGenerationReviewPlacement(value) {
   if (value.heightReference !== HEIGHT_REFERENCE) {
     throw new TypeError("Reviewed placement heightReference must be WGS84-ellipsoid.");
   }
+  if (!["X", "Y", "Z"].includes(value.upAxis) ||
+      !["X", "Y", "Z"].includes(value.forwardAxis)) {
+    throw new TypeError("Reviewed placement upAxis and forwardAxis must be explicitly X, Y or Z.");
+  }
 
   const normalized = normalizeGeneratedModelDefinition({
     id: "reviewed-placement",

@@ -52,6 +52,8 @@ The example values are illustrative only. The same complete object must have bee
 
 Success returns HTTP 201 with the job/review/model/version identifiers, asset URL, exact model and report hashes, and the normalized placement. The response deliberately omits local filesystem paths. Responses are marked `Cache-Control: no-store`.
 
+The review API and local publication CLI use the same placement contract. The CLI supplies the fixed `WGS84-ellipsoid` height-reference marker; the human-reviewed values must otherwise match exactly. Legacy approval records without a placement digest are rejected.
+
 The route uses the common timing-safe bearer-token verifier with a distinct server secret. The body is bounded to 16 KiB. Missing server configuration returns 503; invalid/missing credentials return 401; malformed placement returns 400; a missing job returns 404; a busy catalog lock returns 409; review, status or hash failures return 422. Unexpected server errors are sanitized as 500 responses.
 
 ## Integrity and filesystem boundaries
