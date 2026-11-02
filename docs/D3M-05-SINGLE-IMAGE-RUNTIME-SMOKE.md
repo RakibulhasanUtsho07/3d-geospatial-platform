@@ -29,10 +29,11 @@ Provision the actual worker host first:
 - One non-empty JPEG or PNG source image already stored inside the private workspace, its actual licence/permission basis, and a valid BuildingSpec for the same building ID.
 - Explicit operator review of the installed TripoSR code/checkpoint licence and the actual rembg model-weight licence. Package licence and model-weight licence are separate.
 
-Do not assume that the default rembg model is commercially licensed for every use. Check the installed default model and its current model terms before the run. The currently documented bria-rmbg / BRIA RMBG 2.0 weights have a non-commercial use restriction unless separately licensed:
+Do not assume that the default rembg model is commercially licensed for every use. The current rembg upstream README identifies `bria-rmbg` as the default and notes that its weights require a paid agreement for commercial use; it also states that model-weight licences are separate from rembg's MIT package licence. Verify the model name and licence for the exact installed rembg release before the run. The BRIA RMBG 2.0 model card identifies the self-hosted weights as CC BY-NC 4.0 / non-commercial, with commercial deployment requiring a separate BRIA agreement. The TripoSR model card currently identifies TripoSR as MIT-licensed; still check the exact installed repository revision and checkpoint notices.
 
-- [rembg environment variables and cache locations](https://github.com/danielgatis/rembg#environment-variables)
+- [rembg upstream model defaults, cache locations and model-weight licensing](https://github.com/danielgatis/rembg#models)
 - [BRIA RMBG 2.0 model card and terms](https://huggingface.co/briaai/RMBG-2.0)
+- [TripoSR model card and MIT licence](https://huggingface.co/stabilityai/TripoSR)
 - [TripoSR upstream repository](https://github.com/VAST-AI-Research/TripoSR)
 
 D3M-04's worker health endpoint must report single-image-ai.status=ready, modelWeights=cached and backgroundRemovalWeights=cached before the smoke will start. The smoke performs this preflight again immediately before invoking the workflow.
