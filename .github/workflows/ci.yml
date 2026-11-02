@@ -62,6 +62,7 @@ on:
       - development
       - feat/brf06-observation-review-dev-20261030
       - feat/brf46-source-operation-scope-gate
+      - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
       - main
