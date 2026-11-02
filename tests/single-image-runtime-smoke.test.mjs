@@ -408,21 +408,25 @@ test("rejects WebP/unknown signatures before invoking the readiness probe", asyn
   assert.equal(probeCalls, 0);
 });
 
-test("refuses to overwrite an existing smoke evidence record", async (t) => {
+test("refuses to overwrite an existing smoke report with fresh workflow IDs", async (t) => {
   const root = await workspace(t);
   const source = await writeInput(root);
-  const first = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
-    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
-  }));
-  assert.equal(first.report.status, "passed");
+  const reportPath = path.join(root, ".building-engine", "runtime-smokes", "smoke-job.json");
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  await writeFile(reportPath, "{}\\n");
+  let probeCalls = 0;
+
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, {
-      runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+      probeCapabilities: async () => {
+        probeCalls += 1;
+        return readyCapabilities();
+      },
     })),
-    /already exists|EEXIST/,
+    /EEXIST|already exists/,
   );
+  assert.equal(probeCalls, 0);
 });
-
 
 test("independent verifier detects a source file changed after the smoke report was written", async (t) => {
   const root = await workspace(t);
