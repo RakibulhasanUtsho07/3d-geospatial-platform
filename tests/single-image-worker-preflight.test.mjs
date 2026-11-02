@@ -39,6 +39,8 @@ test("preflight reports ready only when both model caches are verified", async (
 test("preflight blocks when TripoSR cache is missing", async () => {
   const report = await runSingleImageWorkerPreflight({
     probe: async () => ({
+      schemaVersion: "1.0.0",
+      checkedAt: "2026-11-02T12:00:00.000Z",
       strategies: { "single-image-ai": {
         status: "configured", blockers: [],
         modelWeights: "missing", backgroundRemovalWeights: "cached",
@@ -52,6 +54,8 @@ test("preflight blocks when TripoSR cache is missing", async () => {
 test("preflight blocks when rembg cache is unknown", async () => {
   const report = await runSingleImageWorkerPreflight({
     probe: async () => ({
+      schemaVersion: "1.0.0",
+      checkedAt: "2026-11-02T12:00:00.000Z",
       strategies: { "single-image-ai": {
         status: "configured", blockers: [],
         modelWeights: "cached", backgroundRemovalWeights: "unknown",
