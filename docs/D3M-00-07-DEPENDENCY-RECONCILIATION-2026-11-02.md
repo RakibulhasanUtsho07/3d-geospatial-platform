@@ -114,3 +114,33 @@ The updated D3M-07 branch must receive fresh exact-head Push CI and PR Full CI a
 Keep groundTruth, acceptanceEligible, publicationEligible, publishable, mapReady, automaticApproval and worker dispatch/publication authorization false until their separate evidence contracts are independently satisfied.
 
 **Audit conclusion:** The code path is materially more complete than a basic prototype, but the D3M-00→D3M-07 chain is not yet an end-to-end, real-worker-validated building reconstruction and map-publication system. The dependency/CI/documentation gaps listed here must be closed before claiming completion.
+
+
+## 10. Follow-up hardening — D3M-07 capability response contract (2026-11-02)
+
+The initial reconciliation follow-up added capability schema-version and canonical timestamp checks. A second review tightened the output contract further:
+
+- A capability status must be one of `ready`, `configured` or `blocked`; unsupported/missing statuses fail closed.
+- TripoSR and rembg cache states are allow-listed to `cached`, `missing` or `unknown`. Unexpected strings/paths are normalized to `unknown` and cannot be copied into the sanitized report.
+- The rembg model name is emitted only when it matches the restricted model identifier syntax; filesystem-like/path values are not returned.
+- The capability timestamp must be canonical UTC and exactly match the timestamp requested for this probe. Missing, stale or changed timestamps fail closed; the report falls back to the locally generated timestamp.
+- Added tests for unsupported cache-state/path injection, unsafe rembg model identifiers and stale probe timestamps.
+
+The updated source and tests are on the D3M-07 branch. The current exact-head PR and Push CI runs are:
+- PR Full CI: [#41443645721](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443645721), head `8947049cd219474859be5923bde44b5c503ebd6d`.
+- Push CI: [#41443642326](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443642326), same head `8947049cd219474859be5923bde44b5c503ebd6d`.
+
+At the time this section was written, both runs were queued and had no job result yet; **no pass is claimed**. Earlier runs #41436755755/#41436748360 validate only the pre-reconciliation head `af287278...`.
+
+## 11. Remaining explicit blockers after repository-side work
+
+The following cannot be truthfully closed by source edits or synthetic CI:
+
+1. D3M-00 promotion ancestry: `development` and `main` remain diverged (91 ahead / 6 behind at the audited refs); no release approval was supplied. The legacy `rakibul-hasan` branch is also divergent and must not be bulk-merged.
+2. D3M-01 parent stack: #281 still needs a reviewed rebase/retarget onto the selected current development base. D3M-01.G #292 must then be rebased onto the current #290 head. Do not force-push or rewrite shared branches without a reviewed parent/child plan.
+3. D3M-02/03/06 CI/base consistency: D3M-02 #302 lacks a same-head Push run; D3M-03 #304 lacks a same-head PR run and its base must be reconciled; D3M-06 #310 lacks a same-head Push run. The D3M-07 workflow filter only enables future D3M-06 Push runs after the parent branch itself receives the filter.
+4. Real deployment configuration: publisher token/public model storage, operator login/session secrets, durable private shared worker storage, service supervision and the real worker status have not been verified in the target deployment.
+5. Real model operation: no provisioned worker-host preflight or actual TripoSR/rembg inference report with a real authorized source has been supplied in this run.
+6. Real-world acceptance: independent dimensions, survey/control sources, vertical datum, held-out points, production trusted reviewer registry, human GLB review, geometry/texture accuracy and end-to-end map reload/rollback are still not proven.
+
+No PR was merged, no branch was force-pushed or retargeted, and no release flag was enabled by this audit.
