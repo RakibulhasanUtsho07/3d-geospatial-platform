@@ -147,6 +147,8 @@ npm run preflight:single-image-worker -- --python "<worker-python>" --runner-scr
 
 The command returns exit code `0` only when the installed runtime/device probe succeeds and **both** TripoSR and the installed rembg default model weights are verified as cached. A missing, unknown or merely configured cache state returns exit code `2`. It does not download weights, create a rembg session, run inference or publish anything. Its report deliberately excludes environment variables, executable paths, cache paths and credentials.
 
+The D3M-05 smoke repeats the same single-image-only capability check immediately before inference; neither command launches the unrelated COLMAP `--help` checks. The D3M-05 run still performs the actual TripoSR runner launch through the workflow after all operator/source/model-rights gates pass.
+
 The preflight requests only the `single-image-ai` strategy; it does not launch the unrelated COLMAP `--help` checks. The configured TripoSR `run.py` is opened and syntax-compiled in memory, but its top-level code and `--help` handler are never executed. The Python subprocess disables bytecode writes and sets Hugging Face offline/telemetry flags while checking packages and local cache metadata. This is an application-level preflight, not an OS sandbox or network firewall; package imports still occur.
 
 A `ready` result is only a precondition. It does not prove that the runner will complete inference, that model terms permit the intended use, that sufficient GPU memory is available, or that the resulting building geometry is accurate. Continue with the D3M-05 smoke only after source rights and both model licences have been reviewed; then run the independent evidence verifier and human GLB inspection.
