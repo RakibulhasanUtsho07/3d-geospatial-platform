@@ -123,6 +123,17 @@ export async function POST(request: Request) {
     const sourceUrl = formText(form, "sourceUrl", 500);
     const capturedAt = formText(form, "capturedAt", 500);
     const description = formText(form, "description", 2000);
+    const rawOperations = formText(form, "permittedOperations", 1200, true)!;
+    let permittedOperations: unknown;
+    try {
+      permittedOperations = JSON.parse(rawOperations) as unknown;
+    } catch {
+      throw new TypeError("permittedOperations must be a JSON array of operation scopes.");
+    }
+    if (!Array.isArray(permittedOperations) || permittedOperations.length === 0 ||
+        permittedOperations.some((scope) => typeof scope !== "string")) {
+      throw new TypeError("permittedOperations must be a non-empty JSON array of operation scopes.");
+    }
 
     const result = await ingestUploadedGenerationMedia({
       workspaceRoot,
@@ -135,6 +146,7 @@ export async function POST(request: Request) {
       sourceUrl,
       capturedAt,
       description,
+      permittedOperations,
       title: entry.name.slice(0, 500) || "uploaded-media",
       bytes: Buffer.from(await entry.arrayBuffer()),
     });
