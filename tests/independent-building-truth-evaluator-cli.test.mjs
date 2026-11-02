@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
@@ -9,6 +10,7 @@ import test from "node:test";
 import { extractGlbGeometry } from "../src/core/building-generation/glb-geometry-extraction.mjs";
 import { adaptIndependentReferenceGeometry } from "../src/core/building-generation/independent-reference-geometry-adapter.mjs";
 import { geometryPayloadSha256 } from "../src/core/building-generation/geometry-extraction-provenance.mjs";
+import { createD3m01dSignedReviewFixture } from "./fixtures/d3m01d-signed-review-fixture.mjs";
 import {
   createBuildingGlb,
   MODEL_TO_EVALUATION,
@@ -204,13 +206,36 @@ async function setup(t) {
   await writeFile(path.join(root, "tools/reference-adapter.mjs"), adapterBytes);
   await writeFile(path.join(root, "configs/geometry-extractor.json"), extractorConfigBytes);
   await writeFile(path.join(root, "evaluation.json"), JSON.stringify(makeManifest(), null, 2));
-  return { root };
+  const review = await createD3m01dSignedReviewFixture({
+    workspaceRoot: root,
+    buildingId: "cli-site-building",
+    candidatePath: "evidence/candidate.glb",
+  });
+  await writeFile(path.join(root, "review-fixture.json"), JSON.stringify(review, null, 2));
+  return { root, review };
 }
-function run(root, output) {
-  return spawnSync(process.execPath, [
+function run(root, output, options = {}) {
+  const stored = JSON.parse(readFileSync(path.join(root, "review-fixture.json"), "utf8"));
+  const review = options.review ?? stored;
+  const args = [
     fileURLToPath(new URL("../scripts/evaluate-independent-building-truth.mjs", import.meta.url)),
     "evaluation.json", output, "--root=" + root,
-  ], { cwd: root, encoding: "utf8" });
+  ];
+  if (!options.omitReceipt) {
+    args.push(
+      "--workspace=" + root,
+      "--building-id=" + (options.buildingId ?? review.buildingId),
+      "--review-job-id=" + (options.reviewJobId ?? review.reviewJobId),
+    );
+  }
+  return spawnSync(process.execPath, args, {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: options.registryJson ?? review.registryJson ?? "",
+    },
+  });
 }
 
 test("replays exact candidate GLB and independent source bytes before producing a review-required report", async (t) => {
@@ -219,6 +244,10 @@ test("replays exact candidate GLB and independent source bytes before producing 
   assert.equal(execution.status, 0, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "report.json"), "utf8"));
   assert.equal(report.status, "benchmark-review-required");
+  assert.equal(report.authenticatedReview.status, "cryptographically-reverified");
+  assert.equal(report.authenticatedReview.decision, "continue-to-independent-validation");
+  assert.equal(report.authenticatedReview.candidateGlbSha256, candidateSha);
+  assert.ok(report.checks.some((check) => check.id === "authenticated-review-receipt" && check.status === "passed"));
   assert.equal(report.metricComputation.status, "computed-after-source-replay");
   assert.ok(report.metrics, "metrics are only present after source bytes and both replays pass");
   assert.equal(report.assetIntegrity.filter((item) => item.status !== "passed").length, 0);
@@ -364,15 +393,15 @@ test("withholds metrics when candidate GLB bytes differ from the pinned source h
   const { root } = await setup(t);
   await writeFile(path.join(root, "evidence/candidate.glb"), Buffer.from("tampered candidate GLB bytes"));
   const execution = run(root, "candidate-hash-failed-report.json");
-  assert.equal(execution.status, 1, execution.stderr);
+  assert.equal(execution.status, 2, execution.stderr);
   const report = JSON.parse(await readFile(path.join(root, "candidate-hash-failed-report.json"), "utf8"));
-  assert.equal(report.status, "benchmark-failed");
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.equal(report.authenticatedReview.status, "blocked");
   assert.equal(report.metrics, null);
   assert.equal(report.metricComputation.status, "withheld");
-  assert.ok(report.metricComputation.prerequisites.some((item) =>
-    item.id === "candidate-glb-byte-integrity" && item.status === "failed"));
+  assert.match(report.authenticatedReview.reason, /Candidate GLB bytes no longer match the immutable hand-off identity/);
   assert.ok(report.failures.some((check) =>
-    check.id === "geometry-metrics-withheld-until-source-replay-passes"));
+    check.id === "authenticated-review-required-before-metrics"));
   assert.ok(Object.values(report.policy).every((value) => value === false));
 });
 
@@ -404,4 +433,42 @@ test("reports an exact-byte mismatch as failed instead of trusting stale referen
   assert.ok(report.failures.some((check) => check.id === "geometry-metrics-withheld-until-source-replay-passes"));
   assert.ok(report.failures.some((check) => check.id === "reference-source-byte-integrity"));
   assert.equal(report.policy.acceptanceEligible, false);
+});
+
+
+test("blocks the standalone evaluator CLI when no D3M-01.D signed receipt is supplied", async (t) => {
+  const { root } = await setup(t);
+  const execution = run(root, "missing-review-report.json", { omitReceipt: true });
+  assert.equal(execution.status, 2, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "missing-review-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.equal(report.authenticatedReview.status, "blocked");
+  assert.equal(report.metrics, null);
+  assert.equal(report.metricComputation.status, "withheld");
+  assert.ok(report.failures.some((check) => check.id === "authenticated-review-required-before-metrics"));
+});
+
+test("blocks the standalone evaluator CLI when its current trusted reviewer key is rotated", async (t) => {
+  const { root } = await setup(t);
+  const replacement = generateKeyPairSync("ed25519");
+  const replacementPem = replacement.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const registryJson = JSON.stringify([{ reviewerId: "reviewer-fixture", publicKeyPem: replacementPem }]);
+  const execution = run(root, "rotated-reviewer-key-report.json", { registryJson });
+  assert.equal(execution.status, 2, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "rotated-reviewer-key-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.equal(report.authenticatedReview.status, "blocked");
+  assert.equal(report.metrics, null);
+  assert.match(report.authenticatedReview.reason, /signature is invalid/);
+});
+
+test("blocks the standalone evaluator CLI when manifest and signed-review building IDs differ", async (t) => {
+  const { root } = await setup(t);
+  const execution = run(root, "wrong-building-report.json", { buildingId: "another-building" });
+  assert.equal(execution.status, 2, execution.stderr);
+  const report = JSON.parse(await readFile(path.join(root, "wrong-building-report.json"), "utf8"));
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.equal(report.authenticatedReview.status, "blocked");
+  assert.equal(report.metrics, null);
+  assert.match(report.authenticatedReview.reason, /manifest buildingId must match/);
 });

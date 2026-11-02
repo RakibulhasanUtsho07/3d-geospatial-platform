@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import {createHash} from "node:crypto";
+import {createHash,generateKeyPairSync} from "node:crypto";
 import {mkdir,mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
 import {spawnSync} from "node:child_process";
+import {readFileSync} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import test from "node:test";
 import {MODEL_TO_EVALUATION,createBuildingGlb,surveyGeometryDocument} from "./fixtures/glb-geometry-fixture.mjs";
+import {createD3m01dSignedReviewFixture} from "./fixtures/d3m01d-signed-review-fixture.mjs";
 
 const hash=bytes=>createHash("sha256").update(bytes).digest("hex");
 const prepSource=fileURLToPath(new URL("../scripts/prepare-independent-building-truth-manifest.mjs",import.meta.url));
@@ -22,6 +24,18 @@ async function setup(t){
     await readFile(fileURLToPath(new URL("../src/core/building-generation/independent-reference-geometry-adapter.mjs",import.meta.url))));
   await writeFile(path.join(root,"src/core/building-generation/geometry-extraction-provenance.mjs"),
     await readFile(fileURLToPath(new URL("../src/core/building-generation/geometry-extraction-provenance.mjs",import.meta.url))));
+  for (const name of [
+    "source-bound-authenticated-review.mjs",
+    "reconstruction-job-state.mjs",
+    "source-bound-reconstruction-handoff.mjs",
+    "glb-geometry-qa.mjs",
+    "mesh-topology-qa.mjs",
+  ]) {
+    await writeFile(
+      path.join(root,"src/core/building-generation",name),
+      await readFile(fileURLToPath(new URL("../src/core/building-generation/"+name,import.meta.url))),
+    );
+  }
   const glb=createBuildingGlb(),reference=Buffer.from(JSON.stringify(
     surveyGeometryDocument({coordinateFrameId:"survey-local-frame-v1",localCoordinates:true}),null,2)+"\n");
   await writeFile(path.join(root,"evidence/candidate.glb"),glb);await writeFile(path.join(root,"evidence/survey.json"),reference);
@@ -40,14 +54,28 @@ async function setup(t){
     tolerances:{footprintAreaRelativeErrorPercent:5,footprintBoundaryP95M:0.1,footprintBoundaryMaxM:0.2,
       dimensionRelativeErrorPercent:5,checkPointRmseM:0.1,checkPointMaxM:0.2,surfaceDistanceP95M:0.1,surfaceDistanceMaxM:0.2}};
   await writeFile(path.join(root,"configs/evaluation.json"),JSON.stringify(config,null,2));
-  return {root,config,glb,reference};
+  const review=await createD3m01dSignedReviewFixture({
+    workspaceRoot:root,
+    buildingId:config.buildingId,
+    candidatePath:"evidence/candidate.glb",
+  });
+  await writeFile(path.join(root,"review-fixture.json"),JSON.stringify(review,null,2));
+  return {root,config,glb,reference,review};
 }
-function run(script,root,args){return spawnSync(process.execPath,[script,...args,"--root="+root],{cwd:root,encoding:"utf8"});}
+function run(script,root,args,options={}){
+  const review=JSON.parse(readFileSync(path.join(root,"review-fixture.json"),"utf8"));
+  const cliArgs=[script,...args,"--root="+root];
+  if(!options.omitReceipt)cliArgs.push("--workspace="+root,"--building-id="+review.buildingId,"--review-job-id="+review.reviewJobId);
+  return spawnSync(process.execPath,cliArgs,{
+    cwd:root,encoding:"utf8",
+    env:{...process.env,RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON:options.registryJson??review.registryJson??""}
+  });
+}
 
 test("prepares a manifest from exact GLB bytes and independently supplied reference JSON",async t=>{
   const {root}=await setup(t);
   const prepared=run(prepSource,root,["configs/evaluation.json","prepared.json"]);
-  assert.equal(prepared.status,0,prepared.stderr);
+  assert.equal(prepared.status,0,JSON.stringify({stderr:prepared.stderr,stdout:prepared.stdout},null,2));
   const manifest=JSON.parse(await readFile(path.join(root,"prepared.json"),"utf8"));
   assert.equal(manifest.candidate.glbSha256,hash(await readFile(path.join(root,"evidence/candidate.glb"))));
   assert.equal(manifest.candidate.geometryExtractionSummary.sourceVertexCount,8);
@@ -86,7 +114,7 @@ test("rejects hash-pinned GLB/reference changes and coordinate-frame disagreemen
   const {root}=await setup(t);
   await writeFile(path.join(root,"evidence/candidate.glb"),Buffer.from("modified"));
   const stale=run(prepSource,root,["configs/evaluation.json","stale.json"]);
-  assert.equal(stale.status,1);assert.match(stale.stderr,/differs from actual source bytes/);
+  assert.equal(stale.status,1);assert.match(stale.stderr,/Candidate GLB bytes no longer match the immutable hand-off identity/);
   const freshRoot=await setup(t);t.after(()=>rm(freshRoot.root,{recursive:true,force:true}));
   const truth=JSON.parse((await readFile(path.join(freshRoot.root,"evidence/survey.json"))).toString("utf8"));
   truth.coordinateFrameId="wrong-frame";
@@ -115,4 +143,23 @@ test("refuses caller-injected candidate checkpoint coordinates without GLB verte
   const execution=run(prepSource,root,["configs/evaluation.json","unbound.json"]);
   assert.equal(execution.status,1);
   assert.match(execution.stderr,/cannot be supplied as unbound coordinates/);
+});
+
+
+test("blocks direct geometry preparation when no signed D3M-01.D receipt is provided",async t=>{
+  const {root}=await setup(t);
+  const prepared=run(prepSource,root,["configs/evaluation.json","unauthorized-prepared.json"],{omitReceipt:true});
+  assert.notEqual(prepared.status,0,JSON.stringify({stdout:prepared.stdout,stderr:prepared.stderr},null,2));
+  await assert.rejects(readFile(path.join(root,"unauthorized-prepared.json")),{code:"ENOENT"});
+});
+
+test("blocks direct geometry preparation when the current trusted key no longer verifies",async t=>{
+  const {root}=await setup(t);
+  const replacement=generateKeyPairSync("ed25519");
+  const replacementPem=replacement.publicKey.export({type:"spki",format:"pem"}).toString();
+  const registryJson=JSON.stringify([{reviewerId:"reviewer-fixture",publicKeyPem:replacementPem}]);
+  const prepared=run(prepSource,root,["configs/evaluation.json","rotated-key-prepared.json"],{registryJson});
+  assert.notEqual(prepared.status,0,JSON.stringify({stdout:prepared.stdout,stderr:prepared.stderr},null,2));
+  assert.match(prepared.stderr,/signature is invalid/);
+  await assert.rejects(readFile(path.join(root,"rotated-key-prepared.json")),{code:"ENOENT"});
 });

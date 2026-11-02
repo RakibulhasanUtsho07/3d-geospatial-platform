@@ -424,6 +424,15 @@ function addMetricThreshold(record, tolerances, key, label, displayValue, unit, 
  * metre-based coordinate frame. Metrics remain evidence diagnostics; this function
  * never approves, publishes or marks a building map-ready.
  */
+/**
+ * Low-level, pure geometry-metric kernel.
+ *
+ * This function consumes already-normalized in-memory geometry and performs no
+ * filesystem reads, source-byte replay or reviewer authentication. It is not
+ * an authorized truth-evaluation entry point and its output is not a release
+ * decision. The supported source-bound CLI performs the D3M-01.D receipt check
+ * and exact-source replay before invoking this kernel.
+ */
 export function evaluateIndependentBuildingTruth(input = {}) {
   if (!object(input)) throw new TypeError("evaluation input must be an object.");
   if (input.schemaVersion !== "1.0.0") throw new TypeError("schemaVersion must be 1.0.0.");
@@ -554,7 +563,17 @@ export function evaluateIndependentBuildingTruth(input = {}) {
     checks, warnings, failures,
     counts: { passed: checks.filter((item) => item.status === "passed").length,
       warnings: warnings.length, failures: failures.length },
-    policy: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+    policy: {
+      candidateGeometryValidated: false,
+      independentReferenceVerified: false,
+      heldOutCheckpointAccuracyVerified: false,
+      groundTruth: false,
+      acceptanceEligible: false,
+      publicationEligible: false,
+      mapReady: false,
+      automaticApproval: false,
+      dispatchAllowed: false,
+    },
     limitations: [
       "This evaluator measures supplied geometry evidence; it does not independently extract footprint, dimensions, checkpoint identities or surface meshes from the GLB or survey source.",
       "A source hash binds the declared bytes but does not authenticate source identity, survey accuracy, curator independence or usage rights.",
@@ -562,6 +581,7 @@ export function evaluateIndependentBuildingTruth(input = {}) {
       "Surface distance samples mesh vertices against the opposite mesh triangles; it is not continuous signed Hausdorff distance and cannot prove surface completeness or correct topology.",
       "Checkpoint independence is a manifest declaration. The curator must verify that these points were excluded from fitting and registration.",
       "No overall accuracy percentage, automatic model selection, publication approval or map-ready decision is produced.",
+      "This pure in-memory metric kernel does not authenticate the D3M-01.D reviewer receipt; only the source-bound evaluator CLI performs that authorization check before calling this function.",
     ],
   };
 }
