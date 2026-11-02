@@ -11,6 +11,7 @@ const BUILDING_FEATURE_COUNT = 36;
 const ROAD_FEATURE_COUNT = 24;
 const FIRST_BUILDING_RESPONSE_DELAY_MS = 4_000;
 const FIRST_ROAD_RESPONSE_DELAY_MS = 3_500;
+const CANCEL_RESPONSE_DELAY_MS = 8_000;
 
 type MetricName = "buildings" | "roads";
 type BrowserMetricEvent = {
@@ -34,6 +35,29 @@ type TimedRoute = {
   routeDelayMs: number;
   fulfilledAtMs?: number;
   fulfillError?: string;
+  delayedForCancellation?: boolean;
+};
+
+type WorkloadProbeDiagnostics = {
+  getRequestLifecycleDiagnostics?: () => {
+    loadInProgress: boolean;
+    hasActiveEndpoint: boolean;
+    hasAbortController: boolean;
+    hasPendingRequest: boolean;
+  } | null;
+  focusViewportForBenchmark?: (longitudeDegrees: number, latitudeDegrees: number, heightMeters: number) => boolean;
+  notifyCameraIntent?: () => {
+    loadInProgress: boolean;
+    intentRevisionBefore: number;
+    intentRevisionAfter: number;
+    cameraBoundsChanged: boolean;
+  } | null;
+};
+
+type WorkloadProbeWindow = Window & {
+  __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
+  __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: WorkloadProbeDiagnostics;
+  __MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?: Array<{ atMs: number; endpoint: string }>;
 };
 
 function wait(milliseconds: number): Promise<void> {
@@ -166,6 +190,8 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const fixtureSha256 = sha256(Buffer.from(JSON.stringify({ buildings, roads })));
   let firstBuildingDelayUsed = false;
   let firstRoadDelayUsed = false;
+  let delayNextBuildingResponse = false;
+  let delayedBuildingResponseClaimed = false;
   const browserEvents: BrowserMetricEvent[] = [];
   const requestEvents = new WeakMap<object, BrowserMetricEvent>();
   const requestStartedAt = new WeakMap<object, number>();
@@ -259,6 +285,20 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     });
   });
 
+  await page.addInitScript(() => {
+    const target = window as WorkloadProbeWindow;
+    target.__MAP_ENGINE_WORKLOAD_BENCHMARK__ = true;
+    target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ = [];
+    window.addEventListener("map:viewport-request-aborted", (event: Event) => {
+      const detail = (event as CustomEvent<{ atMs?: number; endpoint?: string | null }>).detail;
+      if (typeof detail?.endpoint !== "string") return;
+      target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?.push({
+        atMs: Number.isFinite(detail.atMs) ? detail.atMs as number : performance.now(),
+        endpoint: detail.endpoint,
+      });
+    });
+  });
+
   await page.route("https://tile.openstreetmap.org/**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -281,11 +321,19 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await page.route(/\/api\/geospatial\/overture-buildings(?:\/viewport)?\/?(?:\?.*)?$/, async (route) => {
     const startedAtMs = performance.now();
     const routeOrdinal = buildingRoutes.length + 1;
+    const delayedForCancellation = delayNextBuildingResponse && !delayedBuildingResponseClaimed;
+    if (delayedForCancellation) {
+      delayNextBuildingResponse = false;
+      delayedBuildingResponseClaimed = true;
+    }
     const routeRecord: TimedRoute = {
       url: route.request().url(),
       startedAtMs,
       routeOrdinal,
-      routeDelayMs: !firstBuildingDelayUsed ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
+      routeDelayMs: delayedForCancellation
+        ? CANCEL_RESPONSE_DELAY_MS
+        : !firstBuildingDelayUsed ? FIRST_BUILDING_RESPONSE_DELAY_MS : 80,
+      ...(delayedForCancellation ? { delayedForCancellation: true } : {}),
     };
     buildingRoutes.push(routeRecord);
     if (!firstBuildingDelayUsed) firstBuildingDelayUsed = true;
@@ -350,6 +398,113 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
       canvas: { width: canvas?.width ?? 0, height: canvas?.height ?? 0, cssWidth: rect?.width ?? 0, cssHeight: rect?.height ?? 0 },
     };
   });
+
+  // Let the initial camera preset settle and prove that the first real building
+  // response has committed before arming the controlled cancellation probe.
+  await expect.poll(
+    () => renderEvents.some((event) =>
+      event.kind === "building-render" &&
+      event.detail.returnedFeatures === BUILDING_FEATURE_COUNT &&
+      event.detail.renderedExtrusions === BUILDING_FEATURE_COUNT
+    ),
+    { timeout: 45_000 },
+  ).toBe(true);
+
+  await expect.poll(async () => {
+    const lifecycle = await page.evaluate(() => {
+      const target = window as WorkloadProbeWindow;
+      return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.getRequestLifecycleDiagnostics?.() ?? null;
+    });
+    return Boolean(
+      lifecycle &&
+      !lifecycle.loadInProgress &&
+      !lifecycle.hasActiveEndpoint &&
+      !lifecycle.hasAbortController &&
+      !lifecycle.hasPendingRequest
+    );
+  }, { timeout: 20_000, intervals: [100, 200, 300] }).toBe(true);
+
+  const existingBuildingUrls = new Set(buildingRoutes.map((route) => route.url));
+  delayNextBuildingResponse = true;
+  const delayedBuildingRequestPromise = page.waitForRequest(
+    (request) =>
+      request.url().includes("/api/geospatial/overture-buildings") &&
+      !existingBuildingUrls.has(request.url()),
+    { timeout: 20_000 },
+  );
+
+  const focusApplied = await page.evaluate(() => {
+    const target = window as WorkloadProbeWindow;
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.focusViewportForBenchmark?.(
+      90.4178,
+      23.7086,
+      220,
+    ) ?? false;
+  });
+  assert.equal(focusApplied, true, "the opt-in camera probe must start a fresh local viewport");
+
+  const delayedBuildingRequest = await delayedBuildingRequestPromise;
+  const delayedBuildingRoute = await expect.poll(
+    () => buildingRoutes.find((route) => route.url === delayedBuildingRequest.url() && route.delayedForCancellation) ?? null,
+    { timeout: 10_000 },
+  ).toBeTruthy().then(() => buildingRoutes.find((route) => route.url === delayedBuildingRequest.url())!);
+
+  const intentProbe = await page.evaluate(() => {
+    const target = window as WorkloadProbeWindow;
+    return target.__MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?.notifyCameraIntent?.() ?? null;
+  });
+  assert.ok(intentProbe, "the benchmark-only production camera-intent probe must remain installed");
+  assert.equal(intentProbe.loadInProgress, true, "the deliberately delayed building request must remain active");
+  assert.equal(intentProbe.cameraBoundsChanged, true, "the second camera intent must change viewport bounds");
+  assert.ok(
+    intentProbe.intentRevisionAfter > intentProbe.intentRevisionBefore,
+    "the production camera handler must invalidate the obsolete viewport intent",
+  );
+
+  const delayedAbortObserved = await page.waitForFunction(
+    (url) => {
+      const target = window as WorkloadProbeWindow;
+      return target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?.some((event) => event.endpoint === url) ?? false;
+    },
+    delayedBuildingRequest.url(),
+    { timeout: CANCEL_RESPONSE_DELAY_MS - 500 },
+  ).then(() => true).catch(() => false);
+  assert.equal(
+    delayedAbortObserved,
+    true,
+    "The active building request must receive an AbortController abort after a newer camera intent.",
+  );
+
+  await expect.poll(
+    () => browserEvents.some((event) =>
+      event.kind === "fetch-cancelled" &&
+      event.metric === "buildings" &&
+      event.url === delayedBuildingRequest.url()
+    ),
+    { timeout: 10_000 },
+  ).toBe(true);
+
+  // The stale route intentionally remains held briefly after the browser abort;
+  // allow the route handler to observe that it can no longer fulfill the request.
+  await expect.poll(
+    () => Boolean(delayedBuildingRoute.fulfillError),
+    { timeout: CANCEL_RESPONSE_DELAY_MS + 3_000, intervals: [250, 500] },
+  ).toBe(true);
+
+  // The manager must run its coalesced latest request and commit it before the
+  // broader real-user pan/zoom workload begins.
+  await expect.poll(
+    () => renderEvents.some((event) => {
+      const latestRoute = buildingRoutes.at(-1);
+      return Boolean(
+        latestRoute &&
+        latestRoute.routeOrdinal > delayedBuildingRoute.routeOrdinal &&
+        event.kind === "building-render" &&
+        sameBounds(event.detail.viewport, latestRoute.url)
+      );
+    }),
+    { timeout: 45_000, intervals: [250, 500, 1000] },
+  ).toBe(true);
 
   const movementStartedAtMs = performance.now();
   const movementActions: string[] = [];
