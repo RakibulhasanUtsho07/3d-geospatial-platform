@@ -262,6 +262,32 @@ test("claims, completes and records a fail-closed review candidate", async (t) =
   }), /Only running jobs/);
 });
 
+test("claim filter skips older queued jobs for unsupported strategies", async (t) => {
+  const workspaceRoot = await makeWorkspace(t);
+  await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
+  await writeFile(path.join(workspaceRoot, "uploads", "view.jpg"), Buffer.from([0xff, 0xd8, 0xff, 0x00]));
+  const ai = await enqueueGenerationJob({
+    workspaceRoot,
+    input: basicInput({
+      strategy: "single-image-ai",
+      sources: [{
+        sourceId: "ai-view", relativePath: "uploads/view.jpg", kind: "image",
+        licence: "CC BY 4.0",
+        permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+      }],
+      viewSourceIds: ["ai-view"], confirmRights: true, confirmOperationScopes: true,
+      confirmSingleViewInference: true,
+    }),
+  });
+  const procedural = await enqueueGenerationJob({ workspaceRoot, input: basicInput() });
+  const claimed = await claimNextGenerationJob({
+    workspaceRoot, workerId: "procedural-worker", supportedStrategies: ["procedural", "auto"],
+  });
+  assert.equal(claimed.job.jobId, procedural.jobId);
+  assert.equal((await getGenerationJob({ workspaceRoot, jobId: ai.jobId })).status, "queued");
+  assert.equal((await getGenerationJob({ workspaceRoot, jobId: ai.jobId })).attempt, 0);
+});
+
 test("recovers interrupted work into a retryable queued job and enforces the retry ceiling", async (t) => {
   const workspaceRoot = await makeWorkspace(t);
   const queued = await enqueueGenerationJob({ workspaceRoot, input: basicInput() });
