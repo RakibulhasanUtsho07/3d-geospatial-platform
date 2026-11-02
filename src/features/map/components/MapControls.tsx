@@ -73,7 +73,7 @@ export default function MapControls({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="absolute right-4 top-[14rem] z-20 flex max-h-[calc(100%-8rem)] flex-col items-end sm:top-[5rem]">
+    <div className="absolute right-4 top-[14rem] z-20 flex flex-col items-end sm:top-[5rem]">
       <button
         type="button"
         aria-label="Map controls"
