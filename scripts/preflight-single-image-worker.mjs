@@ -27,8 +27,9 @@ export async function main(args = process.argv.slice(2), env = process.env) {
       "  --timeout-ms <1000..30000>     Bounded probe timeout (default: 10000)",
       "  --json                         Emit machine-readable JSON",
       "",
-      "Read-only: checks installed runtime/device and local TripoSR/rembg caches; syntax-compiles run.py in memory.",
-      "Does not execute run.py or its --help handler, download weights, create a model, run inference or publish to the map.",
+      "Non-inference preflight: checks installed runtime/device and local TripoSR/rembg caches; syntax-compiles run.py in memory.",
+      "Does not execute run.py or its --help handler, call model-download/inference APIs or publish to the map.",
+      "Python imports can initialize installed packages or trigger package-specific side effects; this is not an OS sandbox or network firewall.",
     ].join("\n"));
     return 0;
   }
