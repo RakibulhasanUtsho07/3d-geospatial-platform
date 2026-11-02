@@ -588,7 +588,6 @@ export async function runSingleImageRuntimeSmoke(options) {
     await replaceReportAtomically(reportPath, report);
     return { report, reportPath, exitCode: 0 };
   } catch (error) {
-    if (typeof options.onFailureForTest === "function") options.onFailureForTest(error);
     if (!workflowStarted) report.readiness.blockers = ["single-image-readiness-probe-failed"];
     report.status = workflowStarted ? "failed" : "blocked";
     report.completedAt = new Date().toISOString();
