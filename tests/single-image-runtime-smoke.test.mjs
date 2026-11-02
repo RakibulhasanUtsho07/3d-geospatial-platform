@@ -9,6 +9,7 @@ import test from "node:test";
 
 import { runSingleImageRuntimeSmoke } from "../src/core/building-generation/single-image-runtime-smoke.mjs";
 import { verifySingleImageRuntimeSmoke } from "../src/core/building-generation/verify-single-image-runtime-smoke.mjs";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 
@@ -19,11 +20,30 @@ function hash(bytes) {
 function makeGlb() {
   const json = Buffer.from(JSON.stringify({
     asset: { version: "2.0" },
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    buffers: [{ byteLength: 42 }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: 36 },
+      { buffer: 0, byteOffset: 36, byteLength: 6 },
+    ],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 3, type: "VEC3", min: [0, 0, 0], max: [1, 1, 0] },
+      { bufferView: 1, componentType: 5123, count: 3, type: "SCALAR" },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
   }), "utf8");
-  const padding = (4 - (json.length % 4)) % 4;
-  const jsonChunk = Buffer.concat([json, Buffer.alloc(padding, 0x20)]);
-  const total = 12 + 8 + jsonChunk.length;
+  const jsonPadding = (4 - (json.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([json, Buffer.alloc(jsonPadding, 0x20)]);
+  const binary = Buffer.alloc(44);
+  const positions = [
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ];
+  positions.forEach((value, index) => binary.writeFloatLE(value, index * 4));
+  binary.writeUInt16LE(0, 36);
+  binary.writeUInt16LE(1, 38);
+  binary.writeUInt16LE(2, 40);
+  const total = 12 + 8 + jsonChunk.length + 8 + binary.length;
   const bytes = Buffer.alloc(total);
   bytes.writeUInt32LE(0x46546c67, 0);
   bytes.writeUInt32LE(2, 4);
@@ -31,6 +51,10 @@ function makeGlb() {
   bytes.writeUInt32LE(jsonChunk.length, 12);
   bytes.writeUInt32LE(0x4e4f534a, 16);
   jsonChunk.copy(bytes, 20);
+  const binaryHeader = 20 + jsonChunk.length;
+  bytes.writeUInt32LE(binary.length, binaryHeader);
+  bytes.writeUInt32LE(0x004e4942, binaryHeader + 4);
+  binary.copy(bytes, binaryHeader + 8);
   return bytes;
 }
 
@@ -126,12 +150,7 @@ async function fakeWorkflowResult(options, root, source) {
         },
         source: { sha256: source.sha256 },
         outputs: { glb: { sha256: outputHash, bytes: glb.length, meshCount: 1 } },
-        modelQuality: {
-          valid: true,
-          status: "review-recommended",
-          warnings: ["synthetic geometry fixture requires human review"],
-          counts: { triangleCount: 1, vertexCount: 3, primitiveCount: 1 },
-        },
+        modelQuality: analyzeGlbQuality(glb),
         scaleCalibration: { status: "not-calibrated" },
         georeference: { status: "not-solved" },
         mapReady: false,
@@ -228,7 +247,9 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(result.report.output.sha256, hash(await readFile(actualModelPath)));
   assert.equal(result.report.output.meshCount, 1);
   assert.equal(result.report.geometryQa.status, "warnings-require-review");
-  assert.equal(result.report.geometryQa.warningCount, 1);
+  assert.equal(result.report.geometryQa.sourceStatus, "review-recommended");
+  assert.ok(result.report.geometryQa.warningCount > 0);
+  assert.equal(result.report.geometryQa.valid, true);
   assert.equal(result.report.mapReady, false);
   assert.equal(result.report.publicationEligible, false);
   assert.equal(result.report.automaticApproval, false);
