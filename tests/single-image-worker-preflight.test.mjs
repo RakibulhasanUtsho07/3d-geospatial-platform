@@ -19,10 +19,12 @@ const readyCapabilities = {
 };
 
 test("preflight reports ready only when both model caches are verified", async () => {
+  let probeOptions = null;
   const report = await runSingleImageWorkerPreflight({
-    probe: async () => readyCapabilities,
+    probe: async (options) => { probeOptions = options; return readyCapabilities; },
     now: "2026-11-02T12:00:00.000Z",
   });
+  assert.deepEqual(probeOptions.strategies, ["single-image-ai"]);
   assert.equal(report.status, "ready");
   assert.equal(report.model.tripoModelWeights, "cached");
   assert.equal(report.model.backgroundRemovalWeights, "cached");
