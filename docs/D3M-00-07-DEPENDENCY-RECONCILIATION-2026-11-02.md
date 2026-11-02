@@ -349,3 +349,25 @@ This section supersedes the status table in §13.2 where runs have since reached
 The D3M-01 ancestry remains 0-behind for every parent/child pair at the SHAs in §13.1. No feature PR was promoted or merged into `development`/ `main`; only branch-to-branch sync commits were applied. The working code paths remain Draft.
 
 **Remaining completion gate:** obtain terminal-success exact-head PR and Push CI for #290, #292 and the newest #312 documentation head. Then re-check the PR heads have not moved, re-run the 0-behind ancestry comparisons, and update this audit again. Real worker-host inference, licensed source/model use, production reviewer provisioning, independent survey/accuracy review and map publication/rollback remain separate external gates.
+
+
+## 15. Final D3M-01 CI terminal reconciliation — 2026-11-02
+
+This update supersedes the §14 statement that #290/#292 were in progress.
+
+The D3M-01 parent-to-child ancestry remains 0-behind throughout #281 → #284 → #286 → #288 → #290 → #292. Every listed implementation branch remains Draft/unmerged, but both required CI event types have now reached terminal success on the current recorded code heads:
+
+| PR | Exact code head | PR Full CI | Push CI |
+|---:|---|---|---|
+| #281 | `daa02d5aa0d7c7ba4c0de6860fe1678160682998` | #41461174767 success | #41461160231 success |
+| #284 | `cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc` | #41461409064 success | #41461401395 success |
+| #286 | `310eba45a4b57444009651d1d5e0371a79bb6a8f` | #41461924513 success | #41461920651 success |
+| #288 | `5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5` | #41462368236 success | #41462360896 success |
+| #290 | `236c02b54a353780baa360d9833058c2bab8264c` | #41462671163 success | #41462663993 success |
+| #292 | `54d4c6d040726bc0cf8edda34e97f3f185877e87` | #41462785232 success | #41462774252 success |
+
+The prior current D3M-07 documentation head `3f6c079299729e27f6f775bab61d608f883ad594` has queued exact-head PR #41464027945 and Push #41464018711. The audit and roadmap are being updated in this final commit, so the resulting branch SHA changes once more; only runs targeting that resulting SHA may validate the latest D3M-07 branch. Do not inherit the prior-head CI status.
+
+**D3M-01 CI closeout:** complete for the recorded implementation heads. **D3M-07 latest documentation-head CI:** pending final exact-head run. All PRs remain Draft/unmerged pending review/integration approval. No promotion to `development` or `main` was performed.
+
+Operational gates remain open: real worker preflight/inference, source/model rights, independent GLB review, production reviewer/operator/publisher provisioning, surveyed scale and vertical datum, held-out accuracy, and deployed map reload/rollback. Keep all release flags false.

@@ -331,3 +331,19 @@ The in-progress jobs were at “Verify viewport API against the production serve
 The current D3M-01 branch ancestry remains synchronized (0 commits behind at each parent-child boundary), and D3M-02→D3M-07 code heads previously passed exact-head PR and Push CI. However, the latest documentation commit changed D3M-07 PR #312 to the head above, so that new head needs fresh exact-head CI too.
 
 **Remaining exact-head checks:** #290 PR/Push, #292 PR/Push, and #312 PR/Push. All associated feature PRs remain Draft; no code promotion to `development` or `main` was performed. Real worker-host smoke/inference, source/model rights, production reviewer/operator/publisher provisioning, survey/vertical datum, held-out accuracy, human GLB review and deployed map reload/rollback remain external gates. All release/approval flags stay false.
+
+
+## 2026-11-02 — final D3M-01 CI terminal reconciliation
+
+This section supersedes the older pending status in the late-day checkpoint. The D3M-01 chain (#281 → #284 → #286 → #288 → #290 → #292) has 0-behind ancestry at every boundary, and each current recorded implementation head has terminal-success exact-head PR Full CI and Push CI:
+
+- #281: PR #41461174767 / Push #41461160231 — success.
+- #284: PR #41461409064 / Push #41461401395 — success.
+- #286: PR #41461924513 / Push #41461920651 — success.
+- #288: PR #41462368236 / Push #41462360896 — success.
+- #290: PR #41462671163 / Push #41462663993 — success.
+- #292: PR #41462785232 / Push #41462774252 — success.
+
+D3M-02 through D3M-07 also passed exact-head PR + Push CI on the implementation SHAs recorded in reconciliation §13.3. D3M-07 has subsequently received these audit/roadmap documentation changes. The previous docs head `3f6c079299729e27f6f775bab61d608f883ad594` had queued PR #41464027945 and Push #41464018711; this final commit advances the D3M-07 branch again, so wait for/check only the new resulting exact-head events before marking the whole branch fully CI-complete.
+
+All implementation PRs remain Draft/unmerged. Do not merge to `development` or `main` without explicit integration/release review. Current `development` and `main` still diverge (91 ahead / 6 behind, 204 changed paths); no bulk promotion was performed. Real worker-host inference, source/model permissions, production reviewer/operator/publisher configuration, independent surveyed dimensions/vertical datum, held-out accuracy, human GLB visual review and production map reload/rollback remain unproven. Release/approval flags stay false.
