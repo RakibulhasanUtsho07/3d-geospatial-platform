@@ -153,7 +153,8 @@ async function requireFreshSmokeIdentities(root, buildingId, jobId, sourceId) {
   const workerJobId = deriveSingleImageWorkerJobId(jobId);
   const paths = [
     [".building-engine/media/" + buildingId + "/sources/" + sourceId + ".json", "Smoke source record"],
-    [".building-engine/jobs/" + buildingId + "/" + jobId, "Smoke reconstruction job state"],
+    [".building-engine/reconstruction-jobs/" + buildingId + "/" + jobId, "Smoke resumable reconstruction state"],
+    [".building-engine/jobs/" + buildingId + "/" + jobId, "Smoke job artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow", "Smoke workflow artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + workerJobId + "-single-view", "TripoSR single-view artifact directory"],
   ];
