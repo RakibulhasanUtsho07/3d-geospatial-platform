@@ -44,7 +44,6 @@ on:
       - feat/correction-verification-similarity-evidence
       - feat/release-readiness-accuracy-evidence
       - feat/final-merge-cleanup
-      - feat/texture-projection-validation
       - feat/p2-7-viewport-tile-selectivity
       - feat/brf06-observation-review-dev-20261030
       - feat/p2-8-startup-coverage-alignment
@@ -65,11 +64,11 @@ on:
       - feat/d3m01c-candidate-evidence-handoff-20261030
       - feat/d3m01e-brf25-authenticated-review-gate-20261030
       - feat/d3m01d-authenticated-geometry-review-20261030
-      - feat/d3m01d-authenticated-geometry-review-20261030
-      - feat/d3m01e-brf25-authenticated-review-gate-20261030
       - feat/d3m01f-governed-reviewer-registry-20261031
+      - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
+      - feat/d3m01f-governed-reviewer-registry-20261031
       - main
       - refactor/p1-road-layer-manager-sync
       - refactor/p1-building-viewport-manager-sync
