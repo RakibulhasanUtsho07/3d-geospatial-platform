@@ -39,7 +39,7 @@ type GenerationJob = {
   startedAt: string | null;
   finishedAt: string | null;
   heartbeatAt: string | null;
-  lastError: string | null;
+  lastError: string | { name: string; message: string } | null;
   result: Record<string, unknown> | null;
   review?: Record<string, unknown>;
   mapReady: false;
@@ -711,7 +711,7 @@ export default function GenerationJobIntakePanel() {
           </label>
           <label className="flex items-start gap-2 text-xs leading-5 text-amber-100">
             <input type="checkbox" checked={confirmOperationScopes} onChange={(event) => setConfirmOperationScopes(event.target.checked)} className="mt-0.5" />
-            <span>I explicitly authorize these operation scopes for every selected image: <strong>{getMapGenerationOperationScopes(strategy).join(", ")}</strong>. The worker records these operator-supplied scopes in source/job provenance; it does not independently verify the source owner's permission. This is separate from copyright/reuse rights.</span>
+            <span>I explicitly authorize these operation scopes for every selected image: <strong>{getMapGenerationOperationScopes(strategy).join(", ")}</strong>. The worker records these operator-supplied scopes in source/job provenance; it does not independently verify the source owner&apos;s permission. This is separate from copyright/reuse rights.</span>
           </label>
 
           {uploadProgress && <p role="status" className="text-xs text-cyan-100">{uploadProgress}</p>}
@@ -768,7 +768,7 @@ export default function GenerationJobIntakePanel() {
                   <p className="mt-2 text-emerald-100">Candidate generated. Inspect GLB and QA evidence, then record the separate review before publication. This job is not automatically placed on the map.</p>
                 )}
                 {job.status === "failed" && job.lastError && (
-                  <p role="alert" className="mt-2 rounded-lg bg-red-500/10 p-2 leading-5 text-red-200">{job.lastError}</p>
+                  <p role="alert" className="mt-2 rounded-lg bg-red-500/10 p-2 leading-5 text-red-200">{typeof job.lastError === "string" ? job.lastError : job.lastError.message}</p>
                 )}
               </div>
             )}
