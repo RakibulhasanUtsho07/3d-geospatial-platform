@@ -21,6 +21,7 @@ async function main() {
       resolution: { type: "string", default: "256" },
       "timeout-ms": { type: "string", default: "1800000" },
       "confirm-source-rights": { type: "boolean", default: false },
+      "confirm-operation-scopes": { type: "boolean", default: false },
       "confirm-single-view-inference": { type: "boolean", default: false },
       "confirm-model-licences": { type: "boolean", default: false },
     },
@@ -33,6 +34,7 @@ async function main() {
       "    --licence <source-rights-basis>",
       "    --runner-script <TripoSR-repo/run.py>",
       "    --confirm-source-rights",
+      "    --confirm-operation-scopes",
       "    --confirm-single-view-inference",
       "    --confirm-model-licences",
       "    [--python <python>] [--device cuda:0|mps|cpu] [--resolution 256] [--timeout-ms 1800000]",
@@ -72,6 +74,7 @@ async function main() {
     mcResolution,
     timeoutMs,
     confirmSourceRights: values["confirm-source-rights"],
+    confirmOperationScopes: values["confirm-operation-scopes"],
     confirmSingleViewInference: values["confirm-single-view-inference"],
     confirmModelLicences: values["confirm-model-licences"],
   });
