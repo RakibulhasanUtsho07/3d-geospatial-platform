@@ -328,6 +328,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       mimeType: source.mimeType,
       bytes: source.bytes,
       sha256: source.sha256,
+      licence: options.licence.trim().slice(0, 300),
       rights: "operator-attested-not-independently-verified",
     },
     model: {
