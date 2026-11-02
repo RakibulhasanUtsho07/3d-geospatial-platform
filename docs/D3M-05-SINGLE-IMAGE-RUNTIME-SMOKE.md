@@ -109,3 +109,24 @@ The verifier independently reads the report, rejects symlinked/out-of-workspace 
 npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, simulated TripoSR child-process spawn evidence, pre-runner and failed-spawn classification, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
 
 Full CI must pass on the exact current D3M-05 PR head; a green result from an earlier commit does not validate later changes. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.
+
+## Operator-host preflight and evidence capture
+
+Before invoking the smoke, confirm that the selected Python executable is the same environment that contains the TripoSR, PyTorch, ONNX Runtime and rembg packages. A local version/device check can catch an obviously wrong interpreter before creating a smoke report:
+
+~~~powershell
+& "D:\AI\TripoSR\.venv\Scripts\python.exe" -c "import sys, torch, onnxruntime, rembg; print('python', sys.version); print('torch', torch.__version__); print('onnxruntime', onnxruntime.__version__); print('rembg', getattr(rembg, '__version__', 'version-not-exposed')); print('cuda_available', torch.cuda.is_available()); print('cuda_devices', torch.cuda.device_count() if torch.cuda.is_available() else 0); print('mps_available', bool(hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()))"
+~~~
+
+Replace the interpreter path with the actual worker environment. Do not paste private cache paths or environment variables containing credentials into an issue or commit. Choose `--device cuda:N` only when that indexed CUDA device is visible to this interpreter; choose `--device mps` only when PyTorch reports MPS available; otherwise use `--device cpu`. The authoritative D3M-04 probe runs again inside the smoke and rejects a device/cache mismatch.
+
+The command's offline socket guard is not a host firewall. When the test requires strict no-egress, deny outbound traffic at the worker host/network layer before execution. On Windows, apply a restrictive workspace ACL; Node mode bits are not a substitute for ACL enforcement.
+
+After the smoke exits, run the independent verifier against the same private workspace and job ID. Copy the sanitized results into [the D3M-05 real-worker smoke log template](evidence-templates/D3M-05-REAL-WORKER-SMOKE-LOG.md). Keep the original JSON report, source image and GLB in the private workspace. Do not commit or attach those files to the repository; the template records only non-secret metadata and hashes.
+
+## CI and real-host status (2026-11-02)
+
+- D3M-05 implementation branch head `07e122053ff99059b72661e85e4f2e44b2a3c8ac` passed exact-head PR Full CI: [run #41412587662](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41412587662), 182 workflow steps, no failed steps.
+- The D3M-06 descendant code head `f8b974465ac6d52b32ada50fb2356844a6f126d8` also passed exact-head PR Full CI: [run #41415299310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41415299310), 182 workflow steps, no failed steps.
+- Both runs use CI fakes/fixtures for the inference workflow. **No real TripoSR/rembg inference, CUDA/MPS execution or building-quality result is claimed.**
+- **Remaining operational blocker:** an operator must run this command on the provisioned worker host with the authorized source image and verified model-weight terms, then independently verify and inspect the resulting private GLB. Until that happens, D3M-05 remains a runtime-smoke implementation candidate, not a passed real inference.
