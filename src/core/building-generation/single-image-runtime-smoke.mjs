@@ -48,9 +48,9 @@ const OFFLINE_SITE_CUSTOMIZE = [
   "",
 ].join("\n");
 
-function safeId(value, label) {
-  if (typeof value !== "string" || !SAFE_ID.test(value)) {
-    throw new TypeError(label + " must be a safe identifier.");
+function safeId(value, label, maxLength = 80) {
+  if (typeof value !== "string" || !SAFE_ID.test(value) || value.length > maxLength) {
+    throw new TypeError(label + " must be a safe identifier no longer than " + maxLength + " characters.");
   }
   return value;
 }
@@ -338,7 +338,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     }
   }
 
-  const jobId = safeId(options.jobId, "jobId");
+  const jobId = safeId(options.jobId, "jobId", 60);
   const sourceId = safeId(options.sourceId, "sourceId");
   const relativePath = safeRelativePath(options.sourceRelativePath, "sourceRelativePath");
   if (typeof options.licence !== "string" || !options.licence.trim() ||
