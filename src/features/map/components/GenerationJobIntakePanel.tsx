@@ -152,7 +152,10 @@ export default function GenerationJobIntakePanel() {
     let alive = true;
     let timer: ReturnType<typeof setInterval> | null = null;
 
+    let pollInFlight = false;
     async function poll() {
+      if (pollInFlight) return;
+      pollInFlight = true;
       try {
         const [jobResponse, workerResponse] = await Promise.all([
           fetch("/api/building-generation/jobs/" + encodeURIComponent(activeJobId), {
@@ -195,6 +198,8 @@ export default function GenerationJobIntakePanel() {
         }
       } catch (cause: unknown) {
         if (alive) setStatusError(cause instanceof Error ? cause.message : "Could not refresh generation job status.");
+      } finally {
+        pollInFlight = false;
       }
     }
 
@@ -648,9 +653,20 @@ export default function GenerationJobIntakePanel() {
         </form>
 
         {uploadedSources.length > 0 && (
-          <p className="text-[11px] leading-5 text-zinc-500">
-            {uploadedSources.length} private upload record(s) retained in this panel for retry. Stored source records have not been rights-approved.
-          </p>
+          <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/[0.035] p-3">
+            <p className="text-xs font-semibold text-emerald-100">
+              {uploadedSources.length} image(s) securely stored in the private workspace and retained for retry
+            </p>
+            <ul className="mt-2 space-y-1 text-[11px] text-zinc-400">
+              {uploadedSources.map((source) => (
+                <li key={source.sourceId} className="flex flex-wrap justify-between gap-2">
+                  <span className="min-w-0 break-all">{source.title ?? source.sourceId}</span>
+                  <span className="font-mono text-zinc-500">{source.sha256.slice(0, 12)}…</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[10px] leading-4 text-zinc-500">These source records remain unreviewed. They are reused on retry while this panel remains mounted; upload retries after a lost response use deterministic content IDs and server-side SHA-256 verification.</p>
+          </div>
         )}
 
         <div className="border-t border-white/10 pt-3">
