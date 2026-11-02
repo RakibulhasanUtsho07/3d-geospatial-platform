@@ -118,6 +118,9 @@ jobs:
     name: Lint and production build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      P3_4_HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      P3_4_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out repository

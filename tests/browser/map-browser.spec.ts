@@ -237,8 +237,8 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
     JSON.stringify({
       schemaVersion: 1,
       purpose: "P3.4 map-panel overlay layout visual evidence",
-      branch: process.env.GITHUB_REF_NAME ?? null,
-      commitSha: process.env.GITHUB_SHA ?? null,
+      branch: process.env.P3_4_HEAD_REF ?? process.env.GITHUB_REF_NAME ?? null,
+      commitSha: process.env.P3_4_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
       captures: [
         { file: "desktop-default-1440x900.png", width: 1440, height: 900, state: "default collapsed panels" },
         { file: "mobile-default-390x844.png", width: 390, height: 844, state: "default collapsed panels" },
