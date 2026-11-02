@@ -369,12 +369,23 @@ export function calibrateFloorPlanRasterVectors({
       return {
         id: requireId(opening.id, "opening.id"),
         type: opening.type,
+        offsetPx,
+        widthPx,
         offsetM: roundMetric(offsetPx * metresPerPixel),
         widthM: roundMetric(widthPx * metresPerPixel),
         heightM: requireNumber(opening.heightM, "opening.heightM", 0.4, normalizedLevel.wallHeightM),
         sillHeightM: requireNumber(opening.sillHeightM, "opening.sillHeightM", 0, normalizedLevel.wallHeightM),
       };
-    }).sort((left, right) => left.offsetM - right.offsetM);
+    }).sort((left, right) => left.offsetPx - right.offsetPx);
+    for (let openingIndex = 1; openingIndex < openings.length; openingIndex += 1) {
+      const previous = openings[openingIndex - 1];
+      const current = openings[openingIndex];
+      if (current.offsetPx < previous.offsetPx + previous.widthPx - 1e-8) {
+        fail("INVALID_WALL_OPENINGS", "Openings '" + previous.id + "' and '" + current.id + "' overlap on wall '" + id + "'.");
+      }
+    }
+    const normalizedOpenings = openings.map(({ offsetPx: _offsetPx, widthPx: _widthPx, ...opening }) => opening)
+      .sort((left, right) => left.offsetM - right.offsetM);
     return {
       id,
       proposalId,
@@ -390,7 +401,7 @@ export function calibrateFloorPlanRasterVectors({
           id,
           start: toLocalMetric(startPx, originPixel, metresPerPixel),
           end: toLocalMetric(endPx, originPixel, metresPerPixel),
-          openings,
+          openings: normalizedOpenings,
         };
         if (wall.heightM !== undefined) {
           normalizedWall.heightM = requireNumber(wall.heightM, "wall.heightM", 2, normalizedLevel.wallHeightM);
