@@ -66,6 +66,7 @@ on:
       - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
+      - feat/d3m01c-candidate-evidence-handoff-20261030
       - main
       - refactor/p1-road-layer-manager-sync
       - refactor/p1-building-viewport-manager-sync
