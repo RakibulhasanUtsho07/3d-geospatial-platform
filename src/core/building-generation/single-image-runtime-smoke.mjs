@@ -38,7 +38,7 @@ const OFFLINE_SITE_CUSTOMIZE = [
   "socket.socket.sendto = _deny_runtime_network",
   "socket.create_connection = _deny_runtime_network",
   "",
-].join("\\n");
+].join("\n");
 
 function safeId(value, label) {
   if (typeof value !== "string" || !SAFE_ID.test(value)) {
@@ -202,15 +202,16 @@ function qualitySummary(modelQuality) {
 }
 
 function offlineSpawn(spawnImpl, offlinePythonDirectory) {
-  const pythonPath = [offlinePythonDirectory, process.env.PYTHONPATH]
-    .filter(Boolean)
-    .join(path.delimiter);
   return (executable, args, options = {}) => spawnImpl(executable, args, {
     ...options,
     env: {
       ...process.env,
       ...(options.env ?? {}),
-      PYTHONPATH: pythonPath,
+      PYTHONPATH: [
+        offlinePythonDirectory,
+        options.env?.PYTHONPATH,
+        process.env.PYTHONPATH,
+      ].filter(Boolean).join(path.delimiter),
       ...OFFLINE_ENV,
     },
   });
