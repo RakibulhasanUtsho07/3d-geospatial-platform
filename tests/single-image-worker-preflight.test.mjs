@@ -6,6 +6,7 @@ import {
 } from "../src/core/building-generation/single-image-worker-preflight.mjs";
 
 const readyCapabilities = {
+  schemaVersion: "1.0.0",
   checkedAt: "2026-11-02T12:00:00.000Z",
   strategies: {
     "single-image-ai": {
@@ -81,4 +82,24 @@ test("preflight rejects an invalid timestamp", async () => {
     runSingleImageWorkerPreflight({ probe: async () => readyCapabilities, now: "not-a-date" }),
     /valid timestamp/,
   );
+});
+
+
+test("preflight blocks a capability response with a non-canonical timestamp", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({ ...readyCapabilities, checkedAt: "2026-11-02" }),
+    now: "2026-11-02T12:30:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.equal(report.checkedAt, "2026-11-02T12:30:00.000Z");
+  assert.ok(report.blockers.some((item) => /timestamp is missing, invalid, or non-canonical/.test(item)));
+});
+
+test("preflight blocks an unsupported capability schema version", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({ ...readyCapabilities, schemaVersion: "99.0.0" }),
+    now: "2026-11-02T12:30:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.some((item) => /missing or unsupported schema version/.test(item)));
 });
