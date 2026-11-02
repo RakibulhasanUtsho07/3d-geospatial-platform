@@ -46,6 +46,7 @@ test("preflight blocks when TripoSR cache is missing", async () => {
         modelWeights: "missing", backgroundRemovalWeights: "cached",
       } },
     }),
+    now: "2026-11-02T12:00:00.000Z",
   });
   assert.equal(report.status, "blocked");
   assert.match(report.blockers[0], /both be verified as cached/);
@@ -61,6 +62,7 @@ test("preflight blocks when rembg cache is unknown", async () => {
         modelWeights: "cached", backgroundRemovalWeights: "unknown",
       } },
     }),
+    now: "2026-11-02T12:00:00.000Z",
   });
   assert.equal(report.status, "blocked");
 });
@@ -75,6 +77,7 @@ test("preflight does not copy environment secrets into its report", async () => 
   const report = await runSingleImageWorkerPreflight({
     env: { API_TOKEN: "do-not-leak-this", BUILDING_ENGINE_PYTHON_EXECUTABLE: "/private/python" },
     probe: async () => readyCapabilities,
+    now: "2026-11-02T12:00:00.000Z",
   });
   const serialized = JSON.stringify(report);
   assert.equal(serialized.includes("do-not-leak-this"), false);
@@ -138,4 +141,39 @@ test("preflight rejects a capability timestamp that does not match the requested
   });
   assert.equal(report.status, "blocked");
   assert.equal(report.checkedAt, "2026-11-02T12:00:00.000Z");
+});
+
+
+test("preflight blocks malformed blocker arrays instead of dropping invalid entries", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({
+      ...readyCapabilities,
+      strategies: {
+        "single-image-ai": {
+          ...readyCapabilities.strategies["single-image-ai"],
+          blockers: [null],
+        },
+      },
+    }),
+    now: "2026-11-02T12:00:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.match(report.blockers[0], /missing or malformed/);
+});
+
+test("preflight blocks cached rembg weights without a verified model identifier", async () => {
+  const report = await runSingleImageWorkerPreflight({
+    probe: async () => ({
+      ...readyCapabilities,
+      strategies: {
+        "single-image-ai": {
+          ...readyCapabilities.strategies["single-image-ai"],
+          backgroundRemovalModel: null,
+        },
+      },
+    }),
+    now: "2026-11-02T12:00:00.000Z",
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.some((item) => /no verified model identifier/.test(item)));
 });
