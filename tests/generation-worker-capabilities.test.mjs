@@ -36,8 +36,8 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
       BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
       BUILDING_ENGINE_DEVICE: "cuda:0",
     },
-    spawnImpl: (executable, args) => {
-      calls.push({ executable, args });
+    spawnImpl: (executable, args, options) => {
+      calls.push({ executable, args, options });
       return fakeSuccessfulSpawn(executable === "python-fixture"
         ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_CACHED"
         : undefined)();
@@ -60,8 +60,52 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
   assert.equal(pythonProbe.args[1].includes("import onnxruntime, rembg, torch"), true);
   assert.equal(pythonProbe.args[1].includes("resolve_existing"), true);
   assert.equal(pythonProbe.args[1].includes("REMBG_MODEL_WEIGHTS_CACHED"), true);
+  assert.equal(pythonProbe.args[1].includes("compile(runner_source, runner_path, 'exec', dont_inherit=True)"), true);
+  assert.equal(pythonProbe.args[1].includes("runpy"), false);
+  assert.equal(pythonProbe.args[1].includes("sys.argv"), false);
+  assert.equal(calls.some((entry) => entry.args.includes(runner) && entry.args.includes("--help")), false);
+  assert.equal(pythonProbe.options.env.PYTHONDONTWRITEBYTECODE, "1");
+  assert.equal(pythonProbe.options.env.HF_HUB_OFFLINE, "1");
+  assert.equal(pythonProbe.options.env.TRANSFORMERS_OFFLINE, "1");
   assert.equal(pythonProbe.args[1].includes("new_session("), false);
   assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural", "photogrammetry", "single-image-ai"]);
+});
+
+test("single-image-only probe skips all COLMAP executable checks", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-single-only-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runner = path.join(root, "run.py");
+  await writeFile(runner, "raise RuntimeError('must only be syntax-compiled')\n");
+  const calls = [];
+  const result = await probeGenerationWorkerCapabilities({
+    env: {
+      BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
+      BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
+      BUILDING_ENGINE_DEVICE: "cpu",
+    },
+    strategies: ["single-image-ai"],
+    spawnImpl: (executable, args) => {
+      calls.push({ executable, args });
+      return fakeSuccessfulSpawn(executable === "python-fixture"
+        ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_CACHED"
+        : "")();
+    },
+  });
+  assert.equal(result.strategies["single-image-ai"].status, "ready");
+  assert.equal("photogrammetry" in result.strategies, false);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].executable, "python-fixture");
+});
+
+test("rejects invalid or duplicate strategy selections", async () => {
+  await assert.rejects(
+    probeGenerationWorkerCapabilities({ strategies: ["single-image-ai", "single-image-ai"], spawnImpl: () => { throw new Error("must not spawn"); } }),
+    /unique supported worker strategies/,
+  );
+  await assert.rejects(
+    probeGenerationWorkerCapabilities({ strategies: ["unknown"], spawnImpl: () => { throw new Error("must not spawn"); } }),
+    /unique supported worker strategies/,
+  );
 });
 
 test("keeps single-image jobs unclaimable when TripoSR weights are not cached", async (t) => {

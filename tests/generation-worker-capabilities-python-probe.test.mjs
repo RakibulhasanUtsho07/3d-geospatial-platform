@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn as nodeSpawn, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -91,14 +91,13 @@ async function createFixture(t, {
   sessionModule.push("sessions_class = [FixtureSession]", "");
   await writeFile(path.join(stubs, "rembg", "sessions", "__init__.py"), sessionModule.join("\n"));
 
+  const runnerExecutionMarker = path.join(root, "runner-executed.marker");
   await writeFile(
     path.join(runnerDirectory, "run.py"),
     [
-      "import argparse",
-      "parser = argparse.ArgumentParser(description='TripoSR fixture runner')",
-      "parser.add_argument('--fixture', action='store_true')",
-      "parser.parse_args()",
-      "raise RuntimeError('runner must exit on --help before inference')",
+      "from pathlib import Path",
+      "Path(" + JSON.stringify(runnerExecutionMarker) + ").write_text('executed')",
+      "raise RuntimeError('configured runner must never execute during capability preflight')",
       "",
     ].join("\n"),
   );
@@ -111,6 +110,7 @@ async function createFixture(t, {
         ...options,
         env: {
           ...process.env,
+          ...options.env,
           PYTHONPATH: [stubs, existingPythonPath].filter(Boolean).join(path.delimiter),
           FAKE_HF_CACHE: hfCache,
           FAKE_REMBG_CACHE: rembgCache,
@@ -125,7 +125,7 @@ async function createFixture(t, {
     return child;
   };
 
-  return { root, python, runner: path.join(runnerDirectory, "run.py"), spawnImpl };
+  return { root, python, runner: path.join(runnerDirectory, "run.py"), runnerExecutionMarker, spawnImpl };
 }
 
 async function probe(fixture, t) {
@@ -144,7 +144,7 @@ async function probe(fixture, t) {
   });
 }
 
-test("executes the bounded Python probe against cached TripoSR and rembg fixtures", async (t) => {
+test("checks cached TripoSR/rembg and runner syntax without executing configured run.py", async (t) => {
   const fixture = await createFixture(t);
   const capabilities = await probe(fixture, t);
   if (!capabilities) return;
@@ -155,6 +155,10 @@ test("executes the bounded Python probe against cached TripoSR and rembg fixture
   assert.equal(singleImage.backgroundRemovalWeights, "cached");
   assert.equal(singleImage.backgroundRemovalModel, "bria-rmbg");
   assert.ok(getClaimableGenerationStrategies(capabilities).includes("single-image-ai"));
+  let runnerExecuted = false;
+  try { await access(fixture.runnerExecutionMarker); runnerExecuted = true; }
+  catch (error) { if (error?.code !== "ENOENT") throw error; }
+  assert.equal(runnerExecuted, false, "preflight must syntax-compile run.py without executing its top-level code");
   assert.equal(JSON.stringify(capabilities).includes(fixture.root), false);
 });
 

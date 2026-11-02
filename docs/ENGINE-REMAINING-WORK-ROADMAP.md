@@ -239,3 +239,41 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Record a separate exact-head Push CI pass before promotion. The available commit-scoped workflow result only exposes PR-triggered runs; no Push CI success is claimed here.
 - [ ] Next operational gate: run the D3M-05 single-image smoke on the provisioned worker host using the real TripoSR/rembg caches and reviewed model/source terms, then independently verify and visually inspect the private GLB/report. This requires access to the actual worker host and must not be replaced by CI fakes.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.
+
+## D3M-07 — non-inference single-image worker preflight
+
+**Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
+**Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
+
+- [x] Add a preflight adapter around the authoritative D3M-04 capability probe; request only `single-image-ai` so this check does not launch unrelated COLMAP commands.
+- [x] Require TripoSR and rembg caches to be explicitly `cached` before returning ready; reject missing, unknown, malformed and blocked states.
+- [x] Add a CLI with explicit Python, TripoSR runner and device overrides; use bounded probe timeout and non-zero exit for blocked/unknown readiness.
+- [x] Keep output sanitized: do not serialize environment variables, executable paths, cache paths or credentials.
+- [x] Prevent configured runner execution: read and syntax-compile `run.py` in memory; never invoke its top-level code or `--help` handler. Set Python bytecode suppression and Hugging Face offline/telemetry flags for the probe subprocess.
+- [x] Keep release flags false and state clearly that preflight does not run inference, verify licences, establish GPU memory sufficiency or prove building accuracy.
+- [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation, secret/path non-disclosure, strategy scoping and a real-Python runner-execution marker check.
+- [x] Add the tests and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
+- [x] Align the D3M-05 real-smoke readiness recheck with the same single-image-only strategy scope; keep actual TripoSR execution inside the authorized inference workflow.
+- [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
+- [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
+- **Safety boundary:** the preflight does not execute the configured TripoSR runner or call model-download/inference APIs. Python imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic read-only environment, OS sandbox or host firewall. Apply host/network egress and filesystem controls when strict guarantees are required.
+
+
+## 2026-11-02 — D3M-00 → D3M-07 dependency/evidence reconciliation
+
+The canonical current work-package mapping and branch/CI blockers are recorded in [D3M-00–07 Dependency Reconciliation](./D3M-00-07-DEPENDENCY-RECONCILIATION-2026-11-02.md).
+
+Key closeout findings:
+- D3M-01.A/B PR #281 is based on an old development head (35 ahead / 5 behind current development); exact-head CI passed, but it still needs rebase/retarget and revalidation.
+- D3M-01.G PR #292 is based on D3M-01.F at 89f3f11a..., while current parent PR #290 is ab50f062...; rebase #292 and rerun PR + Push CI.
+- D3M-03 current head has Push CI success but no exact-head PR CI run; rerun PR CI after stack rebase/retarget.
+- D3M-06 current head has PR CI success but no exact-head Push CI; D3M-06 was added to the Push branch filter by the reconciliation update, but a same-head run is still required after safely updating/revalidating the branch.
+- D3M-07 prior head af287278... had both exact-head PR + Push CI success (184/184 each). The current reconciliation commit adds schema/timestamp validation and therefore requires fresh exact-head CI.
+- Real D3M-05 inference, independent GLB inspection, source rights, surveyed scale/georeferencing, production reviewer provisioning and deployed map publication remain external acceptance gates. Do not promote release flags.
+
+
+## 2026-11-02 — D3M-07 fail-closed output hardening follow-up
+
+The D3M-07 preflight now validates capability schema version, canonical/exact probe timestamp, strategy status and allow-listed model cache states. Unexpected model state values and unsafe rembg model identifiers are normalized/omitted instead of being echoed into the preflight report. Added regression coverage for schema, timestamp, stale result, unsupported cache-state and path-injection cases.
+
+Current exact-head PR and Push CI are recorded at [#41443645721](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443645721) and [#41443642326](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41443642326) on `8947049cd219474859be5923bde44b5c503ebd6d`. At the time of this update both were queued; do not treat the previous `af287278...` green runs as proof for this new head.
