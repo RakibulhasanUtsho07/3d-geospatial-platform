@@ -36,6 +36,7 @@ type TimedRoute = {
   fulfilledAtMs?: number;
   fulfillError?: string;
   delayedForCancellation?: boolean;
+  settled?: boolean;
 };
 
 type WorkloadProbeDiagnostics = {
@@ -348,6 +349,8 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
       routeRecord.fulfilledAtMs = performance.now();
     } catch (error: unknown) {
       routeRecord.fulfillError = error instanceof Error ? error.message : String(error);
+    } finally {
+      routeRecord.settled = true;
     }
   });
 
@@ -444,10 +447,14 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   assert.equal(focusApplied, true, "the opt-in camera probe must start a fresh local viewport");
 
   const delayedBuildingRequest = await delayedBuildingRequestPromise;
-  const delayedBuildingRoute = await expect.poll(
-    () => buildingRoutes.find((route) => route.url === delayedBuildingRequest.url() && route.delayedForCancellation) ?? null,
+  await expect.poll(
+    () => buildingRoutes.some((route) => route.url === delayedBuildingRequest.url() && route.delayedForCancellation),
     { timeout: 10_000 },
-  ).toBeTruthy().then(() => buildingRoutes.find((route) => route.url === delayedBuildingRequest.url())!);
+  ).toBe(true);
+  const delayedBuildingRoute = buildingRoutes.find(
+    (route) => route.url === delayedBuildingRequest.url() && route.delayedForCancellation,
+  );
+  assert.ok(delayedBuildingRoute, "the held building route must be identifiable");
 
   const intentProbe = await page.evaluate(() => {
     const target = window as WorkloadProbeWindow;
@@ -484,10 +491,10 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
     { timeout: 10_000 },
   ).toBe(true);
 
-  // The stale route intentionally remains held briefly after the browser abort;
-  // allow the route handler to observe that it can no longer fulfill the request.
+  // The stale route intentionally remains held after the browser abort.
+  // Wait for its fixture handler to finish so the test does not leak pending routes.
   await expect.poll(
-    () => Boolean(delayedBuildingRoute.fulfillError),
+    () => delayedBuildingRoute.settled === true,
     { timeout: CANCEL_RESPONSE_DELAY_MS + 3_000, intervals: [250, 500] },
   ).toBe(true);
 
