@@ -78,6 +78,13 @@ async function sha256File(file: File): Promise<string> {
   return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+async function stableSourceId(contentHash: string, licence: string): Promise<string> {
+  const identity = new TextEncoder().encode(contentHash + "\\0" + licence.trim());
+  const digest = await crypto.subtle.digest("SHA-256", identity);
+  const hex = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return "map-" + hex.slice(0, 32);
+}
+
 function statusLabel(status: GenerationJob["status"]): string {
   if (status === "queued") return "Queued";
   if (status === "running") return "Running";
@@ -299,7 +306,7 @@ export default function GenerationJobIntakePanel() {
     if (reusable) return reusable;
 
     const contentHash = fileKey.slice(fileKey.lastIndexOf("|") + 1);
-    const sourceId = "map-" + contentHash.slice(0, 32);
+    const sourceId = await stableSourceId(contentHash, licence);
     const form = new FormData();
     form.append("buildingId", buildingId.trim());
     form.append("sourceId", sourceId);
