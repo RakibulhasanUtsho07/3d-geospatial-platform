@@ -1,0 +1,26 @@
+# P3.4 — Responsive map panel occlusion checkpoint
+
+**Date:** 2026-11-02  
+**Branch:** `feat/p34-map-panel-occlusion-20261102`  
+**Base:** `development` at `f7b2a67fcf0c34623196fa92e719640086e2adce`
+
+## Problem confirmed in source
+
+The map canvas had multiple panels mounted open over it at the same time: the property discovery filters and results panel, the full layer checklist, and the full vertical camera-control stack. On narrow screens, fixed left/right panel widths and the top offsets also allowed the overlay controls to compete for the same map area.
+
+## Changes in this candidate
+
+- Property discovery now starts collapsed and can be opened from an explicit, labelled disclosure control.
+- Map layers now start collapsed; the disclosure reports the number of visible layers and preserves the existing layer toggles.
+- Camera/navigation controls now start collapsed behind an accessible disclosure. The complete existing action set remains available when expanded and the menu is scrollable within the viewport.
+- Mobile docks use non-overlapping vertical rows for property discovery, map controls, and nearby places. The generated-model launcher moves above the bottom layer dock on narrow screens.
+- Added Playwright coverage for collapsed defaults, expand/collapse behavior, and default dock separation at desktop (1440×900) and mobile (390×844). Existing layer and camera tests explicitly open their relevant docks.
+- Added the feature branch to the CI push branch filter. Pull-request CI already includes `development` as a target branch.
+
+## Validation status
+
+This is an implementation candidate. Exact-head Full CI, Push CI, and the browser viewport assertions must complete successfully before this work is considered validated. No map imagery provider or red-tile behavior was changed: the reported red imagery/overlay anomaly still requires a separate evidence-led investigation and must not be claimed fixed by this layout change.
+
+## Non-goals and remaining P3.4 evidence
+
+This change reduces default UI occlusion; it does not prove the visual fidelity of the buildings, eliminate the side panel when a user intentionally opens it, or diagnose raster imagery artifacts. The follow-up baseline must still compare equivalent camera/data/device captures and confirm the usable canvas area after the layout change.
