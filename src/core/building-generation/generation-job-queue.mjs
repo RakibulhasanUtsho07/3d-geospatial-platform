@@ -151,6 +151,10 @@ function normalizeRequest(raw) {
   if (sources.length && !confirmRights) {
     throw new Error("confirmRights must be true after the operator has checked source rights.");
   }
+  const confirmOperationScopes = raw.confirmOperationScopes === true;
+  if (sources.length && !confirmOperationScopes) {
+    throw new Error("confirmOperationScopes must be true after the operator authorizes the required media operation scopes.");
+  }
   const viewSourceIds = raw.viewSourceIds === undefined ? undefined : raw.viewSourceIds;
   if (viewSourceIds !== undefined) {
     if (!Array.isArray(viewSourceIds) || viewSourceIds.length > MAX_SOURCES) {
