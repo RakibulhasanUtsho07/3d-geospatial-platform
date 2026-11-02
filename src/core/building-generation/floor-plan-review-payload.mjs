@@ -337,6 +337,14 @@ export function buildFloorPlanRasterReviewPayload({
       vectorIds.add(normalized.id);
       return normalized;
     });
+    const orderedOpenings = [...normalizedOpenings].sort((left, right) => left.offsetPx - right.offsetPx);
+    for (let openingIndex = 1; openingIndex < orderedOpenings.length; openingIndex += 1) {
+      const previous = orderedOpenings[openingIndex - 1];
+      const current = orderedOpenings[openingIndex];
+      if (current.offsetPx < previous.offsetPx + previous.widthPx - 1e-8) {
+        fail("OPENINGS_OVERLAP", "Openings '" + previous.id + "' and '" + current.id + "' overlap on wall '" + wallId + "'.");
+      }
+    }
     const normalized = {
       proposalId: candidate.id,
       decision: "accept",
