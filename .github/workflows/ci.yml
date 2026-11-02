@@ -65,6 +65,7 @@ on:
       - feat/brf47-cross-role-asset-identity-20261031
   pull_request:
     branches:
+      - feat/brf06-observation-review-dev-20261030
       - main
       - refactor/p1-road-layer-manager-sync
       - refactor/p1-building-viewport-manager-sync
