@@ -136,10 +136,10 @@ After the smoke exits, run the independent verifier against the same private wor
 Before collecting rights attestations or invoking a real smoke, run the dedicated read-only preflight from the repository root:
 
 ~~~powershell
-npm run preflight:single-image-worker -- --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --runner-script "D:\AI\TripoSR\ run.py" --device cuda:0
+npm run preflight:single-image-worker -- --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --runner-script "D:\AI\TripoSR\run.py" --device cuda:0
 ~~~
 
-Replace both paths with the actual worker environment. Remove the illustrative space before `run.py` if copying the command; the actual runner path must point to the installed TripoSR `run.py`. Use `--device cpu` or `--device mps` when appropriate. To capture a machine-readable, sanitized report:
+Replace both paths with the actual worker environment. Use `--device cpu` or `--device mps` when appropriate. To capture a machine-readable, sanitized report:
 
 ~~~powershell
 npm run preflight:single-image-worker -- --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cpu --json
