@@ -72,6 +72,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   const python = env.BUILDING_ENGINE_PYTHON_EXECUTABLE || env.TRIPOSR_PYTHON || "python";
   const device = env.BUILDING_ENGINE_DEVICE || "cuda:0";
   if (!["cpu", "mps"].includes(device) && !/^cuda:\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
+  let probeResult = null;
   if (runner && !blockers.length) {
     const script = [
       "import os, runpy, sys", "import torch",
@@ -91,18 +92,18 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       "try:", "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
       "except SystemExit as error:", "    if error.code not in (None, 0): raise",
     ].join("\n");
-    const result = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
-    if (!result.ok) {
-      blockers.push(result.reason === "spawn-error"
+    probeResult = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
+    if (!probeResult.ok) {
+      blockers.push(probeResult.reason === "spawn-error"
         ? "Configured Python executable could not be started; check BUILDING_ENGINE_PYTHON_EXECUTABLE."
-        : result.reason === "timeout"
+        : probeResult.reason === "timeout"
           ? "TripoSR runner/PyTorch/device readiness probe timed out."
           : "TripoSR runner imports, PyTorch, or configured compute device failed its readiness probe.");
     }
   }
-  const modelWeights = blockers.length || !result?.ok
+  const modelWeights = blockers.length || !probeResult?.ok
     ? "unknown"
-    : result.stdout.includes("TRIPOSR_WEIGHTS_CACHED")
+    : probeResult.stdout.includes("TRIPOSR_WEIGHTS_CACHED")
       ? "cached"
       : "missing";
   return {
