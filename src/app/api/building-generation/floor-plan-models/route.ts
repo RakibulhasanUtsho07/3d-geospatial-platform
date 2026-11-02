@@ -5,6 +5,10 @@ import { createFloorPlanModelCandidate } from "@/core/building-generation/floor-
 
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 async function readJsonBody(request: Request): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
@@ -94,29 +98,33 @@ export async function POST(request: Request) {
   } catch (error) {
     return errorResponse(error);
   }
-  if (!input || typeof input !== "object" || Array.isArray(input) ||
-      !("floorPlan" in input) || !input.floorPlan ||
-      typeof input.floorPlan !== "object" || Array.isArray(input.floorPlan) ||
-      ("calibrationEvidence" in input && (
-        !input.calibrationEvidence || typeof input.calibrationEvidence !== "object" ||
-        Array.isArray(input.calibrationEvidence) ||
-        !input.calibrationEvidence.proposalReport ||
-        typeof input.calibrationEvidence.proposalReport !== "object" ||
-        Array.isArray(input.calibrationEvidence.proposalReport) ||
-        !input.calibrationEvidence.review ||
-        typeof input.calibrationEvidence.review !== "object" ||
-        Array.isArray(input.calibrationEvidence.review)
-      ))) {
-    return NextResponse.json({
-      error: "Request body must contain a floorPlan object and, when supplied, calibrationEvidence with the original proposalReport and completed review objects.",
-    }, { status: 400 });
+  if (!isRecord(input) || !isRecord(input.floorPlan)) {
+    return NextResponse.json({ error: "Request body must contain a floorPlan object." }, { status: 400 });
+  }
+
+  let calibrationEvidence:
+    | { proposalReport: Record<string, unknown>; review: Record<string, unknown> }
+    | undefined;
+  if (input.calibrationEvidence !== undefined) {
+    const rawEvidence = input.calibrationEvidence;
+    if (!isRecord(rawEvidence) ||
+        !isRecord(rawEvidence.proposalReport) ||
+        !isRecord(rawEvidence.review)) {
+      return NextResponse.json({
+        error: "calibrationEvidence must contain the original proposalReport and completed review objects.",
+      }, { status: 400 });
+    }
+    calibrationEvidence = {
+      proposalReport: rawEvidence.proposalReport,
+      review: rawEvidence.review,
+    };
   }
 
   try {
     const result = await createFloorPlanModelCandidate({
       workspaceRoot,
       floorPlan: input.floorPlan,
-      calibrationEvidence: "calibrationEvidence" in input ? input.calibrationEvidence : undefined,
+      calibrationEvidence,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
