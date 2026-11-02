@@ -43,11 +43,12 @@ function sha256(bytes) {
 async function readRegularWorkspaceFile(root, relativePath, label, maximumBytes) {
   const safePath = safeRelativePath(relativePath, label);
   let current = root;
-  for (const [index, segment] of safePath.split("/").entries()) {
+  const segments = safePath.split("/");
+  for (const [index, segment] of segments.entries()) {
     current = path.join(current, segment);
     const entry = await lstat(current);
     if (entry.isSymbolicLink()) throw new TypeError(label + " must not contain symlink path components.");
-    const final = index === safePath.split("/").length - 1;
+    const final = index === segments.length - 1;
     if (!final && !entry.isDirectory()) throw new TypeError(label + " contains a non-directory path component.");
     if (final && !entry.isFile()) throw new TypeError(label + " must be a regular file.");
     const actual = await realpath(current);
@@ -137,10 +138,25 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       report.candidateDisposition !== "ai-proposed-requires-human-review") {
     throw new TypeError("Smoke report violates the fail-closed publication contract.");
   }
+  if (report.inference?.status !== "completed" ||
+      !Number.isFinite(report.inference.durationMs) || report.inference.durationMs < 0) {
+    throw new TypeError("Smoke report does not contain a completed inference record.");
+  }
+  if (report.networkPolicy?.huggingFaceOffline !== true ||
+      report.networkPolicy?.transformersOffline !== true ||
+      report.networkPolicy?.datasetsOffline !== true ||
+      report.networkPolicy?.pythonSocketConnectionsBlocked !== true ||
+      report.networkPolicy?.kernelNetworkIsolation !== "not-enforced-by-this-command") {
+    throw new TypeError("Smoke report does not record the declared offline network policy.");
+  }
   if (!report.source || !SAFE_ID.test(report.source.sourceId ?? "") ||
       report.source.rights !== "operator-attested-not-independently-verified" ||
+      typeof report.source.licence !== "string" || !report.source.licence.trim() ||
       !HASH.test(report.source.sha256 ?? "")) {
     throw new TypeError("Smoke report source evidence is invalid.");
+  }
+  if (report.model?.licenceReview !== "operator-attested-not-independently-verified") {
+    throw new TypeError("Smoke report is missing the model-licence review attestation.");
   }
   if (!report.output || !HASH.test(report.output.sha256 ?? "") ||
       !Number.isSafeInteger(report.output.bytes) || report.output.bytes <= 0) {
