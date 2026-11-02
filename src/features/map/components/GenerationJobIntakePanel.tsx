@@ -288,6 +288,7 @@ export default function GenerationJobIntakePanel() {
     setBusy(true);
     setUploadProgress("");
     let localSources = [...uploadedSources];
+    const selectedSources: UploadedSource[] = [];
     try {
       const buildingSpec = buildMapGenerationBuildingSpec({
         id: buildingId.trim(),
@@ -307,6 +308,7 @@ export default function GenerationJobIntakePanel() {
         const digest = await sha256File(file);
         const fileKey = [file.name, file.size, file.lastModified, digest].join("|");
         const source = await uploadOne(file, index, files.length, fileKey, localSources);
+        selectedSources.push(source);
         if (!localSources.some((item) => item.sourceId === source.sourceId)) {
           localSources = [...localSources, source];
         }
@@ -317,11 +319,7 @@ export default function GenerationJobIntakePanel() {
       const requestBody = buildMapGenerationJobInput({
         buildingSpec,
         strategy,
-        uploadedSources: localSources.filter((source) =>
-          files.some((file) => source.fileKey === [
-            file.name, file.size, file.lastModified,
-          ].join("|") || source.title === file.name)
-        ).map((source) => ({
+        uploadedSources: selectedSources.map((source) => ({
           sourceId: source.sourceId,
           relativePath: source.relativePath,
           kind: source.kind,
@@ -330,9 +328,7 @@ export default function GenerationJobIntakePanel() {
           attribution,
         })),
         confirmRights,
-        selectedViewSourceIds: localSources
-          .filter((source) => files.some((file) => source.title === file.name))
-          .map((source) => source.sourceId),
+        selectedViewSourceIds: selectedSources.map((source) => source.sourceId),
         confirmSingleViewInference,
         confirmSameBuilding,
         confirmOverlapReviewed,
@@ -580,9 +576,6 @@ export default function GenerationJobIntakePanel() {
                 )}
                 {job.status === "failed" && job.lastError && (
                   <p role="alert" className="mt-2 rounded-lg bg-red-500/10 p-2 leading-5 text-red-200">{job.lastError}</p>
-                )}
-                {job.status === "completed" && job.result && typeof job.result.modelPath === "string" && (
-                  <p className="break-all text-zinc-500">Private candidate: {job.result.modelPath}</p>
                 )}
               </div>
             )}
