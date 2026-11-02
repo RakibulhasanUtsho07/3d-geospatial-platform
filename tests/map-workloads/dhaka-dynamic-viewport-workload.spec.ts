@@ -471,7 +471,15 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const delayedAbortObserved = await page.waitForFunction(
     (url) => {
       const target = window as WorkloadProbeWindow;
-      return target.__P34_WORKLOAD_ABORT_EVENTS__?.some((event) => event.endpoint === url) ?? false;
+      return target.__P34_WORKLOAD_ABORT_EVENTS__?.some((event) => {
+        // BuildingViewportManager emits its owned endpoint as a relative path;
+        // Playwright's request URL is absolute. Compare canonical same-origin URLs.
+        try {
+          return new URL(event.endpoint, window.location.origin).href === url;
+        } catch {
+          return false;
+        }
+      }) ?? false;
     },
     delayedBuildingRequest.url(),
     { timeout: CANCEL_RESPONSE_DELAY_MS - 500 },
