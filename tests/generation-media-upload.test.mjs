@@ -85,9 +85,34 @@ test("validates identifiers, byte limits and duplicate source IDs", async (t) =>
     }),
     /50 MiB API upload limit/,
   );
-  await ingestUploadedGenerationMedia({ workspaceRoot: root, buildingId: "b1", sourceId: "same", bytes: png });
+  const first = await ingestUploadedGenerationMedia({
+    workspaceRoot: root, buildingId: "b1", sourceId: "same", bytes: png, licence: "CC BY 4.0",
+  });
+  const retry = await ingestUploadedGenerationMedia({
+    workspaceRoot: root, buildingId: "b1", sourceId: "same", bytes: png, licence: "CC BY 4.0",
+  });
+  assert.equal(first.reused, false);
+  assert.equal(retry.reused, true);
+  assert.equal(retry.record.sha256, first.record.sha256);
+  assert.equal(retry.record.relativePath, first.record.relativePath);
   await assert.rejects(
-    ingestUploadedGenerationMedia({ workspaceRoot: root, buildingId: "b1", sourceId: "same", bytes: png }),
-    /already exists/,
+    ingestUploadedGenerationMedia({
+      workspaceRoot: root,
+      buildingId: "b1",
+      sourceId: "same",
+      bytes: Buffer.concat([png, Buffer.from("changed")]),
+      licence: "CC BY 4.0",
+    }),
+    /already exists with different content/,
+  );
+  await assert.rejects(
+    ingestUploadedGenerationMedia({
+      workspaceRoot: root,
+      buildingId: "b1",
+      sourceId: "same",
+      bytes: png,
+      licence: "owner permission",
+    }),
+    /already exists with different source metadata/,
   );
 });
