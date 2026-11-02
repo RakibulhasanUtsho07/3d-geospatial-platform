@@ -147,3 +147,8 @@ The codebase still needs real-data validation and product-level completion. The 
 ## 2026-11-02 — P3.4 responsive map-panel occlusion candidate
 
 The property-search, map-layer and camera-control docks now default to collapsed disclosures so the Dhaka 3D canvas is less obstructed on first load. Mobile dock positions were separated and a Playwright regression was added for desktop/mobile default layout. See [P3.4 map-panel occlusion checkpoint](./P3-4-MAP-PANEL-OCCLUSION-2026-11-02.md). The implementation remains a candidate until exact-head PR Full CI and Push CI pass. This change does not fix or explain the red imagery/overlay anomaly; that requires separate evidence-led diagnosis.
+
+
+### P3.4 validation follow-up — deterministic cancellation fixture
+
+The first P3.4 CI attempt exposed a timing-sensitive P2.6 dynamic-workload assertion: the initial camera preset could coalesce the rapid zoom actions before a request was active, so the test observed multiple unique bounds but no cancellation. The workload now waits for its initial stage, holds one new viewport response, calls the benchmark-only production camera-intent handler with changed bounds, and requires both the real AbortController event and browser AbortError before continuing pan/zoom and render/memory assertions. This is a test-fixture determinism fix, not a relaxation of the cancellation requirement. Exact-head CI must still pass before P3.4 is validated.
