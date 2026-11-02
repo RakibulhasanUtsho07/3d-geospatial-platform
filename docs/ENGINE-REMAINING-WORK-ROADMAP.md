@@ -158,3 +158,21 @@ The codebase still needs real-data validation and product-level completion. The 
 - **Validation pending:** exact-head GitHub Actions, lint/build and reviewer inspection must pass before this milestone is called validated or merged.
 - **Limits:** existing development review remains shared-token/operator-attested, not cryptographic reviewer identity. Placement remains an explicit operator input. Job release flags remain false; this does not prove image-based architectural accuracy, rights, survey truth or automatic approval.
 
+
+
+## D3M-03 — map-side image intake and generation job tracking (implementation candidate)
+
+**Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
+**Dependency:** D3M-02 PR #302; implementation branch `feat/d3m03-map-generation-intake-20261102`  
+**Runbook:** [D3M-03 Map Image Intake and Job Tracking](D3M-03-MAP-IMAGE-INTAKE-AND-JOB-TRACKING.md)
+
+- Mounted a map-side intake panel for up to 12 JPEG/PNG/WebP facade images, 20 MiB each, using the existing signature-checking private media-upload API.
+- Added metric footprint generation from explicit WGS84 center, footprint width/depth, heading, floor count and floor height. The resulting footprint/floor evidence is explicitly marked estimated, not surveyed.
+- Added strategy-specific controls for single-image AI, COLMAP photogrammetry and procedural generation; procedural is labeled as dimension-driven and not image-derived.
+- Requires a non-unknown rights/licence basis and explicit operator rights confirmation before queue creation. Upload records remain unreviewed until the rights-review workflow.
+- Added retry reuse of exact uploaded-source records while the dialog remains mounted and job/worker status polling with terminal-state stop.
+- Added short-lived HttpOnly operator sessions. A distinct login token is exchanged once for a 30-minute SameSite=Strict cookie; the server-only HMAC signing secret and legacy generation bearer token are never embedded in the browser bundle.
+- Added metric-geometry/strategy helper regression tests and a CI step.
+- **Validation pending:** exact-head Full CI, production build and reviewer inspection. This change depends on D3M-02 PR #302 and is not merged to development/main.
+- **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
+
