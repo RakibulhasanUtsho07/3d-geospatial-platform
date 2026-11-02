@@ -247,7 +247,7 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
         "Map API and tile imagery are deterministic browser-test stubs.",
         "These screenshots validate panel placement and canvas occlusion only; they do not validate live Dhaka imagery, building fidelity, or the red imagery anomaly.",
       ],
-    }, null, 2) + "\\n",
+    }, null, 2) + "\n",
     "utf8",
   );
 });
