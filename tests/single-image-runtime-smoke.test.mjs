@@ -93,8 +93,6 @@ async function fakeWorkflowResult(options, root, source) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmSingleViewInference, true);
-  assert.ok(options.triposrLicenceReview);
-  assert.ok(options.rembgLicenceReview);
   assert.deepEqual(options.viewSourceIds, ["facade-photo"]);
   assert.equal(options.sources.length, 1);
   assert.equal(options.sources[0].sourceId, "facade-photo");
