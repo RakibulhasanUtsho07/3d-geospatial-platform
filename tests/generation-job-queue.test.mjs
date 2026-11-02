@@ -111,7 +111,7 @@ test("rejects WebP selected views for single-image AI and photogrammetry before 
       confirmOperationScopes: true,
       confirmSingleViewInference: true,
     }),
-  }), /image\\/webp.*supports JPEG or PNG/i);
+  }), /image.*webp.*supports JPEG or PNG/i);
   assert.deepEqual(await listGenerationJobs({ workspaceRoot: singleWorkspace, limit: 5 }), []);
 
   const photoWorkspace = await makeWorkspace(t);
@@ -139,7 +139,7 @@ test("rejects WebP selected views for single-image AI and photogrammetry before 
       confirmUpAxisReviewed: true,
       upAxis: "Y",
     }),
-  }), /image\\/webp.*supports JPEG or PNG/i);
+  }), /image.*webp.*supports JPEG or PNG/i);
   assert.deepEqual(await listGenerationJobs({ workspaceRoot: photoWorkspace, limit: 5 }), []);
 });
 
