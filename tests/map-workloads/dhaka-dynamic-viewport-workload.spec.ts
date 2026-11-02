@@ -330,6 +330,12 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
 
   await page.setViewportSize({ width: 1600, height: 950 });
   await page.goto("/map", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  const layersToggle = page.getByRole("button", { name: "Map layers" });
+  await expect(layersToggle).toBeEnabled({ timeout: 45_000 });
+  await layersToggle.click();
+  const controlsToggle = page.getByRole("button", { name: "Map controls" });
+  await expect(controlsToggle).toBeEnabled({ timeout: 45_000 });
+  await controlsToggle.click();
   await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeEnabled({ timeout: 45_000 });
   const canvas = page.getByTestId("cesium-map-container").locator("canvas").first();
   await expect(canvas).toBeVisible({ timeout: 45_000 });
