@@ -417,8 +417,10 @@ export default function GenerationJobIntakePanel() {
       setFiles([]);
       setUploadProgress("");
     } catch (cause: unknown) {
+      const detail = cause instanceof Error ? cause.message : "Could not create the generation job.";
+      if (/unauthorized|operator session/i.test(detail)) setSessionActive(false);
       setError(
-        (cause instanceof Error ? cause.message : "Could not create the generation job.") +
+        detail +
         (localSources.length ? " Successfully uploaded source records were retained in this panel; retrying the same files and licence will reuse them." : "")
       );
     } finally {
