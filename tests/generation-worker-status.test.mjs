@@ -41,7 +41,10 @@ test("writes a bounded running heartbeat and reports active job information", as
       strategies: {
         procedural: { status: "ready", blockers: [], caveats: ["local generator"] },
         photogrammetry: { status: "blocked", blockers: ["COLMAP unavailable"], caveats: [] },
-        "single-image-ai": { status: "configured", blockers: [], caveats: ["weights unchecked"], modelWeights: "missing" },
+        "single-image-ai": {
+          status: "configured", blockers: [], caveats: ["weights unchecked"],
+          modelWeights: "missing", backgroundRemovalWeights: "cached", backgroundRemovalModel: "u2net",
+        },
       },
     },
     now,
@@ -55,6 +58,8 @@ test("writes a bounded running heartbeat and reports active job information", as
   assert.equal(result.capabilities.strategies.procedural.status, "ready");
   assert.equal(result.capabilities.strategies.photogrammetry.status, "blocked");
   assert.equal(result.capabilities.strategies["single-image-ai"].modelWeights, "missing");
+  assert.equal(result.capabilities.strategies["single-image-ai"].backgroundRemovalWeights, "cached");
+  assert.equal(result.capabilities.strategies["single-image-ai"].backgroundRemovalModel, "u2net");
   assert.ok(result.heartbeatAgeMs <= DEFAULT_WORKER_STATUS_STALE_AFTER_MS);
 
   const statusFile = path.join(root, ".building-engine", "generation-queue", "worker-status.json");
@@ -63,6 +68,35 @@ test("writes a bounded running heartbeat and reports active job information", as
   const saved = JSON.parse(await readFile(statusFile, "utf8"));
   assert.equal(saved.workerId, "worker-one");
   assert.equal(saved.currentJobId, "gen-demo-01");
+});
+
+test("treats legacy single-image worker status without rembg fields as cache-unknown", async (t) => {
+  const root = await workspace(t);
+  const now = "2026-11-02T12:00:00.000Z";
+  await writeGenerationWorkerStatus({
+    workspaceRoot: root,
+    workerId: "legacy-worker",
+    startedAt: now,
+    now,
+    capabilities: {
+      schemaVersion: "1.0.0",
+      checkedAt: now,
+      strategies: {
+        procedural: { status: "ready", blockers: [], caveats: [] },
+        photogrammetry: { status: "blocked", blockers: ["COLMAP unavailable"], caveats: [] },
+        "single-image-ai": {
+          status: "configured", blockers: [], caveats: [],
+          modelWeights: "cached",
+        },
+      },
+    },
+  });
+
+  const status = await getGenerationWorkerStatus({ workspaceRoot: root, now });
+  const singleImage = status.capabilities.strategies["single-image-ai"];
+  assert.equal(singleImage.modelWeights, "cached");
+  assert.equal(singleImage.backgroundRemovalWeights, "unknown");
+  assert.equal(singleImage.backgroundRemovalModel, undefined);
 });
 
 test("rejects malformed worker strategy capability records", async (t) => {

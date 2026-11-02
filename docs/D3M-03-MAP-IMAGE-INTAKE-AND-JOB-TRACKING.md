@@ -3,7 +3,7 @@
 **Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
 **Dependency:** [D3M-02 PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302)  
 **Implementation branch:** `feat/d3m03-map-generation-intake-20261102`  
-**Status:** Implementation candidate. Baseline exact-head Full CI passed 179/179 steps on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb` ([run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751)). Always verify the latest PR head has its own green checks; this CI does not prove that a configured TripoSR/COLMAP worker completed a real building reconstruction. PR #304 remains Draft and depends on D3M-02 PR #302.
+**Status:** Implementation candidate. Baseline exact-head Full CI passed 179/179 steps on `e8860543277132008f2b8641f06d15fee90a6b1d` ([run #41399692306](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41399692306)). Always verify the latest PR head has its own green checks; this CI does not prove that a configured TripoSR/COLMAP worker completed a real building reconstruction. PR #304 remains Draft and depends on D3M-02 PR #302.
 
 ## User flow
 

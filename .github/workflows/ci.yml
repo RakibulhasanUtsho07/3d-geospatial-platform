@@ -64,6 +64,7 @@ on:
       - feat/d3m02-generation-job-map-publish-20261101
       - feat/brf47-cross-role-asset-identity-20261031
       - feat/d3m03-map-generation-intake-20261102
+      - feat/d3m04-triposr-background-cache-readiness-20261102
   pull_request:
     branches:
       - main
@@ -106,7 +107,8 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - feat/brf46-source-operation-scope-gate
       - development
-      - feat/d3m02-generation-job-map-publish-20261101
+      - feat/d3m03-map-generation-intake-20261102
+      - feat/d3m04-triposr-background-cache-readiness-20261102
 
 permissions:
   contents: read

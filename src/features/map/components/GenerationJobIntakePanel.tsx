@@ -51,6 +51,8 @@ type StrategyCapability = {
   blockers: string[];
   caveats: string[];
   modelWeights?: "cached" | "missing" | "not-checked" | "unknown";
+  backgroundRemovalWeights?: "cached" | "missing" | "not-checked" | "unknown";
+  backgroundRemovalModel?: string;
 };
 
 type WorkerStatus = {
@@ -396,7 +398,11 @@ export default function GenerationJobIntakePanel() {
       const detail = strategyCapability.blockers.join(" ") ||
         (strategy === "single-image-ai" && strategyCapability.modelWeights === "missing"
           ? "TripoSR config.yaml and model.ckpt must be cached before this worker can claim single-image jobs."
-          : "Required runtime prerequisites are not ready.");
+          : strategy === "single-image-ai" && strategyCapability.backgroundRemovalWeights === "missing"
+            ? "The installed rembg default model (" + (strategyCapability.backgroundRemovalModel ?? "configured default") + ") must be cached in the worker's Python environment."
+            : strategy === "single-image-ai" && strategyCapability.backgroundRemovalWeights === "unknown"
+              ? "The installed rembg default model/cache could not be identified; refresh the runtime configuration and restart the worker."
+              : "Required runtime prerequisites are not ready.");
       setError("The active worker cannot run " + strategy + ": " + detail);
       return;
     }
@@ -789,20 +795,38 @@ export default function GenerationJobIntakePanel() {
                       const readiness = capability.status === "ready"
                         ? "Ready"
                         : capability.status === "configured" && capability.modelWeights === "missing"
-                          ? "Weights missing"
-                          : capability.status === "configured" ? "Runtime configured" : "Blocked";
+                          ? "TripoSR weights missing"
+                          : capability.status === "configured" && capability.backgroundRemovalWeights === "missing"
+                            ? "Background-removal weights missing"
+                            : capability.status === "configured" && (
+                              capability.modelWeights === "unknown" ||
+                              capability.modelWeights === "not-checked" ||
+                              capability.backgroundRemovalWeights === "unknown" ||
+                              capability.backgroundRemovalWeights === "not-checked"
+                            )
+                              ? "Cache not verified"
+                              : capability.status === "configured" ? "Runtime configured" : "Blocked";
                       return (
                         <div key={key} className="flex flex-wrap gap-x-2">
                           <span className="text-zinc-300">{label}:</span>
-                          <span className={capability.status === "blocked" ? "text-amber-200" : "text-emerald-200"}>{readiness}</span>
+                          <span className={capability.status === "ready" ? "text-emerald-200" : "text-amber-200"}>{readiness}</span>
                           {capability.status === "blocked" && capability.blockers.length > 0 && (
                             <span className="basis-full text-zinc-500">{capability.blockers.join(" ")}</span>
                           )}
                           {key === "single-image-ai" && capability.modelWeights === "missing" && (
                             <span className="basis-full text-amber-200">Cache the TripoSR config.yaml and model.ckpt files first. This worker will keep AI jobs queued until both are present.</span>
                           )}
-                          {key === "single-image-ai" && capability.modelWeights === "not-checked" && (
-                            <span className="basis-full text-zinc-500">Legacy worker status has no model-cache result; restart the worker to refresh readiness.</span>
+                          {key === "single-image-ai" && capability.backgroundRemovalWeights === "missing" && (
+                            <span className="basis-full text-amber-200">
+                              Cache the installed rembg default model{capability.backgroundRemovalModel ? " (" + capability.backgroundRemovalModel + ")" : ""} in the same Python environment. AI jobs remain queued until both TripoSR and background-removal weights are cached.
+                            </span>
+                          )}
+                          {key === "single-image-ai" && (
+                            capability.modelWeights === "not-checked" ||
+                            capability.backgroundRemovalWeights === "not-checked" ||
+                            capability.backgroundRemovalWeights === "unknown"
+                          ) && (
+                            <span className="basis-full text-zinc-500">The effective background-removal cache is not verified. Restart the worker after preparing the model cache; unknown cache layouts fail closed.</span>
                           )}
                         </div>
                       );
