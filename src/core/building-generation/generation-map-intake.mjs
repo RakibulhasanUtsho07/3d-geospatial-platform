@@ -24,7 +24,7 @@ function finite(value, label, minimum, maximum) {
 
 function safeId(value, label) {
   if (typeof value !== "string" || !SAFE_ID.test(value)) {
-    throw new TypeError(label + " must use letters, digits, dot, underscore or hyphen (max 80 characters).");
+    throw new TypeError(label + " must be a safe identifier using letters, digits, dot, underscore or hyphen (max 80 characters).");
   }
   return value;
 }
