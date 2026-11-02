@@ -231,12 +231,23 @@ function parseGlb(bytes) {
 }
 
 function qualitySummary(modelQuality) {
-  const warnings = Array.isArray(modelQuality?.warnings)
+  if (!modelQuality || typeof modelQuality !== "object" || Array.isArray(modelQuality) ||
+      modelQuality.valid !== true ||
+      !["review-recommended", "basic-geometry-check-passed"].includes(modelQuality.status)) {
+    throw new TypeError("TripoSR output is missing a valid GLB geometry-QA report.");
+  }
+  const warnings = Array.isArray(modelQuality.warnings)
     ? modelQuality.warnings.filter((item) => typeof item === "string").slice(0, 40)
-    : [];
-  const counts = modelQuality?.counts && typeof modelQuality.counts === "object"
+    : null;
+  const counts = modelQuality.counts && typeof modelQuality.counts === "object"
     ? modelQuality.counts
-    : {};
+    : null;
+  if (!warnings || !counts ||
+      !Number.isSafeInteger(counts.triangleCount) || counts.triangleCount < 1 ||
+      !Number.isSafeInteger(counts.vertexCount) || counts.vertexCount < 3 ||
+      !Number.isSafeInteger(counts.primitiveCount) || counts.primitiveCount < 1) {
+    throw new TypeError("TripoSR geometry-QA report has missing or invalid mesh counts.");
+  }
   const safeCounts = {};
   for (const key of [
     "triangleCount", "vertexCount", "primitiveCount", "degenerateTriangleCount",
@@ -245,6 +256,8 @@ function qualitySummary(modelQuality) {
     if (Number.isFinite(counts[key]) && counts[key] >= 0) safeCounts[key] = counts[key];
   }
   return {
+    valid: true,
+    sourceStatus: modelQuality.status,
     status: warnings.length ? "warnings-require-review" : "no-reported-warnings-require-review",
     warningCount: warnings.length,
     warnings,
