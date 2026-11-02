@@ -115,6 +115,7 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       cwd: path.dirname(runner),
       env: {
         ...process.env,
+        ...env,
         PYTHONDONTWRITEBYTECODE: "1",
         HF_HUB_OFFLINE: "1",
         HUGGINGFACE_HUB_OFFLINE: "1",
