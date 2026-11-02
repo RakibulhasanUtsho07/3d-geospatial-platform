@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -177,8 +178,29 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     const siteCustomize = readFileSync(path.join(pythonPath, "sitecustomize.py"), "utf8");
     assert.match(siteCustomize, /socket\.socket\.connect = _deny_runtime_network/);
     assert.match(siteCustomize, /socket\.socket\.connect_ex = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.socket\.send = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.socket\.sendall = _deny_runtime_network/);
     assert.match(siteCustomize, /socket\.socket\.sendto = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.socket\.sendmsg = _deny_runtime_network/);
     assert.match(siteCustomize, /socket\.create_connection = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.getaddrinfo = _deny_runtime_network/);
+    assert.match(siteCustomize, /socket\.gethostbyname = _deny_runtime_network/);
+    const offlineProbe = spawnSync("python3", ["-c", [
+      "import socket",
+      "try:",
+      "    socket.socket().connect(('192.0.2.1', 443))",
+      "except OSError as error:",
+      "    assert 'network access is disabled by the single-image runtime smoke' in str(error)",
+      "else:",
+      "    raise SystemExit('Python socket connect was not blocked')",
+      "try:",
+      "    socket.getaddrinfo('example.invalid', 443)",
+      "except OSError as error:",
+      "    assert 'network access is disabled by the single-image runtime smoke' in str(error)",
+      "else:",
+      "    raise SystemExit('Python DNS lookup was not blocked')",
+    ].join("\n")], { env: options.env, encoding: "utf8", timeout: 5000 });
+    assert.equal(offlineProbe.status, 0, offlineProbe.stderr || offlineProbe.stdout);
     return { fake: true };
   };
   let workflowCalls = 0;
