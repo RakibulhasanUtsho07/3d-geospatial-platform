@@ -30,18 +30,18 @@ These labels are not interchangeable. For current implementation status, depende
 
 | Current work package | Tracking issue | Implementation PR / branch | Exact code head | Exact-head CI evidence | Audit status |
 |---|---:|---|---|---|---|
-| D3M-00 — repository/branch reconciliation | Cross-cutting; older docs PR #279 | #279, docs/full-repository-gap-audit-20261030 | 8751c74f08151681edcb1322f04d029910a66a87 | Docs PR CI #41308926283 and Push CI #41308926257 passed on that docs head | **Open:** old-base documentation branch; main/development and rakibul-hasan ancestry remain unreconciled for promotion |
-| D3M-01.A/B — source-bound visual + rights/camera/GCP evidence | #283 tracks C; A/B included in #281 | [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281) | 21ad424b0f611b0274693c4a3c4f633b7548bedc | PR Full CI #41072445284 passed | **Code/CI candidate:** 35 commits ahead / 5 behind current development; rebase/retarget and rerun CI before integration |
-| D3M-01.C — immutable candidate evidence hand-off | #283 | [PR #284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/284) | dc326af772dce95484cd2565d581ed5f99744369 | Push CI #41076263050 passed; hand-off suite documented 11/11 | **Code/CI candidate:** correctly stacked on #281; rights/camera/GCP remain human-review-required |
+| D3M-00 — repository/branch reconciliation | Cross-cutting; older docs PR #279 | #279, docs/full-repository-gap-audit-20261030 | 8751c74f08151681edcb1322f04d029910a66a87 | PR-triggered CI #41308926283 and #41308926257 both passed on that docs head; no same-head Push CI was found | **Open:** old-base documentation branch; main/development and rakibul-hasan ancestry remain unreconciled for promotion |
+| D3M-01.A/B — source-bound visual + rights/camera/GCP evidence | #283 tracks C; A/B included in #281 | [PR #281](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/281) | 21ad424b0f611b0274693c4a3c4f633b7548bedc | PR Full CI #41072445284 passed; same-head Push CI not found | **Code/CI candidate:** 35 commits ahead / 5 behind current development; rebase/retarget and rerun CI before integration |
+| D3M-01.C — immutable candidate evidence hand-off | #283 | [PR #284](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/284) | dc326af772dce95484cd2565d581ed5f99744369 | Push CI #41076263050 passed; same-head PR Full CI not found; hand-off suite documented 11/11 | **Code/CI candidate:** correctly stacked on #281; rights/camera/GCP remain human-review-required |
 | D3M-01.D — trusted-signer geometry review | #285 | [PR #286](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/286) | 3e92b4be02d8f6bad6baec274887c148359ad8f7 | PR CI #41082822869 and Push CI #41082811923 passed | **Code/CI candidate:** synthetic signer tests do not provision real reviewer identity or prove geometry accuracy |
-| D3M-01.E — re-verify signed receipt before independent-truth evaluation | #287 | [PR #288](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/288) | 03c8f4fcf213c7f1201d55a55cee6802fec9bd64 | Push CI #41160633951 passed, 182/182 | **Code/CI candidate:** held-out real survey/reference evidence and production trust anchors remain external |
-| D3M-01.F — governed reviewer registry lifecycle | #289 | [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290) | ab50f062a5d4da6e52f7e9f9b4564ad11124f386 | Push CI #41315532257 passed | **Code/CI candidate:** production registry, real reviewer onboarding, key custody and deployment secret are not established by CI |
+| D3M-01.E — re-verify signed receipt before independent-truth evaluation | #287 | [PR #288](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/288) | 03c8f4fcf213c7f1201d55a55cee6802fec9bd64 | Push CI #41160633951 passed, 182/182; same-head PR Full CI not found | **Code/CI candidate:** held-out real survey/reference evidence and production trust anchors remain external |
+| D3M-01.F — governed reviewer registry lifecycle | #289 | [PR #290](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/290) | ab50f062a5d4da6e52f7e9f9b4564ad11124f386 | Push CI #41315532257 passed; same-head PR Full CI not found | **Code/CI candidate:** production registry, real reviewer onboarding, key custody and deployment secret are not established by CI |
 | D3M-01.G — secret-safe registry preflight | #291 | [PR #292](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/292) | 31c4a924e66735807ea3462b8f73f44fc3c5acec | PR CI #41315555896 and Push CI #41315552065 passed | **Stale dependency:** base is D3M-01.F at 89f3f11a..., while current #290 head is ab50f062...; compare reports 10 ahead / 2 behind from the old base. Rebase on current #290 and rerun both checks |
-| D3M-02 — approved generation-job publication to Cesium catalog | #301 | [PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302) | dff7c70e2cab5936cda0f5b8d02df52b433fcb84 | PR Full CI #41334962827 passed | **Code/CI candidate:** no same-head Push CI run was found; publisher credential, live deployment and real approved job are not evidenced here |
-| D3M-03 — map-side image intake and job tracking | #303 | [PR #304](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/304) | e8860543277132008f2b8641f06d15fee90a6b1d | Push CI #41399692306 passed; older failure #41391738912 targeted prior head 9bf7dde... | **Partial validation:** no PR-triggered CI run for current head was found. Exact PR base was D3M-02 feature branch; rerun PR CI after stack is rebased/retargeted onto the reviewed integration base |
+| D3M-02 — approved generation-job publication to Cesium catalog | #301 | [PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302) | dff7c70e2cab5936cda0f5b8d02df52b433fcb84 | PR Full CI #41334962827 passed; same-head Push CI not found | **Code/CI candidate:** no same-head Push CI run was found; publisher credential, live deployment and real approved job are not evidenced here |
+| D3M-03 — map-side image intake and job tracking | #303 | [PR #304](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/304) | e8860543277132008f2b8641f06d15fee90a6b1d | Push CI #41399692306 passed; same-head PR Full CI not found; older failure #41391738912 targeted prior head 9bf7dde... | **Partial validation:** no PR-triggered CI run for current head was found. Exact PR base was D3M-02 feature branch; rerun PR CI after stack is rebased/retargeted onto the reviewed integration base |
 | D3M-04 — TripoSR + rembg/ONNX worker readiness | #305 | [PR #306](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/306) | d05274f4c30fddc45dc41cd464573c40b6745e58 | PR CI #41405970254 and Push CI #41405965712 passed | **Code/CI candidate:** only synthetic/fake worker environments in CI; real worker readiness still unverified |
 | D3M-05 — offline, fresh-ID, hash-bound single-image smoke | #307 | [PR #308](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/308) | 07e122053ff99059b72661e85e4f2e44b2a3c8ac | PR CI #41412587662 and Push CI #41412580459 passed | **Implementation candidate:** real TripoSR/rembg inference has not been run on the provisioned host; CI uses fakes/synthetic GLB |
-| D3M-06 — bind reviewed placement to publication | #309 | [PR #310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/310) | 0ed7371ec46b71037a5f8971f239322f0ac10709 | PR CI #41429766924 passed | **Push-CI gap:** no Push CI run on this exact head was found; add the branch to the Push workflow filter and require a same-head Push run after revalidation |
+| D3M-06 — bind reviewed placement to publication | #309 | [PR #310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/310) | 0ed7371ec46b71037a5f8971f239322f0ac10709 | PR CI #41429766924 passed; same-head Push CI not found | **Push-CI gap:** no Push CI run on this exact head was found; add the branch to the Push workflow filter and require a same-head Push run after revalidation |
 | D3M-07 — single-image worker preflight | #311 | [PR #312](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/312) | af28727841169e7c99f68dfb1bbd5e13ea88e877 | PR Full CI #41436755755 and Push CI #41436748360 passed, 184/184 each | **Automated candidate validated:** actual worker-host preflight, D3M-05 inference and independent GLB/human review remain pending |
 
 All commit and run IDs above are exact recorded snapshots, not statements that a run on an older commit validates a newer head. Cancelled or failed runs on superseded commits are not used as evidence for the current SHA.
@@ -144,3 +144,28 @@ The following cannot be truthfully closed by source edits or synthetic CI:
 6. Real-world acceptance: independent dimensions, survey/control sources, vertical datum, held-out points, production trusted reviewer registry, human GLB review, geometry/texture accuracy and end-to-end map reload/rollback are still not proven.
 
 No PR was merged, no branch was force-pushed or retargeted, and no release flag was enabled by this audit.
+
+
+## 12. CI event-type correction
+
+A final run-metadata pass checked the GitHub Actions `event` field rather than inferring Push CI from a second successful run. The corrected exact-head event matrix is:
+
+| PR | Exact-head PR event | Exact-head Push event |
+|---:|---|---|
+| #279 (docs) | #41308926283 and #41308926257 — success (both are `pull_request`) | **Not found** |
+| #281 | #41072445284 — success | **Not found** |
+| #284 | **Not found** | #41076263050 — success |
+| #286 | #41082822869 — success | #41082811923 — success |
+| #288 | **Not found** | #41160633951 — success |
+| #290 | **Not found** | #41315532257 — success |
+| #292 | #41315555896 — success | #41315552065 — success |
+| #302 | #41334962827 — success | **Not found** |
+| #304 | **Not found** | #41399692306 — success |
+| #306 | #41405970254 — success | #41405965712 — success |
+| #308 | #41412587662 — success | #41412580459 — success |
+| #310 | #41429766924 — success | **Not found** |
+| #312 prior head | #41436755755 — success | #41436748360 — success |
+
+“Not found” means no completed run with the required event and exact head was returned by the branch/commit Actions history during this audit. It is not inferred from an old run, a child branch's workflow file, or another event type. The current D3M-07 remediation head has fresh runs pending; its terminal status is recorded separately after they complete.
+
+This correction supersedes the older row descriptions above wherever they mislabelled a second PR-triggered run as Push CI. Branch filters added in a descendant workflow only affect future pushes after the workflow file itself exists on the pushed branch; they do not retroactively produce historical runs or fix the parent branch.
