@@ -245,8 +245,18 @@ export default function FloorPlanReviewPage() {
   }
   function addOpening() {
     if (!selectedReview || selectedReview.decision !== "accept-wall") return;
+    const candidateNumber = candidates.findIndex((item) => item.id === selectedCandidateId) + 1;
+    if (candidateNumber < 1) {
+      setError("The selected wall no longer matches a detector candidate. Select the wall again."); return;
+    }
+    const openingIdPrefix = "opening-" + candidateNumber + "-";
+    const nextOpeningNumber = selectedReview.openings.reduce((highest, existing) => {
+      if (!existing.id.startsWith(openingIdPrefix)) return highest;
+      const suffix = Number(existing.id.slice(openingIdPrefix.length));
+      return Number.isSafeInteger(suffix) && suffix > highest ? suffix : highest;
+    }, 0) + 1;
     const opening: Opening = {
-      id: "opening-" + (candidates.findIndex((item) => item.id === selectedCandidateId) + 1) + "-" + (selectedReview.openings.length + 1),
+      id: openingIdPrefix + nextOpeningNumber,
       type: openingType, offsetPx: num(openingOffsetPx), widthPx: num(openingWidthPx), heightM: num(openingHeightM), sillHeightM: num(openingSillM),
     };
     const wallLengthPx = Math.hypot(
