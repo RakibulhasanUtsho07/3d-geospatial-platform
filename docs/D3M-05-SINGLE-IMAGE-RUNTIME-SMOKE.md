@@ -47,7 +47,7 @@ Example (PowerShell; replace every placeholder with a real value from the worker
 npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-operation-scopes --confirm-single-view-inference --confirm-model-licences
 ~~~
 
-The example runner path is illustrative; ensure the actual file path is correct. Use a new smoke jobId for every run. Evidence files are immutable and an existing report is not overwritten.
+The example runner path is illustrative; ensure the actual file path is correct. Use a new smoke jobId and sourceId for every run. The operation-scope confirmation is separate from the rights confirmation: it authorizes private-media-ingestion and single-image-ai-reconstruction for that exact source. Evidence files are immutable; an existing source record, job state, workflow artifact directory, TripoSR sub-job directory or smoke report is rejected rather than reused.
 
 Exit codes:
 
@@ -98,6 +98,6 @@ The verifier independently reads the report, rejects symlinked/out-of-workspace 
 
 ## Automated test scope
 
-npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, the three separate operator confirmations, JPEG/PNG signature enforcement, the Python offline hook, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
+npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
 
 Full CI still needs to pass on the exact final PR head before D3M-05 can be considered validated. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.
