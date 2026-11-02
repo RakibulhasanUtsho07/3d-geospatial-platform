@@ -170,21 +170,36 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
     ...(backgroundRemovalModel ? { backgroundRemovalModel } : {}),
   };
 }
-export async function probeGenerationWorkerCapabilities({ env = process.env, spawnImpl = nodeSpawn, now = new Date(), commandTimeoutMs = 10_000 } = {}) {
+export async function probeGenerationWorkerCapabilities({
+  env = process.env,
+  spawnImpl = nodeSpawn,
+  now = new Date(),
+  commandTimeoutMs = 10_000,
+  strategies = ["photogrammetry", "single-image-ai"],
+} = {}) {
   if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 30_000) throw new RangeError("commandTimeoutMs must be an integer from 1000 to 30000.");
+  if (!Array.isArray(strategies) || !strategies.length ||
+      strategies.some((strategy) => !["photogrammetry", "single-image-ai"].includes(strategy)) ||
+      new Set(strategies).size !== strategies.length) {
+    throw new TypeError("strategies must contain unique supported worker strategies.");
+  }
   const checkedAt = new Date(now).toISOString();
   if (!Number.isFinite(Date.parse(checkedAt))) throw new TypeError("now must be a valid timestamp.");
   const [photogrammetry, singleImage] = await Promise.all([
-    photogrammetryProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs }),
-    singleImageProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs }),
+    strategies.includes("photogrammetry")
+      ? photogrammetryProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs })
+      : Promise.resolve(null),
+    strategies.includes("single-image-ai")
+      ? singleImageProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs })
+      : Promise.resolve(null),
   ]);
   return {
     schemaVersion: GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION,
     checkedAt,
     strategies: {
       procedural: { status: "ready", blockers: [], caveats: ["In-process parametric generator; not image-derived facade reconstruction."] },
-      photogrammetry,
-      "single-image-ai": singleImage,
+      ...(photogrammetry ? { photogrammetry } : {}),
+      ...(singleImage ? { "single-image-ai": singleImage } : {}),
     },
   };
 }
