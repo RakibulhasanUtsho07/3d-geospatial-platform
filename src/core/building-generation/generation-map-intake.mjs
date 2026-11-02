@@ -197,6 +197,7 @@ export function buildMapGenerationJobInput({
     strategy,
     sources,
     confirmRights: confirmRights === true,
+    confirmOperationScopes: confirmOperationScopes === true,
   };
 
   if (strategy === "single-image-ai") {
