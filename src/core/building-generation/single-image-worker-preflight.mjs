@@ -13,7 +13,7 @@ export async function runSingleImageWorkerPreflight({
     throw new TypeError("now must be a valid timestamp.");
   }
   const checkedAt = timestamp.toISOString();
-  const capabilities = await probe({ env, now: checkedAt, commandTimeoutMs });
+  const capabilities = await probe({ env, now: checkedAt, commandTimeoutMs, strategies: ["single-image-ai"] });
   const singleImage = capabilities?.strategies?.["single-image-ai"];
   const blockers = Array.isArray(singleImage?.blockers)
     ? singleImage.blockers.filter((item) => typeof item === "string")
