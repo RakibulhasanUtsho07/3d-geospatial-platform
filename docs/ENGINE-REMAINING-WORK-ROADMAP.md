@@ -253,6 +253,7 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Keep release flags false and state clearly that preflight does not run inference, verify licences, establish GPU memory sufficiency or prove building accuracy.
 - [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation, secret/path non-disclosure, strategy scoping and a real-Python runner-execution marker check.
 - [x] Add the tests and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
+- [x] Align the D3M-05 real-smoke readiness recheck with the same single-image-only strategy scope; keep actual TripoSR execution inside the authorized inference workflow.
 - [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
 - [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
 - **Safety boundary:** package imports still occur; this is not an OS-level sandbox or host firewall. No inference, model download, runner execution or publication is performed by the preflight.
