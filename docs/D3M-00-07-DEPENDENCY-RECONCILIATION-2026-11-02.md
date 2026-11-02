@@ -261,3 +261,73 @@ Use the repository issue/PR contracts rather than the stale pre-reconciliation n
 D3M-02 through D3M-06 each have PR-triggered and Push-triggered terminal success on the current recorded code head. D3M-07 now includes its latest parent, but its new head still needs fresh exact-head PR and Push CI after all final documentation updates. D3M-01.C–G are currently contiguous in the parent-child compare checks and have exact-head PR + Push success; D3M-01.A/B is the unresolved parent-base issue tracked by #314.
 
 No sync PR merged into development or main. No feature PR was marked ready for review. All release flags remain false.
+
+## 13. Late-day D3M-00 → D3M-07 reconciliation update — 2026-11-02
+
+This section supersedes earlier "remaining sync" and exact-head event rows above wherever the same branch/PR has since advanced. All SHA and run references below are exact-head observations.
+
+### 13.1 D3M-01 parent/child ancestry is synchronized
+
+The selected current development head is f7b2a67fcf0c34623196fa92e719640086e2adce. D3M-01.A/B PR #281 was reconciled with that branch by merging the current development ref into the feature branch, not into development/main:
+
+- PR #314 was merged into the D3M-01.A/B feature branch; merge commit 116cd65a81e1687dc889341940f2772358cf82ec.
+- A subsequent CI-trigger correction added the D3M-01.A/B branch to its own pull_request.branches filter. Current #281 head: daa02d5aa0d7c7ba4c0de6860fe1678160682998.
+- Exact-head Push CI: [#41461160231](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41461160231) — success.
+- Exact-head PR CI: [#41461174767](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41461174767) — success.
+
+The complete D3M-01 chain now has no missing parent commits at the audited refs:
+
+| Parent → child | Parent head | Child head | Comparison |
+|---|---|---|---|
+| #281 → #284 | daa02d5aa0d7c7ba4c0de6860fe1678160682998 | cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc | 22 ahead / 0 behind |
+| #284 → #286 | cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc | 310eba45a4b57444009651d1d5e0371a79bb6a8f | 27 ahead / 0 behind |
+| #286 → #288 | 310eba45a4b57444009651d1d5e0371a79bb6a8f | 5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5 | 35 ahead / 0 behind |
+| #288 → #290 | 5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5 | 236c02b54a353780baa360d9833058c2bab8264c | 12 ahead / 0 behind |
+| #290 → #292 | 236c02b54a353780baa360d9833058c2bab8264c | 54d4c6d040726bc0cf8edda34e97f3f185877e87 | 15 ahead / 0 behind |
+
+The merge-conflict cases on the D3M-01 branch stack were resolved with explicit two-parent merge commits. Sync-only PRs #316, #317, #318 and #319 were closed after the equivalent merge commits were applied to their intended child branches. Their closure does not discard the implementation work. The merge commits preserve the child-specific hand-off, authenticated review, BRF-25 and registry implementation; the shared BRF-35 source/candidate uniqueness checks and CI trigger changes are incorporated in all descendants.
+
+### 13.2 D3M-01 exact-head CI checkpoint
+
+| PR | Current head | PR CI | Push CI |
+|---:|---|---|---|
+| #281 | daa02d5aa0d7c7ba4c0de6860fe1678160682998 | #41461174767 — success | #41461160231 — success |
+| #284 | cf1728ca6924b6fa4af8e6ccdcc6cf26615be9dc | #41461409064 — in progress at checkpoint | #41461401395 — success |
+| #286 | 310eba45a4b57444009651d1d5e0371a79bb6a8f | #41461924513 — in progress at checkpoint | #41461920651 — success |
+| #288 | 5a495e7d0b651cf84e1fd5bc91c81a43f6d0b9c5 | #41462368236 — in progress at checkpoint | #41462360896 — in progress at checkpoint |
+| #290 | 236c02b54a353780baa360d9833058c2bab8264c | #41462671163 — in progress at checkpoint | #41462663993 — in progress at checkpoint |
+| #292 | 54d4c6d040726bc0cf8edda34e97f3f185877e87 | #41462785232 — in progress at checkpoint | #41462774252 — in progress at checkpoint |
+
+Do not substitute a prior-head green run for any of the in-progress checks. All #281–#292 feature PRs remain Draft/unmerged pending exact-head terminal results and independent human review.
+
+### 13.3 D3M-02 → D3M-07 exact-head CI and sync results
+
+| PR | Current head | Exact-head PR CI | Exact-head Push CI |
+|---:|---|---|---|
+| #302 / D3M-02 | 116453207d517db6db6a8a19f6cc5802f5630be0 | #41449228282 — success | #41449218404 — success |
+| #304 / D3M-03 | dc826ea5fb327cd4772c7725ad8add85e05a1f13 | #41449879790 — success | #41449860665 — success |
+| #306 / D3M-04 | 4028e097f02ebf3e44505c48b4d79424da2aaf27 | #41450782703 — success | #41450775053 — success |
+| #308 / D3M-05 | 3ed68591ab133acef70f0fedd45fab0f54aee34a | #41450939744 — success | #41450932957 — success |
+| #310 / D3M-06 | 08344f681210da213261dfa7444b687dcb89796a | #41452436484 — success | #41452430526 — success |
+| #312 / D3M-07 | 761f6e01e79fe1b33bb08dd891b9b980072f9ada | #41453880459 — success | #41453875535 — success |
+
+- PR #313 synchronized the D3M-05 parent history into the D3M-06 feature branch. The resulting D3M-06 head above passed both event types.
+- PR #315 synchronized that D3M-06 head into the D3M-07 feature branch. The resulting D3M-07 head above passed both event types.
+- D3M-06 and D3M-07 remain Draft. These checks validate software orchestration and contract tests, not real model inference or architectural accuracy.
+
+### 13.4 Trigger and BRF-35 hardening
+
+- The D3M-06 branch now has its own Push filter; same-head Push and PR results exist on the resulting merged head.
+- The D3M-01 stacked branches now add their parent branch to pull_request.branches and themselves to their own pull_request.branches for the next child PR. This closes the base-branch event-filter gap across the current D3M-01 stack.
+- The shared BRF-35 validator now rejects duplicate source asset IDs across CityGML, images, ULS and survey/control roles. It also rejects a candidate GLB whose asset ID or SHA-256 collides with any source/reference asset. Synthetic regressions cover cross-role collisions and candidate/source identity collisions. All release flags remain false.
+- An intermediate D3M-01C workflow merge omitted a newline between the Push and Pull Request blocks; its first run [#41460767486](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41460767486) failed before jobs were created. The YAML boundary was corrected and the current #284 head has a successful Push CI. The new PR CI remains recorded separately in the table above.
+
+### 13.5 D3M-00 promotion and real-world gates remain blocked
+
+- Current development vs main compare remains diverged: 91 commits ahead, 6 behind, and 204 changed paths in the compare result. No promotion to main was performed.
+- PR #279 remains an old-base documentation PR; it is not a substitute for the current reconciliation record on the D3M-07 branch.
+- All D3M feature PRs remain Draft/unmerged. No release gate was enabled.
+- There is still no supplied evidence of a provisioned production reviewer registry, deployment publisher/operator secrets, durable worker-host storage, actual worker-host preflight, real TripoSR/rembg inference, independent GLB visual review, verified source/model licence grant, surveyed metric scale, validated WGS84/vertical datum, held-out accuracy, or deployment map reload/rollback.
+- Keep groundTruth, acceptanceEligible, publicationEligible, publishable, mapReady, automaticApproval and worker dispatch/publication authorization false.
+
+**Conclusion:** branch ancestry and CI event coverage are now reconciled at the listed SHAs. The D3M-01 child PR checks still in progress at this checkpoint must reach terminal success before that stack can be called CI-complete; real-worker and real-building acceptance gates remain open.
