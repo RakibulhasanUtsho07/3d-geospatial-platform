@@ -123,6 +123,7 @@ export async function POST(request: Request) {
     const sourceUrl = formText(form, "sourceUrl", 500);
     const capturedAt = formText(form, "capturedAt", 500);
     const description = formText(form, "description", 2000);
+    const title = formText(form, "title", 500) ?? entry.name.slice(0, 500) ?? "uploaded-media";
     const rawOperations = formText(form, "permittedOperations", 1200, true)!;
     let permittedOperations: unknown;
     try {
@@ -147,12 +148,13 @@ export async function POST(request: Request) {
       capturedAt,
       description,
       permittedOperations,
-      title: entry.name.slice(0, 500) || "uploaded-media",
+      title,
       bytes: Buffer.from(await entry.arrayBuffer()),
     });
 
     return NextResponse.json({
       source: result.record,
+      reused: result.reused === true,
       note: "Source is stored with usageStatus=unreviewed. Review rights before queueing generation.",
     }, { status: 201 });
   } catch (error) {
