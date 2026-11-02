@@ -167,6 +167,14 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       !Number.isSafeInteger(report.output.bytes) || report.output.bytes <= 0) {
     throw new TypeError("Smoke report model output evidence is invalid.");
   }
+  if (report.geometryQa?.valid !== true ||
+      !["review-recommended", "basic-geometry-check-passed"].includes(report.geometryQa.sourceStatus) ||
+      !["warnings-require-review", "no-reported-warnings-require-review"].includes(report.geometryQa.status) ||
+      !Number.isSafeInteger(report.geometryQa.counts?.triangleCount) || report.geometryQa.counts.triangleCount < 1 ||
+      !Number.isSafeInteger(report.geometryQa.counts?.vertexCount) || report.geometryQa.counts.vertexCount < 3 ||
+      !Number.isSafeInteger(report.geometryQa.counts?.primitiveCount) || report.geometryQa.counts.primitiveCount < 1) {
+    throw new TypeError("Smoke report geometry-QA evidence is missing or invalid.");
+  }
 
   const sourceBytes = await readRegularWorkspaceFile(
     root,
