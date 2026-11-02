@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent, type ChangeEvent } from "react";
 import {
   buildMapGenerationBuildingSpec,
   buildMapGenerationJobInput,
+  getMapGenerationOperationScopes,
 } from "@/core/building-generation/generation-map-intake.mjs";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
@@ -116,6 +117,7 @@ export default function GenerationJobIntakePanel() {
   const [strategy, setStrategy] = useState<Strategy>("single-image-ai");
   const [files, setFiles] = useState<File[]>([]);
   const [confirmRights, setConfirmRights] = useState(false);
+  const [confirmOperationScopes, setConfirmOperationScopes] = useState(false);
   const [confirmSingleViewInference, setConfirmSingleViewInference] = useState(false);
   const [confirmSameBuilding, setConfirmSameBuilding] = useState(false);
   const [confirmOverlapReviewed, setConfirmOverlapReviewed] = useState(false);
@@ -228,6 +230,7 @@ export default function GenerationJobIntakePanel() {
     }
     setFiles(selected);
     setConfirmRights(false);
+    setConfirmOperationScopes(false);
     setMessage(selected.length + " image(s) selected. Rights and source identity still require operator review.");
   }
 
@@ -286,7 +289,8 @@ export default function GenerationJobIntakePanel() {
     );
     if (reusable) return reusable;
 
-    const sourceId = "map-" + crypto.randomUUID().replace(/-/g, "").slice(0, 20) + "-v" + String(index + 1);
+    const contentHash = fileKey.slice(fileKey.lastIndexOf("|") + 1);
+    const sourceId = "map-" + contentHash.slice(0, 32);
     const form = new FormData();
     form.append("buildingId", buildingId.trim());
     form.append("sourceId", sourceId);
@@ -344,6 +348,10 @@ export default function GenerationJobIntakePanel() {
       setError("Confirm that you checked the rights for every selected source before creating a job.");
       return;
     }
+    if (!confirmOperationScopes) {
+      setError("Confirm that every selected source permits the requested generation operations.");
+      return;
+    }
     if (strategy === "single-image-ai" && (files.length !== 1 || !confirmSingleViewInference)) {
       setError("Single-image AI requires exactly one image and explicit single-view inference confirmation.");
       return;
@@ -393,10 +401,12 @@ export default function GenerationJobIntakePanel() {
           relativePath: source.relativePath,
           kind: source.kind,
           licence: source.licence,
+          permittedOperations: getMapGenerationOperationScopes(strategy),
           author,
           attribution,
         })),
         confirmRights,
+        confirmOperationScopes,
         selectedViewSourceIds: selectedSources.map((source) => source.sourceId),
         confirmSingleViewInference,
         confirmSameBuilding,
@@ -589,7 +599,10 @@ export default function GenerationJobIntakePanel() {
 
           <label className="block text-xs font-medium text-zinc-300">
             Generation strategy
-            <select value={strategy} onChange={(event) => setStrategy(event.target.value as Strategy)} className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60">
+            <select value={strategy} onChange={(event) => {
+              setStrategy(event.target.value as Strategy);
+              setConfirmOperationScopes(false);
+            }} className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60">
               <option value="single-image-ai">Single-image AI reconstruction</option>
               <option value="photogrammetry">Multi-view photogrammetry (COLMAP)</option>
               <option value="procedural">Procedural from entered dimensions (does not infer from images)</option>
@@ -618,7 +631,11 @@ export default function GenerationJobIntakePanel() {
 
           <label className="flex items-start gap-2 text-xs leading-5 text-amber-100">
             <input type="checkbox" checked={confirmRights} onChange={(event) => setConfirmRights(event.target.checked)} className="mt-0.5" />
-            <span>I checked the source usage rights and may submit these images for the selected operation. This is my attestation; upload records remain unreviewed until the rights-review workflow runs.</span>
+            <span>I checked the source usage rights for every selected image. This is my attestation; upload records remain unreviewed until the rights-review workflow runs.</span>
+          </label>
+          <label className="flex items-start gap-2 text-xs leading-5 text-amber-100">
+            <input type="checkbox" checked={confirmOperationScopes} onChange={(event) => setConfirmOperationScopes(event.target.checked)} className="mt-0.5" />
+            <span>I explicitly authorize these operation scopes for every selected image: <strong>{getMapGenerationOperationScopes(strategy).join(", ")}</strong>. This permission is recorded in the job provenance and reviewed by the worker; it is separate from copyright/reuse rights.</span>
           </label>
 
           {uploadProgress && <p role="status" className="text-xs text-cyan-100">{uploadProgress}</p>}
