@@ -38,6 +38,30 @@ const primaryButton = "inline-flex items-center justify-center rounded-lg bg-blu
 
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 function pointsString(points: PointPx[]) { return points.map((p) => String(p[0]) + "," + String(p[1])).join(" "); }
+function openingSegment(wall: Pick<CandidateReview, "startPx" | "endPx">, opening: Opening) {
+  const dx = wall.endPx[0] - wall.startPx[0];
+  const dy = wall.endPx[1] - wall.startPx[1];
+  const lengthPx = Math.hypot(dx, dy);
+  if (!Number.isFinite(lengthPx) || lengthPx < 1e-8 ||
+      !Number.isFinite(opening.offsetPx) || !Number.isFinite(opening.widthPx) ||
+      opening.offsetPx < 0 || opening.widthPx <= 0 ||
+      opening.offsetPx + opening.widthPx > lengthPx + 1e-8) return null;
+  const ux = dx / lengthPx;
+  const uy = dy / lengthPx;
+  const nx = -uy;
+  const ny = ux;
+  const x1 = wall.startPx[0] + ux * opening.offsetPx;
+  const y1 = wall.startPx[1] + uy * opening.offsetPx;
+  const x2 = wall.startPx[0] + ux * (opening.offsetPx + opening.widthPx);
+  const y2 = wall.startPx[1] + uy * (opening.offsetPx + opening.widthPx);
+  return {
+    x1, y1, x2, y2,
+    midX: (x1 + x2) / 2,
+    midY: (y1 + y2) / 2,
+    cap1: [x1 - nx * 4, y1 - ny * 4, x1 + nx * 4, y1 + ny * 4] as const,
+    cap2: [x2 - nx * 4, y2 - ny * 4, x2 + nx * 4, y2 + ny * 4] as const,
+  };
+}
 function num(value: string) { return value.trim() === "" ? Number.NaN : Number(value); }
 function safeId(value: string) { return /^[a-z0-9][a-z0-9._-]{0,79}$/i.test(value); }
 async function digestHex(bytes: ArrayBuffer | Uint8Array) {
@@ -225,9 +249,38 @@ export default function FloorPlanReviewPage() {
       id: "opening-" + (candidates.findIndex((item) => item.id === selectedCandidateId) + 1) + "-" + (selectedReview.openings.length + 1),
       type: openingType, offsetPx: num(openingOffsetPx), widthPx: num(openingWidthPx), heightM: num(openingHeightM), sillHeightM: num(openingSillM),
     };
+    const wallLengthPx = Math.hypot(
+      selectedReview.endPx[0] - selectedReview.startPx[0],
+      selectedReview.endPx[1] - selectedReview.startPx[1],
+    );
+    if (![opening.offsetPx, opening.widthPx, opening.heightM, opening.sillHeightM, wallLengthPx].every(Number.isFinite)) {
+      setError("Enter finite numeric values for opening offset, width, height and sill."); return;
+    }
+    if (opening.offsetPx < 0 || opening.widthPx < 0.5 ||
+        opening.offsetPx + opening.widthPx > wallLengthPx + 1e-8) {
+      setError("Opening must fit entirely within the selected wall length."); return;
+    }
+    if (opening.heightM < 0.4 || opening.sillHeightM < 0) {
+      setError("Opening height must be at least 0.4 m and sill height cannot be negative."); return;
+    }
+    const configuredWallHeight = num(wallHeightM);
+    if (Number.isFinite(configuredWallHeight) &&
+        opening.sillHeightM + opening.heightM > configuredWallHeight + 1e-8) {
+      setError("Opening top cannot exceed the configured wall height."); return;
+    }
+    if (opening.type === "door" && opening.sillHeightM > 0.05) {
+      setError("A door opening must start at floor level (sill height ≤ 0.05 m)."); return;
+    }
+    const overlaps = selectedReview.openings.some((existing) =>
+      opening.offsetPx < existing.offsetPx + existing.widthPx - 1e-8 &&
+      existing.offsetPx < opening.offsetPx + opening.widthPx - 1e-8
+    );
+    if (overlaps) {
+      setError("Opening overlaps another opening on this wall."); return;
+    }
     updateSelected({ openings: [...selectedReview.openings, opening] });
     setOpeningOffsetPx(""); setOpeningWidthPx(""); setOpeningHeightM(""); setOpeningSillM("");
-    setSuccess("Opening added to the selected wall draft. Export validation will check it again."); setError("");
+    setSuccess("Opening added and marked on the source canvas at its wall-relative position. Export validation checks it again."); setError("");
   }
 
   async function exportReview() {
@@ -263,7 +316,7 @@ export default function FloorPlanReviewPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700">P3.7 · Private review tooling</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Floor-plan review workspace</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Inspect line proposals, correct endpoints, draw reviewed room polygons, calibrate scale and export hash-bound review JSON.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Inspect line proposals, correct endpoints, draw reviewed room polygons, place door/window openings along accepted walls, calibrate scale and export hash-bound review JSON.</p>
           </div>
           <div className="max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Local-only browser workflow. No image or review is uploaded. Export does not approve or publish a model.</div>
         </header>
@@ -346,6 +399,24 @@ export default function FloorPlanReviewPage() {
                       <text x={room.polygonPx[0][0] + 3} y={room.polygonPx[0][1] - 4} fill="#0f766e" fontSize="13" stroke="white" strokeWidth="2" paintOrder="stroke">{room.name}</text>
                       {selectedRoomId === room.id && room.polygonPx.map((p, index) => <circle key={room.id + "-" + index} cx={p[0]} cy={p[1]} r="4.5" fill="#ffffff" stroke="#d97706" strokeWidth="2" onPointerDown={(e) => startDrag(e, { kind: "room", id: room.id, index })} />)}
                     </g>)}
+                    {candidates.flatMap((candidate) => {
+                      const item = reviews[candidate.id];
+                      if (item?.decision !== "accept-wall") return [];
+                      return item.openings.map((opening) => {
+                        const segment = openingSegment(item, opening);
+                        if (!segment) return null;
+                        const colour = opening.type === "door" ? "#ea580c" : "#0284c7";
+                        const label = opening.type === "door" ? "D" : "W";
+                        return <g key={opening.id} data-testid={"opening-marker-" + opening.id} aria-label={opening.type + " opening on " + candidate.id} pointerEvents="none">
+                          <title>{opening.type + " opening, " + opening.offsetPx + " to " + (opening.offsetPx + opening.widthPx) + " px along " + candidate.id}</title>
+                          <line data-testid={"opening-segment-" + opening.id} x1={segment.x1} y1={segment.y1} x2={segment.x2} y2={segment.y2} stroke="white" strokeWidth="10" strokeLinecap="butt" />
+                          <line x1={segment.x1} y1={segment.y1} x2={segment.x2} y2={segment.y2} stroke={colour} strokeWidth="5" strokeDasharray={opening.type === "window" ? "2 2" : undefined} strokeLinecap="butt" />
+                          <line x1={segment.cap1[0]} y1={segment.cap1[1]} x2={segment.cap1[2]} y2={segment.cap1[3]} stroke={colour} strokeWidth="2" />
+                          <line x1={segment.cap2[0]} y1={segment.cap2[1]} x2={segment.cap2[2]} y2={segment.cap2[3]} stroke={colour} strokeWidth="2" />
+                          <text x={segment.midX + 5} y={segment.midY - 5} fill={colour} stroke="white" strokeWidth="2" paintOrder="stroke" fontSize="11">{label}</text>
+                        </g>;
+                      });
+                    })}
                     {pendingRoomPoints.length > 0 && <g><polyline points={pointsString(pendingRoomPoints)} fill="none" stroke="#d97706" strokeWidth="2.5" strokeDasharray="5 4" />{pendingRoomPoints.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="#d97706" />)}</g>}
                     {pointA && <circle cx={pointA[0]} cy={pointA[1]} r="5" fill="#7c3aed" stroke="white" strokeWidth="2" />}
                     {pointB && <circle cx={pointB[0]} cy={pointB[1]} r="5" fill="#db2777" stroke="white" strokeWidth="2" />}
@@ -357,6 +428,8 @@ export default function FloorPlanReviewPage() {
                   <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-600" />Accepted wall</span>
                   <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-rose-600" />Rejected</span>
                   <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-amber-600" />Room boundary</span>
+                  <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-orange-600" />Door opening</span>
+                  <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-sky-600" />Window opening</span>
                 </div>
               </div>
             ) : <div className="mt-4 flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">Load a matching proposal JSON and original raster to open the canvas.</div>}
@@ -399,7 +472,7 @@ export default function FloorPlanReviewPage() {
                   <div className="rounded-xl border border-slate-200 p-3">
                     <h3 className="text-sm font-semibold">Doors and windows</h3>
                     {selectedReview.openings.map((opening) => <div key={opening.id} className="mt-2 flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-2 text-xs">
-                      <span>{opening.type} · offset {opening.offsetPx}px · width {opening.widthPx}px</span>
+                      <span><span className={"mr-1 inline-block h-2 w-2 rounded-full " + (opening.type === "door" ? "bg-orange-600" : "bg-sky-600")} />{opening.type} · offset {opening.offsetPx}px · width {opening.widthPx}px · height {opening.heightM}m</span>
                       <button type="button" className="text-rose-700 underline" onClick={() => updateSelected({ openings: selectedReview.openings.filter((item) => item.id !== opening.id) })}>Remove</button>
                     </div>)}
                     <label className="mt-3 block text-sm font-medium">Opening type<select className={field} value={openingType} onChange={(e) => setOpeningType(e.target.value as "door" | "window")}><option value="door">Door</option><option value="window">Window</option></select></label>
