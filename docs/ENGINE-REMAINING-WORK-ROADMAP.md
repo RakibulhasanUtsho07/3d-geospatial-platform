@@ -239,3 +239,17 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Record a separate exact-head Push CI pass before promotion. The available commit-scoped workflow result only exposes PR-triggered runs; no Push CI success is claimed here.
 - [ ] Next operational gate: run the D3M-05 single-image smoke on the provisioned worker host using the real TripoSR/rembg caches and reviewed model/source terms, then independently verify and visually inspect the private GLB/report. This requires access to the actual worker host and must not be replaced by CI fakes.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.
+
+## D3M-07 — read-only single-image worker preflight
+
+**Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
+**Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
+
+- [x] Add a read-only preflight adapter around the authoritative D3M-04 capability probe; require TripoSR and rembg caches to be explicitly `cached` before returning ready.
+- [x] Add a CLI with explicit Python, TripoSR runner and device overrides; use bounded probe timeout and non-zero exit for blocked/unknown readiness.
+- [x] Keep output sanitized: do not serialize environment variables, executable paths, cache paths or credentials.
+- [x] Keep release flags false and state clearly that preflight does not run inference, verify licences, establish GPU memory sufficiency or prove building accuracy.
+- [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation and secret/path non-disclosure.
+- [x] Add the test and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
+- [ ] Exact-head Full CI and Push CI must both pass before this checkpoint can be promoted.
+- [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
