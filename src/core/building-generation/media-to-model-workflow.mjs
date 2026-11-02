@@ -455,6 +455,7 @@ export async function runMediaToModelWorkflow(options){
       workspaceRoot:root,jobId:workerJobId,sourceId:viewIds[0],runnerScript:options.runnerScript,pythonPath:options.pythonPath,
       device:config.device,mcResolution:config.mcResolution,pretrainedModelNameOrPath:config.pretrainedModelNameOrPath,
       timeoutMs:config.singleImageTimeoutMs,allowSingleViewInference:options.confirmSingleViewInference===true,
+      ...(typeof options.spawnImpl === "function" ? { spawnImpl: options.spawnImpl } : {}),
      },
     });
     let modelBytes;

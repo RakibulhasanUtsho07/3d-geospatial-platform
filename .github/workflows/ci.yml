@@ -65,6 +65,7 @@ on:
       - feat/brf47-cross-role-asset-identity-20261031
       - feat/d3m03-map-generation-intake-20261102
       - feat/d3m04-triposr-background-cache-readiness-20261102
+      - feat/d3m05-single-image-runtime-smoke-20261102
   pull_request:
     branches:
       - main
@@ -109,6 +110,7 @@ on:
       - development
       - feat/d3m03-map-generation-intake-20261102
       - feat/d3m04-triposr-background-cache-readiness-20261102
+      - feat/d3m05-single-image-runtime-smoke-20261102
 
 permissions:
   contents: read
@@ -534,6 +536,15 @@ jobs:
 
       - name: Test single-image AI-to-GLB preview worker
         run: npm run test:single-image-3d
+
+      - name: Test offline single-image runtime smoke contract
+        run: npm run test:single-image-runtime-smoke
+
+      - name: Validate single-image runtime smoke CLI
+        run: npm run smoke:single-image-runtime -- --help
+
+      - name: Validate single-image smoke evidence verifier CLI
+        run: npm run verify:single-image-runtime-smoke -- --help
 
       - name: Test video-frame operation-scope inheritance and cache invalidation
         run: npm run test:video-frame-operation-scopes
