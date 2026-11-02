@@ -46,6 +46,8 @@ export async function runSingleImageWorkerPreflight({
       backgroundRemovalWeights !== singleImage?.backgroundRemovalWeights) {
     blockers.push("Worker capability result has an unsupported model-cache state.");
   }
+  if (tripoModelWeights !== "cached") blockers.push("TripoSR model weights are not verified as cached.");
+  if (backgroundRemovalWeights !== "cached") blockers.push("rembg model weights are not verified as cached.");
   const backgroundRemovalModel = typeof singleImage?.backgroundRemovalModel === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(singleImage.backgroundRemovalModel)
     ? singleImage.backgroundRemovalModel
