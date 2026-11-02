@@ -118,6 +118,50 @@ async function inspectSource(root, relativePath) {
   return { bytes: info.size, mimeType, sha256: digest(bytes) };
 }
 
+async function assertArtifactPathAbsent(root, relativePath, label) {
+  const safePath = safeRelativePath(relativePath, label);
+  const segments = safePath.split("/");
+  let current = root;
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    let entry;
+    try {
+      entry = await lstat(current);
+    } catch (error) {
+      if (error?.code === "ENOENT") return;
+      throw error;
+    }
+    if (entry.isSymbolicLink()) {
+      throw new TypeError(label + " must not contain symlink path components.");
+    }
+    const final = index === segments.length - 1;
+    if (final) throw new TypeError(label + " already exists; use a fresh ID so this smoke performs a new inference.");
+    if (!entry.isDirectory()) throw new TypeError(label + " contains a non-directory path component.");
+    const actual = await realpath(current);
+    if (!inside(root, actual)) throw new TypeError(label + " resolves outside workspaceRoot.");
+  }
+}
+
+function deriveSingleImageWorkerJobId(jobId) {
+  return safeId(
+    jobId.slice(0, 35) + "-" + digest(Buffer.from(jobId)).slice(0, 8) + "-single-image-1",
+    "single-image worker job ID",
+  );
+}
+
+async function requireFreshSmokeIdentities(root, buildingId, jobId, sourceId) {
+  const workerJobId = deriveSingleImageWorkerJobId(jobId);
+  const paths = [
+    [".building-engine/media/" + buildingId + "/sources/" + sourceId + ".json", "Smoke source record"],
+    [".building-engine/jobs/" + buildingId + "/" + jobId, "Smoke reconstruction job state"],
+    [".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow", "Smoke workflow artifact directory"],
+    [".building-engine/jobs/" + buildingId + "/" + workerJobId + "-single-view", "TripoSR single-view artifact directory"],
+  ];
+  for (const [relativePath, label] of paths) {
+    await assertArtifactPathAbsent(root, relativePath, label);
+  }
+}
+
 async function ensurePrivateDirectory(root) {
   const segments = [".building-engine", "runtime-smokes"];
   let current = root;
@@ -287,6 +331,7 @@ export async function runSingleImageRuntimeSmoke(options) {
   const workspaceRoot = await realpath(path.resolve(options.workspaceRoot));
   const buildingSpec = normalizeBuildingSpec(options.buildingSpec).spec;
   const buildingId = safeId(buildingSpec.id, "buildingSpec.id");
+  await requireFreshSmokeIdentities(workspaceRoot, buildingId, jobId, sourceId);
   const source = await inspectSource(workspaceRoot, relativePath);
   const pythonPath = options.pythonPath ||
     process.env.BUILDING_ENGINE_PYTHON_EXECUTABLE ||
