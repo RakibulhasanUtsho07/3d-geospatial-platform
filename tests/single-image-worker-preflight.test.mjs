@@ -49,7 +49,7 @@ test("preflight blocks when TripoSR cache is missing", async () => {
     now: "2026-11-02T12:00:00.000Z",
   });
   assert.equal(report.status, "blocked");
-  assert.match(report.blockers[0], /both be verified as cached/);
+  assert.ok(report.blockers.some((item) => /TripoSR model weights are not verified as cached/.test(item)));
 });
 
 test("preflight blocks when rembg cache is unknown", async () => {
@@ -99,7 +99,7 @@ test("preflight blocks a capability response with a non-canonical timestamp", as
   });
   assert.equal(report.status, "blocked");
   assert.equal(report.checkedAt, "2026-11-02T12:30:00.000Z");
-  assert.ok(report.blockers.some((item) => /timestamp is missing, invalid, or non-canonical/.test(item)));
+  assert.ok(report.blockers.some((item) => /timestamp is missing, invalid, non-canonical, or stale/.test(item)));
 });
 
 test("preflight blocks an unsupported capability schema version", async () => {
