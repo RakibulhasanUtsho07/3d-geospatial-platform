@@ -86,9 +86,14 @@ function validateCapabilities(value) {
         !entry.caveats.every((item) => typeof item === "string" && item.length <= 500)) {
       throw new TypeError("Generation worker capability entry is invalid: " + strategy);
     }
+    const modelWeights = entry.modelWeights ?? "unknown";
+    if (strategy === "single-image-ai" &&
+        !["cached", "missing", "not-checked", "unknown"].includes(modelWeights)) {
+      throw new TypeError("Generation worker modelWeights status is invalid.");
+    }
     strategies[strategy] = {
       status: entry.status, blockers: [...entry.blockers], caveats: [...entry.caveats],
-      ...(strategy === "single-image-ai" ? { modelWeights: entry.modelWeights === "not-checked" ? "not-checked" : "unknown" } : {}),
+      ...(strategy === "single-image-ai" ? { modelWeights } : {}),
     };
   }
   return { schemaVersion: "1.0.0", checkedAt: isoTimestamp(value.checkedAt, "capabilities.checkedAt"), strategies };
