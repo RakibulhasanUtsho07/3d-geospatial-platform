@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  chmod,
   lstat,
   mkdir,
   mkdtemp,
@@ -183,6 +184,13 @@ async function ensurePrivateDirectory(root) {
     }
     current = await realpath(next);
     if (!inside(root, current)) throw new TypeError("Runtime smoke evidence directory escapes workspaceRoot.");
+    if (segment === "runtime-smokes") {
+      await chmod(current, 0o700);
+      const directoryInfo = await stat(current);
+      if (process.platform !== "win32" && (directoryInfo.mode & 0o077) !== 0) {
+        throw new TypeError("Runtime smoke evidence directory must be owner-only.");
+      }
+    }
   }
   return current;
 }
