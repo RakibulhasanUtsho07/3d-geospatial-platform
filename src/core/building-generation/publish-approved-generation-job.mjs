@@ -3,7 +3,11 @@ import { lstat, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promise
 import path from "node:path";
 
 import { getGenerationJob } from "./generation-job-queue.mjs";
-import { REQUIRED_GENERATION_REVIEW_CHECKS } from "./generation-job-review.mjs";
+import {
+  REQUIRED_GENERATION_REVIEW_CHECKS,
+  normalizeGenerationReviewPlacement,
+  hashGenerationReviewPlacement,
+} from "./generation-job-review.mjs";
 import { publishReviewedBuildingModel } from "./published-model-catalog.mjs";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
@@ -92,18 +96,12 @@ async function readAndVerifyQueueRequest(root, jobId) {
 
 /**
  * Publish only a job that has an immutable approved review record whose candidate,
- * QA report and request checksums still match. Placement remains explicit input.
+ * QA report and request checksums still match. Publication placement must also
+ * exactly match the immutable transform recorded at approval.
  */
 export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot = workspaceRoot, jobId, placement }) {
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("jobId must be a safe identifier.");
-  if (!isRecord(placement) || !isRecord(placement.position)) {
-    throw new TypeError("Explicit model placement is required, including longitude, latitude and height.");
-  }
-  for (const key of ["longitude", "latitude", "height"]) {
-    if (typeof placement.position[key] !== "number" || !Number.isFinite(placement.position[key])) {
-      throw new TypeError("placement.position." + key + " must be a finite number.");
-    }
-  }
+  const requestedPlacement = normalizeGenerationReviewPlacement(placement);
 
   const root = await realpath(path.resolve(workspaceRoot));
   const job = await getGenerationJob({ workspaceRoot: root, jobId });
@@ -130,6 +128,14 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
   }
   if (!isRecord(record.checks) || REQUIRED_GENERATION_REVIEW_CHECKS.some((key) => record.checks[key] !== true)) {
     throw new Error("Approved review must retain every required review check.");
+  }
+  const reviewedPlacement = normalizeGenerationReviewPlacement(record.placement);
+  const reviewedPlacementSha256 = hashGenerationReviewPlacement(reviewedPlacement);
+  if (record.placementSha256 !== reviewedPlacementSha256 ||
+      job.review.placementSha256 !== reviewedPlacementSha256 ||
+      JSON.stringify(job.review.placement) !== JSON.stringify(reviewedPlacement) ||
+      JSON.stringify(requestedPlacement) !== JSON.stringify(reviewedPlacement)) {
+    throw new Error("Publication placement must exactly match the immutable approved review placement.");
   }
   if (!isRecord(record.candidate) || record.candidate.modelSha256 !== job.result?.modelSha256 ||
       record.candidate.reportPath !== job.result?.reportPath ||
@@ -168,17 +174,14 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
     model: {
       id: job.buildingId,
       name: request.buildingSpec.name,
-      position: {
-        longitude: placement.position.longitude,
-        latitude: placement.position.latitude,
-        height: placement.position.height,
-      },
-      headingDegrees: placement.headingDegrees ?? 0,
-      pitchDegrees: placement.pitchDegrees ?? 0,
-      rollDegrees: placement.rollDegrees ?? 0,
-      scale: placement.scale ?? 1,
-      upAxis: placement.upAxis ?? "Y",
-      forwardAxis: placement.forwardAxis ?? "Z",
+      position: reviewedPlacement.position,
+      headingDegrees: reviewedPlacement.headingDegrees,
+      pitchDegrees: reviewedPlacement.pitchDegrees,
+      rollDegrees: reviewedPlacement.rollDegrees,
+      scale: reviewedPlacement.scale,
+      upAxis: reviewedPlacement.upAxis,
+      forwardAxis: reviewedPlacement.forwardAxis,
+      heightReference: reviewedPlacement.heightReference,
     },
     review: {
       reviewer: record.reviewer,
@@ -205,6 +208,8 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
       modelSha256: modelHash,
       reportSha256: reportHash,
       placement: attestation.model.position,
+      placementHeightReference: reviewedPlacement.heightReference,
+      placementSha256: reviewedPlacementSha256,
       mapReady: false,
       publicationEligible: false,
       note: "Catalog version was explicitly published; review history remains immutable. Job state remains a review candidate.",

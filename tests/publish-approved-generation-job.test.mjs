@@ -12,6 +12,16 @@ import { getActivePublishedModels, validatePublishedModelCatalog } from "../src/
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const placement = {
+  position: { longitude: 90.406, latitude: 23.7086, height: 12.5 },
+  headingDegrees: 0,
+  pitchDegrees: 0,
+  rollDegrees: 0,
+  scale: 1,
+  upAxis: "Y",
+  forwardAxis: "Z",
+  heightReference: "WGS84-ellipsoid",
+};
 
 function makeGlb(seed = "publish-test") {
   const payload = Buffer.from(JSON.stringify({ asset: { version: "2.0", generator: seed } }));
@@ -61,20 +71,11 @@ async function makeApprovedJob(t) {
       reviewer: "independent-operator",
       notes: "Reviewed reference imagery, dimensions, scale, georeference and generated QA report.",
       checks,
+      placement,
     },
   });
   return { workspaceRoot, jobId: queued.jobId, modelBytes, reviewed };
 }
-
-const placement = {
-  position: { longitude: 90.406, latitude: 23.7086, height: 0 },
-  headingDegrees: 0,
-  pitchDegrees: 0,
-  rollDegrees: 0,
-  scale: 1,
-  upAxis: "Y",
-  forwardAxis: "Z",
-};
 
 test("publishes only an approved, hash-matching review with explicit map placement", async (t) => {
   const setup = await makeApprovedJob(t);
@@ -83,6 +84,9 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(result.mapReady, false);
   assert.equal(result.publicationEligible, false);
   assert.equal(result.placement.longitude, placement.position.longitude);
+  assert.equal(result.placement.height, placement.position.height);
+  assert.equal(result.placementHeightReference, "WGS84-ellipsoid");
+  assert.equal(result.placementSha256, setup.reviewed.review.placementSha256);
   assert.match(result.assetUrl, /^\/models\/generated\//);
   const manifestPath = path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json");
   const catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
@@ -97,6 +101,37 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(unchangedJob.review.decision, "approved");
   assert.equal(unchangedJob.mapReady, false);
   assert.equal(unchangedJob.publicationEligible, false);
+});
+
+test("refuses any publication transform that differs from the immutable approved placement", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const variants = [
+    { position: { ...placement.position, longitude: placement.position.longitude + 0.0001 } },
+    { position: { ...placement.position, latitude: placement.position.latitude + 0.0001 } },
+    { position: { ...placement.position, height: placement.position.height + 1 } },
+    { headingDegrees: 1 },
+    { pitchDegrees: 1 },
+    { rollDegrees: 1 },
+    { scale: 1.01 },
+    { upAxis: "X" },
+    { forwardAxis: "X" },
+    { heightReference: "EGM96" },
+  ];
+  for (const patch of variants) {
+    const candidate = {
+      ...placement,
+      ...patch,
+      position: patch.position ?? placement.position,
+    };
+    await assert.rejects(
+      publishApprovedGenerationJob({ ...setup, placement: candidate }),
+      /exactly match the immutable approved review placement/i,
+    );
+  }
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
 });
 
 test("refuses publication without placement or without an approved review", async (t) => {

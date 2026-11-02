@@ -219,3 +219,19 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Run exact-head Full CI on the runner-launch-correction commit; the earlier green runs do not validate this follow-up commit.
 - [ ] Operator-run one real inference on the provisioned worker host with model licences, source rights, runtime/device and local cache checked; retain the private smoke report and independently review the GLB.
 - **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. No PR in the D3M-02 → D3M-05 stack is merged by this milestone.
+
+## D3M-06 — bind reviewed placement to the map publication transform (implementation candidate)
+
+**Tracking issue:** [#309](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/309)  
+**Dependency:** D3M-05 PR #308 → D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Implementation branch:** `feat/d3m06-reviewed-map-placement-binding-20261102`
+
+- [x] Repository audit confirmed the review API stored boolean metric-scale/georeference checks but no numeric placement; the map publication API independently accepted a new transform after approval.
+- [x] Define explicit placement approval: WGS84 longitude/latitude, WGS84 ellipsoid height, heading/pitch/roll, uniform scale and distinct GLB axes.
+- [x] Store normalized placement and SHA-256 in the immutable review record and job summary.
+- [x] Require publication to match the exact normalized placement and digest from both review sources; reject legacy/missing placement records.
+- [x] Add regression cases for malformed height reference/axes/coordinates and transform changes.
+- [x] Update the D3M-02, generation jobs and published-model runbooks; keep the placement human-supplied and never inferred from a single image.
+- [ ] Run focused review/publication tests, lint and production build on this branch.
+- [ ] Record exact-head Push CI and PR CI before any promotion.
+- **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.

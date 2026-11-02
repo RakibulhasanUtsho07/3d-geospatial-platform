@@ -42,7 +42,7 @@ function errorStatus(error: unknown): number {
   if (/not found/i.test(message)) return 404;
   if (/already in progress|already being published/i.test(message)) return 409;
   if (error instanceof TypeError || error instanceof RangeError) return 400;
-  if (/Only completed|approved review|required review check|checksum mismatch|changed after approval|does not match|invalid or does not match|refusing publication/i.test(message)) return 422;
+  if (/Only completed|approved review|required review check|checksum mismatch|changed after approval|does not match|invalid or does not match|refusing publication|placement must exactly match/i.test(message)) return 422;
   return 500;
 }
 

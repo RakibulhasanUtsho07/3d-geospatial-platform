@@ -96,7 +96,17 @@ Send a review decision only after inspecting the GLB candidate and its QA report
 {
   "decision": "approved",
   "reviewer": "operator-handle",
-  "notes": "Reviewed the candidate and supporting evidence.",
+  "notes": "Reviewed the candidate, placement and supporting evidence.",
+  "placement": {
+    "position": { "longitude": 90.40606, "latitude": 23.7086, "height": 0 },
+    "headingDegrees": 0,
+    "pitchDegrees": 0,
+    "rollDegrees": 0,
+    "scale": 1,
+    "upAxis": "Y",
+    "forwardAxis": "Z",
+    "heightReference": "WGS84-ellipsoid"
+  },
   "checks": {
     "rightsVerified": true,
     "sourceIdentityVerified": true,
@@ -109,7 +119,7 @@ Send a review decision only after inspecting the GLB candidate and its QA report
 }
 ```
 
-Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
+Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true and the complete placement is supplied. The immutable review record stores the normalized placement and its SHA-256 digest. Publication later requires the same exact transform; changing even the coordinate, height, orientation, scale or GLB axes is rejected. Height is WGS84 ellipsoid height; convert other vertical references before approval. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
 
 The review API writes an audit record under the private job workspace and returns its hash. It deliberately **does not** set `mapReady` or `publicationEligible` to true, and it does not publish. Publication is a separate explicit operator action: use the D3M-02 map panel/API or the existing publication CLI after review and placement checks. The `reviewer` value is an operator-supplied label, not an identity-provider-verified account; the review token grants review permission to anyone who holds it.
 

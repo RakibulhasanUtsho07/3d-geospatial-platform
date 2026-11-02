@@ -10,6 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { normalizeGeneratedModelDefinition } from "../map-engine/generated-model-policy.mjs";
 import { getGenerationJob, updateGenerationJob } from "./generation-job-queue.mjs";
 
 export const GENERATION_REVIEW_SCHEMA_VERSION = "1.0.0";
@@ -23,6 +24,8 @@ export const REQUIRED_GENERATION_REVIEW_CHECKS = Object.freeze([
   "verticalDatumVerified",
   "qaReportReviewed",
 ]);
+
+const HEIGHT_REFERENCE = "WGS84-ellipsoid";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -149,6 +152,58 @@ async function writeJsonAtomically(filePath, value) {
   }
 }
 
+
+/**
+ * Normalize the exact placement reviewed for publication.
+ * Cesium's GeneratedModelLayer passes position.height to Cartesian3.fromDegrees
+ * on the WGS84 ellipsoid, so a different vertical reference must be converted
+ * before approval rather than silently interpreted here.
+ */
+export function normalizeGenerationReviewPlacement(value) {
+  if (!isRecord(value) || !isRecord(value.position)) {
+    throw new TypeError("An explicit reviewed placement object is required.");
+  }
+  for (const key of ["longitude", "latitude", "height"]) {
+    if (typeof value.position[key] !== "number" || !Number.isFinite(value.position[key])) {
+      throw new TypeError("Reviewed placement position." + key + " must be an explicit finite number.");
+    }
+  }
+  for (const key of ["headingDegrees", "pitchDegrees", "rollDegrees", "scale"]) {
+    if (typeof value[key] !== "number" || !Number.isFinite(value[key])) {
+      throw new TypeError("Reviewed placement " + key + " must be an explicit finite number.");
+    }
+  }
+  if (value.heightReference !== HEIGHT_REFERENCE) {
+    throw new TypeError("Reviewed placement heightReference must be WGS84-ellipsoid.");
+  }
+
+  const normalized = normalizeGeneratedModelDefinition({
+    id: "reviewed-placement",
+    url: "/models/generated/reviewed-placement.glb",
+    position: value.position,
+    headingDegrees: value.headingDegrees,
+    pitchDegrees: value.pitchDegrees,
+    rollDegrees: value.rollDegrees,
+    scale: value.scale,
+    upAxis: value.upAxis,
+    forwardAxis: value.forwardAxis,
+  });
+  return {
+    position: normalized.position,
+    headingDegrees: normalized.headingDegrees,
+    pitchDegrees: normalized.pitchDegrees,
+    rollDegrees: normalized.rollDegrees,
+    scale: normalized.scale,
+    upAxis: normalized.upAxis,
+    forwardAxis: normalized.forwardAxis,
+    heightReference: HEIGHT_REFERENCE,
+  };
+}
+
+export function hashGenerationReviewPlacement(value) {
+  return sha256(Buffer.from(JSON.stringify(normalizeGenerationReviewPlacement(value)), "utf8"));
+}
+
 function validateReviewInput(input) {
   if (!isRecord(input)) throw new TypeError("Review request must be a JSON object.");
   if (!GENERATION_REVIEW_DECISIONS.includes(input.decision)) {
@@ -171,11 +226,19 @@ function validateReviewInput(input) {
   if (input.decision === "approved" && REQUIRED_GENERATION_REVIEW_CHECKS.some((key) => checks[key] !== true)) {
     throw new Error("Approval requires every review check to be explicitly true.");
   }
+  const placement = input.placement === undefined || input.placement === null
+    ? null
+    : normalizeGenerationReviewPlacement(input.placement);
+  if (input.decision === "approved" && !placement) {
+    throw new TypeError("Approval requires the exact reviewed map placement.");
+  }
   return {
     decision: input.decision,
     reviewer: input.reviewer.trim(),
     notes: input.notes.trim(),
     checks,
+    placement,
+    placementSha256: placement ? hashGenerationReviewPlacement(placement) : null,
   };
 }
 
@@ -271,6 +334,8 @@ export async function reviewGenerationJob({ workspaceRoot, jobId, input, now = n
       notes: reviewInput.notes,
       checks: reviewInput.checks,
       candidate: candidateEvidence,
+      placement: reviewInput.placement,
+      placementSha256: reviewInput.placementSha256,
       mapReady: false,
       publicationEligible: false,
       publicationAction: "not-performed",
@@ -295,6 +360,8 @@ export async function reviewGenerationJob({ workspaceRoot, jobId, input, now = n
           notes: record.notes,
           checks: record.checks,
           candidateSha256: record.candidate.modelSha256,
+          placement: record.placement,
+          placementSha256: record.placementSha256,
           recordPath,
           recordSha256,
           mapReady: false,

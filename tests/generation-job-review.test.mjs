@@ -10,6 +10,16 @@ import { reviewGenerationJob, REQUIRED_GENERATION_REVIEW_CHECKS } from "../src/c
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 const HASH = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const REVIEWED_PLACEMENT = {
+  position: { longitude: 90.406, latitude: 23.7086, height: 12.5 },
+  headingDegrees: 0,
+  pitchDegrees: 0,
+  rollDegrees: 0,
+  scale: 1,
+  upAxis: "Y",
+  forwardAxis: "Z",
+  heightReference: "WGS84-ellipsoid",
+};
 
 function makeGlb(seed = "review-test") {
   const payload = Buffer.from(JSON.stringify({ asset: { version: "2.0", generator: seed } }));
@@ -71,6 +81,7 @@ function reviewInput(overrides = {}) {
     reviewer: "local-reviewer",
     notes: "Reviewed candidate, QA report, rights, dimensions and georeferencing evidence.",
     checks,
+    placement: REVIEWED_PLACEMENT,
     ...overrides,
   };
 }
@@ -80,6 +91,10 @@ test("records an approval only after matching GLB and QA hashes; still blocks pu
   const result = await reviewGenerationJob({ ...setup, input: reviewInput() });
   assert.equal(result.review.decision, "approved");
   assert.equal(result.review.candidate.modelSha256, HASH(setup.modelBytes));
+  assert.deepEqual(result.review.placement, REVIEWED_PLACEMENT);
+  assert.equal(result.review.placementSha256, HASH(Buffer.from(JSON.stringify(REVIEWED_PLACEMENT))));
+  assert.deepEqual(result.job.review.placement, REVIEWED_PLACEMENT);
+  assert.equal(result.job.review.placementSha256, result.review.placementSha256);
   assert.equal(result.job.review.decision, "approved");
   assert.equal(result.job.mapReady, false);
   assert.equal(result.job.publicationEligible, false);
@@ -88,6 +103,33 @@ test("records an approval only after matching GLB and QA hashes; still blocks pu
   assert.equal(evidence.reviewId, result.review.reviewId);
   assert.equal(HASH(Buffer.from(JSON.stringify(evidence, null, 2) + "\n")), result.job.review.recordSha256);
   await assert.rejects(reviewGenerationJob({ ...setup, input: reviewInput() }), /immutable/);
+});
+
+test("approval requires complete WGS84 ellipsoid placement and valid axes", async (t) => {
+  const setup = await setupCompletedJob(t);
+  await assert.rejects(
+    reviewGenerationJob({ ...setup, input: reviewInput({ placement: undefined }) }),
+    /exact reviewed map placement/i,
+  );
+  await assert.rejects(
+    reviewGenerationJob({ ...setup, input: reviewInput({
+      placement: { ...REVIEWED_PLACEMENT, heightReference: "EGM96" },
+    }) }),
+    /heightReference must be WGS84-ellipsoid/i,
+  );
+  await assert.rejects(
+    reviewGenerationJob({ ...setup, input: reviewInput({
+      placement: { ...REVIEWED_PLACEMENT, upAxis: "Y", forwardAxis: "Y" },
+    }) }),
+    /up axis and forward axis must be different/i,
+  );
+  await assert.rejects(
+    reviewGenerationJob({ ...setup, input: reviewInput({
+      placement: { ...REVIEWED_PLACEMENT, position: { ...REVIEWED_PLACEMENT.position, longitude: 181 } },
+    }) }),
+    /Longitude must be a finite number/i,
+  );
+  assert.equal((await getGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: setup.jobId })).review, undefined);
 });
 
 test("refuses approval when any mandatory review checklist item is false", async (t) => {
