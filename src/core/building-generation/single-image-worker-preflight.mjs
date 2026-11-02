@@ -24,11 +24,14 @@ export async function runSingleImageWorkerPreflight({
     Number.isFinite(parsedReportedTimestamp.getTime()) &&
     parsedReportedTimestamp.toISOString() === reportedTimestamp &&
     reportedTimestamp === checkedAt;
-  const blockers = Array.isArray(singleImage?.blockers)
-    ? singleImage.blockers.filter((item) => typeof item === "string")
+  const rawBlockers = singleImage?.blockers;
+  const blockersValid = Array.isArray(rawBlockers) &&
+    rawBlockers.every((item) => typeof item === "string" && item.length <= 500);
+  const blockers = blockersValid
+    ? rawBlockers.filter(Boolean)
     : ["Single-image worker capability result is missing or malformed."];
   if (!schemaValid) blockers.push("Worker capability result has a missing or unsupported schema version.");
-  if (!capabilityTimestampValid) blockers.push("Worker capability result timestamp is missing, invalid, or non-canonical.");
+  if (!capabilityTimestampValid) blockers.push("Worker capability result timestamp is missing, invalid, non-canonical, or stale.");
   const supportedStatuses = new Set(["ready", "configured", "blocked"]);
   const supportedModelStates = new Set(["cached", "missing", "unknown"]);
   const capabilityStatusValid = supportedStatuses.has(singleImage?.status);
@@ -47,6 +50,12 @@ export async function runSingleImageWorkerPreflight({
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(singleImage.backgroundRemovalModel)
     ? singleImage.backgroundRemovalModel
     : null;
+  if (backgroundRemovalWeights === "cached" && !backgroundRemovalModel) {
+    blockers.push("Cached rembg weights have no verified model identifier.");
+  }
+  if (capabilityStatusValid && singleImage.status !== "ready" && blockers.length === 0) {
+    blockers.push("Single-image worker strategy is not ready.");
+  }
   const ready = schemaValid &&
     capabilityTimestampValid &&
     capabilityStatusValid &&
