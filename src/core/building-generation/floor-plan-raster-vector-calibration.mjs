@@ -384,8 +384,14 @@ export function calibrateFloorPlanRasterVectors({
         fail("INVALID_WALL_OPENINGS", "Openings '" + previous.id + "' and '" + current.id + "' overlap on wall '" + id + "'.");
       }
     }
-    const normalizedOpenings = openings.map(({ offsetPx: _offsetPx, widthPx: _widthPx, ...opening }) => opening)
-      .sort((left, right) => left.offsetM - right.offsetM);
+    const normalizedOpenings = openings.map((opening) => ({
+      id: opening.id,
+      type: opening.type,
+      offsetM: opening.offsetM,
+      widthM: opening.widthM,
+      heightM: opening.heightM,
+      sillHeightM: opening.sillHeightM,
+    })).sort((left, right) => left.offsetM - right.offsetM);
     return {
       id,
       proposalId,
