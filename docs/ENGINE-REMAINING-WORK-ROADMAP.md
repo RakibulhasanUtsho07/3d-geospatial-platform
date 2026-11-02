@@ -173,8 +173,8 @@ The codebase still needs real-data validation and product-level completion. The 
 - Added retry reuse of exact uploaded-source records while the dialog remains mounted and job/worker status polling with terminal-state stop.
 - Added short-lived HttpOnly operator sessions. A distinct login token is exchanged once for a 30-minute SameSite=Strict cookie; the server-only HMAC signing secret and legacy generation bearer token are never embedded in the browser bundle.
 - Added metric-geometry/strategy helper regression tests and a CI step.
-- Exact-head Full CI passed on `3e4aba47126e585f39ff91a0cc55dc91d38ada78`. WebP selected-view signature enforcement is on `4f1bd48f6040dc5b135d5c2bb98e31263c3b83d0`; its last observed run was still on the final production viewport API verification with 170/178 steps complete and no failure.
-- Added bounded COLMAP and TripoSR/Python/PyTorch/device readiness probes, a sanitized strategy health snapshot, and claim filtering so unsupported jobs remain queued without consuming retry attempts. Exact-head CI for this capability work is pending.
+- Exact-head Full CI passed on `51ea64e4cce35059af14bd33587cbf7965004a12`: worker liveness, COLMAP/TripoSR runtime probing, strategy-filtered queue claims, UI and regression tests all passed.
+- Added local Hugging Face cache checks for TripoSR `config.yaml` and `model.ckpt`; single-image AI is claimable only when both files are cached. Exact-head CI for this final model-cache gate is pending.
 - D3M-03 remains Draft and depends on D3M-02 PR #302; neither has been merged to development/main.
 - **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. WebP is not a valid selected input for the current single-image AI or COLMAP photogrammetry worker; it is rejected at UI and queue preflight for those strategies. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
 
