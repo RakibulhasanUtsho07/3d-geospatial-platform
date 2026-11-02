@@ -43,7 +43,7 @@ test("builds a valid WGS84 polygon from metric width, depth and heading", () => 
 });
 
 test("rejects invalid identity, WGS84 coordinates and metric dimensions", () => {
-  assert.throws(() => buildMapGenerationBuildingSpec({ ...baseBuilding, id: "../outside" }), /safe identifier/);
+  assert.throws(() => buildMapGenerationBuildingSpec({ ...baseBuilding, id: "../outside" }), /letters, digits, dot, underscore or hyphen/);
   assert.throws(() => buildMapGenerationBuildingSpec({ ...baseBuilding, longitude: 181 }), /Longitude/);
   assert.throws(() => buildMapGenerationBuildingSpec({ ...baseBuilding, latitude: 86 }), /Latitude/);
   assert.throws(() => buildMapGenerationBuildingSpec({ ...baseBuilding, widthM: 0.5 }), /Footprint width/);
