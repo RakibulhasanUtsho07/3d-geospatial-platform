@@ -71,7 +71,7 @@ test("keeps single-image jobs unclaimable when TripoSR weights are not cached", 
   });
   assert.equal(result.strategies["single-image-ai"].status, "configured");
   assert.equal(result.strategies["single-image-ai"].modelWeights, "missing");
-  assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural"]);
+  assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural", "photogrammetry"]);
 });
 
 test("blocks missing/symlinked runner files and never serializes their paths", async (t) => {
