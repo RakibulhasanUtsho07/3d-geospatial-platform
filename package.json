@@ -58,6 +58,7 @@
     "test:single-image-3d": "node --test tests/single-image-3d-worker.test.mjs",
     "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs",
     "smoke:single-image-runtime": "node scripts/smoke-test-single-image-runtime.mjs",
+    "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs",
     "test:video-frame-operation-scopes": "node --test tests/video-frame-extractor-operation-scopes.test.mjs",
     "generate:building-from-image": "node scripts/generate-building-from-image.mjs",
     "review:building-source": "node scripts/review-building-source.mjs",
