@@ -346,7 +346,7 @@ test("writes a sanitized failure report when actual inference or export fails", 
   assert.equal(result.report.publicationEligible, false);
 });
 
-test("requires the three separate operator confirmations", async (t) => {
+test("requires four independent operator confirmations", async (t) => {
   const root = await workspace(t);
   const source = await writeInput(root);
 
@@ -443,4 +443,51 @@ test("independent verifier refuses a report that enables a release flag", async 
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /fail-closed publication contract/i,
   );
+});
+
+
+test("refuses to reuse a prior workflow artifact directory instead of treating a cached stage as new inference", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const previousWorkflow = path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow");
+  await mkdir(previousWorkflow, { recursive: true });
+  let probeCalls = 0;
+  let workflowCalls = 0;
+
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, {
+      probeCapabilities: async () => {
+        probeCalls += 1;
+        return readyCapabilities();
+      },
+      runWorkflow: async () => {
+        workflowCalls += 1;
+        return null;
+      },
+    })),
+    /Smoke workflow artifact directory already exists/,
+  );
+  assert.equal(probeCalls, 0);
+  assert.equal(workflowCalls, 0);
+  await assert.rejects(stat(path.join(root, ".building-engine", "runtime-smokes", "smoke-job.json")), /ENOENT/);
+});
+
+test("refuses to reuse an existing source record under the same source ID", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const record = path.join(root, ".building-engine", "media", fixture.id, "sources", "facade-photo.json");
+  await mkdir(path.dirname(record), { recursive: true });
+  await writeFile(record, "{}\n");
+  let probeCalls = 0;
+
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, {
+      probeCapabilities: async () => {
+        probeCalls += 1;
+        return readyCapabilities();
+      },
+    })),
+    /Smoke source record already exists/,
+  );
+  assert.equal(probeCalls, 0);
 });
