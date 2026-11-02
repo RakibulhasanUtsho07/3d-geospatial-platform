@@ -127,6 +127,8 @@ async function fakeWorkflowResult(options, root, source) {
         source: { sha256: source.sha256 },
         outputs: { glb: { sha256: outputHash, bytes: glb.length, meshCount: 1 } },
         modelQuality: {
+          valid: true,
+          status: "review-recommended",
           warnings: ["synthetic geometry fixture requires human review"],
           counts: { triangleCount: 1, vertexCount: 3, primitiveCount: 1 },
         },
