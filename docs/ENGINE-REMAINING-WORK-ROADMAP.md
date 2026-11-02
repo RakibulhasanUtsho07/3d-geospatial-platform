@@ -240,7 +240,7 @@ The codebase still needs real-data validation and product-level completion. The 
 - [ ] Next operational gate: run the D3M-05 single-image smoke on the provisioned worker host using the real TripoSR/rembg caches and reviewed model/source terms, then independently verify and visually inspect the private GLB/report. This requires access to the actual worker host and must not be replaced by CI fakes.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.
 
-## D3M-07 — read-only single-image worker preflight
+## D3M-07 — non-inference single-image worker preflight
 
 **Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
 **Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
@@ -256,4 +256,4 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Align the D3M-05 real-smoke readiness recheck with the same single-image-only strategy scope; keep actual TripoSR execution inside the authorized inference workflow.
 - [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
 - [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
-- **Safety boundary:** package imports still occur; this is not an OS-level sandbox or host firewall. No inference, model download, runner execution or publication is performed by the preflight.
+- **Safety boundary:** the preflight does not execute the configured TripoSR runner or call model-download/inference APIs. Python imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic read-only environment, OS sandbox or host firewall. Apply host/network egress and filesystem controls when strict guarantees are required.
