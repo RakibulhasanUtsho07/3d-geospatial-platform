@@ -8,14 +8,14 @@ import test from "node:test";
 
 import { getClaimableGenerationStrategies, probeGenerationWorkerCapabilities } from "../src/core/building-generation/generation-worker-capabilities.mjs";
 
-function fakeSuccessfulSpawn() {
+function fakeSuccessfulSpawn(stdoutText = "mock help output") {
   return () => {
     const child = new EventEmitter();
     child.stdout = new PassThrough();
     child.stderr = new PassThrough();
     child.kill = () => true;
     process.nextTick(() => {
-      child.stdout.end("mock help output");
+      child.stdout.end(stdoutText);
       child.stderr.end("");
       child.emit("close", 0, null);
     });
@@ -36,19 +36,42 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
       BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
       BUILDING_ENGINE_DEVICE: "cuda:0",
     },
-    spawnImpl: (executable, args) => { calls.push({ executable, args }); return fakeSuccessfulSpawn()(); },
+    spawnImpl: (executable, args) => {
+      calls.push({ executable, args });
+      return fakeSuccessfulSpawn(executable === "python-fixture" ? "TRIPOSR_WEIGHTS_CACHED" : undefined)();
+    },
     now: "2026-11-02T04:00:00.000Z",
   });
   assert.equal(result.strategies.procedural.status, "ready");
   assert.equal(result.strategies.photogrammetry.status, "ready");
-  assert.equal(result.strategies["single-image-ai"].status, "configured");
-  assert.equal(result.strategies["single-image-ai"].modelWeights, "not-checked");
+  assert.equal(result.strategies["single-image-ai"].status, "ready");
+  assert.equal(result.strategies["single-image-ai"].modelWeights, "cached");
   assert.equal(calls.filter((entry) => entry.executable === "colmap-fixture").length, 4);
   const pythonProbe = calls.find((entry) => entry.executable === "python-fixture" && entry.args[0] === "-c");
   assert.ok(pythonProbe);
   assert.equal(pythonProbe.args[1].includes("\n"), true);
   assert.equal(pythonProbe.args[1].includes("configured CUDA device unavailable"), true);
+  assert.equal(pythonProbe.args[1].includes("try_to_load_from_cache"), true);
+  assert.equal(pythonProbe.args[1].includes("model.ckpt"), true);
   assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural", "photogrammetry", "single-image-ai"]);
+});
+
+test("keeps single-image jobs unclaimable when TripoSR weights are not cached", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-no-weights-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const runner = path.join(root, "run.py");
+  await writeFile(runner, "print('fixture runner')\\n");
+  const result = await probeGenerationWorkerCapabilities({
+    env: {
+      BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
+      BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
+      BUILDING_ENGINE_DEVICE: "cpu",
+    },
+    spawnImpl: (executable) => fakeSuccessfulSpawn(executable === "python-fixture" ? "TRIPOSR_WEIGHTS_MISSING:model.ckpt" : undefined)(),
+  });
+  assert.equal(result.strategies["single-image-ai"].status, "configured");
+  assert.equal(result.strategies["single-image-ai"].modelWeights, "missing");
+  assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural"]);
 });
 
 test("blocks missing/symlinked runner files and never serializes their paths", async (t) => {
