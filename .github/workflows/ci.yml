@@ -61,7 +61,9 @@ on:
       - feat/p2-20-viewport-movement-cache-benchmark
       - development
       - feat/brf46-source-operation-scope-gate
+      - feat/d3m02-generation-job-map-publish-20261101
       - feat/brf47-cross-role-asset-identity-20261031
+      - feat/d3m03-map-generation-intake-20261102
   pull_request:
     branches:
       - main
@@ -176,6 +178,9 @@ jobs:
         run: npm run test:building-media
       - name: Test authenticated generation media upload storage
         run: npm run test:generation-media-upload
+
+      - name: Test map-side generation intake geometry and strategy dispatch
+        run: npm run test:generation-map-intake
 
       - name: Test media source rights review and BuildingSpec preparation
         run: npm run test:building-source-workflow
