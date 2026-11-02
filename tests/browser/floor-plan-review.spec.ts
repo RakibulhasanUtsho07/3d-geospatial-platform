@@ -126,7 +126,7 @@ test("draws and reviews a closed room, rejects a false line and downloads a priv
   await page.getByLabel("Opening height (m)").fill("2.1");
   await page.getByLabel("Sill height (m)").fill("0");
   await page.getByRole("button", { name: "Add reviewed opening", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("Opening overlaps another opening on this wall.");
+  await expect(page.getByText("Opening overlaps another opening on this wall.", { exact: true })).toBeVisible();
   await expect(doorMarker).toBeVisible();
 
   await page.getByLabel("Opening type").selectOption("window");

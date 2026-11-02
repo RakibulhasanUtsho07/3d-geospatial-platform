@@ -175,7 +175,76 @@ test("rejects overlapping pixel opening intervals during vector calibration", ()
   );
 });
 
-test("converts reviewed pixel opening intervals to metres and delegates opening fit to model validation", () => {
+test("supports a room boundary edge covered by adjacent split reviewed wall segments", () => {
+  const input = fixture();
+  input.proposalReport.candidates[1].end = { x: 300, y: 200 };
+  input.proposalReport.candidates.push({
+    id: "line-0005",
+    orientation: "vertical",
+    start: { x: 300, y: 200 },
+    end: { x: 300, y: 300 },
+    semanticClass: "ambiguous-line-candidate",
+  });
+  input.review.proposalReportSha256 = hashFloorPlanRasterProposalReport(input.proposalReport);
+  input.review.candidateDecisions.push({ proposalId: "line-0005", decision: "accept-wall" });
+  input.review.walls[1].endPx = [300, 200];
+  input.review.walls.push({
+    id: "east-wall-lower",
+    proposalId: "line-0005",
+    decision: "accept",
+    semanticClass: "wall",
+    reviewed: true,
+    startPx: [300, 200],
+    endPx: [300, 300],
+    openings: [],
+  });
+
+  const result = calibrateFloorPlanRasterVectors(input);
+  assert.equal(result.floorPlan.walls.length, 5);
+  assert.equal(result.audit.vector.allRoomBoundariesCovered, true);
+  assert.ok(result.audit.vector.roomBoundaryChecks.every((check) => check.covered));
+});
+
+test("revalidates opening type, wall fit, effective wall height, sill and door semantics", () => {
+  const invalidCases = [
+    {
+      opening: { id: "bad-type", type: "arch", offsetPx: 10, widthPx: 20, heightM: 1.2, sillHeightM: 0.8 },
+      message: /type must be door or window/,
+    },
+    {
+      opening: { id: "out-of-bounds", type: "window", offsetPx: 195, widthPx: 20, heightM: 1.2, sillHeightM: 0.8 },
+      message: /extends past wall/,
+    },
+    {
+      opening: { id: "raised-door", type: "door", offsetPx: 10, widthPx: 20, heightM: 2.1, sillHeightM: 0.1 },
+      message: /floor level/,
+    },
+    {
+      opening: { id: "over-height-window", type: "window", offsetPx: 10, widthPx: 20, heightM: 2.5, sillHeightM: 0.8 },
+      message: /extends above wall/,
+    },
+  ];
+  for (const item of invalidCases) {
+    const input = fixture();
+    input.review.walls[0].openings = [item.opening];
+    assert.throws(
+      () => calibrateFloorPlanRasterVectors(input),
+      (error) => error.code === "INVALID_WALL_OPENINGS" && item.message.test(error.message),
+    );
+  }
+
+  const shorterWall = fixture();
+  shorterWall.review.walls[0].heightM = 2.5;
+  shorterWall.review.walls[0].openings = [{
+    id: "too-tall-for-wall", type: "window", offsetPx: 10, widthPx: 20, heightM: 2.1, sillHeightM: 0.5,
+  }];
+  assert.throws(
+    () => calibrateFloorPlanRasterVectors(shorterWall),
+    (error) => error.code === "INVALID_WALL_OPENINGS" && /extends above wall/.test(error.message),
+  );
+});
+
+test("converts reviewed pixel opening intervals to metre-space dimensions before model preflight", () => {
   const input = fixture();
   input.review.walls[0].openings = [{
     id: "main-door",

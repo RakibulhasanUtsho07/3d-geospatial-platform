@@ -66,6 +66,10 @@ function inputs() {
       reviewed: true,
       startPx: [candidate.start.x, candidate.start.y],
       endPx: [candidate.end.x, candidate.end.y],
+      openings: index === 1 ? [
+        { id: "east-door", type: "door", offsetPx: 20, widthPx: 20, heightM: 2.1, sillHeightM: 0 },
+        { id: "east-window", type: "window", offsetPx: 70, widthPx: 30, heightM: 1.2, sillHeightM: 0.8 },
+      ] : [],
     })),
   };
   return { sourceBytes, proposalReport, review };
@@ -94,12 +98,25 @@ test("CLI binds source bytes and writes private vector and audit JSON without ov
   assert.equal(geometry.walls.length, 4);
   assert.equal(audit.source.bytesVerified, true);
   assert.equal(audit.vector.allRoomBoundariesCovered, true);
+  assert.equal(audit.vector.openingCount, 2);
+  assert.deepEqual(geometry.walls[1].openings.map((opening) => opening.type), ["door", "window"]);
   assert.deepEqual(audit.releaseFlags, {
     acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false,
   });
   assert.equal((await stat(geometryPath)).mode & 0o777, 0o600);
   assert.equal((await stat(auditPath)).mode & 0o777, 0o600);
   assert.equal(hash(Buffer.from(JSON.stringify(geometry, null, 2) + "\n")), hash(await readFile(geometryPath)));
+
+  // Run the calibrated geometry through the real generator and verify hash parity with the in-memory preflight.
+  const candidatePath = path.join(root, "candidate.glb");
+  const candidateScriptPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../scripts/generate-floor-plan-model.mjs");
+  const candidateRun = spawnSync(process.execPath, [candidateScriptPath, geometryPath, candidatePath, sourcePath], { encoding: "utf8" });
+  assert.equal(candidateRun.status, 0, candidateRun.stderr);
+  const candidateReport = JSON.parse(await readFile(candidatePath + ".report.json", "utf8"));
+  assert.equal(candidateReport.output.sha256, audit.vector.generatedPreviewGlbSha256);
+  assert.equal(candidateReport.input.sourceEvidenceVerified, true);
+  assert.equal(candidateReport.geometry.openingCount, 2);
+
   const secondRun = spawnSync(process.execPath, [scriptPath, proposalPath, reviewPath, sourcePath, geometryPath, auditPath], { encoding: "utf8" });
   assert.notEqual(secondRun.status, 0);
   assert.match(secondRun.stderr, /already exists/);

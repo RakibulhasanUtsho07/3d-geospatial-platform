@@ -362,19 +362,37 @@ export function calibrateFloorPlanRasterVectors({
     if (!Array.isArray(openingsRaw) || openingsRaw.length > 20) {
       fail("INVALID_WALL_OPENINGS", "Wall '" + id + "' openings must be an array with at most 20 entries.");
     }
+    const wallHeightM = wall.heightM === undefined
+      ? normalizedLevel.wallHeightM
+      : requireNumber(wall.heightM, "wall.heightM", 2, normalizedLevel.wallHeightM);
     const openings = openingsRaw.map((opening, openingIndex) => {
       requireRecord(opening, "wall " + id + ".openings[" + openingIndex + "]");
+      const openingId = requireId(opening.id, "opening.id");
+      if (opening.type !== "door" && opening.type !== "window") {
+        fail("INVALID_WALL_OPENINGS", "Opening '" + openingId + "' type must be door or window.");
+      }
       const offsetPx = requireNumber(opening.offsetPx, "opening.offsetPx", 0, segmentLengthPx);
       const widthPx = requireNumber(opening.widthPx, "opening.widthPx", 0.5, segmentLengthPx);
+      if (offsetPx + widthPx > segmentLengthPx + EPSILON) {
+        fail("INVALID_WALL_OPENINGS", "Opening '" + openingId + "' extends past wall '" + id + "'.");
+      }
+      const heightM = requireNumber(opening.heightM, "opening.heightM", 0.4, wallHeightM);
+      const sillHeightM = requireNumber(opening.sillHeightM, "opening.sillHeightM", 0, wallHeightM);
+      if (sillHeightM + heightM > wallHeightM + EPSILON) {
+        fail("INVALID_WALL_OPENINGS", "Opening '" + openingId + "' extends above wall '" + id + "'.");
+      }
+      if (opening.type === "door" && sillHeightM > 0.05) {
+        fail("INVALID_WALL_OPENINGS", "Door '" + openingId + "' must start at floor level.");
+      }
       return {
-        id: requireId(opening.id, "opening.id"),
+        id: openingId,
         type: opening.type,
         offsetPx,
         widthPx,
         offsetM: roundMetric(offsetPx * metresPerPixel),
         widthM: roundMetric(widthPx * metresPerPixel),
-        heightM: requireNumber(opening.heightM, "opening.heightM", 0.4, normalizedLevel.wallHeightM),
-        sillHeightM: requireNumber(opening.sillHeightM, "opening.sillHeightM", 0, normalizedLevel.wallHeightM),
+        heightM,
+        sillHeightM,
       };
     }).sort((left, right) => left.offsetPx - right.offsetPx);
     for (let openingIndex = 1; openingIndex < openings.length; openingIndex += 1) {
@@ -410,7 +428,7 @@ export function calibrateFloorPlanRasterVectors({
           openings: normalizedOpenings,
         };
         if (wall.heightM !== undefined) {
-          normalizedWall.heightM = requireNumber(wall.heightM, "wall.heightM", 2, normalizedLevel.wallHeightM);
+          normalizedWall.heightM = wallHeightM;
         }
         if (wall.thicknessM !== undefined) {
           normalizedWall.thicknessM = requireNumber(wall.thicknessM, "wall.thicknessM", 0.05, 0.75);

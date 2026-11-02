@@ -14,7 +14,7 @@ No model is automatically published. The acceptanceEligible, publicationEligible
 - Requires two image-space calibration points plus their known real-world distance and an evidence description for the dimension used. The computed scale is isotropic (metres per pixel); the tool does not verify the dimension against a survey.
 - Converts image coordinates to local x,z metres relative to a reviewer-selected pixel origin. It separately requires a declared WGS84 origin, heading and level dimensions; it does not infer north, height, elevation datum or a geodetic transform.
 - Checks that each accepted room boundary edge is covered by reviewed wall centre-lines within a declared tolerance (default 0.15 m, allowed 0.05–0.5 m). Missing wall coverage blocks conversion.
-- Delegates polygon validity, wall lengths, unique IDs, opening fit, and shell geometry checks to the existing production GLB generator validator. The output records the preview GLB hash and byte size but does not write the GLB to disk.
+- Independently revalidates opening type, pixel interval bounds/overlap, opening height, sill height, door floor-level semantics, and effective wall height before geometry conversion. The existing production GLB generator independently validates polygon topology, wall lengths, unique IDs, opening fit, and shell geometry. The output records the preview GLB hash and byte size but does not write the GLB to disk.
 - Writes geometry JSON and a separate audit JSON with mode 0600 and refuses to overwrite existing files.
 
 ## Local commands
@@ -25,7 +25,7 @@ npm run calibrate:floor-plan-raster-vectors -- proposal-report.json review.json 
 
 npm run generate:floor-plan-model -- output-geometry.json private-candidate.glb original-floor-plan.png
 
-The last command is an optional subsequent candidate-generation step. Its own review/publication flow remains separate and fail-closed. Use the same original source raster for hash verification. Output JSON files must not already exist.
+The last command is the subsequent local GLB candidate-generation step. It rechecks the original source hash and should produce the same GLB SHA-256 recorded by the calibration audit's in-memory preview. The dedicated CLI integration test verifies this round-trip, including a door and a window opening. Its own review/publication flow remains separate and fail-closed; no map asset is written. Use the same original source raster for hash verification. Output JSON files must not already exist.
 
 ## Review JSON contract
 
@@ -48,7 +48,7 @@ This slice proves deterministic conversion mechanics, exact byte/hash binding, e
 
 ## Regression coverage
 
-The focused suite covers deterministic conversion, source-byte mismatch, stale proposal report, incomplete line review, large endpoint correction reasons, room boundary closure failure, implausible scale, unreviewed rooms, opening pixel-to-metre conversion and the private CLI/non-overwrite behavior.
+The focused suite covers deterministic conversion, source-byte mismatch, stale proposal report, incomplete line review, large endpoint correction reasons, missing room-boundary coverage, an edge assembled from adjacent split wall segments, implausible scale, unreviewed rooms, opening type/bounds/height/sill/overlap checks, pixel-to-metre conversion, and a CLI round-trip proving that the final generated GLB hash matches the in-memory geometry preflight. Split-wall coverage is synthetic and does not replace validation on rights-cleared real plans.
 
 ## Interactive local review editor
 

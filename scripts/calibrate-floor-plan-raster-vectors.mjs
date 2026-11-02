@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -31,7 +31,20 @@ async function assertOutputAbsent(filePath, label) {
 
 async function writePrivateNewFile(filePath, bytes) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, bytes, { flag: "wx", mode: 0o600 });
+  const handle = await open(filePath, "wx", 0o600);
+  const createdFile = await handle.stat();
+  try {
+    await handle.writeFile(bytes);
+    await handle.sync();
+    await handle.close();
+  } catch (error) {
+    await handle.close().catch(() => {});
+    const currentFile = await lstat(filePath).catch(() => null);
+    if (currentFile && currentFile.dev === createdFile.dev && currentFile.ino === createdFile.ino) {
+      await rm(filePath, { force: true });
+    }
+    throw error;
+  }
 }
 
 async function main() {
@@ -74,8 +87,8 @@ async function main() {
     wroteGeometry = true;
     await writePrivateNewFile(auditPath, auditBytes);
   } catch (error) {
-    if (wroteGeometry) await rm(geometryPath, { force: true });
-    await rm(auditPath, { force: true });
+    // The second writer cleans up only an inode it created. Never unlink a competing path.
+    if (wroteGeometry) await rm(geometryPath, { force: true }).catch(() => {});
     throw error;
   }
   process.stdout.write(JSON.stringify({
