@@ -245,11 +245,14 @@ The codebase still needs real-data validation and product-level completion. The 
 **Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
 **Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
 
-- [x] Add a read-only preflight adapter around the authoritative D3M-04 capability probe; require TripoSR and rembg caches to be explicitly `cached` before returning ready.
+- [x] Add a preflight adapter around the authoritative D3M-04 capability probe; request only `single-image-ai` so this check does not launch unrelated COLMAP commands.
+- [x] Require TripoSR and rembg caches to be explicitly `cached` before returning ready; reject missing, unknown, malformed and blocked states.
 - [x] Add a CLI with explicit Python, TripoSR runner and device overrides; use bounded probe timeout and non-zero exit for blocked/unknown readiness.
 - [x] Keep output sanitized: do not serialize environment variables, executable paths, cache paths or credentials.
+- [x] Prevent configured runner execution: read and syntax-compile `run.py` in memory; never invoke its top-level code or `--help` handler. Set Python bytecode suppression and Hugging Face offline/telemetry flags for the probe subprocess.
 - [x] Keep release flags false and state clearly that preflight does not run inference, verify licences, establish GPU memory sufficiency or prove building accuracy.
-- [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation and secret/path non-disclosure.
-- [x] Add the test and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
-- [ ] Exact-head Full CI and Push CI must both pass before this checkpoint can be promoted.
+- [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation, secret/path non-disclosure, strategy scoping and a real-Python runner-execution marker check.
+- [x] Add the tests and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
+- [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
 - [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
+- **Safety boundary:** package imports still occur; this is not an OS-level sandbox or host firewall. No inference, model download, runner execution or publication is performed by the preflight.
