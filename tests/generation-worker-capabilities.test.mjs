@@ -36,8 +36,8 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
       BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
       BUILDING_ENGINE_DEVICE: "cuda:0",
     },
-    spawnImpl: (executable, args) => {
-      calls.push({ executable, args });
+    spawnImpl: (executable, args, options) => {
+      calls.push({ executable, args, options });
       return fakeSuccessfulSpawn(executable === "python-fixture"
         ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_CACHED"
         : undefined)();
@@ -60,6 +60,13 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
   assert.equal(pythonProbe.args[1].includes("import onnxruntime, rembg, torch"), true);
   assert.equal(pythonProbe.args[1].includes("resolve_existing"), true);
   assert.equal(pythonProbe.args[1].includes("REMBG_MODEL_WEIGHTS_CACHED"), true);
+  assert.equal(pythonProbe.args[1].includes("compile(runner_source, runner_path, 'exec', dont_inherit=True)"), true);
+  assert.equal(pythonProbe.args[1].includes("runpy"), false);
+  assert.equal(pythonProbe.args[1].includes("sys.argv"), false);
+  assert.equal(calls.some((entry) => entry.args.includes(runner) && entry.args.includes("--help")), false);
+  assert.equal(pythonProbe.options.env.PYTHONDONTWRITEBYTECODE, "1");
+  assert.equal(pythonProbe.options.env.HF_HUB_OFFLINE, "1");
+  assert.equal(pythonProbe.options.env.TRANSFORMERS_OFFLINE, "1");
   assert.equal(pythonProbe.args[1].includes("new_session("), false);
   assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural", "photogrammetry", "single-image-ai"]);
 });
