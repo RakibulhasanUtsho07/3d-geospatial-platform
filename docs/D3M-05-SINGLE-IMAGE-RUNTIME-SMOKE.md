@@ -44,7 +44,7 @@ Use an isolated test building ID and a test image whose reuse rights permit this
 Example (PowerShell; replace every placeholder with a real value from the worker host):
 
 ~~~powershell
-npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads\smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-single-view-inference --confirm-model-licences
+npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-single-view-inference --confirm-model-licences
 ~~~
 
 The example runner path is illustrative; ensure the actual file path is correct. Use a new smoke jobId for every run. Evidence files are immutable and an existing report is not overwritten.
@@ -85,6 +85,16 @@ The smoke result itself leaves:
 - automaticApproval=false
 
 A smoke pass is not a promotion or publication authorization.
+
+## Independent evidence verification
+
+After the smoke process exits, re-open the on-disk evidence with the separate verifier:
+
+~~~powershell
+npm run verify:single-image-runtime-smoke -- "D:\BuildingEngineWorkspace" "smoke-dhaka-front-20261102"
+~~~
+
+The verifier independently reads the report, rejects symlinked/out-of-workspace paths, re-hashes the source and GLB, verifies byte counts and GLB 2.0 mesh structure, and checks that the report's readiness and release flags remain fail-closed. It detects accidental source/output changes after the smoke. This is artifact-integrity verification, not a digital signature: it does not independently prove the source licence, model-weight licence, report author, physical building identity or architectural accuracy.
 
 ## Automated test scope
 
