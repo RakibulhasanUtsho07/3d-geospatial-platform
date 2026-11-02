@@ -298,6 +298,9 @@ export async function runSingleImageRuntimeSmoke(options) {
   if (options.confirmSourceRights !== true) {
     throw new TypeError("confirmSourceRights must be true after checking the source image rights.");
   }
+  if (options.confirmOperationScopes !== true) {
+    throw new TypeError("confirmOperationScopes must be true after authorizing private-media-ingestion and single-image-ai-reconstruction.");
+  }
   if (options.confirmSingleViewInference !== true) {
     throw new TypeError("confirmSingleViewInference must be true for single-view AI inference.");
   }
@@ -375,6 +378,8 @@ export async function runSingleImageRuntimeSmoke(options) {
       sha256: source.sha256,
       licence: options.licence.trim().slice(0, 300),
       rights: "operator-attested-not-independently-verified",
+      permittedOperations: ["private-media-ingestion", "single-image-ai-reconstruction"],
+      operationScopeAttestation: "operator-attested-not-independently-verified",
     },
     model: {
       tripoModelId: MODEL_ID,
