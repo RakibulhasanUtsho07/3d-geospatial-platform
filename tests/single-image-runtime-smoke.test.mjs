@@ -94,6 +94,8 @@ async function fakeWorkflowResult(options, root, source) {
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmOperationScopes, true);
   assert.equal(options.confirmSingleViewInference, true);
+  assert.ok(options.triposrLicenceReview);
+  assert.ok(options.rembgLicenceReview);
   assert.deepEqual(options.viewSourceIds, ["facade-photo"]);
   assert.equal(options.sources.length, 1);
   assert.equal(options.sources[0].sourceId, "facade-photo");
@@ -172,6 +174,8 @@ function makeOptions(root, source, overrides = {}) {
     sourceId: "facade-photo",
     sourceRelativePath: source.relativePath,
     licence: "CC BY 4.0",
+    triposrLicenceReview: "TripoSR code and checkpoint terms reviewed for test",
+    rembgLicenceReview: "Fixture rembg model licence terms reviewed for test",
     runnerScript: path.join(root, "triposr", "run.py"),
     pythonPath: "python-fixture",
     device: "cpu",
@@ -265,6 +269,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(saved.status, "passed");
   assert.equal(saved.output.sha256, result.report.output.sha256);
   assert.equal(saved.model.licenceReview, "operator-attested-not-independently-verified");
+  assert.equal(saved.model.triposrLicenceReview, "TripoSR code and checkpoint terms reviewed for test");
+  assert.equal(saved.model.rembgLicenceReview, "Fixture rembg model licence terms reviewed for test");
   assert.equal(saved.source.licence, "CC BY 4.0");
   assert.deepEqual(saved.source.permittedOperations, ["private-media-ingestion", "single-image-ai-reconstruction"]);
   assert.equal(saved.source.operationScopeAttestation, "operator-attested-not-independently-verified");
@@ -388,6 +394,14 @@ test("requires four independent operator confirmations", async (t) => {
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source, { confirmModelLicences: false })),
     /confirmModelLicences/,
+  );
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, { triposrLicenceReview: "" })),
+    /TripoSR code/checkpoint licence review/,
+  );
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source, { rembgLicenceReview: "" })),
+    /rembg model-weight licence review/,
   );
 });
 
