@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildMapGenerationBuildingSpec,
   buildMapGenerationJobInput,
+  getMapGenerationOperationScopes,
 } from "../src/core/building-generation/generation-map-intake.mjs";
 
 const baseBuilding = {
@@ -19,12 +20,13 @@ const baseBuilding = {
   headingDegrees: 25,
 };
 
-function source(sourceId, relativePath = ".building-engine/media/b1/assets/a.jpg") {
+function source(sourceId, relativePath = ".building-engine/media/b1/assets/a.jpg", strategy = "procedural") {
   return {
     sourceId,
     relativePath,
     kind: "image",
     licence: "CC BY 4.0",
+    permittedOperations: getMapGenerationOperationScopes(strategy),
   };
 }
 
@@ -54,7 +56,7 @@ test("builds a procedural job while making source rights confirmation explicit",
     buildingSpec,
     strategy: "procedural",
     uploadedSources: [source("front-photo")],
-    confirmRights: true,
+    confirmRights: true, confirmOperationScopes: true,
   });
   assert.equal(request.strategy, "procedural");
   assert.equal(request.sources[0].relativePath, ".building-engine/media/b1/assets/a.jpg");
@@ -64,17 +66,20 @@ test("builds a procedural job while making source rights confirmation explicit",
 
 test("requires exactly one selected view and opt-in for single-image inference", () => {
   const buildingSpec = buildMapGenerationBuildingSpec(baseBuilding);
-  const uploadedSources = [source("front-photo"), source("side-photo", ".building-engine/media/b1/assets/b.jpg")];
+  const uploadedSources = [
+    source("front-photo", ".building-engine/media/b1/assets/a.jpg", "single-image-ai"),
+    source("side-photo", ".building-engine/media/b1/assets/b.jpg", "single-image-ai"),
+  ];
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front-photo"], confirmSingleViewInference: false,
   }), /explicit single-view inference/);
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front-photo", "side-photo"], confirmSingleViewInference: true,
   }), /exactly one selected image/);
   const request = buildMapGenerationJobInput({
-    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "single-image-ai", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front-photo"], confirmSingleViewInference: true,
   });
   assert.deepEqual(request.viewSourceIds, ["front-photo"]);
@@ -84,22 +89,22 @@ test("requires exactly one selected view and opt-in for single-image inference",
 test("requires three views and all operator attestations for photogrammetry", () => {
   const buildingSpec = buildMapGenerationBuildingSpec(baseBuilding);
   const uploadedSources = [
-    source("front", ".building-engine/media/b1/assets/front.jpg"),
-    source("left", ".building-engine/media/b1/assets/left.jpg"),
-    source("right", ".building-engine/media/b1/assets/right.jpg"),
+    source("front", ".building-engine/media/b1/assets/front.jpg", "photogrammetry"),
+    source("left", ".building-engine/media/b1/assets/left.jpg", "photogrammetry"),
+    source("right", ".building-engine/media/b1/assets/right.jpg", "photogrammetry"),
   ];
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front", "left"],
     confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true, upAxis: "Y",
   }), /at least three selected images/);
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front", "left", "right"],
     confirmSameBuilding: true, confirmOverlapReviewed: false, confirmUpAxisReviewed: true, upAxis: "Y",
   }), /explicit same-building, overlap and up-axis/);
   const request = buildMapGenerationJobInput({
-    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true,
+    buildingSpec, strategy: "photogrammetry", uploadedSources, confirmRights: true, confirmOperationScopes: true,
     selectedViewSourceIds: ["front", "left", "right"],
     confirmSameBuilding: true, confirmOverlapReviewed: true, confirmUpAxisReviewed: true, upAxis: "Y",
   });
@@ -113,12 +118,35 @@ test("rejects unverified licence, unsafe paths, duplicate source IDs and missing
     buildingSpec, strategy: "procedural", uploadedSources: [source("front-photo")], confirmRights: false,
   }), /Confirm source rights/);
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "procedural", uploadedSources: [{ ...source("front-photo"), licence: "unknown" }], confirmRights: true,
+    buildingSpec, strategy: "procedural", uploadedSources: [{ ...source("front-photo"), licence: "unknown" }], confirmRights: true, confirmOperationScopes: true,
   }), /known licence/);
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "procedural", uploadedSources: [source("front-photo", "../escape.jpg")], confirmRights: true,
+    buildingSpec, strategy: "procedural", uploadedSources: [source("front-photo", "../escape.jpg")], confirmRights: true, confirmOperationScopes: true,
   }), /unsafe workspace-relative path/);
   assert.throws(() => buildMapGenerationJobInput({
-    buildingSpec, strategy: "procedural", uploadedSources: [source("front-photo"), source("front-photo")], confirmRights: true,
+    buildingSpec, strategy: "procedural", uploadedSources: [source("front-photo"), source("front-photo")], confirmRights: true, confirmOperationScopes: true,
   }), /unique/);
+});
+
+
+test("requires a distinct operator attestation for operation scopes, not only reuse rights", () => {
+  const buildingSpec = buildMapGenerationBuildingSpec(baseBuilding);
+  assert.throws(() => buildMapGenerationJobInput({
+    buildingSpec,
+    strategy: "procedural",
+    uploadedSources: [source("front-photo")],
+    confirmRights: true,
+    confirmOperationScopes: false,
+  }), /permits the selected generation operation/);
+  const request = buildMapGenerationJobInput({
+    buildingSpec,
+    strategy: "procedural",
+    uploadedSources: [source("front-photo")],
+    confirmRights: true,
+    confirmOperationScopes: true,
+  });
+  assert.deepEqual(request.sources[0].permittedOperations, [
+    "private-media-ingestion",
+    "procedural-model-derivation",
+  ]);
 });
