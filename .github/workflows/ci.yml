@@ -109,6 +109,7 @@ on:
       - feat/brf46-source-operation-scope-gate
       - feat/d3m01c-candidate-evidence-handoff-20261030
       - development
+      - feat/d3m01d-authenticated-geometry-review-20261030
 
 permissions:
   contents: read
