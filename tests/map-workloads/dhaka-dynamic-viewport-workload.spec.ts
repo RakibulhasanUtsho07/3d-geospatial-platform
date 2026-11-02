@@ -58,7 +58,7 @@ type WorkloadProbeDiagnostics = {
 type WorkloadProbeWindow = Window & {
   __MAP_ENGINE_WORKLOAD_BENCHMARK__?: boolean;
   __MAP_ENGINE_WORKLOAD_DIAGNOSTICS__?: WorkloadProbeDiagnostics;
-  __MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?: Array<{ atMs: number; endpoint: string }>;
+  __P34_WORKLOAD_ABORT_EVENTS__?: Array<{ atMs: number; endpoint: string }>;
 };
 
 function wait(milliseconds: number): Promise<void> {
@@ -289,11 +289,11 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   await page.addInitScript(() => {
     const target = window as WorkloadProbeWindow;
     target.__MAP_ENGINE_WORKLOAD_BENCHMARK__ = true;
-    target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__ = [];
+    target.__P34_WORKLOAD_ABORT_EVENTS__ = [];
     window.addEventListener("map:viewport-request-aborted", (event: Event) => {
       const detail = (event as CustomEvent<{ atMs?: number; endpoint?: string | null }>).detail;
       if (typeof detail?.endpoint !== "string") return;
-      target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?.push({
+      target.__P34_WORKLOAD_ABORT_EVENTS__?.push({
         atMs: Number.isFinite(detail.atMs) ? detail.atMs as number : performance.now(),
         endpoint: detail.endpoint,
       });
@@ -471,7 +471,7 @@ test("stresses repeated map viewport changes, cancellation, staging and memory",
   const delayedAbortObserved = await page.waitForFunction(
     (url) => {
       const target = window as WorkloadProbeWindow;
-      return target.__MAP_ENGINE_WORKLOAD_ABORT_EVENTS__?.some((event) => event.endpoint === url) ?? false;
+      return target.__P34_WORKLOAD_ABORT_EVENTS__?.some((event) => event.endpoint === url) ?? false;
     },
     delayedBuildingRequest.url(),
     { timeout: CANCEL_RESPONSE_DELAY_MS - 500 },
