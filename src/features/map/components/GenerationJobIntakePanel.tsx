@@ -111,8 +111,9 @@ function workerLabel(status: WorkerStatus["availability"]): string {
 }
 
 /**
- * Map-side intake UI. The bearer token stays in React memory only; uploaded
- * media remains private and unreviewed until the existing review workflow.
+ * Map-side intake UI. The bearer token stays in React memory only. Uploads
+ * start unreviewed; a worker later records only the operator's explicit
+ * CLI attestation as pipeline usage approval, not independent rights review.
  */
 export default function GenerationJobIntakePanel() {
   const [expanded, setExpanded] = useState(false);
@@ -706,11 +707,11 @@ export default function GenerationJobIntakePanel() {
 
           <label className="flex items-start gap-2 text-xs leading-5 text-amber-100">
             <input type="checkbox" checked={confirmRights} onChange={(event) => setConfirmRights(event.target.checked)} className="mt-0.5" />
-            <span>I checked the source usage rights for every selected image. This is my attestation; upload records remain unreviewed until the rights-review workflow runs.</span>
+            <span>I attest that I checked the reuse rights for every selected image. When the worker processes this job, it records <code>usageStatus=approved</code> with <code>rightsReviewMethod=explicit-cli-attestation</code> from this attestation only. This is not independent legal verification or a separate reviewer approval.</span>
           </label>
           <label className="flex items-start gap-2 text-xs leading-5 text-amber-100">
             <input type="checkbox" checked={confirmOperationScopes} onChange={(event) => setConfirmOperationScopes(event.target.checked)} className="mt-0.5" />
-            <span>I explicitly authorize these operation scopes for every selected image: <strong>{getMapGenerationOperationScopes(strategy).join(", ")}</strong>. This permission is recorded in the job provenance and reviewed by the worker; it is separate from copyright/reuse rights.</span>
+            <span>I explicitly authorize these operation scopes for every selected image: <strong>{getMapGenerationOperationScopes(strategy).join(", ")}</strong>. The worker records these operator-supplied scopes in source/job provenance; it does not independently verify the source owner's permission. This is separate from copyright/reuse rights.</span>
           </label>
 
           {uploadProgress && <p role="status" className="text-xs text-cyan-100">{uploadProgress}</p>}

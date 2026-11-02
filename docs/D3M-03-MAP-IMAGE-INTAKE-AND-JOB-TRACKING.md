@@ -3,7 +3,7 @@
 **Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
 **Dependency:** [D3M-02 PR #302](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/302)  
 **Implementation branch:** `feat/d3m03-map-generation-intake-20261102`  
-**Status:** Implementation candidate; WebP compatibility and worker-readiness baseline passed exact-head Full CI on `51ea64e4cce35059af14bd33587cbf7965004a12`; model-cache readiness gate added afterward and awaits its own exact-head CI
+**Status:** Implementation candidate. Baseline exact-head Full CI passed 179/179 steps on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb` ([run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751)). Always verify the latest PR head has its own green checks; this CI does not prove that a configured TripoSR/COLMAP worker completed a real building reconstruction. PR #304 remains Draft and depends on D3M-02 PR #302.
 
 ## User flow
 
@@ -11,13 +11,13 @@
 2. Connect the operator session using the deployment's `GENERATION_OPERATOR_LOGIN_TOKEN`. The token is sent once to the same-origin session endpoint and cleared from the React component after success. The server returns a 30-minute `HttpOnly; SameSite=Strict` cookie, marked `Secure` in production and scoped to `/api/building-generation`.
 3. Enter the building ID/name, WGS84 center, reference height, footprint width/depth, floor count/floor height and footprint heading. These are explicit operator inputs. The UI converts a metric rectangle to a WGS84 GeoJSON polygon; it does not derive dimensions or coordinates from an image.
 4. Select up to 12 JPEG/PNG/WebP facade images (maximum 20 MiB each). Each file is sent sequentially to the existing `POST /api/building-generation/uploads` endpoint. The server checks the actual file signature, hashes and stores it under the private workspace. The UI uses the exact returned `source.relativePath` and source ID; it does not guess any content-addressed path. WebP is accepted by general intake/procedural use, but selected views for single-image AI and COLMAP photogrammetry must be JPEG/PNG; the UI and queue both reject WebP for those strategies before job creation.
-5. Enter a non-unknown licence/permission basis, optional author/attribution, and explicitly confirm rights. This checkbox is an operator attestation only. The source record remains `usageStatus=unreviewed` until the existing rights-review workflow records a decision.
+5. Enter a non-unknown licence/permission basis, optional author/attribution, and explicitly confirm rights. This checkbox is an operator attestation only. The upload response initially stores the source as `usageStatus=unreviewed`. When the worker later executes the media-ingestion stage, `reviewBuildingSource` records the operator's submitted basis as `usageStatus=approved` with `rightsReviewMethod=explicit-cli-attestation` and the selected operation scopes. This is a pipeline eligibility state based on the operator's attestation—not an independent copyright check, external legal clearance, or separate reviewer decision.
 6. Choose a generation strategy and explicitly authorize the required source-operation scopes (separate from copyright/reuse rights):
    - **Single-image AI:** `private-media-ingestion` plus `single-image-ai-reconstruction`; exactly one image plus explicit single-view inference confirmation. Hidden/rear geometry is inferred, not observed. The AI worker/runtime must be installed and configured.
    - **Multi-view photogrammetry:** `private-media-ingestion`, `photogrammetry-reconstruction` and `texture-baking`; at least three images plus same-building, overlap and up-axis confirmations. The COLMAP worker/runtime must be configured.
    - **Procedural:** `private-media-ingestion` plus `procedural-model-derivation`; creates a parameter-driven model from the dimensions/architecture input. It does **not** infer facade geometry from the uploaded images; the images are retained as private source records.
    
-   Both the rights attestation and operation-scope authorization are required. The helper and server queue record the exact least-privilege scope list for the chosen strategy; the worker's rights-review stage writes that reviewed scope into the source provenance.
+   Both operator attestations are required. The helper and server queue record the exact least-privilege scope list for the chosen strategy. During worker ingestion, the submitted licence and scopes are written to source provenance as an explicit CLI attestation; the worker does not independently review copyright or source-owner permission.
 7. Select **Upload images and create generation job**. After every upload succeeds, the UI sends the exact returned file paths to `POST /api/building-generation/jobs`. The existing durable queue performs its own path, file-size, licence, strategy and selected-view image-signature checks before creating the job.
 8. While the panel is open, worker health/readiness refreshes every 15 seconds; the active job status refreshes every 5 seconds. Job polling stops on completed or failed status. An existing job can be tracked by job ID while an operator session is active.
 9. A completed job is only a candidate. Inspect the GLB and QA report, record the separate review, and use D3M-02's publication panel only after review and explicit placement.
@@ -63,7 +63,7 @@ The UI consumes:
 
 A worker may run on a separate host, but it must access the exact same persistent private workspace. If it is offline or stale, a job remains queued; a queued response is not proof that reconstruction has begun. When a worker is online but a strategy is blocked, that job also stays queued without incrementing its attempt count until a compatible worker is available. The status panel displays the probe blockers.
 
-The UI does not display private filesystem paths, mark any job publication-ready, or auto-place a candidate into Cesium. D3M-02 remains the separate review-approved publication hand-off.
+The UI does not display private filesystem paths, mark any job publication-ready, or auto-place a candidate into Cesium. D3M-02 remains a separate job-level review and explicit publication hand-off. Its reviewer label/token is operator-supplied; it is not an identity-provider-verified reviewer identity. Neither source `usageStatus=approved` nor the later operator review alone proves independent legal rights or model accuracy.
 
 ## Verification
 

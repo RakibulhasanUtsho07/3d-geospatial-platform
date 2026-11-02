@@ -48,6 +48,9 @@ test("runs a complete local image intake → rights record → BuildingSpec sync
  assert.equal(manifest.mapReady,false);assert.equal(manifest.publicationEligible,false);
  assert.equal(spec.sources.find(source=>source.id==="front-photo").licence,"CC BY 4.0");
  assert.equal(spec.sources.find(source=>source.id==="front-photo").usageStatus,"approved");
+ const sourceRecord=JSON.parse(await readFile(path.join(root,".building-engine","media",fixture.id,"sources","front-photo.json"),"utf8"));
+ assert.equal(sourceRecord.usageStatus,"approved");
+ assert.equal(sourceRecord.rightsReviewMethod,"explicit-cli-attestation");
  assert.ok(manifest.modelReport.geometryQuality.counts.triangleCount>0);
  assert.equal(manifest.inputs.mediaRecords[0].sha256,spec.sources.find(source=>source.id==="front-photo").assetId);
  assert.ok((await stat(result.modelPath)).size>100);
