@@ -34,7 +34,7 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
       BUILDING_ENGINE_COLMAP_PATH: "colmap-fixture",
       BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runner,
       BUILDING_ENGINE_PYTHON_EXECUTABLE: "python-fixture",
-      BUILDING_ENGINE_DEVICE: "cpu",
+      BUILDING_ENGINE_DEVICE: "cuda:0",
     },
     spawnImpl: (executable, args) => { calls.push({ executable, args }); return fakeSuccessfulSpawn()(); },
     now: "2026-11-02T04:00:00.000Z",
@@ -44,7 +44,10 @@ test("probes COLMAP commands and TripoSR/PyTorch/device prerequisites", async (t
   assert.equal(result.strategies["single-image-ai"].status, "configured");
   assert.equal(result.strategies["single-image-ai"].modelWeights, "not-checked");
   assert.equal(calls.filter((entry) => entry.executable === "colmap-fixture").length, 4);
-  assert.equal(calls.some((entry) => entry.executable === "python-fixture" && entry.args[0] === "-c"), true);
+  const pythonProbe = calls.find((entry) => entry.executable === "python-fixture" && entry.args[0] === "-c");
+  assert.ok(pythonProbe);
+  assert.equal(pythonProbe.args[1].includes("\n"), true);
+  assert.equal(pythonProbe.args[1].includes("configured CUDA device unavailable"), true);
   assert.deepEqual(getClaimableGenerationStrategies(result), ["auto", "procedural", "photogrammetry", "single-image-ai"]);
 });
 
