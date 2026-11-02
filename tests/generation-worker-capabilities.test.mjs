@@ -75,7 +75,7 @@ test("single-image-only probe skips all COLMAP executable checks", async (t) => 
   const root = await mkdtemp(path.join(os.tmpdir(), "generation-capability-single-only-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const runner = path.join(root, "run.py");
-  await writeFile(runner, "raise RuntimeError('must only be syntax-compiled')\\n");
+  await writeFile(runner, "raise RuntimeError('must only be syntax-compiled')\n");
   const calls = [];
   const result = await probeGenerationWorkerCapabilities({
     env: {
@@ -87,7 +87,7 @@ test("single-image-only probe skips all COLMAP executable checks", async (t) => 
     spawnImpl: (executable, args) => {
       calls.push({ executable, args });
       return fakeSuccessfulSpawn(executable === "python-fixture"
-        ? "TRIPOSR_WEIGHTS_CACHED\\nREMBG_MODEL_NAME:bria-rmbg\\nREMBG_MODEL_WEIGHTS_CACHED"
+        ? "TRIPOSR_WEIGHTS_CACHED\nREMBG_MODEL_NAME:bria-rmbg\nREMBG_MODEL_WEIGHTS_CACHED"
         : "")();
     },
   });
