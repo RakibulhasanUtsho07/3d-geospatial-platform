@@ -50,7 +50,7 @@ type StrategyCapability = {
   status: "ready" | "configured" | "blocked";
   blockers: string[];
   caveats: string[];
-  modelWeights?: "not-checked" | "unknown";
+  modelWeights?: "cached" | "missing" | "not-checked" | "unknown";
 };
 
 type WorkerStatus = {
@@ -391,8 +391,12 @@ export default function GenerationJobIntakePanel() {
       return;
     }
     const strategyCapability = worker?.capabilities?.strategies[strategy];
-    if (worker?.availability === "online" && strategyCapability?.status === "blocked") {
-      setError("The active worker cannot run " + strategy + ": " + (strategyCapability.blockers.join(" ") || "runtime prerequisites are unavailable."));
+    if (worker?.availability === "online" && strategyCapability && strategyCapability.status !== "ready") {
+      const detail = strategyCapability.blockers.join(" ") ||
+        (strategy === "single-image-ai" && strategyCapability.modelWeights === "missing"
+          ? "TripoSR config.yaml and model.ckpt must be cached before this worker can claim single-image jobs."
+          : "Required runtime prerequisites are not ready.");
+      setError("The active worker cannot run " + strategy + ": " + detail);
       return;
     }
     if (!files.length) {
@@ -781,7 +785,11 @@ export default function GenerationJobIntakePanel() {
                       const capability = worker.capabilities?.strategies[key];
                       if (!capability) return null;
                       const label = key === "procedural" ? "Procedural" : key === "photogrammetry" ? "COLMAP photogrammetry" : "Single-image AI";
-                      const readiness = capability.status === "ready" ? "Ready" : capability.status === "configured" ? "Runtime configured" : "Blocked";
+                      const readiness = capability.status === "ready"
+                        ? "Ready"
+                        : capability.status === "configured" && capability.modelWeights === "missing"
+                          ? "Weights missing"
+                          : capability.status === "configured" ? "Runtime configured" : "Blocked";
                       return (
                         <div key={key} className="flex flex-wrap gap-x-2">
                           <span className="text-zinc-300">{label}:</span>
@@ -789,8 +797,11 @@ export default function GenerationJobIntakePanel() {
                           {capability.status === "blocked" && capability.blockers.length > 0 && (
                             <span className="basis-full text-zinc-500">{capability.blockers.join(" ")}</span>
                           )}
-                          {key === "single-image-ai" && capability.status === "configured" && (
-                            <span className="basis-full text-zinc-500">Pretrained weights/cache are not checked by this probe; checked when a job starts.</span>
+                          {key === "single-image-ai" && capability.modelWeights === "missing" && (
+                            <span className="basis-full text-amber-200">Cache the TripoSR config.yaml and model.ckpt files first. This worker will keep AI jobs queued until both are present.</span>
+                          )}
+                          {key === "single-image-ai" && capability.modelWeights === "not-checked" && (
+                            <span className="basis-full text-zinc-500">Legacy worker status has no model-cache result; restart the worker to refresh readiness.</span>
                           )}
                         </div>
                       );
