@@ -8,10 +8,11 @@ export async function runSingleImageWorkerPreflight({
   now = new Date(),
   commandTimeoutMs = 10_000,
 } = {}) {
-  const checkedAt = new Date(now).toISOString();
-  if (!Number.isFinite(Date.parse(checkedAt))) {
+  const timestamp = new Date(now);
+  if (!Number.isFinite(timestamp.getTime())) {
     throw new TypeError("now must be a valid timestamp.");
   }
+  const checkedAt = timestamp.toISOString();
   const capabilities = await probe({ env, now: checkedAt, commandTimeoutMs });
   const singleImage = capabilities?.strategies?.["single-image-ai"];
   const blockers = Array.isArray(singleImage?.blockers)
