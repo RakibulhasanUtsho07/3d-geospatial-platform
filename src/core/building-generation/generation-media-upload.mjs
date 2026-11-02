@@ -3,6 +3,7 @@ import { realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { ingestMediaFile } from "./media-intake.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 export const MAX_GENERATION_MEDIA_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
@@ -29,6 +30,12 @@ export async function ingestUploadedGenerationMedia(options) {
   const sourceId = safeId(options.sourceId, "sourceId");
   const kind = options.kind ?? "auto";
   if (!KINDS.has(kind)) throw new TypeError("kind must be auto, image, video or floor-plan.");
+  const permittedOperations = options.permittedOperations === undefined
+    ? undefined
+    : normalizeSourceOperationScopes(options.permittedOperations, "permittedOperations");
+  if (permittedOperations && !permittedOperations.includes("private-media-ingestion")) {
+    throw new TypeError("permittedOperations must explicitly allow private-media-ingestion.");
+  }
 
   const bytes = Buffer.isBuffer(options.bytes)
     ? options.bytes
@@ -61,6 +68,7 @@ export async function ingestUploadedGenerationMedia(options) {
       sourceUrl: options.sourceUrl,
       capturedAt: options.capturedAt,
       description: options.description,
+      ...(permittedOperations === undefined ? {} : { permittedOperations }),
     });
     return { record: result.record };
   } finally {
