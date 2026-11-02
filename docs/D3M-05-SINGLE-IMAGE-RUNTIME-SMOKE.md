@@ -9,7 +9,7 @@
 
 D3M-04 checks whether the configured worker can safely claim a single-image AI job. D3M-05 adds one explicit, operator-invoked inference smoke that traverses the same **runMediaToModelWorkflow** path as the durable queue worker.
 
-The command does not introduce a second TripoSR implementation, does not auto-download missing models, and does not publish the candidate to Cesium. It writes a private, hash-bound smoke report under:
+The command does not introduce a second TripoSR implementation, does not auto-download missing models, and does not publish the candidate to Cesium. It requires a fresh job ID and source ID; if the corresponding source record or workflow/TripoSR artifact directory already exists, it refuses to reuse that state so a smoke cannot silently pass from a cached prior inference. It writes a private, hash-bound smoke report under:
 
 ~~~text
 <workspaceRoot>/.building-engine/runtime-smokes/<jobId>.json
@@ -44,7 +44,7 @@ Use an isolated test building ID and a test image whose reuse rights permit this
 Example (PowerShell; replace every placeholder with a real value from the worker host):
 
 ~~~powershell
-npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-single-view-inference --confirm-model-licences
+npm run smoke:single-image-runtime -- "D:\BuildingEngineWorkspace" "D:\BuildingEngineWorkspace\smoke-building-spec.json" "smoke-dhaka-front-20261102" "smoke-dhaka-front-image-20261102" "uploads/smoke-dhaka-front.jpg" --licence "Owner permission recorded in test intake" --runner-script "D:\AI\TripoSR\run.py" --python "D:\AI\TripoSR\.venv\Scripts\python.exe" --device cuda:0 --resolution 256 --timeout-ms 1800000 --confirm-source-rights --confirm-operation-scopes --confirm-single-view-inference --confirm-model-licences
 ~~~
 
 The example runner path is illustrative; ensure the actual file path is correct. Use a new smoke jobId for every run. Evidence files are immutable and an existing report is not overwritten.
@@ -64,7 +64,7 @@ Exit codes:
 - This is application-level Python socket blocking, **not** operating-system or kernel network isolation. Run the smoke on a host/network policy that already prevents outbound access when strict isolation is required. The report explicitly records that boundary.
 - The readiness preflight uses local-only model-cache resolution. It does not instantiate a rembg session or request weights.
 - Source and model artifacts remain inside the private workflow directory. The smoke report contains only relative paths, safe model identifiers, source/output hashes, byte counts, the selected device and sanitized QA summary. It does not copy cache paths, API secrets, or raw subprocess output into the smoke evidence.
-- The source-rights and model-licence confirmations are operator attestations, not independent legal verification.
+- The source-rights, operation-scope and model-licence confirmations are separate operator attestations, not independent legal verification.
 
 ## Output review checklist
 
@@ -94,7 +94,7 @@ After the smoke process exits, re-open the on-disk evidence with the separate ve
 npm run verify:single-image-runtime-smoke -- "D:\BuildingEngineWorkspace" "smoke-dhaka-front-20261102"
 ~~~
 
-The verifier independently reads the report, rejects symlinked/out-of-workspace paths, re-hashes the source and GLB, verifies byte counts and GLB 2.0 mesh structure, and checks that the report's readiness and release flags remain fail-closed. It detects accidental source/output changes after the smoke. This is artifact-integrity verification, not a digital signature: it does not independently prove the source licence, model-weight licence, report author, physical building identity or architectural accuracy.
+The verifier independently reads the report, rejects symlinked/out-of-workspace paths, re-hashes the source and GLB, verifies byte counts and GLB 2.0 mesh structure, and checks that the report's readiness, separate operation-scope attestation and release flags remain fail-closed. It detects accidental source/output changes after the smoke. This is artifact-integrity verification, not a digital signature: it does not independently prove the source licence, model-weight licence, report author, physical building identity or architectural accuracy.
 
 ## Automated test scope
 
