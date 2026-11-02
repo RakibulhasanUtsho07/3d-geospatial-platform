@@ -18,12 +18,22 @@ function runProbe(executable, args, { cwd, timeoutMs = 10_000, spawnImpl = nodeS
     };
     child.stdout?.on("data", (chunk) => { stdout = (stdout + chunk.toString()).slice(-3000); });
     child.stderr?.on("data", (chunk) => { stderr = (stderr + chunk.toString()).slice(-3000); });
-    child.once("error", () => finish({ ok: false, reason: "spawn-error" }));
-    child.once("close", (code, signal) => finish({ ok: code === 0, code, signal: signal ?? null, reason: code === 0 ? null : "non-zero-exit" }));
+    child.once("error", () => {
+      if (settled && killTimer) clearTimeout(killTimer);
+      finish({ ok: false, reason: "spawn-error" });
+    });
+    child.once("close", (code, signal) => {
+      if (settled && killTimer) {
+        clearTimeout(killTimer);
+        return;
+      }
+      finish({ ok: code === 0, code, signal: signal ?? null, reason: code === 0 ? null : "non-zero-exit" });
+    });
     const timer = setTimeout(() => {
       try { child.kill("SIGTERM"); } catch {}
+      finish({ ok: false, reason: "timeout" });
       killTimer = setTimeout(() => { try { child.kill("SIGKILL"); } catch {} }, 1000);
-      killTimer.unref?.(); finish({ ok: false, reason: "timeout" });
+      killTimer.unref?.();
     }, timeoutMs);
     timer.unref?.();
   });
@@ -64,12 +74,19 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   if (!["cpu", "mps"].includes(device) && !/^cuda:\d+$/.test(device)) blockers.push("BUILDING_ENGINE_DEVICE must be cpu, mps or cuda:N.");
   if (runner && !blockers.length) {
     const script = [
-      "import runpy, sys", "import torch", "device = " + JSON.stringify(device),
+      "import os, runpy, sys", "import torch",
+      "from huggingface_hub import try_to_load_from_cache",
+      "device = " + JSON.stringify(device),
       "if device.startswith('cuda:'):", "    index = int(device.split(':', 1)[1])",
       "    if not torch.cuda.is_available() or index >= torch.cuda.device_count(): raise SystemExit('configured CUDA device unavailable')",
       "elif device == 'mps':",
       "    if not (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()): raise SystemExit('configured MPS device unavailable')",
       "elif device != 'cpu': raise SystemExit('unsupported compute device')",
+      "missing_weights = []",
+      "for model_file in ('config.yaml', 'model.ckpt'):",
+      "    cached_file = try_to_load_from_cache('stabilityai/TripoSR', model_file)",
+      "    if not isinstance(cached_file, str) or not os.path.isfile(cached_file): missing_weights.append(model_file)",
+      "print('TRIPOSR_WEIGHTS_CACHED' if not missing_weights else 'TRIPOSR_WEIGHTS_MISSING:' + ','.join(missing_weights), flush=True)",
       "sys.argv = [" + JSON.stringify(runner) + ", '--help']",
       "try:", "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
       "except SystemExit as error:", "    if error.code not in (None, 0): raise",
@@ -83,14 +100,25 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
           : "TripoSR runner imports, PyTorch, or configured compute device failed its readiness probe.");
     }
   }
+  const modelWeights = blockers.length || !result?.ok
+    ? "unknown"
+    : result.stdout.includes("TRIPOSR_WEIGHTS_CACHED")
+      ? "cached"
+      : "missing";
   return {
-    status: blockers.length ? "blocked" : "configured", blockers,
+    status: blockers.length ? "blocked" : modelWeights === "cached" ? "ready" : "configured",
+    blockers,
     caveats: [
       "Runner imports, PyTorch and configured device are checked without generating a model.",
-      "Pretrained model weights/cache and remote availability are not checked until a real job starts.",
+      modelWeights === "cached"
+        ? "The configured TripoSR config.yaml and model.ckpt files are present in the local Hugging Face cache."
+        : modelWeights === "missing"
+          ? "The configured TripoSR config.yaml and/or model.ckpt is not cached; this worker will not claim single-image jobs until both files are cached."
+          : "Model cache state could not be verified because the runtime probe did not complete.",
+      "The background-removal model/cache and actual end-to-end inference are still checked only when a real job starts.",
       "Single-image output remains an AI proposal and requires independent review.",
     ],
-    modelWeights: "not-checked",
+    modelWeights,
   };
 }
 
@@ -117,6 +145,7 @@ export function getClaimableGenerationStrategies(capabilities) {
   if (!capabilities || typeof capabilities !== "object" || !capabilities.strategies) return ["auto", "procedural"];
   const allowed = ["auto", "procedural"];
   if (capabilities.strategies.photogrammetry?.status === "ready") allowed.push("photogrammetry");
-  if (capabilities.strategies["single-image-ai"]?.status === "configured") allowed.push("single-image-ai");
+  if (capabilities.strategies["single-image-ai"]?.status === "ready" &&
+      capabilities.strategies["single-image-ai"]?.modelWeights === "cached") allowed.push("single-image-ai");
   return allowed;
 }
