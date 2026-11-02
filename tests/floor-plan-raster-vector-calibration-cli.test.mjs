@@ -7,6 +7,11 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { ingestMediaFile } from "../src/core/building-generation/media-intake.mjs";
+import {
+  createFloorPlanModelCandidate,
+  loadFloorPlanModelCandidate,
+} from "../src/core/building-generation/floor-plan-model-job.mjs";
 import { hashFloorPlanRasterProposalReport } from "../src/core/building-generation/floor-plan-raster-vector-calibration.mjs";
 
 function hash(bytes) {
@@ -14,7 +19,7 @@ function hash(bytes) {
 }
 
 function inputs() {
-  const sourceBytes = Buffer.from("CLI verified source image bytes");
+  const sourceBytes = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Buffer.from("synthetic CLI source bytes")]);
   const points = [
     [[100, 100], [300, 100]],
     [[300, 100], [300, 300]],
@@ -116,6 +121,39 @@ test("CLI binds source bytes and writes private vector and audit JSON without ov
   assert.equal(candidateReport.output.sha256, audit.vector.generatedPreviewGlbSha256);
   assert.equal(candidateReport.input.sourceEvidenceVerified, true);
   assert.equal(candidateReport.geometry.openingCount, 2);
+
+  // Ingest the exact same source bytes, then exercise the existing private candidate service.
+  const ingested = await ingestMediaFile({
+    workspaceRoot: root,
+    sourcePath: path.basename(sourcePath),
+    buildingId: geometry.buildingId,
+    sourceId: geometry.source.sourceId,
+    kind: "floor-plan",
+    licence: "unknown",
+    usageStatus: "unreviewed",
+  });
+  assert.equal(ingested.record.sha256, geometry.source.sha256);
+  const storedCandidate = await createFloorPlanModelCandidate({ workspaceRoot: root, floorPlan: geometry });
+  assert.equal(storedCandidate.modelSha256, audit.vector.generatedPreviewGlbSha256);
+  assert.equal(storedCandidate.sourceSha256, ingested.record.sha256);
+  assert.equal(storedCandidate.report.input.sourceEvidenceVerified, true);
+  assert.equal(storedCandidate.report.input.sourceUsageStatus, "unreviewed");
+  assert.equal(storedCandidate.mapReady, false);
+  assert.equal(storedCandidate.publicationEligible, false);
+
+  const loadedCandidate = await loadFloorPlanModelCandidate({
+    workspaceRoot: root,
+    buildingId: geometry.buildingId,
+    candidateId: storedCandidate.candidateId,
+  });
+  assert.equal(loadedCandidate.modelSha256, audit.vector.generatedPreviewGlbSha256);
+  assert.equal(loadedCandidate.plan.walls[1].openings.length, 2);
+  assert.equal(loadedCandidate.report.input.verifiedSourceSha256, ingested.record.sha256);
+  const storedCandidateDir = path.join(
+    root, ".building-engine", "floor-plan-candidates", geometry.buildingId, storedCandidate.candidateId,
+  );
+  assert.equal((await stat(path.join(storedCandidateDir, "model.glb"))).mode & 0o777, 0o600);
+  assert.equal((await stat(storedCandidateDir)).mode & 0o077, 0);
 
   const secondRun = spawnSync(process.execPath, [scriptPath, proposalPath, reviewPath, sourcePath, geometryPath, auditPath], { encoding: "utf8" });
   assert.notEqual(secondRun.status, 0);

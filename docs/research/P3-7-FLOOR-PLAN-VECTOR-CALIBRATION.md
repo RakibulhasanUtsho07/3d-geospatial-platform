@@ -25,7 +25,18 @@ npm run calibrate:floor-plan-raster-vectors -- proposal-report.json review.json 
 
 npm run generate:floor-plan-model -- output-geometry.json private-candidate.glb original-floor-plan.png
 
-The last command is the subsequent local GLB candidate-generation step. It rechecks the original source hash and should produce the same GLB SHA-256 recorded by the calibration audit's in-memory preview. The dedicated CLI integration test verifies this round-trip, including a door and a window opening. Its own review/publication flow remains separate and fail-closed; no map asset is written. Use the same original source raster for hash verification. Output JSON files must not already exist.
+The last command is a local GLB preflight/candidate file, not a persistent map candidate. It rechecks the original source hash and should produce the same GLB SHA-256 recorded by the calibration audit's in-memory preview. The dedicated CLI integration test verifies this round-trip, including door/window geometry, then ingests the same source bytes through the existing media-intake service, creates a private floor-plan candidate through `createFloorPlanModelCandidate`, reloads it through the integrity-checking reader, and confirms the stored GLB hash is still identical. No map asset is written. Use the same original source raster for hash verification. Output JSON files must not already exist.
+
+## Persistent private candidate handoff
+
+The local editor intentionally makes no API requests and downloads only the review JSON. The following authenticated server handoff is separate from the browser review step:
+
+1. Configure `BUILDING_ENGINE_WORKSPACE` and a `GENERATION_API_TOKEN` of at least 32 characters on the server.
+2. Upload the exact original raster/PDF with `POST /api/building-generation/uploads` as multipart form data (`file`, `buildingId`, `sourceId`, `kind=floor-plan`). Media intake records the exact bytes and returns the source SHA-256. The default reuse status is `unreviewed`.
+3. Ensure the calibrated geometry JSON's `source.sourceId` and `source.sha256` match that uploaded source record, then POST `{ "floorPlan": <geometry JSON> }` to `/api/building-generation/floor-plan-models` with `Authorization: Bearer <GENERATION_API_TOKEN>`. The service reopens and rehashes the private ingested source, requires `kind=floor-plan`, and stores the GLB, geometry and report in a private candidate directory. The response remains `candidate-requires-human-review`; map/publication flags stay false.
+4. Candidate review is a separate authenticated operation at `/api/building-generation/floor-plan-models/{buildingId}/{candidateId}/review`, using the separately configured `GENERATION_REVIEW_API_TOKEN`. Approval requires immutable QA/review evidence, verified source rights, explicit metric/geospatial checks and reviewer attestations. Review does not publish; the explicit publication command remains separate.
+
+The integration test validates the service-level source-ingestion-to-candidate handoff with synthetic bytes and verifies the saved model hash. It does not exercise deployment secrets, an HTTP upload against a live server, source permission review, human architectural review, or publication.
 
 ## Review JSON contract
 
