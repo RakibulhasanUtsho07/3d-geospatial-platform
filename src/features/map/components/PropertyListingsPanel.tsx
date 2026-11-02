@@ -191,7 +191,7 @@ export default function PropertyListingsPanel({
   const hasServiceResults = nearbyPlaces !== null;
 
   return (
-    <aside aria-label="Property listings" className="absolute left-4 right-4 top-[10rem] z-20 max-h-[calc(100%-11rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:top-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(370px,calc(100%-5.5rem))]">
+    <aside aria-label="Property listings" className="absolute left-4 right-4 top-[10rem] z-20 max-h-[calc(100vh-11rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl sm:left-auto sm:right-4 sm:top-4 sm:max-h-[calc(100%-2rem)] sm:w-[min(370px,calc(100%-5.5rem))]">
       <button type="button" aria-label="Property discovery options" aria-controls="property-listings-content" aria-expanded={expanded} onClick={() => setExpanded((previous) => !previous)} className="flex w-full items-center justify-between gap-3 border-b border-white/10 px-4 py-3 text-left transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
         <span>
           <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">Property discovery</span>
@@ -201,7 +201,7 @@ export default function PropertyListingsPanel({
       </button>
 
       {expanded && (
-        <div id="property-listings-content" className="max-h-[min(60vh,42rem)] overflow-y-auto sm:max-h-[calc(100vh-8rem)]">
+        <div id="property-listings-content" className="max-h-[calc(100vh-17rem)] overflow-y-auto sm:max-h-[calc(100vh-8rem)]">
           <form onSubmit={handleSearch} className="space-y-3 border-b border-white/10 p-3">
             <label className="block text-xs text-zinc-400">
               Search area or property
