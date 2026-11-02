@@ -298,3 +298,15 @@ Remaining:
 - Review #314; if accepted, merge it only into the D3M-01.A/B feature branch and run fresh CI, then recheck child stack ancestry and exact-head CI.
 - Keep PRs Draft until review. Do not promote development to main in this work item; their refs remain divergent (91 ahead / 6 behind).
 - Real worker-host inference, model/source rights, production credentials, independent survey truth, visual accuracy review and release readiness remain external blockers. No accuracy or map-ready claim is made and all release flags remain false.
+
+## 2026-11-02 — Final parent synchronization and numbering correction
+
+- D3M-05 → D3M-06 dependency sync PR #313 is merged as D3M-06 feature-branch commit 08344f681210da213261dfa7444b687dcb89796a. Its exact-head PR Full CI #41452436484 and Push CI #41452430526 both completed successfully.
+- D3M-06 → D3M-07 dependency sync PR #315 is merged as D3M-07 feature-branch commit f1991cea20b3533e407c7982edcda9690e485b53. Current parent-child comparison: 51 ahead / 0 behind. New D3M-07 exact-head PR #41453732972 and Push #41453723478 were pending before the final documentation refresh; rerun/inspect CI on the final SHA after the doc commits.
+- D3M-01 sync PR #314 remains Draft/open/mergeable. #281 is 36 ahead / 5 behind current development. Keep it unresolved until the development additions are reviewed, integrated only into the D3M-01 parent feature branch, and new exact-head tests pass.
+- D3M-02/#302, D3M-03/#304, D3M-04/#306, D3M-05/#308 and D3M-06/#310 each have PR + Push CI success on their current recorded code heads.
+- D3M-01.C–G (#284/#286/#288/#290/#292) have PR + Push CI success and 0-behind parent comparisons on their current recorded heads.
+
+Canonical D3M numbering: D3M-00 is the execution baseline / BRF-05/06 visual-review integration; D3M-01.A–G is the source-bound evidence and trusted-review chain; D3M-02 is approved-job map publication; D3M-03 is map-side intake/job tracking; D3M-04 is TripoSR/rembg cache readiness; D3M-05 is the offline real-inference smoke contract; D3M-06 binds reviewed placement; D3M-07 is the scoped non-inference worker preflight. Use this mapping in continuation work instead of the stale mapping from older plan text.
+
+Do not confuse CI success with deployment or accuracy acceptance. Real worker-host preflight/inference, source and model-weight permissions, production operator/publisher credentials, a production trusted reviewer registry, independent metric/survey/vertical-datum truth, human GLB review, and deployed map reload/rollback remain external gates. Keep all ground-truth, acceptance, publication, map-ready, automatic-approval and dispatch flags false.
