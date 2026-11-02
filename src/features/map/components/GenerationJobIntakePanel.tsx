@@ -236,6 +236,10 @@ export default function GenerationJobIntakePanel() {
     setFiles(selected);
     setConfirmRights(false);
     setConfirmOperationScopes(false);
+    setConfirmSingleViewInference(false);
+    setConfirmSameBuilding(false);
+    setConfirmOverlapReviewed(false);
+    setConfirmUpAxisReviewed(false);
     setMessage(selected.length + " image(s) selected. Rights and source identity still require operator review.");
   }
 
@@ -537,7 +541,7 @@ export default function GenerationJobIntakePanel() {
               <input type="number" step="any" min="-85" max="85" value={latitude} onChange={(event) => setLatitude(event.target.value)} required className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60" />
             </label>
             <label className="block text-xs font-medium text-zinc-300">
-              Reference height (m)
+              Reference height (m; datum unverified)
               <input type="number" step="any" value={referenceHeight} onChange={(event) => setReferenceHeight(event.target.value)} required className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60" />
             </label>
           </div>
@@ -589,7 +593,10 @@ export default function GenerationJobIntakePanel() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="block text-xs font-medium text-zinc-300">
               Licence / permission basis (applies to every selected image)
-              <input value={licence} onChange={(event) => setLicence(event.target.value)} required maxLength={300} placeholder="e.g. CC BY 4.0 / owner permission" className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60" />
+              <input value={licence} onChange={(event) => {
+                setLicence(event.target.value);
+                setConfirmRights(false);
+              }} required maxLength={300} placeholder="e.g. CC BY 4.0 / owner permission" className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60" />
             </label>
             <label className="block text-xs font-medium text-zinc-300">
               Author (optional)
@@ -607,6 +614,10 @@ export default function GenerationJobIntakePanel() {
             <select value={strategy} onChange={(event) => {
               setStrategy(event.target.value as Strategy);
               setConfirmOperationScopes(false);
+              setConfirmSingleViewInference(false);
+              setConfirmSameBuilding(false);
+              setConfirmOverlapReviewed(false);
+              setConfirmUpAxisReviewed(false);
             }} className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60">
               <option value="single-image-ai">Single-image AI reconstruction</option>
               <option value="photogrammetry">Multi-view photogrammetry (COLMAP)</option>
