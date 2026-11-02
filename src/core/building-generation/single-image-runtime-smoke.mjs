@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
-  link,
   lstat,
   mkdir,
+  mkdtemp,
   readFile,
   realpath,
   rename,
@@ -29,6 +29,16 @@ const OFFLINE_ENV = Object.freeze({
   HF_DATASETS_OFFLINE: "1",
   HF_HUB_DISABLE_TELEMETRY: "1",
 });
+const OFFLINE_SITE_CUSTOMIZE = [
+  "import socket",
+  "def _deny_runtime_network(*args, **kwargs):",
+  "    raise OSError('network access is disabled by the single-image runtime smoke')",
+  "socket.socket.connect = _deny_runtime_network",
+  "socket.socket.connect_ex = _deny_runtime_network",
+  "socket.socket.sendto = _deny_runtime_network",
+  "socket.create_connection = _deny_runtime_network",
+  "",
+].join("\\n");
 
 function safeId(value, label) {
   if (typeof value !== "string" || !SAFE_ID.test(value)) {
@@ -191,12 +201,16 @@ function qualitySummary(modelQuality) {
   };
 }
 
-function offlineSpawn(spawnImpl) {
+function offlineSpawn(spawnImpl, offlinePythonDirectory) {
+  const pythonPath = [offlinePythonDirectory, process.env.PYTHONPATH]
+    .filter(Boolean)
+    .join(path.delimiter);
   return (executable, args, options = {}) => spawnImpl(executable, args, {
     ...options,
     env: {
       ...process.env,
       ...(options.env ?? {}),
+      PYTHONPATH: pythonPath,
       ...OFFLINE_ENV,
     },
   });
@@ -272,7 +286,6 @@ export async function runSingleImageRuntimeSmoke(options) {
     "python";
   const runnerScript = path.resolve(options.runnerScript);
   const spawnImpl = options.spawnImpl ?? nodeSpawn;
-  const spawnOffline = offlineSpawn(spawnImpl);
   const env = {
     ...process.env,
     BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runnerScript,
@@ -329,10 +342,22 @@ export async function runSingleImageRuntimeSmoke(options) {
       huggingFaceOffline: true,
       transformersOffline: true,
       datasetsOffline: true,
-      hostNetworkIsolation: "not-enforced-by-this-command",
+      pythonSocketConnectionsBlocked: true,
+      kernelNetworkIsolation: "not-enforced-by-this-command",
     },
   };
-  await createInitialReport(reportPath, report);
+  const offlinePythonDirectory = await mkdtemp(path.join(process.env.TMPDIR || process.env.TEMP || process.cwd(), "single-image-offline-"));
+  try {
+    await writeFile(path.join(offlinePythonDirectory, "sitecustomize.py"), OFFLINE_SITE_CUSTOMIZE, {
+      flag: "wx",
+      mode: 0o600,
+    });
+    await createInitialReport(reportPath, report);
+  } catch (error) {
+    await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+  const spawnOffline = offlineSpawn(spawnImpl, offlinePythonDirectory);
 
   let workflowStarted = false;
   try {
@@ -490,5 +515,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     report.automaticApproval = false;
     await replaceReportAtomically(reportPath, report).catch(() => {});
     return { report, reportPath, exitCode: workflowStarted ? 1 : 2 };
+  } finally {
+    await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
   }
 }
