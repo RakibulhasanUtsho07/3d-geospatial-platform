@@ -127,7 +127,11 @@ function createWorkflowStubs(f, { geometryBlockers = [], geometryOutput = true }
           inputs: {
             mediaRecords: f.sources.map((source, index) => ({
               id: source.sourceId,
+              kind: "image",
               sha256: f.images[index].sha256,
+              licence: source.licence,
+              usageStatus: "approved",
+              permittedOperations: source.permittedOperations,
             })),
             selectedViewIds: f.sources.map((source) => source.sourceId),
           },
