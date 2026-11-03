@@ -211,6 +211,9 @@ jobs:
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
 
+      - name: Test generic render review profile schema
+        run: npm run test:render-review-profile
+
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
