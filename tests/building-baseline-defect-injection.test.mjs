@@ -35,6 +35,12 @@ function controlledBaselinePasses(glb) {
     qa.counts.meshCount === baseline.geometryExpectations.meshCount &&
     qa.counts.triangleCount === baseline.geometryExpectations.triangleCount &&
     qa.counts.degenerateTriangleCount === baseline.geometryExpectations.degenerateTriangleCount &&
+    qa.meshDetails.every(({ topology }) =>
+      topology?.topologyAnalyzed === baseline.geometryExpectations.topology.topologyAnalyzed &&
+      topology.connectedComponentCount === baseline.geometryExpectations.topology.connectedComponentCount &&
+      topology.boundaryEdgeCount === baseline.geometryExpectations.topology.boundaryEdgeCount &&
+      topology.nonManifoldEdgeCount === baseline.geometryExpectations.topology.nonManifoldEdgeCount
+    ) &&
     dimensions.status === "dimension-check-passed-review-required";
 }
 
