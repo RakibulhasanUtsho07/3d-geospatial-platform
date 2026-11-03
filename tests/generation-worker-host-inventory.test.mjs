@@ -50,6 +50,11 @@ function pythonResult(overrides = {}) {
       },
       onnxProviders: ["CUDAExecutionProvider", "CPUExecutionProvider"],
       rembgDefaultModel: "isnet-general-use",
+      modelArtifacts: {
+        tripoConfig: { status: "cached", bytes: 512, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        tripoCheckpoint: { status: "cached", bytes: 480000000, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        rembgWeights: { status: "cached", bytes: 176000000 },
+      },
       runnerSyntaxCompiled: true,
       runnerSha256Matches: true,
       probeErrors: [],
@@ -101,6 +106,9 @@ test("collects a ready redacted host inventory with runtime, GPU, cache and runn
   assert.equal(report.runner.status, "present");
   assert.match(report.runner.sha256, /^[a-f0-9]{64}$/);
   assert.equal(report.modelReadiness.backgroundRemovalModel, "isnet-general-use");
+  assert.equal(report.modelArtifacts.tripoCheckpoint.snapshotRevision, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  assert.equal(report.modelArtifacts.tripoCheckpoint.bytes, 480000000);
+  assert.equal(report.modelArtifacts.rembgWeights.status, "cached");
   assert.deepEqual(capabilityArgs.strategies, ["single-image-ai"]);
   assert.equal(spawn[1][0], "-c");
   assert.equal(spawn[1][3], report.runner.sha256);
@@ -226,6 +234,11 @@ test("records a partial inventory when optional packages or acceleration provide
       accelerators: { cudaAvailable: false, cudaRuntime: null, hipRuntime: null, cudaDevices: [], mpsAvailable: false },
       onnxProviders: [],
       rembgDefaultModel: null,
+      modelArtifacts: {
+        tripoConfig: { status: "cached", bytes: 512, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        tripoCheckpoint: { status: "cached", bytes: 480000000, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        rembgWeights: { status: "missing", bytes: null },
+      },
       runnerSyntaxCompiled: true,
       runnerSha256Matches: true,
       probeErrors: ["onnxruntime-import-or-provider-probe-failed", "rembg-import-or-default-model-probe-failed"],
