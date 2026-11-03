@@ -137,6 +137,10 @@ export function normalizeBuildingSpec(raw) {
   }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
+  const windowShape = windows.shape === undefined ? "rectangular" : str(windows.shape, "windows.shape", 20).toLowerCase();
+  if (!["rectangular", "arched"].includes(windowShape)) throw new TypeError("windows.shape must be rectangular or arched");
+  const doorShape = a.doorShape === undefined ? "rectangular" : str(a.doorShape, "doorShape", 20).toLowerCase();
+  if (!["rectangular", "arched"].includes(doorShape)) throw new TypeError("doorShape must be rectangular or arched");
   const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
   const domeAnchor = dome.anchor === undefined ? "front-facade-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
   if (!["front-facade-inset", "footprint-bounds-center"].includes(domeAnchor)) {
@@ -160,6 +164,7 @@ export function normalizeBuildingSpec(raw) {
     concreteColor: hex(a.concreteColor, "#B8B7B1", "concreteColor"),
     doorColor: hex(a.doorColor, "#76533A", "doorColor"),
     includeDoor: bool(a.includeDoor, true, "includeDoor"),
+    doorShape,
     balcony: {
       enabled: bool(balcony.enabled, true, "balcony.enabled"),
       everyFloors: balcony.everyFloors === undefined ? 2 : num(balcony.everyFloors, "balcony.everyFloors", 1, 20),
@@ -168,6 +173,7 @@ export function normalizeBuildingSpec(raw) {
     },
     windows: {
       enabled: bool(windows.enabled, true, "windows.enabled"),
+      shape: windowShape,
       widthM: windows.widthM === undefined ? 1.15 : num(windows.widthM, "windows.widthM", 0.4, 3),
       heightM: windows.heightM === undefined ? 1.25 : num(windows.heightM, "windows.heightM", 0.4, 3)
     },
