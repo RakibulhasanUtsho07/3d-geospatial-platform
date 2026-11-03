@@ -18,8 +18,12 @@ test("maps geographic east/north coordinates into the right-handed glTF east/up/
   const north = coordinateToLocalMeters([origin.longitude, origin.latitude + 0.0001], origin);
   assert.ok(east.x > 0 && Math.abs(east.z) < 1e-9, "longitude east maps to +X");
   assert.ok(north.z < 0 && Math.abs(north.x) < 1e-9, "latitude north maps to -Z");
-  const xCrossY = [1, 0, 0].map((_, i) => i === 2 ? 1 : 0);
-  assert.deepEqual(xCrossY, [0, 0, 1], "+X east crossed with +Y up points to +Z south");
+  const cross = (a, b) => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+  assert.deepEqual(cross([1, 0, 0], [0, 1, 0]), [0, 0, 1], "+X east crossed with +Y up points to +Z south");
 });
 
 test("normalizes BuildingSpec and derives metric footprint while retaining evidence",()=>{
