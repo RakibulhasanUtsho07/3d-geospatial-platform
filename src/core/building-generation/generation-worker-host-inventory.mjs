@@ -184,6 +184,7 @@ function parsePythonInventory(result) {
       onnxProviders: [],
       rembgDefaultModel: null,
       runnerSyntaxCompiled: false,
+      runnerSha256Matches: false,
       blockers: ["python-runtime-inventory-output-exceeded-limit"],
     };
   }
@@ -215,7 +216,7 @@ function parsePythonInventory(result) {
       typeof data.runnerSha256Matches === "boolean";
     if (!coreValid) throw new TypeError("malformed Python inventory core");
     return {
-      status: probeErrors.length === 0 && data.runnerSyntaxCompiled ? "ready" : "partial",
+      status: probeErrors.length === 0 && data.runnerSyntaxCompiled && data.runnerSha256Matches ? "ready" : "partial",
       pythonVersion: safeText(data.pythonVersion, 40),
       pythonImplementation: safeText(data.pythonImplementation, 40),
       pythonPlatform: safeText(data.pythonPlatform, 80),
@@ -246,6 +247,7 @@ function parsePythonInventory(result) {
       onnxProviders: [],
       rembgDefaultModel: null,
       runnerSyntaxCompiled: false,
+      runnerSha256Matches: false,
       blockers: ["python-runtime-inventory-result-malformed"],
     };
   }
@@ -336,7 +338,11 @@ export async function collectGenerationWorkerHostInventory({
       mpsAvailable: python.accelerators.mpsAvailable,
       onnxProviders: python.onnxProviders,
     },
-    runner: runner,
+    runner: {
+      ...runner,
+      syntaxCompiledInMemory: python.runnerSyntaxCompiled,
+      sha256MatchedInProbe: python.runnerSha256Matches,
+    },
     modelReadiness: {
       status: capabilities.status,
       strategyStatus: capabilities.strategyStatus,
