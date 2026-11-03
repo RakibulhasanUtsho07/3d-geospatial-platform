@@ -79,7 +79,7 @@ function encodeGlb(spec, geo, frontFacingAzimuthDegrees, frontAxisConfidence, fr
     const pa=accessor(pi,5126,g.positions.length/3,"VEC3",{min,max}),na=accessor(ni,5126,g.normals.length/3,"VEC3"),ia=accessor(ii,small?5123:5125,ivals.length,"SCALAR",{min:[lo],max:[hi]});
     meshes.push({name:spec.id+"-"+name,primitives:[{attributes:{POSITION:pa,NORMAL:na},indices:ia,material:indexOf.get(name),mode:4}]});nodes.push({name:spec.name+" - "+name,mesh:meshes.length-1});
   }
-  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,frontFacingAzimuthDegrees,frontAxisConfidence,frontAxisSource,coordinateFrame:"x-east,y-up,z-north"}}};
+  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,frontFacingAzimuthDegrees,frontAxisConfidence,frontAxisSource,coordinateFrame:"gltf-right-handed-x-east-y-up-z-south"}}};
   const jb=Buffer.from(JSON.stringify(gltf)), jp=(4-jb.length%4)%4, bp=(4-binary.length%4)%4;
   const json=Buffer.concat([jb,Buffer.alloc(jp,0x20)]), bin=bp?Buffer.concat([binary,Buffer.alloc(bp)]):binary, total=12+8+json.length+8+bin.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
@@ -102,7 +102,8 @@ export function generateProceduralGlb(rawSpec) {
   const requestedFrontAzimuth=spec.architecture.frontFacingAzimuthDegrees;
   const azimuthVector=requestedFrontAzimuth===null?null:{
     x:Math.sin(requestedFrontAzimuth*Math.PI/180),
-    z:Math.cos(requestedFrontAzimuth*Math.PI/180)
+    // In the right-handed glTF map frame, +Z is south and -Z is north.
+    z:-Math.cos(requestedFrontAzimuth*Math.PI/180)
   };
   let front;
   let facadeSelectionMethod;
@@ -144,7 +145,7 @@ export function generateProceduralGlb(rawSpec) {
     }
   }
   const frontEdge=edges[front];
-  const actualFrontAzimuthDegrees=(Math.atan2(frontEdge.out.x,frontEdge.out.z)*180/Math.PI+360)%360;
+  const actualFrontAzimuthDegrees=(Math.atan2(frontEdge.out.x,-frontEdge.out.z)*180/Math.PI+360)%360;
   const azimuthAlignment=azimuthVector===null?null:
     frontEdge.out.x*azimuthVector.x+frontEdge.out.z*azimuthVector.z;
   if(azimuthAlignment!==null&&azimuthAlignment<Math.cos(15*Math.PI/180)){
