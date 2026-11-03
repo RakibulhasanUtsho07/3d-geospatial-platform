@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "rangmahal-south-facade-review",
+  "excludeNodeNamePrefixes": ["Site_"],
+  "frontView": {
+    "includeNodeNames": [
+      "Rangmahal_GF",
+      "Rangmahal_FF",
+      "Portico_S",
+      "Portico_N",
+      "Stair_S",
+      "Veranda_S",
+      "Dome_Drum",
+      "Dome",
+      "Finial"
+    ],
+    "excludeNodeNames": ["RoofDeck"],
+    "elevationDegrees": 5,
+    "framingLabel": "rangmahal-south-facade-focused"
+  }
+}
