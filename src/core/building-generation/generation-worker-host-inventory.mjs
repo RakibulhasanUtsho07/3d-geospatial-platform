@@ -381,10 +381,10 @@ export async function collectGenerationWorkerHostInventory({
         backgroundRemovalWeights: "unknown",
         blockers: [capabilityProbeFailed
           ? "single-image-capability-probe-failed"
-          : "configured-tripiosr-runner-file-not-valid"],
+          : "configured-triposr-runner-file-not-valid"],
       };
   const blockers = [];
-  if (runner.status !== "present") blockers.push("configured-tripiosr-runner-file-not-valid");
+  if (runner.status !== "present") blockers.push("configured-triposr-runner-file-not-valid");
   if (python.status !== "ready") blockers.push("python-runtime-inventory-incomplete");
   if (capabilities.status !== "ready") blockers.push(...capabilities.blockers);
   const hostInfo = {
