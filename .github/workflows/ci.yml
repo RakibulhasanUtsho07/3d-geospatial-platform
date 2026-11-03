@@ -214,6 +214,12 @@ jobs:
       - name: Test generic render review profile schema
         run: npm run test:render-review-profile
 
+      - name: Test shared candidate evidence manifest and GLB provenance
+        run: npm run test:building-candidate-evidence-manifest
+
+      - name: Test controlled GLB baseline and defect injection
+        run: npm run test:building-baseline-defect-injection
+
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
 
