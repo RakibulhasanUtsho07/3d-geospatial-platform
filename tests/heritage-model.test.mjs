@@ -238,9 +238,9 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
   assert.match(renderer, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
-  assert.ok(renderer.includes('"top", (0.0, 1.0, 0.0)'), "top review camera follows the glTF Y-up axis");
-  assert.match(renderer, /camera_track_up_axis\(direction\.y\)/);
-  assert.ok(renderer.includes('camera_track_up_axis(direction.y)'), "top and side views select a stable camera roll axis");
+  assert.ok(renderer.includes('"top", (0.0, 0.0, 1.0)'), "top review camera follows Blender's Z-up axis");
+  assert.match(renderer, /camera_track_up_axis\(direction\)/g);
+  assert.ok(renderer.includes('camera_track_up_axis(direction)'), "top and side views select a stable camera roll axis");
   assert.ok(
     /if view_id == "front":[\s\S]*?if focus_rangmahal:[\s\S]*?if obj not in front_review_meshes:/.test(renderer),
     "Rangmahal node filtering must be restricted to the dedicated front-detail view",
