@@ -391,7 +391,9 @@ export async function collectGenerationWorkerHostInventory({
       };
   const blockers = [];
   if (runner.status !== "present") blockers.push("configured-triposr-runner-file-not-valid");
-  if (python.status !== "ready") blockers.push("python-runtime-inventory-incomplete");
+  if (python.status !== "ready") {
+    blockers.push(...python.blockers, "python-runtime-inventory-incomplete");
+  }
   if (capabilities.status !== "ready") blockers.push(...capabilities.blockers);
   const hostInfo = {
     platform: safeText(host.platform(), 40),
