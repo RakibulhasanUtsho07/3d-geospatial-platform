@@ -362,45 +362,47 @@ The comparison counts above describe divergent history from each merge base; the
 - Separate manual workflow_dispatch CI run #41604663810 and P3.6 browser run #41604666326 failed because the lifecycle evidence test accepted only `push` / `pull_request` even though the repository supports manual `workflow_dispatch`. The failure occurs at the event-name assertion, after the browser lifecycle report itself is produced. This is not a PR-triggered BRF-04 failure; the cross-event contract is tracked separately in PR #341.
 - PR #339 remains Draft/unmerged pending review. Its synthetic checks do not prove real-building fidelity or survey accuracy.
 
-### NEXT-03 — explicit facade selection and exterior insert placement
+### NEXT-03 — explicit facade selection, compass orientation and dome anchor
 
-- Current-main gap: `procedural-glb.mjs` always selected the longest footprint edge as the entrance, used a fixed exterior normal regardless of polygon winding, and placed window jambs along global X rather than the facade tangent.
-- Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Current-main gap: entrance selection fell back to the longest footprint edge; facade normals and insert positions needed winding-aware, facade-local coordinates. GLB/render-review had no shared model front-bearing contract. Central domes only supported front-inset placement.
+- Historical sources: facade-local insert-placement work in stale PR #103; compass front-bearing and dome-bounds-anchor changes in stale PR #185. Neither historic PR was merged.
+- Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, originally based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
 - Draft PR #340: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/340
-- Exact head: `9e2bb3bbba1fe5316429256c5a83101521928f52`; 7 commits ahead / 0 behind, 5 changed paths.
-- Adds validated `architecture.frontFacadeEdgeIndex`; if omitted, preserves longest-edge inference but records it as estimated and review-required.
-- Adds facade-local tangent/outward frame with winding-aware exterior normal; places panes, frames, door and jambs at a 2 mm inner-face clearance, with jamb offsets along facade tangent.
-- Selected front edge is used by front-specific procedural features and recorded in `facadeSelection` report.
-- Adds tests for rotated axes, insert clearance, normal and reversed GeoJSON winding, explicit facade edge, inferred fallback and invalid indexes; documents the BuildingSpec contract.
-- Exact-head Full CI run #41605913082 **passed**. Focused generator test, capture-manifest suite, generation queue/API suite and production-server viewport verification all passed.
-- PR #340 remains Draft pending code/geometry review. Synthetic regression tests do not establish real-building accuracy.
+- Current exact head: `39e32ef15ef0b296ebebac32f84e773af68ef726`; compare is 27 commits ahead / 0 behind, 11 changed paths. The commit count includes successive isolated file updates on this feature branch.
+- Adds validated, mutually exclusive `architecture.frontFacadeEdgeIndex` and `architecture.frontFacingAzimuthDegrees` selectors. Compass bearing is clockwise from north in `x=east,y=up,z=north`; nearest outward footprint edge is selected. A deviation greater than 15 degrees emits a warning and remains review-required.
+- Preserves explicit orientation confidence and source through generation report, GLB extras, Blender five-view camera selection and final render-review manifest. Conflicting evidence values downgrade confidence to `unknown` and require review.
+- Keeps winding-aware facade-local tangent/normal placement, 2 mm insert clearance and jamb tangent placement.
+- Adds central dome anchor policy: backward-compatible `front-inset` or `footprint-bounds-center`. Report includes model-space center and associated evidence confidence.
+- Bangabhaban's 180-degree south bearing and center-anchored dome are explicitly recorded as **estimated**, with source references. This is not a surveyed orientation or verified dome location.
+- Tests cover edge/azimuth conflict, invalid bearing/anchor, evidence conflict downgrade, GLB metadata, dome bounds center, render-manifest source/confidence and renderer legacy fallback.
+- The earlier facade-only exact-head CI #41605913082 passed, but later orientation/dome/render changes supersede that head.
+- Final exact-head CI #41608904987 was pending/queued at last refresh for current head `39e32ef...`. A renderer test assertion was updated afterward to reflect the tuple return from the bearing/confidence parser; that update triggered the current exact-head run #41608904987? Verify its head before counting any result. The latest exact head is `39e32ef...`; no Full CI pass is claimed for the expanded scope yet.
+- Keep PR #340 Draft until exact-head CI and all related focused renderer/generator tests pass; then complete geometry/code review. Do not merge automatically.
 
 ### NEXT-04 — workflow_dispatch evidence event provenance
 
-- Root cause: manual workflow dispatches were supported by the CI/P3.6 workflows, but `tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts` required manifest `eventName` to be only `push` or `pull_request`. Runs #41604663810 and #41604666326 failed at this exact assertion; their logs show the controller lifecycle report had been produced and other browser checks completed.
-- Clean branch: `fix/p36-workflow-dispatch-evidence-event-20261103`, based on current main.
+- Root cause: manual workflow dispatches were supported by CI/P3.6, but `tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts` required eventName to be only `push` or `pull_request`. Manual runs #41604663810 and #41604666326 failed at this assertion after the controller lifecycle report and browser scenarios had run.
+- Clean branch based on main: `fix/p36-workflow-dispatch-evidence-event-20261103`.
 - Draft PR #341: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/341
-- Head: `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. The manifest still records the actual `GITHUB_EVENT_NAME`; the test now accepts `workflow_dispatch` as a legitimate event while rejecting missing/unrecognized event names.
+- Head `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. Event manifest still records the actual `GITHUB_EVENT_NAME`; the test now accepts `workflow_dispatch` while rejecting missing/unknown events.
 - Exact-head Full CI #41606193975 **passed**.
-- P3.6 Dhaka multi-building workflow #41606193939 **passed** on the same exact head.
-- A separate manual workflow-dispatch rerun remains outstanding. The available GitHub connection can inspect Actions but cannot dispatch this workflow; an operator must perform that manual trigger to close the cross-event verification.
-- PR #341 remains Draft until manual workflow-dispatch verification and code review are complete.
+- P3.6 Dhaka multi-building workflow #41606193939 **passed** on the same head.
+- An operator-run manual `workflow_dispatch` retest remains outstanding. The current GitHub connection can inspect Actions but cannot invoke manual workflow dispatch. Do not call the manual trigger path verified until that rerun exists.
+- PR #341 remains Draft pending manual trigger verification and code review.
 
 ### NEXT-05 — raw video must not count as a facade capture without extracted frames
 
-- Current-main gap confirmed in `src/core/building-generation/building-capture-manifest.mjs`: capture coverage counted `video` records alongside `photo` and `video-frame`, even though a raw video file is not an independently inspectable still/frame for facade coverage.
-- Historical source: PR #189 proposed the same safeguard but was stacked on an old BRF-02 base and included a larger image-quality-preflight integration. Only the narrow video/frame evidence contract was ported.
-- Clean branch: `fix/capture-video-frame-evidence-coverage-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Current-main gap: `assessBuildingCaptureManifest` counted raw `video` records as capture views. A video file itself is not an independently inspectable still/frame for front/back/left/right view coverage.
+- Historical source: stale stacked PR #189 proposed a similar safeguard as part of a larger image-quality integration. Only the narrow video/frame relationship was ported.
+- Clean branch based on main: `fix/capture-video-frame-evidence-coverage-main-20261103`.
 - Draft PR #342: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/342
-- Exact head: `7559946227c4cf156b7faa81586e1a97a0cdfcbb`; 3 commits ahead / 0 behind, 3 changed paths.
-- Counts only capture `photo` and `video-frame` records toward facade coverage; raw videos are counted separately.
-- Requires each declared capture video to have at least one extracted `video-frame` linked by the same parent `sourceId`.
-- Adds explicit `video-frame-extraction` readiness check and two tests: raw video cannot fill a missing side; a linked extracted frame can.
-- Updates the capture-manifest documentation. Does not decode/extract video or claim frame quality.
-- Exact-head CI run #41607259442 is in progress; at last refresh it was at dependency installation, with no failed steps yet. Focused capture-manifest and full CI results are pending.
-- Keep PR #342 Draft until exact-head focused tests, lint, Full CI and evidence checks pass.
+- Exact head `7559946227c4cf156b7faa81586e1a97a0cdfcbb`; 3 commits ahead / 0 behind, 3 changed paths.
+- Only `photo` and `video-frame` records count toward view coverage; raw videos are counted separately. Every capture video needs at least one extracted-frame record linked by parent `sourceId`.
+- Added `video-frame-extraction` readiness check, tests for raw-video rejection and linked-frame acceptance, and documentation.
+- Exact-head Full CI #41607259442 **passed**, including the capture manifest regression step #30, renderer suite and production-server viewport verification.
+- PR #342 remains Draft pending code review. This schema does not decode or extract video and does not establish frame quality.
 
-**Immediate next action:** refresh PR #342 run #41607259442 and inspect its focused capture-manifest/CLI steps, full CI and logs. If it passes, review the raw-video/frame-link edge cases and keep Draft pending review. Separately obtain an operator-run `workflow_dispatch` retest for PR #341. Then continue the targeted PR #185–#189 audit only for unique, current-main-compatible work; do not merge historical stacked branches. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate either.
+**Immediate next action:** refresh PR #340 CI run #41608904987 and verify it matches the latest branch head `39e32ef...`; inspect focused generator, heritage, renderer and manifest steps plus Full CI terminal logs. If successful, inspect evidence/report output and keep PR #340 Draft pending review. Then continue the targeted PR #187 renderer-profile audit (it is absent from current main but changes the same Blender/render-manifest paths, so compare compatibility before porting). Separately seek an operator-run `workflow_dispatch` retest for PR #341. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate them.
 
 
 
