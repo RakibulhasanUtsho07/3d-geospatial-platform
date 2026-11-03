@@ -98,3 +98,11 @@ test("preserves legacy renderer defaults while applying explicit profiles only w
   assert.match(rendererSource, /excluded_prefixes = \["Site_"\]/);
   assert.match(rendererSource, /if focus_rangmahal:/);
 });
+
+test("finalizes the render manifest from the Blender profile evidence without undeclared metadata", async () => {
+  const wrapper = await readFile(new URL("../scripts/render-building-review-views.mjs", import.meta.url), "utf8");
+  const manifest = await readFile(new URL("../src/core/building-generation/render-review-manifest.mjs", import.meta.url), "utf8");
+  assert.match(wrapper, /raw\.reviewProfile\?\.sha256 !== reviewProfileAssessment\.sha256/);
+  assert.match(manifest, /reviewProfile: rawManifest\.reviewProfile/);
+  assert.doesNotMatch(wrapper, /renderProfileMetadata/);
+});
