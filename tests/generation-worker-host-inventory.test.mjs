@@ -227,6 +227,29 @@ test("fails closed with a redacted blocker when the authoritative capability pro
   assert.equal(JSON.stringify(report).includes("/private/worker/cache"), false);
 });
 
+test("blocks cached model artifacts with missing or invalid byte lengths", async (t) => {
+  const { runner } = await runnerFixture(t);
+  const inventory = JSON.parse(pythonResult().stdout);
+  inventory.modelArtifacts.tripoConfig.bytes = 0;
+  inventory.modelArtifacts.tripoCheckpoint.bytes = null;
+  inventory.modelArtifacts.rembgWeights.bytes = null;
+  const report = await collectGenerationWorkerHostInventory({
+    pythonPath: "python-fixture",
+    runnerScript: runner,
+    device: "cpu",
+    now: NOW,
+    spawnSyncImpl: () => ({ status: 0, stdout: JSON.stringify(inventory) }),
+    probeCapabilities: async () => capabilities(),
+    host: fakeHost(),
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("triposr-cache-artifact-size-invalid"));
+  assert.ok(report.blockers.includes("rembg-cache-artifact-size-invalid"));
+  assert.equal(report.modelArtifacts.tripoConfig.bytes, null);
+  assert.equal(report.modelArtifacts.tripoCheckpoint.bytes, null);
+  assert.equal(report.modelArtifacts.rembgWeights.bytes, null);
+});
+
 test("blocks malformed runtime inventory core records instead of reporting ready", async (t) => {
   const { runner } = await runnerFixture(t);
   const report = await collectGenerationWorkerHostInventory({
