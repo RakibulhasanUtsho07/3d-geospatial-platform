@@ -168,16 +168,18 @@ test("rejects symlinked runner files without launching Python", async (t) => {
   const link = path.join(root, "linked-run.py");
   await symlink(runner, link);
   let launched = false;
+  let capabilityProbeCalled = false;
   const report = await collectGenerationWorkerHostInventory({
     pythonPath: "python-fixture",
     runnerScript: link,
     device: "cpu",
     now: NOW,
     spawnSyncImpl: () => { launched = true; return pythonResult(); },
-    probeCapabilities: async () => capabilities(),
+    probeCapabilities: async () => { capabilityProbeCalled = true; return capabilities(); },
     host: fakeHost(),
   });
   assert.equal(launched, false);
+  assert.equal(capabilityProbeCalled, false);
   assert.equal(report.status, "blocked");
   assert.equal(report.runner.status, "invalid");
   assert.ok(report.blockers.includes("configured-tripiosr-runner-file-not-valid"));
