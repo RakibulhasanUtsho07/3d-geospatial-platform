@@ -86,6 +86,8 @@ test("terminates a stalled Blender process and never promotes its partial output
 test("reads and applies an explicit hash-pinned review profile", () => {
   assert.match(rendererSource, /def read_review_profile\(opts\):/);
   assert.match(rendererSource, /--review-profile-sha256/);
+  assert.match(rendererSource, /Explicit review profiles require a 64-character preflight SHA-256 digest/);
+  assert.match(rendererSource, /expected_hash != profile_hash/);
   assert.match(rendererSource, /missing_front_names/);
   assert.match(rendererSource, /front_profile\["elevationDegrees"\]/);
   assert.match(rendererSource, /"reviewProfile": review_profile_evidence/);
