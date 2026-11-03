@@ -44,7 +44,7 @@
     "build:heritage-model": "node scripts/build-ahsan-manzil-model.mjs",
     "test:generated-model-policy": "node --test tests/generated-model-policy.test.mjs",
     "test:generated-model-layer-boundary": "node --test tests/generated-model-layer-boundary.test.mjs",
-    "test:building-generation": "node --test tests/building-generation-engine.test.mjs",
+    "test:building-generation": "node --test tests/building-generation-engine.test.mjs tests/facade-wall-openings.test.mjs",
     "test:render-review-profile": "node --test tests/render-review-profile.test.mjs",
     "test:building-candidate-evidence-manifest": "node --test tests/building-candidate-evidence-manifest.test.mjs",
     "test:building-baseline-defect-injection": "node --test tests/building-baseline-defect-injection.test.mjs",
