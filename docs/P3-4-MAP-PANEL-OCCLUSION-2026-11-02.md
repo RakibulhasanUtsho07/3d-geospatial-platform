@@ -49,6 +49,13 @@ The feature remains Draft/unmerged. Automated diagnostics do not establish the a
 
 ## Current-main reconciliation — 2026-11-03
 
-The original source candidate remains PR #320 on historical base `development@f7b2a67...`. Its map-panel code is being carried to `main@3c929c88427fbcb1d40a22506f2f7a8e103d57af` on `integration/p34-main-port-20261103`, preserving D3M-01 and P3.6–P3.8 changes. The source head's Full CI #41580141385 passed 181/181. Its new screenshot artifact `13206560328` was inspected on desktop 1440×900 and mobile 390×844: the Cesium logo and attribution text remain visible and are not covered by the map docks.
+The original source candidate remains PR #320 on historical base `development@f7b2a67...`. Its map-panel code is being carried to `main@7b50e5750994c4b4c8063a39f2f8547c949368ed` on `integration/p34-main-refresh-20261103`, preserving D3M-01 and P3.6–P3.8 changes. The source head's Full CI #41580141385 passed 181/181. Its new screenshot artifact `13206560328` was inspected on desktop 1440×900 and mobile 390×844: the Cesium logo and attribution text remain visible and are not covered by the map docks.
 
 A fresh current-main Full CI, Push CI, and six-sample real-Dhaka browser baseline are still required on the port branch before merge. The six-sample baseline is the live-data acceptance evidence; the deterministic desktop/mobile fixture screenshots prove layout placement only. Keep the red imagery/overlay anomaly open until the producing layer/root cause is isolated and an equivalent live baseline passes human review.
+
+
+## Refreshed current-main candidate — 2026-11-03
+
+The P3.4 changes are now on `integration/p34-main-refresh-20261103`, based on current `main@7b50e5750994c4b4c8063a39f2f8547c949368ed` after BRF-48 and BRF-14 were promoted. It is 29 commits ahead and zero behind; the complete changed-file set is limited to P3.4 map UX, diagnostic, browser tests, real-Dhaka baseline workflow and documentation. BRF-48/BRF-14/P3.6–P3.8 source files are preserved.
+
+The refreshed branch requires new exact-head Full CI, Push CI and six-sample baseline; earlier P3.4 source-head runs are historical only. Keep this PR Draft until fresh validations and visual artifacts complete.
