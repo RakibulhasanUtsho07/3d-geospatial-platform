@@ -43,6 +43,7 @@ function createReport() {
     benchmark: "real-dhaka-map-performance-baseline",
     candidate: {
       gitCommitSha: commitSha,
+      gitWorkingTreeDirty: false,
       dataInputs: [
         { path: "data/overture/spatial-tiles/manifest.json", exists: true, bytes: 300, sha256: "d".repeat(64) },
         { path: "data/overture/dhaka-buildings-3d-pilot.geojson", exists: true, bytes: 400, sha256: "e".repeat(64) },
@@ -67,6 +68,16 @@ test("accepts six cold/warm samples with real building readiness, offline road r
     validateRealDhakaBaselineReport(report, { expectedCommitSha: commitSha, screenshotShaByPath: screenshotDigests(report) }),
     [],
   );
+});
+
+test("rejects a six-sample report captured from a dirty working tree", () => {
+  const report = createReport();
+  report.candidate.gitWorkingTreeDirty = true;
+  const errors = validateRealDhakaBaselineReport(report, {
+    expectedCommitSha: commitSha,
+    screenshotShaByPath: screenshotDigests(report),
+  });
+  assert.ok(errors.some((error) => /clean candidate working tree/.test(error)));
 });
 
 test("rejects a candidate report generated for another commit", () => {
