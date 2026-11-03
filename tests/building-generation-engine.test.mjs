@@ -39,3 +39,136 @@ test("labels media route candidates without claiming photogrammetry ran",()=>{
  assert.ok(result.report.warnings.some(w=>w.includes("does not run image understanding")));assert.ok(result.report.limitations.some(s=>s.includes("not a photogrammetry")));
 });
 test("is deterministic for a fixed BuildingSpec",()=>assert.deepEqual(generateBuildingModel(fixture).glb,generateBuildingModel(fixture).glb));
+
+import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "../src/core/building-generation/facade-placement.mjs";
+
+function extractMeshPositions(glb, suffix) {
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.subarray(20, 20 + jsonLength).toString("utf8").trim());
+  const binaryStart = 28 + jsonLength;
+  const mesh = gltf.meshes.find(item => item.name.endsWith(suffix));
+  assert.ok(mesh, "generated GLB includes " + suffix + " mesh");
+  const accessor = gltf.accessors[mesh.primitives[0].attributes.POSITION];
+  const view = gltf.bufferViews[accessor.bufferView];
+  const stride = view.byteStride || 12;
+  const start = binaryStart + (view.byteOffset || 0) + (accessor.byteOffset || 0);
+  return Array.from({ length: accessor.count }, (_, index) => {
+    const offset = start + index * stride;
+    return {
+      x: glb.readFloatLE(offset),
+      y: glb.readFloatLE(offset + 4),
+      z: glb.readFloatLE(offset + 8),
+    };
+  });
+}
+
+function edgeFrameFor(derived, edgeIndex) {
+  const p = derived.localFootprint[edgeIndex];
+  const n = derived.localFootprint[(edgeIndex + 1) % derived.localFootprint.length];
+  const signedArea = derived.localFootprint.reduce((sum, point, index) => {
+    const next = derived.localFootprint[(index + 1) % derived.localFootprint.length];
+    return sum + point.x * next.z - next.x * point.z;
+  }, 0) / 2;
+  return { p, ...createFacadeFrame(p, n, signedArea >= 0 ? 1 : -1) };
+}
+
+test("facade-local tangent and exterior normal stay orthogonal for rotated edges", () => {
+  for (const degrees of [0, 30, 45, 90, 180, 270]) {
+    const angle = degrees * Math.PI / 180;
+    const frame = createFacadeFrame({ x: 0, z: 0 }, { x: 10 * Math.cos(angle), z: 10 * Math.sin(angle) });
+    assert.ok(Math.abs(frame.len - 10) < 1e-9);
+    assert.ok(Math.abs(frame.tangent.x * frame.out.x + frame.tangent.z * frame.out.z) < 1e-9);
+    assert.ok(Math.abs(Math.hypot(frame.out.x, frame.out.z) - 1) < 1e-9);
+    const localXAxis = { x: Math.cos(frame.yaw), z: -Math.sin(frame.yaw) };
+    assert.ok(Math.abs(localXAxis.x - frame.tangent.x) < 1e-9);
+    assert.ok(Math.abs(localXAxis.z - frame.tangent.z) < 1e-9);
+    const anchor = { x: 2.1, z: -4.2 };
+    const moved = offsetFacadePoint(anchor, frame, 1.75, 0.12);
+    const dx = moved.x - anchor.x, dz = moved.z - anchor.z;
+    assert.ok(Math.abs(dx * frame.tangent.x + dz * frame.tangent.z - 1.75) < 1e-9);
+    assert.ok(Math.abs(dx * frame.out.x + dz * frame.out.z - 0.12) < 1e-9);
+  }
+});
+
+test("surface inserts place their inner face at the configured clearance", () => {
+  for (const [depth, clearance] of [[0.055, 0.002], [0.075, 0.002], [0.09, 0.003]]) {
+    assert.ok(Math.abs(surfaceInsertCenterOffset(depth, clearance) - depth / 2 - clearance) < 1e-12);
+  }
+  assert.throws(() => surfaceInsertCenterOffset(0.05, -0.001), /between 0 and 0.05/);
+  assert.throws(() => surfaceInsertCenterOffset(0, 0.002), /greater than zero/);
+});
+
+test("generated windows meet the exterior wall plane for either footprint winding", () => {
+  const original = fixture.footprint.coordinates[0].slice(0, -1);
+  const reversedOpen = [...original].reverse();
+  const reversed = [...reversedOpen, reversedOpen[0]];
+  const cases = [
+    [fixture, "normal winding"],
+    [{ ...fixture, footprint: { ...fixture.footprint, coordinates: [reversed] } }, "reversed winding"],
+  ];
+
+  for (const [spec, label] of cases) {
+    const built = generateProceduralGlb(spec);
+    const vertices = extractMeshPositions(built.glb, "-glass");
+    const { derived } = normalizeBuildingSpec(spec);
+    for (let edgeIndex = 0; edgeIndex < derived.localFootprint.length; edgeIndex++) {
+      const { p, len, tangent, out } = edgeFrameFor(derived, edgeIndex);
+      const distances = vertices.map(point => {
+        const dx = point.x - p.x, dz = point.z - p.z;
+        return {
+          along: dx * tangent.x + dz * tangent.z,
+          outward: dx * out.x + dz * out.z,
+        };
+      }).filter(value => value.along > 0.25 && value.along < len - 0.25 && value.outward > 0 && value.outward < 0.1)
+        .map(value => value.outward);
+      assert.ok(distances.length > 0, label + " contains glass on edge " + edgeIndex);
+      assert.ok(Math.abs(Math.min(...distances) - 0.002) < 0.0001, label + " glass inner face clearance on edge " + edgeIndex);
+      assert.ok(Math.abs(Math.max(...distances) - 0.057) < 0.0001, label + " glass outer face depth on edge " + edgeIndex);
+    }
+  }
+});
+
+test("explicit front facade selection drives the door and is reported", () => {
+  const explicitSpec = { ...fixture, architecture: { ...fixture.architecture, frontFacadeEdgeIndex: 1 } };
+  const explicit = generateProceduralGlb(explicitSpec);
+  assert.deepEqual(explicit.report.facadeSelection, {
+    method: "explicit-edge-index",
+    edgeIndex: 1,
+    confidence: "operator-specified",
+  });
+  assert.equal(explicit.normalizedSpec.architecture.frontFacadeEdgeIndex, 1);
+  const doorVertices = extractMeshPositions(explicit.glb, "-door");
+  const { derived } = normalizeBuildingSpec(explicitSpec);
+  const selected = edgeFrameFor(derived, 1);
+  const selectedDistances = doorVertices.map(point => {
+    const dx = point.x - selected.p.x, dz = point.z - selected.p.z;
+    return {
+      along: dx * selected.tangent.x + dz * selected.tangent.z,
+      outward: dx * selected.out.x + dz * selected.out.z,
+    };
+  }).filter(value => value.along > 0.1 && value.along < selected.len - 0.1 && value.outward > 0 && value.outward < 0.1)
+    .map(value => value.outward);
+  assert.ok(selectedDistances.length > 0, "door vertices are attached to the explicitly selected facade");
+  assert.ok(Math.abs(Math.min(...selectedDistances) - 0.002) < 0.0001, "door inner face has 2 mm clearance");
+  assert.ok(Math.abs(Math.max(...selectedDistances) - 0.072) < 0.0001, "door outer face matches its 70 mm depth");
+
+  const inferred = generateProceduralGlb(fixture);
+  assert.deepEqual(inferred.report.facadeSelection, {
+    method: "longest-edge-inferred",
+    edgeIndex: 0,
+    confidence: "estimated",
+  });
+  assert.ok(inferred.report.warnings.some(message => message.includes("Front facade was inferred")));
+  assert.equal(inferred.report.reviewRequired, true);
+});
+
+test("BuildingSpec rejects a facade edge index outside the footprint edges or non-integer values", () => {
+  assert.throws(
+    () => normalizeBuildingSpec({ ...fixture, architecture: { ...fixture.architecture, frontFacadeEdgeIndex: 4 } }),
+    /frontFacadeEdgeIndex must be between 0 and 3/,
+  );
+  assert.throws(
+    () => normalizeBuildingSpec({ ...fixture, architecture: { ...fixture.architecture, frontFacadeEdgeIndex: 1.5 } }),
+    /frontFacadeEdgeIndex must be an integer/,
+  );
+});
