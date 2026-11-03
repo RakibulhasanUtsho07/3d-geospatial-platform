@@ -144,6 +144,8 @@ export interface MapEngine {
   tiltDown(stepDegrees?: number): void;
 
   resetOrientation(): void;
+  /** Return to the initial Dhaka property-discovery camera without changing layers. */
+  resetHomeView(): void;
 
   getCapabilities(): MapEngineCapabilities;
 
