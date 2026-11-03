@@ -13,7 +13,7 @@ This inventory is a preflight aid. It does not replace the D3M-04 readiness gate
 From the repository root on the actual provisioned worker host:
 
 ~~~powershell
-npm run inventory:building-worker-host -- --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cuda:0
+node scripts/collect-generation-worker-host-inventory.mjs --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cuda:0
 ~~~
 
 Use \`--device cpu\` or \`--device mps\` when appropriate. The tool writes one sanitized JSON report to stdout. Save it only in the access-controlled private worker workspace; do not commit it or upload raw source/model artifacts to GitHub.
@@ -21,7 +21,7 @@ Use \`--device cpu\` or \`--device mps\` when appropriate. The tool writes one s
 To check syntax and usage without running a probe:
 
 ~~~powershell
-npm run inventory:building-worker-host -- --help
+node scripts/collect-generation-worker-host-inventory.mjs --help
 ~~~
 
 ## What the inventory records
