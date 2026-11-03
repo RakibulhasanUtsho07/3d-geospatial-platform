@@ -83,14 +83,20 @@ test("terminates a stalled Blender process and never promotes its partial output
 });
 
 
-test("uses the candidate GLB front bearing for orthographic views and preserves a legacy fallback", () => {
-  assert.match(rendererSource, /def read_front_facing_azimuth\(model_path\):/);
-  assert.match(rendererSource, /front_azimuth, front_axis_confidence = read_front_facing_azimuth\(model_path\)/);
-  assert.match(rendererSource, /front_axis_source = "renderer-default"/);
-  assert.match(rendererSource, /front_axis_source = "glb-extras\.frontFacingAzimuthDegrees"/);
-  assert.match(rendererSource, /sin_bearing \* math\.cos\(front_elevation\)/);
+test("uses the GLB Y-up camera basis for compass, canonical and turntable review views", () => {
+  assert.match(rendererSource, /DEFAULT_FRONT_BEARING_DEGREES = 180\.0/);
+  assert.match(rendererSource, /def camera_direction_from_bearing\(bearing_degrees, elevation_degrees=0\.0\):/);
+  assert.match(rendererSource, /math\.sin\(bearing\) \* horizontal,\s*math\.sin\(elevation\),\s*math\.cos\(bearing\) \* horizontal/);
+  assert.match(rendererSource, /def build_review_view_directions\(/);
+  assert.match(rendererSource, /"top", \(0\.0, 1\.0, 0\.0\)/);
+  assert.match(rendererSource, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
+  assert.match(rendererSource, /"frontCameraEffectiveBearingDegrees": effective_front_bearing/);
   assert.match(rendererSource, /"frontFacingAzimuthDegrees": front_azimuth/);
   assert.match(rendererSource, /"frontAxisConfidence": front_axis_confidence/);
   assert.match(rendererSource, /confidence = building.get\("frontAxisConfidence", "unknown"\)/);
   assert.match(rendererSource, /"frontAxisSource": front_axis_source/);
+  assert.doesNotMatch(rendererSource, /Vector\(\(0\.0, 0\.0, 1\.0\)\), "ORTHO"\)/);
+  assert.match(rendererSource, /Vector\(\(1\.4, 2\.2, -1\.8\)\)/);
+  assert.match(rendererSource, /Vector\(\(-1\.8, 1\.0, -0\.3\)\)/);
+  assert.match(rendererSource, /Vector\(\(0\.3, 1\.5, 1\.7\)\)/);
 });
