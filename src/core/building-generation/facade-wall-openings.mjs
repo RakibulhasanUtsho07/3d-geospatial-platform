@@ -57,14 +57,19 @@ function segmentsIntersect(a, b, c, d) {
     (Math.abs(cdB) <= EPSILON && pointOnSegment(b, c, d));
 }
 
-function ringsIntersect(first, second) {
+function ringBoundariesIntersect(first, second) {
   for (let a = 0; a < first.length; a++) {
     const a0 = first[a], a1 = first[(a + 1) % first.length];
     for (let b = 0; b < second.length; b++) {
       if (segmentsIntersect(a0, a1, second[b], second[(b + 1) % second.length])) return true;
     }
   }
-  return pointInRing(first[0], second) || pointInRing(second[0], first);
+  return false;
+}
+
+function ringsIntersect(first, second) {
+  return ringBoundariesIntersect(first, second) ||
+    pointInRing(first[0], second) || pointInRing(second[0], first);
 }
 
 function dedupeSorted(values) {
@@ -369,7 +374,8 @@ export function addExtrudedFacadeProfile(geo, {
     const outer = orientRing(profile, true);
     const normalizedHoles = holes.map((hole) => orientRing(hole, false));
     for (const hole of normalizedHoles) {
-      if (!pointInRing(hole[0], outer) || ringsIntersect(outer, hole)) {
+      if (hole.some((point) => !pointInRing(point, outer)) ||
+          ringBoundariesIntersect(outer, hole)) {
         throw new RangeError("facade profile hole must be fully inside its outer profile");
       }
     }
