@@ -83,15 +83,15 @@ test("terminates a stalled Blender process and never promotes its partial output
 });
 
 
-test("uses the GLB Y-up camera basis for compass, canonical and turntable review views", () => {
+test("converts right-handed glTF map bearings into Blender's Z-up camera frame", () => {
   assert.match(rendererSource, /DEFAULT_FRONT_BEARING_DEGREES = 180\.0/);
   assert.match(rendererSource, /def camera_direction_from_bearing\(bearing_degrees, elevation_degrees=0\.0\):/);
-  assert.match(rendererSource, /math\.sin\(bearing\) \* horizontal,\s*math\.sin\(elevation\),\s*math\.cos\(bearing\) \* horizontal/);
+  assert.match(rendererSource, /math\.sin\(bearing\) \* horizontal,\s*math\.cos\(bearing\) \* horizontal,\s*math\.sin\(elevation\)/);
   assert.match(rendererSource, /def build_review_view_directions\(/);
-  assert.match(rendererSource, /"top", \(0\.0, 1\.0, 0\.0\)/);
+  assert.match(rendererSource, /"top", \(0\.0, 0\.0, 1\.0\)/);
   assert.match(rendererSource, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
-  assert.match(rendererSource, /camera_track_up_axis\(direction\.y\)/);
-  assert.match(rendererSource, /to_track_quat\("-Z", camera_track_up_axis\(direction\.y\)\)/);
+  assert.match(rendererSource, /camera_track_up_axis\(direction\)/g);
+  assert.match(rendererSource, /to_track_quat\("-Z", camera_track_up_axis\(direction\)\)/);
   assert.match(rendererSource, /camera_track_up_axis\(direction\.y\)/);
 
   assert.match(rendererSource, /"frontCameraEffectiveBearingDegrees": effective_front_bearing/);
@@ -99,8 +99,8 @@ test("uses the GLB Y-up camera basis for compass, canonical and turntable review
   assert.match(rendererSource, /"frontAxisConfidence": front_axis_confidence/);
   assert.match(rendererSource, /confidence = building.get\("frontAxisConfidence", "unknown"\)/);
   assert.match(rendererSource, /"frontAxisSource": front_axis_source/);
-  assert.doesNotMatch(rendererSource, /Vector\(\(0\.0, 0\.0, 1\.0\)\), "ORTHO"\)/);
-  assert.match(rendererSource, /Vector\(\(1\.4, 2\.2, -1\.8\)\)/);
-  assert.match(rendererSource, /Vector\(\(-1\.8, 1\.0, -0\.3\)\)/);
-  assert.match(rendererSource, /Vector\(\(0\.3, 1\.5, 1\.7\)\)/);
+  assert.doesNotMatch(rendererSource, /Vector\(\(0\.0, 1\.0, 0\.0\)\), "ORTHO"\)/);
+  assert.match(rendererSource, /Vector\(\(1\.4, -1\.8, 2\.2\)\)/);
+  assert.match(rendererSource, /Vector\(\(-1\.8, -0\.3, 1\.0\)\)/);
+  assert.match(rendererSource, /Vector\(\(0\.3, 1\.7, 1\.5\)\)/);
 });
