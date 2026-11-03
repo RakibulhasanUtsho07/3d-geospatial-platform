@@ -401,6 +401,7 @@ def main():
                             math.sin(elevation)))
         views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
 
+    # Whole-model views restore it and retain the complete generated roof geometry.
     original_render_visibility = [(obj, obj.hide_render) for obj in meshes]
     raw_views = []
     for view_id, direction, camera_type in views:
