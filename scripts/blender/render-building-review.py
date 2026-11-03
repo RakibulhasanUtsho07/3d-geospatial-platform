@@ -385,12 +385,14 @@ def main():
     views = [
         # Five-degree south-elevation view reveals stair treads; RoofDeck is excluded
         # only from this facade-detail camera, while the other 12 views retain roof context.
-        ("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO"),
+        ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
         ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
         ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
         ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
     ]
+    if profile_explicit:
+        views[0] = ("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO")
     elevation = math.radians(22.0)
     for angle in range(0, 360, 45):
         azimuth = math.radians(angle)
