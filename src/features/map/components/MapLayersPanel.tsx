@@ -35,7 +35,7 @@ export default function MapLayersPanel({
   return (
     <aside
       aria-label="Map layers"
-      className="absolute bottom-4 left-4 z-20 w-[min(290px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 text-white shadow-2xl backdrop-blur-xl"
+      className="absolute bottom-[3.25rem] left-4 z-20 w-[min(290px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/90 text-white shadow-2xl backdrop-blur-xl"
     >
       <button
         type="button"
