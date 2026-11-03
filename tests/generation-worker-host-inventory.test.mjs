@@ -214,7 +214,7 @@ test("rejects invalid timestamps and unsupported devices", async (t) => {
   const { runner } = await runnerFixture(t);
   await assert.rejects(
     collectGenerationWorkerHostInventory({
-      pythonPath: "python-fixture", runnerScript: runner, device: "cuda", now: "bad-date",
+      pythonPath: "python-fixture", runnerScript: runner, device: "cpu", now: "bad-date",
       spawnSyncImpl: () => pythonResult(), probeCapabilities: async () => capabilities(), host: fakeHost(),
     }),
     /valid timestamp/,
