@@ -625,6 +625,12 @@ jobs:
       - name: Test fail-closed single-image worker preflight
         run: npm run test:single-image-worker-preflight
 
+      - name: Test redacted generation worker host inventory
+        run: npm run test:generation-worker-host-inventory
+
+      - name: Validate generation worker host inventory CLI
+        run: npm run inventory:building-worker-host -- --help
+
       - name: Validate single-image worker preflight CLI
         run: npm run preflight:single-image-worker -- --help
 
