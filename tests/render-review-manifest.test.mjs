@@ -99,6 +99,7 @@ test("retains the GLB facade orientation and requires review for unverified sele
     coordinateFrame: "glTF-local:+X=east,+Y=up,+Z=north",
     selectionMethod: "azimuth-nearest-edge",
     edgeIndex: 1,
+    requestedAzimuthDegrees: 90,
     actualAzimuthDegrees: 90,
     confidence: "operator-specified",
     source: "buildingSpec.architecture.frontFacingAzimuthDegrees",
@@ -109,6 +110,7 @@ test("retains the GLB facade orientation and requires review for unverified sele
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
   assert.equal(report.facadeOrientation.edgeIndex, 1);
+  assert.equal(report.facadeOrientation.requestedAzimuthDegrees, 90);
   assert.equal(report.facadeOrientation.confidence, "operator-specified");
   assert.ok(report.warnings.includes("front-facade-orientation-needs-independent-review"));
   assert.equal(report.publicationEligible, false);
@@ -121,6 +123,7 @@ test("rejects malformed facade orientation in the Blender render manifest", () =
     coordinateFrame: "glTF-local:+X=east,+Y=up,+Z=north",
     selectionMethod: "azimuth-nearest-edge",
     edgeIndex: 0,
+    requestedAzimuthDegrees: null,
     actualAzimuthDegrees: 90,
     confidence: "verified",
     source: "fixture",

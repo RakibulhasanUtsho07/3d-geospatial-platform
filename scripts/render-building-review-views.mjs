@@ -193,6 +193,7 @@ async function main() {
         ["--front-facade-outward-normal-x", facadeOrientation.outwardNormal.x],
         ["--front-facade-outward-normal-z", facadeOrientation.outwardNormal.z],
         ["--front-facade-azimuth-degrees", facadeOrientation.actualAzimuthDegrees],
+        ["--front-facade-requested-azimuth-degrees", facadeOrientation.requestedAzimuthDegrees === null ? "null" : facadeOrientation.requestedAzimuthDegrees],
         ["--front-facade-selection-method", facadeOrientation.selectionMethod],
         ["--front-facade-edge-index", facadeOrientation.edgeIndex],
         ["--front-facade-confidence", facadeOrientation.confidence],
@@ -227,7 +228,8 @@ async function main() {
         renderedOrientation.edgeIndex !== facadeOrientation.edgeIndex ||
         renderedOrientation.source !== facadeOrientation.source ||
         renderedOrientation.confidence !== facadeOrientation.confidence ||
-        renderedOrientation.actualAzimuthDegrees !== facadeOrientation.actualAzimuthDegrees) {
+        renderedOrientation.actualAzimuthDegrees !== facadeOrientation.actualAzimuthDegrees ||
+        renderedOrientation.requestedAzimuthDegrees !== facadeOrientation.requestedAzimuthDegrees) {
         throw new Error("Blender render manifest facade orientation does not match the input GLB metadata");
       }
     } else if (raw.facadeOrientation !== null && raw.facadeOrientation !== undefined) {

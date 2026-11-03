@@ -278,7 +278,7 @@ def read_facade_orientation(opts):
     keys = [
         "--front-facade-direction-x", "--front-facade-direction-y", "--front-facade-direction-z",
         "--front-facade-outward-normal-x", "--front-facade-outward-normal-z",
-        "--front-facade-azimuth-degrees", "--front-facade-selection-method",
+        "--front-facade-azimuth-degrees", "--front-facade-requested-azimuth-degrees", "--front-facade-selection-method",
         "--front-facade-edge-index", "--front-facade-confidence",
         "--front-facade-source", "--front-facade-review-required",
         "--front-facade-coordinate-frame",
@@ -295,16 +295,21 @@ def read_facade_orientation(opts):
             "z": float(opts["--front-facade-outward-normal-z"]),
         }
         azimuth = float(opts["--front-facade-azimuth-degrees"])
+        requested_azimuth_raw = opts["--front-facade-requested-azimuth-degrees"]
+        requested_azimuth = None if requested_azimuth_raw == "null" else float(requested_azimuth_raw)
         edge_index = int(opts["--front-facade-edge-index"])
     except (TypeError, ValueError):
         raise RuntimeError("GLB facade-orientation numeric arguments are invalid")
-    if any(not math.isfinite(value) for value in direction + [normal["x"], normal["z"], azimuth]):
+    numeric_values = direction + [normal["x"], normal["z"], azimuth]
+    if requested_azimuth is not None:
+        numeric_values.append(requested_azimuth)
+    if any(not math.isfinite(value) for value in numeric_values):
         raise RuntimeError("GLB facade-orientation values must be finite")
     direction_length = math.sqrt(sum(value * value for value in direction))
     normal_length = math.hypot(normal["x"], normal["z"])
     if abs(direction_length - 1.0) > 1e-5 or abs(normal_length - 1.0) > 1e-3:
         raise RuntimeError("GLB facade-orientation vectors must be unit length")
-    if azimuth < 0.0 or azimuth > 360.0 or edge_index < 0:
+    if azimuth < 0.0 or azimuth > 360.0 or (requested_azimuth is not None and (requested_azimuth < 0.0 or requested_azimuth > 360.0)) or edge_index < 0:
         raise RuntimeError("GLB facade-orientation azimuth or edge index is invalid")
     normal_azimuth = (math.degrees(math.atan2(normal["x"], normal["z"])) + 360.0) % 360.0
     if abs((normal_azimuth - azimuth + 540.0) % 360.0 - 180.0) > 0.05:
@@ -337,6 +342,7 @@ def read_facade_orientation(opts):
         "selectionMethod": method,
         "edgeIndex": edge_index,
         "actualAzimuthDegrees": azimuth,
+        "requestedAzimuthDegrees": requested_azimuth,
         "confidence": confidence,
         "source": source,
         "reviewRequired": review_required_value == "true",

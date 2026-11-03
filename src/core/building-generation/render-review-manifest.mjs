@@ -98,6 +98,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       value.coordinateFrame === "glTF-local:+X=east,+Y=up,+Z=north" &&
       ["explicit-edge-index", "azimuth-nearest-edge", "longest-edge-inferred"].includes(value.selectionMethod) &&
       Number.isSafeInteger(value.edgeIndex) && value.edgeIndex >= 0 &&
+      (value.requestedAzimuthDegrees === null || (finite(value.requestedAzimuthDegrees) && value.requestedAzimuthDegrees >= 0 && value.requestedAzimuthDegrees <= 360)) &&
       finite(value.actualAzimuthDegrees) && value.actualAzimuthDegrees >= 0 && value.actualAzimuthDegrees <= 360 &&
       confidenceValues.has(value.confidence) && typeof value.source === "string" && value.source.trim().length > 0 &&
       typeof value.reviewRequired === "boolean" &&

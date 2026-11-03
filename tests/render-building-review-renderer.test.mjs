@@ -168,6 +168,8 @@ test("passes the embedded facade direction to Blender and records confidence and
   assert.match(wrapper, /extractGlbFacadeOrientation\(modelBytes\)/);
   assert.match(wrapper, /--front-facade-direction-x/);
   assert.match(wrapper, /--front-facade-coordinate-frame/);
+  assert.match(wrapper, /--front-facade-requested-azimuth-degrees/);
+  assert.match(rendererSource, /"requestedAzimuthDegrees": requested_azimuth/);
   assert.match(wrapper, /renderedOrientation\.source !== facadeOrientation\.source/);
   assert.match(rendererSource, /def read_facade_orientation\(opts\):/);
   assert.match(rendererSource, /Vector\(facade_orientation\["blenderCameraDirection"\]\)/);
