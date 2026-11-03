@@ -1,6 +1,7 @@
 # D3M-ENGINE-01 — BRF-01–04 Current-Main Integration
 
 **Status:** implementation assembled; exact-head validation and artifact inspection pending  
+**Latest test repair:** profile unit fixture is now self-contained; rerun required on final commit  
 **Base:** `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`  
 **Branch:** `feat/d3m-engine-01-brf-evidence-20261103`  
 **PR:** [#343](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/343)
