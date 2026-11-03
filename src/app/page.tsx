@@ -26,17 +26,11 @@ export default function HomePage() {
             Open 3D Map
           </Link>
           <Link
-                      href="/map"
-                      className="inline-flex rounded-xl border border-white/10 bg-white px-5 py-3 text-sm font-medium text-black transition hover:bg-zinc-200"
-                    >
-                      Open 3D Map
-                    </Link>
-                    <Link
-                      href="/experimental/floor-plan-review"
-                      className="inline-flex rounded-xl border border-white/15 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-                    >
-                      Floor-plan Review (Experimental)
-                    </Link>
+            href="/experimental/floor-plan-review"
+            className="inline-flex rounded-xl border border-white/15 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+          >
+            Floor-plan Review (Experimental)
+          </Link>
         </div>
       </section>
     </main>
