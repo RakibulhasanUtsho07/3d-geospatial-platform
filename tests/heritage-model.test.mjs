@@ -237,7 +237,8 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
-  assert.ok(renderer.includes('("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO")'));
+  assert.match(renderer, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
+  assert.ok(renderer.includes('"top", (0.0, 1.0, 0.0)'), "top review camera follows the glTF Y-up axis");
   assert.ok(
     /if view_id == "front":[\s\S]*?if focus_rangmahal:[\s\S]*?if obj not in front_review_meshes:/.test(renderer),
     "Rangmahal node filtering must be restricted to the dedicated front-detail view",
@@ -251,7 +252,7 @@ test("Blender front review view prioritizes the facade over the roof deck", asyn
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
   assert.ok(renderer.includes("light_power * 0.33, light_size * 1.05"));
   assert.ok(renderer.includes("light_power * 0.38, light_size"));
-  assert.ok(renderer.includes('("turntable-" + str(angle).zfill(3), direction, "ORTHO")'));
+  assert.match(renderer, /camera_direction_from_bearing\(angle, turntable_elevation_degrees\)/);
   assert.ok(renderer.includes("def projected_ortho_scale("), "review views fit to their projected geometry bounds");
   assert.ok(renderer.includes("original_render_visibility"), "renderer restores whole-model visibility for each view");
   assert.ok(renderer.includes("if focus_rangmahal:"), "front-detail filtering applies only when Rangmahal facade meshes are present");
