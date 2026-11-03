@@ -174,8 +174,10 @@ export function generateProceduralGlb(rawSpec) {
         const edgePoint = { x: e.p.x + e.tangent.x * opening.centerU, z: e.p.z + e.tangent.z * opening.centerU };
         const baseY = floor * floorH;
         const paneDepth = 0.055, frameDepth = 0.075, faceClearanceM = 0.002;
-        const paneFrontDepth = surfaceInsertCenterOffset(paneDepth, faceClearanceM);
-        const frameFrontDepth = surfaceInsertCenterOffset(frameDepth, faceClearanceM);
+        const paneCenterOffset = surfaceInsertCenterOffset(paneDepth, faceClearanceM);
+        const frameCenterOffset = surfaceInsertCenterOffset(frameDepth, faceClearanceM);
+        const paneFrontDepth = paneDepth + faceClearanceM;
+        const frameFrontDepth = frameDepth + faceClearanceM;
         const centerY = baseY + opening.bottomM + opening.heightM / 2;
         if (opening.shape === "arched") {
           const profile = createFacadeOpeningProfile(opening);
@@ -195,23 +197,23 @@ export function generateProceduralGlb(rawSpec) {
             addExtrudedFacadeProfile(geo,{edge:e,baseY,profile:outerProfile,holes:[profile],frontDepth:frameFrontDepth,depthM:frameDepth,material:"frame"});
           } else warnings.push("An arched opening frame could not maintain its required surround clearance; human review is required.");
         } else if (opening.kind === "window") {
-          const paneCenter=offsetFacadePoint(edgePoint,e,0,paneFrontDepth);
-          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameFrontDepth);
+          const paneCenter=offsetFacadePoint(edgePoint,e,0,paneCenterOffset);
+          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameCenterOffset);
           const jamb=0.055;
           geo.box("glass",paneCenter.x,centerY,paneCenter.z,opening.widthM,opening.heightM,paneDepth,e.yaw);
           geo.box("frame",frameCenter.x,centerY+opening.heightM/2,frameCenter.z,opening.widthM+jamb,jamb,frameDepth,e.yaw);
           geo.box("frame",frameCenter.x,centerY-opening.heightM/2,frameCenter.z,opening.widthM+jamb,jamb,frameDepth,e.yaw);
-          const left=offsetFacadePoint(edgePoint,e,-opening.widthM/2,frameFrontDepth);
-          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2,frameFrontDepth);
+          const left=offsetFacadePoint(edgePoint,e,-opening.widthM/2,frameCenterOffset);
+          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2,frameCenterOffset);
           geo.box("frame",left.x,centerY,left.z,jamb,opening.heightM,frameDepth,e.yaw);
           geo.box("frame",right.x,centerY,right.z,jamb,opening.heightM,frameDepth,e.yaw);
         } else {
           const doorCenter=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
-          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameFrontDepth);
+          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameCenterOffset);
           geo.box("door",doorCenter.x,centerY,doorCenter.z,opening.widthM,opening.heightM,0.07,e.yaw);
           geo.box("frame",frameCenter.x,baseY+opening.bottomM+opening.heightM+0.04,frameCenter.z,opening.widthM+0.14,0.08,0.09,e.yaw);
-          const left=offsetFacadePoint(edgePoint,e,-(opening.widthM/2+0.035),frameFrontDepth);
-          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2+0.035,frameFrontDepth);
+          const left=offsetFacadePoint(edgePoint,e,-(opening.widthM/2+0.035),frameCenterOffset);
+          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2+0.035,frameCenterOffset);
           geo.box("frame",left.x,centerY,left.z,0.07,opening.heightM,0.09,e.yaw);
           geo.box("frame",right.x,centerY,right.z,0.07,opening.heightM,0.09,e.yaw);
         }
