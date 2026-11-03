@@ -251,7 +251,7 @@ test("ignores only benchmark artifacts and byte-identical Cesium runtime copies"
     await writeFile(path.join(cesiumSource, "Cesium.js"), "pinned cesium browser bundle");
     await writeFile(path.join(cesiumSource, "ThirdParty", "zip-module.wasm"), "pinned cesium wasm");
     await writeFile(path.join(publicCesium, "ThirdParty", "zip-module.wasm"), "committed older wasm");
-    await writeFile(path.join(root, ".gitignore"), "node_modules/\\n");
+    await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
     execFileSync("git", ["add", "."], { cwd: root });
     execFileSync("git", ["commit", "-qm", "initial"], { cwd: root });
 
