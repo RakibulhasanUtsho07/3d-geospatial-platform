@@ -260,7 +260,10 @@
     "test:dhaka-overture-architecture-coverage": "node --test tests/dhaka-overture-architecture-coverage.test.mjs",
     "test:floor-plan-raster-vector-calibration": "node --test tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs",
     "test:floor-plan-review-payload": "node --test tests/floor-plan-review-payload.test.mjs",
-    "calibrate:floor-plan-raster-vectors": "node scripts/calibrate-floor-plan-raster-vectors.mjs"
+    "calibrate:floor-plan-raster-vectors": "node scripts/calibrate-floor-plan-raster-vectors.mjs",
+    "test:imagery-tile-error-diagnostics": "node --test tests/imagery-tile-error-diagnostics.test.mjs",
+    "test:canvas-red-pixel-diagnostics": "node --test tests/canvas-red-pixel-diagnostics.test.mjs",
+    "test:map-viewport-ux": "node --test tests/map-viewport-ux.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
