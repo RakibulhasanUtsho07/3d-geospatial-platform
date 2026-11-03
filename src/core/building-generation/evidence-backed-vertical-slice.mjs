@@ -398,11 +398,23 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
     if (mediaReport.output?.modelPath !== mediaModelRelative) {
       throw new TypeError("media-to-model report path does not match the emitted GLB");
     }
-    const ingestedHashes = new Map((mediaReport.inputs?.mediaRecords ?? []).map((record) => [record.id, record.sha256]));
+    const ingestedRecords = new Map((mediaReport.inputs?.mediaRecords ?? []).map((record) => [record.id, record]));
     for (const source of evidence.sourceManifest) {
-      if (ingestedHashes.get(source.sourceId) !== source.sha256) {
+      const ingested = ingestedRecords.get(source.sourceId);
+      if (!ingested || ingested.sha256 !== source.sha256) {
         throw new TypeError("media workflow did not preserve exact source bytes for " + source.sourceId);
       }
+      if (ingested.kind !== "image" || ingested.licence !== source.licence ||
+          ingested.usageStatus !== "approved" ||
+          REQUIRED_SCOPES.some((scope) => !(ingested.permittedOperations ?? []).includes(scope))) {
+        throw new TypeError("media rights/intake record does not preserve the exact approved still-image scope for " + source.sourceId);
+      }
+    }
+    const actualSelectedIds = mediaReport.inputs?.selectedViewIds;
+    if (!Array.isArray(actualSelectedIds) ||
+        actualSelectedIds.length !== evidence.viewSourceIds.length ||
+        [...actualSelectedIds].sort().join("\\u0000") !== [...evidence.viewSourceIds].sort().join("\\u0000")) {
+      throw new TypeError("media-to-model workflow selected-view IDs do not match the exact preflight source set");
     }
     report.childJobs.media.status = mediaReport.status ?? "completed-requires-review";
     report.childJobs.media.output = {
