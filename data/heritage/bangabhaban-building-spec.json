@@ -42,6 +42,7 @@
   },
   "architecture": {
     "style": "bangabhaban-palatial-islamic-bangla",
+    "frontFacingAzimuthDegrees": 180,
     "roofType": "flat",
     "wallColor": "#F1EEE6",
     "roofColor": "#E8E5DE",
@@ -63,10 +64,11 @@
     },
     "centralDome": {
       "enabled": true,
+      "anchor": "footprint-bounds-center",
       "radiusM": 4.2,
       "riseM": 5.6,
       "drumHeightM": 1.7,
-      "insetFromFrontM": 6.2
+      "insetFromFrontM": 10.5
     },
     "frontArcade": {
       "enabled": true,
@@ -162,14 +164,15 @@
       "value": {
         "radiusM": 4.2,
         "riseM": 5.6,
-        "drumHeightM": 1.7
+        "drumHeightM": 1.7,
+        "anchor": "footprint-bounds-center"
       },
       "confidence": "estimated",
       "sourceIds": [
         "commons-aerial-2006",
         "commons-exterior-2017"
       ],
-      "notes": "Parametric proportions are visual estimates, not measured dimensions."
+      "notes": "Dome center is now explicitly anchored to the provisional footprint bounds center to avoid the prior front-inset offset. Dome size and placement still require rectified imagery or measured plan evidence."
     },
     {
       "field": "frontArcade",

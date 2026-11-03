@@ -6,6 +6,15 @@ import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-
 
 const spec = JSON.parse(await readFile(new URL("../data/heritage/bangabhaban-building-spec.json", import.meta.url), "utf8"));
 
+function parseGlbJson(buffer) {
+  assert.equal(buffer.readUInt32LE(0), 0x46546c67);
+  assert.equal(buffer.readUInt32LE(4), 2);
+  assert.equal(buffer.readUInt32LE(8), buffer.byteLength);
+  const jsonLength = buffer.readUInt32LE(12);
+  assert.equal(buffer.readUInt32LE(16), 0x4e4f534a);
+  return JSON.parse(buffer.subarray(20, 20 + jsonLength).toString("utf8").trim());
+}
+
 test("Bangabhaban spec keeps non-survey inputs explicitly estimated", () => {
   const result = generateBuildingModel(spec);
   assert.equal(result.normalizedSpec.id, "bangabhaban-dhaka");
@@ -13,6 +22,30 @@ test("Bangabhaban spec keeps non-survey inputs explicitly estimated", () => {
   assert.equal(result.normalizedSpec.architecture.frontArcade.enabled, true);
   assert.ok(result.normalizedSpec.evidence.some((e) => e.field === "footprint" && e.confidence === "estimated"));
   assert.equal(result.report.reviewRequired, true);
+});
+
+test("Bangabhaban declares the south facade and anchors its dome to the footprint bounds center", () => {
+  const result = generateBuildingModel(spec);
+  assert.equal(result.normalizedSpec.architecture.frontFacingAzimuthDegrees, 180);
+  assert.equal(result.normalizedSpec.architecture.centralDome.anchor, "footprint-bounds-center");
+  assert.equal(result.report.architecturePlacement.frontFacade.actualAzimuthDegrees, 180);
+  assert.equal(result.report.architecturePlacement.centralDome.anchor, "footprint-bounds-center");
+  assert.ok(Math.abs(result.report.architecturePlacement.centralDome.centerModelMeters.x) < 0.05);
+  assert.ok(Math.abs(result.report.architecturePlacement.centralDome.centerModelMeters.z) < 0.05);
+  const gltf = parseGlbJson(result.glb);
+  assert.equal(gltf.extras.building.frontFacingAzimuthDegrees, 180);
+  assert.equal(gltf.extras.building.coordinateFrame, "x-east,y-up,z-north");
+});
+
+test("rejects unknown dome-anchor policies instead of silently placing the dome", () => {
+  const invalid = {
+    ...spec,
+    architecture: {
+      ...spec.architecture,
+      centralDome: { ...spec.architecture.centralDome, anchor: "guess-a-location" }
+    }
+  };
+  assert.throws(() => generateBuildingModel(invalid), /unsupported centralDome.anchor/);
 });
 
 test("engine emits a structurally parseable dome-and-arcade GLB candidate", () => {

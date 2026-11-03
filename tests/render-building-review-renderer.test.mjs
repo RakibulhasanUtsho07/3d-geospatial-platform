@@ -19,6 +19,16 @@ test("falls back to a full-model front render for generic building GLBs", () => 
   assert.doesNotMatch(rendererSource, /Could not find Rangmahal meshes for the focused front review view/);
 });
 
+test("uses the candidate GLB's explicit front bearing and keeps a legacy fallback", () => {
+  assert.match(rendererSource, /def read_front_facing_azimuth\(model_path\):/);
+  assert.match(rendererSource, /front_azimuth = read_front_facing_azimuth\(model_path\)/);
+  assert.match(rendererSource, /if front_azimuth is None:[\s\S]*front_axis_source = "renderer-default"/);
+  assert.match(rendererSource, /front_axis_source = "glb-extras\.frontFacingAzimuthDegrees"/);
+  assert.match(rendererSource, /frontFacingAzimuthDegrees/);
+  assert.match(rendererSource, /sin_bearing \* math\.cos\(front_elevation\)/);
+  assert.match(rendererSource, /frontAxisSource/);
+});
+
 test("keeps the five orthographic views and eight turntable views in the renderer", () => {
   for (const view of ["front", "back", "left", "right", "top"]) {
     assert.ok(rendererSource.includes('"' + view + '"'), "missing orthographic view " + view);

@@ -22,6 +22,11 @@ test("rejects malformed footprints, dangling evidence and unsafe sources",()=>{
  assert.throws(()=>normalizeBuildingSpec({...fixture,dimensions:{floorCount:0}}),/between 1 and 100/);
  assert.throws(()=>normalizeBuildingSpec({...fixture,architecture:{wallColor:"blue"}}),/#RRGGBB/);
 });
+test("keeps legacy facade selection and dome placement defaults when no override is supplied", () => {
+ const { spec } = normalizeBuildingSpec(fixture);
+ assert.equal(spec.architecture.frontFacingAzimuthDegrees, null);
+ assert.equal(spec.architecture.centralDome.anchor, "front-inset");
+});
 test("writes a binary GLB with metric geometry, nodes and materials",()=>{
  const {glb,report}=generateProceduralGlb(fixture);assert.ok(Buffer.isBuffer(glb));assert.ok(glb.byteLength>5000);
  const model=parseGlb(glb);assert.equal(model.asset.version,"2.0");assert.equal(model.asset.extras.buildingId,fixture.id);assert.ok(model.meshes.length>=3);

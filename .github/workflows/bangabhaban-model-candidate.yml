@@ -29,8 +29,8 @@ jobs:
           node-version: 24
       - name: Generate model through the repository engine
         run: node scripts/build-bangabhaban-model-candidate.mjs
-      - name: Validate model and candidate gates
-        run: node --test tests/bangabhaban-generation.test.mjs tests/glb-geometry-qa.test.mjs
+      - name: Validate model, facade orientation, dome anchor and candidate gates
+        run: node --test tests/bangabhaban-generation.test.mjs tests/render-building-review-renderer.test.mjs tests/glb-geometry-qa.test.mjs
       - name: Install Blender and contact-sheet dependencies
         run: |
           sudo apt-get update -qq
