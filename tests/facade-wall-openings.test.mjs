@@ -24,7 +24,7 @@ test("arched profile area is conserved by the wall scanline tessellator",()=>{
  assert.equal(profile.length,35);
  assert.ok(area(profile)>3.45&&area(profile)<3.58);
  const result=createWallPanelTopology({lengthM:10,heightM:4,openings:[
-  {id:"arch",kind:"window",shape:"arched",centerU:5,bottomM:0.8,widthM:2,heightM:2},
+  {id:"arch",kind:"window",shape:"arched",centerU:5,bottomM:0.8,widthM:2,heightM:2,archSegments:32},
  ]});
  assert.ok(Math.abs(result.wallFaceAreaM2-(40-area(profile)))<1e-5);
 });
