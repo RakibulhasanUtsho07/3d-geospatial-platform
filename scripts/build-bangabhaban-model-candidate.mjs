@@ -14,6 +14,14 @@ const { glb, normalizedSpec, report } = generateBuildingModel(rawSpec);
 await mkdir(path.dirname(modelPath), { recursive: true });
 await writeFile(modelPath, glb);
 const sha256 = createHash("sha256").update(glb).digest("hex");
+const facadeSelection = report.facadeSelection;
+if (!facadeSelection ||
+    !Number.isFinite(facadeSelection.actualAzimuthDegrees) ||
+    typeof facadeSelection.confidence !== "string" ||
+    typeof facadeSelection.source !== "string" ||
+    !facadeSelection.source.trim()) {
+  throw new Error("Generation report is missing validated facade-selection provenance.");
+}
 const candidate = {
   schemaVersion: "1.0.0",
   generatedAt: new Date().toISOString(),
@@ -34,9 +42,9 @@ const candidate = {
   model: {
     path: path.relative(root, modelPath).split(path.sep).join("/"),
     coordinateFrame: "gltf-right-handed-x-east-y-up-z-south",
-    frontFacingAzimuthDegrees: report.frontFacade?.actualAzimuthDegrees ?? null,
-    frontAxisConfidence: report.frontFacade?.confidence ?? "unknown",
-    frontAxisSource: report.frontFacade?.source ?? "unknown",
+    frontFacingAzimuthDegrees: facadeSelection.actualAzimuthDegrees,
+    frontAxisConfidence: facadeSelection.confidence,
+    frontAxisSource: facadeSelection.source,
     bytes: glb.byteLength,
     sha256,
     format: "glb",
