@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 type ObservedRequests = {
   buildings: URL[];
@@ -141,11 +143,46 @@ async function stubMapNetwork(page: Page): Promise<ObservedRequests> {
 async function openReadyMap(page: Page): Promise<void> {
   await page.goto("/map", { waitUntil: "domcontentloaded" });
   await expect(
-    page.getByRole("checkbox", { name: "Detailed OSM roads" }),
+    page.getByRole("button", { name: "Map layers" }),
   ).toBeEnabled({ timeout: 45_000 });
   await expect(
     page.getByTestId("cesium-map-container").locator("canvas").first(),
   ).toBeVisible({ timeout: 45_000 });
+}
+
+async function openMapLayers(page: Page): Promise<void> {
+  const toggle = page.getByRole("button", { name: "Map layers" });
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toBeVisible();
+}
+
+async function openMapControls(page: Page): Promise<void> {
+  const toggle = page.getByRole("button", { name: "Map controls" });
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+}
+
+async function expectNotOverlapping(first: Locator, second: Locator): Promise<void> {
+  const [a, b] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  expect(a, "first map dock should be visible").not.toBeNull();
+  expect(b, "second map dock should be visible").not.toBeNull();
+  const separated = a!.x + a!.width <= b!.x ||
+    b!.x + b!.width <= a!.x ||
+    a!.y + a!.height <= b!.y ||
+    b!.y + b!.height <= a!.y;
+  expect(separated, "map dock controls should not overlap by default").toBe(true);
+}
+
+async function expectDockClearOfCesiumAttribution(page: Page, dock: Locator): Promise<void> {
+  const credits = page.locator(
+    ".cesium-viewer-bottom .cesium-credit-logoContainer, " +
+    ".cesium-viewer-bottom .cesium-credit-textContainer",
+  );
+  const creditCount = await credits.count();
+  expect(creditCount, "Cesium attribution logo/text should be present").toBeGreaterThan(0);
+  for (let index = 0; index < creditCount; index += 1) {
+    await expectNotOverlapping(dock, credits.nth(index));
+  }
 }
 
 function roadBoundsKey(url: URL): string {
@@ -154,9 +191,88 @@ function roadBoundsKey(url: URL): string {
     .join("|");
 }
 
+test("map opens with compact panels and non-overlapping docks on desktop and mobile", async ({ page }) => {
+  await stubMapNetwork(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openReadyMap(page);
+
+  const layers = page.getByRole("button", { name: "Map layers" });
+  const controls = page.getByRole("button", { name: "Map controls" });
+  const properties = page.getByRole("button", { name: "Property discovery options" });
+  const generatedModels = page.getByRole("button", { name: /Generated models/ });
+
+  await expect(layers).toHaveAttribute("aria-expanded", "false");
+  await expect(controls).toHaveAttribute("aria-expanded", "false");
+  await expect(properties).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("checkbox", { name: "Detailed OSM roads" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0);
+
+  await expectNotOverlapping(properties, controls);
+  await expectNotOverlapping(layers, generatedModels);
+  await expectDockClearOfCesiumAttribution(page, layers);
+  await expectDockClearOfCesiumAttribution(page, generatedModels);
+
+  // Keep visual evidence separate from the performance artifacts. Map imagery
+  // and API data are deterministic stubs in this test, so these captures are
+  // strictly for overlay geometry/readability, not production imagery review.
+  const visualEvidenceDirectory = resolve(process.cwd(), "artifacts/p3-4-map-panel-occlusion");
+  await mkdir(visualEvidenceDirectory, { recursive: true });
+  await page.screenshot({
+    path: resolve(visualEvidenceDirectory, "desktop-default-1440x900.png"),
+    fullPage: false,
+    animations: "disabled",
+  });
+
+  await openMapLayers(page);
+  await expect(page.getByRole("checkbox", { name: "Street map imagery" })).toBeVisible();
+  await layers.click();
+  await expect(page.getByRole("checkbox", { name: "Street map imagery" })).toHaveCount(0);
+
+  await openMapControls(page);
+  await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+  await controls.click();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectNotOverlapping(
+    page.getByRole("complementary", { name: "Building search" }),
+    properties,
+  );
+  await expectNotOverlapping(properties, controls);
+  await expectNotOverlapping(controls, page.getByRole("complementary", { name: "Nearby places" }));
+  await expectNotOverlapping(layers, generatedModels);
+  await expectDockClearOfCesiumAttribution(page, layers);
+  await expectDockClearOfCesiumAttribution(page, generatedModels);
+  await page.screenshot({
+    path: resolve(visualEvidenceDirectory, "mobile-default-390x844.png"),
+    fullPage: false,
+    animations: "disabled",
+  });
+
+  await writeFile(
+    resolve(visualEvidenceDirectory, "manifest.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      purpose: "P3.4 map-panel overlay layout visual evidence",
+      branch: process.env.P3_4_HEAD_REF ?? process.env.GITHUB_REF_NAME ?? null,
+      commitSha: process.env.P3_4_HEAD_SHA ?? process.env.GITHUB_SHA ?? null,
+      captures: [
+        { file: "desktop-default-1440x900.png", width: 1440, height: 900, state: "default collapsed panels" },
+        { file: "mobile-default-390x844.png", width: 390, height: 844, state: "default collapsed panels" },
+      ],
+      limitations: [
+        "Map API and tile imagery are deterministic browser-test stubs.",
+        "These screenshots validate panel placement and canvas occlusion only; they do not validate live Dhaka imagery, building fidelity, or the red imagery anomaly.",
+      ],
+    }, null, 2) + "\n",
+    "utf8",
+  );
+});
+
 test("3D map initializes and imagery/building layer switches remain in sync", async ({ page }) => {
   const observed = await stubMapNetwork(page);
   await openReadyMap(page);
+  await openMapLayers(page);
+  await openMapControls(page);
 
   const imagery = page.getByRole("checkbox", { name: "Street map imagery" });
   const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
@@ -189,6 +305,7 @@ test("3D map initializes and imagery/building layer switches remain in sync", as
 test("road visibility can be disabled and restored", async ({ page }) => {
   const observed = await stubMapNetwork(page);
   await openReadyMap(page);
+  await openMapLayers(page);
 
   const roads = page.getByRole("checkbox", { name: "Detailed OSM roads" });
   await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
@@ -207,6 +324,7 @@ test("road visibility can be disabled and restored", async ({ page }) => {
 test("canvas drag stays interactive and zooming requests fresh road viewport bounds", async ({ page }) => {
   const observed = await stubMapNetwork(page);
   await openReadyMap(page);
+  await openMapControls(page);
   await expect.poll(() => observed.roads.length, { timeout: 20_000 }).toBeGreaterThan(0);
 
   // Let the initial camera preset settle so the next requests belong to this test.
@@ -359,6 +477,8 @@ test("selecting a building then a road clears the previous details panel", async
   });
 
   await openReadyMap(page);
+  await openMapLayers(page);
+  await openMapControls(page);
   await expect.poll(() => observed.buildings.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(() => observed.roads.length, { timeout: 15_000 }).toBeGreaterThan(0);
   await expect.poll(

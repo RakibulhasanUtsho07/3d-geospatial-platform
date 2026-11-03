@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - feat/p34-map-panel-occlusion-20261102
+      - integration/p34-main-port-20261103
+      - integration/p34-main-after-p37-20261103
     paths:
       - "src/app/**"
       - "src/core/map-engine/**"
@@ -21,10 +24,27 @@ on:
       - ".github/workflows/real-dhaka-baseline.yml"
       - "package.json"
       - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/app/**"
+      - "src/core/map-engine/**"
+      - "src/core/geospatial/**"
+      - "src/features/map/**"
+      - "data/overture/**"
+      - "public/data/roads/**"
+      - "scripts/benchmark-map-browser.mjs"
+      - "scripts/validate-real-dhaka-baseline.mjs"
+      - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
+      - ".github/workflows/real-dhaka-baseline.yml"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 concurrency:
   group: real-dhaka-baseline-${{ github.ref }}
@@ -38,6 +58,8 @@ jobs:
     steps:
       - name: Check out candidate
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -48,11 +70,55 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Commit reconciled lockfile and bind exact candidate SHA
+        id: candidate
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- package-lock.json; then
+            git add package-lock.json
+            git commit -m "chore(deps): reconcile npm lockfile for reproducible CI"
+            git push origin "HEAD:${HEAD_BRANCH}"
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch exact-head workflows after lockfile commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          for workflow in ci.yml p3-6-dhaka-3d-tiles-package.yml brf-14-multiview-source-intake.yml brf45-exact-asset-rights-admission.yml; do
+            curl --fail --silent --show-error -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/dispatches" \
+              -d "{\"ref\":\"$HEAD_BRANCH\"}"
+          done
+
+      - name: Upload regenerated npm lockfile snapshot for reconciliation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p34-npm-lockfile-snapshot
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Install Chromium and Linux dependencies
         run: npx playwright install --with-deps chromium
 
       - name: Build and validate the Overture spatial tiles
         run: npm run build:geospatial-tiles && npm run test:geospatial-tiles
+
+      - name: Require a clean candidate checkout after data preparation
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
 
       - name: Start development app and capture cold/warm browser samples
         env:
@@ -64,16 +130,16 @@ jobs:
           MAP_BENCHMARK_ROAD_RETRY_GRACE_MS: "6000"
           MAP_BENCHMARK_WIDTH: "1280"
           MAP_BENCHMARK_HEIGHT: "800"
-          MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ github.sha }}
-          MAP_BENCHMARK_COMMIT_SHA: ${{ github.sha }}
+          MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ steps.candidate.outputs.sha }}
+          MAP_BENCHMARK_COMMIT_SHA: ${{ steps.candidate.outputs.sha }}
           MAP_BENCHMARK_SCENARIO: ci-real-dhaka-initial-camera
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "artifacts/real-dhaka-baseline/${GITHUB_SHA}"
+          mkdir -p "$MAP_BENCHMARK_OUT_DIR"
           npm run dev -- --hostname 127.0.0.1 --port 3000 > "$RUNNER_TEMP/next-dev.log" 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; cp "$RUNNER_TEMP/next-dev.log" "artifacts/real-dhaka-baseline/${GITHUB_SHA}/dev-server.log" 2>/dev/null || true' EXIT
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; cp "$RUNNER_TEMP/next-dev.log" "$MAP_BENCHMARK_OUT_DIR/dev-server.log" 2>/dev/null || true' EXIT
 
           ready=0
           for attempt in $(seq 1 90); do
@@ -94,16 +160,18 @@ jobs:
 
       - name: Verify six real-Dhaka cold/warm samples, input hashes, and road rendering
         if: success()
-        run: >-
-          npm run verify:real-dhaka-baseline --
-          "artifacts/real-dhaka-baseline/${GITHUB_SHA}/report.json"
-          "--expected-commit-sha=${GITHUB_SHA}"
+        env:
+          MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ steps.candidate.outputs.sha }}
+        run: |
+          echo "Git status immediately after six-sample browser capture:"
+          git status --porcelain=v1 --untracked-files=all
+          npm run verify:real-dhaka-baseline -- "$MAP_BENCHMARK_OUT_DIR/report.json" "--expected-commit-sha=${{ steps.candidate.outputs.sha }}"
 
       - name: Upload real-Dhaka report, screenshots, and server logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: real-dhaka-browser-baseline-${{ github.sha }}
-          path: artifacts/real-dhaka-baseline/${{ github.sha }}/
+          name: real-dhaka-browser-baseline-${{ steps.candidate.outputs.sha }}
+          path: artifacts/real-dhaka-baseline/${{ steps.candidate.outputs.sha }}/
           if-no-files-found: warn
           retention-days: 14

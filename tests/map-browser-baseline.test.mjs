@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { classifyResourceUrl, createNetworkCounters, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
+import { classifyResourceUrl, createNetworkCounters, getWorkingTreeDirty, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
 
 test("summarizes browser samples using nearest-rank p50 and p95", () => {
   assert.deepEqual(summarizeValues([10, 20, 30, 40, 50]), {
@@ -63,6 +67,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 0,
     stagedFeatureCount: 120,
@@ -70,6 +78,10 @@ test("does not call a canvas-only map ready without a successful viewport stage"
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 0,
@@ -80,16 +92,42 @@ test("accepts a map readiness record only when a viewport staged real building f
   assert.equal(validateMapReadyState({
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 2,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 157,
   }), true);
 });
 
+test("requires hidden loading overlay and settled visible base imagery", () => {
+  const valid = {
+    hasError: false,
+    telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
+    canvasCount: 1,
+    viewportStageSuccessCount: 1,
+    stagedFeatureCount: 12,
+  };
+  assert.equal(validateMapReadyState({ ...valid, loadingOverlayVisible: true }), false);
+  assert.equal(validateMapReadyState({ ...valid, viewerAvailable: false }), false);
+  assert.equal(validateMapReadyState({ ...valid, imageryLayerCount: 0 }), false);
+  assert.equal(validateMapReadyState({ ...valid, imageryTilesLoaded: false }), false);
+});
+
 test("rejects map readiness when initialization fails or telemetry is unavailable", () => {
   const valid = {
     hasError: false,
     telemetryAvailable: true,
+    loadingOverlayVisible: false,
+    viewerAvailable: true,
+    imageryLayerCount: 1,
+    imageryTilesLoaded: true,
     canvasCount: 1,
     viewportStageSuccessCount: 1,
     stagedFeatureCount: 12,
@@ -192,4 +230,71 @@ test("captures offline road source/detail headers and pending-request lifecycle 
   assert.deepEqual(snapshot.roadApi.upstreamAttempts, { sampleCount: 1, total: 0, max: 0 });
   assert.equal(snapshot.roadApi.pendingRequestsAtCapture, 0);
   assert.equal(JSON.stringify(snapshot).includes("west=90.4"), false);
+});
+
+
+test("ignores only benchmark artifacts and byte-identical Cesium runtime copies", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "real-dhaka-baseline-git-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Baseline Test"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "baseline@example.test"], { cwd: root });
+
+    const cesiumSource = path.join(root, "node_modules", "cesium", "Build", "Cesium");
+    const publicCesium = path.join(root, "public", "cesium");
+    const output = path.join(root, "artifacts", "real-dhaka-baseline", "candidate");
+    await mkdir(path.join(cesiumSource, "ThirdParty"), { recursive: true });
+    await mkdir(path.join(publicCesium, "ThirdParty"), { recursive: true });
+    await mkdir(output, { recursive: true });
+
+    await writeFile(path.join(root, "source.js"), "export const value = 1;\\n");
+    await writeFile(path.join(cesiumSource, "Cesium.js"), "pinned cesium browser bundle");
+    await writeFile(path.join(cesiumSource, "ThirdParty", "zip-module.wasm"), "pinned cesium wasm");
+    await writeFile(path.join(publicCesium, "ThirdParty", "zip-module.wasm"), "committed older wasm");
+    await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
+    execFileSync("git", ["add", "."], { cwd: root });
+    execFileSync("git", ["commit", "-qm", "initial"], { cwd: root });
+
+    // Runtime copies exactly match their pinned package source bytes.
+    await writeFile(path.join(publicCesium, "Cesium.js"), await readFile(path.join(cesiumSource, "Cesium.js")));
+    await writeFile(path.join(publicCesium, "ThirdParty", "zip-module.wasm"), await readFile(path.join(cesiumSource, "ThirdParty", "zip-module.wasm")));
+    await writeFile(path.join(output, "report.json"), "{}\\n");
+    await writeFile(path.join(output, "cold-01.png"), "synthetic screenshot");
+    await mkdir(path.join(output, "nested"), { recursive: true });
+    await writeFile(path.join(output, "nested", "capture.json"), "generated evidence");
+    const gitStatus = execFileSync(
+      "git",
+      ["status", "--porcelain=v1", "--untracked-files=all", "-z"],
+      { cwd: root, encoding: "utf8" },
+    );
+    const cesiumBundleMatches = Buffer.compare(
+      await readFile(path.join(publicCesium, "Cesium.js")),
+      await readFile(path.join(cesiumSource, "Cesium.js")),
+    ) === 0;
+    const cesiumWasmMatches = Buffer.compare(
+      await readFile(path.join(publicCesium, "ThirdParty", "zip-module.wasm")),
+      await readFile(path.join(cesiumSource, "ThirdParty", "zip-module.wasm")),
+    ) === 0;
+    assert.equal(
+      getWorkingTreeDirty(output, root),
+      false,
+      "unexpected dirty paths: " + JSON.stringify(gitStatus.split("\\0").filter(Boolean)) +
+        "; Cesium bundle match=" + cesiumBundleMatches +
+        "; Cesium WASM match=" + cesiumWasmMatches,
+    );
+
+    // A mismatch to the package source must no longer be ignored.
+    await writeFile(path.join(publicCesium, "Cesium.js"), "tampered browser bundle");
+    assert.equal(getWorkingTreeDirty(output, root), true, "non-identical generated Cesium bytes must be dirty");
+    await writeFile(path.join(publicCesium, "Cesium.js"), await readFile(path.join(cesiumSource, "Cesium.js")));
+
+    await writeFile(path.join(root, "source.js"), "export const value = 2;\\n");
+    assert.equal(getWorkingTreeDirty(output, root), true, "tracked source edits must remain visible");
+    await writeFile(path.join(root, "source.js"), "export const value = 1;\\n");
+
+    await writeFile(path.join(root, "unexpected.txt"), "not a benchmark artifact");
+    assert.equal(getWorkingTreeDirty(output, root), true, "untracked source files must remain visible");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
