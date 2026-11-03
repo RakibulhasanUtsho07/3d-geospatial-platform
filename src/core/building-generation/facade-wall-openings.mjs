@@ -241,7 +241,7 @@ export function createWallPanelTopology({ lengthM, heightM, openings = [] }) {
       bottomM: opening.bottomM,
       widthM: opening.widthM,
       heightM: opening.heightM,
-      profileAreaM2: Number(profileAreaM2.toFixed(6)),
+      profileAreaM2,
       points: orientRing(points, false),
     };
   });
@@ -264,7 +264,10 @@ export function createWallPanelTopology({ lengthM, heightM, openings = [] }) {
     expectedWallFaceAreaM2: Number(expectedAreaM2.toFixed(6)),
     frontQuads: tessellation.frontQuads,
     boundaryEdges: tessellation.boundaryEdges,
-    openings: records.map(({ points, ...record }) => record),
+    openings: records.map(({ points, profileAreaM2, ...record }) => ({
+      ...record,
+      profileAreaM2: Number(profileAreaM2.toFixed(6)),
+    })),
     contours,
   };
 }
