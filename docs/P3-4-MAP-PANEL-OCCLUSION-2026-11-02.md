@@ -45,3 +45,10 @@ A separate diagnostic slice is now included in the P3.4 candidate. It records bo
 A flagged sample is a request for human review, not proof of a bad raster tile and not a reason to hide or mask a layer. The original `cold-01` outlier remains unresolved until a fresh real-Dhaka artifact is inspected and, if necessary, fixed-camera layer isolation identifies its producing layer. The current P3.4 branch now triggers that capture workflow on pushes.
 
 The feature remains Draft/unmerged. Automated diagnostics do not establish the anomaly root cause, general map visual fidelity, or surveyed building accuracy.
+
+
+## Current-main reconciliation — 2026-11-03
+
+The original source candidate remains PR #320 on historical base `development@f7b2a67...`. Its map-panel code is being carried to `main@3c929c88427fbcb1d40a22506f2f7a8e103d57af` on `integration/p34-main-port-20261103`, preserving D3M-01 and P3.6–P3.8 changes. The source head's Full CI #41580141385 passed 181/181. Its new screenshot artifact `13206560328` was inspected on desktop 1440×900 and mobile 390×844: the Cesium logo and attribution text remain visible and are not covered by the map docks.
+
+A fresh current-main Full CI, Push CI, and six-sample real-Dhaka browser baseline are still required on the port branch before merge. The six-sample baseline is the live-data acceptance evidence; the deterministic desktop/mobile fixture screenshots prove layout placement only. Keep the red imagery/overlay anomaly open until the producing layer/root cause is isolated and an equivalent live baseline passes human review.
