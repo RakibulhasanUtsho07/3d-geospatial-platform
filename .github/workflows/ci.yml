@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/d3m-engine-01-brf-evidence-20261103
+      - feat/d3m-engine-02-worker-host-inventory-20261103
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
@@ -89,6 +90,7 @@ on:
   pull_request:
     branches:
       - main
+      - feat/d3m-engine-01-brf-evidence-20261103
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
