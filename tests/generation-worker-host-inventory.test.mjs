@@ -207,7 +207,7 @@ test("rejects symlinked runner files without launching Python", async (t) => {
   assert.equal(capabilityProbeCalled, false);
   assert.equal(report.status, "blocked");
   assert.equal(report.runner.status, "invalid");
-  assert.ok(report.blockers.includes("configured-tripiosr-runner-file-not-valid"));
+  assert.ok(report.blockers.includes("configured-triposr-runner-file-not-valid"));
 });
 
 test("fails closed with a redacted blocker when the authoritative capability probe throws", async (t) => {
