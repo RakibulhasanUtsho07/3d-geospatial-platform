@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedAt": "2026-10-26T03:36:15.712Z",
+  "generatedAt": "2026-11-03T10:30:22.942Z",
   "status": "candidate-generated-review-required",
   "engine": "procedural-glb-v1",
   "building": {
@@ -25,6 +25,7 @@
     "architecture": {
       "style": "bangabhaban-palatial-islamic-bangla",
       "roofType": "flat",
+      "frontFacingAzimuthDegrees": 180,
       "wallColor": "#F1EEE6",
       "roofColor": "#E8E5DE",
       "glassColor": "#353936",
@@ -45,6 +46,7 @@
       },
       "centralDome": {
         "enabled": true,
+        "anchor": "footprint-bounds-center",
         "radiusM": 4.2,
         "riseM": 5.6,
         "drumHeightM": 1.7,
@@ -64,8 +66,12 @@
   },
   "model": {
     "path": "data/heritage/generated/bangabhaban-candidate.glb",
-    "bytes": 628068,
-    "sha256": "a3d0c9c6dde5432c24efc95c2cf8035aefd6f285f72bc3e48f44681c03633cc6",
+    "coordinateFrame": "gltf-right-handed-x-east-y-up-z-south",
+    "frontFacingAzimuthDegrees": 180,
+    "frontAxisConfidence": "estimated",
+    "frontAxisSource": "buildingSpec.architecture.frontFacingAzimuthDegrees",
+    "bytes": 628260,
+    "sha256": "1dea5c00d0e23539bdb7ccd7e90f4ea70249b1e8a5d214b92542a8f0e1e52a64",
     "format": "glb",
     "textureStatus": "untextured-procedural-materials-only"
   },
@@ -112,14 +118,15 @@
       "value": {
         "radiusM": 4.2,
         "riseM": 5.6,
-        "drumHeightM": 1.7
+        "drumHeightM": 1.7,
+        "anchor": "footprint-bounds-center"
       },
       "confidence": "estimated",
       "sourceIds": [
         "commons-aerial-2006",
         "commons-exterior-2017"
       ],
-      "notes": "Parametric proportions are visual estimates, not measured dimensions."
+      "notes": "Dome center is provisionally anchored to the footprint bounds center; placement and dome dimensions remain estimated until rectified imagery or measured plan evidence is available."
     },
     {
       "field": "frontArcade",
@@ -143,6 +150,16 @@
         "commons-exterior-2017"
       ],
       "notes": "Assumed for massing only; no section drawing or survey height is available."
+    },
+    {
+      "field": "frontFacingAzimuthDegrees",
+      "value": 180,
+      "confidence": "estimated",
+      "sourceIds": [
+        "commons-aerial-2006",
+        "commons-exterior-2017"
+      ],
+      "notes": "South-facing facade bearing is an approximate model-authoring orientation inferred from reference imagery, not a surveyed compass bearing."
     }
   ],
   "sourceProvenance": [
@@ -205,19 +222,19 @@
     },
     "bounds": {
       "min": [
-        -22.935684204101562,
+        -22.09018325805664,
         0,
-        -11.98778247833252
+        -10.541031837463379
       ],
       "max": [
-        22.935684204101562,
+        22.09018325805664,
         18.100000381469727,
-        10.661532402038574
+        11.98778247833252
       ],
       "dimensions": [
-        45.871368408203125,
+        44.18036651611328,
         18.100000381469727,
-        22.649314880371094
+        22.5288143157959
       ],
       "units": "model-space-unverified"
     },
@@ -304,8 +321,8 @@
         "topology": {
           "vertexCount": 4536,
           "triangleCount": 1512,
-          "modelDiagonal": 50.72501,
-          "longEdgeThreshold": 7.608752,
+          "modelDiagonal": 50.441627,
+          "longEdgeThreshold": 7.566244,
           "maxEdgeLength": 6.739006,
           "meanEdgeLength": 1.264414,
           "longEdgeCount": 0,
@@ -339,8 +356,8 @@
         "topology": {
           "vertexCount": 15804,
           "triangleCount": 5268,
-          "modelDiagonal": 51.972456,
-          "longEdgeThreshold": 7.795868,
+          "modelDiagonal": 50.432513,
+          "longEdgeThreshold": 7.564877,
           "maxEdgeLength": 2.161874,
           "meanEdgeLength": 0.726541,
           "longEdgeCount": 0,
@@ -457,7 +474,7 @@
     "strategy": "reference-assisted-procedural",
     "output": {
       "format": "glb",
-      "bytes": 628068,
+      "bytes": 628260,
       "heightM": 10.8
     },
     "geometry": {
@@ -473,6 +490,36 @@
         "concrete",
         "door"
       ]
+    },
+    "facadeSelection": {
+      "method": "azimuth-nearest-edge",
+      "edgeIndex": 0,
+      "confidence": "estimated",
+      "requestedAzimuthDegrees": 180,
+      "actualAzimuthDegrees": 180,
+      "source": "buildingSpec.architecture.frontFacingAzimuthDegrees",
+      "alignmentDot": 1
+    },
+    "architecturePlacement": {
+      "frontFacade": {
+        "edgeIndex": 0,
+        "requestedAzimuthDegrees": 180,
+        "actualAzimuthDegrees": 180,
+        "confidence": "estimated",
+        "source": "buildingSpec.architecture.frontFacingAzimuthDegrees",
+        "outwardNormal": {
+          "x": 0,
+          "z": 1
+        }
+      },
+      "centralDome": {
+        "anchor": "footprint-bounds-center",
+        "centerModelMeters": {
+          "x": 0,
+          "z": 0
+        },
+        "evidenceConfidence": "estimated"
+      }
     },
     "georeference": {
       "longitude": 90.41782,
@@ -525,6 +572,14 @@
           "building-description",
           "commons-exterior-2017"
         ]
+      },
+      {
+        "field": "frontFacingAzimuthDegrees",
+        "confidence": "estimated",
+        "sourceIds": [
+          "commons-aerial-2006",
+          "commons-exterior-2017"
+        ]
       }
     ],
     "sources": [
@@ -564,7 +619,7 @@
     "confidenceSummary": {
       "verified": 0,
       "derived": 1,
-      "estimated": 5,
+      "estimated": 6,
       "ai-proposed": 0,
       "unknown": 0
     },
@@ -572,7 +627,7 @@
     "warnings": [
       "The procedural preview uses explicit BuildingSpec values; it does not infer facade geometry from the visual media.",
       "The procedural preview does not run image understanding; visual media do not alter geometry unless an explicit reconstruction strategy runs. Video frame extraction, photogrammetry and single-image AI are separate optional routes, and selecting a route does not prove that a reconstruction worker ran successfully.",
-      "Estimated or AI-proposed properties need review before they are treated as verified: location, footprint, centralDome, frontArcade, floorHeightM.",
+      "Estimated or AI-proposed properties need review before they are treated as verified: location, footprint, centralDome, frontArcade, floorHeightM, frontFacingAzimuthDegrees.",
       "Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.",
       "GLB geometry QA: disconnected-mesh-components-present.",
       "GLB geometry QA: long-triangle-edges-present.",
@@ -603,7 +658,7 @@
       "warnings": [
         "The procedural preview uses explicit BuildingSpec values; it does not infer facade geometry from the visual media.",
         "The procedural preview does not run image understanding; visual media do not alter geometry unless an explicit reconstruction strategy runs. Video frame extraction, photogrammetry and single-image AI are separate optional routes, and selecting a route does not prove that a reconstruction worker ran successfully.",
-        "Estimated or AI-proposed properties need review before they are treated as verified: location, footprint, centralDome, frontArcade, floorHeightM."
+        "Estimated or AI-proposed properties need review before they are treated as verified: location, footprint, centralDome, frontArcade, floorHeightM, frontFacingAzimuthDegrees."
       ],
       "nextAction": "generate-procedural-preview"
     },
@@ -627,19 +682,19 @@
       },
       "bounds": {
         "min": [
-          -22.935684204101562,
+          -22.09018325805664,
           0,
-          -11.98778247833252
+          -10.541031837463379
         ],
         "max": [
-          22.935684204101562,
+          22.09018325805664,
           18.100000381469727,
-          10.661532402038574
+          11.98778247833252
         ],
         "dimensions": [
-          45.871368408203125,
+          44.18036651611328,
           18.100000381469727,
-          22.649314880371094
+          22.5288143157959
         ],
         "units": "model-space-unverified"
       },
@@ -726,8 +781,8 @@
           "topology": {
             "vertexCount": 4536,
             "triangleCount": 1512,
-            "modelDiagonal": 50.72501,
-            "longEdgeThreshold": 7.608752,
+            "modelDiagonal": 50.441627,
+            "longEdgeThreshold": 7.566244,
             "maxEdgeLength": 6.739006,
             "meanEdgeLength": 1.264414,
             "longEdgeCount": 0,
@@ -761,8 +816,8 @@
           "topology": {
             "vertexCount": 15804,
             "triangleCount": 5268,
-            "modelDiagonal": 51.972456,
-            "longEdgeThreshold": 7.795868,
+            "modelDiagonal": 50.432513,
+            "longEdgeThreshold": 7.564877,
             "maxEdgeLength": 2.161874,
             "meanEdgeLength": 0.726541,
             "longEdgeCount": 0,
