@@ -59,6 +59,8 @@ async function fixture(t) {
       relativePath,
       licence: "CC BY 4.0",
       permittedOperations: [...SCOPES],
+      author: "Test photographer " + (index + 1),
+      attribution: "Test attribution " + (index + 1),
     });
     images.push({
       id: sourceId,
@@ -183,6 +185,8 @@ test("binds media intake and reviewed geometry workflow to the same exact source
   assert.equal(stubs.calls.media, 1);
   assert.equal(stubs.calls.geometry, 1);
   assert.equal(stubs.calls.mediaOptions.strategy, "photogrammetry");
+  assert.equal(stubs.calls.mediaOptions.sources[0].author, "Test photographer 1");
+  assert.equal(stubs.calls.mediaOptions.sources[0].attribution, "Test attribution 1");
   assert.deepEqual(stubs.calls.mediaOptions.viewSourceIds, f.sources.map((source) => source.sourceId));
   assert.equal(stubs.calls.mediaOptions.jobId, "vertical-slice-001-media");
   assert.equal(stubs.calls.geometryOptions.jobId, "vertical-slice-001-geometry");
