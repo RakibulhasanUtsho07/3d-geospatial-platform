@@ -130,11 +130,10 @@ test("generated windows meet the exterior wall plane for either footprint windin
 test("explicit front facade selection drives the door and is reported", () => {
   const explicitSpec = { ...fixture, architecture: { ...fixture.architecture, frontFacadeEdgeIndex: 1 } };
   const explicit = generateProceduralGlb(explicitSpec);
-  assert.deepEqual(explicit.report.facadeSelection, {
-    method: "explicit-edge-index",
-    edgeIndex: 1,
-    confidence: "operator-specified",
-  });
+  assert.equal(explicit.report.facadeSelection.method, "explicit-edge-index");
+  assert.equal(explicit.report.facadeSelection.edgeIndex, 1);
+  assert.equal(explicit.report.facadeSelection.confidence, "operator-specified");
+  assert.equal(explicit.report.facadeSelection.source, "buildingSpec.architecture.frontFacadeEdgeIndex");
   assert.equal(explicit.normalizedSpec.architecture.frontFacadeEdgeIndex, 1);
   const doorVertices = extractMeshPositions(explicit.glb, "-door");
   const { derived } = normalizeBuildingSpec(explicitSpec);
@@ -152,11 +151,10 @@ test("explicit front facade selection drives the door and is reported", () => {
   assert.ok(Math.abs(Math.max(...selectedDistances) - 0.072) < 0.0001, "door outer face matches its 70 mm depth");
 
   const inferred = generateProceduralGlb(fixture);
-  assert.deepEqual(inferred.report.facadeSelection, {
-    method: "longest-edge-inferred",
-    edgeIndex: 0,
-    confidence: "estimated",
-  });
+  assert.equal(inferred.report.facadeSelection.method, "longest-edge-inferred");
+  assert.equal(inferred.report.facadeSelection.edgeIndex, 0);
+  assert.equal(inferred.report.facadeSelection.confidence, "estimated");
+  assert.equal(inferred.report.facadeSelection.source, "longest-edge-inferred");
   assert.ok(inferred.report.warnings.some(message => message.includes("Front facade was inferred")));
   assert.equal(inferred.report.reviewRequired, true);
 });
