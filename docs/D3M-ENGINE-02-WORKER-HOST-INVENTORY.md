@@ -16,7 +16,7 @@ From the repository root on the actual provisioned worker host:
 node scripts/collect-generation-worker-host-inventory.mjs --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cuda:0
 ~~~
 
-Use \`--device cpu\` or \`--device mps\` when appropriate. The tool writes one sanitized JSON report to stdout. Save it only in the access-controlled private worker workspace; do not commit it or upload raw source/model artifacts to GitHub.
+Use `--device cpu` or `--device mps` when appropriate. The tool writes one sanitized JSON report to stdout. Save it only in the access-controlled private worker workspace; do not commit it or upload raw source/model artifacts to GitHub.
 
 To check syntax and usage without running a probe:
 
@@ -39,9 +39,9 @@ The report deliberately excludes hostname, username, executable/runner/cache pat
 
 ## Limits and safety
 
-- The tool invokes the authoritative D3M-04 capability probe for only \`single-image-ai\`; it does not execute unrelated COLMAP readiness checks.
+- The tool invokes the authoritative D3M-04 capability probe for only `single-image-ai`; it does not execute unrelated COLMAP readiness checks.
 - Imports of PyTorch, ONNX Runtime and rembg execute installed package initialization and can have package-specific side effects. The process sets Hugging Face offline/telemetry flags, but this is not a kernel network firewall, an OS sandbox or a hermetic no-write guarantee.
-- A \`ready-for-operator-smoke\` result means only that this snapshot observed the configured runtime/device and both caches as ready. It does not show that the TripoSR process can complete, that model-weight licensing is approved, or that the resulting GLB is architecturally accurate.
+- A `ready-for-operator-smoke` result means only that this snapshot observed the configured runtime/device and both caches as ready. It does not show that the TripoSR process can complete, that model-weight licensing is approved, or that the resulting GLB is architecturally accurate.
 - Model and checkpoint licences remain separate operator/legal gates. Review the exact TripoSR code/checkpoint and active rembg weight terms before smoke execution.
 - The runner SHA-256 binds the script file bytes. The TripoSR snapshot revision identifies the cached config/checkpoint revision but is not a byte hash of the weight file; the rembg entry records model ID and byte length but not a weight-file hash. Record the actual repository revision, model identifiers and licence basis separately in the D3M-05 evidence log.
 - A fresh D3M-05 smoke must still use fresh job/source IDs, an already-stored rights-cleared JPEG/PNG image, four independent operator confirmations, cached weights and the independent smoke verifier.
@@ -51,9 +51,9 @@ The report deliberately excludes hostname, username, executable/runner/cache pat
 1. Run this inventory on the actual worker host, saving the sanitized JSON in the restricted workspace.
 2. Confirm its Python executable is the same environment used by the worker service; paths are intentionally not included in the report.
 3. Review exact source reuse rights, the permitted operation scopes, single-view inference consent, TripoSR code/checkpoint terms and rembg model-weight terms.
-4. Confirm the inventory reports both model caches as \`cached\` and the selected device is actually available.
+4. Confirm the inventory reports both model caches as `cached` and the selected device is actually available.
 5. Run the existing D3M-05 one-image workflow on a fresh job/source with host-level egress controls when strict no-egress is required.
-6. Run \`npm run verify:single-image-runtime-smoke -- "<workspace>" "<fresh-job-id>"\`.
-7. Open the resulting GLB in an independent viewer. Record dimensions, geometry defects, warnings and the human disposition in \`docs/evidence-templates/D3M-05-REAL-WORKER-SMOKE-LOG.md\` or the operator's private equivalent.
+6. Run `npm run verify:single-image-runtime-smoke -- "<workspace>" "<fresh-job-id>"`.
+7. Open the resulting GLB in an independent viewer. Record dimensions, geometry defects, warnings and the human disposition in `docs/evidence-templates/D3M-05-REAL-WORKER-SMOKE-LOG.md` or the operator's private equivalent.
 
-No CI fixture or synthetic GLB counts as this real-host proof. The output remains private; \`mapReady\`, \`publicationEligible\` and \`automaticApproval\` remain false.
+No CI fixture or synthetic GLB counts as this real-host proof. The output remains private; `mapReady`, `publicationEligible` and `automaticApproval` remain false.
