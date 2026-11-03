@@ -162,10 +162,10 @@ jobs:
         if: success()
         env:
           MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ steps.candidate.outputs.sha }}
-        run: >-
-          npm run verify:real-dhaka-baseline --
-          "$MAP_BENCHMARK_OUT_DIR/report.json"
-          "--expected-commit-sha=${{ steps.candidate.outputs.sha }}"
+        run: |
+          echo "Git status immediately after six-sample browser capture:"
+          git status --porcelain=v1 --untracked-files=all
+          npm run verify:real-dhaka-baseline -- "$MAP_BENCHMARK_OUT_DIR/report.json" "--expected-commit-sha=${{ steps.candidate.outputs.sha }}"
 
       - name: Upload real-Dhaka report, screenshots, and server logs
         if: always()
