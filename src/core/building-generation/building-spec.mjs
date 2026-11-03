@@ -138,6 +138,10 @@ export function normalizeBuildingSpec(raw) {
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
   const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
+  const domeAnchor = dome.anchor === undefined ? "front-facade-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
+  if (!["front-facade-inset", "footprint-bounds-center"].includes(domeAnchor)) {
+    throw new TypeError("centralDome.anchor must be 'front-facade-inset' or 'footprint-bounds-center'");
+  }
   const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
@@ -169,6 +173,7 @@ export function normalizeBuildingSpec(raw) {
     },
     centralDome: {
       enabled: bool(dome.enabled, false, "centralDome.enabled"),
+      anchor: domeAnchor,
       radiusM: dome.radiusM === undefined ? 3.5 : num(dome.radiusM, "centralDome.radiusM", 1, 15),
       riseM: dome.riseM === undefined ? 4.5 : num(dome.riseM, "centralDome.riseM", 1, 20),
       drumHeightM: dome.drumHeightM === undefined ? 1.5 : num(dome.drumHeightM, "centralDome.drumHeightM", 0.5, 8),

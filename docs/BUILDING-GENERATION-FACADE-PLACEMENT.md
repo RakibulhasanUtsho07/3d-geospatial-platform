@@ -60,3 +60,13 @@ The generator writes the same `facadeOrientation` object to GLB extras and the g
 The review wrapper validates the GLB JSON chunk and metadata before launching Blender. It maps the model-local outward normal `(x, z)` to Blender's imported horizontal axes `(x, -z)`, adds a fixed five-degree camera elevation, and passes the result to Blender. The raw render manifest echoes the source normal and converted camera direction; the Node wrapper checks the metadata against the exact input GLB before the final manifest is accepted.
 
 This is a review-camera alignment only. It does not generate a surveyed compass orientation, compare the render to a reference photograph, prove model correctness, or change publication gates. An inferred/operator-specified/non-verified direction is explicitly retained as review-required.
+
+
+## Central-dome anchor selection
+
+When `architecture.centralDome.enabled` is true, BuildingSpec supports two explicit placement rules:
+
+- `front-facade-inset` (default): preserves the existing behavior by centering the dome on the selected front-facade edge and moving it inward by `insetFromFrontM`.
+- `footprint-bounds-center`: places the dome at the midpoint of the footprint's axis-aligned local `minX/maxX/minZ/maxZ` bounds. In this mode `insetFromFrontM` is retained in the spec but does not affect the center.
+
+The generated report records the selected anchor, model-local X/Z center, an estimated placement confidence and a review-required flag. A central dome is a procedural massing assumption even when its anchor is explicitly selected; the report therefore keeps review required and emits a warning. The bounds-center option is **not** a polygon centroid or an architectural measurement, and it can be inappropriate for an asymmetric/concave footprint. Verify it against an independent plan, survey or elevation before accepting the model.

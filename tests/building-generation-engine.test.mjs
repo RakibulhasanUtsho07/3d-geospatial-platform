@@ -116,6 +116,18 @@ test("publishes the same facade selectors and mutual-exclusion rule in the JSON 
   required:["frontFacadeEdgeIndex","frontFacingAzimuthDegrees"],
   properties:{frontFacingAzimuthDegrees:{type:"number"}}
  });
+ assert.deepEqual(architecture.properties.centralDome,{
+  type:"object",
+  properties:{
+   enabled:{type:"boolean"},
+   anchor:{enum:["front-facade-inset","footprint-bounds-center"]},
+   radiusM:{type:"number",minimum:1,maximum:15},
+   riseM:{type:"number",minimum:1,maximum:20},
+   drumHeightM:{type:"number",minimum:0.5,maximum:8},
+   insetFromFrontM:{type:"number",minimum:0,maximum:100}
+  },
+  additionalProperties:false
+ });
  assert.equal(architecture.additionalProperties,false);
 });
 
@@ -201,6 +213,68 @@ test("local latitude increases remain positive model-space northing; facade work
  assert.ok(east.x>0,"easting remains +X in the existing generator frame");
 });
 
+
+
+test("normalizes and validates explicit central-dome placement anchors",()=>{
+ const defaultAnchor=normalizeBuildingSpec(facadeTestSpec({architecture:{centralDome:{enabled:true}}}));
+ assert.equal(defaultAnchor.spec.architecture.centralDome.anchor,"front-facade-inset");
+ const boundsAnchor=normalizeBuildingSpec(facadeTestSpec({architecture:{centralDome:{enabled:true,anchor:"footprint-bounds-center"}}}));
+ assert.equal(boundsAnchor.spec.architecture.centralDome.anchor,"footprint-bounds-center");
+ assert.throws(
+  ()=>normalizeBuildingSpec(facadeTestSpec({architecture:{centralDome:{enabled:true,anchor:"freehand"}}})),
+  /centralDome.anchor must be/
+ );
+});
+
+function domeApex(glb) {
+ const points=extractMeshPositions(glb,"-roof");
+ const maxY=Math.max(...points.map(point=>point.y));
+ const apex=points.filter(point=>Math.abs(point.y-maxY)<1e-5);
+ assert.ok(apex.length>=3,"dome roof contains apex vertices");
+ return {
+  x:apex.reduce((sum,point)=>sum+point.x,0)/apex.length,
+  z:apex.reduce((sum,point)=>sum+point.z,0)/apex.length,
+ };
+}
+
+test("places central dome at selected front-facade inset by default and supports footprint-bounds center",()=>{
+ const frontSpec=facadeTestSpec({
+  architecture:{centralDome:{enabled:true,anchor:"front-facade-inset",insetFromFrontM:4}}
+ });
+ const frontResult=generateProceduralGlb(frontSpec);
+ const frontNormalized=normalizeBuildingSpec(frontSpec);
+ const frontPoints=frontNormalized.derived.localFootprint;
+ const frontIndex=frontResult.report.facadeSelection.edgeIndex;
+ const edge=frontPoints[frontIndex],next=frontPoints[(frontIndex+1)%frontPoints.length];
+ const frame=facadeFramesFor(frontSpec)[frontIndex];
+ const expectedFront={
+  x:(edge.x+next.x)/2-frame.out.x*4,
+  z:(edge.z+next.z)/2-frame.out.z*4
+ };
+ const frontApex=domeApex(frontResult.glb);
+ assert.ok(Math.abs(frontApex.x-expectedFront.x)<1e-4);
+ assert.ok(Math.abs(frontApex.z-expectedFront.z)<1e-4);
+ assert.equal(frontResult.report.architecturePlacement.centralDome.anchor,"front-facade-inset");
+ assert.equal(frontResult.report.architecturePlacement.centralDome.confidence,"estimated");
+ assert.equal(frontResult.report.architecturePlacement.centralDome.reviewRequired,true);
+ assert.equal(frontResult.report.reviewRequired,true);
+
+ const centerSpec=facadeTestSpec({
+  architecture:{centralDome:{enabled:true,anchor:"footprint-bounds-center",insetFromFrontM:4}}
+ });
+ const centerResult=generateProceduralGlb(centerSpec);
+ const centerNormalized=normalizeBuildingSpec(centerSpec);
+ const bounds=centerNormalized.spec.footprint.bounds;
+ const expectedCenter={x:(bounds.minX+bounds.maxX)/2,z:(bounds.minZ+bounds.maxZ)/2};
+ const centerApex=domeApex(centerResult.glb);
+ assert.ok(Math.abs(centerApex.x-expectedCenter.x)<1e-4);
+ assert.ok(Math.abs(centerApex.z-expectedCenter.z)<1e-4);
+ assert.equal(centerResult.report.architecturePlacement.centralDome.anchor,"footprint-bounds-center");
+ assert.deepEqual(centerResult.report.architecturePlacement.centralDome.centerModelXZ,{
+  x:Number(expectedCenter.x.toFixed(3)),z:Number(expectedCenter.z.toFixed(3))
+ });
+ assert.equal(centerResult.report.reviewRequired,true,"procedural dome placement must remain review-required");
+});
 
 test("embeds the selected facade normal and review provenance in GLB extras",()=>{
  const result=generateProceduralGlb(facadeTestSpec({architecture:{frontFacingAzimuthDegrees:90}}));

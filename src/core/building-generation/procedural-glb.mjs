@@ -181,9 +181,21 @@ export function generateProceduralGlb(rawSpec) {
   // Optional architectural massing features: retained in the normalized BuildingSpec
   // and generated deterministically so specialist buildings need not be reduced to a box.
   const dome=spec.architecture.centralDome;
+  let domePlacement=null;
   if(dome.enabled){
     const e=edges[front],midX=(e.p.x+e.n.x)/2,midZ=(e.p.z+e.n.z)/2;
-    const cx=midX-e.out.x*dome.insetFromFrontM,cz=midZ-e.out.z*dome.insetFromFrontM;
+    const domeCenter=dome.anchor==="footprint-bounds-center"
+      ? {x:(spec.footprint.bounds.minX+spec.footprint.bounds.maxX)/2,z:(spec.footprint.bounds.minZ+spec.footprint.bounds.maxZ)/2}
+      : {x:midX-e.out.x*dome.insetFromFrontM,z:midZ-e.out.z*dome.insetFromFrontM};
+    const cx=domeCenter.x,cz=domeCenter.z;
+    domePlacement={
+      anchor:dome.anchor,
+      centerModelXZ:{x:Number(cx.toFixed(3)),z:Number(cz.toFixed(3))},
+      confidence:"estimated",
+      source:"buildingSpec.architecture.centralDome.anchor",
+      reviewRequired:true
+    };
+    warnings.push("Central dome placement is a procedural anchor ("+dome.anchor+"); verify its position against independent architectural evidence.");
     const baseY=height+spec.dimensions.parapetHeightM;
     geo.cylinder("concrete",cx,baseY,cz,dome.radiusM*0.88,dome.drumHeightM,24);
     const domeY=baseY+dome.drumHeightM,segments=32,steps=12;
@@ -296,7 +308,8 @@ export function generateProceduralGlb(rawSpec) {
         source:selectedFacade.source,
         outwardNormal:{x:Number(edges[front].out.x.toFixed(6)),z:Number(edges[front].out.z.toFixed(6))},
         insertFaceClearanceM:0.002
-      }
+      },
+      centralDome:domePlacement
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
@@ -305,7 +318,8 @@ export function generateProceduralGlb(rawSpec) {
     reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||
       spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
       frontAxisNeedsReview||
-      selectedFacade.reviewRequired,
+      selectedFacade.reviewRequired||
+      (domePlacement?.reviewRequired===true),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
