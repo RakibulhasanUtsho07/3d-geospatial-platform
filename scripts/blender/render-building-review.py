@@ -43,20 +43,20 @@ DEFAULT_FRONT_BEARING_DEGREES = 180.0
 
 
 def camera_direction_from_bearing(bearing_degrees, elevation_degrees=0.0):
-    """Return a unit camera-position direction in glTF coordinates: X east, Y up, Z north."""
+    """Return a Blender-world camera direction after glTF import: X east, Y north, Z up."""
     bearing = math.radians(float(bearing_degrees) % 360.0)
     elevation = math.radians(float(elevation_degrees))
     horizontal = math.cos(elevation)
     return (
         math.sin(bearing) * horizontal,
-        math.sin(elevation),
         math.cos(bearing) * horizontal,
+        math.sin(elevation),
     )
 
 
-def camera_track_up_axis(vertical_component):
-    """Use north (+Z) as screen-up for a vertical top camera; otherwise glTF +Y."""
-    return "Z" if abs(float(vertical_component)) > 0.999 else "Y"
+def camera_track_up_axis(direction):
+    """Use Blender Z-up for horizon views and north (+Y) as roll reference for top view."""
+    return "Y" if abs(float(direction.z)) > 0.999 else "Z"
 
 
 def build_review_view_directions(front_bearing_degrees=None, front_elevation_degrees=5.0, turntable_elevation_degrees=22.0):
@@ -132,7 +132,7 @@ def scene_bounds(mesh_objects):
 def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
     """Fit an orthographic camera to the visible geometry projected into this view."""
     camera_location = view_center + direction.normalized()
-    rotation = (view_center - camera_location).to_track_quat("-Z", camera_track_up_axis(direction.y))
+    rotation = (view_center - camera_location).to_track_quat("-Z", camera_track_up_axis(direction))
     camera_right = rotation @ Vector((1.0, 0.0, 0.0))
     camera_up = rotation @ Vector((0.0, 1.0, 0.0))
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -329,14 +329,14 @@ def main():
     light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
     light_size = max_dimension * 0.68
     light_offset = max_dimension * 0.65
-    # glTF uses Y-up; keep all review lights above the ground plane.
-    add_area_light("ReviewKeyLight", center + Vector((1.4, 2.2, -1.8)) * light_offset, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, 1.0, -0.3)) * light_offset, center, light_power * 0.33, light_size * 1.05)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.5, 1.7)) * light_offset, center, light_power * 0.38, light_size)
+    # Blender's glTF importer converts (x, y, z) to (x, -z, y): Z-up.
+    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
 
-    # BuildingSpec and generated GLBs use glTF's Y-up frame (X east, Z north).
-    # Missing orientation uses a deterministic south-facing default; it is not
-    # evidence that the real building entrance faces south.
+    # The GLB stores a right-handed map frame: X east, Y up, Z south.
+    # Blender's glTF importer maps it to X east, Y north, Z up.
+    # A missing bearing uses a deterministic south-facing default, not real-world evidence.
     front_azimuth, front_axis_confidence = read_front_facing_azimuth(model_path)
     if front_azimuth is None:
         front_axis_source = "renderer-default"
@@ -384,7 +384,7 @@ def main():
         camera_data.ortho_scale = view_scale
         camera.location = view_center + direction * view_distance
         camera.rotation_euler = (view_center - camera.location).to_track_quat(
-            "-Z", camera_track_up_axis(direction.y)
+            "-Z", camera_track_up_axis(direction)
         ).to_euler()
         scene.camera = camera
         filename = view_id + ".png"
