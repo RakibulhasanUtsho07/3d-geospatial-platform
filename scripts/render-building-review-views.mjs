@@ -7,7 +7,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
 import { validateRenderReviewProfile } from "../src/core/building-generation/render-review-profile.mjs";
-import { validateRenderReviewProfile } from "../src/core/building-generation/render-review-profile.mjs";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
 import {
   assessSourceCameraForRender,
@@ -80,7 +79,6 @@ async function main() {
     return value;
   };
   const reviewProfilePathArg = singleFlag("review-profile");
-  const reviewProfilePathArg = singleFlag("review-profile");
   const sourceCameraPathArg = singleFlag("source-camera");
   const sourceImagePathArg = singleFlag("source-image");
   const calibrationEvidencePathArg = singleFlag("calibration-evidence");
@@ -106,23 +104,6 @@ async function main() {
     if (error.code !== "ENOENT") throw error;
   }
   const modelBytes = await readFile(modelPath);
-  let renderProfileMetadata = null;
-  if (reviewProfilePathArg) {
-    const profilePath = path.resolve(reviewProfilePathArg);
-    const profileBytes = await readFile(profilePath);
-    let parsedProfile;
-    try {
-      parsedProfile = JSON.parse(profileBytes.toString("utf8"));
-    } catch (error) {
-      throw new TypeError("render review profile JSON is invalid: " + (error instanceof Error ? error.message : String(error)));
-    }
-    const validatedProfile = validateRenderReviewProfile(parsedProfile);
-    renderProfileMetadata = {
-      profileId: validatedProfile.profileId,
-      schemaVersion: validatedProfile.schemaVersion,
-      sha256: sha256(profileBytes),
-    };
-  }
   let sourceCameraAssessment = null;
   let sourceCameraPath = null;
   if (cameraInputs.every(Boolean)) {
@@ -198,9 +179,6 @@ async function main() {
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
     ];
-    if (reviewProfilePathArg && renderProfileMetadata) {
-      args.push("--review-profile-json", path.resolve(reviewProfilePathArg), "--review-profile-sha256", renderProfileMetadata.sha256);
-    }
     if (reviewProfilePath && reviewProfileAssessment?.sha256) {
       args.push("--review-profile-json", reviewProfilePath, "--review-profile-sha256", reviewProfileAssessment.sha256);
     }
