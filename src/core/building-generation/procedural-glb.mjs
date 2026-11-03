@@ -108,17 +108,23 @@ export function generateProceduralGlb(rawSpec) {
   let facadeSelectionMethod;
   let frontAxisConfidence;
   let frontAxisSource;
+  let orientationEvidenceField=null;
+  let orientationEvidenceValue=null;
   if(spec.architecture.frontFacadeEdgeIndex!==undefined){
     front=spec.architecture.frontFacadeEdgeIndex;
     facadeSelectionMethod="explicit-edge-index";
-    frontAxisConfidence=spec.evidence.find(item=>item.field==="frontFacadeEdgeIndex")?.confidence??"operator-specified";
+    orientationEvidenceField="frontFacadeEdgeIndex";
+    orientationEvidenceValue=front;
+    frontAxisConfidence="operator-specified";
     frontAxisSource="buildingSpec.architecture.frontFacadeEdgeIndex";
   }else if(azimuthVector!==null){
     front=edges.reduce((best,e,i)=>
       e.out.x*azimuthVector.x+e.out.z*azimuthVector.z >
       edges[best].out.x*azimuthVector.x+edges[best].out.z*azimuthVector.z ? i : best,0);
     facadeSelectionMethod="azimuth-nearest-edge";
-    frontAxisConfidence=spec.evidence.find(item=>item.field==="frontFacingAzimuthDegrees")?.confidence??"operator-specified";
+    orientationEvidenceField="frontFacingAzimuthDegrees";
+    orientationEvidenceValue=requestedFrontAzimuth;
+    frontAxisConfidence="operator-specified";
     frontAxisSource="buildingSpec.architecture.frontFacingAzimuthDegrees";
   }else{
     front=edges.reduce((best,e,i)=>e.len>edges[best].len?i:best,0);
@@ -126,6 +132,16 @@ export function generateProceduralGlb(rawSpec) {
     frontAxisConfidence="estimated";
     frontAxisSource="longest-edge-inferred";
     warnings.push("Front facade was inferred from the longest footprint edge; set architecture.frontFacadeEdgeIndex or frontFacingAzimuthDegrees to select it explicitly.");
+  }
+  if(orientationEvidenceField!==null){
+    const orientationEvidence=spec.evidence.filter(item=>item.field===orientationEvidenceField);
+    const hasConflictingEvidence=orientationEvidence.some(item=>item.value!==orientationEvidenceValue);
+    if(hasConflictingEvidence){
+      frontAxisConfidence="unknown";
+      warnings.push("Front facade orientation evidence conflicts with the configured selector; independent review is required.");
+    }else if(orientationEvidence.length){
+      frontAxisConfidence=orientationEvidence[0].confidence;
+    }
   }
   const frontEdge=edges[front];
   const actualFrontAzimuthDegrees=(Math.atan2(frontEdge.out.x,frontEdge.out.z)*180/Math.PI+360)%360;
