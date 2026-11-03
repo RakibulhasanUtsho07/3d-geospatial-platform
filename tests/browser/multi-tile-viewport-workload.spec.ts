@@ -572,6 +572,19 @@ test("P2.6 measures real multi-tile viewport churn, cancellation, frame readines
   };
 
   await page.goto("/map", { waitUntil: "domcontentloaded" });
+
+  // Map data-layer controls and the camera dock now start collapsed to keep
+  // the map canvas clear. Open them explicitly for this workload run.
+  const layersToggle = page.getByRole("button", { name: "Map layers" });
+  await expect(layersToggle).toBeEnabled({ timeout: 45_000 });
+  await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute("aria-expanded", "true");
+
+  const controlsToggle = page.getByRole("button", { name: "Map controls" });
+  await expect(controlsToggle).toBeEnabled({ timeout: 45_000 });
+  await controlsToggle.click();
+  await expect(controlsToggle).toHaveAttribute("aria-expanded", "true");
+
   await expect(
     page.getByRole("checkbox", { name: "Detailed OSM roads" }),
   ).toBeEnabled({ timeout: 45_000 });
