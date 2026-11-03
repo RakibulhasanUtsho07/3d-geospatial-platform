@@ -149,6 +149,10 @@ jobs:
     name: Lint and production build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Bind P3.6 browser evidence to the proposed source commit, not the
+      # synthetic merge SHA that GitHub uses for pull_request workflows.
+      P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out repository
