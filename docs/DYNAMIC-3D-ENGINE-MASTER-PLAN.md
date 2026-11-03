@@ -264,7 +264,7 @@ Exit: repository state and selected candidate are recorded before code changes. 
 Source stack to inspect selectively:
 - PR #187 / branch `feat/brf-01-generic-renderer` head `5ec16ed677019c28c8380362b56de4062c683e4a` — generic renderer and review-profile work; based on #185.
 - PR #188 / branch `feat/brf-02-candidate-evidence-manifest` head `21b0df2fc527f6e9adbe70f2918c9a690fa3cbd7` — candidate evidence manifest; based on #187.
-- PR #189 / branch `feat/brf-03-capture-quality-coverage` head `69eb71ec90d60f49f0913ddf25533a074fa3cbd7` — capture image-quality/coverage preflight; based on #188.
+- PR #189 / branch `feat/brf-03-capture-quality-coverage` head `69eb71ec90d60f49f0913ddf25533a074b70c63d` — capture image-quality/coverage preflight; based on #188.
 - PR #190 / branch `feat/brf-04-baseline-defect-benchmarks` head `dce0d4f92e6e30feb9cff2880c3175dc2feeaf13` — controlled baseline and deliberate defect injection; based on #189.
 - A cleaner renderer-only current-base candidate also exists at `feat/brf-01-generic-renderer-current-base`; compare its exact latest head and changed files before using it.
 
