@@ -48,3 +48,18 @@
 ## Release boundary
 
 `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false. A green CI run or cached-model preflight does not establish real building reconstruction accuracy, licence clearance, survey truth or automatic publication.
+
+
+## 2026-11-03 — promotion correction after D3M-ENGINE-02
+
+This section supersedes the earlier snapshot's main SHA and pending-promotion statements.
+
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- D3M-03 reconciliation PR #324 merged to main at `6b3c8e3de3eb1e34685e1a25ab34a95f3a3f1993`.
+- D3M-04 through D3M-07 cumulative source stack merged through PR #325 at `6aeb6d97e719497d957c722260c507e5fedbf8ac`. Its source includes D3M-05 runtime smoke orchestration and verifier, D3M-06 reviewed placement binding and D3M-07 non-inference preflight. The old stacked source PRs were closed as superseded.
+- D3M-01 reviewer-trust integration merged through PR #326 at `fb3537d3199c98b43218b7853303858b5c9c0590`.
+- D3M-ENGINE-02 worker-host inventory and cache-byte fail-closed checks merged through PR #347 at `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- Post-merge main Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps. It covers the D3M-05 offline smoke contract test, D3M-07 preflight test, D3M-ENGINE-02 inventory tests/CLI and production viewport verification.
+- BRF-35 linkage [#41649268750](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268750) and BRF-45 exact-asset rights [#41649268800](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268800) also completed successfully on the same main SHA.
+
+**Remaining operational acceptance:** no actual worker-host inventory report, successful TripoSR/rembg inference, independently verified private GLB or human visual disposition has been recorded. D3M-05 issue #307 remains open. CI fixtures and a cached-model preflight are not real inference evidence. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
