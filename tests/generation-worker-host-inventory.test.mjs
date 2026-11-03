@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  buildPythonInventoryProgram,
   collectGenerationWorkerHostInventory,
 } from "../src/core/building-generation/generation-worker-host-inventory.mjs";
 
@@ -81,6 +83,21 @@ function fakeHost() {
     freemem: () => 20 * 1024 ** 3,
   };
 }
+
+
+test("generated Python inventory probe has valid syntax and initializes model artifact records", () => {
+  const source = buildPythonInventoryProgram();
+  assert.ok(source.includes("'modelArtifacts': {'tripoConfig'"));
+  assert.ok(source.includes("try_to_load_from_cache('stabilityai/TripoSR'"));
+  assert.ok(source.includes("resolve_existing"));
+  assert.ok(source.includes("runnerSha256Matches"));
+  const result = spawnSync("python3", ["-c", "import ast,sys; ast.parse(sys.stdin.read())"], {
+    input: source,
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});
 
 test("collects a ready redacted host inventory with runtime, GPU, cache and runner fingerprints", async (t) => {
   const { runner } = await runnerFixture(t);
