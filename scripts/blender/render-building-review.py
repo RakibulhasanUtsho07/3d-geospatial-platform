@@ -101,14 +101,18 @@ def read_front_facing_azimuth(model_path):
         raise RuntimeError("GLB JSON chunk could not be read: " + str(error))
     building = (document.get("extras") or {}).get("building") or {}
     angle = building.get("frontFacingAzimuthDegrees")
+    coordinate_frame = building.get("coordinateFrame")
     if angle is None:
-        return None, "unknown"
+        return None, "unknown", coordinate_frame
     if isinstance(angle, bool) or not isinstance(angle, (int, float)) or not math.isfinite(angle) or angle < 0 or angle > 360:
         raise RuntimeError("GLB frontFacingAzimuthDegrees must be a finite bearing from 0 to 360")
+    expected_frame = "gltf-right-handed-x-east-y-up-z-south"
+    if coordinate_frame != expected_frame:
+        raise RuntimeError("GLB with a geographic front bearing must declare coordinateFrame " + expected_frame)
     confidence = building.get("frontAxisConfidence", "unknown")
     if confidence not in ["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]:
         raise RuntimeError("GLB frontAxisConfidence is unsupported")
-    return float(angle), confidence
+    return float(angle), confidence, coordinate_frame
 
 
 
@@ -337,7 +341,7 @@ def main():
     # The GLB stores a right-handed map frame: X east, Y up, Z south.
     # Blender's glTF importer maps it to X east, Y north, Z up.
     # A missing bearing uses a deterministic south-facing default, not real-world evidence.
-    front_azimuth, front_axis_confidence = read_front_facing_azimuth(model_path)
+    front_azimuth, front_axis_confidence, model_coordinate_frame = read_front_facing_azimuth(model_path)
     if front_azimuth is None:
         front_axis_source = "renderer-default"
         front_axis_confidence = "unknown"
@@ -443,6 +447,7 @@ def main():
         "width": resolution,
         "height": resolution,
         "frontFacingAzimuthDegrees": front_azimuth,
+        "modelCoordinateFrame": model_coordinate_frame,
         "frontCameraEffectiveBearingDegrees": effective_front_bearing,
         "frontAxisConfidence": front_axis_confidence,
         "frontAxisSource": front_axis_source,
