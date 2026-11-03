@@ -104,8 +104,10 @@ test("collects a ready redacted host inventory with runtime, GPU, cache and runn
   assert.deepEqual(capabilityArgs.strategies, ["single-image-ai"]);
   assert.equal(spawn[1][0], "-c");
   assert.equal(spawn[1][3], report.runner.sha256);
-  assert.match(spawn[1][1], /hashlib.sha256\\(runner_bytes\\).hexdigest\\(\\) == sys.argv\\[2\\]/);
-  assert.match(spawn[1][1], /compile\\(runner_bytes/);
+  assert.ok(spawn[1][1].includes("hashlib.sha256(runner_bytes).hexdigest() == sys.argv[2]"));
+  assert.ok(spawn[1][1].includes("compile(runner_bytes"));
+  assert.equal(report.runner.syntaxCompiledInMemory, true);
+  assert.equal(report.runner.sha256MatchedInProbe, true);
   assert.doesNotMatch(spawn[1][1], /exec\(runner_bytes/);
   assert.equal(report.mapReady, false);
   assert.equal(report.publicationEligible, false);
