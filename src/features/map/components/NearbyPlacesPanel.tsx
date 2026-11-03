@@ -145,7 +145,7 @@ export default function NearbyPlacesPanel({
   return (
     <aside
       aria-label="Nearby places"
-      className="absolute left-4 top-[13.25rem] z-20 w-[min(360px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl"
+      className="absolute left-4 top-[17rem] z-20 w-[min(360px,calc(100%-5.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl sm:top-[13.25rem]"
     >
       <button
         type="button"
