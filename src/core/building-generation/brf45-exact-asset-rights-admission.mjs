@@ -131,6 +131,7 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
     sourceBinding.sourceManifestFilename === "brf-14-multiview-source.json" &&
     sourceBinding.sampleId === sourceManifest.sampleId &&
     sourceBinding.sourceRepositoryCommit === sourceManifest.dataset?.sourceRepositoryCommit &&
+    sourceBinding.dataRepositoryRevision === sourceManifest.dataset?.dataRepositoryRevision &&
     sourceBinding.declaredLicense === sourceManifest.dataset?.license &&
     sourceBinding.licenseScope === sourceManifest.dataset?.licenseScope &&
     sourceBinding.rightsStatus === sourceManifest.dataset?.rightsStatus;
@@ -172,6 +173,7 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
       row.byteSize === source.expectedByteSize &&
       row.sourceUrl === source.sourceUrl &&
       row.sourceRepositoryCommit === sourceBinding.sourceRepositoryCommit &&
+      row.dataRepositoryRevision === sourceBinding.dataRepositoryRevision &&
       isHttps(row.sourceUrl) && isSha(row.sha256) &&
       Number.isSafeInteger(row.byteSize) && row.byteSize > 0 &&
       Array.isArray(row.requestedScopes) &&
@@ -180,8 +182,8 @@ export async function validateBrf45ExactAssetRightsAdmission(manifest, options =
       row.requestedScopes.every(scope => ALLOWED_SCOPES.has(scope)) &&
       unique(row.requestedScopes).length === row.requestedScopes.length;
     add(checks, blockers, rowPrefix + "-exact-source-binding", exactSourceMatch,
-      exactSourceMatch ? "Source ID, filename, URL, commit, exact hash/size and requested scopes match BRF-14."
-        : "Source identity, URL, commit, SHA-256, size or requested scopes differ from BRF-14.");
+      exactSourceMatch ? "Source ID, filename, immutable data URL/revision, metadata commit, exact hash/size and requested scopes match BRF-14."
+        : "Source identity, immutable data URL/revision, metadata commit, SHA-256, size or requested scopes differ from BRF-14.");
     if (!source || seenIds.has(id)) {
       add(checks, blockers, rowPrefix + "-source-id-unique-and-known", false,
         "Rights row references an unknown or duplicate source ID.");
