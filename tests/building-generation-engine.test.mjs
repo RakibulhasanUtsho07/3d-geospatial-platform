@@ -6,6 +6,7 @@ import { createFacadeFrame } from "../src/core/building-generation/facade-placem
 import { generateBuildingModel, planGeneration } from "../src/core/building-generation/generation-engine.mjs";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
+const buildingSpecSchema=JSON.parse(await readFile(new URL("../building-generation-spec.schema.json",import.meta.url),"utf8"));
 function parseGlb(buffer){
  assert.equal(buffer.readUInt32LE(0),0x46546c67);assert.equal(buffer.readUInt32LE(4),2);assert.equal(buffer.readUInt32LE(8),buffer.byteLength);
  const size=buffer.readUInt32LE(12);assert.equal(buffer.readUInt32LE(16),0x4e4f534a);
@@ -97,6 +98,26 @@ function facadeTestSpec({reverseWinding=false,architecture={}}={}) {
   }
  };
 }
+
+test("publishes the same facade selectors and mutual-exclusion rule in the JSON Schema",()=>{
+ const architecture=buildingSpecSchema.properties.architecture;
+ assert.deepEqual(architecture.properties.frontFacadeEdgeIndex,{
+  type:"integer",
+  minimum:0,
+  description:"Zero-based index into the normalized outer footprint ring; maximum valid index is footprint vertex count minus one."
+ });
+ assert.deepEqual(architecture.properties.frontFacingAzimuthDegrees,{
+  type:["number","null"],
+  minimum:0,
+  maximum:360,
+  description:"Optional clockwise-from-north bearing. Specify this or frontFacadeEdgeIndex, not both; null is treated as unspecified."
+ });
+ assert.deepEqual(architecture.not,{
+  required:["frontFacadeEdgeIndex","frontFacingAzimuthDegrees"],
+  properties:{frontFacingAzimuthDegrees:{type:"number"}}
+ });
+ assert.equal(architecture.additionalProperties,false);
+});
 
 test("normalizes explicit front facade edge and compass bearing as mutually exclusive selectors",()=>{
  const explicit=normalizeBuildingSpec(facadeTestSpec({architecture:{frontFacadeEdgeIndex:1}}));
