@@ -259,7 +259,8 @@
     "audit:dhaka-overture-architecture-coverage": "node scripts/audit-dhaka-overture-architecture-coverage.mjs",
     "test:dhaka-overture-architecture-coverage": "node --test tests/dhaka-overture-architecture-coverage.test.mjs",
     "test:imagery-tile-error-diagnostics": "node --test tests/imagery-tile-error-diagnostics.test.mjs",
-    "test:canvas-red-pixel-diagnostics": "node --test tests/canvas-red-pixel-diagnostics.test.mjs"
+    "test:canvas-red-pixel-diagnostics": "node --test tests/canvas-red-pixel-diagnostics.test.mjs",
+    "test:map-viewport-ux": "node --test tests/map-viewport-ux.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
