@@ -262,3 +262,12 @@ The codebase still needs real-data validation and product-level completion. The 
 - A real worker-host TripoSR/rembg inference, independently verified GLB and human visual review have not been completed. CI uses synthetic fixtures and does not establish model accuracy.
 - Rights and model-weight licences require an explicit deployment decision. In particular, verify the selected rembg weight licence for the intended use.
 - `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false. No automatic publication or accuracy claim is made.
+
+## D3M-01 — source-bound review and governed reviewer trust
+
+- **Integration candidate:** `integration/d3m01-main-reconciled-20261103` (PR #326, exact-head CI pending).
+- Includes the BRF-05/06 local source-bound mask and architectural-observation review tools, BRF-07 evidence bundle, immutable source-bound candidate hand-off, Ed25519-signed reviewer decision receipt, and D3M-01.F/G public-key registry lifecycle/preflight.
+- Reviewer signatures bind the exact hand-off artifact, candidate GLB and geometry report. Production accepts only the versioned server-configured public-key registry; API callers cannot submit trusted keys. Revoked, expired, malformed, duplicate, orphaned or invalid key chains fail closed.
+- A valid signature proves possession of a key provisioned in the server trust registry only. It does not prove a person's civil identity, legal authority, source rights, survey accuracy or architectural correctness.
+- The mask and observation editors remain local manual annotation tools; source rights, camera calibration, independent reference data and human review remain separate evidence gates.
+- No real reviewer has been onboarded and no production registry or signing key has been provisioned. `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false.

@@ -234,7 +234,15 @@
     "test:single-image-worker-preflight": "node --test tests/single-image-worker-preflight.test.mjs",
     "preflight:single-image-worker": "node scripts/preflight-single-image-worker.mjs",
     "smoke:single-image-runtime": "node scripts/smoke-test-single-image-runtime.mjs",
-    "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs"
+    "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs",
+    "test:source-bound-visual-evidence-bundle": "node --test tests/source-bound-visual-evidence-bundle.test.mjs tests/source-bound-evidence-bundle-ui.test.mjs",
+    "test:source-bound-reconstruction-evidence": "node --test tests/source-bound-reconstruction-evidence.test.mjs",
+    "test:source-bound-reconstruction-handoff": "node --test tests/source-bound-reconstruction-handoff.test.mjs tests/source-bound-reconstruction-handoff-cli.test.mjs",
+    "prepare:source-bound-reconstruction-handoff": "node scripts/prepare-source-bound-reconstruction-handoff.mjs",
+    "test:source-bound-authenticated-review": "node --test tests/source-bound-authenticated-review.test.mjs tests/trusted-reviewer-registry.test.mjs tests/source-bound-authenticated-review-api.test.mjs tests/source-bound-authenticated-review-signing.test.mjs tests/source-bound-geometry-review-cli.test.mjs",
+    "prepare:source-bound-geometry-review": "node scripts/prepare-source-bound-geometry-review.mjs",
+    "validate:trusted-reviewer-registry": "node scripts/validate-trusted-reviewer-registry.mjs",
+    "test:trusted-reviewer-registry-cli": "node --test tests/trusted-reviewer-registry-cli.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

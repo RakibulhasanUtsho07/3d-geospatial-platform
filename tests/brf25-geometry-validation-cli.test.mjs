@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -7,9 +7,175 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { MODEL_TO_EVALUATION, createBuildingGlb, surveyGeometryDocument } from "./fixtures/glb-geometry-fixture.mjs";
+import {
+  CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS,
+  createOrResumeReconstructionJob,
+  fingerprintStageInput,
+  startReconstructionStage,
+  completeReconstructionStage,
+} from "../src/core/building-generation/reconstruction-job-state.mjs";
+import {
+  canonicalSourceBoundReviewSubmissionBytes,
+  parseTrustedReconstructionReviewerKeys,
+  prepareSourceBoundGeometryReview,
+  recordSourceBoundAuthenticatedReview,
+} from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const runnerSource = fileURLToPath(new URL("../scripts/run-brf25-geometry-validation.mjs", import.meta.url));
+
+
+async function createReviewReceipt(workspaceRoot, { decision = "continue-to-independent-validation" } = {}) {
+  const buildingId = "brf25-synthetic-building-01";
+  const handoffJobId = "handoff-brf25-synthetic-01";
+  const candidateBytes = await readFile(path.join(workspaceRoot, "output/candidate.glb"));
+  const candidateSha = hash(candidateBytes);
+  await createOrResumeReconstructionJob({
+    workspaceRoot,
+    buildingId,
+    jobId: handoffJobId,
+    sourceManifest: {
+      schemaVersion: "1.0.0",
+      recordType: "source-bound-reconstruction-handoff-source",
+      candidateGlbSha256: candidateSha,
+      sourceJobId: "brf25-source-job-01",
+    },
+    config: {
+      handoffContractVersion: "1.0.0",
+      handoffPrepared: true,
+      dispatchAllowed: false,
+      groundTruth: false,
+      acceptanceEligible: false,
+      publicationEligible: false,
+      publishable: false,
+      mapReady: false,
+      automaticApproval: false,
+    },
+    stageIds: CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS,
+    now: "2026-10-30T15:00:00.000Z",
+  });
+
+  const handoff = {
+    schemaVersion: "1.0.0",
+    recordType: "source-bound-reconstruction-handoff",
+    handoffId: handoffJobId,
+    createdAt: "2026-10-30T15:00:00.000Z",
+    buildingId,
+    sourceJobId: "brf25-source-job-01",
+    disposition: "prepared-for-human-review",
+    handoffPrepared: true,
+    reviewRequired: true,
+    dispatchAllowed: false,
+    candidate: {
+      path: "output/candidate.glb",
+      sha256: candidateSha,
+      bytes: candidateBytes.length,
+      geometryAccuracyEvaluated: false,
+    },
+    checks: {
+      sourceJobCompleted: true,
+      sourceJobArtifactsVerified: true,
+      visualBundleHashRecomputed: true,
+      reconstructionEvidenceHashRecomputed: true,
+      candidateGlbHashRecomputed: true,
+      candidateGlbContainerValid: true,
+      qaReportHashRecomputed: true,
+      qaReportMatchesImmutableSourceArtifact: true,
+      visualSourceMatchesSelectedJobView: true,
+      exactCandidateHashMatchesEvidenceBundle: true,
+      rightsEvidenceCompleteButHumanReviewRequired: true,
+      cameraEvidenceStructurallyValidButHumanReviewRequired: true,
+      groundControlRegistrationRecomputedButHumanReviewRequired: true,
+      verticalDatumResolved: true,
+    },
+    policy: {
+      candidateGeometryValidated: false,
+      groundTruth: false,
+      acceptanceEligible: false,
+      publicationEligible: false,
+      publishable: false,
+      mapReady: false,
+      automaticApproval: false,
+      dispatchAllowed: false,
+    },
+  };
+
+  for (const [index, stageId] of CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS.entries()) {
+    const inputFingerprint = fingerprintStageInput({
+      stageId,
+      inputs: { index, candidateSha },
+      parameters: { fixture: "brf25-d3m01e-review-gate" },
+    });
+    await startReconstructionStage({
+      workspaceRoot,
+      buildingId,
+      jobId: handoffJobId,
+      stageId,
+      inputFingerprint,
+      now: "2026-10-30T15:01:00.000Z",
+    });
+    await completeReconstructionStage({
+      workspaceRoot,
+      buildingId,
+      jobId: handoffJobId,
+      stageId,
+      payload: stageId === "candidate-evidence-handoff"
+        ? { handoff }
+        : { verificationStatus: "review-ready", candidateGlbSha256: candidateSha },
+      outputs: { candidateGlbSha256: candidateSha, reviewOnly: true },
+      now: "2026-10-30T15:02:00.000Z",
+    });
+  }
+
+  const prepared = await prepareSourceBoundGeometryReview({ workspaceRoot, buildingId, handoffJobId });
+  const pair = generateKeyPairSync("ed25519");
+  const publicKeyPem = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const registry = parseTrustedReconstructionReviewerKeys([{ reviewerId: "reviewer-brf25", publicKeyPem }]);
+  const checks = {
+    rightsUseScope: "verified",
+    sameBuildingIdentity: "verified",
+    cameraCalibration: "verified",
+    groundControlCorrespondence: "verified",
+    metricScale: "verified",
+    verticalDatum: "verified",
+    geometryTopology: "accepted-for-independent-validation",
+    sourceCameraComparison: "consistent",
+  };
+  const submission = {
+    ...prepared.submissionTemplate,
+    reviewerId: "reviewer-brf25",
+    reviewedAtUtc: "2026-10-30T15:05:00.000Z",
+    decision,
+    checks: decision === "continue-to-independent-validation" ? checks : {
+      rightsUseScope: "not-reviewed",
+      sameBuildingIdentity: "not-reviewed",
+      cameraCalibration: "not-reviewed",
+      groundControlCorrespondence: "not-reviewed",
+      metricScale: "not-reviewed",
+      verticalDatum: "unresolved",
+      geometryTopology: "not-reviewed",
+      sourceCameraComparison: "not-reviewed",
+    },
+    notes: "Synthetic CI receipt only; not a real-building review.",
+  };
+  const signatureBase64 = sign(null, canonicalSourceBoundReviewSubmissionBytes(submission), pair.privateKey).toString("base64");
+  const result = await recordSourceBoundAuthenticatedReview({
+    workspaceRoot,
+    buildingId,
+    handoffJobId,
+    submission,
+    signatureBase64,
+    trustedReviewerKeys: registry,
+    now: "2026-10-30T15:10:00.000Z",
+  });
+  return {
+    buildingId,
+    reviewJobId: result.reviewJobId,
+    registryJson: JSON.stringify([{ reviewerId: "reviewer-brf25", publicKeyPem }]),
+    candidateSha,
+  };
+}
+
 const copyMap = [
   ["scripts/prepare-independent-building-truth-manifest.mjs", "../scripts/prepare-independent-building-truth-manifest.mjs"],
   ["scripts/evaluate-independent-building-truth.mjs", "../scripts/evaluate-independent-building-truth.mjs"],
@@ -17,9 +183,14 @@ const copyMap = [
   ["src/core/building-generation/independent-reference-geometry-adapter.mjs", "../src/core/building-generation/independent-reference-geometry-adapter.mjs"],
   ["src/core/building-generation/geometry-extraction-provenance.mjs", "../src/core/building-generation/geometry-extraction-provenance.mjs"],
   ["src/core/building-generation/independent-building-truth-evaluator.mjs", "../src/core/building-generation/independent-building-truth-evaluator.mjs"],
+  ["src/core/building-generation/source-bound-authenticated-review.mjs", "../src/core/building-generation/source-bound-authenticated-review.mjs"],
+  ["src/core/building-generation/source-bound-reconstruction-handoff.mjs", "../src/core/building-generation/source-bound-reconstruction-handoff.mjs"],
+  ["src/core/building-generation/reconstruction-job-state.mjs", "../src/core/building-generation/reconstruction-job-state.mjs"],
+  ["src/core/building-generation/glb-geometry-qa.mjs", "../src/core/building-generation/glb-geometry-qa.mjs"],
+  ["src/core/building-generation/mesh-topology-qa.mjs", "../src/core/building-generation/mesh-topology-qa.mjs"],
 ];
 
-async function setup(t, { staleConfigHash = false } = {}) {
+async function setup(t, { staleConfigHash = false, reviewDecision = "continue-to-independent-validation" } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "brf25-geometry-chain-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const dir of [
@@ -96,27 +267,39 @@ async function setup(t, { staleConfigHash = false } = {}) {
   };
   await writeFile(path.join(root, "workspace/.building-engine/authorizations/building-01/job-01.json"),
     JSON.stringify(authorization, null, 2) + "\n");
-  return { root, glb, candidateHash };
+  const review = await createReviewReceipt(path.join(root, "workspace"), { decision: reviewDecision });
+  return { root, glb, candidateHash, review };
 }
 
-function run(root, output = "artifacts/brf25/run-01") {
-  return spawnSync(process.execPath, [
+function run(root, output = "artifacts/brf25/run-01", review = null) {
+  const args = [
     runnerSource,
     "workspace/.building-engine/authorizations/building-01/job-01.json",
     "configs/evaluation.json",
     output,
     "--workspace=workspace",
     "--root=" + root,
-  ], { cwd: root, encoding: "utf8", timeout: 120000 });
+  ];
+  if (review) args.push("--building-id=" + review.buildingId, "--review-job-id=" + review.reviewJobId);
+  return spawnSync(process.execPath, args, {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 120000,
+    env: { ...process.env, RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: review?.registryJson ?? "" },
+  });
 }
 
 test("runs actual-GLB extraction then independent truth evaluation, and stays review-only (synthetic fixture)", async (t) => {
-  const { root, candidateHash } = await setup(t);
-  const result = run(root);
+  const { root, candidateHash, review } = await setup(t);
+  const result = run(root, "artifacts/brf25/run-01", review);
   assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/run-01/brf25-geometry-validation.json"), "utf8"));
-  assert.equal(report.status, "geometry-evaluated-review-required");
+  assert.equal(report.status, "geometry-evaluated-review-required", JSON.stringify(report.blockers));
   assert.equal(report.binding.candidateGlbSha256, candidateHash);
+  assert.equal(report.artifacts.authenticatedReview.decision, "continue-to-independent-validation");
+  assert.equal(report.artifacts.authenticatedReview.candidateGlbSha256, candidateHash);
+  assert.equal(report.artifacts.authenticatedReview.status, "cryptographically-reverified");
+  assert.equal(report.checks.find((item) => item.id === "authenticated-review-receipt").status, "passed");
   assert.equal(report.artifacts.preparedManifest.candidateGlbSha256, candidateHash);
   assert.equal(report.evaluation.status, "benchmark-review-required");
   assert.equal(report.visualReview.status, "pending-human-review");
@@ -133,11 +316,46 @@ test("runs actual-GLB extraction then independent truth evaluation, and stays re
 });
 
 test("blocks stale truth-config candidate hashes before extraction (synthetic fixture)", async (t) => {
-  const { root } = await setup(t, { staleConfigHash: true });
-  const result = run(root, "artifacts/brf25/stale-run");
+  const { root, review } = await setup(t, { staleConfigHash: true });
+  const result = run(root, "artifacts/brf25/stale-run", review);
   assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
   const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/stale-run/brf25-geometry-validation.json"), "utf8"));
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.some((item) => item.id === "config-candidate-sha256"));
   await assert.rejects(readFile(path.join(root, "artifacts/brf25/stale-run/prepared-manifest.json")));
+});
+
+
+test("blocks BRF-25 before extraction when no D3M-01.D review receipt is supplied", async (t) => {
+  const { root } = await setup(t);
+  const result = run(root, "artifacts/brf25/missing-review", null);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/missing-review/brf25-geometry-validation.json"), "utf8"));
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.some((item) => item.id === "authenticated-review-receipt"));
+  await assert.rejects(readFile(path.join(root, "artifacts/brf25/missing-review/prepared-manifest.json")));
+  await assert.rejects(readFile(path.join(root, "artifacts/brf25/missing-review/evaluation-report.json")));
+});
+
+test("blocks BRF-25 when the current trusted key no longer verifies the stored receipt", async (t) => {
+  const { root, review } = await setup(t);
+  const replacement = generateKeyPairSync("ed25519");
+  const replacementPem = replacement.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const rotated = { ...review, registryJson: JSON.stringify([{ reviewerId: "reviewer-brf25", publicKeyPem: replacementPem }]) };
+  const result = run(root, "artifacts/brf25/rotated-key", rotated);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/rotated-key/brf25-geometry-validation.json"), "utf8"));
+  assert.equal(report.status, "blocked");
+  assert.match(report.blockers.find((item) => item.id === "authenticated-review-receipt").detail, /signature is invalid/);
+  await assert.rejects(readFile(path.join(root, "artifacts/brf25/rotated-key/prepared-manifest.json")));
+});
+
+test("blocks BRF-25 when a signed non-continue decision is present", async (t) => {
+  const { root, review } = await setup(t, { reviewDecision: "hold" });
+  const result = run(root, "artifacts/brf25/hold-decision", review);
+  assert.equal(result.status, 2, result.stderr + "\n" + result.stdout);
+  const report = JSON.parse(await readFile(path.join(root, "artifacts/brf25/hold-decision/brf25-geometry-validation.json"), "utf8"));
+  assert.equal(report.status, "blocked");
+  assert.match(report.blockers.find((item) => item.id === "authenticated-review-receipt").detail, /requires a signed continue-to-independent-validation decision/);
+  await assert.rejects(readFile(path.join(root, "artifacts/brf25/hold-decision/prepared-manifest.json")));
 });
