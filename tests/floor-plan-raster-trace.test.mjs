@@ -57,6 +57,30 @@ test("finds long orthogonal wall hypotheses and closed rectangular room cells", 
   assert.match(result.limitations.join(" "), /Coordinates are pixels, not metres/);
 });
 
+test("bounds raw line-run candidates for noisy rasters before grouping", () => {
+  const width = 256;
+  const height = 200;
+  const pixels = Buffer.alloc(width * height, 245);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x + 7 < width; x += 9) {
+      pixels.fill(20, y * width + x, y * width + x + 8);
+    }
+  }
+  assert.throws(() => traceFloorPlanRaster({
+    width,
+    height,
+    grayscale: pixels,
+    sourceSha256: SOURCE_HASH,
+    options: {
+      threshold: 180,
+      maxGapPx: 0,
+      lineMergeTolerancePx: 1,
+      minLineLengthPx: 8,
+      minRoomSidePx: 8,
+    },
+  }), /more than 5000 raw line-run candidates/);
+});
+
 test("does not propose rooms where one side is visibly open", () => {
   const raster = fixtureRaster();
   for (let y = 206; y <= 214; y += 1) {
