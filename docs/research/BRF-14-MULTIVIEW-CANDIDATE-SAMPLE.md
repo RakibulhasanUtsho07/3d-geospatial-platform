@@ -15,6 +15,8 @@ The sample uses source-reported capture metadata and a pose-aware azimuth-spread
 - Dataset card: https://huggingface.co/datasets/Matt1up/drone-building-scans
 - Upstream repository: https://github.com/Matt1Up/drone-building-scans-dataset
 - Metadata commit: `19b3ce9cccf3e8fd414ff705f75d0f2105846fc1`
+- **Hugging Face image-data revision:** `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f` (full immutable commit SHA used in all selected image URLs)
+- The metadata commit above belongs to the GitHub inventory/checksum/COLMAP repository; it is a different repository and must not be treated as the image-data revision.
 - Image inventory: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/images.csv
 - Image checksum list: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/checksums.sha256
 - COLMAP camera poses: https://github.com/Matt1Up/drone-building-scans-dataset/blob/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/poses/flat-roof/colmap/images.txt
@@ -24,6 +26,13 @@ The sample uses source-reported capture metadata and a pose-aware azimuth-spread
 - Upstream reports 951 aligned images for this capture, but this intake downloads only the selected sixteen.
 
 The source README declares CC BY 4.0 and states the licence covers imagery. The stored rights status is explicitly source-declared and not independently authenticated. This intake does not assume that the separate reference GLB/OBJ, visible trademarks or signage use the same licence.
+
+
+## Immutable image revision and metadata provenance
+
+As checked on 31 October 2026, the Hugging Face dataset snapshot `fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f` exposes the `flat-roof/images` directory. The BRF-14 manifest now uses this full revision in every image `sourceUrl`; mutable `resolve/main` paths are rejected by the verifier and dedicated workflow allowlist. The workflow must still download all sixteen selected images at this exact revision and prove that each actual byte count and SHA-256 matches the manifest before the intake is considered passed.
+
+Two separate upstream identities are retained deliberately: `dataset.dataRepositoryRevision` pins the Hugging Face binary image repository, while `dataset.sourceRepositoryCommit` / `upstreamFiles.metadataCommit` pin the GitHub repository containing the inventory, checksums and COLMAP pose metadata. BRF-45 carries both identities and rejects a rights row whose declared data revision differs from BRF-14. The expected SHA-256/byte-size checks remain necessary even with immutable URLs.
 
 ## Coordinate-frame handling
 
@@ -117,3 +126,24 @@ Edit the generated multiview-human-review-decision-template.json only after insp
     python3 scripts/brf21_human_review.py validate --artifact-root path/to/brf-14-artifacts --decision review-decision.json
 
 The artifact root must contain the unchanged brf-14-multiview-source.json, multiview-source-byte-verification.json, multiview-review-manifest.json, pairwise-overlap-report.json, multiview-contact-sheet.png, camera-angle-coverage.png and pairwise-overlap-graph.png. The commands reject modified/stale inputs, unknown views/pairs, path traversal, symlink inputs, missing review fields and attempts to enable release flags. A pending template is not a valid completed review. A complete record only confirms schema and evidence binding; it does not authenticate the reviewer, legal rights or accuracy, and it does not execute COLMAP or publish a GLB. The real sample remains pending human review and independent survey/checkpoint evidence.
+
+## Integration addendum — 2026-11-01
+
+BRF-14 revision pinning was retargeted from the previous `development@98b2fa56f387c2bdbf4dad5c24e6f131dd66d076` base to current `development@f7b2a67fcf0c34623196fa92e719640086e2adce` after BRF-47 was merged.
+
+The exact-head validation recorded above belongs to PR head `3897523a88bd6a868e90deef0339aa0c985ca3e5` on the prior base. It is useful byte-integrity evidence, but the current-base PR must receive fresh exact-head Full CI and BRF-14/BRF-45 intake checks before promotion.
+
+The retarget does not change the pinned Hugging Face data revision, selected image SHA-256 values, source-declared imagery license status, or any release flag. Rights remain source-declared/pending independent authority review; the reference model and any derived output are outside the imagery-only licence statement.
+
+
+## Current-base exact-head validation — 2026-11-01
+
+The PR was retargeted to `development@f7b2a67fcf0c34623196fa92e719640086e2adce` after BRF-47 was merged. The current PR head `5fbde143c88793a19f283e18758d8bd80c0a1bdb` has completed these exact-head checks successfully:
+
+- Full CI: [run 41313060929](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060929).
+- Immutable BRF-14 source-byte intake: [run 41313060911](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060911).
+- BRF-45 exact-asset rights-admission workflow: [run 41313061024](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313061024).
+- BRF-16 reference inspection: [run 41313060887](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060887).
+- BRF-18 footprint cross-check: [run 41313060901](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41313060901).
+
+A successful workflow means its automated checks completed; it does not mean that BRF-45 admitted real-world rights. The imagery licence remains source-declared and not independently authenticated. The reference GLB/OBJ, visible trademarks/signage, and derived model outputs are not covered by an assumed extension of the imagery licence. No same-building validation, independent survey/checkpoint match, platform-generated GLB or reconstruction accuracy result is established here. No independent reviewer approval is recorded for PR #294; it remains Draft and unmerged. Keep all acceptance/publication/map/automatic-approval flags false.
