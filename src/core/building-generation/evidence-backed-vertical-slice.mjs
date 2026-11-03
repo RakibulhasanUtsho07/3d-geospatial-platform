@@ -152,7 +152,7 @@ function requireAttestations(media, geometry) {
   }
 }
 
-async function prepareEvidence({ root, media, geometry }) {
+async function prepareEvidence({ root, buildingId, media, geometry }) {
   if (!media || typeof media !== "object" || Array.isArray(media)) {
     throw new TypeError("media options are required");
   }
@@ -294,7 +294,7 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
   const jobId = safeId(options.jobId, "jobId", 40);
   const media = options.media;
   const geometry = options.geometry;
-  const evidence = await prepareEvidence({ root: workspaceRoot, media, geometry });
+  const evidence = await prepareEvidence({ root: workspaceRoot, buildingId, media, geometry });
 
   const mediaJobId = safeId(jobId + "-media", "media child job ID");
   const geometryJobId = safeId(jobId + "-geometry", "geometry child job ID");
