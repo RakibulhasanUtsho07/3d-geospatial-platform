@@ -2,7 +2,9 @@ name: BRF-35 same-building linkage and metric-frame gate
 
 on:
   push:
-    branches: [development]
+    branches:
+      - development
+      - feat/brf48-six-disjoint-heldout-checkpoints-20261101
     paths:
       - ".github/workflows/brf35-building-linkage.yml"
       - "src/core/building-generation/brf35-building-linkage.mjs"
@@ -13,7 +15,9 @@ on:
       - "docs/research/BRF-35-BUILDING-LINKAGE-AND-METRIC-FRAME.md"
       - "package.json"
   pull_request:
-    branches: [development]
+    branches:
+      - development
+      - feat/brf47-cross-role-asset-identity-20261031
     paths:
       - ".github/workflows/brf35-building-linkage.yml"
       - "src/core/building-generation/brf35-building-linkage.mjs"
@@ -55,7 +59,7 @@ jobs:
           if (report.status !== "blocked-missing-or-invalid-evidence") throw new Error("Real-world candidate unexpectedly left the blocked state.");
           if (report.blockingCount < 1) throw new Error("Candidate has no recorded blockers.");
           if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must all remain false.");
-          for (const required of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed", "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present", "held-out-checkpoints-independent"]) {
+          for (const required of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed", "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present", "candidate-fit-source-refs-hash-bound", "held-out-checkpoints-independent", "held-out-checkpoints-disjoint-from-fit-sources"]) {
             if (!report.blockers.includes(required)) throw new Error("Expected blocker not preserved: " + required);
           }
           console.log("BRF-35 remains fail-closed; " + report.blockingCount + " blockers recorded.");
