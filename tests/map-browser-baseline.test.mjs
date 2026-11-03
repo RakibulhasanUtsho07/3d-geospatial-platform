@@ -233,7 +233,7 @@ test("captures offline road source/detail headers and pending-request lifecycle 
 });
 
 
-test("ignores only the benchmark output directory when checking source working-tree cleanliness", async () => {
+test("ignores nested benchmark artifacts but still detects all other changes", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "real-dhaka-baseline-git-"));
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -247,6 +247,7 @@ test("ignores only the benchmark output directory when checking source working-t
     await mkdir(output, { recursive: true });
     await writeFile(path.join(output, "report.json"), "{}\\n");
     await writeFile(path.join(output, "cold-01.png"), "synthetic screenshot");
+    await writeFile(path.join(output, "nested", "capture.json"), "generated evidence");
     assert.equal(getWorkingTreeDirty(output, root), false);
 
     await writeFile(path.join(root, "source.js"), "export const value = 2;\\n");
