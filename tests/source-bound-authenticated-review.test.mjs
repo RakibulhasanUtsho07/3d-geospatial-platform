@@ -612,6 +612,25 @@ test("rejects a reviewer signature timestamp outside the configured key validity
 });
 
 
+test("rejects a signed review timestamp later than the server record time", async (t) => {
+  const root = await workspace(t);
+  await createHandoff(root);
+  const keys = makeKeys();
+  const { submission } = await prepareSubmission(root, {
+    reviewedAtUtc: "2026-10-30T15:11:00.000Z",
+  });
+
+  await assert.rejects(recordSourceBoundAuthenticatedReview({
+    workspaceRoot: root,
+    buildingId: "building-a",
+    handoffJobId: "handoff-test-01",
+    submission,
+    signatureBase64: signSubmission(submission, keys.privateKey),
+    trustedReviewerKeys: makeReviewerRegistry(keys.publicKeyPem),
+    now: "2026-10-30T15:10:00.000Z",
+  }), /must not be later than the server-recorded review time/i);
+});
+
 test("production environment cannot opt back into legacy reviewer key arrays", () => {
   const previous = process.env.NODE_ENV;
   process.env.NODE_ENV = "production";
