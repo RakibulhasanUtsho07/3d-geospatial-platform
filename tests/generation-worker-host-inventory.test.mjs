@@ -51,6 +51,7 @@ function pythonResult(overrides = {}) {
       onnxProviders: ["CUDAExecutionProvider", "CPUExecutionProvider"],
       rembgDefaultModel: "isnet-general-use",
       runnerSyntaxCompiled: true,
+      runnerSha256Matches: true,
       probeErrors: [],
     }),
     ...overrides,
@@ -220,6 +221,7 @@ test("records a partial inventory when optional packages or acceleration provide
       onnxProviders: [],
       rembgDefaultModel: null,
       runnerSyntaxCompiled: true,
+      runnerSha256Matches: true,
       probeErrors: ["onnxruntime-import-or-provider-probe-failed", "rembg-import-or-default-model-probe-failed"],
     }),
   });
