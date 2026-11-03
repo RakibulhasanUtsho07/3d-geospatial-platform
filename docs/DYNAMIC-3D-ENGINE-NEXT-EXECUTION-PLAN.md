@@ -119,11 +119,13 @@ Completed:
 Completed evidence inspection:
 - Downloaded and inspected the six PNGs and report from run #41598308948. All six files have the same 437,683-byte length and SHA-256 e6eb87b7e5115e5f91e38c2146a2fcea05d715e61ce6855aeead97e32d5834fa.
 - The 1280×800 headless screenshot shows a populated Cesium canvas, visible road geometry and dense box-like building extrusions; the five floating UI panels listed in §2.1 obscure portions of the map. Roofs remain visually plain.
+- Also inspected the dedicated responsive-layout artifact from Full CI run #41598309048 (`p3-4-map-panel-occlusion-visual-evidence`): 1440×900 desktop and 390×844 mobile captures. The browser test verifies the default discovery/map docks do not overlap at these sizes and checks the Cesium attribution remains clear. These captures use deterministic stub imagery (solid-blue map canvas) and sample API responses; they validate layout only, not live Dhaka map rendering or imagery quality.
 - Report visualAnomalyReview: saturated-red signal evaluated 6 canvas samples and flagged 0. This is not a root-cause diagnosis.
 - Cold/warm median map-ready: 18.45 s / 17.77 s; median road-terminal: 23.46 s / 22.78 s; median long-task count: 60 / 57. These are CI observations, not device-level SLAs.
 
 Remaining:
 1. Perform target-workstation browser review at representative desktop and mobile sizes; record browser, viewport, GPU/device and screenshots.
+2. Compare the target-workstation layout against the already inspected 1440×900 and 390×844 CI dock captures; the automated assertions passed for those two sizes.
 2. Decide whether the panel occlusion seen in CI is acceptable for the intended viewport or requires a measured layout correction.
 3. Verify the historic red imagery/overlay anomaly has a diagnosed cause before claiming it is fixed. Pixel detection is a signal, not a root-cause diagnosis.
 4. Confirm camera orientation, building/road alignment, image-provider failures, fallback/cancellation behavior and layer toggles.
