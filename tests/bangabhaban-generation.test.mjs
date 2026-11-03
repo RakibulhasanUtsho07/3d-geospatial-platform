@@ -62,7 +62,7 @@ test("Bangabhaban selects its estimated south facade and centers the dome on the
   assert.equal(result.report.architecturePlacement.centralDome.evidenceConfidence, "estimated");
   const gltf = parseGlbJson(result.glb);
   assert.equal(gltf.extras.building.frontFacingAzimuthDegrees, 180);
-  assert.equal(gltf.extras.building.frontAxisConfidence, "operator-specified");
+  assert.equal(gltf.extras.building.frontAxisConfidence, "estimated");
   assert.equal(gltf.extras.building.frontAxisSource, "buildingSpec.architecture.frontFacingAzimuthDegrees");
   assert.equal(gltf.extras.building.coordinateFrame, "x-east,y-up,z-north");
 });
