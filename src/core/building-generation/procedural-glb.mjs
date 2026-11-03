@@ -63,7 +63,7 @@ function triangulate(points) {
   }
   if(order.length===3) triangles.push(order.slice()); return triangles;
 }
-function encodeGlb(spec, geo) {
+function encodeGlb(spec, geo, frontFacingAzimuthDegrees, frontAxisConfidence, frontAxisSource) {
   const active=MATERIALS.filter(name=>geo.groups.get(name).indices.length), indexOf=new Map(active.map((name,i)=>[name,i]));
   const materials=active.map(name=>({name:name==="wall"?"Facade":name[0].toUpperCase()+name.slice(1),pbrMetallicRoughness:{baseColorFactor:rgba(({wall:spec.architecture.wallColor,roof:spec.architecture.roofColor,glass:spec.architecture.glassColor,frame:spec.architecture.frameColor,concrete:spec.architecture.concreteColor,door:spec.architecture.doorColor,metal:"#4B5563"})[name]),metallicFactor:name==="metal"?0.65:0,roughnessFactor:name==="glass"?0.24:0.78}}));
   const bins=[], views=[], accessors=[], meshes=[], nodes=[]; let offset=0;
@@ -79,7 +79,7 @@ function encodeGlb(spec, geo) {
     const pa=accessor(pi,5126,g.positions.length/3,"VEC3",{min,max}),na=accessor(ni,5126,g.normals.length/3,"VEC3"),ia=accessor(ii,small?5123:5125,ivals.length,"SCALAR",{min:[lo],max:[hi]});
     meshes.push({name:spec.id+"-"+name,primitives:[{attributes:{POSITION:pa,NORMAL:na},indices:ia,material:indexOf.get(name),mode:4}]});nodes.push({name:spec.name+" - "+name,mesh:meshes.length-1});
   }
-  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType}}};
+  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,frontFacingAzimuthDegrees,frontAxisConfidence,frontAxisSource,coordinateFrame:"x-east,y-up,z-north"}}};
   const jb=Buffer.from(JSON.stringify(gltf)), jp=(4-jb.length%4)%4, bp=(4-binary.length%4)%4;
   const json=Buffer.concat([jb,Buffer.alloc(jp,0x20)]), bin=bp?Buffer.concat([binary,Buffer.alloc(bp)]):binary, total=12+8+json.length+8+bin.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
@@ -99,12 +99,46 @@ export function generateProceduralGlb(rawSpec) {
   },0)/2;
   const outwardSign=footprintSignedArea>=0?1:-1;
   const edges=points.map((p,i)=>{const n=points[(i+1)%points.length];return {p,n,...createFacadeFrame(p,n,outwardSign)};});
-  const front=spec.architecture.frontFacadeEdgeIndex===undefined
-    ? edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0)
-    : spec.architecture.frontFacadeEdgeIndex;
-  if(spec.architecture.frontFacadeEdgeIndex===undefined){
-    warnings.push("Front facade was inferred from the longest footprint edge; set architecture.frontFacadeEdgeIndex to select the entrance facade explicitly.");
+  const requestedFrontAzimuth=spec.architecture.frontFacingAzimuthDegrees;
+  const azimuthVector=requestedFrontAzimuth===null?null:{
+    x:Math.sin(requestedFrontAzimuth*Math.PI/180),
+    z:Math.cos(requestedFrontAzimuth*Math.PI/180)
+  };
+  let front;
+  let facadeSelectionMethod;
+  let frontAxisConfidence;
+  let frontAxisSource;
+  if(spec.architecture.frontFacadeEdgeIndex!==undefined){
+    front=spec.architecture.frontFacadeEdgeIndex;
+    facadeSelectionMethod="explicit-edge-index";
+    frontAxisConfidence="operator-specified";
+    frontAxisSource="buildingSpec.architecture.frontFacadeEdgeIndex";
+  }else if(azimuthVector!==null){
+    front=edges.reduce((best,e,i)=>
+      e.out.x*azimuthVector.x+e.out.z*azimuthVector.z >
+      edges[best].out.x*azimuthVector.x+edges[best].out.z*azimuthVector.z ? i : best,0);
+    facadeSelectionMethod="azimuth-nearest-edge";
+    frontAxisConfidence="operator-specified";
+    frontAxisSource="buildingSpec.architecture.frontFacingAzimuthDegrees";
+  }else{
+    front=edges.reduce((best,e,i)=>e.len>edges[best].len?i:best,0);
+    facadeSelectionMethod="longest-edge-inferred";
+    frontAxisConfidence="estimated";
+    frontAxisSource="longest-edge-inferred";
+    warnings.push("Front facade was inferred from the longest footprint edge; set architecture.frontFacadeEdgeIndex or frontFacingAzimuthDegrees to select it explicitly.");
   }
+  const frontEdge=edges[front];
+  const actualFrontAzimuthDegrees=(Math.atan2(frontEdge.out.x,frontEdge.out.z)*180/Math.PI+360)%360;
+  const azimuthAlignment=azimuthVector===null?null:
+    frontEdge.out.x*azimuthVector.x+frontEdge.out.z*azimuthVector.z;
+  if(azimuthAlignment!==null&&azimuthAlignment<Math.cos(15*Math.PI/180)){
+    warnings.push("Configured front-facing azimuth differs from the nearest footprint edge by more than 15 degrees.");
+  }
+  const xs=points.map(point=>point.x),zs=points.map(point=>point.z);
+  const footprintBoundsCenter={
+    x:(Math.min(...xs)+Math.max(...xs))/2,
+    z:(Math.min(...zs)+Math.max(...zs))/2
+  };
   for(let floor=0;floor<floorCount;floor++)for(let ei=0;ei<edges.length;ei++){
     const e=edges[ei],cx=(e.p.x+e.n.x)/2-e.out.x*wt/2,cz=(e.p.z+e.n.z)/2-e.out.z*wt/2;
     geo.box("wall",cx,floor*floorH+floorH/2,cz,e.len+wt*0.35,floorH,wt,e.yaw);
@@ -154,9 +188,18 @@ export function generateProceduralGlb(rawSpec) {
   // Optional architectural massing features: retained in the normalized BuildingSpec
   // and generated deterministically so specialist buildings need not be reduced to a box.
   const dome=spec.architecture.centralDome;
+  let domePlacement=null;
   if(dome.enabled){
     const e=edges[front],midX=(e.p.x+e.n.x)/2,midZ=(e.p.z+e.n.z)/2;
-    const cx=midX-e.out.x*dome.insetFromFrontM,cz=midZ-e.out.z*dome.insetFromFrontM;
+    const domeCenter=dome.anchor==="footprint-bounds-center"
+      ? footprintBoundsCenter
+      : {x:midX-e.out.x*dome.insetFromFrontM,z:midZ-e.out.z*dome.insetFromFrontM};
+    const cx=domeCenter.x,cz=domeCenter.z;
+    domePlacement={
+      anchor:dome.anchor,
+      centerModelMeters:{x:Number(cx.toFixed(3)),z:Number(cz.toFixed(3))},
+      evidenceConfidence:spec.evidence.find(item=>item.field==="centralDome")?.confidence??"unknown"
+    };
     const baseY=height+spec.dimensions.parapetHeightM;
     geo.cylinder("concrete",cx,baseY,cz,dome.radiusM*0.88,dome.drumHeightM,24);
     const domeY=baseY+dome.drumHeightM,segments=32,steps=12;
@@ -233,15 +276,24 @@ export function generateProceduralGlb(rawSpec) {
       geo.box("concrete",cornice[0],cornice[1],cornice[2],span+0.5,0.24,arcade.columnDepthM*1.4,e.yaw);
     }
   }
-  const glb=encodeGlb(spec,geo);
+  const actualAzimuthRounded=Number(actualFrontAzimuthDegrees.toFixed(3));
+  const glb=encodeGlb(spec,geo,actualAzimuthRounded,frontAxisConfidence,frontAxisSource);
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
     geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo)},
     facadeSelection:{
-      method:spec.architecture.frontFacadeEdgeIndex===undefined?"longest-edge-inferred":"explicit-edge-index",
+      method:facadeSelectionMethod,
       edgeIndex:front,
-      confidence:spec.architecture.frontFacadeEdgeIndex===undefined?"estimated":"operator-specified"
+      confidence:frontAxisConfidence,
+      requestedAzimuthDegrees:requestedFrontAzimuth,
+      actualAzimuthDegrees:actualAzimuthRounded,
+      source:frontAxisSource,
+      alignmentDot:azimuthAlignment===null?null:Number(azimuthAlignment.toFixed(6))
+    },
+    architecturePlacement:{
+      frontFacade:{edgeIndex:front,requestedAzimuthDegrees:requestedFrontAzimuth,actualAzimuthDegrees:actualAzimuthRounded,outwardNormal:{x:Number(frontEdge.out.x.toFixed(5)),z:Number(frontEdge.out.z.toFixed(5))}},
+      centralDome:domePlacement
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
@@ -249,7 +301,8 @@ export function generateProceduralGlb(rawSpec) {
     confidenceSummary:Object.fromEntries(["verified","derived","estimated","ai-proposed","unknown"].map(level=>[level,spec.evidence.filter(e=>e.confidence===level).length])),
     reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||
       spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
-      spec.architecture.frontFacadeEdgeIndex===undefined,
+      (spec.architecture.frontFacadeEdgeIndex===undefined&&requestedFrontAzimuth===null)||
+      (azimuthAlignment!==null&&azimuthAlignment<Math.cos(15*Math.PI/180)),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
 }
