@@ -235,6 +235,8 @@
     "test:generation-map-intake": "node --test tests/generation-map-intake.test.mjs",
     "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs",
     "test:single-image-worker-preflight": "node --test tests/single-image-worker-preflight.test.mjs",
+    "test:generation-worker-host-inventory": "node --test tests/generation-worker-host-inventory.test.mjs",
+    "inventory:building-worker-host": "node scripts/collect-generation-worker-host-inventory.mjs",
     "preflight:single-image-worker": "node scripts/preflight-single-image-worker.mjs",
     "smoke:single-image-runtime": "node scripts/smoke-test-single-image-runtime.mjs",
     "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs",
