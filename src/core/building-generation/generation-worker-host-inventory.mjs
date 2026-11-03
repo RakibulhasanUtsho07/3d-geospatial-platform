@@ -86,7 +86,7 @@ export function buildPythonInventoryProgram() {
     "  'onnxProviders': [],",
     "  'rembgDefaultModel': None,",
     "  'modelArtifacts': {'tripoConfig': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'tripoCheckpoint': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'rembgWeights': {'status': 'unknown', 'bytes': None}},",
-    "  'runnerSyntaxCompiled': False,"
+    "  'runnerSyntaxCompiled': False,",
     "  'runnerSha256Matches': False,",
     "  'probeErrors': [],",
     "}",
