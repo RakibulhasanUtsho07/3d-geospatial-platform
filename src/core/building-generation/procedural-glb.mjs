@@ -63,6 +63,152 @@ function triangulate(points) {
   }
   if(order.length===3) triangles.push(order.slice()); return triangles;
 }
+
+function openingTopAt(opening, alongM) {
+  if (opening.shape !== "arched") return opening.topM;
+  const dx = alongM - opening.centerAlongEdgeM;
+  const radius = opening.archRadiusM;
+  return opening.topM - radius + Math.sqrt(Math.max(0, radius * radius - dx * dx));
+}
+
+function wallPoint(edge, alongM, y, inwardM) {
+  const ux = (edge.n.x - edge.p.x) / edge.len;
+  const uz = (edge.n.z - edge.p.z) / edge.len;
+  return [
+    edge.p.x + ux * alongM - edge.out.x * inwardM,
+    y,
+    edge.p.z + uz * alongM - edge.out.z * inwardM
+  ];
+}
+
+// Emit a closed wall shell with actual through-openings. The front/back wall
+// surfaces are split at opening boundaries; reveal surfaces bridge wall depth.
+function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings) {
+  const topY = baseY + heightM;
+  const startU = -wallThicknessM * 0.175;
+  const endU = edge.len + wallThicknessM * 0.175;
+  const breaks = new Set([startU, endU]);
+  const addBreak = (u) => {
+    if (Number.isFinite(u) && u > startU + 1e-8 && u < endU - 1e-8) breaks.add(u);
+  };
+
+  for (const opening of openings) {
+    const left = opening.centerAlongEdgeM - opening.widthM / 2;
+    const right = opening.centerAlongEdgeM + opening.widthM / 2;
+    addBreak(left);
+    addBreak(right);
+    if (opening.shape === "arched") {
+      for (let step = 1; step < 16; step++) addBreak(left + opening.widthM * step / 16);
+    }
+  }
+
+  const values = [...breaks].sort((a, b) => a - b);
+  const tangent = {
+    x: (edge.n.x - edge.p.x) / edge.len,
+    z: (edge.n.z - edge.p.z) / edge.len
+  };
+  const addFaceStrip = (u0, u1, low0, low1, high0, high1) => {
+    if (high0 - low0 < 1e-8 && high1 - low1 < 1e-8) return;
+    geo.quad("wall",
+      wallPoint(edge, u0, low0, 0),
+      wallPoint(edge, u1, low1, 0),
+      wallPoint(edge, u1, high1, 0),
+      wallPoint(edge, u0, high0, 0),
+      [edge.out.x, 0, edge.out.z]);
+    geo.quad("wall",
+      wallPoint(edge, u1, low1, wallThicknessM),
+      wallPoint(edge, u0, low0, wallThicknessM),
+      wallPoint(edge, u0, high0, wallThicknessM),
+      wallPoint(edge, u1, high1, wallThicknessM),
+      [-edge.out.x, 0, -edge.out.z]);
+  };
+
+  for (let index = 0; index < values.length - 1; index++) {
+    const u0 = values[index];
+    const u1 = values[index + 1];
+    if (u1 - u0 < 1e-8) continue;
+    const mid = (u0 + u1) / 2;
+    const active = openings.filter((opening) =>
+      mid > opening.centerAlongEdgeM - opening.widthM / 2 + 1e-8 &&
+      mid < opening.centerAlongEdgeM + opening.widthM / 2 - 1e-8 &&
+      opening.topM > baseY + 1e-8 && opening.bottomM < topY - 1e-8
+    );
+    if (active.length > 1) {
+      throw new RangeError("overlapping facade openings are not supported; revise the opening layout");
+    }
+    const opening = active[0];
+    const low = opening ? Math.max(baseY, Math.min(topY, opening.bottomM)) : topY;
+    if (!opening) {
+      addFaceStrip(u0, u1, baseY, baseY, topY, topY);
+    } else {
+      if (low > baseY + 1e-8) addFaceStrip(u0, u1, baseY, baseY, low, low);
+      const upper0 = Math.max(baseY, Math.min(topY, openingTopAt(opening, u0)));
+      const upper1 = Math.max(baseY, Math.min(topY, openingTopAt(opening, u1)));
+      if (upper0 < topY - 1e-8 || upper1 < topY - 1e-8) {
+        addFaceStrip(u0, u1, upper0, upper1, topY, topY);
+      }
+    }
+
+    // Close the top and (where material exists) bottom of this wall section.
+    geo.quad("wall",
+      wallPoint(edge, u0, topY, 0), wallPoint(edge, u1, topY, 0),
+      wallPoint(edge, u1, topY, wallThicknessM), wallPoint(edge, u0, topY, wallThicknessM),
+      [0, 1, 0]);
+    if (!opening || opening.bottomM > baseY + 1e-8) {
+      geo.quad("wall",
+        wallPoint(edge, u0, baseY, 0), wallPoint(edge, u0, baseY, wallThicknessM),
+        wallPoint(edge, u1, baseY, wallThicknessM), wallPoint(edge, u1, baseY, 0),
+        [0, -1, 0]);
+    }
+  }
+
+  // Close the two wall ends. Adjacent facade shells intentionally overlap at corners.
+  geo.quad("wall",
+    wallPoint(edge, startU, baseY, 0), wallPoint(edge, startU, baseY, wallThicknessM),
+    wallPoint(edge, startU, topY, wallThicknessM), wallPoint(edge, startU, topY, 0),
+    [-tangent.x, 0, -tangent.z]);
+  geo.quad("wall",
+    wallPoint(edge, endU, baseY, 0), wallPoint(edge, endU, topY, 0),
+    wallPoint(edge, endU, topY, wallThicknessM), wallPoint(edge, endU, baseY, wallThicknessM),
+    [tangent.x, 0, tangent.z]);
+
+  for (const opening of openings) {
+    const left = opening.centerAlongEdgeM - opening.widthM / 2;
+    const right = opening.centerAlongEdgeM + opening.widthM / 2;
+    const bottom = Math.max(baseY, opening.bottomM);
+    const leftTop = Math.max(bottom, Math.min(topY, openingTopAt(opening, left)));
+    const rightTop = Math.max(bottom, Math.min(topY, openingTopAt(opening, right)));
+
+    // Left/right jamb returns through the full wall thickness.
+    geo.quad("wall",
+      wallPoint(edge, left, bottom, 0), wallPoint(edge, left, bottom, wallThicknessM),
+      wallPoint(edge, left, leftTop, wallThicknessM), wallPoint(edge, left, leftTop, 0),
+      [-tangent.x, 0, -tangent.z]);
+    geo.quad("wall",
+      wallPoint(edge, right, bottom, 0), wallPoint(edge, right, rightTop, 0),
+      wallPoint(edge, right, rightTop, wallThicknessM), wallPoint(edge, right, bottom, wallThicknessM),
+      [tangent.x, 0, tangent.z]);
+
+    if (bottom > baseY + 1e-8) {
+      geo.quad("wall",
+        wallPoint(edge, left, bottom, 0), wallPoint(edge, right, bottom, 0),
+        wallPoint(edge, right, bottom, wallThicknessM), wallPoint(edge, left, bottom, wallThicknessM),
+        [0, -1, 0]);
+    }
+    const segments = opening.shape === "arched" ? 16 : 1;
+    for (let segment = 0; segment < segments; segment++) {
+      const u0 = left + opening.widthM * segment / segments;
+      const u1 = left + opening.widthM * (segment + 1) / segments;
+      geo.quad("wall",
+        wallPoint(edge, u0, openingTopAt(opening, u0), 0),
+        wallPoint(edge, u1, openingTopAt(opening, u1), 0),
+        wallPoint(edge, u1, openingTopAt(opening, u1), wallThicknessM),
+        wallPoint(edge, u0, openingTopAt(opening, u0), wallThicknessM),
+        [0, 1, 0]);
+    }
+  }
+}
+
 function encodeGlb(spec, geo, facadeOrientation) {
   const active=MATERIALS.filter(name=>geo.groups.get(name).indices.length), indexOf=new Map(active.map((name,i)=>[name,i]));
   const materials=active.map(name=>({name:name==="wall"?"Facade":name[0].toUpperCase()+name.slice(1),pbrMetallicRoughness:{baseColorFactor:rgba(({wall:spec.architecture.wallColor,roof:spec.architecture.roofColor,glass:spec.architecture.glassColor,frame:spec.architecture.frameColor,concrete:spec.architecture.concreteColor,door:spec.architecture.doorColor,metal:"#4B5563"})[name]),metallicFactor:name==="metal"?0.65:0,roughnessFactor:name==="glass"?0.24:0.78}}));
@@ -129,44 +275,112 @@ export function generateProceduralGlb(rawSpec) {
     warnings.push("Front facade selector conflicts with its attached evidence; independent review is required.");
   }
   const frontAxisNeedsReview=frontAxisConfidence!=="verified";
-  for(let floor=0;floor<floorCount;floor++)for(let ei=0;ei<edges.length;ei++){
-    const e=edges[ei],cx=(e.p.x+e.n.x)/2-e.out.x*wt/2,cz=(e.p.z+e.n.z)/2-e.out.z*wt/2;
-    geo.box("wall",cx,floor*floorH+floorH/2,cz,e.len+wt*0.35,floorH,wt,e.yaw);
-    const w=spec.architecture.windows;if(!w.enabled||e.len<2.7)continue;
-    const bays=Math.max(1,Math.min(12,Math.floor(e.len/3.2)));
-    const ww=Math.min(w.widthM,e.len/(bays+1)*0.68),wh=Math.min(w.heightM,floorH*0.52);
-    for(let bay=0;bay<bays;bay++){
-      if(floor===0&&ei===front&&bay===Math.floor(bays/2))continue;
-      const t=(bay+1)/(bays+1);
-      const edgePoint={
-        x:e.p.x+(e.n.x-e.p.x)*t,
-        z:e.p.z+(e.n.z-e.p.z)*t
-      };
-      const y=floor*floorH+floorH*0.56;
-      const paneDepth=0.055,frameDepth=0.075,faceClearanceM=0.002,f=0.055;
-      const panePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(paneDepth,faceClearanceM));
-      const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-      const leftJamb=offsetFacadePoint(edgePoint,e,-ww/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-      const rightJamb=offsetFacadePoint(edgePoint,e,ww/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
-      geo.box("glass",panePoint.x,y,panePoint.z,ww,wh,paneDepth,e.yaw);
-      geo.box("frame",framePoint.x,y+wh/2,framePoint.z,ww+f,f,frameDepth,e.yaw);
-      geo.box("frame",framePoint.x,y-wh/2,framePoint.z,ww+f,f,frameDepth,e.yaw);
-      geo.box("frame",leftJamb.x,y,leftJamb.z,f,wh,frameDepth,e.yaw);
-      geo.box("frame",rightJamb.x,y,rightJamb.z,f,wh,frameDepth,e.yaw);
+
+  const arcade=spec.architecture.frontArcade;
+  const arcadeHeight=Math.min(arcade.heightM,floorH-0.05);
+  const arcadeSpan=edges[front].len*arcade.spanRatio;
+  const arcadeBay=arcadeSpan/arcade.bayCount;
+  const arcadeStart=(edges[front].len-arcadeSpan)/2;
+  const arcadeOuterRadius=Math.max(arcade.columnWidthM*1.6,(arcadeBay-arcade.columnWidthM)/2);
+  const arcadeInnerRadius=Math.max(0.35,arcadeOuterRadius-arcade.archThicknessM);
+  const arcadeSpringY=arcadeHeight-arcadeOuterRadius;
+  const arcadeOpeningRadius=Math.max(0.3,arcadeInnerRadius-0.08);
+  const structuralOpenings=[];
+  if(arcade.enabled&&arcade.heightM>floorH-0.05){
+    warnings.push("frontArcade.heightM is limited to the first storey for structural openings; the emitted arch requires review.");
+  }
+
+  for(let floor=0;floor<floorCount;floor++){
+    const floorY=floor*floorH;
+    for(let ei=0;ei<edges.length;ei++){
+      const e=edges[ei];
+      const openings=[];
+      const windowSpec=spec.architecture.windows;
+      const arcadeOwnsGroundFacade=arcade.enabled&&ei===front&&floor===0&&arcadeSpringY>0.5;
+
+      if(windowSpec.enabled&&e.len>=2.7&&!arcadeOwnsGroundFacade){
+        const bays=Math.max(1,Math.min(12,Math.floor(e.len/3.2)));
+        const widthM=Math.min(windowSpec.widthM,e.len/(bays+1)*0.68);
+        const heightM=Math.min(windowSpec.heightM,floorH*0.52);
+        for(let bayIndex=0;bayIndex<bays;bayIndex++){
+          if(floor===0&&ei===front&&bayIndex===Math.floor(bays/2))continue;
+          const t=(bayIndex+1)/(bays+1);
+          const centerAlongEdgeM=e.len*t;
+          const centerY=floorY+floorH*0.56;
+          const opening={
+            kind:"window",shape:"rectangular",edgeIndex:ei,floorIndex:floor,
+            centerAlongEdgeM,widthM,bottomM:centerY-heightM/2,topM:centerY+heightM/2
+          };
+          openings.push(opening);
+          structuralOpenings.push(opening);
+
+          // Keep the existing 2 mm exterior-face clearance while removing the
+          // wall volume behind the pane and frame.
+          const edgePoint={x:e.p.x+(e.n.x-e.p.x)*t,z:e.p.z+(e.n.z-e.p.z)*t};
+          const paneDepth=0.055,frameDepth=0.075,faceClearanceM=0.002,f=0.055;
+          const panePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(paneDepth,faceClearanceM));
+          const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+          const leftJamb=offsetFacadePoint(edgePoint,e,-widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+          const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2,surfaceInsertCenterOffset(frameDepth,faceClearanceM));
+          geo.box("glass",panePoint.x,centerY,panePoint.z,widthM,heightM,paneDepth,e.yaw);
+          geo.box("frame",framePoint.x,centerY+heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
+          geo.box("frame",framePoint.x,centerY-heightM/2,framePoint.z,widthM+f,f,frameDepth,e.yaw);
+          geo.box("frame",leftJamb.x,centerY,leftJamb.z,f,heightM,frameDepth,e.yaw);
+          geo.box("frame",rightJamb.x,centerY,rightJamb.z,f,heightM,frameDepth,e.yaw);
+        }
+      }
+
+      if(arcade.enabled&&ei===front&&floor===0&&arcadeSpringY>0.5){
+        for(let bayIndex=0;bayIndex<arcade.bayCount;bayIndex++){
+          const centerAlongEdgeM=arcadeStart+(bayIndex+0.5)*arcadeBay;
+          const opening={
+            kind:"arch",shape:"arched",edgeIndex:ei,floorIndex:floor,
+            centerAlongEdgeM,widthM:arcadeOpeningRadius*2,bottomM:floorY,
+            topM:arcadeSpringY+arcadeOpeningRadius,archRadiusM:arcadeOpeningRadius
+          };
+          openings.push(opening);
+          structuralOpenings.push(opening);
+        }
+      }
+
+      if(spec.architecture.includeDoor&&ei===front&&floor===0&&!arcade.enabled){
+        const widthM=Math.min(1.05,e.len*0.25);
+        const doorHeight=Math.min(2.16,floorH-0.05);
+        const opening={
+          kind:"door",shape:"rectangular",edgeIndex:ei,floorIndex:floor,
+          centerAlongEdgeM:e.len/2,widthM,bottomM:floorY,topM:floorY+doorHeight
+        };
+        openings.push(opening);
+        structuralOpenings.push(opening);
+      }
+
+      addWallWithOpenings(geo,e,floorY,floorH,wt,openings);
     }
   }
+
   if(spec.architecture.includeDoor&&edges[front].len>=2.5){
     const e=edges[front];
     const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
-    const w=Math.min(1.05,e.len*0.25),faceClearanceM=0.002;
+    const widthM=Math.min(1.05,e.len*0.25),faceClearanceM=0.002;
+    const doorHeight=Math.min(2.16,floorH-0.05);
+    const doorCenterY=doorHeight/2;
     const doorPoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
     const framePoint=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.09,faceClearanceM));
-    const leftJamb=offsetFacadePoint(edgePoint,e,-(w/2+0.035),surfaceInsertCenterOffset(0.09,faceClearanceM));
-    const rightJamb=offsetFacadePoint(edgePoint,e,w/2+0.035,surfaceInsertCenterOffset(0.09,faceClearanceM));
-    geo.box("door",doorPoint.x,1.08,doorPoint.z,w,2.16,0.07,e.yaw);
-    geo.box("frame",framePoint.x,2.19,framePoint.z,w+0.14,0.08,0.09,e.yaw);
-    geo.box("frame",leftJamb.x,1.08,leftJamb.z,0.07,2.16,0.09,e.yaw);
-    geo.box("frame",rightJamb.x,1.08,rightJamb.z,0.07,2.16,0.09,e.yaw);
+    const leftJamb=offsetFacadePoint(edgePoint,e,-(widthM/2+0.035),surfaceInsertCenterOffset(0.09,faceClearanceM));
+    const rightJamb=offsetFacadePoint(edgePoint,e,widthM/2+0.035,surfaceInsertCenterOffset(0.09,faceClearanceM));
+    geo.box("door",doorPoint.x,doorCenterY,doorPoint.z,widthM,doorHeight,0.07,e.yaw);
+    geo.box("frame",framePoint.x,doorHeight+0.03,framePoint.z,widthM+0.14,0.08,0.09,e.yaw);
+    geo.box("frame",leftJamb.x,doorCenterY,leftJamb.z,0.07,doorHeight,0.09,e.yaw);
+    geo.box("frame",rightJamb.x,doorCenterY,rightJamb.z,0.07,doorHeight,0.09,e.yaw);
+  }
+
+  for(const opening of structuralOpenings){
+    opening.confidence="estimated";
+    opening.source="procedural-default";
+    opening.reviewRequired=true;
+  }
+  if(structuralOpenings.length){
+    warnings.push("Facade doors, windows and arches are structural openings, but their dimensions and positions are procedural estimates requiring independent review.");
   }
   if(spec.architecture.balcony.enabled&&floorCount>1){const e=edges[front],b=spec.architecture.balcony,bays=Math.max(1,Math.min(6,Math.floor(e.len/Math.max(2.4,b.widthM+0.7)))),bw=Math.min(b.widthM,e.len/(bays+0.35));
     for(let floor=1;floor<floorCount;floor+=b.everyFloors)for(let bay=0;bay<bays;bay++){const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*b.depthM*0.45,z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*b.depthM*0.45,y=floor*floorH+0.06,rx=x+e.out.x*b.depthM*0.85,rz=z+e.out.z*b.depthM*0.85;
@@ -227,16 +441,13 @@ export function generateProceduralGlb(rawSpec) {
     }
   }
 
-  const arcade=spec.architecture.frontArcade;
   if(arcade.enabled){
     const e=edges[front],ux=(e.n.x-e.p.x)/e.len,uz=(e.n.z-e.p.z)/e.len;
-    const span=e.len*arcade.spanRatio,bay=span/arcade.bayCount,start=(e.len-span)/2;
-    const arcadeHeight=Math.min(arcade.heightM,height-0.25);
-    const outerRadius=Math.max(arcade.columnWidthM*1.6,(bay-arcade.columnWidthM)/2);
-    const innerRadius=Math.max(0.35,outerRadius-arcade.archThicknessM);
-    const springY=arcadeHeight-outerRadius;
+    const span=arcadeSpan,bay=arcadeBay,start=arcadeStart;
+    const outerRadius=arcadeOuterRadius,innerRadius=arcadeInnerRadius;
+    const springY=arcadeSpringY;
     if(springY>0.5){
-      const wallOffset=wt/2+0.08,columnOffset=wt/2+arcade.projectionM;
+      const wallOffset=-(wt+0.08),columnOffset=wt/2+arcade.projectionM;
       const archOffset=columnOffset+arcade.columnDepthM/2+0.025;
       const point=(u,y,offset)=>[e.p.x+ux*u+e.out.x*offset,y,e.p.z+uz*u+e.out.z*offset];
       // Dark infill is intentionally placed over the uncut procedural wall to approximate
@@ -245,7 +456,7 @@ export function generateProceduralGlb(rawSpec) {
         const centerU=start+(bayIndex+0.5)*bay,basePoint=point(centerU,springY/2,wallOffset);
         geo.box("glass",basePoint[0],basePoint[1],basePoint[2],Math.max(0.5,bay-arcade.columnWidthM*1.05),springY,0.08,e.yaw);
         const center=point(centerU,springY,wallOffset+0.045);
-        const openingRadius=Math.max(0.3,innerRadius-0.08);
+        const openingRadius=arcadeOpeningRadius;
         for(let segment=0;segment<16;segment++){
           const a0=segment/16*Math.PI,a1=(segment+1)/16*Math.PI;
           const p0=point(centerU+openingRadius*Math.cos(a0),springY+openingRadius*Math.sin(a0),wallOffset+0.045);
@@ -288,7 +499,7 @@ export function generateProceduralGlb(rawSpec) {
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
-    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo)},
+    geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
     facadeOrientation,
     facadeSelection:{
       method:selectedFacade.method,
