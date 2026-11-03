@@ -96,9 +96,11 @@ test("preserves a validated GLB front bearing and source in the review manifest"
   const data = fixture();
   data.rawManifest.frontFacingAzimuthDegrees = 180;
   data.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  data.rawManifest.frontAxisConfidence = "estimated";
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
   assert.equal(report.frontFacingAzimuthDegrees, 180);
+  assert.equal(report.frontAxisConfidence, "estimated");
   assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
 });
 
@@ -111,7 +113,14 @@ test("fails closed when front bearing metadata has an invalid value or source", 
   const wrongSource = fixture();
   wrongSource.rawManifest.frontFacingAzimuthDegrees = 90;
   wrongSource.rawManifest.frontAxisSource = "renderer-default";
+  wrongSource.rawManifest.frontAxisConfidence = "estimated";
   assert.ok(finalizeRenderReviewManifest(wrongSource).errors.includes("render-front-bearing-metadata-invalid"));
+
+  const invalidConfidence = fixture();
+  invalidConfidence.rawManifest.frontFacingAzimuthDegrees = 90;
+  invalidConfidence.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  invalidConfidence.rawManifest.frontAxisConfidence = "false-verified";
+  assert.ok(finalizeRenderReviewManifest(invalidConfidence).errors.includes("render-front-bearing-metadata-invalid"));
 
   const missingBearingSource = fixture();
   missingBearingSource.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
