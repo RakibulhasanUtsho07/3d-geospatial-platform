@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 
 import {
-  authorizeGenerationApiRequest,
+  authorizeGenerationOperatorRequest,
   getGenerationWorkspaceRoot,
 } from "@/core/building-generation/generation-api-auth.mjs";
 import { getGenerationWorkerStatus } from "@/core/building-generation/generation-worker-status.mjs";
 
 export async function GET(request: Request) {
-  const auth = authorizeGenerationApiRequest(request);
+  const auth = authorizeGenerationOperatorRequest(request);
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

@@ -5,7 +5,7 @@ import {
   listGenerationJobs,
 } from "@/core/building-generation/generation-job-queue.mjs";
 import {
-  authorizeGenerationApiRequest,
+  authorizeGenerationOperatorRequest,
   getGenerationWorkspaceRoot,
 } from "@/core/building-generation/generation-api-auth.mjs";
 
@@ -13,7 +13,7 @@ import {
 const MAX_BODY_BYTES = 1024 * 1024;
 
 function authorize(request: Request) {
-  const result = authorizeGenerationApiRequest(request);
+  const result = authorizeGenerationOperatorRequest(request);
   if (!result.allowed) {
     return {
       response: NextResponse.json({ error: result.error }, { status: result.status }),
