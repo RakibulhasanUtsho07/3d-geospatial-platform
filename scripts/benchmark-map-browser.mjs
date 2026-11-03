@@ -72,12 +72,32 @@ function roundMs(value) {
     : null;
 }
 
-function safeGitValue(args) {
+function safeGitValue(args, cwd = projectRoot) {
   try {
-    return execFileSync("git", args, { cwd: projectRoot, encoding: "utf8" }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   } catch {
     return null;
   }
+}
+
+/**
+ * Exclude only this benchmark's generated artifact directory from the source
+ * cleanliness check. Tracked edits and untracked files elsewhere still count.
+ */
+export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot) {
+  const root = path.resolve(rootDirectory);
+  const output = path.resolve(outputDirectory);
+  const relativeOutput = path.relative(root, output);
+  const isSafeRelativeOutput = relativeOutput !== "" &&
+    relativeOutput !== ".." &&
+    !relativeOutput.startsWith(".." + path.sep) &&
+    !path.isAbsolute(relativeOutput);
+  const args = ["status", "--porcelain", "--untracked-files=all"];
+  if (isSafeRelativeOutput) {
+    args.push("--", ".", ":(exclude)" + relativeOutput.split(path.sep).join("/"));
+  }
+  const status = safeGitValue(args, root);
+  return status === null ? null : status.length > 0;
 }
 
 async function hashFile(relativePath) {
@@ -674,11 +694,9 @@ async function runBenchmark() {
       !outputDirectory.startsWith(path.resolve(projectRoot, "artifacts") + path.sep)) {
     throw new Error("Refusing to write benchmark output outside artifacts/.");
   }
-  await mkdir(outputDirectory, { recursive: true });
-
   const commitSha = process.env.MAP_BENCHMARK_COMMIT_SHA || safeGitValue(["rev-parse", "HEAD"]);
-  const gitStatus = safeGitValue(["status", "--porcelain"]);
-  const dirtyTree = gitStatus === null ? null : gitStatus.length > 0;
+  const dirtyTree = getWorkingTreeDirty(outputDirectory);
+  await mkdir(outputDirectory, { recursive: true });
   const dataInputs = [];
   for (const relativePath of DATA_INPUTS) dataInputs.push(await hashFile(relativePath));
   const configuredRoadExtract = process.env.DHAKA_ROADS_EXTRACT_PATH?.trim();
