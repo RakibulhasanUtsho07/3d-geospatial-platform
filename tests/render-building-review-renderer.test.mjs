@@ -81,3 +81,18 @@ test("terminates a stalled Blender process and never promotes its partial output
   assert.match(wrapper, /result\.error\.code === "ETIMEDOUT"/);
   assert.match(wrapper, /no render set is accepted/);
 });
+
+
+test("reads and applies an explicit hash-pinned review profile", () => {
+  assert.match(rendererSource, /def read_review_profile\(opts\):/);
+  assert.match(rendererSource, /--review-profile-sha256/);
+  assert.match(rendererSource, /missing_front_names/);
+  assert.match(rendererSource, /front_profile\["elevationDegrees"\]/);
+  assert.match(rendererSource, /"reviewProfile": review_profile_evidence/);
+});
+
+test("preserves legacy renderer defaults while applying explicit profiles only when supplied", () => {
+  assert.match(rendererSource, /profile_explicit = "--review-profile-json" in opts/);
+  assert.match(rendererSource, /excluded_prefixes = \["Site_"\]/);
+  assert.match(rendererSource, /if focus_rangmahal:/);
+});
