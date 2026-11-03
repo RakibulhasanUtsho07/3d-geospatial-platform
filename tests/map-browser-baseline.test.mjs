@@ -262,7 +262,26 @@ test("ignores only benchmark artifacts and byte-identical Cesium runtime copies"
     await writeFile(path.join(output, "cold-01.png"), "synthetic screenshot");
     await mkdir(path.join(output, "nested"), { recursive: true });
     await writeFile(path.join(output, "nested", "capture.json"), "generated evidence");
-    assert.equal(getWorkingTreeDirty(output, root), false);
+    const gitStatus = execFileSync(
+      "git",
+      ["status", "--porcelain=v1", "--untracked-files=all", "-z"],
+      { cwd: root, encoding: "utf8" },
+    );
+    const cesiumBundleMatches = Buffer.compare(
+      await readFile(path.join(publicCesium, "Cesium.js")),
+      await readFile(path.join(cesiumSource, "Cesium.js")),
+    ) === 0;
+    const cesiumWasmMatches = Buffer.compare(
+      await readFile(path.join(publicCesium, "ThirdParty", "zip-module.wasm")),
+      await readFile(path.join(cesiumSource, "ThirdParty", "zip-module.wasm")),
+    ) === 0;
+    assert.equal(
+      getWorkingTreeDirty(output, root),
+      false,
+      "unexpected dirty paths: " + JSON.stringify(gitStatus.split("\\0").filter(Boolean)) +
+        "; Cesium bundle match=" + cesiumBundleMatches +
+        "; Cesium WASM match=" + cesiumWasmMatches,
+    );
 
     // A mismatch to the package source must no longer be ignored.
     await writeFile(path.join(publicCesium, "Cesium.js"), "tampered browser bundle");
