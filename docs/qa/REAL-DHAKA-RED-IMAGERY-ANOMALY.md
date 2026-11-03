@@ -54,3 +54,8 @@ The privacy-safe imagery error diagnostics, Cesium imagery-readiness probe, stab
 The new evidence must be re-run on the current feature head. A non-zero provider error count is useful correlation evidence but must be matched to tile coordinates/retry details and the screenshot. A zero error count does not rule out an invalid HTTP-200 tile, unexpected raster content, imagery transition or another overlay. Repeated red-pixel outliers without provider errors require fixed-camera layer-isolation captures.
 
 Do not hide or paint over the layer to make the red signal disappear. Do not mark the anomaly fixed until the producing layer/root cause is identified, a targeted correction is made, and an equivalent six-sample run is visually reviewed.
+
+
+## Current status — 2026-11-03
+
+The P3.4 panel/diagnostic work is being ported to current `main` at `3c929c88427fbcb1d40a22506f2f7a8e103d57af`. The desktop/mobile fixture screenshot review confirms the dock no longer covers Cesium attribution, but this does not address the original red imagery anomaly. The saturated-red signal remains a manual-review indicator, not a classifier. A fresh six-sample live-Dhaka baseline, screenshot inspection and fixed-camera layer isolation (if the outlier repeats) remain mandatory; do not close the anomaly on the strength of a green unit test or fixture screenshot.
