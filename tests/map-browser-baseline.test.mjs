@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { classifyResourceUrl, createNetworkCounters, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
+import { classifyResourceUrl, createNetworkCounters, getWorkingTreeDirty, resolveRoadReadiness, summarizeValues, validateMapReadyState } from "../scripts/benchmark-map-browser.mjs";
 
 test("summarizes browser samples using nearest-rank p50 and p95", () => {
   assert.deepEqual(summarizeValues([10, 20, 30, 40, 50]), {
@@ -226,4 +230,31 @@ test("captures offline road source/detail headers and pending-request lifecycle 
   assert.deepEqual(snapshot.roadApi.upstreamAttempts, { sampleCount: 1, total: 0, max: 0 });
   assert.equal(snapshot.roadApi.pendingRequestsAtCapture, 0);
   assert.equal(JSON.stringify(snapshot).includes("west=90.4"), false);
+});
+
+
+test("ignores only the benchmark output directory when checking source working-tree cleanliness", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "real-dhaka-baseline-git-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Baseline Test"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "baseline@example.test"], { cwd: root });
+    await writeFile(path.join(root, "source.js"), "export const value = 1;\\n");
+    execFileSync("git", ["add", "source.js"], { cwd: root });
+    execFileSync("git", ["commit", "-qm", "initial"], { cwd: root });
+
+    const output = path.join(root, "artifacts", "real-dhaka-baseline", "candidate");
+    await mkdir(output, { recursive: true });
+    await writeFile(path.join(output, "report.json"), "{}\\n");
+    await writeFile(path.join(output, "cold-01.png"), "synthetic screenshot");
+    assert.equal(getWorkingTreeDirty(output, root), false);
+
+    await writeFile(path.join(root, "source.js"), "export const value = 2;\\n");
+    assert.equal(getWorkingTreeDirty(output, root), true, "tracked source edits must remain visible");
+
+    await writeFile(path.join(root, "unexpected.txt"), "not a benchmark artifact");
+    assert.equal(getWorkingTreeDirty(output, root), true, "untracked source files must remain visible");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
