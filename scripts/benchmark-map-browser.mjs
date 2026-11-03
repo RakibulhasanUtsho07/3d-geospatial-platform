@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { performance } from "node:perf_hooks";
+import { flagCanvasRedPixelOutliers, measureCanvasRedPixelSignal } from "../src/core/map-engine/canvas-red-pixel-diagnostics.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_URL = "http://127.0.0.1:3000/map";
@@ -71,14 +72,47 @@ function roundMs(value) {
     : null;
 }
 
-function safeGitValue(args) {
+function safeGitValue(args, cwd = projectRoot) {
   try {
-    return execFileSync("git", args, { cwd: projectRoot, encoding: "utf8" }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   } catch {
     return null;
   }
 }
 
+/**
+ * Exclude only this benchmark's generated artifact directory from the source
+ * cleanliness check. Tracked edits and untracked files elsewhere still count.
+ */
+export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot) {
+  const root = path.resolve(rootDirectory);
+  const output = path.resolve(outputDirectory);
+  const relativeOutput = path.relative(root, output);
+  const isSafeRelativeOutput = relativeOutput !== "" &&
+    relativeOutput !== ".." &&
+    !relativeOutput.startsWith(".." + path.sep) &&
+    !path.isAbsolute(relativeOutput);
+  const status = safeGitValue(["status", "--porcelain=v1", "--untracked-files=all", "-z"], root);
+  if (status === null) return null;
+  if (!isSafeRelativeOutput) return status.length > 0;
+
+  const outputPath = relativeOutput.split(path.sep).join("/");
+  const changedPaths = [];
+  const records = status.split("\0").filter(Boolean);
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    const statusCode = record.slice(0, 2);
+    changedPaths.push(record.slice(3));
+    // Porcelain -z emits a second NUL-delimited path for rename/copy records.
+    if (statusCode.includes("R") || statusCode.includes("C")) {
+      if (index + 1 < records.length) changedPaths.push(records[++index]);
+    }
+  }
+  return changedPaths.some((changedPath) => {
+    const normalized = changedPath.replace(/\\/g, "/");
+    return normalized !== outputPath && !normalized.startsWith(outputPath + "/");
+  });
+}
 async function hashFile(relativePath) {
   const absolutePath = path.isAbsolute(relativePath)
     ? relativePath
@@ -239,15 +273,18 @@ async function waitForMapReady(page, timeoutMs) {
   });
   await page.waitForFunction(() => {
     const container = document.querySelector('[data-testid="cesium-map-container"]');
-    const text = document.body?.innerText || "";
-    const hasError = text.includes("3D map initialization failed");
-    const loading = text.includes("Loading Ahsan Manzil 3D map");
+    const hasError = (document.body?.innerText || "").includes("3D map initialization failed");
+    const loadingOverlayVisible = Boolean(document.querySelector('[data-testid="map-loading-overlay"]'));
     const telemetry = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.();
     const stage = telemetry?.metrics?.["viewport.stage"];
+    const imagery = window.__MAP_ENGINE_PERFORMANCE__?.renderReadiness?.();
     return hasError || (
       Boolean(container?.querySelector("canvas")) &&
-      !loading &&
-      Number(stage?.successCount) > 0
+      !loadingOverlayVisible &&
+      Number(stage?.successCount) > 0 &&
+      imagery?.viewerAvailable === true &&
+      Number(imagery.imageryLayerCount) > 0 &&
+      imagery.imageryTilesLoaded === true
     );
   }, null, { timeout: timeoutMs });
 
@@ -258,9 +295,14 @@ async function waitForMapReady(page, timeoutMs) {
     const stageEvent = telemetry?.recentEvents?.slice().reverse().find(
       (event) => event.metric === "viewport.stage" && event.outcome === "success"
     );
+    const imagery = window.__MAP_ENGINE_PERFORMANCE__?.renderReadiness?.() ?? null;
     return {
       hasError: text.includes("3D map initialization failed"),
       telemetryAvailable: typeof window.__MAP_ENGINE_PERFORMANCE__?.snapshot === "function",
+      loadingOverlayVisible: Boolean(document.querySelector('[data-testid="map-loading-overlay"]')),
+      viewerAvailable: imagery?.viewerAvailable === true,
+      imageryLayerCount: Number.isSafeInteger(imagery?.imageryLayerCount) ? imagery.imageryLayerCount : null,
+      imageryTilesLoaded: imagery?.imageryTilesLoaded === true,
       canvasCount: document.querySelectorAll('[data-testid="cesium-map-container"] canvas').length,
       viewportStageSuccessCount: Number(stage?.successCount) || 0,
       stagedFeatureCount: Number.isSafeInteger(stageEvent?.featureCount) ? stageEvent.featureCount : null,
@@ -271,8 +313,13 @@ async function waitForMapReady(page, timeoutMs) {
     throw new Error("Map telemetry is missing. Start the app with npm run dev, not production mode.");
   }
   if (state.canvasCount < 1) throw new Error("Cesium did not create a map canvas.");
+  if (state.loadingOverlayVisible) throw new Error("The map loading overlay is still visible.");
+  if (!state.viewerAvailable || state.imageryLayerCount < 1) {
+    throw new Error("Cesium map or base imagery layer is not available yet.");
+  }
+  if (!state.imageryTilesLoaded) throw new Error("Visible Cesium imagery tiles are not settled.");
   if (!validateMapReadyState(state)) {
-    throw new Error("Map readiness requires a successful viewport stage containing at least one building feature; observed " +
+    throw new Error("Map readiness requires a successful viewport stage with building features and settled imagery; observed " +
       state.viewportStageSuccessCount + " successful stage(s), feature count " + String(state.stagedFeatureCount) + ".");
   }
   return state;
@@ -376,6 +423,11 @@ export function validateMapReadyState(state) {
     state &&
     state.hasError === false &&
     state.telemetryAvailable === true &&
+    state.loadingOverlayVisible === false &&
+    state.viewerAvailable === true &&
+    Number.isSafeInteger(state.imageryLayerCount) &&
+    state.imageryLayerCount > 0 &&
+    state.imageryTilesLoaded === true &&
     Number.isSafeInteger(state.canvasCount) &&
     state.canvasCount >= 1 &&
     Number.isSafeInteger(state.viewportStageSuccessCount) &&
@@ -385,10 +437,40 @@ export function validateMapReadyState(state) {
   );
 }
 
+async function waitForStableImagery(page, timeoutMs = 15000, stableMs = 750) {
+  const startedAt = performance.now();
+  let stableSince = null;
+  let lastState = null;
+
+  while (performance.now() - startedAt < timeoutMs) {
+    lastState = await page.evaluate(() =>
+      window.__MAP_ENGINE_PERFORMANCE__?.renderReadiness?.() ?? null
+    );
+    const ready = lastState?.viewerAvailable === true &&
+      Number.isSafeInteger(lastState.imageryLayerCount) &&
+      lastState.imageryLayerCount > 0 &&
+      lastState.imageryTilesLoaded === true;
+
+    if (ready) {
+      stableSince ??= performance.now();
+      if (performance.now() - stableSince >= stableMs) {
+        return { ...lastState, stableForMs: roundMs(performance.now() - stableSince) };
+      }
+    } else {
+      stableSince = null;
+    }
+    await page.waitForTimeout(100);
+  }
+
+  throw new Error("Visible Cesium imagery did not remain loaded for " + stableMs +
+    "ms within " + timeoutMs + "ms; last readiness state: " + JSON.stringify(lastState));
+}
+
 async function capturePageMetrics(
   page, counters, origin, screenshotPath, loadToMapReadyMs, mode, index, scenario,
   readiness, roadReadiness, loadToRoadTerminalMs,
 ) {
+  const imageryReadiness = await waitForStableImagery(page);
   const metrics = await page.evaluate((pageOrigin) => {
     const nav = performance.getEntriesByType("navigation")[0];
     const paints = performance.getEntriesByType("paint");
@@ -439,6 +521,13 @@ async function capturePageMetrics(
     }
 
     const telemetry = window.__MAP_ENGINE_PERFORMANCE__?.snapshot?.() ?? null;
+    const rawImageryErrors = window.__MAP_ENGINE_IMAGERY_TILE_ERRORS__;
+    const imageryTileErrors = rawImageryErrors && typeof rawImageryErrors === "object"
+      ? {
+          total: Number.isSafeInteger(rawImageryErrors.total) ? rawImageryErrors.total : 0,
+          recent: Array.isArray(rawImageryErrors.recent) ? rawImageryErrors.recent.slice(-50) : [],
+        }
+      : { total: 0, recent: [] };
     const tasks = window.__MAP_BASELINE_LONG_TASKS__ ?? null;
     const memory = performance.memory && Number.isFinite(performance.memory.usedJSHeapSize)
       ? {
@@ -460,6 +549,7 @@ async function capturePageMetrics(
       paintTimingsMs: Object.fromEntries(paints.map((entry) => [entry.name, Number(entry.startTime.toFixed(2))])),
       resources: resourceSummary,
       telemetry,
+      imageryTileErrors,
       longTasks: tasks ? {
         count: tasks.count,
         totalDurationMs: Number(tasks.totalDurationMs.toFixed(2)),
@@ -476,6 +566,12 @@ async function capturePageMetrics(
     };
   }, origin);
 
+  const canvasScreenshotBytes = await page
+    .getByTestId("cesium-map-container")
+    .locator("canvas")
+    .first()
+    .screenshot({ animations: "disabled" });
+  const visualRedPixelSignal = await measureCanvasRedPixelSignal(canvasScreenshotBytes);
   const screenshotBytes = await page.screenshot({
     path: screenshotPath,
     fullPage: false,
@@ -494,6 +590,9 @@ async function capturePageMetrics(
     paintTimingsMs: metrics.paintTimingsMs,
     resources: metrics.resources,
     mapTelemetry: metrics.telemetry,
+    imageryTileErrors: metrics.imageryTileErrors,
+    visualRedPixelSignal,
+    imageryReadiness,
     longTasks: metrics.longTasks,
     memory: metrics.memory,
     environment: metrics.environment,
@@ -608,11 +707,9 @@ async function runBenchmark() {
       !outputDirectory.startsWith(path.resolve(projectRoot, "artifacts") + path.sep)) {
     throw new Error("Refusing to write benchmark output outside artifacts/.");
   }
-  await mkdir(outputDirectory, { recursive: true });
-
   const commitSha = process.env.MAP_BENCHMARK_COMMIT_SHA || safeGitValue(["rev-parse", "HEAD"]);
-  const gitStatus = safeGitValue(["status", "--porcelain"]);
-  const dirtyTree = gitStatus === null ? null : gitStatus.length > 0;
+  const dirtyTree = getWorkingTreeDirty(outputDirectory);
+  await mkdir(outputDirectory, { recursive: true });
   const dataInputs = [];
   for (const relativePath of DATA_INPUTS) dataInputs.push(await hashFile(relativePath));
   const configuredRoadExtract = process.env.DHAKA_ROADS_EXTRACT_PATH?.trim();
@@ -725,6 +822,16 @@ async function runBenchmark() {
     await browser.close();
   }
 
+  const visualRuns = results.filter((run) =>
+    run.status === "ok" && run.visualRedPixelSignal,
+  );
+  const visualAssessments = flagCanvasRedPixelOutliers(
+    visualRuns.map((run) => run.visualRedPixelSignal),
+  );
+  for (let index = 0; index < visualRuns.length; index += 1) {
+    visualRuns[index].visualAnomalyReview = visualAssessments[index];
+  }
+
   const report = {
     schemaVersion: 1,
     benchmark: "real-dhaka-map-performance-baseline",
@@ -758,7 +865,7 @@ async function runBenchmark() {
       readyTimeoutMs,
       roadReadyTimeoutMs,
       roadRetryGraceMs,
-      readyCondition: "A successful viewport.stage event with at least one building feature.",
+      readyCondition: "A successful viewport.stage with building features, hidden loading overlay, base imagery available, and visible Cesium imagery tiles settled; screenshots require 750ms stable imagery readiness.",
       roadSettlement: "Wait for roads.fetch and, after a successful fetch, the following roads.render event; record errors, cancellation and timeout instead of silently treating the canvas as fully ready.",
       screenshotDigestsProveCapturedFileIntegrityNotCrossMachineBitIdentity: true,
       telemetryWindow: "Map-engine telemetry generated during each navigation; in-app retention is bounded.",
@@ -774,6 +881,11 @@ async function runBenchmark() {
     summary: {
       cold: summarizeRuns(results.filter((run) => run.mode === "cold")),
       warm: summarizeRuns(results.filter((run) => run.mode === "warm")),
+      visualAnomalyReview: {
+        method: "Conservative saturated-red signal on the Cesium canvas only; peer outlier flags request human review and do not identify the producing layer.",
+        evaluatedCanvasSamples: visualRuns.length,
+        flaggedCanvasSamples: visualAssessments.filter((item) => item.flagged).length,
+      },
     },
     runs: results,
   };
