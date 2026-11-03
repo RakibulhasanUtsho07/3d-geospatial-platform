@@ -90,5 +90,7 @@ test("uses the candidate GLB front bearing for orthographic views and preserves 
   assert.match(rendererSource, /front_axis_source = "glb-extras\.frontFacingAzimuthDegrees"/);
   assert.match(rendererSource, /sin_bearing \* math\.cos\(front_elevation\)/);
   assert.match(rendererSource, /"frontFacingAzimuthDegrees": front_azimuth/);
+  assert.match(rendererSource, /"frontAxisConfidence": front_axis_confidence/);
+  assert.match(rendererSource, /confidence = building.get\("frontAxisConfidence", "unknown"\)/);
   assert.match(rendererSource, /"frontAxisSource": front_axis_source/);
 });
