@@ -244,9 +244,19 @@ function parsePythonInventory(result) {
     const probeErrors = Array.isArray(data.probeErrors)
       ? data.probeErrors.filter((value) => typeof value === "string" && /^[a-z0-9-]{1,100}$/.test(value)).slice(0, 12)
       : ["python-runtime-inventory-result-malformed"];
+    const tripoRevision = modelArtifacts.tripoConfig.snapshotRevision;
+    if (modelArtifacts.tripoConfig.status !== "cached" ||
+        modelArtifacts.tripoCheckpoint.status !== "cached" ||
+        !tripoRevision || modelArtifacts.tripoCheckpoint.snapshotRevision !== tripoRevision) {
+      probeErrors.push("triposr-cache-artifact-identity-incomplete");
+    }
+    if (modelArtifacts.rembgWeights.status !== "cached") {
+      probeErrors.push("rembg-cache-artifact-identity-incomplete");
+    }
     const coreValid = typeof data.pythonVersion === "string" &&
       typeof data.pythonImplementation === "string" &&
       typeof data.pythonPlatform === "string" &&
+      data.modelArtifacts !== null && typeof data.modelArtifacts === "object" &&
       typeof data.runnerSyntaxCompiled === "boolean" &&
       typeof data.runnerSha256Matches === "boolean";
     if (!coreValid) throw new TypeError("malformed Python inventory core");
