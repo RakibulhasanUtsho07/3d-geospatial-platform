@@ -42,7 +42,7 @@ test("worker runs a durable procedural job and leaves the GLB gated for human re
   assert.deepEqual(summary.claimableStrategies, ["auto", "procedural"]);
 });
 
-test("leaves unsupported strategy jobs queued without incrementing attempts", async (t) => {
+test("leaves single-image jobs queued when rembg model weights are missing without consuming attempts", async (t) => {
   const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "generation-worker-capability-"));
   t.after(() => rm(workspaceRoot, { recursive: true, force: true }));
   await mkdir(path.join(workspaceRoot, "uploads"), { recursive: true });
@@ -65,7 +65,10 @@ test("leaves unsupported strategy jobs queued without incrementing attempts", as
     strategies: {
       procedural: { status: "ready", blockers: [], caveats: [] },
       photogrammetry: { status: "blocked", blockers: ["COLMAP unavailable"], caveats: [] },
-      "single-image-ai": { status: "blocked", blockers: ["TripoSR unavailable"], caveats: [] },
+      "single-image-ai": {
+        status: "configured", blockers: [], caveats: ["TripoSR weights cached; rembg default model cache missing."],
+        modelWeights: "cached", backgroundRemovalWeights: "missing", backgroundRemovalModel: "bria-rmbg",
+      },
     },
   };
   const summary = await runGenerationWorker({
@@ -77,5 +80,9 @@ test("leaves unsupported strategy jobs queued without incrementing attempts", as
   assert.deepEqual(summary.claimableStrategies, ["auto", "procedural"]);
   assert.equal(after.status, "queued");
   assert.equal(after.attempt, 0);
-  assert.equal((await getGenerationWorkerStatus({ workspaceRoot })).capabilities.strategies["single-image-ai"].status, "blocked");
+  const persisted = (await getGenerationWorkerStatus({ workspaceRoot })).capabilities.strategies["single-image-ai"];
+  assert.equal(persisted.status, "configured");
+  assert.equal(persisted.modelWeights, "cached");
+  assert.equal(persisted.backgroundRemovalWeights, "missing");
+  assert.equal(persisted.backgroundRemovalModel, "bria-rmbg");
 });

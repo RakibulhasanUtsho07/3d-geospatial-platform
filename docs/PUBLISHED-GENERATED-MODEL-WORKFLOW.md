@@ -25,7 +25,9 @@ Activation verifies that the versioned GLB still matches the stored SHA-256 befo
 
 The connected generation queue has a separate review API. Submit the explicit review after inspecting the exact GLB and QA report, using `GENERATION_REVIEW_API_TOKEN` (not `GENERATION_API_TOKEN`). The approved review record is persisted under the private job workspace and its hash is attached to the job status.
 
-After the job is approved, publish the same reviewed bytes with explicit map placement:
+The review request must include the exact complete placement object as part of the approval. The immutable review record stores its canonical SHA-256; the publication CLI/API must receive that exact same placement. The CLI supplies the fixed `WGS84-ellipsoid` height-reference marker rather than allowing callers to select an arbitrary datum. A legacy approval without the placement binding is rejected. Height is interpreted as WGS84 ellipsoid height; convert other datums before review.
+
+After the job is approved, publish the same reviewed bytes with the exact placement recorded at approval:
 
 ```powershell
 $workspace = "E:\\building-engine-workspace"
@@ -43,7 +45,7 @@ Successful publication writes the content-addressed GLB and updates `public/mode
 
 The Generated models dialog now includes **Publish an approved generation job to this map**. It calls `POST /api/building-generation/jobs/<jobId>/publish` with a distinct `GENERATION_PUBLISH_API_TOKEN`, explicit WGS84 position, height, orientation, scale and GLB axes. See [D3M-02 — Generation Job to Cesium Map Publication](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md) for the exact contract and deployment requirements.
 
-The API invokes the existing approved-job publisher. It re-verifies the request, approved review record, candidate GLB and QA report from the private workspace; it writes only the content-addressed GLB and manifest under the application public root (`process.cwd()/public/models/generated/`). The application public directory must be writable and persistent. The UI then rereads the catalog and checks the exact model ID, active version ID, SHA-256 and asset URL before loading the catalog definition into the current Cesium session.
+The API invokes the existing approved-job publisher. It re-verifies the request, approved review record (including the exact placement digest), candidate GLB and QA report from the private workspace; it rejects a changed longitude/latitude/height/orientation/scale/axis and writes only the content-addressed GLB and manifest under the application public root (`process.cwd()/public/models/generated/`). The application public directory must be writable and persistent. The UI then rereads the catalog and checks the exact model ID, active version ID, SHA-256 and asset URL before loading the catalog definition into the current Cesium session.
 
 The publish token is entered in the panel and retained only in component memory; it is not stored in localStorage. Publication is explicit and makes the GLB publicly fetchable. The API does not change the generation job's `mapReady` or `publicationEligible` flags, and the map load is not proof of model accuracy or independent survey acceptance.
 

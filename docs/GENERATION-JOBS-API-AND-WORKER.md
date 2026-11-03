@@ -96,7 +96,17 @@ Send a review decision only after inspecting the GLB candidate and its QA report
 {
   "decision": "approved",
   "reviewer": "operator-handle",
-  "notes": "Reviewed the candidate and supporting evidence.",
+  "notes": "Reviewed the candidate, placement and supporting evidence.",
+  "placement": {
+    "position": { "longitude": 90.40606, "latitude": 23.7086, "height": 0 },
+    "headingDegrees": 0,
+    "pitchDegrees": 0,
+    "rollDegrees": 0,
+    "scale": 1,
+    "upAxis": "Y",
+    "forwardAxis": "Z",
+    "heightReference": "WGS84-ellipsoid"
+  },
   "checks": {
     "rightsVerified": true,
     "sourceIdentityVerified": true,
@@ -109,7 +119,7 @@ Send a review decision only after inspecting the GLB candidate and its QA report
 }
 ```
 
-Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
+Use `decision` = `rejected` or `changes_requested` to record a non-approval. An approval is rejected unless every check is explicitly true and the complete placement is supplied. The immutable review record stores the normalized placement and its SHA-256 digest. Publication later requires the same exact transform; changing even the coordinate, height, orientation, scale or GLB axes is rejected. Height is WGS84 ellipsoid height; convert other vertical references before approval. The API verifies that the GLB is a plausible GLB 2.0 file, that its SHA-256 matches the completed job, and that the report points to the same candidate and remains fail-closed.
 
 The review API writes an audit record under the private job workspace and returns its hash. It deliberately **does not** set `mapReady` or `publicationEligible` to true, and it does not publish. Publication is a separate explicit operator action: use the D3M-02 map panel/API or the existing publication CLI after review and placement checks. The `reviewer` value is an operator-supplied label, not an identity-provider-verified account; the review token grants review permission to anyone who holds it.
 
@@ -133,7 +143,7 @@ $env:BUILDING_ENGINE_WORKSPACE = "E:\\building-engine-workspace"
 node scripts/run-generation-worker.mjs --once
 ```
 
-The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. For single-image AI, the probe also verifies that TripoSR's `config.yaml` and `model.ckpt` are present in the local Hugging Face cache; the worker claims AI jobs only when those files are cached. Jobs for unavailable strategies remain queued without consuming retry attempts. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md) for the cache prefetch command and probe limitations. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
+The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. For single-image AI, the probe also imports ONNX Runtime and rembg, verifies TripoSR's `config.yaml` and `model.ckpt` in the local Hugging Face cache, discovers the installed rembg default session model, and verifies that model's local cache entry through the package resolver. Both model caches must be present before the worker claims AI jobs; unknown model/cache layouts fail closed. These probes do not construct an inference session or download weights. Jobs for unavailable strategies remain queued without consuming retry attempts. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md) for cache preparation and licensing notes. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
 
 ## Local outputs and review
 

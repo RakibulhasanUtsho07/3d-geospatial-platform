@@ -87,13 +87,26 @@ function validateCapabilities(value) {
       throw new TypeError("Generation worker capability entry is invalid: " + strategy);
     }
     const modelWeights = entry.modelWeights ?? "unknown";
+    const backgroundRemovalWeights = entry.backgroundRemovalWeights ?? "unknown";
+    const backgroundRemovalModel = entry.backgroundRemovalModel ?? null;
     if (strategy === "single-image-ai" &&
         !["cached", "missing", "not-checked", "unknown"].includes(modelWeights)) {
       throw new TypeError("Generation worker modelWeights status is invalid.");
     }
+    if (strategy === "single-image-ai" &&
+        !["cached", "missing", "not-checked", "unknown"].includes(backgroundRemovalWeights)) {
+      throw new TypeError("Generation worker backgroundRemovalWeights status is invalid.");
+    }
+    if (strategy === "single-image-ai" && backgroundRemovalModel !== null &&
+        (typeof backgroundRemovalModel !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(backgroundRemovalModel))) {
+      throw new TypeError("Generation worker backgroundRemovalModel is invalid.");
+    }
     strategies[strategy] = {
       status: entry.status, blockers: [...entry.blockers], caveats: [...entry.caveats],
-      ...(strategy === "single-image-ai" ? { modelWeights } : {}),
+      ...(strategy === "single-image-ai" ? {
+        modelWeights, backgroundRemovalWeights,
+        ...(backgroundRemovalModel ? { backgroundRemovalModel } : {}),
+      } : {}),
     };
   }
   return { schemaVersion: "1.0.0", checkedAt: isoTimestamp(value.checkedAt, "capabilities.checkedAt"), strategies };

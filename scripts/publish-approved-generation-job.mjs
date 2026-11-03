@@ -12,7 +12,8 @@ function usage() {
   console.log("  npm run publish:approved-generation-job -- <workspaceRoot> <jobId> --longitude <deg> --latitude <deg> --height <metres>");
   console.log("");
   console.log("Optional placement: --heading <deg> --pitch <deg> --roll <deg> --scale <factor> --up-axis X|Y|Z --forward-axis X|Y|Z");
-  console.log("The job must have an immutable approved review whose GLB/report hashes still match. Publication is explicit; no job is published automatically.");
+  console.log("Height is interpreted as WGS84 ellipsoid height. The complete transform must match the immutable approved review exactly.");
+  console.log("Publication is explicit; no job is published automatically.");
 }
 function numberOption(value, name) {
   if (value === undefined) return undefined;
@@ -56,6 +57,7 @@ async function main() {
     jobId: positionals[1],
     placement: {
       position: { longitude, latitude, height },
+      heightReference: "WGS84-ellipsoid",
       headingDegrees: numberOption(values.heading, "--heading"),
       pitchDegrees: numberOption(values.pitch, "--pitch"),
       rollDegrees: numberOption(values.roll, "--roll"),
@@ -73,6 +75,8 @@ async function main() {
     reportSha256: result.reportSha256,
     reviewId: result.reviewId,
     placement: result.placement,
+    placementHeightReference: result.placementHeightReference,
+    placementSha256: result.placementSha256,
     mapReady: false,
     publicationEligible: false,
     note: result.note,

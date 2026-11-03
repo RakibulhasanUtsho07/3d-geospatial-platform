@@ -97,6 +97,7 @@ export default function GenerationJobPublishPanel({
           latitude: finiteNumber(latitude, "Latitude", -90, 90),
           height: finiteNumber(height, "Height", -12000, 9000000),
         },
+        heightReference: "WGS84-ellipsoid",
         headingDegrees: finiteNumber(heading, "Heading", -360, 360),
         pitchDegrees: finiteNumber(pitch, "Pitch", -90, 90),
         rollDegrees: finiteNumber(roll, "Roll", -360, 360),
@@ -181,7 +182,7 @@ export default function GenerationJobPublishPanel({
       </summary>
       <div className="mt-2">
         <p className="text-xs leading-5 text-zinc-400">
-          Use this only after a completed job has an approved review record. The server rechecks the immutable review, candidate GLB and QA-report hashes. Placement must be supplied explicitly; it is never inferred from an image or model.
+          Use this only after a completed job has an approved review record. Enter the exact longitude, latitude, ellipsoid height, heading, pitch, roll, scale and axes captured by that approval; any difference is rejected. Placement is never inferred from an image or model.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-3 space-y-3">
@@ -223,7 +224,7 @@ export default function GenerationJobPublishPanel({
               <input type="number" step="any" value={latitude} onChange={(event) => setLatitude(event.target.value)} required className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60" />
             </label>
             <label className="block text-xs font-medium text-zinc-300">
-              Height (m)
+              Height (m; WGS84 ellipsoid)
               <input type="number" step="any" value={height} onChange={(event) => setHeight(event.target.value)} required className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-300/60" />
             </label>
           </div>
