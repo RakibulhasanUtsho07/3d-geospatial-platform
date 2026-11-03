@@ -135,14 +135,14 @@ export function normalizeBuildingSpec(raw) {
   if (frontFacadeEdgeIndex !== undefined && frontFacingAzimuthDegrees !== null) {
     throw new TypeError("specify either frontFacadeEdgeIndex or frontFacingAzimuthDegrees, not both");
   }
-  const domeAnchor = dome.anchor === undefined ? "front-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
-  if (!["front-inset", "footprint-bounds-center"].includes(domeAnchor)) {
-    throw new TypeError("unsupported centralDome.anchor");
-  }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
   const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
   const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
+  const domeAnchor = dome.anchor === undefined ? "front-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
+  if (!["front-inset", "footprint-bounds-center"].includes(domeAnchor)) {
+    throw new TypeError("unsupported centralDome.anchor");
+  }
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
     if (typeof value !== "boolean") throw new TypeError(label + " must be boolean");
