@@ -3,6 +3,7 @@ name: BRF-14 multi-view source-byte intake
 on:
   pull_request:
     branches:
+      - main
       - development
     paths:
       - ".github/workflows/brf-14-multiview-source-intake.yml"
