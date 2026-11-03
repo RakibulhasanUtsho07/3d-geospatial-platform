@@ -94,6 +94,9 @@ test("converts right-handed glTF map bearings into Blender's Z-up camera frame",
   assert.match(rendererSource, /to_track_quat\("-Z", camera_track_up_axis\(direction\)\)/);
 
   assert.match(rendererSource, /"frontCameraEffectiveBearingDegrees": effective_front_bearing/);
+  assert.match(rendererSource, /coordinate_frame = building.get\("coordinateFrame"\)/);
+  assert.match(rendererSource, /GLB with a geographic front bearing must declare coordinateFrame/);
+  assert.match(rendererSource, /"modelCoordinateFrame": model_coordinate_frame/);
   assert.match(rendererSource, /"frontFacingAzimuthDegrees": front_azimuth/);
   assert.match(rendererSource, /"frontAxisConfidence": front_axis_confidence/);
   assert.match(rendererSource, /confidence = building.get\("frontAxisConfidence", "unknown"\)/);
