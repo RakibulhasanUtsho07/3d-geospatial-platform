@@ -27,6 +27,7 @@ function fixture(overrides = {}) {
       rendererVersion: "4.5.0",
       width: 512,
       height: 512,
+      modelCoordinateFrame: "gltf-right-handed-x-east-y-up-z-south",
       sceneBounds: { min: [-1,-1,0], max: [1,1,3], dimensions: [2,2,3], coordinateUnits: "imported-model-units-unverified" },
       views,
       ...overrides.raw,
@@ -101,6 +102,7 @@ test("preserves a validated GLB front bearing and source in the review manifest"
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
   assert.equal(report.frontFacingAzimuthDegrees, 180);
+  assert.equal(report.modelCoordinateFrame, "gltf-right-handed-x-east-y-up-z-south");
   assert.equal(report.frontCameraEffectiveBearingDegrees, 180);
   assert.equal(report.frontAxisConfidence, "estimated");
   assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
@@ -141,4 +143,17 @@ test("fails closed when effective front camera bearing contradicts the source be
   const defaultMismatch = fixture();
   defaultMismatch.rawManifest.frontCameraEffectiveBearingDegrees = 0;
   assert.ok(finalizeRenderReviewManifest(defaultMismatch).errors.includes("render-effective-front-bearing-mismatch"));
+});
+
+
+test("fails closed when a GLB bearing is supplied without the right-handed geospatial coordinate frame", () => {
+  const data = fixture();
+  data.rawManifest.frontFacingAzimuthDegrees = 180;
+  data.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  data.rawManifest.frontAxisConfidence = "estimated";
+  data.rawManifest.modelCoordinateFrame = "x-east,y-up,z-north";
+  const report = finalizeRenderReviewManifest(data);
+  assert.ok(report.errors.includes("render-model-coordinate-frame-invalid"));
+  assert.ok(report.errors.includes("render-bearing-requires-right-handed-model-coordinate-frame"));
+  assert.equal(report.publicationEligible, false);
 });
