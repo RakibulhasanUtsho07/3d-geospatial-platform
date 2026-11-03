@@ -17,7 +17,7 @@ def load_direction_policy():
     source = RENDERER.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(RENDERER))
     selected = []
-    wanted_functions = {"camera_direction_from_bearing", "build_review_view_directions"}
+    wanted_functions = {"camera_direction_from_bearing", "camera_track_up_axis", "build_review_view_directions"}
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == "DEFAULT_FRONT_BEARING_DEGREES"
@@ -71,6 +71,8 @@ class BlenderCameraDirectionPolicyTests(unittest.TestCase):
         self.assertVectorClose(views["left"], (-1.0, 0.0, 0.0))
         self.assertVectorClose(views["right"], (1.0, 0.0, 0.0))
         self.assertVectorClose(views["top"], (0.0, 1.0, 0.0))
+        self.assertEqual(POLICY["camera_track_up_axis"](views["front"][1]), "Y")
+        self.assertEqual(POLICY["camera_track_up_axis"](views["top"][1]), "Z")
 
     def test_explicit_front_bearing_rotates_front_back_and_relative_sides(self):
         views = dict(POLICY["build_review_view_directions"](0.0))
