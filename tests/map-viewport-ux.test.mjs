@@ -16,16 +16,16 @@ const [controls, layers, properties, canvas, controller, adapter, engineTypes, b
 test("camera controls start collapsed and expose an accessible toggle", () => {
   assert.match(controls, /const \[expanded, setExpanded\] = useState\(false\)/);
   assert.match(controls, /aria-expanded=\{expanded\}/);
-  assert.match(controls, /aria-controls="map-camera-controls"/);
-  assert.match(controls, /id="map-camera-controls"/);
+  assert.match(controls, /aria-controls="map-controls-menu"/);
+  assert.match(controls, /id="map-controls-menu"/);
   assert.match(controls, /label="Return to Dhaka property-discovery view"/);
 });
 
 test("layer list starts collapsed so it does not cover discovery/search controls", () => {
   assert.match(layers, /const \[expanded, setExpanded\] = useState\(false\)/);
   assert.match(layers, /aria-expanded=\{expanded\}/);
-  assert.match(layers, /aria-controls="map-layers-list"/);
-  assert.match(layers, /className=\{expanded \? "space-y-1 border-t border-white\/10 p-2" : "hidden"\}/);
+  assert.match(layers, /aria-controls="map-layer-options"/);
+  assert.match(layers, /expanded && (/);
 });
 
 test("property discovery starts collapsed to preserve the map viewport", () => {
