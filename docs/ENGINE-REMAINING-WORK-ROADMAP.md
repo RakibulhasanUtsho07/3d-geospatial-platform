@@ -351,3 +351,17 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The prior P3.4 baseline failed its clean-tree provenance gate because the benchmark's own nested artifact directory appeared in Git status. The benchmark now parses NUL-delimited porcelain status and excludes only its own output subtree; tracked edits and all other untracked paths remain dirty. A temp-Git-repository regression test covers nested generated evidence plus unrelated tracked/untracked changes.
 - The P3.4 current-main candidate must still pass exact-head Full CI and the six-sample clean working-tree Real-Dhaka baseline. Until both succeed and the resulting screenshots/report are inspected, P3.4 is not accepted as complete. The diagnostics do not prove that the previous red imagery anomaly has been fixed.
 - The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
+
+
+## D3M-ENGINE-03 — Evidence-backed building-to-map vertical slice
+
+**Implementation branch:** `feat/facade-selection-insert-placement-20261103`  
+**Baseline:** `main@bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`
+
+- Reuses existing D3M-01–07 and BRF-05–07 source-bound evidence, multi-view architecture workflow, worker preflight/smoke, reviewed WGS84 placement, review hand-off, publication catalog and Cesium load.
+- Closes a procedural-generator gap: doors/windows were separate objects over solid walls. This branch adds scanline-triangulated wall faces with rectangular/faceted-arch aperture loops, through-thickness reveals, overlap/bounds checks and GLB/report metadata.
+- Reconciles PR #349's controlled synthetic non-manifold-edge defect regression.
+- Earlier exact-head Full CI and Blender renderer smoke passed; the new changes need fresh exact-head CI.
+- Still operationally blocked: real D3M-05 TripoSR/rembg inference on the provisioned host, exact source/model-weight rights, production trusted-reviewer registry, independently surveyed dimensions/ground controls/vertical datum, and authorized human visual review.
+- Opening dimensions remain procedural; no photo reconstruction, surveyed accuracy, architectural correctness or automatic approval is claimed.
+- `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` stay false.
