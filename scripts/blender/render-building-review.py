@@ -39,6 +39,41 @@ def add_area_light(name, position, center, power, size):
     obj.rotation_euler = (center - obj.location).to_track_quat("-Z", "Y").to_euler()
     return obj
 
+DEFAULT_FRONT_BEARING_DEGREES = 180.0
+
+
+def camera_direction_from_bearing(bearing_degrees, elevation_degrees=0.0):
+    """Return a unit camera-position direction in glTF coordinates: X east, Y up, Z north."""
+    bearing = math.radians(float(bearing_degrees) % 360.0)
+    elevation = math.radians(float(elevation_degrees))
+    horizontal = math.cos(elevation)
+    return (
+        math.sin(bearing) * horizontal,
+        math.sin(elevation),
+        math.cos(bearing) * horizontal,
+    )
+
+
+def build_review_view_directions(front_bearing_degrees=None, front_elevation_degrees=5.0, turntable_elevation_degrees=22.0):
+    """Build front-relative orthographic views and a compass-clockwise eight-view turntable."""
+    bearing = DEFAULT_FRONT_BEARING_DEGREES if front_bearing_degrees is None else float(front_bearing_degrees)
+    return [
+        ("front", camera_direction_from_bearing(bearing, front_elevation_degrees)),
+        ("back", camera_direction_from_bearing(bearing + 180.0, 0.0)),
+        # The camera is outside the facade looking toward the building. From that
+        # viewing position, left is front-bearing +90 degrees and right is -90.
+        ("left", camera_direction_from_bearing(bearing + 90.0, 0.0)),
+        ("right", camera_direction_from_bearing(bearing - 90.0, 0.0)),
+        ("top", (0.0, 1.0, 0.0)),
+    ] + [
+        (
+            "turntable-" + str(angle).zfill(3),
+            camera_direction_from_bearing(angle, turntable_elevation_degrees),
+        )
+        for angle in range(0, 360, 45)
+    ]
+
+
 def read_front_facing_azimuth(model_path):
     """Read an optional front-bearing from GLB JSON extras without loading the binary chunk."""
     with open(model_path, "rb") as stream:
@@ -289,44 +324,29 @@ def main():
     light_power = max(1000.0, min(450000.0, max_dimension * max_dimension * 29.0))
     light_size = max_dimension * 0.68
     light_offset = max_dimension * 0.65
-    add_area_light("ReviewKeyLight", center + Vector((1.4, -1.8, 2.2)) * light_offset, center, light_power, light_size)
-    add_area_light("ReviewFillLight", center + Vector((-1.8, -0.3, 1.0)) * light_offset, center, light_power * 0.33, light_size * 1.05)
-    add_area_light("ReviewRimLight", center + Vector((0.3, 1.7, 1.5)) * light_offset, center, light_power * 0.38, light_size)
+    # glTF uses Y-up; keep all review lights above the ground plane.
+    add_area_light("ReviewKeyLight", center + Vector((1.4, 2.2, -1.8)) * light_offset, center, light_power, light_size)
+    add_area_light("ReviewFillLight", center + Vector((-1.8, 1.0, -0.3)) * light_offset, center, light_power * 0.33, light_size * 1.05)
+    add_area_light("ReviewRimLight", center + Vector((0.3, 1.5, 1.7)) * light_offset, center, light_power * 0.38, light_size)
 
-    # Legacy GLBs without orientation metadata retain the established north-facing front camera.
-    # Generated GLBs carry the selected facade bearing in their own model metadata.
+    # BuildingSpec and generated GLBs use glTF's Y-up frame (X east, Z north).
+    # Missing orientation uses a deterministic south-facing default; it is not
+    # evidence that the real building entrance faces south.
     front_azimuth, front_axis_confidence = read_front_facing_azimuth(model_path)
     if front_azimuth is None:
-        views = [
-            ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
-            ("back", Vector((0.0, 1.0, 0.0)), "ORTHO"),
-            ("left", Vector((-1.0, 0.0, 0.0)), "ORTHO"),
-            ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
-            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
-        ]
         front_axis_source = "renderer-default"
         front_axis_confidence = "unknown"
     else:
-        bearing = math.radians(front_azimuth)
-        front_elevation = math.radians(5.0)
-        sin_bearing, cos_bearing = math.sin(bearing), math.cos(bearing)
-        views = [
-            ("front", Vector((sin_bearing * math.cos(front_elevation),
-                              -cos_bearing * math.cos(front_elevation),
-                              math.sin(front_elevation)),), "ORTHO"),
-            ("back", Vector((-sin_bearing, cos_bearing, 0.0)), "ORTHO"),
-            ("left", Vector((cos_bearing, -sin_bearing, 0.0)), "ORTHO"),
-            ("right", Vector((-cos_bearing, sin_bearing, 0.0)), "ORTHO"),
-            ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
-        ]
         front_axis_source = "glb-extras.frontFacingAzimuthDegrees"
-    elevation = math.radians(22.0)
-    for angle in range(0, 360, 45):
-        azimuth = math.radians(angle)
-        direction = Vector((math.cos(azimuth) * math.cos(elevation),
-                            math.sin(azimuth) * math.cos(elevation),
-                            math.sin(elevation)))
-        views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
+    front_elevation_degrees = 5.0
+    effective_front_bearing = DEFAULT_FRONT_BEARING_DEGREES if front_azimuth is None else front_azimuth
+    views = [
+        (view_id, Vector(direction), "ORTHO")
+        for view_id, direction in build_review_view_directions(
+            front_azimuth,
+            front_elevation_degrees=front_elevation_degrees,
+        )
+    ]
 
     original_render_visibility = [(obj, obj.hide_render) for obj in meshes]
     raw_views = []
@@ -416,6 +436,7 @@ def main():
         "width": resolution,
         "height": resolution,
         "frontFacingAzimuthDegrees": front_azimuth,
+        "frontCameraEffectiveBearingDegrees": effective_front_bearing,
         "frontAxisConfidence": front_axis_confidence,
         "frontAxisSource": front_axis_source,
         "sceneBounds": {
