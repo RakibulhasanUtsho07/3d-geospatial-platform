@@ -113,6 +113,13 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       (frontAxisSource !== "renderer-default" || frontAxisConfidence !== "unknown")) {
     errors.push("render-front-bearing-source-mismatch");
   }
+  const effectiveFrontBearing = rawManifest.frontCameraEffectiveBearingDegrees ?? (frontBearing ?? 180);
+  if (!finite(effectiveFrontBearing) || effectiveFrontBearing < 0 || effectiveFrontBearing > 360 ||
+      (frontBearing !== null && Math.abs(effectiveFrontBearing - frontBearing) > 1e-6) ||
+      (frontBearing === null && frontAxisSource === "renderer-default" &&
+       Math.abs(effectiveFrontBearing - 180) > 1e-6)) {
+    errors.push("render-effective-front-bearing-mismatch");
+  }
 
   const status = errors.length ? "failed" : warnings.length ? "review-required" : "render-set-ready-for-human-review";
   return {
@@ -127,6 +134,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     renderResolution: { width: resolution, height: resolution },
     sceneBounds: bounds ?? null,
     frontFacingAzimuthDegrees: frontBearing,
+    frontCameraEffectiveBearingDegrees: effectiveFrontBearing,
     frontAxisConfidence,
     frontAxisSource,
     counts: { requiredViews: REQUIRED_REVIEW_VIEWS.length, generatedViews: views.length, errors: errors.length,
