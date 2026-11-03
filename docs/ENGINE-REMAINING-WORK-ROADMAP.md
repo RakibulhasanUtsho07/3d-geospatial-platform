@@ -1,8 +1,8 @@
 # 3D Geospatial Platform — Engine Completion Roadmap
 
-**Audit date:** 2026-10-25  
+**Audit date:** 2026-11-03  
 **Target branch flow:** `rakibul-hasan` → `development` → `main`  
-**Current status:** P3.1 six-sample real-Dhaka browser baseline and screenshot review are recorded on candidate `2b93cb4d7f51cb09f726fe958cdcf974e763ce73`; strict validation and full CI pass. Human review found visible UX/visual-fidelity defects that remain open. P3.2 still lacks real surveyed building evidence.
+**Current status:** P3.6–P3.8 and D3M-01 foundations are integrated on current `main`/`dev`. P3.7 floor-plan raster-to-vector calibration has merged as a private human-review workflow; P3.4 map-panel UX and imagery diagnostics are in a refreshed current-main validation candidate. P3.2 still lacks real surveyed building evidence, and P3.4 must not be marked complete until its clean exact-head six-sample baseline and Full CI pass.
 
 ## Ground rules
 
@@ -341,3 +341,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The private candidate API reopens the ingested raster, recomputes the calibrated vectors/preview GLB and checks all hashes before storing sidecars in a private regular directory. API authentication, exact source-byte identity, bounded inputs and fail-closed response are retained.
 - Scale is explicitly **human-attested, not independently survey-verified**. Origin/heading/elevation/CRS are not surveyed by this workflow. It does not rasterize PDF, infer room semantics or generate furniture, publish GLBs, or add a map asset. `acceptanceEligible`, `publicationEligible`, `mapReady`, and `automaticApproval` remain false.
 - Current-main port is on `integration/p37-floorplan-refresh-20261103`. Fresh exact-head Full CI and P3.7 dedicated validation are required before promotion; real, rights-cleared floor plans and independent measurements remain a later human evidence gate.
+
+
+## 2026-11-03 — Post-P3.7 promotion and P3.4 current-main validation
+
+- PR #333 merged to `main` at `145d80744bac0859f129e15bd5e93da6ff07d597`; `dev` and `rakibul-hasan` were fast-forwarded to the same commit. Exact-head Full CI #41592869839, dedicated P3.7 #41592869858, P3.6 package #41592869798, BRF-14 #41592869930, BRF-35 #41592869834, BRF-45 #41592869830 and BRF-05–07 #41592869980 all succeeded.
+- P3.7 remains a private, manual, hash-bound floor-plan vector review workflow. Its scale is human-attested rather than independently survey-verified. It does not rasterize PDFs, infer room semantics, publish GLBs or add models to the map. `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false.
+- P3.4 panel UX, Dhaka Home/orientation controls, URL-redacted imagery diagnostics and canvas red-pixel diagnostics are being ported onto the post-P3.7 main in `integration/p34-main-after-p37-20261103`. The port preserves the P3.7 CI/test scripts, floor-plan API and roadmap entry instead of reverting those current-main changes.
+- The prior P3.4 baseline failed its clean-tree provenance gate because the benchmark's own nested artifact directory appeared in Git status. The benchmark now parses NUL-delimited porcelain status and excludes only its own output subtree; tracked edits and all other untracked paths remain dirty. A temp-Git-repository regression test covers nested generated evidence plus unrelated tracked/untracked changes.
+- The P3.4 current-main candidate must still pass exact-head Full CI and the six-sample clean working-tree Real-Dhaka baseline. Until both succeed and the resulting screenshots/report are inspected, P3.4 is not accepted as complete. The diagnostics do not prove that the previous red imagery anomaly has been fixed.
+- The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
