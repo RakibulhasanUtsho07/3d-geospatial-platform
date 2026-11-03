@@ -186,6 +186,9 @@ jobs:
       - name: Test map canvas visual anomaly diagnostics
         run: npm run test:canvas-red-pixel-diagnostics
 
+      - name: Test map viewport UX and Dhaka Home behavior
+        run: npm run test:map-viewport-ux
+
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
 
