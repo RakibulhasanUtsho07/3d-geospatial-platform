@@ -1,5 +1,3 @@
-const EPSILON = 1e-9;
-
 function finite(value, label) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new TypeError(label + " must be a finite number");
