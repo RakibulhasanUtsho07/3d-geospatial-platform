@@ -58,4 +58,9 @@ Do not hide or paint over the layer to make the red signal disappear. Do not mar
 
 ## Current status — 2026-11-03
 
-The P3.4 panel/diagnostic work is being ported to current `main` at `3c929c88427fbcb1d40a22506f2f7a8e103d57af`. The desktop/mobile fixture screenshot review confirms the dock no longer covers Cesium attribution, but this does not address the original red imagery anomaly. The saturated-red signal remains a manual-review indicator, not a classifier. A fresh six-sample live-Dhaka baseline, screenshot inspection and fixed-camera layer isolation (if the outlier repeats) remain mandatory; do not close the anomaly on the strength of a green unit test or fixture screenshot.
+The P3.4 panel/diagnostic work is being ported to current `main` at `7b50e5750994c4b4c8063a39f2f8547c949368ed`. The desktop/mobile fixture screenshot review confirms the dock no longer covers Cesium attribution, but this does not address the original red imagery anomaly. The saturated-red signal remains a manual-review indicator, not a classifier. A fresh six-sample live-Dhaka baseline, screenshot inspection and fixed-camera layer isolation (if the outlier repeats) remain mandatory; do not close the anomaly on the strength of a green unit test or fixture screenshot.
+
+
+## Six-sample current-main CI evidence — 2026-11-03
+
+The prior P3.4 current-main candidate's deterministic CI baseline completed 3/3 cold and 3/3 warm samples with no failures. Each sample staged 3,000 Overture building features and rendered 478 local Dhaka road features; the six screenshot digests matched the generated artifact manifest. The canvas-only saturated-red outlier review flagged 0/6 samples and provider diagnostics recorded zero tile errors. This did not reproduce the previously observed 1.434% cold-01 anomaly. It does not identify the historical producing layer or prove real live imagery is fault-free; keep the anomaly unresolved until a comparable target-workstation/live-provider capture and visual review determine its cause.
