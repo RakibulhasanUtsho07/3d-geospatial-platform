@@ -173,6 +173,18 @@ async function expectNotOverlapping(first: Locator, second: Locator): Promise<vo
   expect(separated, "map dock controls should not overlap by default").toBe(true);
 }
 
+async function expectDockClearOfCesiumAttribution(page: Page, dock: Locator): Promise<void> {
+  const credits = page.locator(
+    ".cesium-viewer-bottom .cesium-credit-logoContainer, " +
+    ".cesium-viewer-bottom .cesium-credit-textContainer",
+  );
+  const creditCount = await credits.count();
+  expect(creditCount, "Cesium attribution logo/text should be present").toBeGreaterThan(0);
+  for (let index = 0; index < creditCount; index += 1) {
+    await expectNotOverlapping(dock, credits.nth(index));
+  }
+}
+
 function roadBoundsKey(url: URL): string {
   return ["west", "south", "east", "north"]
     .map((key) => url.searchParams.get(key) ?? "missing")
@@ -197,6 +209,8 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
 
   await expectNotOverlapping(properties, controls);
   await expectNotOverlapping(layers, generatedModels);
+  await expectDockClearOfCesiumAttribution(page, layers);
+  await expectDockClearOfCesiumAttribution(page, generatedModels);
 
   // Keep visual evidence separate from the performance artifacts. Map imagery
   // and API data are deterministic stubs in this test, so these captures are
@@ -226,6 +240,8 @@ test("map opens with compact panels and non-overlapping docks on desktop and mob
   await expectNotOverlapping(properties, controls);
   await expectNotOverlapping(controls, page.getByRole("complementary", { name: "Nearby places" }));
   await expectNotOverlapping(layers, generatedModels);
+  await expectDockClearOfCesiumAttribution(page, layers);
+  await expectDockClearOfCesiumAttribution(page, generatedModels);
   await page.screenshot({
     path: resolve(visualEvidenceDirectory, "mobile-default-390x844.png"),
     fullPage: false,
