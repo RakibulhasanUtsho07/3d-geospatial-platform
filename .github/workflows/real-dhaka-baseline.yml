@@ -65,13 +65,19 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Chromium and Linux dependencies
         run: npx playwright install --with-deps chromium
 
       - name: Build and validate the Overture spatial tiles
         run: npm run build:geospatial-tiles && npm run test:geospatial-tiles
+
+      - name: Require a clean candidate checkout after data preparation
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
 
       - name: Start development app and capture cold/warm browser samples
         env:
