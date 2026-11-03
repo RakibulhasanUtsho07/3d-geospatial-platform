@@ -82,3 +82,22 @@ The JSON config uses `schemaVersion: "1.0.0"`, `buildingId`, and `dimensionRefer
 For dimensions, the accepted provenance labels are `surveyed` and `published-measurement`; a guess cannot pass as ground truth. Survey provenance and reviewer outcomes remain operator-attested. If control evidence or render/reference review is missing or pending, the status is `benchmark-incomplete`; mismatched measurements/references or stale hashes produce `benchmark-failed`; complete evidence can produce `benchmark-passed-review-required`. Geometry QA warnings remain visible and can also keep the result incomplete.
 
 The report contains no combined accuracy percentage. It always keeps `mapReady: false`, `publicationEligible: false`, and `automaticApproval: false`.
+
+## BRF-04 — Controlled synthetic baseline and deliberate defect injection
+
+The checked-in regression fixture `benchmarks/building-reconstruction/brf-04-controlled-baseline-v1.json` describes a deterministic synthetic closed cuboid with model-space dimensions 10 × 8 × 6 units, one mesh, 12 triangles and zero degenerate triangles. The fixture's unit conversion is 1 metre per model unit **only for this synthetic test**.
+
+The test generates the GLB in memory and verifies:
+- exact axis-aligned dimensions, mesh/triangle counts and zero degenerate triangles;
+- byte-identical SHA-256 for repeated generation from the same inputs;
+- a +20% Y-axis scale defect remains structurally parseable but fails the 2% dimension tolerance;
+- a repeated vertex index remains structurally parseable but is reported as a degenerate triangle;
+- invalid fixture dimensions and defect specifications are rejected.
+
+Run the focused regression suite with:
+
+```bash
+npm run test:building-baseline-defect-injection
+```
+
+The synthetic baseline is authoritative only for GLB parser/geometry QA regression and dimension-tolerance behavior. It is not a real building, survey, camera-calibration, architectural-fidelity, texture, georeference or photo-reconstruction benchmark. Passing it does not enable `mapReady`, `publicationEligible` or `automaticApproval`; all three remain false in the fixture contract.
