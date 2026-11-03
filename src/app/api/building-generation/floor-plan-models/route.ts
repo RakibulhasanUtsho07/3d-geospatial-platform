@@ -3,12 +3,16 @@ import { NextResponse } from "next/server";
 import { authorizeGenerationApiRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
 import { createFloorPlanModelCandidate } from "@/core/building-generation/floor-plan-model-job.mjs";
 
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_BODY_BYTES = 20 * 1024 * 1024;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 async function readJsonBody(request: Request): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    throw new RangeError("Floor-plan JSON exceeds the 2 MiB request limit.");
+    throw new RangeError("Floor-plan JSON exceeds the 20 MiB request limit.");
   }
   if (!request.body) throw new TypeError("Request body is required.");
 
@@ -22,7 +26,7 @@ async function readJsonBody(request: Request): Promise<unknown> {
       total += part.value.byteLength;
       if (total > MAX_BODY_BYTES) {
         await reader.cancel().catch(() => {});
-        throw new RangeError("Floor-plan JSON exceeds the 2 MiB request limit.");
+        throw new RangeError("Floor-plan JSON exceeds the 20 MiB request limit.");
       }
       chunks.push(part.value);
     }
@@ -55,8 +59,10 @@ function errorResponse(error: unknown, generationFailure = false) {
     if (code === "ENOENT") {
       return NextResponse.json({ error: "Uploaded floor-plan source was not found in the private workspace." }, { status: 404 });
     }
-    if (code === "SOURCE_KIND_MISMATCH" || code === "SOURCE_CHECKSUM_MISMATCH") {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Source evidence did not match." }, { status: 422 });
+    if (code === "SOURCE_KIND_MISMATCH" || code === "SOURCE_CHECKSUM_MISMATCH" ||
+        code === "CALIBRATION_EVIDENCE_INVALID" || code === "CALIBRATED_GEOMETRY_MISMATCH" ||
+        code === "CALIBRATED_MODEL_MISMATCH") {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Source or calibration evidence did not match." }, { status: 422 });
     }
   }
   const message = error instanceof Error ? error.message : "";
@@ -92,16 +98,33 @@ export async function POST(request: Request) {
   } catch (error) {
     return errorResponse(error);
   }
-  if (!input || typeof input !== "object" || Array.isArray(input) ||
-      !("floorPlan" in input) || !input.floorPlan ||
-      typeof input.floorPlan !== "object" || Array.isArray(input.floorPlan)) {
+  if (!isRecord(input) || !isRecord(input.floorPlan)) {
     return NextResponse.json({ error: "Request body must contain a floorPlan object." }, { status: 400 });
+  }
+
+  let calibrationEvidence:
+    | { proposalReport: Record<string, unknown>; review: Record<string, unknown> }
+    | undefined;
+  if (input.calibrationEvidence !== undefined) {
+    const rawEvidence = input.calibrationEvidence;
+    if (!isRecord(rawEvidence) ||
+        !isRecord(rawEvidence.proposalReport) ||
+        !isRecord(rawEvidence.review)) {
+      return NextResponse.json({
+        error: "calibrationEvidence must contain the original proposalReport and completed review objects.",
+      }, { status: 400 });
+    }
+    calibrationEvidence = {
+      proposalReport: rawEvidence.proposalReport,
+      review: rawEvidence.review,
+    };
   }
 
   try {
     const result = await createFloorPlanModelCandidate({
       workspaceRoot,
       floorPlan: input.floorPlan,
+      calibrationEvidence,
     });
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

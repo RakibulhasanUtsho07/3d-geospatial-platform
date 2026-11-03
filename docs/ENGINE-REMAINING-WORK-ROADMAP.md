@@ -332,3 +332,12 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - CI and the dedicated P3.6 workflow now run the focused audit tests; the dedicated workflow also builds and uploads the full-source report. The 17,008 source records include 17,008 provenance records, but only 15,868 carry a license value; the other 1,140 must not be treated as rights-cleared.
 
 **Not completed:** roof/facade geometry, imagery texture, windows/doors or parent/part assembly. All release flags stay false. Next gate is to inspect the hash-pinned report and choose one small geometry prototype only when its parent/part source geometry and independent measurements are sufficient; otherwise request rights-cleared, calibrated imagery or independent reference data.
+
+
+## 2026-11-03 — P3.7 floor-plan raster calibration current-main port
+
+- Added a browser-only review workspace for manual wall/room review, source-image SHA verification, two-point known-distance scale input and explicit room-boundary closure.
+- Added deterministic raster-to-metre vector conversion with proposal/review canonical hashes; every proposed line has explicit accept-wall/reject decision; room boundary edges must be covered by reviewed wall vectors; door/window openings are checked for bounds and overlap.
+- The private candidate API reopens the ingested raster, recomputes the calibrated vectors/preview GLB and checks all hashes before storing sidecars in a private regular directory. API authentication, exact source-byte identity, bounded inputs and fail-closed response are retained.
+- Scale is explicitly **human-attested, not independently survey-verified**. Origin/heading/elevation/CRS are not surveyed by this workflow. It does not rasterize PDF, infer room semantics or generate furniture, publish GLBs, or add a map asset. `acceptanceEligible`, `publicationEligible`, `mapReady`, and `automaticApproval` remain false.
+- Current-main port is on `integration/p37-floorplan-refresh-20261103`. Fresh exact-head Full CI and P3.7 dedicated validation are required before promotion; real, rights-cleared floor plans and independent measurements remain a later human evidence gate.

@@ -81,7 +81,9 @@ on:
       - feat/brf48-six-disjoint-heldout-checkpoints-20261101
       - integration/brf48-main-20261103
       - integration/brf14-main-refresh-20261103
+      - integration/p37-floorplan-refresh-20261103
 
+  workflow_dispatch:
   pull_request:
     branches:
       - main
@@ -212,6 +214,12 @@ jobs:
         run: npm run test:floor-plan-raster-trace
       - name: Test private raster proposal persistence and integrity
         run: npm run test:floor-plan-raster-line-job
+
+      - name: Test hash-bound calibrated floor-plan vector draft
+        run: npm run test:floor-plan-raster-vector-calibration
+
+      - name: Test source-bound floor-plan review and room boundary closure
+        run: npm run test:floor-plan-review-payload
 
       - name: Test local media intake and bounded video frame extraction
         run: npm run test:building-media
