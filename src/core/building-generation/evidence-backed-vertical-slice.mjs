@@ -462,12 +462,18 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
       if (texturedFile.sha256 !== String(texturedModel.sha256).toLowerCase()) {
         throw new TypeError("architectural geometry textured-GLB hash does not match the emitted file");
       }
+      const texturedTriangleCount = texturedModel.texturedTriangleCount;
+      const untexturedTriangleCount = texturedModel.untexturedTriangleCount;
+      if (!Number.isSafeInteger(texturedTriangleCount) || texturedTriangleCount < 1 ||
+          !Number.isSafeInteger(untexturedTriangleCount) || untexturedTriangleCount < 0) {
+        throw new TypeError("textured geometry candidate must report positive textured-triangle and non-negative untextured-triangle counts");
+      }
       texturedOutput = {
         path: texturedRelative,
         sha256: texturedFile.sha256,
         bytes: texturedFile.bytes.length,
-        texturedTriangleCount: texturedModel.texturedTriangleCount ?? 0,
-        untexturedTriangleCount: texturedModel.untexturedTriangleCount ?? 0,
+        texturedTriangleCount,
+        untexturedTriangleCount,
       };
       report.acceptance.texturedGlbAvailable = true;
     }
@@ -494,6 +500,7 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
     report.acceptance.geometryWorkflowChecksPassed = geometryReport.blockers?.length === 0 &&
       geometryReport.checks?.glbTextureBindingQaValid === true &&
       Boolean(texturedOutput) &&
+      texturedOutput.texturedTriangleCount > 0 &&
       texturedOutput.untexturedTriangleCount === 0;
     report.status = report.acceptance.texturedGlbAvailable
       ? "completed-requires-human-review"
