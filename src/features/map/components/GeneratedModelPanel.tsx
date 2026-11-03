@@ -207,7 +207,7 @@ export default function GeneratedModelPanel({
           setError(null);
           setMessage(null);
         }}
-        className="absolute bottom-[5.5rem] right-4 z-30 rounded-xl sm:bottom-4 border border-cyan-200/20 bg-zinc-950/95 px-4 py-3 text-left text-sm font-semibold text-cyan-50 shadow-2xl backdrop-blur-xl transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="absolute bottom-[7.75rem] right-4 z-30 rounded-xl sm:bottom-4 border border-cyan-200/20 bg-zinc-950/95 px-4 py-3 text-left text-sm font-semibold text-cyan-50 shadow-2xl backdrop-blur-xl transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <span className="mr-2 inline-flex rounded-md bg-cyan-300/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-cyan-200">GLB</span>
         Generated models{models.length ? " (" + models.length + ")" : ""}
