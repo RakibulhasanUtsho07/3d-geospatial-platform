@@ -90,3 +90,30 @@ test("rejects invalid hashes, invalid dimensions and incomplete render records",
   assert.ok(report.errors.includes("render-not-complete:front"));
   assert.ok(report.errors.includes("render-sha256-invalid:front"));
 });
+
+
+test("preserves a validated GLB front bearing and source in the review manifest", () => {
+  const data = fixture();
+  data.rawManifest.frontFacingAzimuthDegrees = 180;
+  data.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  const report = finalizeRenderReviewManifest(data);
+  assert.equal(report.valid, true);
+  assert.equal(report.frontFacingAzimuthDegrees, 180);
+  assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
+});
+
+test("fails closed when front bearing metadata has an invalid value or source", () => {
+  const invalidBearing = fixture();
+  invalidBearing.rawManifest.frontFacingAzimuthDegrees = 361;
+  invalidBearing.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  assert.ok(finalizeRenderReviewManifest(invalidBearing).errors.includes("render-front-bearing-metadata-invalid"));
+
+  const wrongSource = fixture();
+  wrongSource.rawManifest.frontFacingAzimuthDegrees = 90;
+  wrongSource.rawManifest.frontAxisSource = "renderer-default";
+  assert.ok(finalizeRenderReviewManifest(wrongSource).errors.includes("render-front-bearing-metadata-invalid"));
+
+  const missingBearingSource = fixture();
+  missingBearingSource.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  assert.ok(finalizeRenderReviewManifest(missingBearingSource).errors.includes("render-front-bearing-source-mismatch"));
+});
