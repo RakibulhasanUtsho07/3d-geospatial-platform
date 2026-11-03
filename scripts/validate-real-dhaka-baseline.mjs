@@ -55,6 +55,9 @@ export function validateRealDhakaBaselineReport(report, options = {}) {
   } else if (report.candidate?.gitCommitSha !== expectedCommitSha) {
     addError(errors, "Report candidate SHA does not match the workflow commit SHA.");
   }
+  if (report.candidate?.gitWorkingTreeDirty !== false) {
+    addError(errors, "The baseline must be captured from a clean candidate working tree.");
+  }
   if (!isRecord(report.candidate) || !Array.isArray(report.candidate.dataInputs)) {
     addError(errors, "Candidate metadata or dataInputs are missing.");
   } else {
