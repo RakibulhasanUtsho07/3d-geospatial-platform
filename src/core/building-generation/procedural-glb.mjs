@@ -496,11 +496,19 @@ export function generateProceduralGlb(rawSpec) {
     reviewRequired:frontAxisNeedsReview||selectedFacade.reviewRequired
   };
   const glb=encodeGlb(spec,geo,facadeOrientation);
+  const structuralOpeningRecords=structuralOpenings.map(opening=>({
+    edgeIndex:opening.edgeIndex,floorIndex:opening.floorIndex,kind:opening.kind,shape:opening.shape,
+    centerAlongEdgeM:Number(opening.centerAlongEdgeM.toFixed(3)),widthM:Number(opening.widthM.toFixed(3)),
+    bottomM:Number(opening.bottomM.toFixed(3)),topM:Number(opening.topM.toFixed(3)),
+    ...(opening.archRadiusM===undefined?{}:{archRadiusM:Number(opening.archRadiusM.toFixed(3))}),
+    confidence:opening.confidence,source:opening.source,reviewRequired:opening.reviewRequired
+  }));
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
     geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo),structuralOpeningCount:structuralOpenings.length},
     facadeOrientation,
+    structuralOpenings:structuralOpeningRecords,
     facadeSelection:{
       method:selectedFacade.method,
       edgeIndex:front,
@@ -520,7 +528,8 @@ export function generateProceduralGlb(rawSpec) {
         outwardNormal:{x:Number(edges[front].out.x.toFixed(6)),z:Number(edges[front].out.z.toFixed(6))},
         insertFaceClearanceM:0.002
       },
-      centralDome:domePlacement
+      centralDome:domePlacement,
+      structuralOpenings:structuralOpeningRecords
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
@@ -530,6 +539,7 @@ export function generateProceduralGlb(rawSpec) {
       spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
       frontAxisNeedsReview||
       selectedFacade.reviewRequired||
+      structuralOpeningRecords.some(opening=>opening.reviewRequired)||
       (domePlacement?.reviewRequired===true),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
   }};
