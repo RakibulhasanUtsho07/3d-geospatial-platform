@@ -14,7 +14,7 @@
 
 ## Verified baseline
 
-- Current validated `main` / `dev` baseline: `3c929c88427fbcb1d40a22506f2f7a8e103d57af` (P3.6–P3.8 promoted after exact-head validation).
+- Current validated `main` / `dev` baseline: `7b50e5750994c4b4c8063a39f2f8547c949368ed` (P3.6–P3.8 promoted after exact-head validation).
 - Post-merge CI run [#40119673648](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40119673648) passed lint, production build, automated engine/GLB checks, generated spatial-tile checks, and the production viewport API browser test.
 - P2.6–P2.20 viewport workload, caching, cancellation, cross-process repeatability, performance trend, and geometry-read diagnostics are integrated. Their benchmark reports describe bounded workloads; they do not establish a universal FPS or latency SLA.
 - Existing capabilities include Cesium viewport loading, Overture-derived footprint extrusion, OSM road geometry/nearby services, deterministic procedural GLB, candidate generation/review gates, GLB QA, dimension checking, horizontal WGS84 ground-control fitting, render/reference diagnostic tools, and a measured-vector floor-plan shell generator.
@@ -274,7 +274,7 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ## 2026-11-03 — P3.6 through P3.8 main integration candidate
 
-- P3.6–P3.8 bounded Dhaka 3D Tiles, source-height provenance, building composition metadata and full Overture metadata coverage are merged to `main` and `dev` through PR #327 (merge `3c929c88427fbcb1d40a22506f2f7a8e103d57af`). Exact-head Full CI passed 196/196, dedicated P3.6 passed 32/32 and BRF-05–07 intake passed 12/12.
+- P3.6–P3.8 bounded Dhaka 3D Tiles, source-height provenance, building composition metadata and full Overture metadata coverage are merged to `main` and `dev` through PR #327 (merge `7b50e5750994c4b4c8063a39f2f8547c949368ed`). Exact-head Full CI passed 196/196, dedicated P3.6 passed 32/32 and BRF-05–07 intake passed 12/12.
 - P3.8 source head `5f98943775968b8a582f3f2eb5ba5141893eafe0`: Full CI #41331329853 and dedicated #41331329843 passed. P3.7 `cd3eff7e7b557d2690a9d755bee1aef7d379b8be`: Full CI #41329725567 and dedicated #41329725582 passed. P3.6 `6e5fd3fd68905e5098303f37d6f3e83b983ffcf6`: Full CI #41322041348 and dedicated #41322041296 passed. New main-based CI is still mandatory.
 - Output remains bounded footprint-extrusion/cuboid massing, not reconstructed architecture: no roof/facade meshes, doors, windows, textures or parent/part assembly.
 - 3 m/floor and 9 m fallback heights are labelled estimates; no surveyed vertical datum/elevation is claimed.
@@ -336,7 +336,12 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 
 ## 2026-11-03 — P3.4 current-main port
 
-- Responsive map panel occlusion, default-collapsed property/layer/camera docks, desktop/mobile dock spacing, Cesium attribution avoidance, and the map-panel browser regressions are being ported from source PR #320 onto current main by `integration/p34-main-port-20261103`. The source-head Full CI #41580141385 passed 181/181 and the desktop/mobile screenshot artifact was inspected; both screenshots show the Cesium logo/attribution remaining visible outside the docks.
+- Responsive map panel occlusion, default-collapsed property/layer/camera docks, desktop/mobile dock spacing, Cesium attribution avoidance, and the map-panel browser regressions are being ported from source PR #320 onto current main by `integration/p34-main-refresh-20261103`. The source-head Full CI #41580141385 passed 181/181 and the desktop/mobile screenshot artifact was inspected; both screenshots show the Cesium logo/attribution remaining visible outside the docks.
 - The six-sample real-Dhaka baseline remains a separate required check. The visual screenshot artifact uses deterministic API fixtures and transparent tile stubs; it proves layout only, not live imagery or building accuracy.
 - The same port includes URL-redacted imagery-provider error diagnostics, stable imagery readiness measurement and a canvas-only saturated-red outlier signal. Those are diagnostic evidence only. The original red imagery anomaly is not declared fixed; root-cause isolation and equivalent live six-sample review remain open.
 - The port keeps current main's D3M-01/P3.6–P3.8 workflows, package scripts and worker tests. It is a separate current-main candidate and must pass fresh Full CI, Push CI and real-Dhaka baseline before merge.
+
+
+### 2026-11-03 current-main baseline outcome
+
+The previous current-main port candidate's deterministic real-Dhaka CI baseline completed 6/6 successful samples (3 cold, 3 warm), all road fetch/render checks succeeded (478 rendered road features per sample), 3,000 Overture building features staged in each sample, and the canvas red-outlier review flagged 0/6. This did not reproduce the older cold-01 red patch; it does not identify the old patch's root cause or prove live OSM imagery is fault-free. The new refreshed-main PR will repeat exact-head baseline and screenshot validation before promotion.
