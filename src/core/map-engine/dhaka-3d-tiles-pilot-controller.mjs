@@ -12,6 +12,14 @@ function isDestroyed(value) {
   }
 }
 
+function requestRender(viewer) {
+  try {
+    viewer?.scene?.requestRender?.();
+  } catch {
+    // Render scheduling is best-effort and must not turn a successful attachment into a failed load.
+  }
+}
+
 function destroyUnattachedTileset(tileset) {
   if (!tileset || isDestroyed(tileset)) return;
   try {
@@ -38,12 +46,45 @@ function resolveWorldCenter(Cesium, tileset) {
   }
 }
 
+function normalizeUrl(value, name, { optional = false } = {}) {
+  if (optional && value == null) return null;
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new TypeError(name + " must be a non-empty string.");
+  }
+  return value.trim();
+}
+
+function normalizeAttempts(value) {
+  if (!Number.isInteger(value) || value < 1 || value > 3) {
+    throw new RangeError("maxAttemptsPerUrl must be an integer between 1 and 3.");
+  }
+  return value;
+}
+
+function normalizeRetryDelay(value) {
+  if (!Number.isFinite(value) || value < 0 || value > 5000) {
+    throw new RangeError("retryDelayMs must be between 0 and 5000 milliseconds.");
+  }
+  return value;
+}
+
+function wait(milliseconds) {
+  return milliseconds > 0
+    ? new Promise((resolve) => setTimeout(resolve, milliseconds))
+    : Promise.resolve();
+}
+
 /**
- * Owns the opt-in experimental 3D Tiles primitive lifecycle.
+ * Owns an opt-in experimental OGC 3D Tiles primitive lifecycle.
  *
  * Cesium's fromUrl promise is not abortable through the public API used here.
- * disable()/destroy() invalidate its revision immediately; any late tileset is
- * destroyed before it can be attached to an obsolete or disabled viewer.
+ * Each load is guarded by a generation counter; disable/destroy or switching URL
+ * invalidates the generation, and any late successful result is destroyed before
+ * it can attach to an obsolete or disabled viewer.
+ *
+ * Optional fallback URLs and bounded retries are explicit constructor settings.
+ * No fallback is enabled by default, so a fixture can never silently replace a
+ * requested production candidate unless a caller deliberately configures it.
  */
 export class Dhaka3DTilesPilotController {
   #getViewer;
@@ -51,10 +92,15 @@ export class Dhaka3DTilesPilotController {
   #isEnabled;
   #onStatus;
   #url;
+  #fallbackUrl;
+  #maxAttemptsPerUrl;
+  #retryDelayMs;
   #revision = 0;
   #loading = false;
   #tileset = null;
   #attachedViewer = null;
+  #attachedUrl = null;
+  #inflight = null;
   #disposed = false;
 
   constructor({
@@ -63,6 +109,9 @@ export class Dhaka3DTilesPilotController {
     isEnabled,
     onStatus = (event) => { void event; },
     url = DHAKA_3D_TILES_PILOT_URL,
+    fallbackUrl = null,
+    maxAttemptsPerUrl = 2,
+    retryDelayMs = 250,
   }) {
     if (typeof getViewer !== "function" || typeof getCesium !== "function" || typeof isEnabled !== "function") {
       throw new TypeError("Dhaka3DTilesPilotController requires viewer, Cesium and feature-flag providers.");
@@ -71,7 +120,10 @@ export class Dhaka3DTilesPilotController {
     this.#getCesium = getCesium;
     this.#isEnabled = isEnabled;
     this.#onStatus = onStatus;
-    this.#url = url;
+    this.#url = normalizeUrl(url, "url");
+    this.#fallbackUrl = normalizeUrl(fallbackUrl, "fallbackUrl", { optional: true });
+    this.#maxAttemptsPerUrl = normalizeAttempts(maxAttemptsPerUrl);
+    this.#retryDelayMs = normalizeRetryDelay(retryDelayMs);
   }
 
   #emit(status, details = {}) {
@@ -83,100 +135,243 @@ export class Dhaka3DTilesPilotController {
   }
 
   #isCurrent(revision, viewer) {
-    return !this.#disposed &&
-      revision === this.#revision &&
-      this.#isEnabled() &&
-      this.#getViewer() === viewer &&
-      !isDestroyed(viewer);
-  }
-
-  async enable() {
-    if (this.#disposed) return { status: "disposed" };
-    if (!this.#isEnabled()) return { status: "disabled" };
-
-    const viewer = this.#getViewer();
-    const Cesium = this.#getCesium();
-    if (!viewer || isDestroyed(viewer) || typeof Cesium?.Cesium3DTileset?.fromUrl !== "function") {
-      this.#emit("unavailable");
-      return { status: "unavailable" };
-    }
-
-    if (this.#tileset && this.#attachedViewer === viewer && !isDestroyed(this.#tileset)) {
-      return { status: "already-loaded", tileset: this.#tileset };
-    }
-
-    const revision = ++this.#revision;
-    this.#loading = true;
-    this.#emit("loading");
-    let tileset;
-
     try {
-      tileset = await Cesium.Cesium3DTileset.fromUrl(this.#url, {
-        maximumScreenSpaceError: 16,
-      });
-
-      if (!this.#isCurrent(revision, viewer)) {
-        if (revision === this.#revision) {
-          this.#loading = false;
-          this.#emit("cancelled");
-        }
-        destroyUnattachedTileset(tileset);
-        return { status: "cancelled" };
-      }
-
-      const primitives = viewer.scene?.primitives;
-      if (!primitives || typeof primitives.add !== "function") {
-        destroyUnattachedTileset(tileset);
-        throw new Error("Cesium scene primitive collection is unavailable for the Dhaka 3D Tiles pilot.");
-      }
-
-      this.#loading = false;
-      primitives.add(tileset);
-      this.#tileset = tileset;
-      this.#attachedViewer = viewer;
-      viewer.scene.requestRender?.();
-      // Cesium exposes the tileset's world-space bound; convert it back to WGS84
-      // so the browser integration check can compare actual runtime placement
-      // with the source anchor recorded in the manifest.
-      this.#emit("loaded", {
-        worldCenter: resolveWorldCenter(Cesium, tileset),
-      });
-      return { status: "loaded", tileset };
-    } catch (error) {
-      if (revision === this.#revision) this.#loading = false;
-      if (tileset && !this.#tileset) destroyUnattachedTileset(tileset);
-      if (this.#isCurrent(revision, viewer)) this.#emit("error", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
+      return !this.#disposed &&
+        revision === this.#revision &&
+        this.#isEnabled() &&
+        this.#getViewer() === viewer &&
+        !isDestroyed(viewer);
+    } catch {
+      return false;
     }
   }
 
-  disable() {
-    this.#revision += 1;
-    const wasActive = this.#loading || Boolean(this.#tileset);
-    this.#loading = false;
+  #detachAttached() {
     const tileset = this.#tileset;
     const viewer = this.#attachedViewer;
     this.#tileset = null;
     this.#attachedViewer = null;
+    this.#attachedUrl = null;
+    if (!tileset) return;
 
-    if (tileset) {
-      let removed = false;
-      if (viewer && !isDestroyed(viewer)) {
-        try {
-          const primitives = viewer.scene?.primitives;
-          if (primitives && typeof primitives.remove === "function") {
-            removed = primitives.remove(tileset) === true;
-          }
-          viewer.scene?.requestRender?.();
-        } catch {
-          removed = false;
+    let removed = false;
+    if (viewer && !isDestroyed(viewer)) {
+      try {
+        const primitives = viewer.scene?.primitives;
+        if (primitives && typeof primitives.remove === "function") {
+          removed = primitives.remove(tileset) === true;
         }
+        requestRender(viewer);
+      } catch {
+        removed = false;
       }
-      if (!removed) destroyUnattachedTileset(tileset);
+    }
+    // A PrimitiveCollection may use destroyPrimitives=false: successful removal
+    // does not guarantee the primitive itself was destroyed.
+    if (!removed || !isDestroyed(tileset)) destroyUnattachedTileset(tileset);
+  }
+
+  enable({ url = this.#url, fallbackUrl = this.#fallbackUrl } = {}) {
+    if (this.#disposed) return Promise.resolve({ status: "disposed" });
+    if (!this.#isEnabled()) {
+      // A runtime feature-flag transition must not leave previously attached
+      // experimental content in the scene. Disable also invalidates late loads.
+      this.disable();
+      return Promise.resolve({ status: "disabled" });
     }
 
+    let primaryUrl;
+    let secondaryUrl;
+    try {
+      primaryUrl = normalizeUrl(url, "url");
+      secondaryUrl = normalizeUrl(fallbackUrl, "fallbackUrl", { optional: true });
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
+    const viewer = this.#getViewer();
+    const Cesium = this.#getCesium();
+    if (!viewer || isDestroyed(viewer) || typeof Cesium?.Cesium3DTileset?.fromUrl !== "function") {
+      this.#emit("unavailable", { requestedUrl: primaryUrl });
+      return Promise.resolve({ status: "unavailable" });
+    }
+
+    if (
+      this.#tileset &&
+      this.#attachedViewer === viewer &&
+      this.#attachedUrl === primaryUrl &&
+      !isDestroyed(this.#tileset)
+    ) {
+      return Promise.resolve({ status: "already-loaded", tileset: this.#tileset, url: primaryUrl });
+    }
+
+    const requestKey = JSON.stringify([primaryUrl, secondaryUrl, this.#maxAttemptsPerUrl, this.#retryDelayMs]);
+    if (this.#inflight?.requestKey === requestKey && this.#inflight.viewer === viewer) {
+      return this.#inflight.promise;
+    }
+
+    // A different URL or viewer supersedes any pending load and removes older
+    // attached content first. The generation guard cleans up any late old result.
+    this.#revision += 1;
+    const revision = this.#revision;
+    this.#inflight = null;
+    this.#detachAttached();
+    this.#loading = true;
+    const flight = { requestKey, revision, viewer, promise: null };
+    flight.promise = this.#load({
+      revision,
+      viewer,
+      Cesium,
+      primaryUrl,
+      secondaryUrl,
+    }).finally(() => {
+      if (this.#inflight === flight) this.#inflight = null;
+      if (revision === this.#revision) this.#loading = false;
+    });
+    this.#inflight = flight;
+    return flight.promise;
+  }
+
+  async #load({ revision, viewer, Cesium, primaryUrl, secondaryUrl }) {
+    const candidates = secondaryUrl && secondaryUrl !== primaryUrl
+      ? [primaryUrl, secondaryUrl]
+      : [primaryUrl];
+    this.#emit("loading", {
+      requestedUrl: primaryUrl,
+      fallbackConfigured: candidates.length > 1,
+      maxAttemptsPerUrl: this.#maxAttemptsPerUrl,
+    });
+
+    let loadedTileset = null;
+    let loadedUrl = null;
+    const failures = [];
+
+    for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+      const candidateUrl = candidates[candidateIndex];
+      for (let attempt = 1; attempt <= this.#maxAttemptsPerUrl; attempt += 1) {
+        if (!this.#isCurrent(revision, viewer)) return { status: "cancelled" };
+        try {
+          loadedTileset = await Cesium.Cesium3DTileset.fromUrl(candidateUrl, {
+            maximumScreenSpaceError: 16,
+          });
+          loadedUrl = candidateUrl;
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          failures.push({ url: candidateUrl, attempt, message });
+          if (!this.#isCurrent(revision, viewer)) return { status: "cancelled" };
+          if (attempt < this.#maxAttemptsPerUrl) {
+            this.#emit("retrying", {
+              requestedUrl: primaryUrl,
+              attempt,
+              nextAttempt: attempt + 1,
+              maxAttemptsPerUrl: this.#maxAttemptsPerUrl,
+              failedUrl: candidateUrl,
+              message,
+            });
+            await wait(this.#retryDelayMs);
+            if (!this.#isCurrent(revision, viewer)) return { status: "cancelled" };
+            continue;
+          }
+          if (candidateIndex < candidates.length - 1) {
+            this.#emit("fallback", {
+              requestedUrl: primaryUrl,
+              fromUrl: candidateUrl,
+              toUrl: candidates[candidateIndex + 1],
+              failedAttempts: failures.filter((failure) => failure.url === candidateUrl).length,
+              message,
+            });
+          } else {
+            this.#emit("error", {
+              requestedUrl: primaryUrl,
+              attempts: failures,
+              message,
+            });
+          }
+        }
+      }
+      if (loadedTileset) break;
+    }
+
+    if (!this.#isCurrent(revision, viewer)) {
+      destroyUnattachedTileset(loadedTileset);
+      return { status: "cancelled" };
+    }
+
+    if (!loadedTileset) {
+      this.#loading = false;
+      const lastFailure = failures[failures.length - 1];
+      throw new Error(lastFailure?.message ?? "No 3D Tiles URL could be loaded.");
+    }
+
+    const primitives = viewer.scene?.primitives;
+    if (!primitives || typeof primitives.add !== "function") {
+      destroyUnattachedTileset(loadedTileset);
+      this.#loading = false;
+      const error = new Error("Cesium scene primitive collection is unavailable for the Dhaka 3D Tiles pilot.");
+      this.#emit("error", {
+        requestedUrl: primaryUrl,
+        loadedUrl,
+        message: error.message,
+        failures,
+      });
+      throw error;
+    }
+
+    try {
+      primitives.add(loadedTileset);
+    } catch (error) {
+      // A custom primitive collection can throw after mutating its collection.
+      // Attempt removal before direct destruction so a partially-added primitive
+      // cannot remain referenced by a live scene.
+      let removedAfterFailedAdd = false;
+      try {
+        if (typeof primitives.remove === "function") {
+          removedAfterFailedAdd = primitives.remove(loadedTileset) === true;
+        }
+      } catch {
+        removedAfterFailedAdd = false;
+      }
+      // Removal can succeed without destruction when the collection is configured
+      // with destroyPrimitives=false, so explicitly destroy any surviving primitive.
+      if (!removedAfterFailedAdd || !isDestroyed(loadedTileset)) destroyUnattachedTileset(loadedTileset);
+      this.#loading = false;
+      const message = error instanceof Error ? error.message : String(error);
+      this.#emit("error", { requestedUrl: primaryUrl, loadedUrl, message, failures });
+      throw error;
+    }
+
+    this.#loading = false;
+    this.#tileset = loadedTileset;
+    this.#attachedViewer = viewer;
+    this.#attachedUrl = loadedUrl;
+    requestRender(viewer);
+    const result = {
+      status: "loaded",
+      tileset: loadedTileset,
+      url: loadedUrl,
+      requestedUrl: primaryUrl,
+      fallbackUsed: loadedUrl !== primaryUrl,
+      failedAttempts: failures,
+    };
+    // Keep the configured URL stable; an explicit one-shot URL does not silently
+    // rewrite the controller's default source for later enable() calls.
+    this.#emit("loaded", {
+      requestedUrl: primaryUrl,
+      loadedUrl,
+      fallbackUsed: result.fallbackUsed,
+      failedAttempts: failures,
+      worldCenter: resolveWorldCenter(Cesium, loadedTileset),
+    });
+    return result;
+  }
+
+  disable() {
+    this.#revision += 1;
+    const wasActive = this.#loading || Boolean(this.#tileset) || Boolean(this.#inflight);
+    this.#loading = false;
+    this.#inflight = null;
+    this.#detachAttached();
     if (!this.#disposed && wasActive) this.#emit("disabled");
   }
 
@@ -191,7 +386,10 @@ export class Dhaka3DTilesPilotController {
     return {
       enabled: !this.#disposed && this.#isEnabled(),
       loadingOrAttached: this.#loading || Boolean(this.#tileset),
+      loading: this.#loading,
       attached: Boolean(this.#tileset) && !isDestroyed(this.#tileset),
+      attachedUrl: this.#attachedUrl,
+      fallbackConfigured: Boolean(this.#fallbackUrl),
       disposed: this.#disposed,
     };
   }

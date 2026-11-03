@@ -62,6 +62,10 @@ on:
       - development
       - feat/d3m02-generation-job-map-publish-20261101
       - feat/d3m03-map-generation-intake-20261102
+      - feat/p3-6-multibuilding-tiles-package
+      - feat/p3-7-building-composition-evidence-20261102
+      - feat/p3-8-overture-source-coverage-20261101
+      - integration/p3-6-8-main-reconciled-20261103
       - feat/d3m04-triposr-background-cache-readiness-20261102
       - feat/d3m05-single-image-runtime-smoke-20261102
       - feat/d3m06-reviewed-map-placement-binding-20261102
@@ -74,9 +78,13 @@ on:
       - feat/d3m01d-authenticated-geometry-review-20261030
       - feat/d3m01f-governed-reviewer-registry-20261031
       - feat/d3m01g-registry-preflight-20261031
+
   pull_request:
     branches:
       - main
+      - feat/p3-6-multibuilding-tiles-package
+      - feat/p3-7-building-composition-evidence-20261102
+      - feat/p3-8-overture-source-coverage-20261101
       - feat/d3m03-map-generation-intake-20261102
       - feat/d3m04-triposr-background-cache-readiness-20261102
       - feat/d3m05-single-image-runtime-smoke-20261102
@@ -634,6 +642,14 @@ jobs:
 
       - name: Test Dhaka 3D Tiles footprint alignment and deterministic camera evidence
         run: npm run test:dhaka-3d-tiles-alignment-review
+      - name: Test multi-building Dhaka 3D Tiles package generation and integrity
+        run: npm run test:dhaka-3d-tiles-package
+
+      - name: Test per-tile Dhaka 3D Tiles footprint and placement residuals
+        run: npm run test:dhaka-3d-tiles-package-alignment
+
+      - name: Test bounded Dhaka 3D Tiles scale-profile evidence
+        run: npm run test:dhaka-3d-tiles-scale-profile
 
       - name: Test viewport response cache and cancellation policy
         run: npm run test:viewport-cache && npm run test:viewport-load-policy
@@ -673,6 +689,11 @@ jobs:
 
       - name: Test building height provenance and fallbacks
         run: npm run test:building-height
+      - name: Test Overture building composition and architectural metadata evidence
+        run: npm run test:building-architecture-evidence
+
+      - name: Test full Dhaka Overture architecture metadata coverage
+        run: npm run test:dhaka-overture-architecture-coverage
 
       - name: Test nearby-place query and normalization
         run: npm run test:nearby-places

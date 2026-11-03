@@ -271,3 +271,64 @@ The codebase still needs real-data validation and product-level completion. The 
 - A valid signature proves possession of a key provisioned in the server trust registry only. It does not prove a person's civil identity, legal authority, source rights, survey accuracy or architectural correctness.
 - The mask and observation editors remain local manual annotation tools; source rights, camera calibration, independent reference data and human review remain separate evidence gates.
 - No real reviewer has been onboarded and no production registry or signing key has been provisioned. `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false.
+
+## 2026-11-03 — P3.6 through P3.8 main integration candidate
+
+- P3.6–P3.8 bounded Dhaka 3D Tiles, source-height provenance, building composition metadata and full Overture metadata coverage are reconciled onto D3M-01→D3M-07 in `integration/p3-6-8-main-reconciled-20261103` (PR #327; exact-head validation pending).
+- P3.8 source head `5f98943775968b8a582f3f2eb5ba5141893eafe0`: Full CI #41331329853 and dedicated #41331329843 passed. P3.7 `cd3eff7e7b557d2690a9d755bee1aef7d379b8be`: Full CI #41329725567 and dedicated #41329725582 passed. P3.6 `6e5fd3fd68905e5098303f37d6f3e83b983ffcf6`: Full CI #41322041348 and dedicated #41322041296 passed. New main-based CI is still mandatory.
+- Output remains bounded footprint-extrusion/cuboid massing, not reconstructed architecture: no roof/facade meshes, doors, windows, textures or parent/part assembly.
+- 3 m/floor and 9 m fallback heights are labelled estimates; no surveyed vertical datum/elevation is claimed.
+- P3.8 found license metadata on 15,868 of 17,008 records; 1,140 lack a license value. Acceptance/publication/map-ready/automatic-approval gates remain false.
+
+## P3.6 height-provenance implementation slice — 2026-11-01
+
+The default bounded Dhaka 3D Tiles package now derives each tile's vertical interval from feature properties instead of applying a uniform synthetic 8 m height.
+
+- Overture `height` is used as the vertical distance from lowest to highest point; `min_height` is applied as the relative above-ground bottom offset. When `min_height` is absent, integer `min_floor` may be used as a labelled 3 m-per-floor estimate. GLB vertices, tileset root/child vertical regions, build-manifest records, and the alignment reviewer use the same `baseHeightMeters` / `topHeightMeters` interval.
+- Height provenance is preserved in the GLB and build manifest: source category, source/unclamped height, clamping, reported `min_height` / `min_floor`, base-height source/estimate flag, base and top values, the exact base-offset policy and the ground/vertical-reference limitation. The alignment reviewer recomputes the expected values from source properties and rejects GLB+manifest values that are consistently rebound but disagree with the source feature.
+- Floor-count conversion and the 9 m fallback remain explicitly labelled estimates. Overture-provided height is source data, not independent survey truth.
+- Strict numeric parsing rejects partial values such as `"18.5m"` rather than accepting the numeric prefix.
+- The alignment reviewer checks height metadata cross-binding and base/top positions after ECEF transformation. Synthetic test packages remain available only through an explicit `--synthetic-height-meters` override.
+- Production review-package build and the P3.6 dedicated workflow no longer force a synthetic 8 m override. The 32/64/128 bounded scale profile exercises source-derived per-feature intervals by default.
+
+**Vertical limitation remains:** the source extract has 2D footprints and no verified terrain elevation/vertical datum. The ENU origin remains at WGS84 ellipsoid height zero; `min_height` is only a relative above-ground offset from this unverified plane, and a `min_floor` conversion is an estimate. No surveyed absolute elevations, building accuracy, rights or release readiness are claimed. Exact-head CI and live browser validation are required before this slice is promoted.
+
+
+### P3.6 browser evidence audit — 2026-11-01
+
+- The previous dedicated run `41319856042` passed all 28 steps and uploaded browser, controller, alignment, scale-profile and bounded package artifacts. Its 32-content sample passed every footprint/placement check: max horizontal residual 0.067196 m, max perimeter difference 0.215084 m, max vertical transform residual 0.000032 m, zero degenerate triangles.
+- The 32/64/128 scale samples all passed; per-sample package bytes and phase-boundary RSS are retained in the uploaded profile. RSS is not peak memory and shared-runner timings are not production SLOs.
+- Live Cesium fetched one child GLB on the first viewport and one new GLB after a pan, without fetching the full 32-content package or reporting tile failures.
+- Artifact review caught an outdated browser limitation sentence claiming uniform synthetic heights even though the current build used per-feature provenance. The browser review page and Playwright test were corrected to derive and assert the actual height-policy/source counts from the build manifest.
+- Screenshot review still shows simple cuboid footprint extrusions, not building architecture. Facades, fenestration, roof form, textures and human visual acceptance remain unimplemented/blocked.
+- The 32-tile sample contained 19 fallback estimates and 13 floor-count estimates, and no positive Overture `height` value. The 64/128 samples had only one Overture-provided height. Do not imply complete source height coverage.
+- P3.6 feature branch was synchronized with `development@f7b2a67` using a two-parent merge commit; current branch is no longer behind development. Fresh exact-head Full CI and dedicated workflow are mandatory after this integration and evidence-report fix.
+
+
+## P3.7 — Overture building composition and architecture evidence (metadata gate)
+
+A follow-on branch to the P3.6 footprint/height pilot adds a typed, source-bound architecture metadata layer.
+
+- The resolver pins supported fields/enums to Overture Buildings schema v2.0.0: `type`, `building_id`, `has_parts`, facade color/material, roof color/material/shape/direction/orientation/height. Enum values/types were checked against the pinned official schema source.
+- Every field is explicitly `source`, `absent`, or `invalid`; numeric values are not coerced, colors must match Overture hex syntax, identifiers must be non-empty whitespace-free strings, and unknown enum values are not mapped to a plausible style.
+- A full-source composition audit resolves every `building_part.building_id` against parent `building` feature IDs, distinguishes missing/ambiguous parent links, checks part records against `has_parts` claims, and separately records whether parent and parts are both selected in the bounded tile package.
+- Each GLB and build-manifest tile carries the same architecture-evidence object, including its composition link. Manifest/tileset aggregates report per-field availability, parent/part statuses and whole-source linkage counts.
+- The independent alignment reviewer recomputes the architecture object and complete composition audit from the hash-matched FeatureCollection, then verifies source + GLB + manifest + aggregate agreement. Regression cases tamper both GLB and manifest to a false roof shape and require the source-bound reviewer to reject them.
+- The browser review page displays actual roof/facade metadata coverage and explicitly reports `footprint-extrusion-only` with zero generated architectural details.
+- Parent `has_parts=true` and part `building_id` are evidence only. The composition audit reports whether part records resolve to one parent, whether the parent claim agrees, and whether both were emitted; it does not merge their geometries or mean that a building is assembled.
+
+**Not implemented by P3.7:** roof meshes, facade components, windows/doors, balcony/arch geometry, textures or parent/part assembly. No source metadata is invented to fill absent fields. The next geometry stage must first join and validate parent/part records by `building_id`, then generate only geometry supported by source metadata or independently reviewed images. Keep the acceptance/publication/map-ready/automatic-approval flags false.
+
+
+Implementation contract and pinned schema references: [P3.7 Building Composition Evidence](./research/P3-7-BUILDING-COMPOSITION-EVIDENCE.md).
+
+
+## P3.8 — Full Dhaka Overture architecture coverage audit
+
+- Added a deterministic CLI audit for the complete committed Dhaka FeatureCollection, with source-byte SHA-256, input length, report SHA-256, normalized role counts, per-role field coverage, source provenance and parent/part linkage summary.
+- Raw Overture properties.type coverage is reported separately from extractor-derived properties._renderRole. This prevents internal extraction metadata from being presented as an original Overture schema field.
+- The full 17,008-feature extract has 16,986 regular building roles, 7 building_parent roles and 15 building_part roles. All 15 parts resolve to one of the seven parent-role features by building_id; all 15 _parentBuildingId values agree.
+- Initial full-source field inspection: facade_material 2,495; facade_color 1; roof_color 9; roof_material 2; roof_shape 10; roof_direction 1; roof_orientation 0; roof_height 1. These numbers are source metadata coverage only. The CI artifact report binds the exact source SHA and supersedes the manual counts if the input changes.
+- CI and the dedicated P3.6 workflow now run the focused audit tests; the dedicated workflow also builds and uploads the full-source report. The 17,008 source records include 17,008 provenance records, but only 15,868 carry a license value; the other 1,140 must not be treated as rights-cleared.
+
+**Not completed:** roof/facade geometry, imagery texture, windows/doors or parent/part assembly. All release flags stay false. Next gate is to inspect the hash-pinned report and choose one small geometry prototype only when its parent/part source geometry and independent measurements are sufficient; otherwise request rights-cleared, calibrated imagery or independent reference data.

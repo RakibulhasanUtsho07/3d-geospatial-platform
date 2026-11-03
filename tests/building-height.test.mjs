@@ -10,6 +10,10 @@ test("prefers explicit source height and preserves its provenance", () => {
     {
       meters: 18.5,
       baseHeight: 2,
+      baseHeightSource: "overture-min-height",
+      baseHeightEstimated: false,
+      reportedMinHeight: 2,
+      reportedMinFloor: null,
       source: "overture-height",
       unclampedMeters: 18.5,
       heightWasClamped: false,
@@ -25,6 +29,10 @@ test("accepts the documented source-height aliases and numeric strings", () => {
     {
       meters: 24.5,
       baseHeight: 0,
+      baseHeightSource: "ground-zero-default",
+      baseHeightEstimated: false,
+      reportedMinHeight: null,
+      reportedMinFloor: null,
       source: "overture-height",
       unclampedMeters: 24.5,
       heightWasClamped: false,
@@ -42,6 +50,10 @@ test("uses a labelled floor estimate when explicit height is absent", () => {
     {
       meters: 12,
       baseHeight: 1.2,
+      baseHeightSource: "overture-min-height",
+      baseHeightEstimated: false,
+      reportedMinHeight: 1.2,
+      reportedMinFloor: null,
       source: "floor-estimate",
       unclampedMeters: 12,
       heightWasClamped: false,
@@ -61,6 +73,10 @@ test("uses an explicitly labelled fallback estimate when source height and floor
     {
       meters: 9,
       baseHeight: 0,
+      baseHeightSource: "ground-zero-default",
+      baseHeightEstimated: false,
+      reportedMinHeight: null,
+      reportedMinFloor: null,
       source: "fallback-estimate",
       unclampedMeters: 9,
       heightWasClamped: false,
@@ -68,6 +84,33 @@ test("uses an explicitly labelled fallback estimate when source height and floor
       baseHeightWasClamped: false,
     },
   );
+});
+
+test("uses min_floor only as a labelled base-height estimate when min_height is absent", () => {
+  const estimated = resolveBuildingHeight({ height: 18, min_floor: 2 });
+  assert.equal(estimated.baseHeight, 6);
+  assert.equal(estimated.baseHeightSource, "min-floor-estimate");
+  assert.equal(estimated.baseHeightEstimated, true);
+  assert.equal(estimated.reportedMinHeight, null);
+  assert.equal(estimated.reportedMinFloor, 2);
+  assert.equal(estimated.unclampedBaseHeight, 6);
+
+  const explicitMinHeightWins = resolveBuildingHeight({ height: 18, min_height: 2, min_floor: 3 });
+  assert.equal(explicitMinHeightWins.baseHeight, 2);
+  assert.equal(explicitMinHeightWins.baseHeightSource, "overture-min-height");
+  assert.equal(explicitMinHeightWins.baseHeightEstimated, false);
+  assert.equal(explicitMinHeightWins.reportedMinFloor, 3);
+
+  const invalidFractionalFloor = resolveBuildingHeight({ min_floor: 1.5 });
+  assert.equal(invalidFractionalFloor.baseHeight, 0);
+  assert.equal(invalidFractionalFloor.baseHeightSource, "ground-zero-default");
+  assert.equal(invalidFractionalFloor.reportedMinFloor, null);
+
+  const clampedFloor = resolveBuildingHeight({ height: 18, min_floor: 40 });
+  assert.equal(clampedFloor.baseHeight, 100);
+  assert.equal(clampedFloor.unclampedBaseHeight, 120);
+  assert.equal(clampedFloor.baseHeightWasClamped, true);
+  assert.equal(clampedFloor.baseHeightEstimated, true);
 });
 
 test("discloses when source height is capped to renderer-safe limits", () => {
@@ -157,4 +200,18 @@ test("valid reference reports are usable only when no actual rendered height is 
     24,
   );
   assert.equal(resolveRenderedHeightForDisplay({}), null);
+});
+
+test("rejects partially numeric strings instead of parsing unit-suffixed values", () => {
+  const invalidHeight = resolveBuildingHeight({ height: "18.5m" });
+  assert.equal(invalidHeight.source, "fallback-estimate");
+  assert.equal(invalidHeight.meters, 9);
+
+  const validFloorFallback = resolveBuildingHeight({ height_m: "18.5 metres", num_floors: "4" });
+  assert.equal(validFloorFallback.source, "floor-estimate");
+  assert.equal(validFloorFallback.meters, 12);
+
+  const invalidMinHeight = resolveBuildingHeight({ height: 20, min_height: "1.2m" });
+  assert.equal(invalidMinHeight.baseHeight, 0);
+  assert.equal(invalidMinHeight.unclampedBaseHeight, 0);
 });
