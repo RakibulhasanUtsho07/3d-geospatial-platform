@@ -58,13 +58,6 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function hashFile(filePath) {
-  const digest = createHash("sha256");
-  const bytes = await readFile(filePath);
-  digest.update(bytes);
-  return digest.digest("hex");
-}
-
 async function readWorkspaceFile(root, relativePath, label, maxBytes) {
   const safePath = safeRelativePath(relativePath, label);
   const candidate = path.resolve(root, ...safePath.split("/"));
@@ -478,8 +471,15 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
       };
       report.acceptance.texturedGlbAvailable = true;
     }
-    const geometryStillMatches = (await hashFile(path.resolve(workspaceRoot, geometry.inputPath))) === evidence.inputSha256;
-    if (!geometryStillMatches) throw new TypeError("geometry input changed while the vertical-slice workflow was running");
+    const geometryInputAfter = await readWorkspaceFile(
+      workspaceRoot,
+      geometry.inputPath,
+      "geometry input",
+      MAX_GEOMETRY_INPUT_BYTES,
+    );
+    if (geometryInputAfter.sha256 !== evidence.inputSha256) {
+      throw new TypeError("geometry input changed while the vertical-slice workflow was running");
+    }
 
     report.childJobs.geometry.status = geometryReport.status ?? "review-required";
     report.childJobs.geometry.output = {
