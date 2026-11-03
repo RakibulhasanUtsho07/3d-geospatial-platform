@@ -32,6 +32,8 @@ A capture manifest is a versioned JSON record with:
 
 The schema is `1.0.0` and is implemented in `src/core/building-generation/building-capture-manifest.mjs`. Missing information is represented as missing/unknown and appears as an incomplete readiness check. Invalid paths, IDs, values, references or hashes are not silently repaired.
 
+Raw video files are retained as source records but do **not** count as independent facade views by themselves. Extract still frames and add `video-frame` capture records that link back to the parent video's `sourceId`. The validator requires at least one linked extracted frame for each declared capture video; only the photo/frame records count toward front/back/left/right coverage. Frame extraction and frame selection remain a separately reviewable preprocessing step—the manifest does not infer camera pose or prove that a selected frame is useful.
+
 A compact illustrative fragment follows. Every identifier, file and number is a placeholder, not real-building evidence. It will not pass unless the referenced files and all required attestations really exist and are reviewed.
 
 ```json
