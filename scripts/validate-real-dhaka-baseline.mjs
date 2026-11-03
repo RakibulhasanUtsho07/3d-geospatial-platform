@@ -123,6 +123,80 @@ export function validateRealDhakaBaselineReport(report, options = {}) {
       if (roadApi.upstreamAttempts?.total !== 0) addError(errors, label + " unexpectedly attempted an upstream Overpass request.");
     }
 
+    const imageryReadiness = run.imageryReadiness;
+    if (!isRecord(imageryReadiness)
+        || imageryReadiness.viewerAvailable !== true
+        || !Number.isSafeInteger(imageryReadiness.imageryLayerCount)
+        || imageryReadiness.imageryLayerCount < 1
+        || imageryReadiness.imageryTilesLoaded !== true
+        || !Number.isFinite(imageryReadiness.stableForMs)
+        || imageryReadiness.stableForMs < 750) {
+      addError(errors, label + " does not prove stable Cesium base-imagery readiness for at least 750 ms.");
+    }
+
+    const imageryTileErrors = run.imageryTileErrors;
+    const validTileErrors = isRecord(imageryTileErrors)
+      && Number.isSafeInteger(imageryTileErrors.total)
+      && imageryTileErrors.total >= 0
+      && Array.isArray(imageryTileErrors.recent)
+      && imageryTileErrors.recent.length <= 50
+      && imageryTileErrors.recent.length <= imageryTileErrors.total;
+    if (!validTileErrors) {
+      addError(errors, label + " has malformed or unbounded imagery tile-error diagnostics.");
+    } else {
+      for (const tileError of imageryTileErrors.recent) {
+        const validCoordinate = (value) => value === null || (Number.isSafeInteger(value) && value >= 0);
+        if (!isRecord(tileError)
+            || typeof tileError.message !== "string"
+            || tileError.message.length > 240
+            || /https?:\/\//i.test(tileError.message)
+            || /\b(?:access_token|token)=(?!\[redacted\])[^&\s)]+/i.test(tileError.message)
+            || !validCoordinate(tileError.x)
+            || !validCoordinate(tileError.y)
+            || !validCoordinate(tileError.level)
+            || !Number.isSafeInteger(tileError.timesRetried)
+            || tileError.timesRetried < 0
+            || typeof tileError.retryWasRequested !== "boolean") {
+          addError(errors, label + " contains malformed or non-redacted imagery tile-error details.");
+          break;
+        }
+      }
+    }
+
+    const redSignal = run.visualRedPixelSignal;
+    if (!isRecord(redSignal)
+        || !Number.isSafeInteger(redSignal.width)
+        || redSignal.width < 1
+        || !Number.isSafeInteger(redSignal.height)
+        || redSignal.height < 1
+        || !Number.isSafeInteger(redSignal.sampledPixels)
+        || redSignal.sampledPixels < 1
+        || !Number.isSafeInteger(redSignal.redPixelSamples)
+        || redSignal.redPixelSamples < 0
+        || redSignal.redPixelSamples > redSignal.sampledPixels
+        || !Number.isFinite(redSignal.redPixelRatio)
+        || redSignal.redPixelRatio < 0
+        || redSignal.redPixelRatio > 1
+        || Math.abs(redSignal.redPixelRatio - redSignal.redPixelSamples / redSignal.sampledPixels) > 0.0000011) {
+      addError(errors, label + " has an invalid Cesium-canvas red-pixel signal.");
+    }
+
+    const visualReview = run.visualAnomalyReview;
+    if (!isRecord(visualReview)
+        || typeof visualReview.flagged !== "boolean"
+        || !Number.isFinite(visualReview.threshold)
+        || visualReview.threshold < 0
+        || visualReview.threshold > 1
+        || !(visualReview.peerMedianRatio === null
+          || (Number.isFinite(visualReview.peerMedianRatio)
+            && visualReview.peerMedianRatio >= 0
+            && visualReview.peerMedianRatio <= 1))
+        || typeof visualReview.reason !== "string"
+        || (visualReview.flagged && visualReview.reason !== "red-pixel-signal-outlier-review-required")
+        || (!visualReview.flagged && visualReview.reason !== "no-red-pixel-outlier-detected")) {
+      addError(errors, label + " is missing a valid visual-anomaly review assessment.");
+    }
+
     const screenshot = run.screenshot;
     if (!isRecord(screenshot)
         || typeof screenshot.path !== "string"
@@ -198,6 +272,11 @@ async function main(argv) {
       warm: report.summary.warm.roadReadinessCounts,
     },
     verifiedScreenshots: referencedPaths.size,
+    visualAnomalyReview: {
+      evaluatedSamples: report.runs.filter((run) => isRecord(run?.visualAnomalyReview)).length,
+      flaggedSamples: report.runs.filter((run) => run?.visualAnomalyReview?.flagged === true).length,
+      manualReviewRequired: report.runs.some((run) => run?.visualAnomalyReview?.flagged === true),
+    },
     roadExtract: report.candidate.dataInputs.find((entry) => entry.path === "public/data/roads/dhaka-road-network-v1.json"),
   }, null, 2));
 }
