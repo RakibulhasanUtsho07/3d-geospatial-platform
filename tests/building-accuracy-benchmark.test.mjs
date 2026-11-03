@@ -95,6 +95,62 @@ test("passes only when dimensions, exact-model ground controls and direct visual
   assert.ok(report.checks.every((check) => check.status === "passed"));
 });
 
+function independentTruthReport(overrides = {}) {
+  return {
+    schemaVersion: "1.0.0",
+    engine: "independent-building-truth-evaluator-v1",
+    evaluationId: "accuracy-truth-eval-01",
+    buildingId: fixture.id,
+    status: "benchmark-review-required",
+    candidate: { glbSha256: candidateHash },
+    reference: { sourceSha256: "b".repeat(64), independentlyAuthenticated: false },
+    metrics: { footprint: {}, dimensions: {}, checkPoints: {}, surfaceDistance: null },
+    checks: [],
+    warnings: [],
+    failures: [],
+    geometryExtractionProvenance: { candidate: { status: "passed" }, reference: { status: "passed" } },
+    policy: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+    ...overrides,
+  };
+}
+function independentTruthEvidence(overrides = {}) {
+  const reportSha256 = "c".repeat(64);
+  return { path: "artifacts/site-independent-truth-report.json", sha256: reportSha256,
+    expectedSha256: reportSha256, verified: true, ...overrides };
+}
+
+test("incorporates a pinned independent-truth geometry report while keeping release gates disabled", () => {
+  const report = buildBuildingAccuracyBenchmark(completeInput({
+    independentTruthReport: independentTruthReport(),
+    independentTruthReportEvidence: independentTruthEvidence(),
+  }));
+  assert.equal(report.status, "benchmark-passed-review-required");
+  assert.equal(report.metrics.independentTruthGeometry.supplied, true);
+  assert.equal(report.metrics.independentTruthGeometry.status, "benchmark-review-required");
+  assert.equal(report.metrics.independentTruthGeometry.reportArtifactPinned, true);
+  assert.ok(report.checks.some((check) => check.id === "independent-truth-report-valid" && check.status === "passed"));
+  assert.ok(report.checks.some((check) => check.id === "independent-truth-report-candidate-binding" && check.status === "passed"));
+  assert.equal(report.policy.mapReady, false);
+  assert.equal(report.policy.publicationEligible, false);
+  assert.equal(report.policy.automaticApproval, false);
+});
+
+test("fails an independent-truth report bound to a different GLB", () => {
+  const truth = independentTruthReport({ candidate: { glbSha256: "d".repeat(64) } });
+  const report = buildBuildingAccuracyBenchmark(completeInput({
+    independentTruthReport: truth,
+    independentTruthReportEvidence: independentTruthEvidence(),
+  }));
+  assert.equal(report.status, "benchmark-failed");
+  assert.ok(report.failures.some((check) => check.id === "independent-truth-report-candidate-binding"));
+});
+
+test("keeps a required but missing independent-truth report incomplete", () => {
+  const report = buildBuildingAccuracyBenchmark(completeInput({ requireIndependentTruthReport: true }));
+  assert.equal(report.status, "benchmark-incomplete");
+  assert.ok(report.warnings.some((check) => check.id === "independent-truth-report-present"));
+});
+
 test("fails a candidate when any independently supplied dimension exceeds tolerance", () => {
   const input = completeInput();
   input.dimensionReference.referenceDimensionsM.z *= 1.2;

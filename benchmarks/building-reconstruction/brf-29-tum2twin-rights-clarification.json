@@ -1,0 +1,418 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "brf-29-tum2twin-rights-clarification-request",
+  "requestId": "BRF-29-TUM2TWIN-RIGHTS-CLARIFICATION-2026-10-28",
+  "status": "draft-not-sent",
+  "reviewedAt": "2026-10-28",
+  "sourceRecord": {
+    "title": "UAV Laser Scanning and Photogrammetry of TUM Downtown Campus",
+    "doi": "10.5281/zenodo.15282970",
+    "url": "https://zenodo.org/records/15282970",
+    "version": "1.2.0",
+    "published": "2025-04-25",
+    "latestVisibleRightsField": "License heading is present but no license value is displayed.",
+    "note": "The record UI says Dataset Open; that label and download availability are not an asset-specific reuse grant."
+  },
+  "officialDatasetPages": [
+    {
+      "role": "UAS imagery",
+      "url": "https://tum2t.win/datasets/im-uas",
+      "observation": "Describes georeferenced images and says openly available; no per-asset licence/scope displayed on the page."
+    },
+    {
+      "role": "UAS laser scanning",
+      "url": "https://tum2t.win/datasets/pc-uas",
+      "observation": "Describes RTK-GNSS georeferenced point clouds and says openly available; no per-asset licence/scope displayed on the page."
+    },
+    {
+      "role": "UAS photogrammetry",
+      "url": "https://tum2t.win/datasets/pc-uasp",
+      "observation": "Describes image-derived point cloud/orthophoto and says openly available; no per-asset licence/scope displayed on the page."
+    },
+    {
+      "role": "Dataset project homepage/contact",
+      "url": "https://tum2t.win/",
+      "observation": "Lists benedikt.schwab@tum.de and olaf.wysocki@tum.de under Contribute. This is a contact route, not proof that either person has legal authority for each asset."
+    },
+    {
+      "role": "Zenodo permission guidance",
+      "url": "https://support.zenodo.org/help/en-gb/2-content/21-can-i-get-permission-to-use-a-specific-record",
+      "observation": "Zenodo says the uploader owns/controls record content and reuse depends on the record licence shown in Rights."
+    }
+  ],
+  "contacts": [
+    {
+      "email": "benedikt.schwab@tum.de",
+      "sourceUrl": "https://tum2t.win/",
+      "role": "published project contribution contact",
+      "authorityConfirmed": false
+    },
+    {
+      "email": "olaf.wysocki@tum.de",
+      "sourceUrl": "https://tum2t.win/",
+      "role": "published project contribution contact",
+      "authorityConfirmed": false
+    },
+    {
+      "email": "info.rsa@ed.tum.de",
+      "sourceUrl": "https://www.asg.ed.tum.de/rsa/datasets/",
+      "role": "published department/dataset enquiry route",
+      "authorityConfirmed": false
+    }
+  ],
+  "requestedScopes": [
+    "download-and-store-for-private-inspection",
+    "use-for-scientific-and-metric-validation",
+    "derive-geometry-and-reconstructed-models",
+    "use-source-images-for-texture-baking",
+    "public-display-in-interactive-web-platform",
+    "commercial-use",
+    "redistribute-original-source-bytes",
+    "redistribute-derived-models-and-textures",
+    "redistribute-renders-and-visualizations"
+  ],
+  "permissionsMustBeAnsweredSeparatelyPerAssetFamily": true,
+  "assets": [
+    {
+      "filename": "Images.zip",
+      "displayedSize": "5.9 GB",
+      "publisherMd5": "3916db207856346dc596d373e477143e",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "opf.zip",
+      "displayedSize": "1.9 GB",
+      "publisherMd5": "73315b6ed761a82da114f8f22b437d7b",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217.laz",
+      "displayedSize": "4.3 GB",
+      "publisherMd5": "e5639848bbedd483c838da8107d35663",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_DSM.tiff",
+      "displayedSize": "1.3 GB",
+      "publisherMd5": "21e6e3333b3066411d8a8bcf9e29d0cd",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_Mesh.jpg",
+      "displayedSize": "13.4 MB",
+      "publisherMd5": "739cd7f71cabfd6d92006fcaaccebbd3",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_Mesh.mtl",
+      "displayedSize": "80 Bytes",
+      "publisherMd5": "ffb31d2b83f3c067d6afdeb8135a9b02",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_Mesh.obj",
+      "displayedSize": "92.0 MB",
+      "publisherMd5": "2d5fd9b70df14467836f5a2d2507ecb3",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_Mesh_offset.xyz",
+      "displayedSize": "32 Bytes",
+      "publisherMd5": "d6ce1e32f86d6d86ee47a0103df7b4a1",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_Photogrammetry_20241217_Orthophoto.tiff",
+      "displayedSize": "1.7 GB",
+      "publisherMd5": "ed4b25bd23ee864fb3eb305267455298",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_ULS_20241217_manual.laz",
+      "displayedSize": "2.8 GB",
+      "publisherMd5": "37ce114fb348fb28066cc967cde9771d",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_ULS_20241217_manual_5mm_fillparts.laz",
+      "displayedSize": "687.0 MB",
+      "publisherMd5": "ed46079bee78f4dc939dbfa5dc2c61e8",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_ULS_20241217_nadir.laz",
+      "displayedSize": "1.3 GB",
+      "publisherMd5": "192f13c2e533842404aef6b10c87e6a7",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_ULS_Photogrammetry_20241217_docu.pdf",
+      "displayedSize": "1.3 MB",
+      "publisherMd5": "3427e70196d1db6a126acb6f041da04a",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    },
+    {
+      "filename": "TUM_Downtown_ULS_trajectory_20241217.txt",
+      "displayedSize": "11.2 MB",
+      "publisherMd5": "07925072660f9ffdbe0b9f9d6916ff7e",
+      "localAcquisitionStatus": "not-acquired",
+      "localByteSize": null,
+      "localSha256": null,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Publisher-listed MD5 is a catalogue cross-check only; compute local SHA-256 and byte size after authorized acquisition."
+    }
+  ],
+  "additionalAssetFamiliesOutsideZenodoRecord": [
+    {
+      "family": "TUM2TWIN CityGML/LOD2/LOD3 building models and source projects",
+      "sourceUrl": "https://github.com/tum-gis/tum2twin",
+      "upstreamDatasetUrl": "https://gitlab.lrz.de/tum-gis/tum2twin-datasets",
+      "sourceFilesPinned": false,
+      "rightsDecision": "pending",
+      "requestedScopes": [
+        "download-and-store-for-private-inspection",
+        "use-for-scientific-and-metric-validation",
+        "derive-geometry-and-reconstructed-models",
+        "use-source-images-for-texture-baking",
+        "public-display-in-interactive-web-platform",
+        "commercial-use",
+        "redistribute-original-source-bytes",
+        "redistribute-derived-models-and-textures",
+        "redistribute-renders-and-visualizations"
+      ],
+      "note": "Separate repository and file family; do not assume this inherits the Zenodo dataset's eventual rights decision."
+    }
+  ],
+  "requiredReplyFields": [
+    "exact filename or covered asset family and immutable record/version",
+    "rights holder or grantor name and their authority to grant the requested rights",
+    "applicable licence identifier, version and canonical URL, or explicit written permission",
+    "permitted and denied scopes from requestedScopes, with any commercial-use boundary",
+    "required attribution wording",
+    "derivative and share-alike/redistribution obligations",
+    "public display, hosting, caching, and model-texture restrictions",
+    "effective date, expiry if any, territory/use limits, and revocation/contact process",
+    "whether the images, point clouds, mesh and building model correspond to one named building ID",
+    "written permission/evidence URL or message reference that can be archived and hash-pinned"
+  ],
+  "policy": {
+    "inferPermissionFromPublicAvailability": false,
+    "inferPermissionFromDatasetOpenLabel": false,
+    "inferPermissionFromPaperPublicationLicence": false,
+    "inferRightsFromRelatedRepository": false,
+    "requireExactAssetByteBindingAfterAcquisition": true,
+    "requireHumanRightsReview": true
+  },
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  }
+}

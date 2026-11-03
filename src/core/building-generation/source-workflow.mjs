@@ -4,6 +4,8 @@ import { lstat, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "n
 import path from "node:path";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { toBuildingSpecSource } from "./media-intake.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
+export { SOURCE_OPERATION_SCOPES, normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 const ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 
@@ -89,12 +91,15 @@ export async function reviewBuildingSource(options) {
   }
   const licence = text(options.licence, "licence", 500, true);
   if (["unknown", "n/a", "none"].includes(licence.toLowerCase())) throw new TypeError("a known source licence/permission basis is required");
+  const permittedOperations = normalizeSourceOperationScopes(options.permittedOperations);
   const loaded = await loadVerifiedSource(options.workspaceRoot, options.buildingId, options.sourceId);
   const record = { ...loaded.record };
   record.licence = licence;
   record.usageStatus = "approved";
   record.rightsReviewMethod = "explicit-cli-attestation";
   record.rightsReviewedAt = new Date().toISOString();
+  record.permittedOperations = permittedOperations;
+  record.operationScopesReviewedAt = record.rightsReviewedAt;
 
   for (const key of ["author", "attribution", "title", "capturedAt", "description", "providerId"]) {
     const value = text(options[key], key, key === "description" ? 2000 : 500, false);
@@ -158,6 +163,6 @@ export async function prepareBuildingSpecSources(options) {
   return {
     buildingSpec: normalized,
     selectedSourceIds: sourceIds,
-    sourceStatuses: additions.map(source => ({ id: source.id, licence: source.licence, usageStatus: source.usageStatus, assetId: source.assetId })),
+    sourceStatuses: additions.map(source => ({ id: source.id, licence: source.licence, usageStatus: source.usageStatus, assetId: source.assetId, permittedOperations: source.permittedOperations ?? [] })),
   };
 }

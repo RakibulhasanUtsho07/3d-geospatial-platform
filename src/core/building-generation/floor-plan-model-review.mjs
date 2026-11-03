@@ -12,6 +12,7 @@ import {
 import path from "node:path";
 
 import { loadVerifiedSource } from "./source-workflow.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 import { publishReviewedBuildingModel, validatePublishedModelCatalog } from "./published-model-catalog.mjs";
 import { loadFloorPlanModelCandidate } from "./floor-plan-model-job.mjs";
 
@@ -64,6 +65,16 @@ function nonEmptyText(value, label, maximum) {
 function knownLicence(value) {
   return typeof value === "string" && value.trim().length > 0 &&
     !["unknown", "n/a", "none"].includes(value.trim().toLowerCase());
+}
+
+function sourceOperationScopes(record, label) {
+  if (record?.permittedOperations === undefined) return [];
+  return normalizeSourceOperationScopes(record.permittedOperations, label + " permittedOperations");
+}
+
+function sameScopes(left, right) {
+  return Array.isArray(left) && Array.isArray(right) &&
+    JSON.stringify(left) === JSON.stringify(right);
 }
 
 function validateReviewInput(input) {
@@ -266,7 +277,8 @@ export async function getFloorPlanModelReviewStatus({ workspaceRoot, buildingId,
         savedReview.candidate.modelSha256 !== candidate.modelSha256 ||
         savedReview.candidate.reportSha256 !== candidate.reportSha256 ||
         savedReview.candidate.geometrySha256 !== candidate.geometrySha256 ||
-        savedReview.candidate.sourceSha256 !== candidate.report.input.verifiedSourceSha256) {
+        savedReview.candidate.sourceSha256 !== candidate.report.input.verifiedSourceSha256 ||
+        !sameScopes(savedReview.candidate.sourcePermittedOperations, candidate.report.input.sourcePermittedOperations)) {
       throw new TypeError("Floor-plan review record does not match the current candidate.");
     }
     review = {
@@ -366,6 +378,7 @@ function catalogAttestation({ record, candidate, publication }) {
         "qaReportReviewed",
       ].map((key) => [key, true])),
       notes: record.notes,
+      permittedOperations: record.candidate.sourcePermittedOperations,
     },
   };
 }
@@ -397,8 +410,15 @@ export async function reviewFloorPlanModelCandidate({ workspaceRoot, buildingId,
       error.code = "SOURCE_RIGHTS_NOT_APPROVED";
       throw error;
     }
+    const reviewedSourceScopes = sourceOperationScopes(source.record, "source " + source.record.id);
+    if (!reviewedSourceScopes.includes("procedural-model-derivation")) {
+      const error = new Error("Floor-plan source requires explicit procedural-model-derivation permission before candidate approval.");
+      error.code = "SOURCE_OPERATION_SCOPE_NOT_APPROVED";
+      throw error;
+    }
     if (candidate.report.input.sourceUsageStatus !== "approved" ||
-        candidate.report.input.sourceLicence !== source.record.licence) {
+        candidate.report.input.sourceLicence !== source.record.licence ||
+        !sameScopes(candidate.report.input.sourcePermittedOperations, reviewedSourceScopes)) {
       const error = new Error("This candidate was created before source rights were approved. Rebuild the candidate after source review so its report captures the approved source metadata.");
       error.code = "CANDIDATE_SOURCE_REVIEW_STALE";
       throw error;
@@ -454,6 +474,7 @@ export async function reviewFloorPlanModelCandidate({ workspaceRoot, buildingId,
         sourceSha256: source.sha256,
         sourceUsageStatus: source.record.usageStatus,
         sourceLicence: source.record.licence,
+        sourcePermittedOperations: sourceOperationScopes(source.record, "source " + source.record.id),
       },
       publication: parsed.publication,
       mapReady: false,
@@ -519,7 +540,10 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
   const source = await sourceForCandidate(root, candidate);
   if (source.record.usageStatus !== "approved" || !knownLicence(source.record.licence) ||
       review.candidate.sourceUsageStatus !== source.record.usageStatus ||
-      review.candidate.sourceLicence !== source.record.licence) {
+      review.candidate.sourceLicence !== source.record.licence ||
+      !sourceOperationScopes(source.record, "source " + source.record.id).includes("procedural-model-derivation") ||
+      !sameScopes(review.candidate.sourcePermittedOperations, sourceOperationScopes(source.record, "source " + source.record.id)) ||
+      !sameScopes(candidate.report.input.sourcePermittedOperations, sourceOperationScopes(source.record, "source " + source.record.id))) {
     const error = new Error("Source rights status changed after review; refusing publication.");
     error.code = "SOURCE_RIGHTS_CHANGED";
     throw error;
@@ -542,6 +566,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
       attestation.review?.reviewedAt !== review.reviewedAt ||
       attestation.review?.evidencePath !== review.evidence?.path ||
       attestation.review?.evidenceSha256 !== review.evidence?.sha256 ||
+      !sameScopes(attestation.review?.permittedOperations, review.candidate.sourcePermittedOperations) ||
       REQUIRED_FLOOR_PLAN_REVIEW_CHECKS.some((key) => attestation.review?.checks?.[key] !== true) ||
       JSON.stringify(attestation.model?.position) !== JSON.stringify(review.publication?.position) ||
       attestation.model?.headingDegrees !== review.publication?.headingDegrees ||

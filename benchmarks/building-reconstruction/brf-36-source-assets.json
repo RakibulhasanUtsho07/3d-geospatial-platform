@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-36-TUM-SOURCE-ASSET-BYTES",
+  "sourceModelId": "DEBY_LOD3_4959323",
+  "assetRootHint": "private-source-assets",
+  "assets": [
+    {
+      "id": "tum-citygml-4959323",
+      "role": "citygml-reference",
+      "status": "pinned",
+      "localPath": "DEBY_LOD3_4959323.gml",
+      "byteSize": 51178520,
+      "sha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37",
+      "sourceCommit": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+      "sourcePath": "citygml/lod3-building-datasets/DEBY_LOD3_4959323.gml",
+      "buildingGmlId": "DEBY_LOD2_4959323",
+      "crs": "EPSG:25832",
+      "rightsStatus": "pending-exact-file-scope-review"
+    },
+    {
+      "id": "matched-image-frames",
+      "role": "image-frame-set",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "rightsStatus": "pending-exact-file-scope-review",
+      "note": "No exact permitted image frame IDs/hashes or same-building mapping has been established."
+    },
+    {
+      "id": "matched-uls-crop",
+      "role": "uls-crop",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "rightsStatus": "pending-exact-file-scope-review",
+      "note": "No hash-pinned crop mapped to the same physical building has been established; the full point cloud is not a substitute."
+    },
+    {
+      "id": "held-out-survey-controls",
+      "role": "survey-control-source",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "rightsStatus": "pending-exact-file-scope-review",
+      "note": "No independent held-out survey/checkpoint asset is currently bound to the candidate."
+    },
+    {
+      "id": "coordinate-operation-evidence",
+      "role": "coordinate-operation-evidence",
+      "status": "pending-acquisition",
+      "localPath": null,
+      "byteSize": null,
+      "sha256": null,
+      "rightsStatus": "not-applicable-pending-operation-selection",
+      "note": "No approved horizontal/vertical operation and required grid manifest has been reviewed."
+    }
+  ],
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  }
+}

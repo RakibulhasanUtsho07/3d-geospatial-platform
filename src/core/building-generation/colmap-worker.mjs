@@ -6,6 +6,7 @@ import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { convertTexturedPlyToGlb } from "./textured-ply-to-glb.mjs";
 import { analyzeImageQuality, compareImageQuality } from "./image-quality-preflight.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { normalizeSourceOperationScopes } from "./source-workflow.mjs";
 import { assessColmapReconstruction } from "./colmap-diagnostics.mjs";
 import { buildModelReviewSummary } from "./model-review-summary.mjs";
 import { analyzeColmapTextModelFiles } from "./colmap-view-coverage.mjs";
@@ -91,7 +92,12 @@ async function readApprovedSources(root,buildingId,sourceIds,spec){
   if(!["image","video-frame"].includes(record.kind)||!["image/jpeg","image/png"].includes(record.mimeType))throw new TypeError("COLMAP worker accepts ingested JPEG/PNG image or video-frame sources only: "+sourceId);
   if(record.usageStatus!=="approved"||typeof record.licence!=="string"||!record.licence.trim()||record.licence.toLowerCase()==="unknown")throw new TypeError("source "+sourceId+" needs a reviewed licence and usageStatus=approved");
   const declared=specById.get(sourceId);
-  if(!declared||declared.assetId!==record.assetId||declared.usageStatus!=="approved"||declared.licence!==record.licence)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
+  if(!declared)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
+  const recordedScopes=normalizeSourceOperationScopes(record.permittedOperations, "source " + sourceId + " permittedOperations");
+  const declaredScopes=normalizeSourceOperationScopes(declared.permittedOperations, "BuildingSpec source " + sourceId + " permittedOperations");
+  if(JSON.stringify(recordedScopes)!==JSON.stringify(declaredScopes))throw new TypeError("BuildingSpec source " + sourceId + " permitted operation scopes do not match the verified source record");
+  for(const scope of ["photogrammetry-reconstruction","texture-baking"]){if(!recordedScopes.includes(scope))throw new TypeError("source "+sourceId+" lacks explicit "+scope+" permission");}
+  if(declared.assetId!==record.assetId||declared.usageStatus!=="approved"||declared.licence!==record.licence)throw new TypeError("BuildingSpec source "+sourceId+" must reference the same approved asset id, licence and usage status");
   if(typeof record.relativePath!=="string"||record.relativePath.includes("\\"))throw new TypeError("invalid asset relativePath for "+sourceId);
   const absolute=path.resolve(root,record.relativePath);if(!inside(root,absolute))throw new TypeError("asset path escapes workspaceRoot");
   const lstatResult=await lstat(absolute);if(lstatResult.isSymbolicLink()||!lstatResult.isFile())throw new TypeError("media asset must be a regular non-symlink file");
@@ -124,7 +130,7 @@ export async function runColmapReconstruction(options){
  await mkdir(jobDir,{recursive:false});const outputJobDir=await realpath(jobDir);if(!inside(root,outputJobDir))throw new TypeError("job directory resolved outside workspaceRoot");
  const imagesDir=path.join(outputJobDir,"images");await mkdir(imagesDir);const realImagesDir=await realpath(imagesDir);if(!inside(root,realImagesDir))throw new TypeError("staging directory resolved outside workspaceRoot");
  const startedAt=new Date().toISOString(),staged=[];
- let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},warnings:[],mapReady:false,outputs:{}};
+ let report={schemaVersion:"1.0.0",engine:"colmap-multiview-worker-v1",buildingId,jobId,status:"running",startedAt,quality,sourceCount:sources.length,sourceIds:sources.map(s=>s.id),sourceSha256:sources.map(s=>({id:s.id,sha256:s.record.sha256,licence:s.record.licence,usageStatus:s.record.usageStatus,permittedOperations:s.record.permittedOperations})),confirmations:{sameBuilding:options.matchConfirmed,overlapReviewed:options.overlapReviewed,upAxisReviewed:options.upAxisReviewed},scaleCalibration:calibration,georeference:{status:"not-solved",longitude:specResult.location.longitude,latitude:specResult.location.latitude,heightM:specResult.location.heightM,headingDegrees},warnings:[],mapReady:false,outputs:{}};
  const reportPath=path.join(outputJobDir,"report.json");
  try{
   for(const source of sources){const ext=source.record.mimeType==="image/png"?".png":".jpg",filename="view-"+String(source.index+1).padStart(4,"0")+ext,dest=path.join(realImagesDir,filename);await copyFile(source.absolute,dest);staged.push({sourceId:source.id,filename,sha256:source.record.sha256});}

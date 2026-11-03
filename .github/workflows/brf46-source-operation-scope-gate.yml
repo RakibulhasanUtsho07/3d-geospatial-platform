@@ -1,0 +1,92 @@
+name: BRF-46 per-source operation-scope gate
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf46-source-operation-scope-gate.yml"
+      - "docs/research/BRF-46-SOURCE-OPERATION-SCOPE-GATE.md"
+      - "scripts/review-building-source.mjs"
+      - "scripts/build-building-from-media.mjs"
+      - "src/core/building-generation/source-workflow.mjs"
+      - "src/core/building-generation/source-operation-scopes.mjs"
+      - "src/core/building-generation/building-spec.mjs"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-to-model-workflow.mjs"
+      - "src/core/building-generation/video-frame-extractor.mjs"
+      - "src/core/building-generation/single-image-3d-worker.mjs"
+      - "src/core/building-generation/colmap-worker.mjs"
+      - "tests/building-source-workflow.test.mjs"
+      - "tests/media-to-model-workflow.test.mjs"
+      - "tests/colmap-reconstruction.test.mjs"
+      - "tests/single-image-3d-worker.test.mjs"
+      - "tests/video-frame-extractor-operation-scopes.test.mjs"
+      - "tests/media-pipeline.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - development
+      - feat/brf46-source-operation-scope-gate
+    paths:
+      - ".github/workflows/brf46-source-operation-scope-gate.yml"
+      - "docs/research/BRF-46-SOURCE-OPERATION-SCOPE-GATE.md"
+      - "scripts/review-building-source.mjs"
+      - "scripts/build-building-from-media.mjs"
+      - "src/core/building-generation/source-workflow.mjs"
+      - "src/core/building-generation/source-operation-scopes.mjs"
+      - "src/core/building-generation/building-spec.mjs"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-to-model-workflow.mjs"
+      - "src/core/building-generation/video-frame-extractor.mjs"
+      - "src/core/building-generation/single-image-3d-worker.mjs"
+      - "src/core/building-generation/colmap-worker.mjs"
+      - "tests/building-source-workflow.test.mjs"
+      - "tests/media-to-model-workflow.test.mjs"
+      - "tests/colmap-reconstruction.test.mjs"
+      - "tests/single-image-3d-worker.test.mjs"
+      - "tests/video-frame-extractor-operation-scopes.test.mjs"
+      - "tests/media-pipeline.test.mjs"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf46-operation-scope-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  operation-scope-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install repository dependencies
+        run: npm install
+      - name: Test exact-source rights review and BuildingSpec scope persistence
+        run: npm run test:building-source-workflow
+      - name: Test media intake, scope preflight, stage cache and procedural candidate workflow
+        run: npm run test:media-to-model-workflow
+      - name: Test direct COLMAP source-scope enforcement
+        run: npm run test:colmap-worker
+      - name: Test direct single-image AI source-scope enforcement
+        run: npm run test:single-image-3d
+      - name: Test video frame operation-scope inheritance and cache invalidation
+        run: npm run test:video-frame-operation-scopes
+      - name: Test existing video intake and FFmpeg regression contract with explicit scope attestations
+        run: npm run test:building-media
+      - name: Check operation-scope flags are exposed in both operator CLIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/review-building-source.mjs --help | grep -F -- '--permitted-operation'
+          node scripts/build-building-from-media.mjs --help | grep -F -- '--permitted-operation'

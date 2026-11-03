@@ -1,0 +1,79 @@
+name: BRF-37 pinned PROJ operation runner
+
+on:
+  push:
+    branches:
+      - development
+      - feat/brf37-pinned-proj-operation-runner
+    paths:
+      - "src/core/building-generation/brf37-proj-operation-executor.mjs"
+      - "scripts/run-brf37-proj-operation.mjs"
+      - "scripts/test-brf37-proj-integration.mjs"
+      - "tests/brf37-proj-operation.test.mjs"
+      - "tests/brf37-proj-operation-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-37-proj-operation.json"
+      - "docs/research/BRF-37-PINNED-PROJ-OPERATION.md"
+      - ".github/workflows/brf37-proj-operation.yml"
+      - "package.json"
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "src/core/building-generation/brf37-proj-operation-executor.mjs"
+      - "scripts/run-brf37-proj-operation.mjs"
+      - "scripts/test-brf37-proj-integration.mjs"
+      - "tests/brf37-proj-operation.test.mjs"
+      - "tests/brf37-proj-operation-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-37-proj-operation.json"
+      - "docs/research/BRF-37-PINNED-PROJ-OPERATION.md"
+      - ".github/workflows/brf37-proj-operation.yml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf37-proj-operation
+  cancel-in-progress: true
+
+jobs:
+  pinned-proj-operation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install PROJ command-line utilities for synthetic integration only
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes proj-bin proj-data
+          cct --version
+          test -s /usr/share/proj/proj.db
+      - name: Test pinned operation contract, fail-closed policy and CLI
+        run: npm run test:brf37-proj-operation
+      - name: Execute synthetic identity pipeline twice using local cct
+        env:
+          PROJ_DATA_PATH: /usr/share/proj
+        run: npm run test:brf37-proj-operation:integration
+      - name: Confirm the real benchmark manifest remains blocked
+        run: |
+          mkdir -p artifacts
+          set +e
+          node scripts/run-brf37-proj-operation.mjs benchmarks/building-reconstruction/brf-37-proj-operation.json --asset-root . --report artifacts/brf37-proj-operation-blocked.json > artifacts/brf37-proj-operation-summary.json
+          status=$?
+          set -e
+          test "$status" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf37-proj-operation-summary.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The production operation manifest must remain blocked.");
+          if (!report.blockers.includes("operation-review")) throw new Error("Missing operation review blocker.");
+          if (report.interpretation.verticalDatum !== "unresolved") throw new Error("Vertical datum must remain unresolved.");
+          if (Object.values(report.interpretation.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          console.log("Production operation and all release flags remain blocked pending reviewed evidence.");
+          NODE

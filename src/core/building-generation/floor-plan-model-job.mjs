@@ -11,6 +11,7 @@ import {
 import path from "node:path";
 
 import { loadVerifiedSource } from "./source-workflow.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 import { generateFloorPlanGlb } from "./floor-plan-model.mjs";
 
 function inside(root, candidate) {
@@ -139,6 +140,9 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
   generated.report.input.verifiedSourceSha256 = loadedSource.sha256;
   generated.report.input.sourceUsageStatus = loadedSource.record.usageStatus ?? "unreviewed";
   generated.report.input.sourceLicence = loadedSource.record.licence ?? "unknown";
+  generated.report.input.sourcePermittedOperations = loadedSource.record.permittedOperations === undefined
+    ? []
+    : normalizeSourceOperationScopes(loadedSource.record.permittedOperations, "source " + sourceId + " permittedOperations");
   generated.report.input.normalizedGeometrySha256 = geometrySha256;
   generated.report.warnings = generated.report.warnings.filter(
     (warning) => !warning.startsWith("A source SHA-256 is metadata"),
@@ -191,6 +195,7 @@ export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan }
     geometrySha256,
     sourceSha256: loadedSource.sha256,
     sourceUsageStatus: generated.report.input.sourceUsageStatus,
+    sourcePermittedOperations: generated.report.input.sourcePermittedOperations,
     candidateUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId,
     modelUrl: "/api/building-generation/floor-plan-models/" + buildingId + "/" + candidateId + "/model",
     mapReady: false,

@@ -34,7 +34,8 @@ async function setup(t) {
     const sourceMetadata = await sharp(sourceBytes).metadata();
     const labelMetadata = await sharp(labelBytes).metadata();
     samples.push({
-      sampleId, captureGroupId: "group-" + sampleId, split,
+      sampleId, buildingGroupId: "building-" + sampleId,
+      captureGroupId: "group-" + sampleId, split,
       source: { path: files[0][0], sha256: hash(sourceBytes), bytes: sourceBytes.length,
         width: sourceMetadata.width, height: sourceMetadata.height, sourceId: "source-" + sampleId,
         rights: { status: "verified", evidenceId: "rights-" + sampleId, reviewedBy: "reviewer-a", reviewedAt } },

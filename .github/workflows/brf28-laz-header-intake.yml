@@ -1,0 +1,53 @@
+name: BRF-28 bounded TUM LAZ header inspection
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf28-laz-header-intake.yml"
+      - "scripts/inspect_brf27_laz_header.py"
+      - "tests/test_brf27_laz_header_inspector.py"
+      - "docs/research/BRF-27-TUM-DOWNTOWN-INTAKE.md"
+      - "benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf28-laz-header-intake.yml"
+      - "scripts/inspect_brf27_laz_header.py"
+      - "tests/test_brf27_laz_header_inspector.py"
+      - "docs/research/BRF-27-TUM-DOWNTOWN-INTAKE.md"
+      - "benchmarks/building-reconstruction/brf-27-tum-downtown-intake.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf28-laz-header-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: python -m py_compile scripts/inspect_brf27_laz_header.py tests/test_brf27_laz_header_inspector.py
+
+      - name: Run bounded LAS/LAZ header parser tests
+        run: python -m unittest discover -s tests -p 'test_brf27_laz_header_inspector.py' -v
+
+      - name: Inspect only the first bounded HTTP range of the public LAZ source
+        run: python scripts/inspect_brf27_laz_header.py --output artifacts/brf28-laz-header/inspection.json
+
+      - name: Upload header inspection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf28-tum-laz-header-inspection
+          path: artifacts/brf28-laz-header/inspection.json
+          if-no-files-found: warn
+          retention-days: 14

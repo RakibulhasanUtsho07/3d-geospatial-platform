@@ -325,10 +325,31 @@ export async function buildBuildingAccuracyEvidencePackFromManifest({ manifestPa
       const reviewPath = inside(root, config.renderReferenceReviewReportPath, buildingId + " review report path");
       review = (await jsonFile(root, reviewPath, buildingId + " render/reference review report")).value;
     }
+    let independentTruthReport = null;
+    let independentTruthReportEvidence = null;
+    const truthReportPathValue = entry.independentTruthReportPath;
+    if (typeof truthReportPathValue === "string" && truthReportPathValue.trim()) {
+      const truthPath = inside(root, truthReportPathValue, buildingId + ".independentTruthReportPath");
+      const { value: truthValue, bytes: truthBytes } = await jsonFile(root, truthPath, buildingId + " independent-truth report");
+      const truthHash = sha256(truthBytes);
+      if (!HASH.test(entry.expectedIndependentTruthReportSha256 ?? "")) {
+        throw new TypeError(buildingId + " must pin expectedIndependentTruthReportSha256 when an independent-truth report is supplied");
+      }
+      checkExpected(entry.expectedIndependentTruthReportSha256, truthHash, buildingId + " independent-truth report");
+      independentTruthReport = truthValue;
+      independentTruthReportEvidence = {
+        path: path.relative(root, truthPath).split(path.sep).join("/"),
+        sha256: truthHash,
+        expectedSha256: entry.expectedIndependentTruthReportSha256.toLowerCase(),
+        verified: true,
+      };
+    }
+    const requireIndependentTruthReport = entry.requireIndependentTruthEvaluation === true;
     const benchmarkReport = buildBuildingAccuracyBenchmark({
       buildingId, candidateGlbSha256: modelHash, geometryQa,
       dimensionReference: config.dimensionReference, groundControl: config.groundControl,
-      renderReferenceReview: review, generatedAt,
+      renderReferenceReview: review, independentTruthReport, independentTruthReportEvidence,
+      requireIndependentTruthReport, generatedAt,
     });
     const sourceMedia = await declaredAssets(entry.sourceMedia ?? [], root, buildingId + ".sourceMedia");
     const referenceImages = await declaredAssets(entry.referenceImages ?? [], root, buildingId + ".referenceImages");
@@ -373,6 +394,10 @@ export async function buildBuildingAccuracyEvidencePackFromManifest({ manifestPa
         sha256: modelHash, expectedSha256: HASH.test(entry.expectedGlbSha256 ?? "") ? entry.expectedGlbSha256.toLowerCase() : null,
         geometryQa },
       sourceMedia, referenceImages, renderEvidence, renderReferenceReview: review, benchmarkReport,
+      requireIndependentTruthEvaluation: requireIndependentTruthReport,
+      independentTruthEvidence: independentTruthReportEvidence ? {
+        supplied: true, ...independentTruthReportEvidence,
+      } : { supplied: false, required: requireIndependentTruthReport, status: "missing" },
       verticalDatum: entry.verticalDatum ?? { status: "not-solved" },
     });
   }

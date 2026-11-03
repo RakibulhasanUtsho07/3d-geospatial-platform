@@ -43,6 +43,7 @@ async function makeWorkspace(t, { approveRights = true } = {}) {
       buildingId: fixture.buildingId,
       sourceId: sourceRecord.id,
       licence: "CC BY 4.0",
+      permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
       confirmRights: true,
       attribution: "Operator-provided permission record",
     });
@@ -238,6 +239,7 @@ test("approval fails closed until source rights are reviewed before candidate ge
     buildingId: setup.candidate.buildingId,
     sourceId: setup.sourceRecord.id,
     licence: "CC BY 4.0",
+    permittedOperations: ["private-media-ingestion", "procedural-model-derivation"],
     confirmRights: true,
   });
   await assert.rejects(

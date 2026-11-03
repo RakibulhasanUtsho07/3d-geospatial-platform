@@ -1,0 +1,46 @@
+name: BRF-29 TUM2TWIN rights clarification request packet
+
+on:
+  push:
+    branches:
+      - development
+      - feat/brf29-tum2twin-rights-request-packet
+    paths:
+      - "benchmarks/building-reconstruction/brf-29-tum2twin-rights-clarification.json"
+      - "docs/research/BRF-29-TUM2TWIN-RIGHTS-CLARIFICATION-REQUEST.md"
+      - "tests/brf29-rights-clarification-request.test.mjs"
+      - ".github/workflows/brf29-tum2twin-rights-request-packet.yml"
+      - "package.json"
+  pull_request:
+    branches:
+      - development
+    paths:
+      - "benchmarks/building-reconstruction/brf-29-tum2twin-rights-clarification.json"
+      - "docs/research/BRF-29-TUM2TWIN-RIGHTS-CLARIFICATION-REQUEST.md"
+      - "tests/brf29-rights-clarification-request.test.mjs"
+      - ".github/workflows/brf29-tum2twin-rights-request-packet.yml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf29-tum2twin-rights-request-packet
+  cancel-in-progress: true
+
+jobs:
+  packet-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies and reconcile repository lockfile
+        run: npm install
+      - name: Validate rights request and pending-only asset inventory
+        run: npm run test:brf29-rights-request-packet

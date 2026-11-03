@@ -1,0 +1,228 @@
+name: BRF-14 multi-view source-byte intake
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-14-multiview-source-intake.yml"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json"
+      - "src/core/building-generation/brf45-exact-asset-rights-admission.mjs"
+      - "scripts/verify-brf14-multiview-source.mjs"
+      - "scripts/run-brf42-multiview-private-intake.mjs"
+      - "tests/brf42-multiview-private-intake.test.mjs"
+      - "package.json"
+      - "src/core/building-generation/media-intake.mjs"
+      - "src/core/building-generation/media-quality-preflight.mjs"
+      - "docs/research/BRF-42-MULTIVIEW-PRIVATE-INTAKE.md"
+      - "tests/brf14-multiview-source-intake.test.mjs"
+      - "scripts/prepare_brf14_multiview_review.py"
+      - "tests/test_prepare_brf14_multiview_review.py"
+      - "docs/research/BRF-14-MULTIVIEW-CANDIDATE-SAMPLE.md"
+      - "docs/research/BRF-10-SURVEY-BACKED-BENCHMARK-READINESS.md"
+      - "scripts/analyze_brf14_multiview_overlap.py"
+      - "tests/test_analyze_brf14_multiview_overlap.py"
+      - "docs/research/BRF-21-PAIRWISE-IMAGE-OVERLAP.md"
+      - "scripts/brf21_human_review.py"
+      - "tests/test_brf21_human_review.py"
+      - "docs/research/BRF-22-HUMAN-REVIEW-DECISION-CONTRACT.md"
+      - "scripts/brf23_reconstruction_preflight.py"
+      - "tests/test_brf23_reconstruction_preflight.py"
+      - "benchmarks/building-reconstruction/brf-23-reconstruction-preflight-profile.json"
+      - "docs/research/BRF-23-RECONSTRUCTION-PREFLIGHT.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-14-multiview-source-intake-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-multi-view-images:
+    name: Download and verify 16 pinned candidate views
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned image-review dependency
+        run: python -m pip install --disable-pip-version-check "numpy==2.2.6" "opencv-python-headless==4.11.0.86" "Pillow==11.3.0"
+
+      - name: Test fail-closed multi-view byte verifier
+        run: node --test tests/brf14-multiview-source-intake.test.mjs
+
+      - name: Validate verifier CLI
+        run: node scripts/verify-brf14-multiview-source.mjs --help
+
+      - name: Test human-review packet and fail-closed gates
+        run: python -m unittest discover -s tests -p "test_prepare_brf14_multiview_review.py"
+
+      - name: Test pairwise image-overlap triage and fail-closed gates
+        run: python -m unittest discover -s tests -p "test_analyze_brf14_multiview_overlap.py"
+
+      - name: Validate overlap analyzer CLI
+        run: python scripts/analyze_brf14_multiview_overlap.py --help
+
+      - name: Test BRF-22 hash-bound human review decision contract
+        run: python -m unittest discover -s tests -p "test_brf21_human_review.py"
+
+      - name: Validate BRF-22 human-review CLI
+        run: python scripts/brf21_human_review.py --help
+      
+      - name: Test BRF-23 reconstruction preflight and fail-closed behaviour
+        run: python -m unittest discover -s tests -p "test_brf23_reconstruction_preflight.py"
+
+      - name: Validate BRF-23 reconstruction preflight CLI
+        run: python scripts/brf23_reconstruction_preflight.py --help
+
+      - name: Download selected images to ephemeral runner storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/brf14/images" artifacts/brf-14
+          while IFS=$'\t' read -r filename url; do
+            [[ "$filename" =~ ^[A-Za-z0-9_.-]+$ ]] || { echo "Unsafe filename in manifest"; exit 1; }
+            [[ "$url" == https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/* ]] || { echo "Source URL is not allowlisted"; exit 1; }
+            curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+              --connect-timeout 20 --max-time 180 \
+              "$url" --output "$RUNNER_TEMP/brf14/images/$filename"
+          done < <(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const m = JSON.parse(readFileSync("benchmarks/building-reconstruction/brf-14-multiview-source.json", "utf8"));
+            for (const v of m.views) console.log(v.filename + "\t" + v.sourceUrl);
+          ')
+
+      - name: Verify actual bytes and source-frame declarations
+        run: |
+          node scripts/verify-brf14-multiview-source.mjs \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --report artifacts/brf-14/multiview-source-byte-verification.json
+
+      - name: Install FFmpeg from pinned action
+        uses: FedericoCarboni/setup-ffmpeg@37062fbf7149fc5578d6c57e08aed62458b375d6
+        continue-on-error: true
+        with:
+          ffmpeg-version: release
+          architecture: x64
+          linking-type: static
+
+      - name: Ensure FFmpeg is available for private image-quality preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! ffmpeg -hide_banner -version >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg
+          fi
+          ffmpeg -hide_banner -version | head -n 1
+
+      - name: Test BRF-42 private multi-view intake and quality gate
+        run: npm run test:brf42-multiview-private-intake
+
+      - name: Ingest all verified views privately and assess image quality
+        run: |
+          set -euo pipefail
+          node scripts/run-brf42-multiview-private-intake.mjs \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --workspace "$RUNNER_TEMP/brf14" \
+            --report artifacts/brf-14/private-multiview-media-intake-report.json
+
+      - name: Assert multi-view intake remains private and blocked for reconstruction
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf-14/private-multiview-media-intake-report.json", "utf8"));
+          if (report.status !== "private-multiview-preflight-complete-not-reconstruction-approved") {
+            throw new Error("Expected all-view private intake and quality preflight to complete.");
+          }
+          if (report.byteVerification.verifiedViewCount !== 16 ||
+              report.privateMediaIntake.ingestedCount !== 16 ||
+              report.imageQualityPreflight.sourceCount !== 16 ||
+              report.imageQualityPreflight.qualityAnalysisComplete !== true) {
+            throw new Error("All 16 pinned images must be independently reverified, privately ingested and quality-assessed.");
+          }
+          if (report.imageQualityPreflight.rightsApproved !== false ||
+              report.imageQualityPreflight.safeToSubmitToColmap !== false ||
+              report.reviewAndRelease.visualOverlap !== "pending-human-review" ||
+              report.reviewAndRelease.candidateGlbGenerated !== false ||
+              report.reviewAndRelease.reconstructionExecuted !== false) {
+            throw new Error("Multi-view demo data must remain blocked from reconstruction until rights and visual review gates pass.");
+          }
+          if (!report.privateMediaIntake.records.every((record) => record.usageStatus === "unreviewed")) {
+            throw new Error("Every source record must retain usageStatus=unreviewed.");
+          }
+          if (Object.values(report.releaseFlags).some(Boolean)) {
+            throw new Error("BRF-42 must not promote acceptance, publication, map-ready or automatic-approval flags.");
+          }
+          console.log("Verified 16 pinned views, privately ingested 16 records, preflighted all images; no reconstruction or release approval.");
+          NODE
+
+      - name: Generate hash-bound contact sheet and camera-angle coverage plot
+        run: |
+          python scripts/prepare_brf14_multiview_review.py \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+            --output-dir artifacts/brf-14
+
+      - name: Analyze pairwise feature overlap for human triage
+        run: |
+          python scripts/analyze_brf14_multiview_overlap.py \
+            --manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --asset-root "$RUNNER_TEMP/brf14/images" \
+            --verification-report artifacts/brf-14/multiview-source-byte-verification.json \
+            --output-dir artifacts/brf-14
+
+      - name: Stage the exact pinned BRF-14 manifest beside derived review artifacts
+        run: |
+          cp benchmarks/building-reconstruction/brf-14-multiview-source.json artifacts/brf-14/brf-14-multiview-source.json
+          cp benchmarks/building-reconstruction/brf-45-exact-asset-rights-admission.json artifacts/brf-14/brf-45-exact-asset-rights-admission.json
+
+      - name: Generate a blank human-review decision form from verified evidence
+        run: python scripts/brf21_human_review.py template --artifact-root artifacts/brf-14 --output multiview-human-review-decision-template.json
+
+      - name: Assess current real sample and assert it stays blocked
+        run: |
+          python scripts/brf23_reconstruction_preflight.py assess \
+            --artifact-root artifacts/brf-14 \
+            --image-root "$RUNNER_TEMP/brf14/images" \
+            --decision multiview-human-review-decision-template.json \
+            --profile benchmarks/building-reconstruction/brf-23-reconstruction-preflight-profile.json \
+            --output reconstruction-preflight-report.json
+          python -c 'import json; from pathlib import Path; r=json.loads(Path("artifacts/brf-14/reconstruction-preflight-report.json").read_text()); assert r["status"] == "blocked", r["status"]; assert r["assessedInputs"]["sourceImages"]["verifiedCount"] == 16, r["assessedInputs"]["sourceImages"]; assert r["assessedInputs"]["humanDecision"]["validationStatus"] == "invalid-or-pending"; assert r["candidateGlbGenerated"] is False; assert r["reconstructionExecuted"] is False; assert all(r[k] is False for k in ("acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval")); assert any("Human review decision failed validation" in x for x in r["blockers"]); print(json.dumps({"sampleStatus": r["status"], "verifiedImages": r["assessedInputs"]["sourceImages"]["verifiedCount"], "blockerCount": len(r["blockers"]), "candidateGlbGenerated": False}, indent=2))'
+
+      - name: Upload derived review artifacts and blank template only (never raw images)
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-20-multiview-human-review-packet
+          path: |
+            artifacts/brf-14/brf-14-multiview-source.json
+            artifacts/brf-14/brf-45-exact-asset-rights-admission.json
+            artifacts/brf-14/multiview-source-byte-verification.json
+            artifacts/brf-14/private-multiview-media-intake-report.json
+            artifacts/brf-14/multiview-contact-sheet.png
+            artifacts/brf-14/camera-angle-coverage.png
+            artifacts/brf-14/multiview-review-manifest.json
+            artifacts/brf-14/pairwise-overlap-graph.png
+            artifacts/brf-14/pairwise-overlap-report.json
+            artifacts/brf-14/multiview-human-review-decision-template.json
+            artifacts/brf-14/reconstruction-preflight-report.json
+          if-no-files-found: error
+          retention-days: 7

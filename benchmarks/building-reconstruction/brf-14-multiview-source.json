@@ -1,0 +1,537 @@
+{
+  "schemaVersion": "1.0.0",
+  "sampleId": "brf-14-flat-roof-16-view-subset",
+  "evaluationStage": "multiview-source-byte-intake-only",
+  "dataset": {
+    "title": "Drone Building Scans",
+    "datasetUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans",
+    "sourceRepository": "https://github.com/Matt1Up/drone-building-scans-dataset",
+    "sourceRepositoryCommit": "19b3ce9cccf3e8fd414ff705f75d0f2105846fc1",
+    "license": "CC-BY-4.0",
+    "licenseScope": "upstream dataset card/README declare CC BY 4.0 for the imagery; this does not assert a licence for the provided reference GLB, trademarks, or signage",
+    "attribution": "Drone Building Scans — Matthew Guertin, 2026. CC BY 4.0. https://github.com/Matt1Up/drone-building-scans-dataset",
+    "rightsStatus": "source-declared-CC-BY-4.0-for-imagery; exact owner authority not independently authenticated"
+  },
+  "building": {
+    "buildingId": "flat-roof-commercial-01",
+    "sourceDescription": "Source dataset describes this sample as a single-storey commercial building with brick/panel walls, glazed frontage and parking.",
+    "sameBuildingBasis": "all selected views belong to the upstream flat-roof capture and source COLMAP model; this is source identity evidence, not an independent survey.",
+    "fullImageCount": 951,
+    "upstreamRegisteredImageCount": 951
+  },
+  "upstreamFiles": {
+    "imageInventoryUrl": "https://raw.githubusercontent.com/Matt1Up/drone-building-scans-dataset/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/images.csv",
+    "checksumListUrl": "https://raw.githubusercontent.com/Matt1Up/drone-building-scans-dataset/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/manifest/flat-roof/checksums.sha256",
+    "colmapImagesUrl": "https://raw.githubusercontent.com/Matt1Up/drone-building-scans-dataset/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/poses/flat-roof/colmap/images.txt",
+    "colmapCamerasUrl": "https://raw.githubusercontent.com/Matt1Up/drone-building-scans-dataset/19b3ce9cccf3e8fd414ff705f75d0f2105846fc1/poses/flat-roof/colmap/cameras.txt",
+    "metadataCommit": "19b3ce9cccf3e8fd414ff705f75d0f2105846fc1"
+  },
+  "coordinateFrameMetadata": {
+    "gps": {
+      "frame": "WGS 84 geographic coordinates as reported in the source image inventory/EXIF",
+      "horizontalCrs": "EPSG:4326 presumed from GPS latitude/longitude; not an authoritative surveyed control frame",
+      "verticalDatum": "not declared; altitude is retained as source metadata only"
+    },
+    "colmap": {
+      "frameId": "drone-building-scans/flat-roof/source-colmap-world-frame",
+      "units": "metres nominal, source notes metric scaling via 1.997 m AprilTag control bar",
+      "epsg": null,
+      "verticalDatum": null,
+      "axisConvention": "local photogrammetry frame; no EPSG or validated up-axis mapping to the GPS frame declared",
+      "registrationToGps": "not established by this intake"
+    },
+    "note": "COLMAP camera centres were derived from source images.txt world-to-camera poses using C=-R^T t. View azimuth/elevation and look-angle fields are relative to the mean camera-centre of the complete 951-frame source reconstruction, not a measured building centroid."
+  },
+  "selectionMethod": {
+    "name": "pose-aware azimuth coverage subset",
+    "expectedViewCount": 16,
+    "description": "Selected 16 views with broad camera-position azimuth coverage and camera forward directions generally aimed toward the mean camera-centre of the pinned source COLMAP reconstruction.",
+    "limitations": [
+      "The view-selection heuristic is not visual overlap review.",
+      "The mean camera-centre is not asserted to be the building centroid.",
+      "The source COLMAP model is not independent survey truth."
+    ]
+  },
+  "maximumImageBytes": 104857600,
+  "maximumTotalBytes": 314572800,
+  "expectedTotalBytes": 181235712,
+  "views": [
+    {
+      "id": "flat-roof-view-01",
+      "filename": "DJI_20260822191304_0654_D.JPG",
+      "localPath": "DJI_20260822191304_0654_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191304_0654_D.JPG",
+      "expectedByteSize": 9211904,
+      "expectedSha256": "1b566af1cca35cb435d34f71da0211907abe85211392fd41dde39502985e0544",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:13:04",
+      "gps": {
+        "latitude": 45.0518355833333,
+        "longitude": -93.3908835555556,
+        "altitudeM": 256.318,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 939,
+        "cameraCenterLocalM": [
+          -19.5,
+          -25.78,
+          3.24
+        ],
+        "centerAzimuthDegrees": 236.4,
+        "centerElevationDegrees": -13.8,
+        "lookAngleToCaptureCenterDegrees": 6.6
+      }
+    },
+    {
+      "id": "flat-roof-view-02",
+      "filename": "DJI_20260822191009_0607_D.JPG",
+      "localPath": "DJI_20260822191009_0607_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191009_0607_D.JPG",
+      "expectedByteSize": 10002432,
+      "expectedSha256": "2e5f7e362f0efe19c015c794a0d4f8afdfab6afb47f80988641e7e34dbaeefa2",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:10:09",
+      "gps": {
+        "latitude": 45.051835,
+        "longitude": -93.3909084444444,
+        "altitudeM": 264.918,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 892,
+        "cameraCenterLocalM": [
+          7.82,
+          -32.06,
+          3.81
+        ],
+        "centerAzimuthDegrees": 287.2,
+        "centerElevationDegrees": -11.9,
+        "lookAngleToCaptureCenterDegrees": 10.5
+      }
+    },
+    {
+      "id": "flat-roof-view-03",
+      "filename": "DJI_20260822191240_0646_D.JPG",
+      "localPath": "DJI_20260822191240_0646_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191240_0646_D.JPG",
+      "expectedByteSize": 9564160,
+      "expectedSha256": "248f9847833c03ed8e70c78da8c2be630dcf26a48c004f64dd5f1f03215af3fe",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:12:40",
+      "gps": {
+        "latitude": 45.0518925833333,
+        "longitude": -93.3908832222222,
+        "altitudeM": 259.718,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 931,
+        "cameraCenterLocalM": [
+          -4.58,
+          -25.72,
+          3.21
+        ],
+        "centerAzimuthDegrees": 264.8,
+        "centerElevationDegrees": -16.5,
+        "lookAngleToCaptureCenterDegrees": 10.6
+      }
+    },
+    {
+      "id": "flat-roof-view-04",
+      "filename": "DJI_20260822185943_0446_D.JPG",
+      "localPath": "DJI_20260822185943_0446_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822185943_0446_D.JPG",
+      "expectedByteSize": 11218944,
+      "expectedSha256": "d8a1e499e5f9f0842205a82034ddb61443d1d394404881855897cf54f24778ff",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:59:43",
+      "gps": {
+        "latitude": 45.0518765555556,
+        "longitude": -93.3908481388889,
+        "altitudeM": 262.754,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 731,
+        "cameraCenterLocalM": [
+          -23.54,
+          -1.24,
+          3
+        ],
+        "centerAzimuthDegrees": 184.1,
+        "centerElevationDegrees": -20.4,
+        "lookAngleToCaptureCenterDegrees": 11.3
+      }
+    },
+    {
+      "id": "flat-roof-view-05",
+      "filename": "DJI_20260822185046_0287_D.JPG",
+      "localPath": "DJI_20260822185046_0287_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822185046_0287_D.JPG",
+      "expectedByteSize": 11493376,
+      "expectedSha256": "05d1a54880bcf647a02ebf376a1b05008ca2068a64db1deffb51fad8af70d64b",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:50:46",
+      "gps": {
+        "latitude": 45.0518173055556,
+        "longitude": -93.3908956666667,
+        "altitudeM": 262.654,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 572,
+        "cameraCenterLocalM": [
+          11.58,
+          -31.55,
+          3.83
+        ],
+        "centerAzimuthDegrees": 293.4,
+        "centerElevationDegrees": -11.6,
+        "lookAngleToCaptureCenterDegrees": 11.3
+      }
+    },
+    {
+      "id": "flat-roof-view-06",
+      "filename": "DJI_20260822191213_0637_D.JPG",
+      "localPath": "DJI_20260822191213_0637_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191213_0637_D.JPG",
+      "expectedByteSize": 10301440,
+      "expectedSha256": "f7272eea714b45f35c4efe56dc3dff5c503153bcd3d889ab50456f5268db9321",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:12:13",
+      "gps": {
+        "latitude": 45.0518253611111,
+        "longitude": -93.3909252777778,
+        "altitudeM": 262.418,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 922,
+        "cameraCenterLocalM": [
+          -23.47,
+          0.93,
+          2.98
+        ],
+        "centerAzimuthDegrees": 178.2,
+        "centerElevationDegrees": -20.5,
+        "lookAngleToCaptureCenterDegrees": 12.7
+      }
+    },
+    {
+      "id": "flat-roof-view-07",
+      "filename": "DJI_20260822191024_0612_D.JPG",
+      "localPath": "DJI_20260822191024_0612_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191024_0612_D.JPG",
+      "expectedByteSize": 10186752,
+      "expectedSha256": "4fc2f9907d9261d2dd1d9f3f7d804a028225144debbae11eb5c981707b768045",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:10:24",
+      "gps": {
+        "latitude": 45.0519191666667,
+        "longitude": -93.3909131944445,
+        "altitudeM": 265.018,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 897,
+        "cameraCenterLocalM": [
+          -21.58,
+          18.2,
+          2.95
+        ],
+        "centerAzimuthDegrees": 137.2,
+        "centerElevationDegrees": -16.8,
+        "lookAngleToCaptureCenterDegrees": 16.4
+      }
+    },
+    {
+      "id": "flat-roof-view-08",
+      "filename": "DJI_20260822184120_0127_D.JPG",
+      "localPath": "DJI_20260822184120_0127_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822184120_0127_D.JPG",
+      "expectedByteSize": 11567104,
+      "expectedSha256": "4e7bd17697a467564d876c673b171081c504b28e623c885715122e2c47ceb90c",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:41:20",
+      "gps": {
+        "latitude": 45.0517071944444,
+        "longitude": -93.3909956111111,
+        "altitudeM": 262.554,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 412,
+        "cameraCenterLocalM": [
+          9.3,
+          17.08,
+          3.27
+        ],
+        "centerAzimuthDegrees": 55.6,
+        "centerElevationDegrees": -20.6,
+        "lookAngleToCaptureCenterDegrees": 18.2
+      }
+    },
+    {
+      "id": "flat-roof-view-09",
+      "filename": "DJI_20260822183700_0049_D.JPG",
+      "localPath": "DJI_20260822183700_0049_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822183700_0049_D.JPG",
+      "expectedByteSize": 12374016,
+      "expectedSha256": "6437d0c3379a2f976c2740c585eef2a121b944ee0e5c44aae8b83d13321f19a4",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:37:00",
+      "gps": {
+        "latitude": 45.0517878055556,
+        "longitude": -93.3909456944444,
+        "altitudeM": 256.654,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 334,
+        "cameraCenterLocalM": [
+          -13.5,
+          22.67,
+          3
+        ],
+        "centerAzimuthDegrees": 116.7,
+        "centerElevationDegrees": -17.6,
+        "lookAngleToCaptureCenterDegrees": 21.3
+      }
+    },
+    {
+      "id": "flat-roof-view-10",
+      "filename": "DJI_20260822190156_0485_D.JPG",
+      "localPath": "DJI_20260822190156_0485_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822190156_0485_D.JPG",
+      "expectedByteSize": 11374592,
+      "expectedSha256": "2244e596d78fc3667757a701af12f7e60c9b3ec7e961f66c6253f4ff94780bfd",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:01:56",
+      "gps": {
+        "latitude": 45.0519105555556,
+        "longitude": -93.3909646666667,
+        "altitudeM": 263.654,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 770,
+        "cameraCenterLocalM": [
+          -0.25,
+          24.78,
+          3.24
+        ],
+        "centerAzimuthDegrees": 85.4,
+        "centerElevationDegrees": -17.4,
+        "lookAngleToCaptureCenterDegrees": 21.4
+      }
+    },
+    {
+      "id": "flat-roof-view-11",
+      "filename": "DJI_20260822191252_0650_D.JPG",
+      "localPath": "DJI_20260822191252_0650_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822191252_0650_D.JPG",
+      "expectedByteSize": 9363456,
+      "expectedSha256": "ca76ab690bb101e66816f38a0e18532dfbf8932247b52dd008fdc74c4b0eaec9",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T19:12:52",
+      "gps": {
+        "latitude": 45.0519153055556,
+        "longitude": -93.3908926111111,
+        "altitudeM": 256.718,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 935,
+        "cameraCenterLocalM": [
+          14.71,
+          16.97,
+          4.91
+        ],
+        "centerAzimuthDegrees": 44.6,
+        "centerElevationDegrees": -14.2,
+        "lookAngleToCaptureCenterDegrees": 21.6
+      }
+    },
+    {
+      "id": "flat-roof-view-12",
+      "filename": "DJI_20260822185934_0443_D.JPG",
+      "localPath": "DJI_20260822185934_0443_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822185934_0443_D.JPG",
+      "expectedByteSize": 11976704,
+      "expectedSha256": "77c534a1139608fff199c7d98e24c22c0f984274536ca8573ddcfda8864fd06e",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:59:34",
+      "gps": {
+        "latitude": 45.0518825277778,
+        "longitude": -93.3909113611111,
+        "altitudeM": 262.754,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 728,
+        "cameraCenterLocalM": [
+          -22.65,
+          -9.37,
+          3.11
+        ],
+        "centerAzimuthDegrees": 205.3,
+        "centerElevationDegrees": -19.1,
+        "lookAngleToCaptureCenterDegrees": 22.1
+      }
+    },
+    {
+      "id": "flat-roof-view-13",
+      "filename": "DJI_20260822185122_0295_D.JPG",
+      "localPath": "DJI_20260822185122_0295_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822185122_0295_D.JPG",
+      "expectedByteSize": 15527936,
+      "expectedSha256": "6db2e1ac972bb53804adb021cd41df46dfd0fbd0e9bcde0f1c027bd9bbdf0a14",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:51:22",
+      "gps": {
+        "latitude": 45.05184175,
+        "longitude": -93.3910466111111,
+        "altitudeM": 262.654,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 580,
+        "cameraCenterLocalM": [
+          19.15,
+          3.05,
+          5.03
+        ],
+        "centerAzimuthDegrees": 7.4,
+        "centerElevationDegrees": -15.3,
+        "lookAngleToCaptureCenterDegrees": 24.8
+      }
+    },
+    {
+      "id": "flat-roof-view-14",
+      "filename": "DJI_20260822185425_0348_D.JPG",
+      "localPath": "DJI_20260822185425_0348_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822185425_0348_D.JPG",
+      "expectedByteSize": 15745024,
+      "expectedSha256": "242acec1532c396b11764ec341faf21e142c682e9e3731829b16e43575f40a0e",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:54:25",
+      "gps": {
+        "latitude": 45.0518536111111,
+        "longitude": -93.3910297222222,
+        "altitudeM": 262.754,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 633,
+        "cameraCenterLocalM": [
+          19.27,
+          -0.37,
+          5.08
+        ],
+        "centerAzimuthDegrees": 358.3,
+        "centerElevationDegrees": -15.3,
+        "lookAngleToCaptureCenterDegrees": 25.6
+      }
+    },
+    {
+      "id": "flat-roof-view-15",
+      "filename": "DJI_20260822181802_0730_D.JPG",
+      "localPath": "DJI_20260822181802_0730_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822181802_0730_D.JPG",
+      "expectedByteSize": 10727424,
+      "expectedSha256": "dfd9166c891c2dcba6ddadbeab72b7f18203077a3c1e1f802fba4d7d6e75e4b1",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:18:02",
+      "gps": {
+        "latitude": 45.05190425,
+        "longitude": -93.3909395277778,
+        "altitudeM": 244.645,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 17,
+        "cameraCenterLocalM": [
+          -2.22,
+          25.96,
+          3.06
+        ],
+        "centerAzimuthDegrees": 90,
+        "centerElevationDegrees": -17,
+        "lookAngleToCaptureCenterDegrees": 27.3
+      }
+    },
+    {
+      "id": "flat-roof-view-16",
+      "filename": "DJI_20260822182454_0861_D.JPG",
+      "localPath": "DJI_20260822182454_0861_D.JPG",
+      "sourceUrl": "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/DJI_20260822182454_0861_D.JPG",
+      "expectedByteSize": 10600448,
+      "expectedSha256": "9f9916931c833c55dafc8776d2c6ead8af276d88e20666d451549f027effb448",
+      "mediaType": "image/jpeg",
+      "declaredWidth": 4096,
+      "declaredHeight": 3072,
+      "capturedAt": "2026-08-22T18:24:54",
+      "gps": {
+        "latitude": 45.0516619722222,
+        "longitude": -93.3915451666667,
+        "altitudeM": 247.745,
+        "verticalDatum": "not declared"
+      },
+      "colmapPose": {
+        "imageId": 148,
+        "cameraCenterLocalM": [
+          21.96,
+          -10.68,
+          14.38
+        ],
+        "centerAzimuthDegrees": 335.6,
+        "centerElevationDegrees": 7.4,
+        "lookAngleToCaptureCenterDegrees": 33.6
+      }
+    }
+  ],
+  "knownLimitations": [
+    "This is a candidate-image sample only; no candidate GLB is produced by this intake workflow.",
+    "Source-declared CC BY 4.0 licence and attribution are recorded, but owner authority is not independently authenticated.",
+    "GPS altitude vertical datum is not declared, and no transform between source GPS coordinates and the local COLMAP frame is admitted.",
+    "The provided GLB/OBJ were produced from the same image set and must not be used as independent held-out truth.",
+    "The 1.997 m AprilTag bar was a reconstruction scale control, not an independent held-out building accuracy check.",
+    "No separately surveyed reference, six held-out checkpoints, or accuracy metrics are included.",
+    "All acceptance, publication, map readiness and automatic-approval flags must remain false."
+  ],
+  "acceptanceEligible": false,
+  "publicationEligible": false,
+  "mapReady": false,
+  "automaticApproval": false
+}

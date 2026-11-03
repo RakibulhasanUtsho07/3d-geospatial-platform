@@ -1,0 +1,62 @@
+name: BRF-36 exact source-byte verifier
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf36-source-byte-verifier.yml"
+      - "src/core/building-generation/brf36-source-byte-verifier.mjs"
+      - "scripts/verify-brf36-source-assets.mjs"
+      - "tests/brf36-source-byte-verifier.test.mjs"
+      - "tests/brf36-source-byte-verifier-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-36-source-assets.json"
+      - "docs/research/BRF-36-SOURCE-ASSET-BYTE-VERIFIER.md"
+      - "package.json"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf36-source-byte-verifier.yml"
+      - "src/core/building-generation/brf36-source-byte-verifier.mjs"
+      - "scripts/verify-brf36-source-assets.mjs"
+      - "tests/brf36-source-byte-verifier.test.mjs"
+      - "tests/brf36-source-byte-verifier-cli.test.mjs"
+      - "benchmarks/building-reconstruction/brf-36-source-assets.json"
+      - "docs/research/BRF-36-SOURCE-ASSET-BYTE-VERIFIER.md"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf36-source-byte-verifier
+  cancel-in-progress: true
+
+jobs:
+  source-byte-verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test local asset-byte verification and safety contract
+        run: npm run test:brf36-source-byte-verifier
+      - name: Confirm the real source set stays blocked without private asset bytes
+        run: |
+          mkdir -p artifacts
+          node scripts/verify-brf36-source-assets.mjs benchmarks/building-reconstruction/brf-36-source-assets.json --asset-root . --report artifacts/brf36-source-byte-report.json > artifacts/brf36-source-byte-summary.json || test "$?" -eq 2
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/brf36-source-byte-summary.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The real asset set must remain blocked.");
+          if (report.verifiedAssetCount !== 0) throw new Error("No private source bytes were supplied to this workflow.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("Release flags must remain false.");
+          for (const expected of ["asset-tum-citygml-4959323-file", "asset-matched-image-frames-acquisition", "asset-matched-uls-crop-acquisition"]) {
+            if (!report.blockers.includes(expected)) throw new Error("Expected source-byte blocker missing: " + expected);
+          }
+          console.log("Real source asset bytes remain blocked; no private assets were present or uploaded.");
+          NODE

@@ -3,6 +3,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { access, lstat, mkdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Transform } from "node:stream";
+import { SOURCE_OPERATION_SCOPES } from "./source-operation-scopes.mjs";
 import { pipeline } from "node:stream/promises";
 
 const MAX_BYTES = { image: 20 * 1024 * 1024, video: 500 * 1024 * 1024, "floor-plan": 50 * 1024 * 1024, "video-frame": 20 * 1024 * 1024, auto: 500 * 1024 * 1024 };
@@ -59,6 +60,17 @@ function buildMetadata(options, detectedMime, hash, byteSize, relativePath) {
     usageStatus: optionalText(options.usageStatus, "usageStatus", 40) ?? "unreviewed",
     licence: optionalText(options.licence, "licence", 500) ?? "unknown",
   };
+  if (options.permittedOperations !== undefined) {
+    const knownScopes = new Set(SOURCE_OPERATION_SCOPES);
+    if (!Array.isArray(options.permittedOperations) || options.permittedOperations.length < 1 ||
+        options.permittedOperations.length > knownScopes.size ||
+        options.permittedOperations.some(scope => typeof scope !== "string" || !knownScopes.has(scope)) ||
+        new Set(options.permittedOperations).size !== options.permittedOperations.length) {
+      throw new TypeError("permittedOperations must contain unique recognized source operation scopes");
+    }
+    record.permittedOperations = [...options.permittedOperations].sort();
+    if (options.parentSourceId) record.operationScopesInheritedFrom = options.parentSourceId;
+  }
   for (const key of ["title", "author", "attribution", "capturedAt", "description", "providerId", "parentSourceId"]) {
     const value = optionalText(options[key], key, key === "description" ? 2000 : 500);
     if (value !== undefined) record[key] = value;
@@ -141,6 +153,7 @@ export function toBuildingSpecSource(record) {
   return {
     id: record.id, kind: record.kind, title: record.title ?? record.id, assetId: record.assetId,
     usageStatus: record.usageStatus ?? "unreviewed", licence: record.licence ?? "unknown",
+    ...(Array.isArray(record.permittedOperations) ? { permittedOperations: [...record.permittedOperations] } : {}),
     ...(record.url ? { url: record.url } : {}), ...(record.author ? { author: record.author } : {}),
     ...(record.attribution ? { attribution: record.attribution } : {}), ...(record.capturedAt ? { capturedAt: record.capturedAt } : {}),
     ...(record.location ? { location: record.location } : {}),

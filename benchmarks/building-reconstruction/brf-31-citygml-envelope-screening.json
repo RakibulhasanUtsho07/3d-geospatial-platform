@@ -1,0 +1,980 @@
+{
+  "schemaVersion": "1.0.0",
+  "evaluationId": "BRF-32-PERSISTED-CITYGML-ENVELOPE-SCREENING",
+  "status": "metadata-screening-complete-identity-and-frame-blocked",
+  "observedAt": "2026-10-28",
+  "source": {
+    "project": "tum-gis/tum2twin-datasets",
+    "projectId": 152545,
+    "commit": "e032a71fc9b3c9c3d4869e3aca9677d1234086aa",
+    "catalogPath": "citygml/lod3-building-datasets",
+    "licenseFileSha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
+    "workflowRun": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40644356209",
+    "workflowArtifact": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40644356209/artifacts/12796359138",
+    "artifactZipSha256": "e7845fc7d3dff6f421a16123930f1f3566892b66436c22e2a2c5f10ed2675dd1"
+  },
+  "probePolicy": {
+    "modelsProbed": 27,
+    "maxPrefixBytesPerModel": 131072,
+    "fullGmlPayloadDownloaded": false,
+    "fullObjectHashVerified": false
+  },
+  "ulsHeaderBoundsForDiscoveryOnly": {
+    "minX": 690787.9737446384,
+    "maxX": 691169.3342446384,
+    "minY": 5335827.531815179,
+    "maxY": 5336383.198915179,
+    "minZ": 530.5947850988182,
+    "maxZ": 606.4985850988182
+  },
+  "guideExamplePoint": {
+    "x": 691045.978,
+    "y": 5336015.44,
+    "z": 519.269,
+    "srsName": "EPSG:25832",
+    "sourceUrl": "https://tum2t.win/tutorials/cm-3dcitydb",
+    "kind": "documentation-example-query-point-not-survey-control"
+  },
+  "summary": {
+    "modelsProbed": 27,
+    "completeEnvelopesFound": 27,
+    "srsNameCounts": {
+      "EPSG:25832": 27
+    },
+    "overlappingBroadUlsBounds": 27,
+    "containsGuidePointXY": 1,
+    "containsGuidePointXYZ": 1,
+    "earlyBuildingIdsHaveLod2SameSuffix": 26,
+    "filenameToBuildingIdPatternException": [
+      {
+        "filename": "DEBY_LOD3_4907518.gml",
+        "earlyBuildingGmlIds": [
+          "_DEBY_LOD3_4907518_BD.6OfditDVD3v039io6LmF"
+        ]
+      }
+    ],
+    "candidateInvestigationLead": "DEBY_LOD3_4959457.gml",
+    "leadStatus": "unselected-point-containment-only",
+    "verticalWarning": {
+      "guidePointZ": 519.269,
+      "ulsGlobalMinZ": 530.5947850988182,
+      "pointBelowUlsGlobalMinZMeters": 11.326,
+      "interpretedAsAccuracyError": false
+    },
+    "note": "Broad XY bounds overlap all 27 envelopes and are not selective. The guide query point lies in one XYZ envelope, but it is not documented as an independent building control."
+  },
+  "models": [
+    {
+      "filename": "DEBY_LOD3_4906965.gml",
+      "repositoryBlobId": "abb32454c304035ef3287d5645a525cdaa0ee239",
+      "lfsDeclaredSha256": "9a8aa5dba712f6162f440004119665e8f9724c029d589e2917439a6c840f532a",
+      "lfsDeclaredBytes": 64036220,
+      "prefixBytes": 131072,
+      "prefixSha256": "7e1a24bac33ebe2d413f642f414e8e31905937b996ef4c12648a2a047f8a3a5e",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906965"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690825.325,
+        5335937.727,
+        514.67
+      ],
+      "upperCorner": [
+        690929.661,
+        5336024.632,
+        552.316
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906966.gml",
+      "repositoryBlobId": "ece1d474b5d3ee0b6faf13d7e1daf4ecb61e07b7",
+      "lfsDeclaredSha256": "818a553387a4fdd1e0559b53cc22e3feb3cc0352c6eaeeaf1a1a2e8d7d263496",
+      "lfsDeclaredBytes": 55514947,
+      "prefixBytes": 131072,
+      "prefixSha256": "b60d5b3a2cbbb1368b213d2dfba99c046fa883d6a61349dceceb426f711cdf1c",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906966"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690845.161,
+        5336017.213,
+        514.875
+      ],
+      "upperCorner": [
+        690892.64,
+        5336102.177,
+        542.417
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906970.gml",
+      "repositoryBlobId": "42a0def4fa5caface90fe60b41c46d7a8873db11",
+      "lfsDeclaredSha256": "dc3124956fd840d2f905a255fd825d85e13b43d856429667b7a7ce54d5561dc9",
+      "lfsDeclaredBytes": 2858169,
+      "prefixBytes": 131072,
+      "prefixSha256": "91bd4afb00e90ddf62480576a8d1d060849468937d66de6f3014947eb35b4fea",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906970"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690921.672,
+        5335933.953,
+        514.82
+      ],
+      "upperCorner": [
+        690938.275,
+        5335950.174,
+        535.964
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906972.gml",
+      "repositoryBlobId": "ee70d80a23940ad66656ee1b338002ede637ded7",
+      "lfsDeclaredSha256": "e9f2e93bdeabb1f431f61ae31dfd37eae851876386de93a909d3f805835bdb5d",
+      "lfsDeclaredBytes": 13731696,
+      "prefixBytes": 131072,
+      "prefixSha256": "cf01e46622e189059be1e099b136645368b1e383efb0557ac24ba8d025cbb7f1",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906972"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690933.049,
+        5335923.121,
+        515
+      ],
+      "upperCorner": [
+        690964.504,
+        5335947.965,
+        535.16
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906976.gml",
+      "repositoryBlobId": "c093499de814cff9b746fb7239971fbf7bc81cda",
+      "lfsDeclaredSha256": "5173eb69969919e69daf238ddc82647195bcff1a8f01e352fcdcdaff9e855d5e",
+      "lfsDeclaredBytes": 16101777,
+      "prefixBytes": 131072,
+      "prefixSha256": "738ae1320ed74b2c8821347fe6f5b6bf4d1fb5c0195ab28c6bf9c65e93e08a3a",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906976"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690960.55,
+        5335914.447,
+        515.08
+      ],
+      "upperCorner": [
+        690989.3,
+        5335934.247,
+        535.342
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906978.gml",
+      "repositoryBlobId": "1e150f6b8db1276046f3a3a2e55d384a3f8b39f4",
+      "lfsDeclaredSha256": "609e6d26afb7efc36659b21839c19b593c97ad131701a5db5d4e3b9a72c6fcff",
+      "lfsDeclaredBytes": 4161805,
+      "prefixBytes": 131072,
+      "prefixSha256": "4f28c843bb7f17a444b598fdfbd08fb667493399e1240ea5619085168b0e9050",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906978"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690992.122,
+        5335960.613,
+        515.9
+      ],
+      "upperCorner": [
+        691002.255,
+        5335975.311,
+        537.904
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906979.gml",
+      "repositoryBlobId": "dc996a492f9c30d338f2f4550a6a52b2a2efaaaf",
+      "lfsDeclaredSha256": "1b4cbd3b19e6b3888b4876e9f3fcb47629b1eb194d2170cb2312a11413d29747",
+      "lfsDeclaredBytes": 8308995,
+      "prefixBytes": 131072,
+      "prefixSha256": "7c69bb4bdde51007741b065c5f04da0bf0483520b5cb6f2c6a30e6955e292cb8",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906979"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690997.246,
+        5335958.473,
+        515.54
+      ],
+      "upperCorner": [
+        691007.694,
+        5335973.355,
+        536.806
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906980.gml",
+      "repositoryBlobId": "79666bcb258ec7328d0889ca82f320be6f3640a5",
+      "lfsDeclaredSha256": "4a0afbd62e057f72d5faf21f50cb04feb69cd2d6e1e988dd4007bfe02e9c9c2c",
+      "lfsDeclaredBytes": 82569402,
+      "prefixBytes": 131072,
+      "prefixSha256": "f37d4ad190d4699bf1dd8ed01a171026ff81f14c67bd77617269c4028cbd70c9",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906980"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690997.142,
+        5335971.159,
+        515.45
+      ],
+      "upperCorner": [
+        691009.158,
+        5335979.038,
+        522.24
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4906981.gml",
+      "repositoryBlobId": "c8115287980196ac045ab609b108b9b58fe44460",
+      "lfsDeclaredSha256": "943c903fa4f9661f22707bc2cd1c59be81940b83dbdf8934206083b3edeeea0c",
+      "lfsDeclaredBytes": 50414963,
+      "prefixBytes": 131072,
+      "prefixSha256": "9d2175462d293d31a242b4e6e229ea0f5abb19291c367b005af3ee448d18330c",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4906981"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690983.701,
+        5335905.639,
+        514.93
+      ],
+      "upperCorner": [
+        691028.914,
+        5335976.896,
+        537.87
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907506.gml",
+      "repositoryBlobId": "0466e4cecd9aab984f2b583a22ae022b6144c8c2",
+      "lfsDeclaredSha256": "a3f8823d3ca093967709d1cb809ac35a4ef44c0f7c1bae2610babf95fc25aff5",
+      "lfsDeclaredBytes": 1771641,
+      "prefixBytes": 131072,
+      "prefixSha256": "5f03dcf0241312143ad121089fdb93802c654ce094edd00e052ab9d0eb80528d",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907506"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690814.835,
+        5335938.577,
+        513.62
+      ],
+      "upperCorner": [
+        690840.101,
+        5335958.845,
+        536.549
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907507.gml",
+      "repositoryBlobId": "b344d2ac9737afd1e17ab26b0ba667f8c325fe28",
+      "lfsDeclaredSha256": "68ce9d2909aa91646eddcfe68602a2523a4be5c9b88c0e768951740e793fe60c",
+      "lfsDeclaredBytes": 18006585,
+      "prefixBytes": 131072,
+      "prefixSha256": "f90571bc07a9a4d0441b14a75b3f6021a68f053729b5dd1b86d21e19c4788fc9",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907507.vQDkhxV4K4VmAMc7aFaV"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690835.535,
+        5335931.105,
+        515.119
+      ],
+      "upperCorner": [
+        690860.924,
+        5335951.291,
+        536.21
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907514.gml",
+      "repositoryBlobId": "73c67dd5eff3c9b1eab11a2e28780d8d70cc86af",
+      "lfsDeclaredSha256": "f3b01eb17319e94112e1c00a535624c0ad9488ad95a2408a88a35b929fd02a81",
+      "lfsDeclaredBytes": 13318877,
+      "prefixBytes": 131072,
+      "prefixSha256": "c45d42ce62057958be2ce2f4697c5c76374734e72414613f888163b0310bdb14",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907514"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690852.191,
+        5335916.299,
+        515.1
+      ],
+      "upperCorner": [
+        690873.91,
+        5335943.36,
+        537.776
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907515.gml",
+      "repositoryBlobId": "41e14cb085f70677b51b2b2f804e78db5b62821c",
+      "lfsDeclaredSha256": "956c7e5abe1f2c9fa8aa8230b2d5b84bd46b6a515b45d840b573be1ca940d321",
+      "lfsDeclaredBytes": 11443639,
+      "prefixBytes": 131072,
+      "prefixSha256": "d60ecce3dba546eac55c143f1797e1b83bd3ec962e62309c84dab898d1c72b5a",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907515"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690865.686,
+        5335911.674,
+        515
+      ],
+      "upperCorner": [
+        690887.75,
+        5335938.516,
+        533.499
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907516.gml",
+      "repositoryBlobId": "2bcfa28197612ac0c2938a3352d8500d79d349a5",
+      "lfsDeclaredSha256": "6d4d7ec8a19491ae16b5243aa5f134c6af9a20e24b7dd05caccdcba47d0cb004",
+      "lfsDeclaredBytes": 5485324,
+      "prefixBytes": 131072,
+      "prefixSha256": "7b068d2fd2a9c976fd3a4f9bd606631d0eec820e74b9b54925ecdd010c76bdea",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907516"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690887.555,
+        5335912.849,
+        515.06
+      ],
+      "upperCorner": [
+        690904.915,
+        5335931.133,
+        530.69
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907517.gml",
+      "repositoryBlobId": "3820bd7517430f941ce05a910cd763aa00bf9e66",
+      "lfsDeclaredSha256": "b0a7a3e25ed9e5d9aeef490c27553f9223ad2b4cd47fff3ab7c9a477af7f5f21",
+      "lfsDeclaredBytes": 10043684,
+      "prefixBytes": 131072,
+      "prefixSha256": "3a1776499b22b597f31748ef0ba1df8718e4b5d9f1b79d2193d8978edf894b40",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907517"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690899.786,
+        5335906.976,
+        515.11
+      ],
+      "upperCorner": [
+        690917.979,
+        5335926.71,
+        530.68
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907518.gml",
+      "repositoryBlobId": "20759d9d2e1264080d4cf2566e664bae403a14da",
+      "lfsDeclaredSha256": "cf7ed0abff8cf27064d240734e6de21d334ebf04e7dca3a12f377308ae545bb5",
+      "lfsDeclaredBytes": 3700309,
+      "prefixBytes": 131072,
+      "prefixSha256": "9cb700f47232538acf2a62a7be11e2a038081ea0ed0ace13c3dc13c3f763ff8f",
+      "earlyBuildingGmlIds": [
+        "_DEBY_LOD3_4907518_BD.6OfditDVD3v039io6LmF"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690917.091,
+        5335897.757,
+        515.07
+      ],
+      "upperCorner": [
+        690937.976,
+        5335919.715,
+        532.36
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": true,
+      "earlyBuildingIdHasLod2SameSuffix": false,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907520.gml",
+      "repositoryBlobId": "b0dc6e17da183eecfbacf20cd9e7dd9bef43ed6f",
+      "lfsDeclaredSha256": "e5de3f7c502677d7db19b9643a352e425559b4b6a60c72d3c8923b324b187a1c",
+      "lfsDeclaredBytes": 25243034,
+      "prefixBytes": 131072,
+      "prefixSha256": "1646a730a0bbe2bd2de74425355cfb251986ee6a00259e7714bbbeab902022e1",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907520"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690955.01,
+        5335883.167,
+        514.87
+      ],
+      "upperCorner": [
+        690976.143,
+        5335905.28,
+        532.766
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4907521.gml",
+      "repositoryBlobId": "7ff5a4df61095c4237e822a16f1121fbe04eeaff",
+      "lfsDeclaredSha256": "61d6fbe1799b98ec1bbad170946ac792283cfc069ee1684cfd578ff945338e6c",
+      "lfsDeclaredBytes": 25953323,
+      "prefixBytes": 131072,
+      "prefixSha256": "d61c7b72b3b84d8447343cb5f42381dab4fd576f48d7bf9c4767d086d62986cb",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4907521"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690973.994,
+        5335874.293,
+        515.26
+      ],
+      "upperCorner": [
+        690997.662,
+        5335897.908,
+        533.576
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959321.gml",
+      "repositoryBlobId": "763bab501c1158c7c30e4a0c104795b4ecc6979c",
+      "lfsDeclaredSha256": "f889b28101646ea9b109a74cb3b6b8d26a7eb00554613b1a8148bfa4038b2490",
+      "lfsDeclaredBytes": 8302603,
+      "prefixBytes": 131072,
+      "prefixSha256": "568299dd41864fd7dfda19fbaf0335ed742f09b88b95a0e5ac6131bab18d3372",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959321"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691042.684,
+        5336073.708,
+        514.25
+      ],
+      "upperCorner": [
+        691053.037,
+        5336088.327,
+        536.156
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959322.gml",
+      "repositoryBlobId": "99cf596b223a88619f5cdd091b989c567dde9235",
+      "lfsDeclaredSha256": "2a3cef07987abf49b1a4cb671bfb6859fe3462a717f7e881ac33e43b47255b91",
+      "lfsDeclaredBytes": 9864712,
+      "prefixBytes": 131072,
+      "prefixSha256": "6a4584cd8f1ffc0f455f5763ab1e75aac1524bf67d34f4f3adca9f5eb6a53363",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959322"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691040.133,
+        5336116.984,
+        514.377
+      ],
+      "upperCorner": [
+        691070.582,
+        5336140.75,
+        536.252
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959323.gml",
+      "repositoryBlobId": "2fd72c942399ff0cc78e3478dced74b60180e5dd",
+      "lfsDeclaredSha256": "a7b30f1596683837329e7b674e16d0dada2c98e3640092129d9092479a67ba37",
+      "lfsDeclaredBytes": 51178520,
+      "prefixBytes": 131072,
+      "prefixSha256": "378a61bd75ee5b3761c1508680b9fa0f269cff6a4a54026f1837925345d3341c",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959323"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691045.511,
+        5336061.116,
+        514.588
+      ],
+      "upperCorner": [
+        691090.284,
+        5336132.407,
+        537.723
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959324.gml",
+      "repositoryBlobId": "04dca410135dd75a32f2b8c6dd2bcd17b5063f5f",
+      "lfsDeclaredSha256": "e4c354cb8125cea346b0444e1d23a7dbca7de1a94643e7ceae7be468da5002cc",
+      "lfsDeclaredBytes": 66269425,
+      "prefixBytes": 131072,
+      "prefixSha256": "8b78f002ccbedf1e59b2afd83f50b9535b4e7b41633572689c108d9cb93b8221",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959324"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691036.101,
+        5336070.019,
+        511.2
+      ],
+      "upperCorner": [
+        691048.082,
+        5336077.866,
+        522.235
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959457.gml",
+      "repositoryBlobId": "c07d1bf900f55f72d45af986e34bb818106cdc32",
+      "lfsDeclaredSha256": "e9772d78a5da22e698ba0a873c5f39bfd7ef194b7a0ee91d646a93231cb2f342",
+      "lfsDeclaredBytes": 36779170,
+      "prefixBytes": 131072,
+      "prefixSha256": "6223815cf22250832e0024f8193257ccb8458c2303d924560b39d20ede510160",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959457"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690953.042,
+        5335962.625,
+        509.79
+      ],
+      "upperCorner": [
+        691055.291,
+        5336105.583,
+        547.33
+      ],
+      "containsGuidePointXY": true,
+      "containsGuidePointXYZ": true,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959458.gml",
+      "repositoryBlobId": "eb8e658313d10bcdf8cb819640172e76ca2ad750",
+      "lfsDeclaredSha256": "97442254b8bf8e80628d9a54d53519f551ffc121aeccb9e6fcdf9083f40d19ba",
+      "lfsDeclaredBytes": 17631330,
+      "prefixBytes": 131072,
+      "prefixSha256": "138feebfb41503b02a965e992fa37e7dfb274464d05c1e9c008f115bffabc2fd",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959458"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691000.964,
+        5336127.139,
+        514.36
+      ],
+      "upperCorner": [
+        691045.404,
+        5336155.896,
+        536.181
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959460.gml",
+      "repositoryBlobId": "07bf30ed7c0581c0c210b031fe814fed8668f4bb",
+      "lfsDeclaredSha256": "723f9ad18f55ed63d15310656bdd67e38217ca2b4c2adc5b16edb34457627974",
+      "lfsDeclaredBytes": 174292255,
+      "prefixBytes": 131072,
+      "prefixSha256": "a4fd4c7ff746335bc5314f2741f3fd17eb453286ee4f1b9bcf1fe3bc7c52e2f3",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959460"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690963.519,
+        5336168.196,
+        514.055
+      ],
+      "upperCorner": [
+        691075.027,
+        5336248.47,
+        533.82
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_4959462.gml",
+      "repositoryBlobId": "c418631f095229496931d4eaf205595a524e1e2b",
+      "lfsDeclaredSha256": "53220c0777336fafb37bc73d3ea3c73dc21f0248a59f333fa072dc5612d59ed6",
+      "lfsDeclaredBytes": 8486629,
+      "prefixBytes": 131072,
+      "prefixSha256": "65891d62f46da8ee1e21cb93a9b2bd047d6b3ac439a6f3820a1e73c7a293367e",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_4959462"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        691035.126,
+        5336140.516,
+        514.34
+      ],
+      "upperCorner": [
+        691059.41,
+        5336179.683,
+        529.684
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    },
+    {
+      "filename": "DEBY_LOD3_60042.gml",
+      "repositoryBlobId": "8b6d29c01abfe51e8de3482a37fde6de64cc1608",
+      "lfsDeclaredSha256": "edf7bf18550a08d971e6c4d0ea3d07ec9739295e8ceed56730bcdd19edaeea21",
+      "lfsDeclaredBytes": 26035809,
+      "prefixBytes": 131072,
+      "prefixSha256": "539a2ffdee28bdbb3be9a5f53a466a77b234b17ce500570ec6c7398f4adf840d",
+      "earlyBuildingGmlIds": [
+        "DEBY_LOD2_60042"
+      ],
+      "srsName": "EPSG:25832",
+      "srsDimension": 3,
+      "lowerCorner": [
+        690876.507,
+        5336096.008,
+        510.36
+      ],
+      "upperCorner": [
+        691006.284,
+        5336192.219,
+        537.245
+      ],
+      "containsGuidePointXY": false,
+      "containsGuidePointXYZ": false,
+      "earlyGmlIdMatchesFilenameId": false,
+      "earlyBuildingIdHasLod2SameSuffix": true,
+      "overlapsBroadUlsXyBounds": true,
+      "fullFileDownloaded": false,
+      "fullObjectHashVerified": false,
+      "coordinateTransformApplied": false,
+      "sameBuildingVerified": false,
+      "assetRightsReviewed": false
+    }
+  ],
+  "buildingSelection": {
+    "status": "not-selected",
+    "buildingId": "",
+    "gmlId": "",
+    "sameBuildingLinkageVerified": false
+  },
+  "releaseFlags": {
+    "acceptanceEligible": false,
+    "publicationEligible": false,
+    "mapReady": false,
+    "automaticApproval": false
+  },
+  "limitations": [
+    "The JSON summarizes the actual workflow artifact from 128 KiB prefixes; no full GML was downloaded.",
+    "LFS full-object SHA-256 values are declarations from LFS pointers, not verified whole-object hashes.",
+    "All 27 GML envelopes say EPSG:25832; the ULS header declares EPSG:32632. No transformation is applied or approved here.",
+    "The point used for screening is an example query point from the documentation, not a surveyed checkpoint/known building centroid.",
+    "26 of 27 early Building IDs are LOD2-prefixed with the same numeric suffix as a LOD3 filename; the identity semantics require review.",
+    "The guide point Z is 11.326 m below the ULS header's global min-Z. This is a frame warning, not a measured model-to-reference error.",
+    "No building identity, asset rights for the ULS or images, candidate GLB, or held-out accuracy is approved."
+  ]
+}

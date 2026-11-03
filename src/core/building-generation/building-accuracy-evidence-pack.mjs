@@ -147,6 +147,27 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
       "Independent dimension evidence and horizontal control-point residuals must pass for this GLB.",
       benchmark.status === "benchmark-failed" ? "failed" : "warning");
 
+    const truthEvidence = building.independentTruthEvidence ?? {};
+    if (building.requireIndependentTruthEvaluation === true || truthEvidence.supplied === true) {
+      const truthCheckIds = [
+        "independent-truth-report-valid",
+        "independent-truth-report-candidate-binding",
+        "independent-truth-report-extraction-provenance",
+        "independent-truth-report-byte-integrity",
+        "independent-truth-report-status",
+      ];
+      const truthChecks = truthCheckIds.map((id) => benchmarkChecks.get(id));
+      const truthPassed = truthChecks.every((status) => status === "passed") &&
+        truthEvidence.supplied === true && truthEvidence.verified === true &&
+        sameHash(truthEvidence.sha256, truthEvidence.expectedSha256);
+      const truthFailed = truthChecks.includes("failed");
+      add("independent-truth-geometry-evaluation", truthPassed,
+        truthPassed
+          ? "Independent-truth geometry report, candidate hash, report bytes and evaluator outcome are all pinned to this building."
+          : "Required/supplied independent-truth report is missing, incomplete, failed, stale or not bound to this exact candidate.",
+        truthFailed ? "failed" : "warning");
+    }
+
     const review = building.renderReferenceReview ?? {};
     const reviewComparisons = Array.isArray(review.comparisons) ? review.comparisons : [];
     const comparisonsByView = new Map(reviewComparisons.filter((item) => object(item) && nonEmpty(item.viewId)).map((item) => [item.viewId, item]));
@@ -205,6 +226,23 @@ export function assessBuildingAccuracyEvidencePack(input = {}) {
         views: views.map((view) => ({ id: view.id ?? null, filename: view.filename ?? null, sha256: view.sha256 ?? null,
           bytes: view.bytes ?? null, width: view.width ?? null, height: view.height ?? null, verified: view.verified === true })) },
       dimensionAndGeoreferenceStatus: benchmark.status ?? "missing",
+      independentTruthGeometry: benchmark.metrics?.independentTruthGeometry ?? {
+        supplied: truthEvidence.supplied === true,
+        required: building.requireIndependentTruthEvaluation === true,
+        status: truthEvidence.status ?? "missing",
+        reportSha256: truthEvidence.sha256 ?? null,
+        reportPath: truthEvidence.path ?? null,
+        reportArtifactPinned: truthEvidence.verified === true &&
+          sameHash(truthEvidence.sha256, truthEvidence.expectedSha256),
+      },
+      independentTruthReportEvidence: {
+        required: building.requireIndependentTruthEvaluation === true,
+        supplied: truthEvidence.supplied === true,
+        path: truthEvidence.path ?? null,
+        sha256: truthEvidence.sha256 ?? null,
+        expectedSha256Pinned: truthEvidence.verified === true &&
+          sameHash(truthEvidence.sha256, truthEvidence.expectedSha256),
+      },
       verticalDatumStatus: vertical.status ?? "not-solved",
       checks,
       policy: { mapReady: false, publicationEligible: false, automaticApproval: false },

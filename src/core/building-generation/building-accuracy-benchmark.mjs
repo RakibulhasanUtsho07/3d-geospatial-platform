@@ -44,6 +44,9 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
     dimensionReference,
     groundControl,
     renderReferenceReview,
+    independentTruthReport = null,
+    independentTruthReportEvidence = null,
+    requireIndependentTruthReport = false,
     generatedAt = new Date().toISOString(),
   } = input;
 
@@ -93,6 +96,74 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
   if (Array.isArray(geometryQa.warnings) && geometryQa.warnings.length > 0) {
     record("glb-geometry-warnings", false,
       "Geometry QA has warnings requiring visual review: " + geometryQa.warnings.join(", "), "warning");
+  }
+
+  let independentTruthSummary = {
+    supplied: false, status: "missing", reportSha256: null, reportPath: null,
+    candidateBound: false, reportArtifactPinned: false,
+  };
+  if (!object(independentTruthReport)) {
+    if (requireIndependentTruthReport === true) {
+      record("independent-truth-report-present", false,
+        "This evidence-pack entry requires a pinned independent-truth geometry report.", "warning");
+      independentTruthSummary = { ...independentTruthSummary, required: true };
+    }
+  } else {
+    const truth = independentTruthReport;
+    const truthStatusValid = ["benchmark-review-required", "benchmark-incomplete", "benchmark-failed"].includes(truth.status);
+    const truthSchemaValid = truth.schemaVersion === "1.0.0" &&
+      truth.engine === "independent-building-truth-evaluator-v1" &&
+      truth.buildingId === buildingId && object(truth.metrics) &&
+      object(truth.policy) && truth.policy.acceptanceEligible === false &&
+      truth.policy.publicationEligible === false && truth.policy.mapReady === false &&
+      truth.policy.automaticApproval === false &&
+      object(truth.geometryExtractionProvenance) &&
+      ["passed", "incomplete", "failed"].includes(truth.geometryExtractionProvenance.candidate?.status) &&
+      ["passed", "incomplete", "failed"].includes(truth.geometryExtractionProvenance.reference?.status);
+    record("independent-truth-report-valid", truthSchemaValid && truthStatusValid,
+      truthSchemaValid && truthStatusValid
+        ? "Independent geometry report is schema-valid, carries extraction provenance checks, and keeps all release gates disabled."
+        : "Independent geometry report is invalid, lacks verified extraction provenance or has altered release-gate policy.");
+    const candidateBound = isHash(truth.candidate?.glbSha256) &&
+      truth.candidate.glbSha256.toLowerCase() === candidateGlbSha256.toLowerCase();
+    record("independent-truth-report-candidate-binding", candidateBound,
+      candidateBound ? "Independent geometry metrics are bound to the exact candidate GLB SHA-256."
+        : "Independent geometry report is stale or belongs to a different candidate GLB.");
+    const extractionProvenancePassed = truth.geometryExtractionProvenance?.candidate?.status === "passed" &&
+      truth.geometryExtractionProvenance?.reference?.status === "passed";
+    record("independent-truth-report-extraction-provenance", extractionProvenancePassed,
+      extractionProvenancePassed
+        ? "Candidate and reference geometry extraction tool/config bytes were verified by the evaluator CLI."
+        : "Candidate or reference geometry extraction provenance is incomplete or failed.",
+      truth.status === "benchmark-failed" ? "failed" : "warning");
+    const artifact = independentTruthReportEvidence ?? {};
+    const artifactPinned = artifact.verified === true &&
+      isHash(artifact.sha256) && isHash(artifact.expectedSha256) &&
+      artifact.sha256.toLowerCase() === artifact.expectedSha256.toLowerCase() &&
+      typeof artifact.path === "string" && artifact.path.trim().length > 0;
+    record("independent-truth-report-byte-integrity", artifactPinned,
+      artifactPinned ? "The exact independent-truth report bytes match the pinned evidence-pack hash."
+        : "Independent-truth report bytes are missing, stale or not pinned by the evidence-pack manifest.",
+      requireIndependentTruthReport === true ? "warning" : "warning");
+    if (truth.status === "benchmark-failed") {
+      record("independent-truth-report-status", false,
+        "Independent-truth evaluator found one or more failed geometry/provenance checks.");
+    } else if (truth.status === "benchmark-incomplete") {
+      record("independent-truth-report-status", false,
+        "Independent-truth evaluator is incomplete because evidence or explicit thresholds are missing.", "warning");
+    } else {
+      record("independent-truth-report-status", truth.status === "benchmark-review-required",
+        "Independent-truth metrics remain review-required and are not an automatic building-accuracy approval.");
+    }
+    independentTruthSummary = {
+      supplied: true, required: requireIndependentTruthReport === true,
+      status: truth.status, reportSha256: artifact.sha256 ?? null,
+      reportPath: artifact.path ?? null, candidateBound, reportArtifactPinned: artifactPinned,
+      warnings: Array.isArray(truth.warnings) ? truth.warnings.length : null,
+      failures: Array.isArray(truth.failures) ? truth.failures.length : null,
+      metricGroups: Object.keys(truth.metrics),
+      metrics: truth.metrics,
+    };
   }
 
   const dimensionEvidenceValid =
@@ -256,8 +327,10 @@ export function buildBuildingAccuracyBenchmark(input = {}) {
       },
       georeference: groundControlSummary,
       visualReference: visualSummary,
+      independentTruthGeometry: independentTruthSummary,
     },
     evidence: {
+      independentTruthGeometry: independentTruthSummary,
       dimensionReference: {
         basis: referenceEvidence.basis ?? "unknown",
         referenceId: referenceEvidence.referenceId ?? null,

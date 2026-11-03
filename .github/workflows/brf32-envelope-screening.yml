@@ -1,0 +1,46 @@
+name: BRF-32 persisted envelope screening contract
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf32-envelope-screening.yml"
+      - "benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json"
+      - "docs/research/BRF-32-CITYGML-ENVELOPE-SCREENING.md"
+      - "tests/brf32-envelope-screening.test.mjs"
+  pull_request:
+    branches: [development]
+    paths:
+      - ".github/workflows/brf32-envelope-screening.yml"
+      - "benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json"
+      - "docs/research/BRF-32-CITYGML-ENVELOPE-SCREENING.md"
+      - "tests/brf32-envelope-screening.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf32-envelope-screening-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-screening-record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate machine-readable envelope report
+        run: node --input-type=module -e "import fs from 'node:fs'; JSON.parse(fs.readFileSync('benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json', 'utf8'));"
+
+      - name: Test persisted CityGML screening facts and fail-closed flags
+        run: node --test tests/brf32-envelope-screening.test.mjs
+
+      - name: Upload screening contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf32-envelope-screening-contract
+          path: benchmarks/building-reconstruction/brf-31-citygml-envelope-screening.json
+          retention-days: 14

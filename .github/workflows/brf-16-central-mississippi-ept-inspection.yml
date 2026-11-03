@@ -1,0 +1,66 @@
+name: BRF-16 Central Mississippi public EPT reference inspection
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-16-central-mississippi-ept-inspection.yml"
+      - "benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json"
+      - "benchmarks/building-reconstruction/brf-14-multiview-source.json"
+      - "scripts/inspect-usgs-ept-reference.py"
+      - "tests/test_inspect_usgs_ept_reference.py"
+      - "docs/research/BRF-16-USGS-TNM-LIDAR-PRODUCT-DISCOVERY.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-16-central-mississippi-ept-inspection-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspect-ept:
+    name: Inspect bounded EPT point-cloud neighbourhood
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install LAZ and CRS reader dependencies
+        run: python -m pip install --disable-pip-version-check "laspy[lazrs]" pyproj numpy
+
+      - name: Test EPT manifest, host allowlist and node bounds
+        run: python -m unittest discover -s tests -p "test_inspect_usgs_ept_reference.py"
+
+      - name: Inspect a bounded point-cloud neighbourhood from public EPT
+        id: inspect
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/brf-16
+          python scripts/inspect-usgs-ept-reference.py \
+            --manifest benchmarks/building-reconstruction/brf-16-central-mississippi-ept-reference.json \
+            --multiview-manifest benchmarks/building-reconstruction/brf-14-multiview-source.json \
+            --report artifacts/brf-16/central-mississippi-ept-reference-report.json
+
+      - name: Upload report only (never upload point-node bytes)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-16-central-mississippi-ept-reference-report
+          path: artifacts/brf-16/central-mississippi-ept-reference-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Enforce bounded EPT source preflight
+        if: steps.inspect.outcome != 'success'
+        run: |
+          echo "EPT inspection did not complete successfully. Inspect the uploaded JSON report and preceding logs."
+          exit 1

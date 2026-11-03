@@ -1,0 +1,89 @@
+name: BRF-16 USGS TNM lidar product discovery
+
+on:
+  pull_request:
+    branches:
+      - development
+    paths:
+      - ".github/workflows/brf-16-usgs-lidar-product-discovery.yml"
+      - "scripts/discover-usgs-tnm-lidar-products.mjs"
+      - "tests/discover-usgs-tnm-lidar-products.test.mjs"
+      - "docs/research/BRF-16-USGS-TNM-LIDAR-PRODUCT-DISCOVERY.md"
+  workflow_dispatch:
+    inputs:
+      latitude:
+        description: "Sample GPS latitude"
+        required: true
+        default: "45.0518"
+        type: string
+      longitude:
+        description: "Sample GPS longitude"
+        required: true
+        default: "-93.391"
+        type: string
+      buffer_meters:
+        description: "Search half-width in metres"
+        required: true
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brf-16-usgs-lidar-product-discovery-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover-products:
+    name: Find downloadable LAS/LAZ products near the sample
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Test fail-closed TNM product discovery
+        run: node --test tests/discover-usgs-tnm-lidar-products.test.mjs
+
+      - name: Validate discovery CLI
+        run: node scripts/discover-usgs-tnm-lidar-products.mjs --help
+
+      - name: Query USGS TNM Access API for LPC LAS/LAZ products
+        id: discovery
+        shell: bash
+        env:
+          SAMPLE_LATITUDE: ${{ inputs.latitude || '45.0518' }}
+          SAMPLE_LONGITUDE: ${{ inputs.longitude || '-93.391' }}
+          BUFFER_METERS: ${{ inputs.buffer_meters || '100' }}
+        run: |
+          set +e
+          mkdir -p artifacts/brf-16
+          node scripts/discover-usgs-tnm-lidar-products.mjs \
+            --latitude "$SAMPLE_LATITUDE" \
+            --longitude "$SAMPLE_LONGITUDE" \
+            --buffer-meters "$BUFFER_METERS" \
+            --report artifacts/brf-16/tnm-lidar-products.json
+          status=$?
+          echo "resolver_exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload TNM search report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brf-16-usgs-tnm-lidar-products
+          path: artifacts/brf-16/tnm-lidar-products.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Require at least one allowlisted downloadable point-cloud product
+        if: steps.discovery.outputs.resolver_exit_code != '0'
+        run: |
+          echo "No verified candidate LAS/LAZ product was established. Inspect the JSON report before changing the source decision."
+          exit 1
