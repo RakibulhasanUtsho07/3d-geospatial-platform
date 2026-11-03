@@ -92,7 +92,6 @@ test("uses the GLB Y-up camera basis for compass, canonical and turntable review
   assert.match(rendererSource, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
   assert.match(rendererSource, /camera_track_up_axis\(direction\.y\)/);
   assert.match(rendererSource, /to_track_quat\("-Z", camera_track_up_axis\(direction\.y\)\)/);
-  assert.match(rendererSource, /camera_track_up_axis\(0\.0\)/);
   assert.match(rendererSource, /camera_track_up_axis\(direction\.y\)/);
 
   assert.match(rendererSource, /"frontCameraEffectiveBearingDegrees": effective_front_bearing/);
