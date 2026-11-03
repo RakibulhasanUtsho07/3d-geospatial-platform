@@ -111,9 +111,14 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   const frontAxisSource = rawManifest.frontAxisSource ?? "renderer-default";
   const frontAxisConfidence = rawManifest.frontAxisConfidence ?? "unknown";
   const validFrontConfidence = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]);
+  const validFrontSources = new Set([
+    "buildingSpec.architecture.frontFacingAzimuthDegrees",
+    "buildingSpec.architecture.frontFacadeEdgeIndex",
+    "longest-edge-inferred",
+  ]);
   if (frontBearing !== null &&
       (!finite(frontBearing) || frontBearing < 0 || frontBearing > 360 ||
-       frontAxisSource !== "glb-extras.frontFacingAzimuthDegrees" ||
+       !validFrontSources.has(frontAxisSource) ||
        !validFrontConfidence.has(frontAxisConfidence))) {
     errors.push("render-front-bearing-metadata-invalid");
   }
