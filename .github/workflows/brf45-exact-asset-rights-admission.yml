@@ -3,6 +3,9 @@ name: BRF-45 exact-asset rights admission
 on:
   push:
     branches:
+      - main
+      - integration/brf14-main-20261103
+      - integration/brf14-main-refresh-20261103
       - development
       - feat/brf45-exact-asset-rights-admission
     paths:
@@ -17,6 +20,7 @@ on:
       - "package.json"
   pull_request:
     branches:
+      - main
       - development
     paths:
       - "src/core/building-generation/brf45-exact-asset-rights-admission.mjs"

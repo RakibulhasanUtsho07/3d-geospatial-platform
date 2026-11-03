@@ -9,7 +9,8 @@ const MAX_VIEW_COUNT = 32;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SAMPLE_ID = "brf-14-flat-roof-16-view-subset";
 const SOURCE_COMMIT = "19b3ce9cccf3e8fd414ff705f75d0f2105846fc1";
-const SOURCE_PREFIX = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/main/flat-roof/images/";
+const DATA_REPOSITORY_REVISION = "fde325fbd1d3636ffcf5d48aedc24cdbfc9a630f";
+const SOURCE_PREFIX = "https://huggingface.co/datasets/Matt1up/drone-building-scans/resolve/" + DATA_REPOSITORY_REVISION + "/flat-roof/images/";
 
 function fail(message) {
   const error = new Error(message);
@@ -45,6 +46,7 @@ function validateManifest(manifest) {
       dataset.datasetUrl !== "https://huggingface.co/datasets/Matt1up/drone-building-scans" ||
       dataset.sourceRepository !== "https://github.com/Matt1Up/drone-building-scans-dataset" ||
       dataset.sourceRepositoryCommit !== SOURCE_COMMIT ||
+      dataset.dataRepositoryRevision !== DATA_REPOSITORY_REVISION ||
       dataset.license !== "CC-BY-4.0" ||
       !validText(dataset.licenseScope) ||
       !validText(dataset.attribution) ||
@@ -246,6 +248,7 @@ export async function verifyBrf14MultiviewSource(manifest, assetRoot) {
       datasetUrl: validated.dataset.datasetUrl,
       sourceRepository: validated.dataset.sourceRepository,
       sourceRepositoryCommit: validated.dataset.sourceRepositoryCommit,
+      dataRepositoryRevision: validated.dataset.dataRepositoryRevision,
       declaredLicense: validated.dataset.license,
       licenseScope: validated.dataset.licenseScope,
       attribution: validated.dataset.attribution,
