@@ -67,3 +67,12 @@ Interpretation limits:
 P0 is measured—not merely implemented—only after a real-data run has at least three successful cold and three successful warm samples; records the candidate SHA and relevant local data hashes or explicitly notes missing inputs; contains viewport/road telemetry where those layers are triggered; and includes six screenshots reviewed for blank canvases, gaps, alignment/occlusion and loading regressions. Record browser/OS/GPU details and known visual defects with that review.
 
 The script and deterministic helper tests create the evidence bundle, and the CI acceptance script verifies six samples, road readiness, pinned data inputs and actual screenshot digests. Human visual sign-off must still record blank canvases, footprint alignment, building height, road occlusion, viewport refresh, console findings, and the screenshot SHA-256 values; a green CI run alone cannot establish those visual judgments.
+
+
+## Current-main P3.4 validation — 2026-11-03
+
+- Candidate branch: `integration/p34-main-port-20261103`; current port PR: #328; exact current branch source head before this documentation checkpoint: `3725b406f55deabdaaaf9ccaedba0e379abac5b5`.
+- The P3.4 desktop/mobile fixture screenshots were inspected from artifact #13206560328. Both show the Cesium logo and attribution text visible outside the map docks. These screenshots use deterministic API fixtures and transparent tile stubs; they validate UI placement only, not live imagery.
+- P3.4 imagery-provider error telemetry and canvas-only saturated-red pixel analysis are diagnostic signals; an outlier stays manual-review-required. The previously observed cold-01 red patch remains unresolved. No imagery layer has been hidden or masked, and no root cause is claimed.
+- A new six-sample real-Dhaka cold/warm baseline is required on the current-main port head. It must bind the report/screenshots/input manifests to the exact commit SHA, then receive manual inspection of all six screenshots, provider errors, tile coordinates/retries and canvas red-signal outliers. A green browser test alone is not a live-data visual acceptance.
+- Release/accuracy gates are unchanged; no citywide coverage, architectural accuracy or production readiness is inferred from this map UX change.
