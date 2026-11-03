@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en" data-review-status="loading">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>P3.6 — Cesium controller lifecycle browser review</title>
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #08111f; color: #e5edf8; }
+    #review-map { position: absolute; inset: 0; background: #09111f; }
+    #review-map .cesium-viewer, #review-map .cesium-widget, #review-map canvas { width: 100%; height: 100%; }
+    header { position: absolute; z-index: 20; top: 14px; left: 14px; max-width: min(620px, calc(100vw - 28px)); padding: 13px 16px; border: 1px solid #35455d; border-radius: 10px; background: rgba(8, 17, 31, .94); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+    h1 { margin: 0; font-size: 15px; font-weight: 650; }
+    p { margin: 6px 0 0; font-size: 12px; line-height: 1.45; color: #b4c2d4; }
+    #review-status { margin-top: 8px; font-size: 12px; color: #a7f3d0; overflow-wrap: anywhere; }
+    #review-result { display: none; }
+  </style>
+  <script>window.CESIUM_BASE_URL = "/cesium/";</script>
+  <script src="/cesium/Cesium.js"></script>
+</head>
+<body>
+  <header>
+    <h1>P3.6 · Controller lifecycle validation</h1>
+    <p>Exercises the authoritative controller module with the live Cesium loader: explicit fallback, terminal load failure, and disable during a real tileset request. This checks cleanup policy; it does not claim that Cesium's underlying request is abortable.</p>
+    <div id="review-status" role="status">Preparing the controller and Cesium viewer…</div>
+  </header>
+  <div id="review-map" aria-label="Experimental controller lifecycle review viewer"></div>
+  <pre id="review-result" aria-hidden="true"></pre>
+  <script type="module">
+  (() => {
+    "use strict";
+
+    const PACKAGE_URL = "/experimental/dhaka-3d-tiles-multibuilding-pilot/tileset.json";
+    const MISSING_PRIMARY_URL = "/experimental/p3-6-controller-missing-primary/tileset.json";
+    const MISSING_FALLBACK_URL = "/experimental/p3-6-controller-missing-fallback/tileset.json";
+    const MODULE_URL = "/experimental/dhaka-3d-tiles-pilot-controller.mjs";
+    const statusNode = document.getElementById("review-status");
+    const resultNode = document.getElementById("review-result");
+
+    function setStatus(status, message) {
+      document.documentElement.dataset.reviewStatus = status;
+      statusNode.textContent = message;
+    }
+
+    async function fetchBytes(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(url + " returned HTTP " + response.status);
+      return new Uint8Array(await response.arrayBuffer());
+    }
+
+    async function sha256Hex(bytes) {
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+    }
+
+    function primitiveCount(viewer) {
+      const count = viewer.scene.primitives.length;
+      if (!Number.isInteger(count)) throw new Error("Cesium primitive collection did not expose a stable count.");
+      return count;
+    }
+
+    function newController(Controller, viewer, events, options = {}) {
+      let enabled = true;
+      const controller = new Controller({
+        getViewer: () => viewer,
+        getCesium: () => Cesium,
+        isEnabled: () => enabled,
+        maxAttemptsPerUrl: 1,
+        retryDelayMs: 0,
+        onStatus: (event) => events.push({ status: event.status, url: event.url, requestedUrl: event.requestedUrl || null, fromUrl: event.fromUrl || null, toUrl: event.toUrl || null, loadedUrl: event.loadedUrl || null, fallbackUsed: event.fallbackUsed ?? null, message: event.message || null }),
+        ...options
+      });
+      return { controller, setEnabled: (value) => { enabled = value; } };
+    }
+
+    async function checkFallbackAndTeardown(Controller, viewer) {
+      const events = [];
+      const baseline = primitiveCount(viewer);
+      const { controller, setEnabled } = newController(Controller, viewer, events);
+      const result = await controller.enable({
+        url: MISSING_PRIMARY_URL,
+        fallbackUrl: PACKAGE_URL
+      });
+      const attachedBeforeDisable = controller.getState().attached;
+      const duplicate = await controller.enable({ url: PACKAGE_URL, fallbackUrl: null });
+      const primitiveDeltaWhileAttached = primitiveCount(viewer) - baseline;
+      const fallbackWasReported = events.some((event) => event.status === "fallback");
+      controller.disable();
+      const destroyedAfterDisable = result.tileset.isDestroyed();
+      const primitiveDeltaAfterDisable = primitiveCount(viewer) - baseline;
+      const attachedAfterDisable = controller.getState().attached;
+      setEnabled(false);
+      const runtimeFlagResult = await controller.enable();
+      const runtimeFlagResultStatus = runtimeFlagResult.status;
+      controller.destroy();
+      return {
+        resultStatus: result.status,
+        fallbackUsed: result.fallbackUsed,
+        loadedUrl: result.url,
+        fallbackWasReported,
+        primaryFailureObserved: events.some((event) => event.status === "fallback" && event.fromUrl === MISSING_PRIMARY_URL),
+        duplicateStatus: duplicate.status,
+        attachedBeforeDisable,
+        primitiveDeltaWhileAttached,
+        destroyedAfterDisable,
+        primitiveDeltaAfterDisable,
+        attachedAfterDisable,
+        runtimeFlagResultStatus
+      };
+    }
+
+    async function checkTerminalFailure(Controller, viewer) {
+      const events = [];
+      const baseline = primitiveCount(viewer);
+      const { controller } = newController(Controller, viewer, events);
+      let rejected = false;
+      let errorMessage = null;
+      try {
+        await controller.enable({ url: MISSING_PRIMARY_URL, fallbackUrl: MISSING_FALLBACK_URL });
+      } catch (error) {
+        rejected = true;
+        errorMessage = error instanceof Error ? error.message : String(error);
+      }
+      const result = {
+        rejected,
+        errorMessage,
+        errorEventCount: events.filter((event) => event.status === "error").length,
+        attached: controller.getState().attached,
+        loading: controller.getState().loading,
+        primitiveDelta: primitiveCount(viewer) - baseline
+      };
+      controller.destroy();
+      return result;
+    }
+
+    async function checkLateResultAfterDisable(Controller, viewer) {
+      const events = [];
+      const baseline = primitiveCount(viewer);
+      const { controller } = newController(Controller, viewer, events);
+      const loaderClass = Cesium.Cesium3DTileset;
+      const originalFromUrl = loaderClass.fromUrl;
+      let resolveStarted;
+      const started = new Promise((resolve) => { resolveStarted = resolve; });
+      let releaseGate;
+      const gate = new Promise((resolve) => { releaseGate = resolve; });
+      let lateTileset = null;
+      let restored = false;
+
+      try {
+        loaderClass.fromUrl = function (url, options) {
+          const underlying = originalFromUrl.call(this, url, options);
+          resolveStarted();
+          return Promise.resolve(underlying).then(async (tileset) => {
+            lateTileset = tileset;
+            await gate;
+            return tileset;
+          });
+        };
+
+        const loading = controller.enable({ url: PACKAGE_URL, fallbackUrl: null });
+        await started;
+        controller.disable();
+        releaseGate();
+        const result = await loading;
+        return {
+          requestStarted: true,
+          resultStatus: result.status,
+          lateTilesetReturned: Boolean(lateTileset),
+          lateTilesetDestroyed: Boolean(lateTileset && lateTileset.isDestroyed()),
+          attached: controller.getState().attached,
+          loading: controller.getState().loading,
+          primitiveDelta: primitiveCount(viewer) - baseline,
+          staleErrorEventEmitted: events.some((event) => event.status === "error")
+        };
+      } finally {
+        releaseGate();
+        loaderClass.fromUrl = originalFromUrl;
+        restored = loaderClass.fromUrl === originalFromUrl;
+        controller.destroy();
+        if (!restored) throw new Error("The Cesium tileset loader was not restored after the cancellation test.");
+      }
+    }
+
+    async function main() {
+      if (typeof Cesium === "undefined") throw new Error("Cesium did not load.");
+      const controllerModuleBytes = await fetchBytes(MODULE_URL);
+      const [tilesetBytes, manifestBytes] = await Promise.all([
+        fetchBytes(PACKAGE_URL),
+        fetchBytes("/experimental/dhaka-3d-tiles-multibuilding-pilot/build-manifest.json")
+      ]);
+      const { Dhaka3DTilesPilotController } = await import(MODULE_URL);
+      if (typeof Dhaka3DTilesPilotController !== "function") throw new Error("Authoritative P3.6 controller export is missing.");
+      const tilesetManifest = JSON.parse(new TextDecoder().decode(tilesetBytes));
+      const buildManifest = JSON.parse(new TextDecoder().decode(manifestBytes));
+      if (tilesetManifest?.asset?.version !== "1.1") throw new Error("Controller lifecycle source package is not OGC 3D Tiles 1.1.");
+      if (tilesetManifest?.asset?.extras?.sourceSha256 !== buildManifest?.source?.sha256) {
+        throw new Error("Controller lifecycle source hash is not bound between the tileset and build manifest.");
+      }
+      const releaseKeys = ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"];
+      if (!buildManifest.releaseFlags || releaseKeys.some((key) => buildManifest.releaseFlags[key] !== false)) {
+        throw new Error("Lifecycle review refuses a package with any release flag enabled.");
+      }
+
+      const viewer = new Cesium.Viewer("review-map", {
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+        baseLayer: false,
+        baseLayerPicker: false,
+        animation: false,
+        timeline: false,
+        geocoder: false,
+        homeButton: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        fullscreenButton: false,
+        infoBox: false,
+        selectionIndicator: false,
+        scene3DOnly: true,
+        requestRenderMode: false,
+        maximumRenderTimeChange: Infinity,
+        shouldAnimate: false
+      });
+      viewer.resize();
+      viewer.scene.globe.show = false;
+      viewer.scene.screenSpaceCameraController.enableInputs = false;
+      if (viewer.scene.canvas.width < 640 || viewer.scene.canvas.height < 400) {
+        throw new Error("The lifecycle viewer did not reach the minimum test viewport.");
+      }
+
+      const fallback = await checkFallbackAndTeardown(Dhaka3DTilesPilotController, viewer);
+      const terminalFailure = await checkTerminalFailure(Dhaka3DTilesPilotController, viewer);
+      const lateResult = await checkLateResultAfterDisable(Dhaka3DTilesPilotController, viewer);
+
+      const report = {
+        schemaVersion: 1,
+        evidenceType: "p3.6-live-cesium-controller-lifecycle",
+        status: "pass",
+        runtime: {
+          cesiumVersion: Cesium.VERSION,
+          userAgent: navigator.userAgent,
+          viewport: { width: viewer.scene.canvas.width, height: viewer.scene.canvas.height }
+        },
+        input: {
+          controllerModuleSha256: await sha256Hex(controllerModuleBytes),
+          tilesetSha256: await sha256Hex(tilesetBytes),
+          buildManifestSha256: await sha256Hex(manifestBytes)
+        },
+        scenarios: { fallbackAndTeardown: fallback, terminalFailure, lateResultAfterDisable: lateResult },
+        limitations: [
+          "The controller is loaded from a build-generated byte-for-byte copy of the authoritative source module.",
+          "The late-result scenario starts a real Cesium fromUrl operation and releases its returned tileset after disable; it proves stale-result destruction, not network-request abort.",
+          "This validates controller lifecycle and package plumbing, not surveyed building heights, architecture, rights or production publication readiness."
+        ],
+        releaseFlags: buildManifest.releaseFlags
+      };
+      resultNode.textContent = JSON.stringify(report);
+      setStatus("ready", "PASS · fallback/teardown, terminal failure and late-result cleanup validated");
+      viewer.scene.requestRender();
+    }
+
+    main().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      resultNode.textContent = JSON.stringify({ schemaVersion: 1, evidenceType: "p3.6-live-cesium-controller-lifecycle", status: "error", error: message });
+      setStatus("error", "FAIL · " + message);
+    });
+  })();
+  </script>
+</body>
+</html>
