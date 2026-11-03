@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { normalizeBuildingSpec } from "../src/core/building-generation/building-spec.mjs";
+import { coordinateToLocalMeters, normalizeBuildingSpec } from "../src/core/building-generation/building-spec.mjs";
 import { generateBuildingModel, planGeneration } from "../src/core/building-generation/generation-engine.mjs";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "../src/core/building-generation/facade-placement.mjs";
@@ -12,6 +12,16 @@ function parseGlb(buffer){
  const gltf=JSON.parse(buffer.subarray(20,20+size).toString("utf8").trim()),bin=20+size;
  assert.equal(buffer.readUInt32LE(bin+4),0x004e4942);assert.ok(gltf.buffers[0].byteLength<=buffer.readUInt32LE(bin));return gltf;
 }
+test("maps geographic east/north coordinates into the right-handed glTF east/up/south frame", () => {
+  const origin = { longitude: 90.4, latitude: 23.7 };
+  const east = coordinateToLocalMeters([origin.longitude + 0.0001, origin.latitude], origin);
+  const north = coordinateToLocalMeters([origin.longitude, origin.latitude + 0.0001], origin);
+  assert.ok(east.x > 0 && Math.abs(east.z) < 1e-9, "longitude east maps to +X");
+  assert.ok(north.z < 0 && Math.abs(north.x) < 1e-9, "latitude north maps to -Z");
+  const xCrossY = [1, 0, 0].map((_, i) => i === 2 ? 1 : 0);
+  assert.deepEqual(xCrossY, [0, 0, 1], "+X east crossed with +Y up points to +Z south");
+});
+
 test("normalizes BuildingSpec and derives metric footprint while retaining evidence",()=>{
  const {spec,derived}=normalizeBuildingSpec(fixture);assert.equal(spec.schemaVersion,"1.0.0");assert.equal(spec.location.longitude,fixture.location.longitude);
  assert.ok(derived.footprintAreaM2>50&&derived.footprintAreaM2<150);assert.equal(spec.evidence[0].confidence,"estimated");assert.deepEqual(spec.evidence[0].sourceIds,["survey-notes"]);
