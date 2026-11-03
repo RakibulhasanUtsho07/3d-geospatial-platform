@@ -110,7 +110,7 @@ export default function MapControls({
             <div className="mx-1 border-t border-white/10" />
 
             <ControlButton
-              label="Go to home view"
+              label="Return to Dhaka property-discovery view"
               symbol="⌂"
               disabled={disabled}
               onClick={onHome}
