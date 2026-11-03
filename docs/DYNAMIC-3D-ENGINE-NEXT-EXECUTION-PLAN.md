@@ -364,45 +364,54 @@ The comparison counts above describe divergent history from each merge base; the
 
 ### NEXT-03 — explicit facade selection, compass orientation and dome anchor
 
-- Current-main gap: entrance selection fell back to the longest footprint edge; facade normals and insert positions needed winding-aware, facade-local coordinates. GLB/render-review had no shared model front-bearing contract. Central domes only supported front-inset placement.
-- Historical sources: facade-local insert-placement work in stale PR #103; compass front-bearing and dome-bounds-anchor changes in stale PR #185. Neither historic PR was merged.
-- Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, originally based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Current-main gap: entrance selection fell back to the longest footprint edge; facade normals/insert positions needed winding-aware, facade-local coordinates. GLB/review-rendering had no shared model-front bearing contract. Central domes only supported front-inset placement.
+- Historical sources: facade-local insert placement in stale PR #103; compass front-bearing and dome-bounds-anchor changes in stale PR #185. Neither old PR was merged.
+- Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
 - Draft PR #340: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/340
-- Current exact head: `39e32ef15ef0b296ebebac32f84e773af68ef726`; compare is 27 commits ahead / 0 behind, 11 changed paths. The commit count includes successive isolated file updates on this feature branch.
-- Adds validated, mutually exclusive `architecture.frontFacadeEdgeIndex` and `architecture.frontFacingAzimuthDegrees` selectors. Compass bearing is clockwise from north in `x=east,y=up,z=north`; nearest outward footprint edge is selected. A deviation greater than 15 degrees emits a warning and remains review-required.
-- Preserves explicit orientation confidence and source through generation report, GLB extras, Blender five-view camera selection and final render-review manifest. Conflicting evidence values downgrade confidence to `unknown` and require review.
-- Keeps winding-aware facade-local tangent/normal placement, 2 mm insert clearance and jamb tangent placement.
-- Adds central dome anchor policy: backward-compatible `front-inset` or `footprint-bounds-center`. Report includes model-space center and associated evidence confidence.
-- Bangabhaban's 180-degree south bearing and center-anchored dome are explicitly recorded as **estimated**, with source references. This is not a surveyed orientation or verified dome location.
-- Tests cover edge/azimuth conflict, invalid bearing/anchor, evidence conflict downgrade, GLB metadata, dome bounds center, render-manifest source/confidence and renderer legacy fallback.
-- The earlier facade-only exact-head CI #41605913082 passed, but later orientation/dome/render changes supersede that head.
-- Final exact-head CI #41608904987 was pending/queued at last refresh for current head `39e32ef...`. A renderer test assertion was updated afterward to reflect the tuple return from the bearing/confidence parser; that update triggered the current exact-head run #41608904987? Verify its head before counting any result. The latest exact head is `39e32ef...`; no Full CI pass is claimed for the expanded scope yet.
-- Keep PR #340 Draft until exact-head CI and all related focused renderer/generator tests pass; then complete geometry/code review. Do not merge automatically.
+- Current head: `6e7bc90eaa9937d7f5fab705f01bbfb841b1683f`; 28 commits ahead / 0 behind, 11 changed paths. The commit count includes successive isolated file updates on this feature branch.
+- Adds validated, mutually exclusive `architecture.frontFacadeEdgeIndex` and `architecture.frontFacingAzimuthDegrees` selectors. Compass bearing is clockwise from north in `x=east,y=up,z=north`; nearest outward footprint edge is selected. A deviation greater than 15 degrees warns and remains review-required.
+- Carries orientation confidence/source through generator report, GLB extras, Blender five-view camera selection and final render-review manifest. If supplied orientation evidence conflicts with the configured selector, confidence becomes `unknown` and review is required.
+- Keeps winding-aware facade-local tangent/normal placement, 2 mm insert clearance and tangent-aligned jamb offsets.
+- Adds central dome anchors: backward-compatible `front-inset` or `footprint-bounds-center`. Report records the selected policy, model-space center and evidence confidence.
+- Bangabhaban's 180-degree south-facing direction and center-anchored dome are explicitly recorded as **estimated** from reference imagery, not surveyed or verified.
+- Tests cover selector ambiguity, invalid bearing/anchor, conflicting evidence, GLB metadata, dome bounds center, render-manifest provenance and renderer legacy fallback.
+- Previous facade-only exact-head CI #41605913082 passed, but it predates the expanded compass/dome/render path and is not acceptance evidence for the current changes.
+- Expanded CI #41608904987 failed at one outdated deep-equality test assertion in the existing facade-selection test. The actual selected-edge/door geometry path passed up to that assertion; the report now adds new metadata fields.
+- The test assertion was updated to check stable required fields while permitting report extension. Current exact-head Full CI #41609196223 is running on `6e7bc90e...`; lint is active and no failures were observed at the last refresh. No expanded-scope Full CI pass is claimed yet.
+- Keep PR #340 Draft until exact-head Full CI and focused generator/render tests pass, followed by code/geometry review. Do not merge automatically.
 
 ### NEXT-04 — workflow_dispatch evidence event provenance
 
-- Root cause: manual workflow dispatches were supported by CI/P3.6, but `tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts` required eventName to be only `push` or `pull_request`. Manual runs #41604663810 and #41604666326 failed at this assertion after the controller lifecycle report and browser scenarios had run.
+- Root cause: manual dispatches were supported by CI/P3.6, but the controller lifecycle browser test accepted only `push` and `pull_request`. Manual runs #41604663810 and #41604666326 failed at that assertion after browser lifecycle scenarios ran.
 - Clean branch based on main: `fix/p36-workflow-dispatch-evidence-event-20261103`.
 - Draft PR #341: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/341
-- Head `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. Event manifest still records the actual `GITHUB_EVENT_NAME`; the test now accepts `workflow_dispatch` while rejecting missing/unknown events.
-- Exact-head Full CI #41606193975 **passed**.
-- P3.6 Dhaka multi-building workflow #41606193939 **passed** on the same head.
-- An operator-run manual `workflow_dispatch` retest remains outstanding. The current GitHub connection can inspect Actions but cannot invoke manual workflow dispatch. Do not call the manual trigger path verified until that rerun exists.
+- Head `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. Manifest retains actual `GITHUB_EVENT_NAME`; test accepts `workflow_dispatch` while rejecting missing/unrecognized events.
+- Exact-head Full CI #41606193975 **passed** and P3.6 workflow #41606193939 **passed**.
+- Manual workflow-dispatch rerun remains outstanding; the current GitHub connection can inspect Actions but cannot invoke the manual dispatch. Do not call the manual trigger path verified until a real dispatch run exists.
 - PR #341 remains Draft pending manual trigger verification and code review.
 
 ### NEXT-05 — raw video must not count as a facade capture without extracted frames
 
-- Current-main gap: `assessBuildingCaptureManifest` counted raw `video` records as capture views. A video file itself is not an independently inspectable still/frame for front/back/left/right view coverage.
-- Historical source: stale stacked PR #189 proposed a similar safeguard as part of a larger image-quality integration. Only the narrow video/frame relationship was ported.
+- Current-main gap: `assessBuildingCaptureManifest` counted raw `video` records as inspectable view records. A video file itself is not an independently inspectable still/frame for front/back/left/right coverage.
+- Historical source: stale stacked PR #189 suggested a similar safeguard in a larger image-quality integration. Only the narrow video/frame relationship was ported.
 - Clean branch based on main: `fix/capture-video-frame-evidence-coverage-main-20261103`.
 - Draft PR #342: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/342
 - Exact head `7559946227c4cf156b7faa81586e1a97a0cdfcbb`; 3 commits ahead / 0 behind, 3 changed paths.
-- Only `photo` and `video-frame` records count toward view coverage; raw videos are counted separately. Every capture video needs at least one extracted-frame record linked by parent `sourceId`.
-- Added `video-frame-extraction` readiness check, tests for raw-video rejection and linked-frame acceptance, and documentation.
-- Exact-head Full CI #41607259442 **passed**, including the capture manifest regression step #30, renderer suite and production-server viewport verification.
-- PR #342 remains Draft pending code review. This schema does not decode or extract video and does not establish frame quality.
+- Only `photo` and `video-frame` records count toward view coverage; videos are counted separately. Each capture video needs at least one linked extracted-frame record by parent `sourceId`.
+- Added `video-frame-extraction` readiness check, regression tests for raw-video rejection and linked-frame acceptance, and documentation.
+- Exact-head Full CI #41607259442 **passed**, including capture-manifest step #30 and production-server viewport verification.
+- PR #342 remains Draft pending code review. This schema does not decode/extract actual video or establish frame quality.
 
-**Immediate next action:** refresh PR #340 CI run #41608904987 and verify it matches the latest branch head `39e32ef...`; inspect focused generator, heritage, renderer and manifest steps plus Full CI terminal logs. If successful, inspect evidence/report output and keep PR #340 Draft pending review. Then continue the targeted PR #187 renderer-profile audit (it is absent from current main but changes the same Blender/render-manifest paths, so compare compatibility before porting). Separately seek an operator-run `workflow_dispatch` retest for PR #341. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate them.
+### NEXT-06 — generic, profile-driven Blender review renderer
+
+- Targeted audit of stale PR #187 found a useful renderer architecture gap: current main's `scripts/blender/render-building-review.py` still contains Rangmahal-specific node-name selection (`Rangmahal_GF`, `Dome`, `RoofDeck`, `Site_`). It falls back to whole-model rendering for other buildings, but adding another heritage building requires another code change.
+- PR #187 is stacked on old base `fix/bangabhaban-front-dome-alignment@5c936c7...`, so it cannot be merged wholesale. The unique profile idea can be ported independently after #340 stabilizes.
+- Candidate scope: a validated versioned render profile that supports global excluded-node prefixes, front-view include/exclude exact node names, bounded elevation, deterministic framing label, profile SHA-256 provenance and Node/Blender parity validation. Default remains generic whole-model; a Rangmahal profile preserves the known focused view without hard-coded names in the renderer.
+- Must preserve PR #340's new GLB bearing/confidence metadata and current render-manifest checks when porting. Do not overwrite those fields with the older PR #187 manifest implementation.
+- Acceptance: profile schema tests (unknown keys, wildcards, duplicates, include/exclude conflict, invalid elevation, missing selected mesh), deterministic profile hash, Blender receives the exact preflight hash, raw/final manifest records profile metadata, generic synthetic GLB produces 13 views in real Blender smoke, and explicit Rangmahal profile produces a focused front view without changing the GLB.
+- Do not start the implementation until current PR #340 exact-head CI #41609196223 is terminal and reviewed. Then create a dependent PR based on the reviewed #340 branch or first integrate #340; avoid a second clean-main PR that conflicts on the same renderer/manifest files.
+
+**Immediate next action:** monitor PR #340 run #41609196223 and inspect exact-head BuildingSpec/generator, render-manifest, heritage and Full CI steps. If a new failure appears, fix only the reproducible cause and rerun exact-head validation. If it passes, keep #340 Draft for review and begin NEXT-06 profile design/port with the orientation metadata preserved. Separately obtain an operator-run manual `workflow_dispatch` retest for PR #341. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate them.
 
 
 
