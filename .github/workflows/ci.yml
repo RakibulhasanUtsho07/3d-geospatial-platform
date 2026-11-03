@@ -597,6 +597,9 @@ jobs:
       - name: Test evidence-based building accuracy benchmark
         run: npm run test:building-accuracy-benchmark
 
+      - name: Test BRF-04 controlled synthetic baseline and deliberate defect injection
+        run: npm run test:building-baseline-defect-injection
+
       - name: Test multi-building accuracy evidence pack integrity and fail-closed release policy
         run: npm run test:building-accuracy-evidence-pack
 
