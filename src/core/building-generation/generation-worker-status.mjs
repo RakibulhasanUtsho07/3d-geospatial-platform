@@ -11,6 +11,9 @@ const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const WORKER_STATES = new Set(["running", "stopped"]);
 const WORKER_PHASES = new Set(["starting", "idle", "processing", "stopping", "stopped"]);
 const MAX_ERROR_LENGTH = 1200;
+const CAPABILITY_STATUSES = new Set(["ready", "configured", "blocked"]);
+const CAPABILITY_STRATEGIES = ["procedural", "photogrammetry", "single-image-ai"];
+const MAX_CAPABILITY_ITEMS = 8;
 
 function inside(root, candidate) {
   const relative = path.relative(root, candidate);
@@ -65,6 +68,37 @@ async function resolveQueueDirectory(root, { create }) {
   return current;
 }
 
+function validateCapabilities(value) {
+  if (value === null || value === undefined) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      value.schemaVersion !== "1.0.0" || !Number.isFinite(Date.parse(value.checkedAt)) ||
+      !value.strategies || typeof value.strategies !== "object" || Array.isArray(value.strategies)) {
+    throw new TypeError("Generation worker capability record is invalid.");
+  }
+  const strategies = {};
+  for (const strategy of CAPABILITY_STRATEGIES) {
+    const entry = value.strategies[strategy];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) ||
+        !CAPABILITY_STATUSES.has(entry.status) ||
+        !Array.isArray(entry.blockers) || entry.blockers.length > MAX_CAPABILITY_ITEMS ||
+        !entry.blockers.every((item) => typeof item === "string" && item.length <= 300) ||
+        !Array.isArray(entry.caveats) || entry.caveats.length > MAX_CAPABILITY_ITEMS ||
+        !entry.caveats.every((item) => typeof item === "string" && item.length <= 500)) {
+      throw new TypeError("Generation worker capability entry is invalid: " + strategy);
+    }
+    const modelWeights = entry.modelWeights ?? "unknown";
+    if (strategy === "single-image-ai" &&
+        !["cached", "missing", "not-checked", "unknown"].includes(modelWeights)) {
+      throw new TypeError("Generation worker modelWeights status is invalid.");
+    }
+    strategies[strategy] = {
+      status: entry.status, blockers: [...entry.blockers], caveats: [...entry.caveats],
+      ...(strategy === "single-image-ai" ? { modelWeights } : {}),
+    };
+  }
+  return { schemaVersion: "1.0.0", checkedAt: isoTimestamp(value.checkedAt, "capabilities.checkedAt"), strategies };
+}
+
 function validateRecord(value) {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
       value.schemaVersion !== GENERATION_WORKER_STATUS_SCHEMA_VERSION ||
@@ -88,6 +122,7 @@ function validateRecord(value) {
     heartbeatAt: isoTimestamp(value.heartbeatAt, "heartbeatAt"),
     currentJobId: value.currentJobId,
     lastError: value.lastError,
+    capabilities: validateCapabilities(value.capabilities),
   };
 }
 
@@ -128,6 +163,7 @@ export async function writeGenerationWorkerStatus({
   currentJobId = null,
   startedAt = new Date(),
   lastError = null,
+  capabilities = null,
   now = new Date(),
 }) {
   const root = await resolveWorkspaceRoot(workspaceRoot);
@@ -155,6 +191,7 @@ export async function writeGenerationWorkerStatus({
     heartbeatAt: nowIso,
     currentJobId,
     lastError: lastError === null ? null : lastError.slice(0, MAX_ERROR_LENGTH),
+    capabilities,
   });
 
   const queueDirectory = await resolveQueueDirectory(root, { create: true });
@@ -212,6 +249,7 @@ export async function getGenerationWorkerStatus({
       heartbeatAt: null,
       currentJobId: null,
       lastError: null,
+      capabilities: null,
     };
   }
 
@@ -233,5 +271,6 @@ export async function getGenerationWorkerStatus({
     heartbeatAgeMs: ageMs,
     currentJobId: stored.currentJobId,
     lastError: stored.lastError,
+    capabilities: stored.capabilities,
   };
 }

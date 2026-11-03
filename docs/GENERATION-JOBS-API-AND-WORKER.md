@@ -17,7 +17,10 @@ Every completed result keeps `mapReady=false` and `publicationEligible=false`. A
 Set these server-side environment variables:
 
 - `GENERATION_API_TOKEN`: a secret bearer token of at least 32 characters for creating/listing generation jobs. Never expose it to browser JavaScript or commit it to Git.
-- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.\n- `GENERATION_PUBLISH_API_TOKEN`: a third, separate secret bearer token of at least 32 characters for publishing an already approved job into the application's public model catalog. Do not reuse either other token.
+- `GENERATION_REVIEW_API_TOKEN`: a separate secret bearer token of at least 32 characters for recording human review decisions. Do not reuse the generation token.
+- `GENERATION_PUBLISH_API_TOKEN`: a third, separate secret bearer token of at least 32 characters for publishing an already approved job into the application's public model catalog. Do not reuse either other token.
+- `GENERATION_OPERATOR_LOGIN_TOKEN`: a separate operator passphrase of at least 32 characters used only to establish the map UI's short-lived HttpOnly session. Do not reuse any API bearer token.
+- `GENERATION_OPERATOR_SESSION_SECRET`: a different server-only secret of at least 32 characters used to HMAC-sign the 30-minute HttpOnly session cookie. Never expose it to browser JavaScript.
 - `BUILDING_ENGINE_WORKSPACE`: an existing, writable directory shared by the Next.js server and generation worker. Keep this workspace private.
 - Optional worker settings: `BUILDING_ENGINE_QUALITY` (`LOW`, `MEDIUM`, `HIGH` or `EXTREME`), `BUILDING_ENGINE_COLMAP_PATH`, `BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT`, `BUILDING_ENGINE_PYTHON_EXECUTABLE`, and `BUILDING_ENGINE_DEVICE`.
 
@@ -30,7 +33,9 @@ All routes require `Authorization: Bearer <GENERATION_API_TOKEN>`. If the secret
 - `POST /api/building-generation/jobs` — enqueue a JSON request and return HTTP 202.
 - `GET /api/building-generation/jobs?limit=20` — list up to 100 recent jobs.
 - `GET /api/building-generation/jobs/<jobId>` — retrieve status/result/error/review summary for a job.
-- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.\n- `POST /api/building-generation/jobs/<jobId>/publish` — publish an already approved job using explicit map placement. This route requires `GENERATION_PUBLISH_API_TOKEN` and is described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md).
+- `POST /api/building-generation/operator-session` — exchange the separate operator login token for a 30-minute HttpOnly, SameSite=Strict cookie used by the map-side intake UI. Details are in [D3M-03](D3M-03-MAP-IMAGE-INTAKE-AND-JOB-TRACKING.md).
+- `POST /api/building-generation/jobs/<jobId>/review` — record an explicit review decision. This route requires `GENERATION_REVIEW_API_TOKEN` (not the generation token), and a completed model plus its hash-matching QA report.
+- `POST /api/building-generation/jobs/<jobId>/publish` — publish an already approved job using explicit map placement. This route requires `GENERATION_PUBLISH_API_TOKEN` and is described in [D3M-02](D3M-02-GENERATION-JOB-TO-MAP-PUBLISH.md).
 
 Example request:
 
@@ -47,11 +52,13 @@ Example request:
     }
   },
   "strategy": "procedural",
-  "sources": []
+  "sources": [],
+  "confirmRights": false,
+  "confirmOperationScopes": false
 }
 ```
 
-Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, and a known licence/permission basis; also set `confirmRights: true` only after checking that the rights claim is accurate. Upload the media with `POST /api/building-generation/uploads` or ingest it through the local CLI first. Before writing a queued job, the server verifies that every source already exists under the private workspace, is a non-empty regular file with no symbolic-link path components, and is within the media-kind size limit. The generation worker still rechecks the actual file signature and checksum during intake; queue preflight is not a replacement for that validation. For API upload details and the 50 MiB request cap, see [Building Generation Engine](BUILDING-GENERATION-ENGINE.md#10-authenticated-media-upload-api).
+Use a complete valid BuildingSpec. For supplied media, each source must have a unique `sourceId`, a safe workspace-relative `relativePath`, a known licence/permission basis and explicit `permittedOperations` scopes. When at least one source is included, also set `confirmOperationScopes: true` after the source owner/operator has authorized those exact scopes; the server queue rejects requests that omit this separate confirmation. Every source must include `private-media-ingestion` plus the required strategy scopes: `procedural-model-derivation` for procedural, `single-image-ai-reconstruction` for single-image AI, or `photogrammetry-reconstruction` and `texture-baking` for photogrammetry. Set `confirmRights: true` only after checking the reuse-rights claim, and provide only the least-privilege operation scopes the source owner/operator authorized. These are separate operator attestations; neither proves independent legal permission. The worker's media-ingestion stage calls `reviewBuildingSource`, which sets the internal source field `usageStatus=approved` and `rightsReviewMethod=explicit-cli-attestation` from the submitted operator attestation. That status is not a separate reviewer decision, a legal opinion, or an independent rights verification. Upload the media with `POST /api/building-generation/uploads` or ingest it through the local CLI first. Before writing a queued job, the server verifies that every source already exists under the private workspace, is a non-empty regular file with no symbolic-link path components, and is within the media-kind size limit. For selected views used by `single-image-ai` or `photogrammetry`, queue preflight also reads the actual file signature and accepts JPEG/PNG only: the current TripoSR and COLMAP workers do not accept WebP inputs. WebP remains accepted by the general media-upload intake and may be retained for procedural jobs, but it must be converted (not merely renamed) before selecting it as an AI/photogrammetry view. The generation worker still rechecks the actual file signature and checksum during intake; queue preflight is not a replacement for that validation. For API upload details and the 50 MiB request cap, see [Building Generation Engine](BUILDING-GENERATION-ENGINE.md#10-authenticated-media-upload-api).
 
 For photogrammetry, include at least three `viewSourceIds`, and explicitly set `confirmSameBuilding`, `confirmOverlapReviewed`, `confirmUpAxisReviewed`, and `upAxis`. For single-image AI inference, provide exactly one selected view and set `confirmSingleViewInference: true`. These flags are operator attestations, not independent proof.
 
@@ -71,7 +78,8 @@ Example request shape (replace the placeholder with the exact path returned by t
       "sourceId": "front-photo",
       "relativePath": ".building-engine/media/dhaka-demo/assets/<sha256-returned-by-upload>.jpg",
       "kind": "image",
-      "licence": "CC BY 4.0"
+      "licence": "CC BY 4.0",
+      "permittedOperations": ["private-media-ingestion", "procedural-model-derivation"]
     }
   ],
   "confirmRights": true
@@ -125,10 +133,10 @@ $env:BUILDING_ENGINE_WORKSPACE = "E:\\building-engine-workspace"
 node scripts/run-generation-worker.mjs --once
 ```
 
-The procedural strategy is the deterministic smoke-test path. Photogrammetry requires the relevant COLMAP setup, and single-image inference requires the separately installed AI worker/dependencies configured for this deployment. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
+The procedural strategy is the deterministic smoke-test path. At worker startup, bounded probes check COLMAP and the TripoSR/Python/PyTorch/device configuration. For single-image AI, the probe also verifies that TripoSR's `config.yaml` and `model.ckpt` are present in the local Hugging Face cache; the worker claims AI jobs only when those files are cached. Jobs for unavailable strategies remain queued without consuming retry attempts. See [Generation Worker Health](GENERATION-WORKER-HEALTH.md) for the cache prefetch command and probe limitations. The queue itself does not install external models, CUDA, FFmpeg or COLMAP.
 
 ## Local outputs and review
 
 Queue state is in `.building-engine/generation-queue/jobs/`. Reconstruction stage artifacts and workflow reports are stored by the existing resumable workflow under `.building-engine/reconstruction-jobs/` and `.building-engine/jobs/`. Back up this workspace if it contains important outputs; do not expose it as a public static directory.
 
-A completed queue job indicates that the workflow produced a review candidate, not that the building is accurate, legally cleared, scaled, georeferenced or publishable. Use the existing QA/review tools and only activate a version through the published-model catalog after a qualified human review.
+A completed queue job indicates that the workflow produced a review candidate, not that the building is accurate, legally cleared, scaled, georeferenced or publishable. In particular, a source record's `usageStatus=approved` may mean only that the worker stored an operator's `explicit-cli-attestation`; do not describe it as independent rights approval. Use the existing QA/review tools and only activate a version through the published-model catalog after the separate job-level review and explicit placement workflow. The reviewer label is operator-supplied, not identity-provider verified.

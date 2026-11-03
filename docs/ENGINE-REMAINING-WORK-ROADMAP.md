@@ -155,6 +155,24 @@ The codebase still needs real-data validation and product-level completion. The 
 - Added a catalog publication lock around manifest read/modify/atomic-write so concurrent publishers cannot silently overwrite each other's model versions.
 - Added a map dialog panel for explicit job ID, placement, orientation, scale and public-asset confirmation. After publishing, it re-reads the catalog and checks exact model/version/hash/URL before loading and focusing the model in the current Cesium session.
 - Added regression cases for a separate public root and a busy catalog lock.
-- **Validation pending:** exact-head GitHub Actions, lint/build and reviewer inspection must pass before this milestone is called validated or merged.
+- [x] Exact-head Full CI passed on D3M-02 head `116453207d517db6db6a8a19f6cc5802f5630be0`: [run #41449228282](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41449228282), 179/179 steps; PR #302 was merged into main on 2026-11-03. This is automated repository validation only; it does not prove production deployment, model accuracy, rights or survey acceptance.
 - **Limits:** existing development review remains shared-token/operator-attested, not cryptographic reviewer identity. Placement remains an explicit operator input. Job release flags remain false; this does not prove image-based architectural accuracy, rights, survey truth or automatic approval.
+
+## D3M-03 — map-side image intake and generation job tracking (implementation candidate; baseline exact-head CI passed)
+
+**Tracking issue:** [#303](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/303)  
+**Dependency:** D3M-02 PR #302; implementation branch `feat/d3m03-map-generation-intake-20261102`  
+**Runbook:** [D3M-03 Map Image Intake and Job Tracking](D3M-03-MAP-IMAGE-INTAKE-AND-JOB-TRACKING.md)
+
+- Mounted a map-side intake panel for up to 12 JPEG/PNG/WebP facade images, 20 MiB each, using the existing signature-checking private media-upload API.
+- Added metric footprint generation from explicit WGS84 center, footprint width/depth, heading, floor count and floor height. The resulting footprint/floor evidence is explicitly marked estimated, not surveyed.
+- Added strategy-specific controls for single-image AI, COLMAP photogrammetry and procedural generation; procedural is labeled as dimension-driven and not image-derived.
+- Requires a non-unknown rights/licence basis and explicit operator rights confirmation before queue creation. Upload starts with `usageStatus=unreviewed`; worker ingestion later sets `usageStatus=approved` via `rightsReviewMethod=explicit-cli-attestation` using that same operator attestation. This is pipeline eligibility metadata, not independent rights review or legal clearance.
+- Added retry reuse of exact uploaded-source records while the dialog remains mounted and job/worker status polling with terminal-state stop.
+- Added short-lived HttpOnly operator sessions. A distinct login token is exchanged once for a 30-minute SameSite=Strict cookie; the server-only HMAC signing secret and legacy generation bearer token are never embedded in the browser bundle.
+- Added metric-geometry/strategy helper regression tests and a CI step.
+- [x] Baseline exact-head Full CI passed on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb`: [run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751), 179/179 steps. This validates automated code/build checks, not an actual TripoSR/COLMAP reconstruction, image quality, survey registration or accuracy.
+- Added local Hugging Face cache checks for TripoSR `config.yaml` and `model.ckpt`; single-image AI is claimable only when both files are cached. Any commit added after the cited SHA needs its own exact-head checks.
+- D3M-02 is now merged into main through PR #302 (merge commit `4ec5305108870a2cc30bd203c4a3c8c7ab9613a0`). D3M-03 has been reconciled against that main base in `integration/d3m03-main-reconciled-20261103`; this integrated candidate still requires exact-head CI and code review before merge.
+- **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. WebP is not a valid selected input for the current single-image AI or COLMAP photogrammetry worker; it is rejected at UI and queue preflight for those strategies. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
 

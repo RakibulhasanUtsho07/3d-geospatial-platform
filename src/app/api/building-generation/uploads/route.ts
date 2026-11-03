@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { authorizeGenerationApiRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
+import { authorizeGenerationOperatorRequest, getGenerationWorkspaceRoot } from "@/core/building-generation/generation-api-auth.mjs";
 import {
   ingestUploadedGenerationMedia,
   MAX_GENERATION_MEDIA_UPLOAD_BYTES,
@@ -65,7 +65,7 @@ function responseError(error: unknown) {
 }
 
 export async function POST(request: Request) {
-  const auth = authorizeGenerationApiRequest(request);
+  const auth = authorizeGenerationOperatorRequest(request);
   if (!auth.allowed) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
@@ -123,6 +123,18 @@ export async function POST(request: Request) {
     const sourceUrl = formText(form, "sourceUrl", 500);
     const capturedAt = formText(form, "capturedAt", 500);
     const description = formText(form, "description", 2000);
+    const title = formText(form, "title", 500) ?? entry.name.slice(0, 500) ?? "uploaded-media";
+    const rawOperations = formText(form, "permittedOperations", 1200, true)!;
+    let permittedOperations: unknown;
+    try {
+      permittedOperations = JSON.parse(rawOperations) as unknown;
+    } catch {
+      throw new TypeError("permittedOperations must be a JSON array of operation scopes.");
+    }
+    if (!Array.isArray(permittedOperations) || permittedOperations.length === 0 ||
+        permittedOperations.some((scope) => typeof scope !== "string")) {
+      throw new TypeError("permittedOperations must be a non-empty JSON array of operation scopes.");
+    }
 
     const result = await ingestUploadedGenerationMedia({
       workspaceRoot,
@@ -135,12 +147,14 @@ export async function POST(request: Request) {
       sourceUrl,
       capturedAt,
       description,
-      title: entry.name.slice(0, 500) || "uploaded-media",
+      permittedOperations,
+      title,
       bytes: Buffer.from(await entry.arrayBuffer()),
     });
 
     return NextResponse.json({
       source: result.record,
+      reused: result.reused === true,
       note: "Source is stored with usageStatus=unreviewed. Review rights before queueing generation.",
     }, { status: 201 });
   } catch (error) {

@@ -36,6 +36,14 @@ test("writes a bounded running heartbeat and reports active job information", as
     currentJobId: "gen-demo-01",
     startedAt: now,
     lastError: "previous non-fatal failure",
+    capabilities: {
+      schemaVersion: "1.0.0", checkedAt: now,
+      strategies: {
+        procedural: { status: "ready", blockers: [], caveats: ["local generator"] },
+        photogrammetry: { status: "blocked", blockers: ["COLMAP unavailable"], caveats: [] },
+        "single-image-ai": { status: "configured", blockers: [], caveats: ["weights unchecked"], modelWeights: "missing" },
+      },
+    },
     now,
   });
   const result = await getGenerationWorkerStatus({ workspaceRoot: root, now: "2026-10-22T12:00:10.000Z" });
@@ -44,6 +52,9 @@ test("writes a bounded running heartbeat and reports active job information", as
   assert.equal(result.phase, "processing");
   assert.equal(result.currentJobId, "gen-demo-01");
   assert.equal(result.lastError, "previous non-fatal failure");
+  assert.equal(result.capabilities.strategies.procedural.status, "ready");
+  assert.equal(result.capabilities.strategies.photogrammetry.status, "blocked");
+  assert.equal(result.capabilities.strategies["single-image-ai"].modelWeights, "missing");
   assert.ok(result.heartbeatAgeMs <= DEFAULT_WORKER_STATUS_STALE_AFTER_MS);
 
   const statusFile = path.join(root, ".building-engine", "generation-queue", "worker-status.json");
@@ -52,6 +63,21 @@ test("writes a bounded running heartbeat and reports active job information", as
   const saved = JSON.parse(await readFile(statusFile, "utf8"));
   assert.equal(saved.workerId, "worker-one");
   assert.equal(saved.currentJobId, "gen-demo-01");
+});
+
+test("rejects malformed worker strategy capability records", async (t) => {
+  const root = await workspace(t);
+  await assert.rejects(writeGenerationWorkerStatus({
+    workspaceRoot: root, workerId: "bad-capability",
+    capabilities: {
+      schemaVersion: "1.0.0", checkedAt: new Date().toISOString(),
+      strategies: {
+        procedural: { status: "ready", blockers: [], caveats: [] },
+        photogrammetry: { status: "maybe", blockers: [], caveats: [] },
+        "single-image-ai": { status: "blocked", blockers: [], caveats: [] },
+      },
+    },
+  }), /capability entry is invalid/);
 });
 
 test("reports a stale heartbeat instead of treating a dead worker as online", async (t) => {

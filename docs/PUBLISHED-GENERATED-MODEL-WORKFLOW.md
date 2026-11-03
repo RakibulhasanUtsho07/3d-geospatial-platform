@@ -108,3 +108,6 @@ The sample coordinates, names, IDs, notes and hashes are placeholders, not verif
 - An asset under \`public/models/generated/\` is publicly served when the site is deployed. Do not publish private, licensed-restricted or personally identifying evidence.
 - Manual/development preview remains available in the map panel and bypasses the catalog. Production use should load from the published catalog.
 - Model versions are retained for rollback; cleanup of old files is intentionally manual to avoid deleting assets still referenced by a deployed catalog.
+
+
+The map-side media intake and job tracker are documented in [D3M-03](D3M-03-MAP-IMAGE-INTAKE-AND-JOB-TRACKING.md). This intake creates private generation candidates; it does not bypass review or publish a generated GLB.

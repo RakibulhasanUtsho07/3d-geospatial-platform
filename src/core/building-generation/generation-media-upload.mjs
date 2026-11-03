@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
 import { ingestMediaFile } from "./media-intake.mjs";
+import { loadVerifiedSource } from "./source-workflow.mjs";
+import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 
 export const MAX_GENERATION_MEDIA_UPLOAD_BYTES = 50 * 1024 * 1024;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
@@ -29,6 +32,12 @@ export async function ingestUploadedGenerationMedia(options) {
   const sourceId = safeId(options.sourceId, "sourceId");
   const kind = options.kind ?? "auto";
   if (!KINDS.has(kind)) throw new TypeError("kind must be auto, image, video or floor-plan.");
+  const permittedOperations = options.permittedOperations === undefined
+    ? undefined
+    : normalizeSourceOperationScopes(options.permittedOperations, "permittedOperations");
+  if (permittedOperations && !permittedOperations.includes("private-media-ingestion")) {
+    throw new TypeError("permittedOperations must explicitly allow private-media-ingestion.");
+  }
 
   const bytes = Buffer.isBuffer(options.bytes)
     ? options.bytes
@@ -42,6 +51,23 @@ export async function ingestUploadedGenerationMedia(options) {
   }
 
   const root = await realpath(path.resolve(options.workspaceRoot));
+  const expectedHash = createHash("sha256").update(bytes).digest("hex");
+  const requestedLicence = options.licence ?? "unknown";
+  try {
+    const existing = await loadVerifiedSource(root, buildingId, sourceId);
+    const expectedKind = kind === "auto" ? existing.record.kind : kind;
+    if (existing.sha256 !== expectedHash) {
+      throw new Error("source id '" + sourceId + "' already exists with different content.");
+    }
+    if (existing.record.licence !== requestedLicence || existing.record.kind !== expectedKind) {
+      throw new Error("source id '" + sourceId + "' already exists with different source metadata.");
+    }
+    return { record: existing.record, reused: true };
+  } catch (error) {
+    if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
+      throw error;
+    }
+  }
   const stagingDirectory = await mkdtemp(path.join(root, ".generation-upload-"));
   const stagingFile = path.join(stagingDirectory, "payload.bin");
   try {
@@ -54,15 +80,16 @@ export async function ingestUploadedGenerationMedia(options) {
       sourceId,
       kind,
       title: options.title,
-      licence: options.licence ?? "unknown",
+      licence: requestedLicence,
       usageStatus: "unreviewed",
       author: options.author,
       attribution: options.attribution,
       sourceUrl: options.sourceUrl,
       capturedAt: options.capturedAt,
       description: options.description,
+      ...(permittedOperations === undefined ? {} : { permittedOperations }),
     });
-    return { record: result.record };
+    return { record: result.record, reused: false };
   } finally {
     await rm(stagingDirectory, { recursive: true, force: true });
   }
