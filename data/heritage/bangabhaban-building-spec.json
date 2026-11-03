@@ -66,7 +66,8 @@
       "radiusM": 4.2,
       "riseM": 5.6,
       "drumHeightM": 1.7,
-      "insetFromFrontM": 6.2
+      "insetFromFrontM": 6.2,
+      "anchor": "footprint-bounds-center"
     },
     "frontArcade": {
       "enabled": true,
@@ -77,7 +78,8 @@
       "projectionM": 1,
       "archThicknessM": 0.38,
       "heightM": 6.5
-    }
+    },
+    "frontFacingAzimuthDegrees": 180
   },
   "sources": [
     {
@@ -162,14 +164,15 @@
       "value": {
         "radiusM": 4.2,
         "riseM": 5.6,
-        "drumHeightM": 1.7
+        "drumHeightM": 1.7,
+        "anchor": "footprint-bounds-center"
       },
       "confidence": "estimated",
       "sourceIds": [
         "commons-aerial-2006",
         "commons-exterior-2017"
       ],
-      "notes": "Parametric proportions are visual estimates, not measured dimensions."
+      "notes": "Dome center is provisionally anchored to the footprint bounds center; placement and dome dimensions remain estimated until rectified imagery or measured plan evidence is available."
     },
     {
       "field": "frontArcade",
@@ -193,6 +196,16 @@
         "commons-exterior-2017"
       ],
       "notes": "Assumed for massing only; no section drawing or survey height is available."
+    },
+    {
+      "field": "frontFacingAzimuthDegrees",
+      "value": 180,
+      "confidence": "estimated",
+      "sourceIds": [
+        "commons-aerial-2006",
+        "commons-exterior-2017"
+      ],
+      "notes": "South-facing facade bearing is an approximate model-authoring orientation inferred from reference imagery, not a surveyed compass bearing."
     }
   ],
   "tags": [
