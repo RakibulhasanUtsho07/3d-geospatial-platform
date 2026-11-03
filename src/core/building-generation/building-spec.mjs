@@ -33,8 +33,10 @@ function hex(value, fallback, label) {
 export function coordinateToLocalMeters(point, origin) {
   const lat0 = origin.latitude * Math.PI / 180;
   return {
+    // glTF map-space is right-handed: +X east, +Y up, +Z south.
+    // Therefore northing is represented by negative model-space Z.
     x: (point[0] - origin.longitude) * Math.PI / 180 * EARTH_RADIUS_M * Math.cos(lat0),
-    z: (point[1] - origin.latitude) * Math.PI / 180 * EARTH_RADIUS_M
+    z: -(point[1] - origin.latitude) * Math.PI / 180 * EARTH_RADIUS_M
   };
 }
 function sourcesOf(value) {
