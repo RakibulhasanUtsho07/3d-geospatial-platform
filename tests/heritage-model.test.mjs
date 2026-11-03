@@ -238,7 +238,14 @@ test("camera-distance LOD selection follows tagged rendering thresholds", async 
 test("Blender front review view prioritizes the facade over the roof deck", async () => {
   const renderer = await readFile(path.join(root, "scripts/blender/render-building-review.py"), "utf8");
   assert.ok(renderer.includes('("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO")'));
-  assert.ok(renderer.includes("Five-degree south-elevation view reveals stair treads; RoofDeck is excluded"));
+  assert.ok(
+    /if view_id == "front":[\s\S]*?if focus_rangmahal:[\s\S]*?if obj not in front_review_meshes:/.test(renderer),
+    "Rangmahal node filtering must be restricted to the dedicated front-detail view",
+  );
+  assert.ok(
+    /else:\s+visible_meshes = meshes\s+view_center = center\s+view_distance = camera_distance\s+view_framing = "whole-model"/.test(renderer),
+    "back, side, top and turntable views must retain whole-model context",
+  );
   assert.ok(renderer.includes("Whole-model views restore it and retain the complete generated roof geometry."));
   assert.ok(renderer.includes('background.inputs["Strength"].default_value = 0.45'));
   assert.ok(renderer.includes("max_dimension * max_dimension * 29.0"));
