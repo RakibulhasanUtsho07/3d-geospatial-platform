@@ -51,7 +51,7 @@ function completeSyntheticManifest() {
     ...horizontal, operationId: "synthetic-vertical-operation", sourceCrs: "EPSG:7837",
     targetCrs: "EPSG:7837", sameDatumEvidenceSha256: sha("8")
   };
-  const checkpoints = [0, 1, 2].map((i) => ({
+  const checkpoints = [0, 1, 2, 3, 4, 5].map((i) => ({
     id: "checkpoint-" + i, sourceAssetId: survey.assetId, sourceSha256: survey.sha256,
     coordinateFrameId: "synthetic-evaluation-frame", xyz: [100 + i, 200 + i, 10 + i],
     uncertaintyM: 0.02, independentOfFit: true
@@ -76,6 +76,10 @@ function completeSyntheticManifest() {
     },
     candidateGlb: candidate,
     accuracy: {
+      fitSourceAssetRefs: [
+        { assetId: image.assetId, sha256: image.sha256, role: "image" },
+        { assetId: uls.assetId, sha256: uls.sha256, role: "uls" }
+      ],
       status: "reviewed", candidateGlbSha256: candidate.sha256, referenceSourceSha256: model.sha256,
       evaluationReportSha256: sha("a"), thresholdPolicyId: "synthetic-policy-v1",
       reviewer: "synthetic-reviewer", reviewedAt, heldOutCheckpoints: checkpoints
@@ -93,7 +97,8 @@ test("real candidate template remains blocked and every release flag is false", 
   assert.ok(report.blockingCount > 0);
   for (const id of ["citygml-source-rights", "image-frames-present", "same-building-linkage-reviewed",
     "horizontal-operation-approved", "vertical-frame-operation-approved", "platform-candidate-glb-present",
-    "held-out-checkpoints-independent"]) assert.ok(report.blockers.includes(id), id);
+    "candidate-fit-source-refs-hash-bound", "held-out-checkpoints-independent",
+    "held-out-checkpoints-disjoint-from-fit-sources"]) assert.ok(report.blockers.includes(id), id);
   assert.deepEqual(report.releaseFlags, FLAGS);
   assert.equal(report.candidateSelected, false);
   assert.equal(report.accuracyPassed, false);
@@ -181,6 +186,99 @@ test("unknown vertical frame or missing vertical transform blocks evaluation", (
   const report = validateBrf35BuildingLinkage(manifest, sourceReport);
   assert.ok(report.blockers.includes("vertical-frame-operation-approved"));
   assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("three or five held-out points cannot satisfy the six-point project gate", () => {
+  for (const count of [3, 5]) {
+    const manifest = completeSyntheticManifest();
+    manifest.accuracy.heldOutCheckpoints = manifest.accuracy.heldOutCheckpoints.slice(0, count);
+    const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+    assert.ok(report.blockers.includes("held-out-checkpoints-independent"));
+    assert.deepEqual(report.releaseFlags, FLAGS);
+  }
+});
+
+test("held-out source assets cannot also be declared as candidate fit inputs", () => {
+  const manifest = completeSyntheticManifest();
+  const survey = manifest.assets.surveyControls[0];
+  manifest.accuracy.fitSourceAssetRefs.push({
+    assetId: survey.assetId, sha256: survey.sha256, role: "survey-control"
+  });
+  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+  assert.ok(report.blockers.includes("held-out-checkpoints-disjoint-from-fit-sources"));
+  assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("held-out source bytes cannot alias a fit input through a different asset ID", () => {
+  const manifest = completeSyntheticManifest();
+  const image = manifest.assets.imageFrames[0];
+  const survey = manifest.assets.surveyControls[0];
+
+  // Model a duplicate byte payload registered under separate image/survey IDs.
+  survey.sha256 = image.sha256;
+  survey.rights.assetSha256 = image.sha256;
+  for (const point of manifest.accuracy.heldOutCheckpoints) {
+    point.sourceSha256 = image.sha256;
+  }
+
+  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+  assert.ok(report.blockers.includes("held-out-checkpoints-disjoint-from-fit-sources"));
+  assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("duplicate held-out checkpoint IDs cannot satisfy the six-point gate", () => {
+  const manifest = completeSyntheticManifest();
+  manifest.accuracy.heldOutCheckpoints[1].id =
+    manifest.accuracy.heldOutCheckpoints[0].id;
+
+  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+  assert.ok(report.blockers.includes("held-out-checkpoints-independent"));
+  assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("duplicate fit-source hashes under different asset IDs are rejected", () => {
+  const manifest = completeSyntheticManifest();
+  const original = manifest.assets.imageFrames[0];
+  const duplicate = {
+    ...original,
+    assetId: "image-front-duplicate",
+    sourceUri: "https://example.test/source/image-front-duplicate",
+    rights: { ...original.rights }
+  };
+  manifest.assets.imageFrames.push(duplicate);
+  manifest.accuracy.fitSourceAssetRefs.push({
+    assetId: duplicate.assetId,
+    sha256: duplicate.sha256,
+    role: "image"
+  });
+
+  const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+  assert.ok(report.blockers.includes("candidate-fit-source-refs-hash-bound"));
+  assert.deepEqual(report.releaseFlags, FLAGS);
+});
+
+test("candidate fit-source references reject missing, duplicate, stale, wrong-role and unknown assets", () => {
+  const invalidCases = [
+    manifest => { manifest.accuracy.fitSourceAssetRefs = []; },
+    manifest => { manifest.accuracy.fitSourceAssetRefs.push({ ...manifest.accuracy.fitSourceAssetRefs[0] }); },
+    manifest => { manifest.accuracy.fitSourceAssetRefs[0].sha256 = sha("f"); },
+    manifest => { manifest.accuracy.fitSourceAssetRefs[0].role = "uls"; },
+    manifest => {
+      const survey = manifest.assets.surveyControls[0];
+      manifest.accuracy.fitSourceAssetRefs.push({
+        assetId: survey.assetId, sha256: survey.sha256, role: "survey-control"
+      });
+    },
+    manifest => { manifest.accuracy.fitSourceAssetRefs[0].assetId = "unknown-fit-source"; },
+    manifest => { manifest.accuracy.fitSourceAssetRefs[0] = null; },
+  ];
+  for (const mutate of invalidCases) {
+    const manifest = completeSyntheticManifest();
+    mutate(manifest);
+    const report = validateBrf35BuildingLinkage(manifest, sourceReport);
+    assert.ok(report.blockers.includes("candidate-fit-source-refs-hash-bound"));
+    assert.deepEqual(report.releaseFlags, FLAGS);
+  }
 });
 
 test("control points reused for fitting are rejected", () => {
