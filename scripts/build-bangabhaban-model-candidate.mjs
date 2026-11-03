@@ -34,6 +34,9 @@ const candidate = {
   model: {
     path: path.relative(root, modelPath).split(path.sep).join("/"),
     coordinateFrame: "gltf-right-handed-x-east-y-up-z-south",
+    frontFacingAzimuthDegrees: report.frontFacade?.actualAzimuthDegrees ?? null,
+    frontAxisConfidence: report.frontFacade?.confidence ?? "unknown",
+    frontAxisSource: report.frontFacade?.source ?? "unknown",
     bytes: glb.byteLength,
     sha256,
     format: "glb",
