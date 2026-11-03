@@ -202,9 +202,11 @@ test("live Cesium controller handles fallback, terminal failure and late complet
     assert.equal(persistedManifest.sourceHeadSha, expectedSourceHead);
     assert.equal(persistedManifest.commit, expectedSourceHead);
     assert.match(persistedManifest.workflowSha ?? "", /^[a-f0-9]{40}$/);
+    // This browser suite is also run manually for operational verification.
+    // Keep the event provenance explicit for the supported GitHub trigger types.
     assert.ok(
-      persistedManifest.eventName === "push" || persistedManifest.eventName === "pull_request",
-      "Artifact must identify its GitHub event.",
+      ["push", "pull_request", "workflow_dispatch"].includes(persistedManifest.eventName ?? ""),
+      "Artifact must identify a supported GitHub event.",
     );
   }
 });
