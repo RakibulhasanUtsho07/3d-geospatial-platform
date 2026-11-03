@@ -54,6 +54,11 @@ def camera_direction_from_bearing(bearing_degrees, elevation_degrees=0.0):
     )
 
 
+def camera_track_up_axis(vertical_component):
+    """Use north (+Z) as screen-up for a vertical top camera; otherwise glTF +Y."""
+    return "Z" if abs(float(vertical_component)) > 0.999 else "Y"
+
+
 def build_review_view_directions(front_bearing_degrees=None, front_elevation_degrees=5.0, turntable_elevation_degrees=22.0):
     """Build front-relative orthographic views and a compass-clockwise eight-view turntable."""
     bearing = DEFAULT_FRONT_BEARING_DEGREES if front_bearing_degrees is None else float(front_bearing_degrees)
@@ -127,7 +132,7 @@ def scene_bounds(mesh_objects):
 def projected_ortho_scale(mesh_objects, view_center, direction, padding=1.15):
     """Fit an orthographic camera to the visible geometry projected into this view."""
     camera_location = view_center + direction.normalized()
-    rotation = (view_center - camera_location).to_track_quat("-Z", "Y")
+    rotation = (view_center - camera_location).to_track_quat("-Z", camera_track_up_axis(direction.y))
     camera_right = rotation @ Vector((1.0, 0.0, 0.0))
     camera_up = rotation @ Vector((0.0, 1.0, 0.0))
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -378,7 +383,9 @@ def main():
         camera_data.type = camera_type
         camera_data.ortho_scale = view_scale
         camera.location = view_center + direction * view_distance
-        camera.rotation_euler = (view_center - camera.location).to_track_quat("-Z", "Y").to_euler()
+        camera.rotation_euler = (view_center - camera.location).to_track_quat(
+            "-Z", camera_track_up_axis(direction.y)
+        ).to_euler()
         scene.camera = camera
         filename = view_id + ".png"
         scene.render.filepath = os.path.join(output_dir, filename)
