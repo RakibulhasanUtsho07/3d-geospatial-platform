@@ -9,6 +9,15 @@ on:
       - ".github/workflows/generic-renderer-smoke.yml"
       - "scripts/blender/render-building-review.py"
       - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/building-spec.mjs"
+      - "src/core/building-generation/facade-placement.mjs"
+      - "src/core/building-generation/facade-wall-openings.mjs"
+      - "tests/facade-wall-openings.test.mjs"
+      - "src/core/building-generation/glb-facade-orientation.mjs"
+      - "src/core/building-generation/procedural-glb.mjs"
+      - "building-generation-spec.schema.json"
+      - "tests/building-generation-engine.test.mjs"
+      - "tests/render-review-manifest.test.mjs"
       - "src/core/building-generation/render-review-profile.mjs"
       - "src/core/building-generation/render-review-manifest.mjs"
       - "tests/render-review-profile.test.mjs"
@@ -24,6 +33,15 @@ on:
       - ".github/workflows/generic-renderer-smoke.yml"
       - "scripts/blender/render-building-review.py"
       - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/building-spec.mjs"
+      - "src/core/building-generation/facade-placement.mjs"
+      - "src/core/building-generation/facade-wall-openings.mjs"
+      - "tests/facade-wall-openings.test.mjs"
+      - "src/core/building-generation/glb-facade-orientation.mjs"
+      - "src/core/building-generation/procedural-glb.mjs"
+      - "building-generation-spec.schema.json"
+      - "tests/building-generation-engine.test.mjs"
+      - "tests/render-review-manifest.test.mjs"
       - "src/core/building-generation/render-review-profile.mjs"
       - "src/core/building-generation/render-review-manifest.mjs"
       - "tests/render-review-profile.test.mjs"
@@ -69,6 +87,7 @@ jobs:
 
       - name: Run renderer profile and manifest tests
         run: |
+          npm run test:building-generation
           npm run test:render-review-profile
           node --test tests/render-review-manifest.test.mjs tests/render-building-review-renderer.test.mjs tests/heritage-model.test.mjs
 

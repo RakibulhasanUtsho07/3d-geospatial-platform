@@ -1,4 +1,6 @@
 import { normalizeBuildingSpec } from "./building-spec.mjs";
+import { createFacadeFrame, offsetFacadePoint, selectFrontFacadeEdge, surfaceInsertCenterOffset } from "./facade-placement.mjs";
+import { addExtrudedFacadeProfile, addWallPanelWithOpenings, createFacadeOpeningProfile } from "./facade-wall-openings.mjs";
 const MATERIALS = ["wall", "roof", "glass", "frame", "concrete", "door", "metal"];
 function rgba(hex) { const s = hex.slice(1); return [0, 2, 4].map(i => parseInt(s.slice(i, i + 2), 16) / 255).concat(1); }
 function normal(a, b, c) {
@@ -62,7 +64,7 @@ function triangulate(points) {
   }
   if(order.length===3) triangles.push(order.slice()); return triangles;
 }
-function encodeGlb(spec, geo) {
+function encodeGlb(spec, geo, facadeOrientation, structuralOpenings) {
   const active=MATERIALS.filter(name=>geo.groups.get(name).indices.length), indexOf=new Map(active.map((name,i)=>[name,i]));
   const materials=active.map(name=>({name:name==="wall"?"Facade":name[0].toUpperCase()+name.slice(1),pbrMetallicRoughness:{baseColorFactor:rgba(({wall:spec.architecture.wallColor,roof:spec.architecture.roofColor,glass:spec.architecture.glassColor,frame:spec.architecture.frameColor,concrete:spec.architecture.concreteColor,door:spec.architecture.doorColor,metal:"#4B5563"})[name]),metallicFactor:name==="metal"?0.65:0,roughnessFactor:name==="glass"?0.24:0.78}}));
   const bins=[], views=[], accessors=[], meshes=[], nodes=[]; let offset=0;
@@ -78,7 +80,7 @@ function encodeGlb(spec, geo) {
     const pa=accessor(pi,5126,g.positions.length/3,"VEC3",{min,max}),na=accessor(ni,5126,g.normals.length/3,"VEC3"),ia=accessor(ii,small?5123:5125,ivals.length,"SCALAR",{min:[lo],max:[hi]});
     meshes.push({name:spec.id+"-"+name,primitives:[{attributes:{POSITION:pa,NORMAL:na},indices:ia,material:indexOf.get(name),mode:4}]});nodes.push({name:spec.name+" - "+name,mesh:meshes.length-1});
   }
-  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType}}};
+  const binary=Buffer.concat(bins), gltf={asset:{version:"2.0",generator:"Dhaka Building Generation Engine / procedural-glb v1",extras:{buildingId:spec.id,schemaVersion:spec.schemaVersion}},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,meshes,materials,accessors,bufferViews:views,buffers:[{byteLength:binary.length}],extras:{building:{id:spec.id,name:spec.name,footprintAreaM2:spec.footprint.areaM2,floors:spec.dimensions.floorCount,roofType:spec.architecture.roofType,facadeOrientation,structuralOpenings}}};
   const jb=Buffer.from(JSON.stringify(gltf)), jp=(4-jb.length%4)%4, bp=(4-binary.length%4)%4;
   const json=Buffer.concat([jb,Buffer.alloc(jp,0x20)]), bin=bp?Buffer.concat([binary,Buffer.alloc(bp)]):binary, total=12+8+json.length+8+bin.length;
   const header=Buffer.alloc(12);header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
@@ -92,18 +94,145 @@ export function generateProceduralGlb(rawSpec) {
   if(spec.sources.some(s=>["image","video","video-frame"].includes(s.kind)))warnings.push("Image/video visual analysis is not run; media are preserved as provenance and cannot silently change geometry.");
   if(spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"))warnings.push("At least one source has unconfirmed reuse rights or review status; verify licence/attribution before publishing.");
   const geo=geometryBuilder(), points=derived.localFootprint, floorCount=spec.dimensions.floorCount, floorH=spec.dimensions.floorHeightM, height=floorCount*floorH, wt=spec.dimensions.wallThicknessM;
-  const edges=points.map((p,i)=>{const n=points[(i+1)%points.length],dx=n.x-p.x,dz=n.z-p.z,len=Math.hypot(dx,dz),ux=dx/len,uz=dz/len;return {p,n,len,out:{x:uz,z:-ux},yaw:Math.atan2(-uz,ux)};});
-  const front=edges.reduce((best,e,i,all)=>e.len>all[best].len?i:best,0);
-  for(let floor=0;floor<floorCount;floor++)for(let ei=0;ei<edges.length;ei++){
-    const e=edges[ei],cx=(e.p.x+e.n.x)/2-e.out.x*wt/2,cz=(e.p.z+e.n.z)/2-e.out.z*wt/2;
-    geo.box("wall",cx,floor*floorH+floorH/2,cz,e.len+wt*0.35,floorH,wt,e.yaw);
-    const w=spec.architecture.windows;if(!w.enabled||e.len<2.7)continue;
-    const bays=Math.max(1,Math.min(12,Math.floor(e.len/3.2))),ww=Math.min(w.widthM,e.len/(bays+1)*0.68),wh=Math.min(w.heightM,floorH*0.52);
-    for(let bay=0;bay<bays;bay++){if(floor===0&&ei===front&&bay===Math.floor(bays/2))continue;const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*(wt/2+0.035),z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*(wt/2+0.035),y=floor*floorH+floorH*0.56,f=0.055;
-      geo.box("glass",x,y,z,ww,wh,0.055,e.yaw);geo.box("frame",x,y+wh/2,z,ww+f,f,0.075,e.yaw);geo.box("frame",x,y-wh/2,z,ww+f,f,0.075,e.yaw);geo.box("frame",x-ww/2,y,z,f,wh,0.075,e.yaw);geo.box("frame",x+ww/2,y,z,f,wh,0.075,e.yaw);
+  const footprintSignedArea=points.reduce((sum,p,i)=>{
+    const next=points[(i+1)%points.length];
+    return sum+p.x*next.z-next.x*p.z;
+  },0)/2;
+  const outwardSign=footprintSignedArea>=0?1:-1;
+  const edges=points.map((point,index)=>{
+    const next=points[(index+1)%points.length];
+    return {p:point,n:next,...createFacadeFrame(point,next,outwardSign)};
+  });
+  const selectedFacade=selectFrontFacadeEdge(edges,{
+    frontFacadeEdgeIndex:spec.architecture.frontFacadeEdgeIndex,
+    frontFacingAzimuthDegrees:spec.architecture.frontFacingAzimuthDegrees
+  });
+  const front=selectedFacade.edgeIndex;
+  warnings.push(...selectedFacade.warnings);
+  const selectorEvidenceField=selectedFacade.method==="explicit-edge-index"
+    ?"frontFacadeEdgeIndex"
+    :selectedFacade.method==="azimuth-nearest-edge"
+      ?"frontFacingAzimuthDegrees"
+      :null;
+  const selectorEvidenceValue=selectorEvidenceField==="frontFacadeEdgeIndex"
+    ?spec.architecture.frontFacadeEdgeIndex
+    :selectorEvidenceField==="frontFacingAzimuthDegrees"
+      ?spec.architecture.frontFacingAzimuthDegrees
+      :null;
+  const selectorEvidence=selectorEvidenceField===null
+    ?[]
+    :spec.evidence.filter(item=>item.field===selectorEvidenceField);
+  const selectorEvidenceConflict=selectorEvidence.some(item=>JSON.stringify(item.value)!==JSON.stringify(selectorEvidenceValue));
+  const frontAxisConfidence=selectorEvidenceConflict
+    ?"unknown"
+    :selectorEvidence[0]?.confidence??selectedFacade.confidence;
+  if(selectorEvidenceConflict){
+    warnings.push("Front facade selector conflicts with its attached evidence; independent review is required.");
+  }
+  const frontAxisNeedsReview=frontAxisConfidence!=="verified";
+  const structuralOpeningRecords = [];
+  let wallPanelCount = 0;
+  let totalWallFaceAreaM2 = 0;
+  let totalOpeningAreaM2 = 0;
+  for (let floor = 0; floor < floorCount; floor += 1) {
+    for (let ei = 0; ei < edges.length; ei += 1) {
+      const e = edges[ei];
+      const openings = [];
+      const w = spec.architecture.windows;
+      const doorOnPanel = floor === 0 && ei === front && spec.architecture.includeDoor && e.len >= 2.5;
+      if (w.enabled && e.len >= 2.7) {
+        const bays = Math.max(1, Math.min(12, Math.floor(e.len / 3.2)));
+        const widthM = Math.min(w.widthM, e.len / (bays + 1) * 0.68);
+        const heightM = Math.min(w.heightM, floorH * 0.52);
+        for (let bay = 0; bay < bays; bay += 1) {
+          if (doorOnPanel && bay === Math.floor(bays / 2)) continue;
+          const centerU = (bay + 1) / (bays + 1) * e.len;
+          openings.push({
+            id: "window-f" + (floor + 1) + "-e" + ei + "-b" + (bay + 1),
+            kind: "window", shape: w.shape, centerU,
+            bottomM: floorH * 0.56 - heightM / 2, widthM, heightM,
+          });
+        }
+      }
+      if (doorOnPanel) openings.push({
+        id: "entrance-door", kind: "door", shape: spec.architecture.doorShape,
+        centerU: e.len / 2, bottomM: 0,
+        widthM: Math.min(1.05, e.len * 0.25), heightM: Math.min(2.16, floorH - 0.08),
+      });
+      const wall = addWallPanelWithOpenings(geo, {
+        edge: e, baseY: floor * floorH, heightM: floorH, wallThicknessM: wt, openings,
+      });
+      wallPanelCount += 1;
+      totalWallFaceAreaM2 += wall.wallFaceAreaM2;
+      for (const opening of wall.openings) {
+        structuralOpeningRecords.push({
+          ...opening, edgeIndex: ei, floorIndex: floor,
+          absoluteBottomM: Number((floor * floorH + opening.bottomM).toFixed(3)),
+          confidence: "procedural-layout", sourceEvidenceIds: [], reviewRequired: true,
+        });
+        totalOpeningAreaM2 += opening.profileAreaM2;
+        const edgePoint = { x: e.p.x + e.tangent.x * opening.centerU, z: e.p.z + e.tangent.z * opening.centerU };
+        const baseY = floor * floorH;
+        const paneDepth = 0.055, frameDepth = 0.075, faceClearanceM = 0.002;
+        const paneCenterOffset = surfaceInsertCenterOffset(paneDepth, faceClearanceM);
+        const frameCenterOffset = surfaceInsertCenterOffset(frameDepth, faceClearanceM);
+        const paneFrontDepth = paneDepth + faceClearanceM;
+        const frameFrontDepth = frameDepth + faceClearanceM;
+        const centerY = baseY + opening.bottomM + opening.heightM / 2;
+        if (opening.shape === "arched") {
+          const profile = createFacadeOpeningProfile(opening);
+          if (opening.kind === "window") {
+            addExtrudedFacadeProfile(geo,{edge:e,baseY,profile,frontDepth:paneFrontDepth,depthM:paneDepth,material:"glass"});
+          } else {
+            const archRise = Math.min(opening.widthM / 2, opening.heightM * 0.55);
+            const leafHeight = Math.max(0.25, opening.heightM - archRise);
+            const doorCenter = offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
+            geo.box("door",doorCenter.x,baseY+opening.bottomM+leafHeight/2,doorCenter.z,opening.widthM*0.96,leafHeight*0.96,0.07,e.yaw);
+          }
+          const frameBottom = Math.max(0,opening.bottomM-0.05);
+          const frameHeight = Math.min(floorH-frameBottom-0.02,opening.heightM+0.2);
+          const frameWidth = opening.widthM+(opening.kind==="door"?0.14:0.11);
+          if(frameHeight>opening.heightM&&frameWidth>opening.widthM){
+            const outerProfile=createFacadeOpeningProfile({...opening,bottomM:frameBottom,widthM:frameWidth,heightM:frameHeight});
+            const frameHoleProfile = opening.kind === "door" && opening.bottomM <= 0
+              ? createFacadeOpeningProfile({...opening,bottomM:0.035,heightM:opening.heightM-0.035})
+              : profile;
+            addExtrudedFacadeProfile(geo,{edge:e,baseY,profile:outerProfile,holes:[frameHoleProfile],frontDepth:frameFrontDepth,depthM:frameDepth,material:"frame"});
+          } else warnings.push("An arched opening frame could not maintain its required surround clearance; human review is required.");
+        } else if (opening.kind === "window") {
+          const paneCenter=offsetFacadePoint(edgePoint,e,0,paneCenterOffset);
+          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameCenterOffset);
+          const jamb=0.055;
+          geo.box("glass",paneCenter.x,centerY,paneCenter.z,opening.widthM,opening.heightM,paneDepth,e.yaw);
+          geo.box("frame",frameCenter.x,centerY+opening.heightM/2,frameCenter.z,opening.widthM+jamb,jamb,frameDepth,e.yaw);
+          geo.box("frame",frameCenter.x,centerY-opening.heightM/2,frameCenter.z,opening.widthM+jamb,jamb,frameDepth,e.yaw);
+          const left=offsetFacadePoint(edgePoint,e,-opening.widthM/2,frameCenterOffset);
+          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2,frameCenterOffset);
+          geo.box("frame",left.x,centerY,left.z,jamb,opening.heightM,frameDepth,e.yaw);
+          geo.box("frame",right.x,centerY,right.z,jamb,opening.heightM,frameDepth,e.yaw);
+        } else {
+          const doorCenter=offsetFacadePoint(edgePoint,e,0,surfaceInsertCenterOffset(0.07,faceClearanceM));
+          const frameCenter=offsetFacadePoint(edgePoint,e,0,frameCenterOffset);
+          geo.box("door",doorCenter.x,centerY,doorCenter.z,opening.widthM,opening.heightM,0.07,e.yaw);
+          geo.box("frame",frameCenter.x,baseY+opening.bottomM+opening.heightM+0.04,frameCenter.z,opening.widthM+0.14,0.08,0.09,e.yaw);
+          const left=offsetFacadePoint(edgePoint,e,-(opening.widthM/2+0.035),frameCenterOffset);
+          const right=offsetFacadePoint(edgePoint,e,opening.widthM/2+0.035,frameCenterOffset);
+          geo.box("frame",left.x,centerY,left.z,0.07,opening.heightM,0.09,e.yaw);
+          geo.box("frame",right.x,centerY,right.z,0.07,opening.heightM,0.09,e.yaw);
+        }
+      }
     }
   }
-  if(spec.architecture.includeDoor&&edges[front].len>=2.5){const e=edges[front],x=(e.p.x+e.n.x)/2+e.out.x*(wt/2+0.04),z=(e.p.z+e.n.z)/2+e.out.z*(wt/2+0.04),w=Math.min(1.05,e.len*0.25);geo.box("door",x,1.08,z,w,2.16,0.07,e.yaw);geo.box("frame",x,2.19,z,w+0.14,0.08,0.09,e.yaw);geo.box("frame",x-w/2-0.035,1.08,z,0.07,2.16,0.09,e.yaw);geo.box("frame",x+w/2+0.035,1.08,z,0.07,2.16,0.09,e.yaw);}
+  const structuralOpenings = {
+    schemaVersion:"1.0.0", engine:"facade-wall-openings-v1",
+    method:"scanline-triangulated-through-wall", wallPanelCount,
+    openingCount:structuralOpeningRecords.length,
+    wallFaceAreaM2:Number(totalWallFaceAreaM2.toFixed(3)),
+    openingAreaM2:Number(totalOpeningAreaM2.toFixed(3)),
+    confidence:"procedural-layout", reviewRequired:structuralOpeningRecords.length>0,
+    openings:structuralOpeningRecords,
+  };
+  if(structuralOpeningRecords.length>0) warnings.push("Door and window openings are structural through-wall apertures, but their dimensions and locations are procedural and require independent architectural review.");
   if(spec.architecture.balcony.enabled&&floorCount>1){const e=edges[front],b=spec.architecture.balcony,bays=Math.max(1,Math.min(6,Math.floor(e.len/Math.max(2.4,b.widthM+0.7)))),bw=Math.min(b.widthM,e.len/(bays+0.35));
     for(let floor=1;floor<floorCount;floor+=b.everyFloors)for(let bay=0;bay<bays;bay++){const t=(bay+1)/(bays+1),x=e.p.x+(e.n.x-e.p.x)*t+e.out.x*b.depthM*0.45,z=e.p.z+(e.n.z-e.p.z)*t+e.out.z*b.depthM*0.45,y=floor*floorH+0.06,rx=x+e.out.x*b.depthM*0.85,rz=z+e.out.z*b.depthM*0.85;
       geo.box("concrete",x,y,z,bw,0.12,b.depthM,e.yaw);geo.box("metal",rx,y+0.48,rz,bw,0.08,0.06,e.yaw);geo.box("metal",rx,y+0.24,rz,bw,0.04,0.045,e.yaw);
@@ -117,9 +246,21 @@ export function generateProceduralGlb(rawSpec) {
   // Optional architectural massing features: retained in the normalized BuildingSpec
   // and generated deterministically so specialist buildings need not be reduced to a box.
   const dome=spec.architecture.centralDome;
+  let domePlacement=null;
   if(dome.enabled){
     const e=edges[front],midX=(e.p.x+e.n.x)/2,midZ=(e.p.z+e.n.z)/2;
-    const cx=midX-e.out.x*dome.insetFromFrontM,cz=midZ-e.out.z*dome.insetFromFrontM;
+    const domeCenter=dome.anchor==="footprint-bounds-center"
+      ? {x:(spec.footprint.bounds.minX+spec.footprint.bounds.maxX)/2,z:(spec.footprint.bounds.minZ+spec.footprint.bounds.maxZ)/2}
+      : {x:midX-e.out.x*dome.insetFromFrontM,z:midZ-e.out.z*dome.insetFromFrontM};
+    const cx=domeCenter.x,cz=domeCenter.z;
+    domePlacement={
+      anchor:dome.anchor,
+      centerModelXZ:{x:Number(cx.toFixed(3)),z:Number(cz.toFixed(3))},
+      confidence:"estimated",
+      source:"buildingSpec.architecture.centralDome.anchor",
+      reviewRequired:true
+    };
+    warnings.push("Central dome placement is a procedural anchor ("+dome.anchor+"); verify its position against independent architectural evidence.");
     const baseY=height+spec.dimensions.parapetHeightM;
     geo.cylinder("concrete",cx,baseY,cz,dome.radiusM*0.88,dome.drumHeightM,24);
     const domeY=baseY+dome.drumHeightM,segments=32,steps=12;
@@ -196,17 +337,63 @@ export function generateProceduralGlb(rawSpec) {
       geo.box("concrete",cornice[0],cornice[1],cornice[2],span+0.5,0.24,arcade.columnDepthM*1.4,e.yaw);
     }
   }
-  const glb=encodeGlb(spec,geo);
+  const facadeOrientation = {
+    schemaVersion:"1.0.0",
+    coordinateFrame:"glTF-local:+X=east,+Y=up,+Z=north",
+    selectionMethod:selectedFacade.method,
+    edgeIndex:front,
+    requestedAzimuthDegrees:selectedFacade.requestedAzimuthDegrees,
+    actualAzimuthDegrees:selectedFacade.actualAzimuthDegrees,
+    outwardNormal:{x:Number(edges[front].out.x.toFixed(6)),z:Number(edges[front].out.z.toFixed(6))},
+    confidence:frontAxisConfidence,
+    source:selectedFacade.source,
+    reviewRequired:frontAxisNeedsReview||selectedFacade.reviewRequired
+  };
+  const glb=encodeGlb(spec,geo,facadeOrientation,structuralOpenings);
   return {glb,normalizedSpec:spec,report:{
     engine:"procedural-glb-v1",buildingId:spec.id,schemaVersion:spec.schemaVersion,strategy:spec.sources.some(s=>["image","video","video-frame"].includes(s.kind))?"reference-assisted-procedural":"procedural-from-spec",
     output:{format:"glb",bytes:glb.byteLength,heightM:Number((height+spec.dimensions.parapetHeightM).toFixed(2))},
     geometry:{footprintAreaM2:spec.footprint.areaM2,perimeterM:spec.footprint.perimeterM,floorCount,polygonVertices:points.length,meshMaterialGroups:activeMaterialsFor(geo)},
+    facadeOrientation,
+    structuralOpenings,
+    facadeSelection:{
+      method:selectedFacade.method,
+      edgeIndex:front,
+      confidence:frontAxisConfidence,
+      requestedAzimuthDegrees:selectedFacade.requestedAzimuthDegrees,
+      actualAzimuthDegrees:selectedFacade.actualAzimuthDegrees,
+      source:selectedFacade.source,
+      alignmentDot:selectedFacade.alignmentDot
+    },
+    architecturePlacement:{
+      frontFacade:{
+        edgeIndex:front,
+        requestedAzimuthDegrees:selectedFacade.requestedAzimuthDegrees,
+        actualAzimuthDegrees:selectedFacade.actualAzimuthDegrees,
+        confidence:frontAxisConfidence,
+        source:selectedFacade.source,
+        outwardNormal:{x:Number(edges[front].out.x.toFixed(6)),z:Number(edges[front].out.z.toFixed(6))},
+        insertFaceClearanceM:0.002
+      },
+      centralDome:domePlacement,
+      structuralOpenings:{
+        engine:structuralOpenings.engine,method:structuralOpenings.method,
+        wallPanelCount:structuralOpenings.wallPanelCount,openingCount:structuralOpenings.openingCount,
+        wallFaceAreaM2:structuralOpenings.wallFaceAreaM2,openingAreaM2:structuralOpenings.openingAreaM2,
+        confidence:structuralOpenings.confidence,reviewRequired:structuralOpenings.reviewRequired
+      }
+    },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
     evidence:spec.evidence.map(e=>({field:e.field,confidence:e.confidence,sourceIds:e.sourceIds})),
     sources:spec.sources.map(s=>({id:s.id,kind:s.kind, ...(s.url?{url:s.url}:{}),licence:s.licence||null,attribution:s.attribution||null,usageStatus:s.usageStatus})),
     confidenceSummary:Object.fromEntries(["verified","derived","estimated","ai-proposed","unknown"].map(level=>[level,spec.evidence.filter(e=>e.confidence===level).length])),
-    reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||spec.sources.some(s=>!s.licence||s.usageStatus!=="approved"),
-    warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
+    reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||
+      spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
+      frontAxisNeedsReview||
+      selectedFacade.reviewRequired||
+      (domePlacement?.reviewRequired===true)||
+      (structuralOpenings.reviewRequired===true),
+    warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route.","Door/window apertures are geometrically cut through procedural wall panels; opening dimensions, spacing and architecture remain estimated until independently reviewed."]
   }};
 }
 function activeMaterialsFor(geo){return MATERIALS.filter(name=>geo.groups.get(name).indices.length>0);}

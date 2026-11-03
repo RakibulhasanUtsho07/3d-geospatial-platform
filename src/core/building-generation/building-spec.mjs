@@ -123,9 +123,29 @@ export function normalizeBuildingSpec(raw) {
   const a = input.architecture === undefined ? {} : obj(input.architecture, "architecture");
   const roofType = (a.roofType || "flat").toLowerCase();
   if (!ROOFS.has(roofType)) throw new TypeError("unsupported roofType");
+  const frontFacadeEdgeIndex = a.frontFacadeEdgeIndex === undefined
+    ? undefined
+    : num(a.frontFacadeEdgeIndex, "frontFacadeEdgeIndex", 0, ring.length - 1);
+  if (frontFacadeEdgeIndex !== undefined && !Number.isInteger(frontFacadeEdgeIndex)) {
+    throw new RangeError("frontFacadeEdgeIndex must be an integer matching an outer footprint edge index");
+  }
+  const frontFacingAzimuthDegrees = a.frontFacingAzimuthDegrees === undefined || a.frontFacingAzimuthDegrees === null
+    ? null
+    : num(a.frontFacingAzimuthDegrees, "frontFacingAzimuthDegrees", 0, 360);
+  if (frontFacadeEdgeIndex !== undefined && frontFacingAzimuthDegrees !== null) {
+    throw new TypeError("specify either frontFacadeEdgeIndex or frontFacingAzimuthDegrees, not both");
+  }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
+  const windowShape = windows.shape === undefined ? "rectangular" : str(windows.shape, "windows.shape", 20).toLowerCase();
+  if (!["rectangular", "arched"].includes(windowShape)) throw new TypeError("windows.shape must be rectangular or arched");
+  const doorShape = a.doorShape === undefined ? "rectangular" : str(a.doorShape, "doorShape", 20).toLowerCase();
+  if (!["rectangular", "arched"].includes(doorShape)) throw new TypeError("doorShape must be rectangular or arched");
   const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
+  const domeAnchor = dome.anchor === undefined ? "front-facade-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
+  if (!["front-facade-inset", "footprint-bounds-center"].includes(domeAnchor)) {
+    throw new TypeError("centralDome.anchor must be 'front-facade-inset' or 'footprint-bounds-center'");
+  }
   const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
@@ -135,6 +155,8 @@ export function normalizeBuildingSpec(raw) {
   const architecture = {
     style: a.style === undefined ? "dhaka-residential-modern" : str(a.style, "style", 80),
     roofType,
+    ...(frontFacadeEdgeIndex === undefined ? {} : { frontFacadeEdgeIndex }),
+    frontFacingAzimuthDegrees,
     wallColor: hex(a.wallColor, "#D8D2C8", "wallColor"),
     roofColor: hex(a.roofColor, "#B5B8BC", "roofColor"),
     glassColor: hex(a.glassColor, "#536D86", "glassColor"),
@@ -142,6 +164,7 @@ export function normalizeBuildingSpec(raw) {
     concreteColor: hex(a.concreteColor, "#B8B7B1", "concreteColor"),
     doorColor: hex(a.doorColor, "#76533A", "doorColor"),
     includeDoor: bool(a.includeDoor, true, "includeDoor"),
+    doorShape,
     balcony: {
       enabled: bool(balcony.enabled, true, "balcony.enabled"),
       everyFloors: balcony.everyFloors === undefined ? 2 : num(balcony.everyFloors, "balcony.everyFloors", 1, 20),
@@ -150,11 +173,13 @@ export function normalizeBuildingSpec(raw) {
     },
     windows: {
       enabled: bool(windows.enabled, true, "windows.enabled"),
+      shape: windowShape,
       widthM: windows.widthM === undefined ? 1.15 : num(windows.widthM, "windows.widthM", 0.4, 3),
       heightM: windows.heightM === undefined ? 1.25 : num(windows.heightM, "windows.heightM", 0.4, 3)
     },
     centralDome: {
       enabled: bool(dome.enabled, false, "centralDome.enabled"),
+      anchor: domeAnchor,
       radiusM: dome.radiusM === undefined ? 3.5 : num(dome.radiusM, "centralDome.radiusM", 1, 15),
       riseM: dome.riseM === undefined ? 4.5 : num(dome.riseM, "centralDome.riseM", 1, 20),
       drumHeightM: dome.drumHeightM === undefined ? 1.5 : num(dome.drumHeightM, "centralDome.drumHeightM", 0.5, 8),
