@@ -83,6 +83,7 @@ on:
       - integration/brf14-main-refresh-20261103
       - integration/p34-main-refresh-20261103
 
+  workflow_dispatch:
   pull_request:
     branches:
       - main
