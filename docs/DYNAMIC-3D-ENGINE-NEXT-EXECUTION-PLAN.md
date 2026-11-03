@@ -356,8 +356,9 @@ The comparison counts above describe divergent history from each merge base; the
 - Exact head at PR creation: `50f19f26d365f66b42b3ce02bd07025d572762bb`; compare was 6 commits ahead / 0 behind, with 6 changed paths.
 - Adds a synthetic 10×8×6 cuboid GLB fixture, repeatability SHA-256 test, deliberate +20% Y-scale and degenerate-triangle defects, invalid-input checks, npm test script, CI step and documented limits.
 - Reuses current-main `glb-geometry-qa.mjs` and `reference-dimension-validation.mjs`; it does not import or merge the old stacked renderer/evidence branches.
-- Exact-head CI run #41604594271 is in progress. The full CI job was still at dependency installation when last inspected; the new BRF-04 step has **not yet been observed running or passing**. Related PR-triggered workflows are also pending/in progress.
-- Keep PR #339 Draft. Read every exact-head CI step; fix failures on the same fresh branch; rerun checks after every head change. Do not claim test success until the new step and full exact-head CI pass.
+- Exact-head CI run #41604594271 is still in progress at the last refresh, but the focused **BRF-04 test step #131 has completed successfully**. The job advanced through the full suite to production-server viewport API verification; the overall CI workflow is not yet terminal, so no full-CI pass is claimed.
+- Same-head supplementary checks passed: P3.6 run #41604594440, P3.7 run #41604594280, BRF-05–07 run #41604594463, BRF-14 run #41604594287, and BRF-35 run #41604594347. Real-Dhaka browser baseline #41604594444 remains in progress. BRF-45 run #41604594331 was cancelled; it is not counted as a pass.
+- PR #339's body was updated with this exact status. Keep it Draft. Continue checking terminal results; if Full CI or Real-Dhaka baseline fails, inspect logs and resolve only reproducible failures on a fresh head. Do not claim success until relevant checks are terminal and reviewed.
 
 **Immediate next action:** refresh PR #339 head and run #41604594271. Confirm the BRF-04 test step outcome and full CI result. If it passes, inspect the resulting artifacts/logs and update this register; do not merge until required review and exact-head CI are confirmed. Afterward, continue a file-by-file source review of the retained unique work in PR #103 and #185–#189. P3.4 target-device review remains externally blocked.
 
