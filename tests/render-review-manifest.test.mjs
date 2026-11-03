@@ -43,6 +43,7 @@ test("finalizes the full five-axis plus eight-angle render set", () => {
   assert.equal(report.status, "render-set-ready-for-human-review");
   assert.equal(report.counts.generatedViews, 13);
   assert.equal(report.publicationEligible, false);
+  assert.equal(report.frontCameraEffectiveBearingDegrees, 180, "legacy/default review camera is south-facing in the glTF frame");
   assert.equal(report.humanReview.status, "pending");
   assert.equal(report.humanReview.checklist.length, 5);
   assert.equal(report.views.find((view) => view.id === "front").framing, "rangmahal-south-facade");
@@ -100,6 +101,7 @@ test("preserves a validated GLB front bearing and source in the review manifest"
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
   assert.equal(report.frontFacingAzimuthDegrees, 180);
+  assert.equal(report.frontCameraEffectiveBearingDegrees, 180);
   assert.equal(report.frontAxisConfidence, "estimated");
   assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
 });
@@ -125,4 +127,18 @@ test("fails closed when front bearing metadata has an invalid value or source", 
   const missingBearingSource = fixture();
   missingBearingSource.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
   assert.ok(finalizeRenderReviewManifest(missingBearingSource).errors.includes("render-front-bearing-source-mismatch"));
+});
+
+
+test("fails closed when effective front camera bearing contradicts the source bearing or default", () => {
+  const explicitMismatch = fixture();
+  explicitMismatch.rawManifest.frontFacingAzimuthDegrees = 180;
+  explicitMismatch.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  explicitMismatch.rawManifest.frontAxisConfidence = "estimated";
+  explicitMismatch.rawManifest.frontCameraEffectiveBearingDegrees = 90;
+  assert.ok(finalizeRenderReviewManifest(explicitMismatch).errors.includes("render-effective-front-bearing-mismatch"));
+
+  const defaultMismatch = fixture();
+  defaultMismatch.rawManifest.frontCameraEffectiveBearingDegrees = 0;
+  assert.ok(finalizeRenderReviewManifest(defaultMismatch).errors.includes("render-effective-front-bearing-mismatch"));
 });
