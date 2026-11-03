@@ -372,8 +372,8 @@ The comparison counts above describe divergent history from each merge base; the
 - Adds facade-local tangent/outward frame with winding-aware exterior normal; places panes, frames, door and jambs at a 2 mm inner-face clearance, with jamb offsets along facade tangent.
 - Selected front edge is used by front-specific procedural features and recorded in `facadeSelection` report.
 - Adds tests for rotated axes, insert clearance, normal and reversed GeoJSON winding, explicit facade edge, inferred fallback and invalid indexes; documents the BuildingSpec contract.
-- Exact-head CI run #41605913082 is in progress. The focused `Test BuildingSpec validation and procedural GLB generation` step #17 **passed**; the overall job had advanced to production-server viewport API verification with no failure observed at the last refresh.
-- Keep PR #340 Draft until full exact-head CI reaches a successful terminal result and review verifies the generated geometry evidence.
+- Exact-head Full CI run #41605913082 **passed**. Focused generator test, capture-manifest suite, generation queue/API suite and production-server viewport verification all passed.
+- PR #340 remains Draft pending code/geometry review. Synthetic regression tests do not establish real-building accuracy.
 
 ### NEXT-04 — workflow_dispatch evidence event provenance
 
@@ -381,10 +381,27 @@ The comparison counts above describe divergent history from each merge base; the
 - Clean branch: `fix/p36-workflow-dispatch-evidence-event-20261103`, based on current main.
 - Draft PR #341: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/341
 - Head: `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. The manifest still records the actual `GITHUB_EVENT_NAME`; the test now accepts `workflow_dispatch` as a legitimate event while rejecting missing/unrecognized event names.
-- Exact-head CI #41606193975 is queued; P3.6 workflow #41606193939 is in progress. A manual dispatch rerun cannot be triggered through the available connector and must be verified separately after merge or by an operator.
-- Keep PR #341 Draft until its PR-triggered CI and P3.6 checks pass; do not claim manual-dispatch validation merely because the pull-request path passes.
+- Exact-head Full CI #41606193975 **passed**.
+- P3.6 Dhaka multi-building workflow #41606193939 **passed** on the same exact head.
+- A separate manual workflow-dispatch rerun remains outstanding. The available GitHub connection can inspect Actions but cannot dispatch this workflow; an operator must perform that manual trigger to close the cross-event verification.
+- PR #341 remains Draft until manual workflow-dispatch verification and code review are complete.
 
-**Immediate next action:** refresh PR #340 run #41605913082 and PR #341 runs #41606193975 / #41606193939; inspect the exact changed test steps, all failed jobs and terminal logs. Fix reproducible failures on the corresponding branch. Do not merge any Draft PR until exact-head CI, relevant browser checks and review pass. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate either. After these PRs reach terminal status, continue the remaining PR #103 and #185–#189 code review only for unique, current-main-compatible work.
+### NEXT-05 — raw video must not count as a facade capture without extracted frames
+
+- Current-main gap confirmed in `src/core/building-generation/building-capture-manifest.mjs`: capture coverage counted `video` records alongside `photo` and `video-frame`, even though a raw video file is not an independently inspectable still/frame for facade coverage.
+- Historical source: PR #189 proposed the same safeguard but was stacked on an old BRF-02 base and included a larger image-quality-preflight integration. Only the narrow video/frame evidence contract was ported.
+- Clean branch: `fix/capture-video-frame-evidence-coverage-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Draft PR #342: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/342
+- Exact head: `7559946227c4cf156b7faa81586e1a97a0cdfcbb`; 3 commits ahead / 0 behind, 3 changed paths.
+- Counts only capture `photo` and `video-frame` records toward facade coverage; raw videos are counted separately.
+- Requires each declared capture video to have at least one extracted `video-frame` linked by the same parent `sourceId`.
+- Adds explicit `video-frame-extraction` readiness check and two tests: raw video cannot fill a missing side; a linked extracted frame can.
+- Updates the capture-manifest documentation. Does not decode/extract video or claim frame quality.
+- Exact-head CI run #41607259442 is in progress; at last refresh it was at dependency installation, with no failed steps yet. Focused capture-manifest and full CI results are pending.
+- Keep PR #342 Draft until exact-head focused tests, lint, Full CI and evidence checks pass.
+
+**Immediate next action:** refresh PR #342 run #41607259442 and inspect its focused capture-manifest/CLI steps, full CI and logs. If it passes, review the raw-video/frame-link edge cases and keep Draft pending review. Separately obtain an operator-run `workflow_dispatch` retest for PR #341. Then continue the targeted PR #185–#189 audit only for unique, current-main-compatible work; do not merge historical stacked branches. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate either.
+
 
 
 ## 7. Mandatory acceptance checklist for every future work unit
