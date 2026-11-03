@@ -250,3 +250,15 @@ test("requires each image to be explicitly bound to a permitted still-image inta
   assert.equal(stubs.calls.media, 0);
   assert.equal(stubs.calls.geometry, 0);
 });
+test("rejects a BuildingSpec identity mismatch before child workflow execution", async (t) => {
+  const f = await fixture(t);
+  f.options.media.buildingSpec.id = "different-building";
+  const stubs = createWorkflowStubs(f);
+  await assert.rejects(
+    runEvidenceBackedVerticalSlice(f.options, stubs),
+    /BuildingSpec.id must exactly match the parent buildingId/,
+  );
+  assert.equal(stubs.calls.media, 0);
+  assert.equal(stubs.calls.geometry, 0);
+});
+
