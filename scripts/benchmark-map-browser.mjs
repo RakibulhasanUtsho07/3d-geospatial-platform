@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -84,6 +85,38 @@ function safeGitValue(args, cwd = projectRoot) {
  * Exclude only this benchmark's generated artifact directory from the source
  * cleanliness check. Tracked edits and untracked files elsewhere still count.
  */
+const GENERATED_CESIUM_ASSET_PAIRS = [
+  {
+    generatedPath: "public/cesium/Cesium.js",
+    sourcePath: "node_modules/cesium/Build/Cesium/Cesium.js",
+  },
+  {
+    generatedPath: "public/cesium/ThirdParty/zip-module.wasm",
+    sourcePath: "node_modules/cesium/Build/Cesium/ThirdParty/zip-module.wasm",
+  },
+];
+
+function isExactGeneratedCesiumAsset(changedPath, rootDirectory) {
+  const normalizedPath = changedPath.replace(/\\\\/g, "/");
+  const asset = GENERATED_CESIUM_ASSET_PAIRS.find((entry) => entry.generatedPath === normalizedPath);
+  if (!asset) return false;
+
+  const generatedPath = path.join(rootDirectory, asset.generatedPath);
+  const sourcePath = path.join(rootDirectory, asset.sourcePath);
+  try {
+    if (!existsSync(generatedPath) || !existsSync(sourcePath)) return false;
+    return Buffer.compare(readFileSync(generatedPath), readFileSync(sourcePath)) === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Exclude only this benchmark's artifacts and byte-identical Cesium static
+ * copies produced from the pinned npm package. Every other tracked/untracked
+ * path remains dirty; a changed Cesium file is allowed only when it exactly
+ * matches its node_modules source bytes.
+ */
 export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot) {
   const root = path.resolve(rootDirectory);
   const output = path.resolve(outputDirectory);
@@ -98,7 +131,7 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
 
   const outputPath = relativeOutput.split(path.sep).join("/");
   const changedPaths = [];
-  const records = status.split("\0").filter(Boolean);
+  const records = status.split("\\0").filter(Boolean);
   for (let index = 0; index < records.length; index += 1) {
     const record = records[index];
     const statusCode = record.slice(0, 2);
@@ -109,11 +142,11 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
     }
   }
   return changedPaths.some((changedPath) => {
-    const normalized = changedPath.replace(/\\/g, "/");
-    return normalized !== outputPath && !normalized.startsWith(outputPath + "/");
+    const normalized = changedPath.replace(/\\\\/g, "/");
+    if (normalized === outputPath || normalized.startsWith(outputPath + "/")) return false;
+    return !isExactGeneratedCesiumAsset(normalized, root);
   });
-}
-async function hashFile(relativePath) {
+}async function hashFile(relativePath) {
   const absolutePath = path.isAbsolute(relativePath)
     ? relativePath
     : path.resolve(projectRoot, relativePath);
