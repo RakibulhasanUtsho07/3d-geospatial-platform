@@ -4,6 +4,7 @@ import test from "node:test";
 import { normalizeBuildingSpec } from "../src/core/building-generation/building-spec.mjs";
 import { generateBuildingModel, planGeneration } from "../src/core/building-generation/generation-engine.mjs";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
+import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "../src/core/building-generation/facade-placement.mjs";
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 function parseGlb(buffer){
  assert.equal(buffer.readUInt32LE(0),0x46546c67);assert.equal(buffer.readUInt32LE(4),2);assert.equal(buffer.readUInt32LE(8),buffer.byteLength);
@@ -39,8 +40,6 @@ test("labels media route candidates without claiming photogrammetry ran",()=>{
  assert.ok(result.report.warnings.some(w=>w.includes("does not run image understanding")));assert.ok(result.report.limitations.some(s=>s.includes("not a photogrammetry")));
 });
 test("is deterministic for a fixed BuildingSpec",()=>assert.deepEqual(generateBuildingModel(fixture).glb,generateBuildingModel(fixture).glb));
-
-import { createFacadeFrame, offsetFacadePoint, surfaceInsertCenterOffset } from "../src/core/building-generation/facade-placement.mjs";
 
 function extractMeshPositions(glb, suffix) {
   const jsonLength = glb.readUInt32LE(12);
