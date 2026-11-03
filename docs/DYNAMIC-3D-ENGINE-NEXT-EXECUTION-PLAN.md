@@ -326,17 +326,40 @@ If WP-02 or WP-03 is blocked by external access/rights/provisioning, record the 
 
 ## 6. Next-action pointer
 
-**Current next action (after the audit snapshot):**
+**Last reviewed:** 2026-11-03, after the P3.4 evidence inspection and WP-00 targeted PR reconciliation.
 
-**NEXT-01 — P3.4 visual acceptance record.**
+### NEXT-01 — P3.4 target-workstation visual acceptance
 
-- Evidence source: PR #334 exact-head Real-Dhaka baseline run #41598308948 and screenshots/report artifact.
-- CI artifact/report inspection is complete. The six screenshot hashes all match; the screenshot shows populated but boxy footprint buildings, rendered roads and multiple floating panels that obscure map space. The report flags 0/6 saturated-red canvas samples.
-- Remaining action: record a human target-workstation review on actual supported desktop/mobile viewports and decide whether panel occlusion is a defect. Do not call the historic red imagery issue fixed without a root-cause diagnosis.
-- If a reproducible issue is found, create one issue with screenshot, route, browser/device, exact candidate SHA and reproduction steps. Do not change code before identifying a reproducible defect.
-- After WP-01 target-device review, the next operational gate is WP-02 real worker-host smoke.
+- Completed: inspected six 1280×800 live-Dhaka CI screenshots/report from run #41598308948; 6/6 sample records succeeded, each reported 3,000 building features and 478 road entities, with no imagery tile errors and no red-outlier flags.
+- Completed: inspected desktop 1440×900 and mobile 390×844 responsive dock captures from run #41598309048. The layout tests assert no panel overlap and clear Cesium attribution at those exact sizes. These are deterministic stub imagery/API layout tests, not live-Dhaka screenshots.
+- Not complete: target-workstation/mobile device review, GPU/browser-specific behavior, deployed-provider health, and root-cause diagnosis of the historical red imagery anomaly. No target device or deployed environment evidence is available from the repository audit.
+- Decision: treat the remaining device/deployment checks as an external validation blocker. Do not fabricate screenshots or mark P3.4 fully accepted. Reopen code work only when a reproducible defect is supplied with viewport, browser/device, screenshot and exact source SHA.
 
-Main push CI for ff5f2fed is already verified successful in run #41600847111. No new code PR is authorized by this plan itself; implementation starts as a separate bounded branch after the current next-action evidence has been reviewed.
+### WP-00 — targeted historical PR reconciliation
+
+Current `main` is still `ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`; `dev` was identical at the audit. Historical PR decisions from exact branch/head comparisons:
+
+| PR | Current finding | Decision |
+|---|---|---|
+| #103 | Head `f75cbc13...`, 71 unique commits from merge base `271b7c5c...`; 878 commits behind current main in the divergent comparison. The specific `facade-placement.mjs` helper is absent from main, but the 29-file PR also changes multiple generation/worker/renderer files. | Do not merge wholesale. Preserve as a source for targeted review of facade-local insert placement; port only after checking current implementation and tests. |
+| #104 | Head `d1347e81...`, 62 unique commits from the same old merge base; 878 behind in the divergent comparison. Main already contains the Ahsan model builder, parameter JSON and LOD3 GLB, while this PR changes those same assets and renderer/test paths. | Treat as a stale model revision, not a clean promotion. Compare its parameter/render evidence against the current main candidate before selecting any individual correction. |
+| #169 | Head `c9c285d9...`, base was historical development `2868a479...`; 42 unique commits and 393 behind current main in the divergent comparison. Bangabhaban review/model/evidence paths in the diff are not in main. The candidate still has documented topology, texture and independent-measurement blockers. | Preserve Draft as a historical candidate/evidence source; do not promote until a current-base independent visual/geometry review closes its blockers. |
+| #185–#190 | Stacked chain rooted at `46dbd970...` on old `rakibul-hasan`; the heads are 245 commits behind current main in the divergent comparisons. Main lacks the old BRF-01 generic profile module, BRF-02 candidate manifest module and BRF-04 controlled synthetic fixture. Current main already has later BRF-25/26 evidence and D3M-01 signed-review paths, so overlap must be reviewed rather than copied. | No stacked merge. BRF-04 is being clean-ported independently in PR #339. Review #185–#189 separately for non-duplicate value and current API compatibility. |
+| #279 | Documentation branch based on historical development `98b2fa56...`; 114 unique commits and 150 behind current main in the divergent comparison. It contains an old repository snapshot/roadmap, not a current-base integration candidate. | Keep as historical reference; PR #338 is the current-main continuation plan. Port only still-useful material after comparing it with #338. |
+
+The comparison counts above describe divergent history from each merge base; they are **not** safe merge instructions and do not prove that each unique commit is still relevant. Never use an ahead count alone to cherry-pick or merge.
+
+### NEXT-02 — BRF-04 controlled GLB regression clean port
+
+- New clean branch: `feat/brf04-controlled-glb-baseline-main-20261103`, created from current main SHA `ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Draft PR #339: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/339
+- Exact head at PR creation: `50f19f26d365f66b42b3ce02bd07025d572762bb`; compare was 6 commits ahead / 0 behind, with 6 changed paths.
+- Adds a synthetic 10×8×6 cuboid GLB fixture, repeatability SHA-256 test, deliberate +20% Y-scale and degenerate-triangle defects, invalid-input checks, npm test script, CI step and documented limits.
+- Reuses current-main `glb-geometry-qa.mjs` and `reference-dimension-validation.mjs`; it does not import or merge the old stacked renderer/evidence branches.
+- Exact-head CI run #41604594271 is in progress. The full CI job was still at dependency installation when last inspected; the new BRF-04 step has **not yet been observed running or passing**. Related PR-triggered workflows are also pending/in progress.
+- Keep PR #339 Draft. Read every exact-head CI step; fix failures on the same fresh branch; rerun checks after every head change. Do not claim test success until the new step and full exact-head CI pass.
+
+**Immediate next action:** refresh PR #339 head and run #41604594271. Confirm the BRF-04 test step outcome and full CI result. If it passes, inspect the resulting artifacts/logs and update this register; do not merge until required review and exact-head CI are confirmed. Afterward, continue a file-by-file source review of the retained unique work in PR #103 and #185–#189. P3.4 target-device review remains externally blocked.
 
 ## 7. Mandatory acceptance checklist for every future work unit
 
