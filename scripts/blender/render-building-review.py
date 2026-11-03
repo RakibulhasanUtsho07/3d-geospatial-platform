@@ -56,7 +56,7 @@ def camera_direction_from_bearing(bearing_degrees, elevation_degrees=0.0):
 
 def camera_track_up_axis(direction):
     """Use Blender Z-up for horizon views and north (+Y) as roll reference for top view."""
-    return "Y" if abs(float(direction.z)) > 0.999 else "Z"
+    return "Y" if abs(float(direction[2])) > 0.999 else "Z"
 
 
 def build_review_view_directions(front_bearing_degrees=None, front_elevation_degrees=5.0, turntable_elevation_degrees=22.0):
@@ -69,7 +69,7 @@ def build_review_view_directions(front_bearing_degrees=None, front_elevation_deg
         # viewing position, left is front-bearing +90 degrees and right is -90.
         ("left", camera_direction_from_bearing(bearing + 90.0, 0.0)),
         ("right", camera_direction_from_bearing(bearing - 90.0, 0.0)),
-        ("top", (0.0, 1.0, 0.0)),
+        ("top", (0.0, 0.0, 1.0)),
     ] + [
         (
             "turntable-" + str(angle).zfill(3),
