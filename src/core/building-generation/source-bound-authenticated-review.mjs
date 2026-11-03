@@ -625,7 +625,7 @@ function parseEd25519PublicKey(publicKeyPem, keyId) {
   return publicKey;
 }
 
-function validateSubmission(submission, prepared) {
+function validateSubmission(submission, prepared, recordedAtUtc) {
   if (!isObject(submission)) throw new TypeError("Review submission must be a JSON object.");
   const allowedKeys = [
     "schemaVersion", "recordType", "buildingId", "sourceJobId", "handoffJobId",
@@ -651,6 +651,14 @@ function validateSubmission(submission, prepared) {
   safeId(submission.reviewerId, "reviewerId");
   if (!isCanonicalUtcTimestamp(submission.reviewedAtUtc)) {
     throw new TypeError("reviewedAtUtc must be a canonical ISO-8601 UTC timestamp with milliseconds.");
+  }
+  if (recordedAtUtc !== undefined) {
+    if (!isCanonicalUtcTimestamp(recordedAtUtc)) {
+      throw new TypeError("recordedAtUtc must be a canonical ISO-8601 UTC timestamp with milliseconds.");
+    }
+    if (Date.parse(submission.reviewedAtUtc) > Date.parse(recordedAtUtc)) {
+      throw new TypeError("reviewedAtUtc must not be later than the server-recorded review time.");
+    }
   }
   if (!DECISIONS.has(submission.decision)) {
     throw new TypeError("decision must be continue-to-independent-validation, changes-requested, hold or reject.");
@@ -814,14 +822,14 @@ export async function recordSourceBoundAuthenticatedReview({
     buildingId: building,
     handoffJobId: handoff,
   });
-  const normalizedSubmission = validateSubmission(submission, prepared);
+  const recordedAt = now === undefined ? new Date().toISOString() : new Date(now).toISOString();
+  if (!isCanonicalUtcTimestamp(recordedAt)) throw new TypeError("now must resolve to a canonical UTC timestamp.");
+  const normalizedSubmission = validateSubmission(submission, prepared, recordedAt);
   const signature = verifyReviewerSignature({
     submission: normalizedSubmission,
     signatureBase64,
     reviewerKeys: trustedReviewerKeys,
   });
-  const recordedAt = now === undefined ? new Date().toISOString() : new Date(now).toISOString();
-  if (!isCanonicalUtcTimestamp(recordedAt)) throw new TypeError("now must resolve to a canonical UTC timestamp.");
 
   const decisionJobId = "review-" + sha256(Buffer.concat([
     signature.payloadBytes,
@@ -1172,7 +1180,7 @@ export async function verifySourceBoundAuthenticatedReviewForIndependentValidati
     checks: decisionRecord.checks,
     notes: decisionRecord.notes,
   };
-  const normalizedSubmission = validateSubmission(reconstructedSubmission, prepared);
+  const normalizedSubmission = validateSubmission(reconstructedSubmission, prepared, decisionRecord.recordedAtUtc);
   const signature = verifyReviewerSignature({
     submission: normalizedSubmission,
     signatureBase64: authentication.signatureBase64,
