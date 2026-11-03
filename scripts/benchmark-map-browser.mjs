@@ -81,10 +81,6 @@ function safeGitValue(args, cwd = projectRoot) {
   }
 }
 
-/**
- * Exclude only this benchmark's generated artifact directory from the source
- * cleanliness check. Tracked edits and untracked files elsewhere still count.
- */
 const GENERATED_CESIUM_ASSET_PAIRS = [
   {
     generatedPath: "public/cesium/Cesium.js",
