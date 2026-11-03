@@ -1,6 +1,6 @@
 # 3D Geospatial Platform — Engine Completion Roadmap
 
-**Audit date:** 2026-10-25  
+**Audit date:** 2026-11-03  
 **Target branch flow:** `rakibul-hasan` → `development` → `main`  
 **Current status:** P3.1 six-sample real-Dhaka browser baseline and screenshot review are recorded on candidate `2b93cb4d7f51cb09f726fe958cdcf974e763ce73`; strict validation and full CI pass. Human review found visible UX/visual-fidelity defects that remain open. P3.2 still lacks real surveyed building evidence.
 
@@ -14,7 +14,7 @@
 
 ## Verified baseline
 
-- Current `main` candidate: `0bf007d2c6749475936d18d0168c168b1ca3fd7e`.
+- Current validated `main` / `dev` baseline: `3c929c88427fbcb1d40a22506f2f7a8e103d57af` (P3.6–P3.8 promoted after exact-head validation).
 - Post-merge CI run [#40119673648](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40119673648) passed lint, production build, automated engine/GLB checks, generated spatial-tile checks, and the production viewport API browser test.
 - P2.6–P2.20 viewport workload, caching, cancellation, cross-process repeatability, performance trend, and geometry-read diagnostics are integrated. Their benchmark reports describe bounded workloads; they do not establish a universal FPS or latency SLA.
 - Existing capabilities include Cesium viewport loading, Overture-derived footprint extrusion, OSM road geometry/nearby services, deterministic procedural GLB, candidate generation/review gates, GLB QA, dimension checking, horizontal WGS84 ground-control fitting, render/reference diagnostic tools, and a measured-vector floor-plan shell generator.
@@ -274,7 +274,7 @@ The codebase still needs real-data validation and product-level completion. The 
 
 ## 2026-11-03 — P3.6 through P3.8 main integration candidate
 
-- P3.6–P3.8 bounded Dhaka 3D Tiles, source-height provenance, building composition metadata and full Overture metadata coverage are reconciled onto D3M-01→D3M-07 in `integration/p3-6-8-main-reconciled-20261103` (PR #327; exact-head validation pending).
+- P3.6–P3.8 bounded Dhaka 3D Tiles, source-height provenance, building composition metadata and full Overture metadata coverage are merged to `main` and `dev` through PR #327 (merge `3c929c88427fbcb1d40a22506f2f7a8e103d57af`). Exact-head Full CI passed 196/196, dedicated P3.6 passed 32/32 and BRF-05–07 intake passed 12/12.
 - P3.8 source head `5f98943775968b8a582f3f2eb5ba5141893eafe0`: Full CI #41331329853 and dedicated #41331329843 passed. P3.7 `cd3eff7e7b557d2690a9d755bee1aef7d379b8be`: Full CI #41329725567 and dedicated #41329725582 passed. P3.6 `6e5fd3fd68905e5098303f37d6f3e83b983ffcf6`: Full CI #41322041348 and dedicated #41322041296 passed. New main-based CI is still mandatory.
 - Output remains bounded footprint-extrusion/cuboid massing, not reconstructed architecture: no roof/facade meshes, doors, windows, textures or parent/part assembly.
 - 3 m/floor and 9 m fallback heights are labelled estimates; no surveyed vertical datum/elevation is claimed.
@@ -332,3 +332,11 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - CI and the dedicated P3.6 workflow now run the focused audit tests; the dedicated workflow also builds and uploads the full-source report. The 17,008 source records include 17,008 provenance records, but only 15,868 carry a license value; the other 1,140 must not be treated as rights-cleared.
 
 **Not completed:** roof/facade geometry, imagery texture, windows/doors or parent/part assembly. All release flags stay false. Next gate is to inspect the hash-pinned report and choose one small geometry prototype only when its parent/part source geometry and independent measurements are sufficient; otherwise request rights-cleared, calibrated imagery or independent reference data.
+
+
+## 2026-11-03 — P3.4 current-main port
+
+- Responsive map panel occlusion, default-collapsed property/layer/camera docks, desktop/mobile dock spacing, Cesium attribution avoidance, and the map-panel browser regressions are being ported from source PR #320 onto current main by `integration/p34-main-port-20261103`. The source-head Full CI #41580141385 passed 181/181 and the desktop/mobile screenshot artifact was inspected; both screenshots show the Cesium logo/attribution remaining visible outside the docks.
+- The six-sample real-Dhaka baseline remains a separate required check. The visual screenshot artifact uses deterministic API fixtures and transparent tile stubs; it proves layout only, not live imagery or building accuracy.
+- The same port includes URL-redacted imagery-provider error diagnostics, stable imagery readiness measurement and a canvas-only saturated-red outlier signal. Those are diagnostic evidence only. The original red imagery anomaly is not declared fixed; root-cause isolation and equivalent live six-sample review remain open.
+- The port keeps current main's D3M-01/P3.6–P3.8 workflows, package scripts and worker tests. It is a separate current-main candidate and must pass fresh Full CI, Push CI and real-Dhaka baseline before merge.
