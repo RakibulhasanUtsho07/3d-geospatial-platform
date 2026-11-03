@@ -190,11 +190,14 @@ export function generateProceduralGlb(rawSpec) {
             geo.box("door",doorCenter.x,baseY+opening.bottomM+leafHeight/2,doorCenter.z,opening.widthM*0.96,leafHeight*0.96,0.07,e.yaw);
           }
           const frameBottom = Math.max(0,opening.bottomM-0.05);
-          const frameHeight = Math.min(floorH-frameBottom-0.02,opening.heightM+0.1);
+          const frameHeight = Math.min(floorH-frameBottom-0.02,opening.heightM+0.2);
           const frameWidth = opening.widthM+(opening.kind==="door"?0.14:0.11);
           if(frameHeight>opening.heightM&&frameWidth>opening.widthM){
             const outerProfile=createFacadeOpeningProfile({...opening,bottomM:frameBottom,widthM:frameWidth,heightM:frameHeight});
-            addExtrudedFacadeProfile(geo,{edge:e,baseY,profile:outerProfile,holes:[profile],frontDepth:frameFrontDepth,depthM:frameDepth,material:"frame"});
+            const frameHoleProfile = opening.kind === "door" && opening.bottomM <= 0
+              ? createFacadeOpeningProfile({...opening,bottomM:0.035,heightM:opening.heightM-0.035})
+              : profile;
+            addExtrudedFacadeProfile(geo,{edge:e,baseY,profile:outerProfile,holes:[frameHoleProfile],frontDepth:frameFrontDepth,depthM:frameDepth,material:"frame"});
           } else warnings.push("An arched opening frame could not maintain its required surround clearance; human review is required.");
         } else if (opening.kind === "window") {
           const paneCenter=offsetFacadePoint(edgePoint,e,0,paneCenterOffset);
