@@ -65,7 +65,16 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+
+      - name: Upload regenerated npm lockfile snapshot for reconciliation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p34-npm-lockfile-snapshot
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 3
 
       - name: Install Chromium and Linux dependencies
         run: npx playwright install --with-deps chromium
