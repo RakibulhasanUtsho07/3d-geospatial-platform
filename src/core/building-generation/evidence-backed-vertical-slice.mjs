@@ -167,6 +167,10 @@ async function prepareEvidence({ root, media, geometry }) {
     throw new TypeError("geometry options are required");
   }
   requireAttestations(media, geometry);
+  if (!media.buildingSpec || typeof media.buildingSpec !== "object" ||
+      media.buildingSpec.id !== buildingId) {
+    throw new TypeError("media BuildingSpec.id must exactly match the parent buildingId");
+  }
 
   if (!Array.isArray(media.sources) || media.sources.length < 3 || media.sources.length > 100) {
     throw new RangeError("the vertical slice requires 3–100 rights-cleared multi-view image sources");
