@@ -128,7 +128,7 @@ function detectLines(data, width, height, options, horizontal) {
   const rawRuns = [];
   for (let coordinate = 0; coordinate < count; coordinate += 1) {
     const lineRuns = scanLine(
-      data, width, height, options, horizontal, coordinate, options.threshold, options.maxGapPx,
+      data, width, height, horizontal, coordinate, options.threshold, options.maxGapPx,
     );
     for (const run of lineRuns) {
       if (run.end - run.start + 1 < options.minLineLengthPx) continue;
