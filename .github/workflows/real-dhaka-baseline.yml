@@ -6,6 +6,7 @@ on:
       - rakibul-hasan
       - feat/p34-map-panel-occlusion-20261102
       - integration/p34-main-port-20261103
+      - integration/p34-main-refresh-20261103
     paths:
       - "src/app/**"
       - "src/core/map-engine/**"
