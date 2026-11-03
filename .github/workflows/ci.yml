@@ -80,6 +80,7 @@ on:
       - feat/d3m01g-registry-preflight-20261031
       - feat/brf48-six-disjoint-heldout-checkpoints-20261101
       - integration/brf48-main-20261103
+      - integration/brf14-main-refresh-20261103
 
   pull_request:
     branches:
