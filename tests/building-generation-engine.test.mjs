@@ -289,3 +289,110 @@ test("embeds the selected facade normal and review provenance in GLB extras",()=
  assert.equal(metadata.reviewRequired,true);
  assert.deepEqual(metadata,result.report.facadeOrientation);
 });
+
+function pointOnTriangle3d(point,a,b,c,tolerance=1e-5) {
+ const ab={x:b.x-a.x,y:b.y-a.y,z:b.z-a.z};
+ const ac={x:c.x-a.x,y:c.y-a.y,z:c.z-a.z};
+ const ap={x:point.x-a.x,y:point.y-a.y,z:point.z-a.z};
+ const n={
+  x:ab.y*ac.z-ab.z*ac.y,
+  y:ab.z*ac.x-ab.x*ac.z,
+  z:ab.x*ac.y-ab.y*ac.x
+ };
+ const nLength=Math.hypot(n.x,n.y,n.z);
+ if(nLength<1e-10)return false;
+ const planeDistance=Math.abs(ap.x*n.x+ap.y*n.y+ap.z*n.z)/nLength;
+ if(planeDistance>tolerance)return false;
+ const dot=(u,v)=>u.x*v.x+u.y*v.y+u.z*v.z;
+ const d00=dot(ab,ab),d01=dot(ab,ac),d11=dot(ac,ac);
+ const d20=dot(ap,ab),d21=dot(ap,ac);
+ const denominator=d00*d11-d01*d01;
+ if(Math.abs(denominator)<1e-12)return false;
+ const v=(d11*d20-d01*d21)/denominator;
+ const w=(d00*d21-d01*d20)/denominator;
+ const u=1-v-w;
+ return u>=-1e-5&&v>=-1e-5&&w>=-1e-5;
+}
+
+function meshHasSurfaceAt(glb,suffix,point) {
+ const vertices=extractMeshPositions(glb,suffix);
+ for(let index=0;index+2<vertices.length;index+=3){
+  if(pointOnTriangle3d(point,vertices[index],vertices[index+1],vertices[index+2]))return true;
+ }
+ return false;
+}
+
+function facadeSample(edge,frame,alongM,y) {
+ return {
+  x:edge.x+frame.tangent.x*alongM,
+  y,
+  z:edge.z+frame.tangent.z*alongM
+ };
+}
+
+test("generates true rectangular window and door wall openings for both footprint windings",()=>{
+ for(const reverseWinding of [false,true]){
+  const spec=facadeTestSpec({reverseWinding});
+  const result=generateProceduralGlb(spec);
+  const normalized=normalizeBuildingSpec(spec);
+  const points=normalized.derived.localFootprint;
+  const frames=facadeFramesFor(spec);
+  const frontIndex=result.report.facadeSelection.edgeIndex;
+  const frontEdge=points[frontIndex];
+  const frontFrame=frames[frontIndex];
+  const doorPoint=facadeSample(frontEdge,frontFrame,frontFrame.len/2,1.08);
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",doorPoint),false,
+   "the wall mesh must be absent inside the structural door opening");
+
+  const solidPoint=facadeSample(frontEdge,frontFrame,frontFrame.len*0.08,0.55);
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",solidPoint),true,
+   "solid wall material outside openings must remain");
+
+  const windowIndex=(frontIndex+1)%points.length;
+  const windowEdge=points[windowIndex];
+  const windowFrame=frames[windowIndex];
+  const bays=Math.max(1,Math.min(12,Math.floor(windowFrame.len/3.2)));
+  const windowAlong=windowFrame.len/(bays+1);
+  const windowY=spec.dimensions.floorHeightM*0.56;
+  const windowPoint=facadeSample(windowEdge,windowFrame,windowAlong,windowY);
+  assert.equal(meshHasSurfaceAt(result.glb,"-wall",windowPoint),false,
+   "the wall mesh must be absent behind a rectangular window");
+
+  assert.ok(result.report.structuralOpenings.some(item=>item.kind==="door"));
+  assert.ok(result.report.structuralOpenings.some(item=>item.kind==="window"));
+  assert.equal(result.report.geometry.structuralOpeningCount,result.report.structuralOpenings.length);
+  assert.ok(result.report.structuralOpenings.every(item=>
+   item.confidence==="estimated"&&item.source==="procedural-default"&&item.reviewRequired===true
+  ));
+ }
+});
+
+test("cuts sampled arched front-arcade openings and preserves wall above the arch",()=>{
+ const spec=facadeTestSpec({
+  architecture:{frontArcade:{enabled:true,heightM:2.8,bayCount:3}}
+ });
+ const result=generateProceduralGlb(spec);
+ const normalized=normalizeBuildingSpec(spec);
+ const points=normalized.derived.localFootprint;
+ const frontIndex=result.report.facadeSelection.edgeIndex;
+ const edge=points[frontIndex];
+ const frame=facadeFramesFor(spec)[frontIndex];
+ const arcade=normalized.spec.architecture.frontArcade;
+ const span=frame.len*arcade.spanRatio;
+ const bay=span/arcade.bayCount;
+ const start=(frame.len-span)/2;
+ const outerRadius=Math.max(arcade.columnWidthM*1.6,(bay-arcade.columnWidthM)/2);
+ const innerRadius=Math.max(0.35,outerRadius-arcade.archThicknessM);
+ const openingRadius=Math.max(0.3,innerRadius-0.08);
+ const springY=Math.min(arcade.heightM,spec.dimensions.floorHeightM-0.05)-outerRadius;
+ const centerAlong=start+bay/2;
+ const insideArch=facadeSample(edge,frame,centerAlong,springY+openingRadius*0.5);
+ const aboveArch=facadeSample(edge,frame,centerAlong,springY+openingRadius+0.08);
+ assert.equal(meshHasSurfaceAt(result.glb,"-wall",insideArch),false,
+  "the curved opening profile must leave a real through-opening");
+ assert.equal(meshHasSurfaceAt(result.glb,"-wall",aboveArch),true,
+  "the wall above the arched opening must remain closed");
+ assert.ok(result.report.structuralOpenings.some(item=>item.shape==="arched"));
+ assert.ok(result.report.warnings.some(item=>item.includes("structural openings")));
+});
+
