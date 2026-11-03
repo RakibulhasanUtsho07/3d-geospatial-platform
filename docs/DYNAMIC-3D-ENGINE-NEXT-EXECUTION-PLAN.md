@@ -43,7 +43,7 @@ Links:
 - PR #334 source Full CI: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41598309048
 - PR #334 source real-Dhaka baseline: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41598308948
 
-The PR #334 real-Dhaka baseline passed six cold/warm samples on source head 75b44be029422f4dee64380fb45d62f52bff53d8. Each sample staged 3,000 building features and rendered 478 road entities; the report recorded zero imagery-tile errors and zero red-outlier flags. The six screenshot hashes were identical. This is deterministic CI evidence, not independent visual sign-off on the user's target workstation, proof of the historical red-overlay root cause, live provider health, or a production performance SLA. PR #334 explicitly did not declare the historic red imagery anomaly fixed.
+The PR #334 real-Dhaka baseline passed six cold/warm samples on source head 75b44be029422f4dee64380fb45d62f52bff53d8. Each sample staged 3,000 building features and rendered 478 road entities; the report recorded zero imagery-tile errors and zero red-outlier flags. The six screenshot hashes are all identical (SHA-256 e6eb87b7e5115e5f91e38c2146a2fcea05d715e61ce6855aeead97e32d5834fa). The downloaded 1280×800 Linux/Chromium screenshot was visually inspected: the map is not blank, buildings and roads render, but the buildings remain boxy footprint extrusions with plain roofs and the Building Discovery, Nearby Places, Property Discovery, Map controls and Map Layers panels cover parts of the map. The report's saturated-red canvas detector flagged 0/6 samples; that signal does not identify a layer or prove the historical red-overlay root cause has been fixed. Cold/warm median map-ready times were 18.45 s / 17.77 s; median road-terminal times were 23.46 s / 22.78 s; median long-task counts were 60 / 57. This is a shared headless CI baseline, not a target-device review, a representative multi-scene visual sample, live provider health, or a production performance SLA. PR #334 explicitly did not declare the historic red imagery anomaly fixed.
 
 ### 2.2 Branch safety rules
 
@@ -116,11 +116,17 @@ Completed:
 - Map viewport UX and browser regression tests.
 - Six cold/warm browser samples on the exact PR #334 source head.
 
+Completed evidence inspection:
+- Downloaded and inspected the six PNGs and report from run #41598308948. All six files have the same 437,683-byte length and SHA-256 e6eb87b7e5115e5f91e38c2146a2fcea05d715e61ce6855aeead97e32d5834fa.
+- The 1280×800 headless screenshot shows a populated Cesium canvas, visible road geometry and dense box-like building extrusions; the five floating UI panels listed in §2.1 obscure portions of the map. Roofs remain visually plain.
+- Report visualAnomalyReview: saturated-red signal evaluated 6 canvas samples and flagged 0. This is not a root-cause diagnosis.
+- Cold/warm median map-ready: 18.45 s / 17.77 s; median road-terminal: 23.46 s / 22.78 s; median long-task count: 60 / 57. These are CI observations, not device-level SLAs.
+
 Remaining:
-1. Inspect the six hash-bound screenshots and report as actual visual evidence; document that identical hashes mean repeated deterministic output, not six visually diverse scenes.
-2. Perform a target-workstation browser review at representative desktop and mobile sizes.
+1. Perform target-workstation browser review at representative desktop and mobile sizes; record browser, viewport, GPU/device and screenshots.
+2. Decide whether the panel occlusion seen in CI is acceptable for the intended viewport or requires a measured layout correction.
 3. Verify the historic red imagery/overlay anomaly has a diagnosed cause before claiming it is fixed. Pixel detection is a signal, not a root-cause diagnosis.
-4. Confirm panel layout, usable map area, camera orientation, building/road alignment, image-provider failures, fallback/cancellation behavior and layer toggles.
+4. Confirm camera orientation, building/road alignment, image-provider failures, fallback/cancellation behavior and layer toggles.
 5. Check the deployed environment separately; CI does not prove deployed Cesium assets, tile providers, API credentials, CORS, cache behavior or device GPU performance.
 6. Extend comparable cold/warm measurements only where they answer a concrete regression question. Do not convert shared CI timing into a production SLA.
 
@@ -323,11 +329,10 @@ If WP-02 or WP-03 is blocked by external access/rights/provisioning, record the 
 **NEXT-01 — P3.4 visual acceptance record.**
 
 - Evidence source: PR #334 exact-head Real-Dhaka baseline run #41598308948 and screenshots/report artifact.
-- Verify the six screenshot hashes and report against the source commit 75b44be029422f4dee64380fb45d62f52bff53d8.
-- Inspect the map panel layout, visible map area, building/road composition, imagery errors and red-pixel diagnostic output. The identical screenshot hashes must be called out as deterministic repeated output, not six independent visual scenes.
-- Record a human target-workstation result. If an anomaly is present, create one issue with screenshot, route, browser/device, exact candidate SHA and reproduction steps. If it is absent, record the evidence without claiming a universal fix.
-- Do not change code before identifying a reproducible issue.
-- After WP-01 review, the next operational gate is WP-02 real worker-host smoke.
+- CI artifact/report inspection is complete. The six screenshot hashes all match; the screenshot shows populated but boxy footprint buildings, rendered roads and multiple floating panels that obscure map space. The report flags 0/6 saturated-red canvas samples.
+- Remaining action: record a human target-workstation review on actual supported desktop/mobile viewports and decide whether panel occlusion is a defect. Do not call the historic red imagery issue fixed without a root-cause diagnosis.
+- If a reproducible issue is found, create one issue with screenshot, route, browser/device, exact candidate SHA and reproduction steps. Do not change code before identifying a reproducible defect.
+- After WP-01 target-device review, the next operational gate is WP-02 real worker-host smoke.
 
 Main push CI for ff5f2fed is already verified successful in run #41600847111. No new code PR is authorized by this plan itself; implementation starts as a separate bounded branch after the current next-action evidence has been reviewed.
 
