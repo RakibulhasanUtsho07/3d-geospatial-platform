@@ -19,6 +19,8 @@ import {
   hashFloorPlanRasterProposalReport,
 } from "./floor-plan-raster-vector-calibration.mjs";
 
+/** @typedef {{ proposalReport: Record<string, unknown>, review: Record<string, unknown> }} FloorPlanCalibrationEvidence */
+
 function inside(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (
@@ -122,7 +124,12 @@ async function writeAtomically(filePath, bytes) {
  * source was already ingested through the protected media-intake pipeline.
  * This does not publish the result or assert that its geometry is accurate.
  */
-export async function createFloorPlanModelCandidate({ workspaceRoot, floorPlan, calibrationEvidence = undefined, traceEvidence = undefined }) {
+export async function createFloorPlanModelCandidate({
+  workspaceRoot,
+  floorPlan,
+  calibrationEvidence = /** @type {FloorPlanCalibrationEvidence | undefined} */ (undefined),
+  traceEvidence = undefined,
+}) {
   if (!floorPlan || typeof floorPlan !== "object" || Array.isArray(floorPlan)) {
     throw new TypeError("floorPlan must be a JSON object.");
   }
