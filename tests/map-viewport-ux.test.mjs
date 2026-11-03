@@ -25,7 +25,7 @@ test("layer list starts collapsed so it does not cover discovery/search controls
   assert.match(layers, /const \[expanded, setExpanded\] = useState\(false\)/);
   assert.match(layers, /aria-expanded=\{expanded\}/);
   assert.match(layers, /aria-controls="map-layer-options"/);
-  assert.match(layers, /expanded && (/);
+  assert.ok(layers.includes("{expanded && ("));
 });
 
 test("property discovery starts collapsed to preserve the map viewport", () => {
