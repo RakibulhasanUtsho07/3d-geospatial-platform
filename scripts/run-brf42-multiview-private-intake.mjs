@@ -46,6 +46,7 @@ function assertVerificationReportMatchesManifest(manifest, priorReport) {
   if (!isObject(priorReport) ||
       priorReport.status !== "views-byte-verified" ||
       priorReport.sampleId !== manifest.sampleId ||
+      priorReport.dataset?.dataRepositoryRevision !== manifest.dataset?.dataRepositoryRevision ||
       priorReport.selectedViewCount !== manifest.views.length ||
       priorReport.actualTotalBytes !== manifest.expectedTotalBytes ||
       !Array.isArray(priorReport.views) ||
@@ -73,6 +74,8 @@ function assertVerificationReportMatchesManifest(manifest, priorReport) {
 }
 function compareFreshVerification(manifest, priorReport, freshReport) {
   if (freshReport.status !== "views-byte-verified" ||
+      freshReport.dataset?.dataRepositoryRevision !== manifest.dataset?.dataRepositoryRevision ||
+      priorReport.dataset?.dataRepositoryRevision !== freshReport.dataset?.dataRepositoryRevision ||
       freshReport.selectedViewCount !== manifest.views.length ||
       freshReport.actualTotalBytes !== priorReport.actualTotalBytes ||
       freshReport.views.length !== priorReport.views.length) {
@@ -199,6 +202,7 @@ export async function runBrf42MultiviewPrivateIntake(options) {
       sha256: ingested.record.sha256,
       byteSize: ingested.record.byteSize,
       sourceUrl: ingested.record.url,
+      dataRepositoryRevision: manifest.dataset.dataRepositoryRevision,
       capturedAt: ingested.record.capturedAt,
       location: ingested.record.location,
       usageStatus: ingested.record.usageStatus,
@@ -228,6 +232,7 @@ export async function runBrf42MultiviewPrivateIntake(options) {
     sourceManifest: {
       sampleId: manifest.sampleId,
       sourceCommit: manifest.dataset.sourceRepositoryCommit,
+      dataRepositoryRevision: manifest.dataset.dataRepositoryRevision,
       declaredLicense: manifest.dataset.license,
       licenseScope: manifest.dataset.licenseScope,
       rightsStatus: manifest.dataset.rightsStatus,
@@ -238,6 +243,7 @@ export async function runBrf42MultiviewPrivateIntake(options) {
     },
     byteVerification: {
       status: freshVerification.status,
+      dataRepositoryRevision: freshVerification.dataset.dataRepositoryRevision,
       selectedViewCount: freshVerification.selectedViewCount,
       verifiedViewCount: freshVerification.views.filter((view) => view.status === "passed").length,
       declaredTotalBytes: freshVerification.declaredTotalBytes,
@@ -342,6 +348,7 @@ async function main() {
     await writeReport(args.reportPath, report);
     console.log(JSON.stringify({
       status: report.status,
+      dataRepositoryRevision: report.sourceManifest.dataRepositoryRevision,
       verifiedViewCount: report.byteVerification.verifiedViewCount,
       ingestedCount: report.privateMediaIntake.ingestedCount,
       qualityAnalysisComplete: report.imageQualityPreflight.qualityAnalysisComplete,
