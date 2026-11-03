@@ -70,3 +70,11 @@ When `architecture.centralDome.enabled` is true, BuildingSpec supports two expli
 - `footprint-bounds-center`: places the dome at the midpoint of the footprint's axis-aligned local `minX/maxX/minZ/maxZ` bounds. In this mode `insetFromFrontM` is retained in the spec but does not affect the center.
 
 The generated report records the selected anchor, model-local X/Z center, an estimated placement confidence and a review-required flag. A central dome is a procedural massing assumption even when its anchor is explicitly selected; the report therefore keeps review required and emits a warning. The bounds-center option is **not** a polygon centroid or an architectural measurement, and it can be inappropriate for an asymmetric/concave footprint. Verify it against an independent plan, survey or elevation before accepting the model.
+
+
+## Structural door/window openings — D3M-ENGINE-03
+
+- Procedural wall panels now use a scanline-triangulated contour with explicit opening loops. The same opening contours are removed from front/back wall faces and their boundary edges are bridged through wall thickness, producing a through-wall aperture rather than infill over a solid wall.
+- Rectangular and faceted arched profiles are supported. Arch segments are bounded and deterministic; rectangular is the compatibility default.
+- GLB `extras.building.structuralOpenings` and the generation report record wall-panel count, opening count/area, profile, edge/floor placement, procedural confidence and review-required state.
+- The opening layout (bay spacing, dimensions and selected facade door) remains procedural. This is not automatic image segmentation, measured architectural drawing, structural engineering validation or BIM-grade boolean operation. All apertures require independent review.
