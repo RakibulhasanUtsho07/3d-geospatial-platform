@@ -115,6 +115,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       warnings: warnings.length },
     views,
     textureQaSummary,
+    reviewProfile: rawManifest.reviewProfile ?? { profileId: "generic-whole-model-v1", source: "built-in-default", sha256: null },
     errors: [...new Set(errors)],
     warnings: [...new Set(warnings)],
     humanReview: {

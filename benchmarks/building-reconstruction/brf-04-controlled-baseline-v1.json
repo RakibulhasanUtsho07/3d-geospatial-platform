@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "baselineId": "synthetic-cuboid-10x8x6-v1",
+  "kind": "controlled-synthetic-regression-fixture",
+  "buildingId": "brf04-controlled-cuboid",
+  "provenance": {
+    "type": "synthetic-known-geometry",
+    "description": "Deterministic closed cuboid created by the test fixture; not a real building and not independent survey evidence.",
+    "authoritativeFor": ["GLB parser integrity", "axis-aligned model-space bounds", "dimension tolerance logic", "degenerate-triangle detection"],
+    "notAuthoritativeFor": ["architectural similarity", "photo reconstruction quality", "real-world scale", "georeference", "heritage fidelity"]
+  },
+  "expectedDimensionsM": {
+    "x": 10,
+    "y": 8,
+    "z": 6
+  },
+  "metresPerModelUnit": 1,
+  "dimensionTolerancePercent": 2,
+  "geometryExpectations": {
+    "validGlb": true,
+    "meshCount": 1,
+    "triangleCount": 12,
+    "degenerateTriangleCount": 0
+  },
+  "defectCases": [
+    {
+      "id": "scale-y-plus-20-percent",
+      "injection": { "type": "scale-axis", "axis": "y", "factor": 1.2 },
+      "expectedDimensionsM": { "x": 10, "y": 9.6, "z": 6 },
+      "expectedOutcome": "dimension-mismatch-review-required",
+      "expectedMaxRelativeErrorPercent": 20
+    },
+    {
+      "id": "degenerate-triangle",
+      "injection": { "type": "duplicate-triangle-index", "triangleIndex": 0 },
+      "expectedOutcome": "geometry-warning",
+      "expectedWarning": "degenerate-triangles-present",
+      "expectedMinimumDegenerateTriangleCount": 1
+    }
+  ],
+  "policy": {
+    "mapReady": false,
+    "publicationEligible": false,
+    "automaticApproval": false,
+    "note": "This controlled benchmark verifies detection and regression behavior only; it must never be presented as a real-building accuracy result."
+  }
+}

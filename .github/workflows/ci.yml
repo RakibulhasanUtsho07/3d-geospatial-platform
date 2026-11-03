@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/d3m-engine-01-brf-evidence-20261103
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
@@ -210,6 +211,15 @@ jobs:
 
       - name: Test GLB geometry quality report and invalid mesh rejection
         run: npm run test:glb-geometry-qa
+
+      - name: Test generic render review profile schema
+        run: npm run test:render-review-profile
+
+      - name: Test shared candidate evidence manifest and GLB provenance
+        run: npm run test:building-candidate-evidence-manifest
+
+      - name: Test controlled GLB baseline and defect injection
+        run: npm run test:building-baseline-defect-injection
 
       - name: Test BuildingSpec validation and procedural GLB generation
         run: npm run test:building-generation
