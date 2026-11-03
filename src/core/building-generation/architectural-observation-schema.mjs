@@ -59,6 +59,79 @@ function validateGeometry(geometry, width, height, label) {
   return geometry;
 }
 
+function normalizeReviewHistory(raw, { label, source, viewId, mask }) {
+  const output = {};
+  if (raw.originalProposal !== undefined) {
+    const proposal = raw.originalProposal;
+    if (!proposal || typeof proposal !== "object" || Array.isArray(proposal) ||
+        proposal.id !== raw.id || proposal.sourceId !== source.id ||
+        proposal.viewId !== viewId || !HASH.test(proposal.sourceSha256 ?? "") ||
+        proposal.sourceSha256.toLowerCase() !== source.sha256.toLowerCase() ||
+        !CATEGORIES.has(proposal.category) || !METHODS.has(proposal.method) ||
+        proposal.status !== "proposed" || !VISIBILITY.has(proposal.visibility) ||
+        !number(proposal.confidence) || proposal.confidence < 0 || proposal.confidence > 1) {
+      throw new TypeError(label + ".originalProposal must preserve the original proposed observation and exact source/view provenance.");
+    }
+    const unknownVisibility = ["not-visible", "not-detected", "occluded"].includes(proposal.visibility);
+    if (proposal.geometry === undefined || proposal.geometry === null) {
+      if (!unknownVisibility) throw new TypeError(label + ".originalProposal needs geometry for its visibility state.");
+    } else validateGeometry(proposal.geometry, source.width, source.height, label + ".originalProposal");
+    const originalEvidence = proposal.evidence ?? {};
+    if (originalEvidence.maskSha256 !== undefined && originalEvidence.maskSha256 !== null &&
+        (!mask || !HASH.test(originalEvidence.maskSha256) ||
+         originalEvidence.maskSha256.toLowerCase() !== mask.sha256.toLowerCase())) {
+      throw new TypeError(label + ".originalProposal mask evidence does not match the batch mask hash.");
+    }
+    if (originalEvidence.edgeMapSha256 !== undefined && originalEvidence.edgeMapSha256 !== null &&
+        !HASH.test(originalEvidence.edgeMapSha256)) {
+      throw new TypeError(label + ".originalProposal edgeMapSha256 must be a SHA-256 digest.");
+    }
+    output.originalProposal = {
+      id: proposal.id, category: proposal.category, sourceId: proposal.sourceId,
+      sourceSha256: source.sha256.toLowerCase(), viewId,
+      geometry: proposal.geometry ?? null, confidence: proposal.confidence,
+      method: proposal.method, status: "proposed", visibility: proposal.visibility,
+      evidence: {
+        ...(originalEvidence.maskSha256 ? { maskSha256: originalEvidence.maskSha256.toLowerCase() } : {}),
+        ...(originalEvidence.edgeMapSha256 ? { edgeMapSha256: originalEvidence.edgeMapSha256.toLowerCase() } : {}),
+      },
+    };
+  }
+
+  if (raw.reviews !== undefined) {
+    if (!Array.isArray(raw.reviews) || raw.reviews.length > 100) {
+      throw new TypeError(label + ".reviews must be an array of at most 100 append-only review events.");
+    }
+    if (raw.reviews.length > 0 && !output.originalProposal) {
+      throw new TypeError(label + ".originalProposal is required when review history is present.");
+    }
+    output.reviews = raw.reviews.map((review, index) => {
+      const reviewLabel = label + ".reviews[" + index + "]";
+      if (!review || typeof review !== "object" || Array.isArray(review) ||
+          !["reviewed", "rejected"].includes(review.decision) ||
+          !nonEmpty(review.reviewerId) || !nonEmpty(review.reviewedAt) ||
+          !Number.isFinite(Date.parse(review.reviewedAt)) ||
+          (review.notes !== undefined && (typeof review.notes !== "string" || review.notes.length > 2000))) {
+        throw new TypeError(reviewLabel + " must contain a valid decision, reviewer, timestamp and at most 2000 characters of notes.");
+      }
+      return {
+        decision: review.decision,
+        reviewerId: review.reviewerId.trim(),
+        reviewedAt: new Date(review.reviewedAt).toISOString(),
+        notes: review.notes?.trim() ?? "",
+      };
+    });
+    if (raw.status !== "proposed" && output.reviews.length > 0) {
+      const latest = output.reviews[output.reviews.length - 1];
+      if (raw.status !== latest.decision || raw.reviewedBy !== latest.reviewerId ||
+          !nonEmpty(raw.reviewedAt) || new Date(raw.reviewedAt).toISOString() !== latest.reviewedAt) {
+        throw new TypeError(label + " current review state must match its latest append-only review event.");
+      }
+    }
+  }
+  return output;
+}
+
 /** Normalize one per-view batch while preserving evidence links and unknown visibility. */
 export function normalizeArchitecturalObservationBatch(input = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new TypeError("observation batch must be an object.");
@@ -115,6 +188,9 @@ export function normalizeArchitecturalObservationBatch(input = {}) {
     if (evidence.edgeMapSha256 !== undefined && evidence.edgeMapSha256 !== null && !HASH.test(evidence.edgeMapSha256)) {
       throw new TypeError(label + " edgeMapSha256 must be a SHA-256 digest.");
     }
+    const reviewHistory = normalizeReviewHistory(raw, {
+      label, source, viewId: input.viewId, mask,
+    });
     return {
       id: raw.id, category: raw.category, sourceId: raw.sourceId,
       sourceSha256: source.sha256.toLowerCase(), viewId: input.viewId,
@@ -123,6 +199,7 @@ export function normalizeArchitecturalObservationBatch(input = {}) {
       evidence: { ...(evidence.maskSha256 ? { maskSha256: evidence.maskSha256.toLowerCase() } : {}),
         ...(evidence.edgeMapSha256 ? { edgeMapSha256: evidence.edgeMapSha256.toLowerCase() } : {}) },
       ...(raw.status !== "proposed" ? { reviewedBy: raw.reviewedBy, reviewedAt: new Date(raw.reviewedAt).toISOString() } : {}),
+      ...reviewHistory,
     };
   });
   return { schemaVersion: "1.0.0", batchId: input.batchId, buildingId: input.buildingId,

@@ -68,6 +68,12 @@ on:
       - feat/d3m07-single-image-worker-preflight-20261102
       - feat/brf46-source-operation-scope-gate
       - feat/brf47-cross-role-asset-identity-20261031
+      - feat/brf06-observation-review-dev-20261030
+      - feat/d3m01c-candidate-evidence-handoff-20261030
+      - feat/d3m01e-brf25-authenticated-review-gate-20261030
+      - feat/d3m01d-authenticated-geometry-review-20261030
+      - feat/d3m01f-governed-reviewer-registry-20261031
+      - feat/d3m01g-registry-preflight-20261031
   pull_request:
     branches:
       - main
@@ -117,6 +123,9 @@ on:
       - development
       - feat/d3m02-generation-job-map-publish-20261101
 
+      - feat/d3m01g-registry-preflight-20261031
+      - feat/d3m01c-candidate-evidence-handoff-20261030
+      - feat/d3m01f-governed-reviewer-registry-20261031
 permissions:
   contents: read
 
@@ -296,6 +305,15 @@ jobs:
         run: node scripts/reconstruct-brf23-reviewed-source.mjs --help
       - name: Test BRF-25 reviewed-candidate geometry validation chain
         run: npm run test:brf25-geometry-validation
+
+      - name: Test D3M-01 signed source-bound review and registry lifecycle
+        run: npm run test:source-bound-authenticated-review
+
+      - name: Test secret-safe trusted reviewer registry CLI
+        run: npm run test:trusted-reviewer-registry-cli
+
+      - name: Validate trusted reviewer registry operator CLI
+        run: npm run validate:trusted-reviewer-registry -- --help
       - name: Validate BRF-25 geometry validation runner CLI
         run: node scripts/run-brf25-geometry-validation.mjs --help
       - name: Test BRF-26 end-to-end evidence bundle and fail-closed gates
@@ -448,6 +466,15 @@ jobs:
         run: npm run test:architectural-feature-proposals
       - name: Test integrated BRF-05–07 visual evidence package and fail-closed real-world gates
         run: npm run test:building-visual-evidence-package
+
+      - name: Test source-bound mask and architectural-observation evidence bundle
+        run: npm run test:source-bound-visual-evidence-bundle
+
+      - name: Test source-bound rights, camera and ground-control reconstruction evidence
+        run: npm run test:source-bound-reconstruction-evidence
+
+      - name: Test immutable source-bound reconstruction candidate hand-off
+        run: npm run test:source-bound-reconstruction-handoff
       - name: Test hash-pinned building visual review packet
         run: npm run test:building-visual-review-packet
       - name: Validate building visual evidence bundle CLI

@@ -51,6 +51,20 @@ export const ARCHITECTURAL_GEOMETRY_STAGE_IDS = Object.freeze([
   "final-acceptance",
 ]);
 
+// Separate immutable child-job profile that binds an already generated candidate
+// to exact source/evidence/QA bytes before downstream human review.
+export const CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS = Object.freeze([
+  "candidate-evidence-verification",
+  "candidate-evidence-handoff",
+]);
+
+// A signed reviewer decision is stored as a separate immutable child job so
+// geometry evidence and each review decision retain their own artifact history.
+export const SOURCE_BOUND_AUTHENTICATED_REVIEW_STAGE_IDS = Object.freeze([
+  "candidate-geometry-qa",
+  "authenticated-human-review",
+]);
+
 const JOB_STATE_FILE = "job-state.json";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -132,7 +146,7 @@ function nowIso(value) {
 }
 
 function assertStageId(stageId) {
-  const known = [...RECONSTRUCTION_STAGE_IDS, ...MEDIA_TO_MODEL_STAGE_IDS, ...ARCHITECTURAL_GEOMETRY_STAGE_IDS];
+  const known = [...RECONSTRUCTION_STAGE_IDS, ...MEDIA_TO_MODEL_STAGE_IDS, ...ARCHITECTURAL_GEOMETRY_STAGE_IDS, ...CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS, ...SOURCE_BOUND_AUTHENTICATED_REVIEW_STAGE_IDS];
   if (!known.includes(stageId)) {
     throw new TypeError("unknown reconstruction stage: " + String(stageId));
   }
@@ -144,6 +158,8 @@ function stageIdsForJob(job, requestedStageIds) {
     RECONSTRUCTION_STAGE_IDS,
     MEDIA_TO_MODEL_STAGE_IDS,
     ARCHITECTURAL_GEOMETRY_STAGE_IDS,
+    CANDIDATE_EVIDENCE_HANDOFF_STAGE_IDS,
+    SOURCE_BOUND_AUTHENTICATED_REVIEW_STAGE_IDS,
   ];
   if (!Array.isArray(candidate) || !plans.some((plan) =>
     plan.length === candidate.length && plan.every((id, index) => id === candidate[index])

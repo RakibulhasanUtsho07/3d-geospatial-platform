@@ -86,4 +86,67 @@ test("review append preserves the proposal and records an append-only audit hist
   assert.equal(rejected.originalProposal.geometry.coordinates[0][0], 10);
   assert.equal(rejected.reviews.length, 2);
   assert.equal(rejected.reviews[0].reviewerId, "architect-a");
+
+  const restored = normalizeArchitecturalObservationBatch({
+    ...fixture(),
+    observations: [rejected],
+  });
+  const normalized = restored.observations[0];
+  assert.equal(normalized.status, "rejected");
+  assert.equal(normalized.reviewedBy, "architect-b");
+  assert.equal(normalized.originalProposal.geometry.coordinates[0][0], 10);
+  assert.equal(normalized.reviews.length, 2);
+  assert.deepEqual(normalized.reviews.map((event) => event.decision), ["reviewed", "rejected"]);
+  assert.equal(normalized.reviews[0].notes, "Roof edge confirmed in this photo.");
+  assert.equal(normalized.reviews[1].reviewerId, "architect-b");
+});
+
+test("preserves a prior review trail when an observation is re-opened as proposed", () => {
+  const original = normalizeArchitecturalObservationBatch(fixture()).observations[0];
+  const reviewed = appendArchitecturalObservationReview(original, {
+    decision: "reviewed", reviewerId: "architect-a", reviewedAt: "2026-10-26T12:00:00Z",
+  });
+  const reopened = {
+    ...reviewed,
+    status: "proposed",
+    reviewedBy: undefined,
+    reviewedAt: undefined,
+    confidence: 0.7,
+    geometry: { type: "LineString", coordinates: [[12, 13], [88, 16]] },
+  };
+  const normalized = normalizeArchitecturalObservationBatch({
+    ...fixture(), observations: [reopened],
+  }).observations[0];
+  assert.equal(normalized.status, "proposed");
+  assert.equal(normalized.geometry.coordinates[0][0], 12);
+  assert.equal(normalized.originalProposal.geometry.coordinates[0][0], 10);
+  assert.equal(normalized.reviews.length, 1);
+  assert.equal(normalized.reviews[0].decision, "reviewed");
+  assert.equal("reviewedBy" in normalized, false);
+});
+
+test("rejects tampered review history and invalid audit notes", () => {
+  const original = normalizeArchitecturalObservationBatch(fixture()).observations[0];
+  const reviewed = appendArchitecturalObservationReview(original, {
+    decision: "reviewed", reviewerId: "architect-a", reviewedAt: "2026-10-26T12:00:00Z",
+    notes: "Roofline confirmed.",
+  });
+
+  const tamperedReviewer = structuredClone(reviewed);
+  tamperedReviewer.reviews[0].reviewerId = "different-reviewer";
+  assert.throws(() => normalizeArchitecturalObservationBatch({
+    ...fixture(), observations: [tamperedReviewer],
+  }), /latest append-only review event/);
+
+  const oversizedNotes = structuredClone(reviewed);
+  oversizedNotes.reviews[0].notes = "x".repeat(2001);
+  assert.throws(() => normalizeArchitecturalObservationBatch({
+    ...fixture(), observations: [oversizedNotes],
+  }), /at most 2000 characters/);
+
+  const missingSnapshot = structuredClone(reviewed);
+  delete missingSnapshot.originalProposal;
+  assert.throws(() => normalizeArchitecturalObservationBatch({
+    ...fixture(), observations: [missingSnapshot],
+  }), /originalProposal is required/);
 });

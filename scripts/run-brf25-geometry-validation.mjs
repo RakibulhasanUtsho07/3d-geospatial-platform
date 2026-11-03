@@ -4,6 +4,10 @@ import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { assessBrf25CandidateBinding } from "../src/core/building-generation/brf25-geometry-validation.mjs";
+import {
+  parseTrustedReconstructionReviewerKeys,
+  verifySourceBoundAuthenticatedReviewForIndependentValidation,
+} from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/i;
 const RELEASE_FLAGS = ["acceptanceEligible", "publicationEligible", "mapReady", "automaticApproval"];
@@ -59,13 +63,19 @@ function runNode(scriptPath, args, root) {
   };
 }
 function usage() {
-  console.log("Usage: node scripts/run-brf25-geometry-validation.mjs <authorization.json> <truth-config.json> <output-directory> --workspace=<workspace-root> [--root=project-root]\nRevalidates a real BRF-24 candidate binding, then runs actual-GLB extraction and independent-truth evaluation. Output remains review-only; this command does not approve a model.");
+  console.log("Usage: node scripts/run-brf25-geometry-validation.mjs <authorization.json> <truth-config.json> <output-directory> --workspace=<workspace-root> --building-id=<buildingId> --review-job-id=<D3M-01.D-reviewJobId> [--root=project-root]\\nRe-verifies the signed D3M-01.D reviewer receipt and BRF-24 candidate binding before actual-GLB extraction and independent-truth evaluation. RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON must be set by the server.");
 }
 async function main() {
   const argv = process.argv.slice(2);
   const rootFlag = argv.find((x) => x.startsWith("--root="));
   const workspaceFlag = argv.find((x) => x.startsWith("--workspace="));
-  const positional = argv.filter((x) => !x.startsWith("--root=") && !x.startsWith("--workspace="));
+  const buildingFlag = argv.find((x) => x.startsWith("--building-id="));
+  const reviewFlag = argv.find((x) => x.startsWith("--review-job-id="));
+  const positional = argv.filter((x) => !x.startsWith("--root=") &&
+    !x.startsWith("--workspace=") && !x.startsWith("--building-id=") &&
+    !x.startsWith("--review-job-id="));
+  const buildingId = buildingFlag?.slice("--building-id=".length) ?? "";
+  const reviewJobId = reviewFlag?.slice("--review-job-id=".length) ?? "";
   if (process.argv.includes("--help")) { usage(); return; }
   if (positional.length !== 3 || !workspaceFlag) {
     usage();
@@ -92,7 +102,18 @@ async function main() {
     blockers: [],
     artifacts: {},
     visualReview: { status: "pending-human-review", acceptanceEligible: false },
-    policy: { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false },
+    policy: {
+      candidateGeometryValidated: false,
+      independentReferenceVerified: false,
+      heldOutCheckpointAccuracyVerified: false,
+      groundTruth: false,
+      acceptanceEligible: false,
+      publicationEligible: false,
+      publishable: false,
+      mapReady: false,
+      automaticApproval: false,
+      dispatchAllowed: false,
+    },
     limitations: [
       "This runner orchestrates actual GLB geometry extraction and independent-truth metrics only after BRF-24 produced a hash-bound candidate.",
       "A benchmark-review-required result is not a final PASS; source-camera visual review and human review remain separate required gates.",
@@ -141,6 +162,44 @@ async function main() {
     return;
   }
 
+  // The receipt is resolved from the immutable job store. Rebuild the linked
+  // hand-off/report from workspace bytes and re-verify its Ed25519 signature
+  // with the current server-side trust registry before extraction can start.
+  try {
+    if (!buildingId || !reviewJobId) {
+      throw new TypeError("--building-id and --review-job-id are required for BRF-25.");
+    }
+    if (configValue?.buildingId !== buildingId) {
+      throw new TypeError("The truth-evaluation config buildingId must match the authenticated-review buildingId.");
+    }
+    const trustedReviewerKeys = parseTrustedReconstructionReviewerKeys(
+      process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON ?? "",
+    );
+    const verifiedReview = await verifySourceBoundAuthenticatedReviewForIndependentValidation({
+      workspaceRoot,
+      buildingId,
+      reviewJobId,
+      expectedCandidateGlbSha256: binding.binding.candidateGlbSha256,
+      trustedReviewerKeys,
+    });
+    report.checks.push({
+      id: "authenticated-review-receipt",
+      status: "passed",
+      detail: "The immutable D3M-01.D decision, candidate, hand-off, geometry report and Ed25519 signature were re-verified against the current trusted reviewer registry.",
+    });
+    report.artifacts.authenticatedReview = verifiedReview.receipt;
+  } catch (error) {
+    const detail = error instanceof Error
+      ? error.message.slice(0, 1000)
+      : String(error).slice(0, 1000);
+    report.checks.push({ id: "authenticated-review-receipt", status: "blocked", detail });
+    report.blockers.push({ id: "authenticated-review-receipt", detail });
+    report.status = "blocked";
+    await writeFile(reportAbs, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    process.exitCode = 2;
+    return;
+  }
+
   const evaluationId = configValue?.evaluationId;
   if (typeof evaluationId !== "string" || !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(evaluationId)) {
     throw new TypeError("Truth config evaluationId must be a safe ID.");
@@ -154,7 +213,14 @@ async function main() {
   }
 
   const prepareScript = await resolveInside(root, "scripts/prepare-independent-building-truth-manifest.mjs", "Geometry preparation CLI");
-  const prepareRun = runNode(prepareScript, [positional[1], preparedRel, "--root=" + root], root);
+  const prepareRun = runNode(prepareScript, [
+    positional[1],
+    preparedRel,
+    "--root=" + root,
+    "--workspace=" + workspaceRoot,
+    "--building-id=" + buildingId,
+    "--review-job-id=" + reviewJobId,
+  ], root);
   report.steps = [{ id: "actual-glb-extraction-and-reference-adaptation", ...prepareRun }];
   if (prepareRun.exitCode !== 0) {
     report.status = "geometry-extraction-failed";
@@ -178,7 +244,14 @@ async function main() {
     extractedHeldOutCheckpointCount: prepared.value.preparation.extractedHeldOutCheckPointCount ?? null };
 
   const evaluateScript = await resolveInside(root, "scripts/evaluate-independent-building-truth.mjs", "Independent-truth evaluator CLI");
-  const evaluateRun = runNode(evaluateScript, [preparedRel, evalRel, "--root=" + root], root);
+  const evaluateRun = runNode(evaluateScript, [
+    preparedRel,
+    evalRel,
+    "--root=" + root,
+    "--workspace=" + workspaceRoot,
+    "--building-id=" + buildingId,
+    "--review-job-id=" + reviewJobId,
+  ], root);
   report.steps.push({ id: "independent-truth-evaluation", ...evaluateRun });
   if (![0, 1, 2].includes(evaluateRun.exitCode)) {
     report.status = "independent-evaluation-failed";
@@ -236,7 +309,18 @@ async function main() {
     policy: evalValue.policy ?? null,
   };
   report.finalDisposition = "REVIEW-REQUIRED";
-  report.policy = { acceptanceEligible: false, publicationEligible: false, mapReady: false, automaticApproval: false };
+  report.policy = {
+    candidateGeometryValidated: false,
+    independentReferenceVerified: false,
+    heldOutCheckpointAccuracyVerified: false,
+    groundTruth: false,
+    acceptanceEligible: false,
+    publicationEligible: false,
+    publishable: false,
+    mapReady: false,
+    automaticApproval: false,
+    dispatchAllowed: false,
+  };
   await writeFile(reportAbs, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
   console.log(JSON.stringify({ report: path.relative(root, reportAbs).split(path.sep).join("/"),
     status: report.status, candidateGlbSha256: binding.binding.candidateGlbSha256,
