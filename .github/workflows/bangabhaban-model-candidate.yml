@@ -109,6 +109,11 @@ jobs:
               manifest.frontCameraEffectiveBearingDegrees !== authoredBearing) {
             throw new Error("GLB, candidate report and render manifest front-bearing values do not agree.");
           }
+          if (report.model.frontFacingAzimuthDegrees !== authoredBearing ||
+              report.model.frontAxisConfidence !== building.frontAxisConfidence ||
+              report.model.frontAxisSource !== building.frontAxisSource) {
+            throw new Error("GLB and candidate report front-axis provenance do not agree.");
+          }
           if (manifest.frontAxisConfidence !== building.frontAxisConfidence ||
               manifest.frontAxisSource !== building.frontAxisSource) {
             throw new Error("GLB and render manifest front-axis provenance do not agree.");
