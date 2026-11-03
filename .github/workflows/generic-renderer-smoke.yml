@@ -1,0 +1,128 @@
+name: Generic building renderer smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/d3m-engine-01-brf-evidence-20261103
+    paths:
+      - ".github/workflows/generic-renderer-smoke.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/render-review-profile.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "tests/render-review-profile.test.mjs"
+      - "tests/render-building-review-renderer.test.mjs"
+      - "tests/fixtures/generic-render-review-profile.json"
+      - "tests/fixtures/demo-building-spec.json"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generic-renderer-smoke.yml"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "src/core/building-generation/render-review-profile.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "tests/render-review-profile.test.mjs"
+      - "tests/render-building-review-renderer.test.mjs"
+      - "tests/fixtures/generic-render-review-profile.json"
+      - "tests/fixtures/demo-building-spec.json"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generic-renderer-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  renderer-smoke:
+    name: Render generic GLB in Blender and verify profile provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        timeout-minutes: 28
+        run: |
+          if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            sudo sed -i 's|azure.archive.ubuntu.com/ubuntu|archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
+          fi
+          sudo timeout 5m apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive timeout 22m apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=60 -o Acquire::https::Timeout=60 install -y --no-install-recommends blender python3-numpy libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Run renderer profile and manifest tests
+        run: |
+          npm run test:render-review-profile
+          node --test tests/render-review-manifest.test.mjs tests/render-building-review-renderer.test.mjs tests/heritage-model.test.mjs
+
+      - name: Generate a generic demo-building GLB
+        run: |
+          mkdir -p "$RUNNER_TEMP/building-review-smoke"
+          npm run generate:building-model -- tests/fixtures/demo-building-spec.json "$RUNNER_TEMP/building-review-smoke/demo.glb"
+
+      - name: Render default generic review profile (13 views)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          smoke_root="$RUNNER_TEMP/building-review-smoke"
+          npm run render:building-review -- "$smoke_root/demo.glb" "$smoke_root/default-rendered" --resolution=256 --blender=blender
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import path from "node:path";
+          const root = path.join(process.env.RUNNER_TEMP, "building-review-smoke", "default-rendered");
+          const manifest = JSON.parse(await readFile(path.join(root, "render-review-manifest.json"), "utf8"));
+          if (manifest.valid !== true || manifest.counts?.generatedViews !== 13) {
+            throw new Error("Default generic renderer did not produce 13 valid views: " + manifest.status);
+          }
+          if (manifest.reviewProfile?.profileId !== "generic-whole-model-v1" ||
+              manifest.reviewProfile?.source !== "built-in-default") {
+            throw new Error("Built-in review profile provenance is missing.");
+          }
+          if (manifest.publicationEligible !== false) throw new Error("Render smoke must never enable publication.");
+          NODE
+
+      - name: Render explicit hash-pinned generic review profile (13 views)
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          MESA_LOADER_DRIVER_OVERRIDE: "llvmpipe"
+        run: |
+          smoke_root="$RUNNER_TEMP/building-review-smoke"
+          npm run render:building-review -- "$smoke_root/demo.glb" "$smoke_root/profile-rendered" --resolution=256 --blender=blender --review-profile=tests/fixtures/generic-render-review-profile.json
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto";
+          import { readFile } from "node:fs/promises";
+          import path from "node:path";
+          const root = path.join(process.env.RUNNER_TEMP, "building-review-smoke");
+          const profilePath = path.resolve("tests/fixtures/generic-render-review-profile.json");
+          const profileBytes = await readFile(profilePath);
+          const expectedSha = createHash("sha256").update(profileBytes).digest("hex");
+          const output = path.join(root, "profile-rendered");
+          const manifest = JSON.parse(await readFile(path.join(output, "render-review-manifest.json"), "utf8"));
+          if (manifest.valid !== true || manifest.counts?.generatedViews !== 13) {
+            throw new Error("Explicit profile render did not produce 13 valid views: " + manifest.status);
+          }
+          if (manifest.reviewProfile?.profileId !== "generic-whole-model-explicit-v1" ||
+              manifest.reviewProfile?.source !== "explicit-file" ||
+              manifest.reviewProfile?.sha256 !== expectedSha) {
+            throw new Error("Explicit render profile SHA-256 provenance did not round-trip.");
+          }
+          if (manifest.publicationEligible !== false) throw new Error("Render smoke must never enable publication.");
+          NODE
