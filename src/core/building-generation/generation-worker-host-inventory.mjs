@@ -76,7 +76,7 @@ function summarizeCapabilityState(capabilities, checkedAt) {
 
 function pythonInventoryProgram() {
   return [
-    "import hashlib, importlib.metadata, inspect, json, platform, re, sys",
+    "import hashlib, importlib.metadata, inspect, json, os, platform, re, sys",
     "out = {",
     "  'pythonVersion': platform.python_version(),",
     "  'pythonImplementation': platform.python_implementation(),",
@@ -92,6 +92,13 @@ function pythonInventoryProgram() {
     "for package in ('torch', 'onnxruntime', 'rembg', 'huggingface-hub', 'transformers'):",
     "  try: out['packages'][package] = importlib.metadata.version(package)",
     "  except Exception: out['packages'][package] = None",
+    "def file_summary(file_path, include_revision=False):",
+    "  if not isinstance(file_path, str) or not os.path.isfile(file_path) or os.path.getsize(file_path) <= 0: return {'status': 'missing', 'bytes': None, 'snapshotRevision': None} if include_revision else {'status': 'missing', 'bytes': None}",
+    "  result = {'status': 'cached', 'bytes': int(os.path.getsize(file_path))}",
+    "  if include_revision:",
+    "    revision = os.path.basename(os.path.dirname(file_path))",
+    "    result['snapshotRevision'] = revision if re.fullmatch(r'[a-f0-9]{40}', revision) else None",
+    "  return result",
     "try:",
     "  import torch",
     "  out['accelerators']['cudaAvailable'] = bool(torch.cuda.is_available())",
@@ -112,10 +119,24 @@ function pythonInventoryProgram() {
     "except Exception: out['probeErrors'].append('onnxruntime-import-or-provider-probe-failed')",
     "try:",
     "  import rembg",
+    "  from rembg.sessions import sessions_class",
     "  parameter = inspect.signature(rembg.new_session).parameters.get('model_name')",
     "  name = parameter.default if parameter else None",
-    "  if isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', name): out['rembgDefaultModel'] = name",
+    "  if isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', name):",
+    "    out['rembgDefaultModel'] = name",
+    "    session_class = next((item for item in sessions_class if item.name() == name), None)",
+    "    resolver = getattr(session_class, 'resolve_existing', None) if session_class is not None else None",
+    "    if callable(resolver):",
+    "      model_path = resolver(name + '.onnx')",
+    "      out['modelArtifacts']['rembgWeights'] = file_summary(os.fspath(model_path) if model_path is not None else '')",
+    "    else: out['modelArtifacts']['rembgWeights']['status'] = 'unknown'",
     "except Exception: out['probeErrors'].append('rembg-import-or-default-model-probe-failed')",
+    "try:",
+    "  from huggingface_hub import try_to_load_from_cache",
+    "  for model_file, key in (('config.yaml', 'tripoConfig'), ('model.ckpt', 'tripoCheckpoint')):",
+    "    cached_file = try_to_load_from_cache('stabilityai/TripoSR', model_file)",
+    "    out['modelArtifacts'][key] = file_summary(cached_file, include_revision=True)",
+    "except Exception: out['probeErrors'].append('triposr-cache-identity-probe-failed')",
     "try:",
     "  with open(sys.argv[1], 'rb') as runner_file: runner_bytes = runner_file.read()",
     "  if not runner_bytes: raise ValueError('empty runner')",
@@ -206,6 +227,20 @@ function parsePythonInventory(result) {
       : [];
     const rembgDefaultModel = typeof data.rembgDefaultModel === "string" && SAFE_MODEL_ID.test(data.rembgDefaultModel)
       ? data.rembgDefaultModel : null;
+    const rawArtifacts = data.modelArtifacts && typeof data.modelArtifacts === "object" ? data.modelArtifacts : {};
+    const parseArtifact = (item, includeRevision = false) => ({
+      status: ["cached", "missing", "unknown"].includes(item?.status) ? item.status : "unknown",
+      bytes: Number.isSafeInteger(item?.bytes) && item.bytes > 0 ? item.bytes : null,
+      ...(includeRevision ? {
+        snapshotRevision: typeof item?.snapshotRevision === "string" && /^[a-f0-9]{40}$/.test(item.snapshotRevision)
+          ? item.snapshotRevision : null,
+      } : {}),
+    });
+    const modelArtifacts = {
+      tripoConfig: parseArtifact(rawArtifacts.tripoConfig, true),
+      tripoCheckpoint: parseArtifact(rawArtifacts.tripoCheckpoint, true),
+      rembgWeights: parseArtifact(rawArtifacts.rembgWeights),
+    };
     const probeErrors = Array.isArray(data.probeErrors)
       ? data.probeErrors.filter((value) => typeof value === "string" && /^[a-z0-9-]{1,100}$/.test(value)).slice(0, 12)
       : ["python-runtime-inventory-result-malformed"];
@@ -232,6 +267,7 @@ function parsePythonInventory(result) {
         ? data.onnxProviders.filter((value) => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/.test(value)).slice(0, 20)
         : [],
       rembgDefaultModel,
+      modelArtifacts,
       runnerSyntaxCompiled: data.runnerSyntaxCompiled === true,
       runnerSha256Matches: data.runnerSha256Matches === true,
       blockers: probeErrors,
@@ -246,6 +282,11 @@ function parsePythonInventory(result) {
       accelerators: { cudaAvailable: false, cudaRuntime: null, hipRuntime: null, cudaDevices: [], mpsAvailable: false },
       onnxProviders: [],
       rembgDefaultModel: null,
+      modelArtifacts: {
+        tripoConfig: { status: "unknown", bytes: null, snapshotRevision: null },
+        tripoCheckpoint: { status: "unknown", bytes: null, snapshotRevision: null },
+        rembgWeights: { status: "unknown", bytes: null },
+      },
       runnerSyntaxCompiled: false,
       runnerSha256Matches: false,
       blockers: ["python-runtime-inventory-result-malformed"],
@@ -357,6 +398,11 @@ export async function collectGenerationWorkerHostInventory({
       ...runner,
       syntaxCompiledInMemory: python.runnerSyntaxCompiled,
       sha256MatchedInProbe: python.runnerSha256Matches,
+    },
+    modelArtifacts: python.modelArtifacts ?? {
+      tripoConfig: { status: "unknown", bytes: null, snapshotRevision: null },
+      tripoCheckpoint: { status: "unknown", bytes: null, snapshotRevision: null },
+      rembgWeights: { status: "unknown", bytes: null },
     },
     modelReadiness: {
       status: capabilities.status,
