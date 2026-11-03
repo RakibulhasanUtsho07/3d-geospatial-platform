@@ -85,7 +85,7 @@ test("terminates a stalled Blender process and never promotes its partial output
 
 test("uses the candidate GLB front bearing for orthographic views and preserves a legacy fallback", () => {
   assert.match(rendererSource, /def read_front_facing_azimuth\(model_path\):/);
-  assert.match(rendererSource, /front_azimuth = read_front_facing_azimuth\(model_path\)/);
+  assert.match(rendererSource, /front_azimuth, front_axis_confidence = read_front_facing_azimuth\(model_path\)/);
   assert.match(rendererSource, /front_axis_source = "renderer-default"/);
   assert.match(rendererSource, /front_axis_source = "glb-extras\.frontFacingAzimuthDegrees"/);
   assert.match(rendererSource, /sin_bearing \* math\.cos\(front_elevation\)/);
