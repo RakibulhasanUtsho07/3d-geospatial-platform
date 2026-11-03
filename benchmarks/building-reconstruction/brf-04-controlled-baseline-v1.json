@@ -6,7 +6,7 @@
   "provenance": {
     "type": "synthetic-known-geometry",
     "description": "Deterministic closed cuboid created by the test fixture; not a real building and not independent survey evidence.",
-    "authoritativeFor": ["GLB parser integrity", "axis-aligned model-space bounds", "dimension tolerance logic", "degenerate-triangle detection"],
+    "authoritativeFor": ["GLB parser integrity", "axis-aligned model-space bounds", "dimension tolerance logic", "degenerate-triangle detection", "non-manifold edge detection"],
     "notAuthoritativeFor": ["architectural similarity", "photo reconstruction quality", "real-world scale", "georeference", "heritage fidelity"]
   },
   "expectedDimensionsM": {
@@ -20,7 +20,13 @@
     "validGlb": true,
     "meshCount": 1,
     "triangleCount": 12,
-    "degenerateTriangleCount": 0
+    "degenerateTriangleCount": 0,
+    "topology": {
+      "topologyAnalyzed": true,
+      "connectedComponentCount": 1,
+      "boundaryEdgeCount": 0,
+      "nonManifoldEdgeCount": 0
+    }
   },
   "defectCases": [
     {
@@ -36,6 +42,18 @@
       "expectedOutcome": "geometry-warning",
       "expectedWarning": "degenerate-triangles-present",
       "expectedMinimumDegenerateTriangleCount": 1
+    },
+    {
+      "id": "non-manifold-shared-edge",
+      "injection": {
+        "type": "third-use-of-shared-edge",
+        "triangleIndex": 2,
+        "edgeVertexIndices": [0, 2],
+        "thirdVertexIndex": 6
+      },
+      "expectedOutcome": "geometry-warning",
+      "expectedWarning": "non-manifold-edges-present",
+      "expectedMinimumNonManifoldEdgeCount": 1
     }
   ],
   "policy": {
