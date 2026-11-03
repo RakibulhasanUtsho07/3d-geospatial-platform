@@ -100,6 +100,14 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   if (rawManifest.width !== resolution || rawManifest.height !== resolution) errors.push("render-manifest-resolution-mismatch");
 
   const frontBearing = rawManifest.frontFacingAzimuthDegrees ?? null;
+  const modelCoordinateFrame = rawManifest.modelCoordinateFrame ?? null;
+  const expectedCoordinateFrame = "gltf-right-handed-x-east-y-up-z-south";
+  if (modelCoordinateFrame !== null && modelCoordinateFrame !== expectedCoordinateFrame) {
+    errors.push("render-model-coordinate-frame-invalid");
+  }
+  if (frontBearing !== null && modelCoordinateFrame !== expectedCoordinateFrame) {
+    errors.push("render-bearing-requires-right-handed-model-coordinate-frame");
+  }
   const frontAxisSource = rawManifest.frontAxisSource ?? "renderer-default";
   const frontAxisConfidence = rawManifest.frontAxisConfidence ?? "unknown";
   const validFrontConfidence = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]);
@@ -134,6 +142,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     renderResolution: { width: resolution, height: resolution },
     sceneBounds: bounds ?? null,
     frontFacingAzimuthDegrees: frontBearing,
+    modelCoordinateFrame,
     frontCameraEffectiveBearingDegrees: effectiveFrontBearing,
     frontAxisConfidence,
     frontAxisSource,
