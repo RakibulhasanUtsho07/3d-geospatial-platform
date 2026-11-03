@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feat/d3m-engine-01-brf-evidence-20261103
       - feat/reviewed-model-map-publish
       - feat/generation-queue-worker
       - dev
