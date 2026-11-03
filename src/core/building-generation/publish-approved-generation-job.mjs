@@ -94,7 +94,7 @@ async function readAndVerifyQueueRequest(root, jobId) {
  * Publish only a job that has an immutable approved review record whose candidate,
  * QA report and request checksums still match. Placement remains explicit input.
  */
-export async function publishApprovedGenerationJob({ workspaceRoot, jobId, placement }) {
+export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot = workspaceRoot, jobId, placement }) {
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("jobId must be a safe identifier.");
   if (!isRecord(placement) || !isRecord(placement.position)) {
     throw new TypeError("Explicit model placement is required, including longitude, latitude and height.");
@@ -194,6 +194,7 @@ export async function publishApprovedGenerationJob({ workspaceRoot, jobId, place
     await writeFile(attestationPath, JSON.stringify(attestation, null, 2) + "\n", { flag: "wx", mode: 0o600 });
     const published = await publishReviewedBuildingModel({
       workspaceRoot: root,
+      publicRoot,
       candidatePath: job.result.modelPath,
       attestationPath,
     });

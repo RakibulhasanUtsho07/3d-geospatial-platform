@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, rename, stat, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { normalizeGeneratedModelDefinition } from "../map-engine/generated-model-policy.mjs";
 import { PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, validatePublishedModelCatalog } from "./published-model-catalog-reader.mjs";
@@ -140,6 +140,67 @@ async function writeCatalogAtomically(manifestPath, catalog) {
   await rename(tempPath, manifestPath);
 }
 
+
+
+async function ensurePublicCatalogDirectory(outputRoot) {
+  let current = outputRoot;
+  for (const segment of ["public", "models", "generated"]) {
+    const next = path.join(current, segment);
+    try {
+      const info = await lstat(next);
+      if (info.isSymbolicLink() || !info.isDirectory()) {
+        throw new TypeError("Public catalog path components must be real directories.");
+      }
+    } catch (error) {
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+      try {
+        await mkdir(next, { mode: 0o755 });
+      } catch (createError) {
+        if (!createError || typeof createError !== "object" || !("code" in createError) || createError.code !== "EEXIST") {
+          throw createError;
+        }
+      }
+      const info = await lstat(next);
+      if (info.isSymbolicLink() || !info.isDirectory()) {
+        throw new TypeError("Public catalog path components must be real directories.");
+      }
+    }
+    current = await realpath(next);
+    assertInside(outputRoot, current, "public catalog directory");
+  }
+  return current;
+}
+
+async function acquireCatalogPublishLock(lockDir) {
+  const ownerPath = path.join(lockDir, "owner");
+  const ownerToken = randomUUID();
+  try {
+    await mkdir(lockDir, { recursive: false, mode: 0o700 });
+    await writeFile(ownerPath, ownerToken + "\n", { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {
+      throw new Error("A generated-model catalog publication is already in progress.");
+    }
+    await rm(lockDir, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+
+  return async () => {
+    try {
+      const currentOwner = await readFile(ownerPath, "utf8");
+      if (currentOwner.trim() === ownerToken) {
+        await rm(lockDir, { recursive: true, force: true });
+      }
+    } catch (error) {
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  };
+}
+
 /**
  * Publish a reviewed candidate through an explicit human-attestation file.
  * The command copies a content-addressed GLB and updates a versioned manifest;
@@ -149,6 +210,7 @@ export async function publishReviewedBuildingModel({
   workspaceRoot,
   candidatePath,
   attestationPath,
+  publicRoot = workspaceRoot,
   publishedAt = new Date().toISOString(),
 }) {
   const root = await realpath(path.resolve(workspaceRoot));
@@ -176,11 +238,19 @@ export async function publishReviewedBuildingModel({
     throw new Error("Review evidence SHA-256 does not match the attestation.");
   }
 
-  const catalogDir = path.join(root, "public", "models", "generated");
-  await mkdir(catalogDir, { recursive: true });
+  const outputRoot = await realpath(path.resolve(publicRoot));
+  const outputRootInfo = await stat(outputRoot);
+  if (!outputRootInfo.isDirectory()) throw new TypeError("publicRoot must be an existing application directory.");
+  const catalogDir = await ensurePublicCatalogDirectory(outputRoot);
+  const releaseCatalogLock = await acquireCatalogPublishLock(path.join(outputRoot, ".generated-model-catalog.publish.lock"));
+  try {
   const manifestPath = path.join(catalogDir, "manifest.json");
   let catalog = { schemaVersion: PUBLISHED_MODEL_CATALOG_SCHEMA_VERSION, models: [] };
   try {
+    const manifestInfo = await lstat(manifestPath);
+    if (manifestInfo.isSymbolicLink() || !manifestInfo.isFile()) {
+      throw new TypeError("Existing published model manifest must be a regular non-symlink file.");
+    }
     catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
@@ -223,7 +293,14 @@ export async function publishReviewedBuildingModel({
     }
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      await writeFile(destination, candidateBytes, { flag: "wx" });
+      const temporaryAssetPath = path.join(catalogDir, "." + assetName + ".tmp-" + randomUUID());
+      try {
+        await writeFile(temporaryAssetPath, candidateBytes, { flag: "wx" });
+        await rename(temporaryAssetPath, destination);
+      } catch (writeError) {
+        await rm(temporaryAssetPath, { force: true }).catch(() => {});
+        throw writeError;
+      }
     } else {
       throw error;
     }
@@ -271,11 +348,14 @@ export async function publishReviewedBuildingModel({
   const validated = validatePublishedModelCatalog(catalog);
   await writeCatalogAtomically(manifestPath, validated);
   return { modelId: attestation.model.id, versionId, assetUrl, sha256: actualCandidateHash, manifestPath };
+  } finally {
+    await releaseCatalogLock();
+  }
 }
 
 /** Change the active catalog version after verifying the referenced GLB still matches its hash. */
-export async function activatePublishedModelVersion({ workspaceRoot, modelId, versionId }) {
-  const root = await realpath(path.resolve(workspaceRoot));
+export async function activatePublishedModelVersion({ workspaceRoot, publicRoot = workspaceRoot, modelId, versionId }) {
+  const root = await realpath(path.resolve(publicRoot));
   if (!ID_PATTERN.test(modelId ?? "") || !VERSION_PATTERN.test(versionId ?? "")) {
     throw new TypeError("modelId and versionId must be valid catalog identifiers.");
   }

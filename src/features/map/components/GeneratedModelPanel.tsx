@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { getActivePublishedModels } from "@/core/building-generation/published-model-catalog-reader.mjs";
+import GenerationJobPublishPanel from "./GenerationJobPublishPanel";
 
 import type { GeneratedModelDefinition } from "@/core/map-engine/types";
 
@@ -166,6 +167,18 @@ export default function GeneratedModelPanel({
     }
   }
 
+  async function handlePublishedJobLoad(definition: GeneratedModelDefinition) {
+    setError(null);
+    setCatalogRefreshKey((current) => current + 1);
+    if (models.some((item) => item.definition.id === definition.id)) {
+      throw new Error("The catalog was refreshed, but this model ID is already loaded in the current map session. Remove the existing version, then load the new active catalog version.");
+    }
+    await onAdd(definition);
+    setModels((current) => [...current, { definition, visible: true }]);
+    onFocus(definition);
+    setMessage((definition.name ?? definition.id) + " was loaded from its newly published catalog version.");
+  }
+
   function toggleVisibility(model: LoadedGeneratedModel) {
     setError(null);
     const visible = !model.visible;
@@ -307,6 +320,11 @@ export default function GeneratedModelPanel({
                 Catalog review claims are operator-supplied attestations. Publishing checks the recorded file hashes; it does not independently prove rights, architecture or survey quality.
               </p>
             </section>
+
+            <GenerationJobPublishPanel
+              disabled={disabled || busy}
+              onPublished={handlePublishedJobLoad}
+            />
 
             <div className="mt-4 border-t border-white/10 pt-4">
               <h3 className="text-sm font-semibold text-zinc-200">Manual / development preview</h3>
