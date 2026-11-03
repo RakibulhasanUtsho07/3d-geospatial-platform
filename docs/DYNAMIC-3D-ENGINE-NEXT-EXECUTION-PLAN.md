@@ -377,7 +377,10 @@ The comparison counts above describe divergent history from each merge base; the
 - Tests cover selector ambiguity, invalid bearing/anchor, conflicting evidence, GLB metadata, dome bounds center, render-manifest provenance and renderer legacy fallback.
 - Previous facade-only exact-head CI #41605913082 passed, but it predates the expanded compass/dome/render path and is not acceptance evidence for the current changes.
 - Expanded CI #41608904987 failed at one outdated deep-equality test assertion in the existing facade-selection test. The actual selected-edge/door geometry path passed up to that assertion; the report now adds new metadata fields.
-- The test assertion was updated to check stable required fields while permitting report extension. Current exact-head Full CI #41609196223 is running on `6e7bc90e...`; lint is active and no failures were observed at the last refresh. No expanded-scope Full CI pass is claimed yet.
+- The test assertion was updated to check stable report fields while permitting report extension. Run #41609196223 then revealed one more brittle source-comment assertion in `tests/heritage-model.test.mjs`; generator, manifest, Blender syntax, Dhaka tiles and placement tests had passed.
+- Replaced the brittle phrase check with behavior assertions: Rangmahal mesh filtering is confined to front-detail view; all other views preserve whole-model context.
+- Current exact head: `2cade9a10552bb3a1f5dbb1c0fe2cd8b1e159dc4`.
+- Exact-head Full CI #41609731172: BuildingSpec/generator #17 passed, render manifest #117 passed, Blender Python syntax #132 passed, Dhaka tiles generation/placement #155–156 passed, heritage GLB/parameter/map test #187 passed, production build #191 passed, Chromium install #192 passed. At latest refresh only production-server viewport/browser verification #193 was still running, with no failures. No terminal Full CI pass is claimed until run #41609731172 completes.
 - Keep PR #340 Draft until exact-head Full CI and focused generator/render tests pass, followed by code/geometry review. Do not merge automatically.
 
 ### NEXT-04 — workflow_dispatch evidence event provenance
