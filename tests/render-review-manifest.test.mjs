@@ -97,7 +97,7 @@ test("rejects invalid hashes, invalid dimensions and incomplete render records",
 test("preserves a validated GLB front bearing and source in the review manifest", () => {
   const data = fixture();
   data.rawManifest.frontFacingAzimuthDegrees = 180;
-  data.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  data.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   data.rawManifest.frontAxisConfidence = "estimated";
   const report = finalizeRenderReviewManifest(data);
   assert.equal(report.valid, true);
@@ -105,13 +105,13 @@ test("preserves a validated GLB front bearing and source in the review manifest"
   assert.equal(report.modelCoordinateFrame, "gltf-right-handed-x-east-y-up-z-south");
   assert.equal(report.frontCameraEffectiveBearingDegrees, 180);
   assert.equal(report.frontAxisConfidence, "estimated");
-  assert.equal(report.frontAxisSource, "glb-extras.frontFacingAzimuthDegrees");
+  assert.equal(report.frontAxisSource, "buildingSpec.architecture.frontFacingAzimuthDegrees");
 });
 
 test("fails closed when front bearing metadata has an invalid value or source", () => {
   const invalidBearing = fixture();
   invalidBearing.rawManifest.frontFacingAzimuthDegrees = 361;
-  invalidBearing.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  invalidBearing.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   assert.ok(finalizeRenderReviewManifest(invalidBearing).errors.includes("render-front-bearing-metadata-invalid"));
 
   const wrongSource = fixture();
@@ -122,20 +122,43 @@ test("fails closed when front bearing metadata has an invalid value or source", 
 
   const invalidConfidence = fixture();
   invalidConfidence.rawManifest.frontFacingAzimuthDegrees = 90;
-  invalidConfidence.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  invalidConfidence.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   invalidConfidence.rawManifest.frontAxisConfidence = "false-verified";
   assert.ok(finalizeRenderReviewManifest(invalidConfidence).errors.includes("render-front-bearing-metadata-invalid"));
 
   const missingBearingSource = fixture();
-  missingBearingSource.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  missingBearingSource.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   assert.ok(finalizeRenderReviewManifest(missingBearingSource).errors.includes("render-front-bearing-source-mismatch"));
 });
 
 
+
+test("accepts only the generator's supported front-axis provenance sources", () => {
+  for (const source of [
+    "buildingSpec.architecture.frontFacingAzimuthDegrees",
+    "buildingSpec.architecture.frontFacadeEdgeIndex",
+    "longest-edge-inferred",
+  ]) {
+    const data = fixture();
+    data.rawManifest.frontFacingAzimuthDegrees = 180;
+    data.rawManifest.frontAxisSource = source;
+    data.rawManifest.frontAxisConfidence = "estimated";
+    const report = finalizeRenderReviewManifest(data);
+    assert.equal(report.valid, true, source);
+    assert.equal(report.frontAxisSource, source);
+  }
+
+  const unsupported = fixture();
+  unsupported.rawManifest.frontFacingAzimuthDegrees = 180;
+  unsupported.rawManifest.frontAxisSource = "untrusted-arbitrary-string";
+  unsupported.rawManifest.frontAxisConfidence = "estimated";
+  assert.ok(finalizeRenderReviewManifest(unsupported).errors.includes("render-front-bearing-metadata-invalid"));
+});
+
 test("fails closed when effective front camera bearing contradicts the source bearing or default", () => {
   const explicitMismatch = fixture();
   explicitMismatch.rawManifest.frontFacingAzimuthDegrees = 180;
-  explicitMismatch.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  explicitMismatch.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   explicitMismatch.rawManifest.frontAxisConfidence = "estimated";
   explicitMismatch.rawManifest.frontCameraEffectiveBearingDegrees = 90;
   assert.ok(finalizeRenderReviewManifest(explicitMismatch).errors.includes("render-effective-front-bearing-mismatch"));
@@ -149,7 +172,7 @@ test("fails closed when effective front camera bearing contradicts the source be
 test("fails closed when a GLB bearing is supplied without the right-handed geospatial coordinate frame", () => {
   const data = fixture();
   data.rawManifest.frontFacingAzimuthDegrees = 180;
-  data.rawManifest.frontAxisSource = "glb-extras.frontFacingAzimuthDegrees";
+  data.rawManifest.frontAxisSource = "buildingSpec.architecture.frontFacingAzimuthDegrees";
   data.rawManifest.frontAxisConfidence = "estimated";
   data.rawManifest.modelCoordinateFrame = "x-east,y-up,z-north";
   const report = finalizeRenderReviewManifest(data);
