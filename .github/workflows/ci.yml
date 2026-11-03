@@ -267,6 +267,9 @@ jobs:
       - name: Test end-to-end media-to-model orchestration
         run: npm run test:media-to-model-workflow
 
+      - name: Test evidence-backed building-to-map vertical slice
+        run: npm run test:evidence-backed-vertical-slice
+
       - name: Test durable generation queue, authenticated API gate and end-to-end worker
         run: npm run test:generation-queue
 
