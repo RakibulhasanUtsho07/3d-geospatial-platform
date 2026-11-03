@@ -279,29 +279,44 @@ export async function collectGenerationWorkerHostInventory({
   const runner = await inspectRunner(runnerScript);
   const normalizedEnv = {
     ...env,
-    BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runnerScript,
+    ...(typeof runnerScript === "string" ? { BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT: runnerScript } : {}),
     BUILDING_ENGINE_PYTHON_EXECUTABLE: pythonPath,
     TRIPOSR_PYTHON: pythonPath,
     BUILDING_ENGINE_DEVICE: device,
     ...OFFLINE_ENV,
   };
-  const probe = runner.status === "present"
-    ? spawnSyncImpl(pythonPath, ["-c", pythonInventoryProgram(), path.resolve(runnerScript), runner.sha256], {
+  let probe = null;
+  if (runner.status === "present") {
+    try {
+      probe = spawnSyncImpl(pythonPath, ["-c", pythonInventoryProgram(), path.resolve(runnerScript), runner.sha256], {
         encoding: "utf8",
         timeout: commandTimeoutMs,
         maxBuffer: 64 * 1024,
         windowsHide: true,
         env: normalizedEnv,
+      });
+    } catch {
+      probe = { error: new Error("python-runtime-inventory-probe-failed"), status: null };
+    }
+  }
+  const python = parsePythonInventory(probe);
+  const capabilityResult = runner.status === "present"
+    ? await probeCapabilities({
+        env: normalizedEnv,
+        now: checkedAt,
+        commandTimeoutMs: Math.min(commandTimeoutMs, 30_000),
+        strategies: ["single-image-ai"],
       })
     : null;
-  const python = parsePythonInventory(probe);
-  const capabilityResult = await probeCapabilities({
-    env: normalizedEnv,
-    now: checkedAt,
-    commandTimeoutMs: Math.min(commandTimeoutMs, 30_000),
-    strategies: ["single-image-ai"],
-  });
-  const capabilities = summarizeCapabilityState(capabilityResult, checkedAt);
+  const capabilities = capabilityResult
+    ? summarizeCapabilityState(capabilityResult, checkedAt)
+    : {
+        status: "blocked",
+        strategyStatus: "unknown",
+        tripoModelWeights: "unknown",
+        backgroundRemovalWeights: "unknown",
+        blockers: ["configured-tripiosr-runner-file-not-valid"],
+      };
   const blockers = [];
   if (runner.status !== "present") blockers.push("configured-tripiosr-runner-file-not-valid");
   if (python.status !== "ready") blockers.push("python-runtime-inventory-incomplete");
