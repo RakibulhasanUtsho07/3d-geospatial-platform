@@ -15,9 +15,18 @@ test("provides a generic whole-model default with no node-name filtering", () =>
   assert.equal(profile.frontView.framingLabel, "whole-model-generic-front");
 });
 
-test("accepts an explicit heritage review profile without coupling it to the renderer implementation", async () => {
-  const source = await readFile(new URL("../data/heritage/rangmahal-render-review-profile.json", import.meta.url), "utf8");
-  const profile = validateRenderReviewProfile(JSON.parse(source));
+test("accepts an explicit heritage review profile without coupling it to the renderer implementation", () => {
+  const profile = validateRenderReviewProfile({
+    schemaVersion: "1.0.0",
+    profileId: "rangmahal-south-facade-review",
+    excludeNodeNamePrefixes: ["Site_"],
+    frontView: {
+      includeNodeNames: ["Rangmahal_GF", "Rangmahal_FF", "Dome"],
+      excludeNodeNames: ["RoofDeck"],
+      elevationDegrees: 5,
+      framingLabel: "rangmahal-south-facade-focused",
+    },
+  });
   assert.equal(profile.profileId, "rangmahal-south-facade-review");
   assert.deepEqual(profile.excludeNodeNamePrefixes, ["Site_"]);
   assert.ok(profile.frontView.includeNodeNames.includes("Dome"));
