@@ -1,9 +1,9 @@
 # D3M-05 — Offline single-image runtime smoke
 
 **Tracking issue:** [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307)  
-**Dependency:** D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
-**Implementation branch:** feat/d3m05-single-image-runtime-smoke-20261102  
-**Status:** Implementation candidate. Do not call the runtime smoke passed until an operator runs it on the actual worker host with the actual TripoSR, ONNX Runtime, rembg model and selected device. CI exercises the orchestration contract with fakes and never downloads model weights.
+**Source integration:** D3M-05 implementation is integrated into `main` through cumulative promotion PR [#325](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/325). The original implementation PR [#308](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/308) is closed as superseded, not merged independently.  
+**Worker-host tooling:** inventory/preflight added to `main` through [D3M-ENGINE-02 PR #347](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/347).  
+**Status:** Implementation and automated CI validation are complete on `main`; the real TripoSR/rembg worker-host inference, independent GLB verification and human inspection are **not run**. Never call the runtime smoke passed until those operator-host steps succeed.
 
 ## Purpose and contract
 
@@ -108,7 +108,7 @@ The verifier independently reads the report, rejects symlinked/out-of-workspace 
 
 npm run test:single-image-runtime-smoke uses a fake workflow and synthetic GLB bytes. It checks the gate for missing/unknown model caches, all four separate operator confirmations, fresh-ID enforcement, JPEG/PNG signature enforcement, the Python offline hook, simulated TripoSR child-process spawn evidence, pre-runner and failed-spawn classification, output hash binding, private report permissions, failure sanitization and evidence immutability. It does **not** exercise real TripoSR weights, rembg/ONNX inference, CUDA/MPS kernels, GPU memory, image-to-building quality or a real operator host.
 
-Full CI must pass on the exact current D3M-05 PR head; a green result from an earlier commit does not validate later changes. D3M-02, D3M-03 and D3M-04 remain open dependencies; no branch in this stack should be merged ahead of its parent dependency.
+The D3M-02/03/04/05/06/07 implementation stack has since been reconciled onto `main` through PR #325. The post-promotion `main` CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps on `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`, including the D3M-05 smoke contract test and smoke/verifier CLI checks. This is automated code/test validation only; it is not a real worker-host inference result.
 
 ## Operator-host preflight and evidence capture
 
@@ -152,3 +152,13 @@ The D3M-05 smoke repeats the same single-image-only capability check immediately
 The preflight requests only the `single-image-ai` strategy; it does not launch the unrelated COLMAP `--help` checks. The configured TripoSR `run.py` is opened and syntax-compiled in memory, but its top-level code and `--help` handler are never executed. The Python subprocess disables bytecode writes and sets Hugging Face offline/telemetry flags while checking packages and local cache metadata. Package imports still execute installed package initialization code and may have package-specific side effects; the preflight is not a hermetic read-only environment, OS sandbox or network firewall. Apply host/network egress controls when strict no-egress or no-write guarantees are required.
 
 A `ready` result is only a precondition. It does not prove that the runner will complete inference, that model terms permit the intended use, that sufficient GPU memory is available, or that the resulting building geometry is accurate. Continue with the D3M-05 smoke only after source rights and both model licences have been reviewed; then run the independent evidence verifier and human GLB inspection.
+
+
+## Main promotion and current real-host status — 2026-11-03
+
+- D3M-05 implementation, D3M-04 capability readiness, D3M-06 reviewed placement and D3M-07 preflight were integrated into `main` by cumulative promotion PR [#325](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/325). The earlier stacked PR #308 is closed as superseded; its code is part of the main-based integration.
+- D3M-ENGINE-02 consolidated worker-host inventory was added by [PR #347](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/347). Its squash merge commit is `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`, the current main head.
+- Post-merge main Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) completed successfully: 207/207 steps. It passed D3M-05 runtime-smoke contract tests (step 138), D3M-07 preflight tests (139), host inventory tests/CLI (140–141), and D3M-05 smoke/verifier CLI validation (143–144).
+- These tests use fake workflow execution and synthetic GLB fixtures. They do **not** run real TripoSR/rembg weights, GPU kernels, a provisioned worker host or a rights-cleared image.
+- **Still outstanding:** run the host inventory and single-image preflight on the actual provisioned worker environment; review source and model-weight terms; execute one fresh D3M-05 smoke with fresh IDs and all four operator confirmations; run the independent verifier; inspect the private GLB in an independent viewer; record the sanitized result using the evidence-log template.
+- Tracking remains open in [issue #307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307). Keep `mapReady=false`, `publicationEligible=false` and `automaticApproval=false`. No private source image, smoke JSON, GLB, model weights, cache path or raw worker log belongs in Git.
