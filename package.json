@@ -257,7 +257,10 @@
     "benchmark:dhaka-3d-tiles-scale-profile": "node scripts/benchmark-dhaka-3d-tiles-scale-profile.mjs",
     "test:dhaka-3d-tiles-scale-profile": "node --test tests/dhaka-3d-tiles-scale-profile.test.mjs",
     "audit:dhaka-overture-architecture-coverage": "node scripts/audit-dhaka-overture-architecture-coverage.mjs",
-    "test:dhaka-overture-architecture-coverage": "node --test tests/dhaka-overture-architecture-coverage.test.mjs"
+    "test:dhaka-overture-architecture-coverage": "node --test tests/dhaka-overture-architecture-coverage.test.mjs",
+    "test:floor-plan-raster-vector-calibration": "node --test tests/floor-plan-raster-vector-calibration.test.mjs tests/floor-plan-raster-vector-calibration-cli.test.mjs",
+    "test:floor-plan-review-payload": "node --test tests/floor-plan-review-payload.test.mjs",
+    "calibrate:floor-plan-raster-vectors": "node scripts/calibrate-floor-plan-raster-vectors.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
