@@ -268,6 +268,12 @@ async function prepareEvidence({ root, buildingId, media, geometry }) {
     sha256: source.sha256,
     licence: source.licence,
     permittedOperations: [...source.permittedOperations].sort(),
+    ...(source.author ? { author: source.author } : {}),
+    ...(source.attribution ? { attribution: source.attribution } : {}),
+    ...(source.sourceUrl ? { sourceUrl: source.sourceUrl } : {}),
+    ...(source.capturedAt ? { capturedAt: source.capturedAt } : {}),
+    ...(source.description ? { description: source.description } : {}),
+    ...(source.captureLocation ? { captureLocation: source.captureLocation } : {}),
   })).sort((a, b) => a.sourceId.localeCompare(b.sourceId));
 
   return {
