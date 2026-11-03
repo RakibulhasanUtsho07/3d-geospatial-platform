@@ -126,3 +126,16 @@ jobs:
           }
           if (manifest.publicationEligible !== false) throw new Error("Render smoke must never enable publication.");
           NODE
+
+      - name: Upload renderer smoke review packet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d3m-engine-01-generic-renderer-review-packet
+          path: |
+            ${{ runner.temp }}/building-review-smoke/demo.glb
+            ${{ runner.temp }}/building-review-smoke/default-rendered/
+            ${{ runner.temp }}/building-review-smoke/profile-rendered/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
