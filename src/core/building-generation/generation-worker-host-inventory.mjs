@@ -74,7 +74,7 @@ function summarizeCapabilityState(capabilities, checkedAt) {
   };
 }
 
-function pythonInventoryProgram() {
+export function buildPythonInventoryProgram() {
   return [
     "import hashlib, importlib.metadata, inspect, json, os, platform, re, sys",
     "out = {",
@@ -85,7 +85,8 @@ function pythonInventoryProgram() {
     "  'accelerators': {'cudaAvailable': False, 'cudaRuntime': None, 'hipRuntime': None, 'cudaDevices': [], 'mpsAvailable': False},",
     "  'onnxProviders': [],",
     "  'rembgDefaultModel': None,",
-    "  'runnerSyntaxCompiled': False,",
+    "  'modelArtifacts': {'tripoConfig': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'tripoCheckpoint': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'rembgWeights': {'status': 'unknown', 'bytes': None}},",
+    "  'runnerSyntaxCompiled': False,"
     "  'runnerSha256Matches': False,",
     "  'probeErrors': [],",
     "}",
@@ -339,7 +340,7 @@ export async function collectGenerationWorkerHostInventory({
   let probe = null;
   if (runner.status === "present") {
     try {
-      probe = spawnSyncImpl(pythonPath, ["-c", pythonInventoryProgram(), path.resolve(runnerScript), runner.sha256], {
+      probe = spawnSyncImpl(pythonPath, ["-c", buildPythonInventoryProgram(), path.resolve(runnerScript), runner.sha256], {
         encoding: "utf8",
         timeout: commandTimeoutMs,
         maxBuffer: 64 * 1024,
