@@ -251,8 +251,14 @@ function parsePythonInventory(result) {
         !tripoRevision || modelArtifacts.tripoCheckpoint.snapshotRevision !== tripoRevision) {
       probeErrors.push("triposr-cache-artifact-identity-incomplete");
     }
+    if (modelArtifacts.tripoConfig.bytes === null || modelArtifacts.tripoCheckpoint.bytes === null) {
+      probeErrors.push("triposr-cache-artifact-size-invalid");
+    }
     if (modelArtifacts.rembgWeights.status !== "cached") {
       probeErrors.push("rembg-cache-artifact-identity-incomplete");
+    }
+    if (modelArtifacts.rembgWeights.bytes === null) {
+      probeErrors.push("rembg-cache-artifact-size-invalid");
     }
     const coreValid = safeText(data.pythonVersion, 40) !== null &&
       safeText(data.pythonImplementation, 40) !== null &&
