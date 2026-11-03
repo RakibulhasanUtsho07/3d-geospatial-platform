@@ -6,6 +6,7 @@ const MAX_DIMENSION = 8192;
 const MAX_PIXELS = 40_000_000;
 const MAX_LINES_PER_ORIENTATION = 1200;
 const MAX_ROOM_CANDIDATES = 2500;
+const MAX_RAW_LINE_RUNS_PER_ORIENTATION = 5000;
 
 function integer(value, label, minimum, maximum) {
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
@@ -126,9 +127,19 @@ function detectLines(data, width, height, options, horizontal) {
   const count = horizontal ? height : width;
   const rawRuns = [];
   for (let coordinate = 0; coordinate < count; coordinate += 1) {
-    rawRuns.push(...scanLine(
-      data, width, height, horizontal, coordinate, options.threshold, options.maxGapPx,
-    ));
+    const lineRuns = scanLine(
+      data, width, height, options, horizontal, coordinate, options.threshold, options.maxGapPx,
+    );
+    for (const run of lineRuns) {
+      if (run.end - run.start + 1 < options.minLineLengthPx) continue;
+      if (rawRuns.length >= MAX_RAW_LINE_RUNS_PER_ORIENTATION) {
+        throw new RangeError(
+          "raster contains more than " + MAX_RAW_LINE_RUNS_PER_ORIENTATION +
+          " raw line-run candidates in one orientation; simplify the image or increase minimum line length.",
+        );
+      }
+      rawRuns.push(run);
+    }
   }
   return mergeParallelRuns(rawRuns, options.lineMergeTolerancePx, options.minLineLengthPx)
     .filter((line) => line.lengthPx >= options.minLineLengthPx)
