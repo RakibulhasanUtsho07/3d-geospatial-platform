@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-11-03  
 **Target branch flow:** `rakibul-hasan` → `development` → `main`  
-**Current status:** P3.1 six-sample real-Dhaka browser baseline and screenshot review are recorded on candidate `2b93cb4d7f51cb09f726fe958cdcf974e763ce73`; strict validation and full CI pass. Human review found visible UX/visual-fidelity defects that remain open. P3.2 still lacks real surveyed building evidence.
+**Current status:** D3M-01 and P3.6–P3.8 are integrated on current `main`/`dev`; P3.4 responsive panels, camera home behavior and real-Dhaka diagnostics are in a current-main candidate branch. Six cold/warm browser samples exist, but the earlier baseline report recorded a dirty working tree and is not accepted as clean exact-source evidence. P3.2 still lacks real surveyed building evidence.
 
 ## Ground rules
 
@@ -344,4 +344,4 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 
 ### 2026-11-03 current-main baseline outcome
 
-The previous current-main port candidate's deterministic real-Dhaka CI baseline completed 6/6 successful samples (3 cold, 3 warm), all road fetch/render checks succeeded (478 rendered road features per sample), 3,000 Overture building features staged in each sample, and the canvas red-outlier review flagged 0/6. This did not reproduce the older cold-01 red patch; it does not identify the old patch's root cause or prove live OSM imagery is fault-free. The new refreshed-main PR will repeat exact-head baseline and screenshot validation before promotion.
+The previous current-main port candidate's deterministic real-Dhaka CI baseline completed 6/6 successful samples (3 cold, 3 warm), all road fetch/render checks succeeded (478 rendered road features per sample), 3,000 Overture building features staged in each sample, and the canvas red-outlier review flagged 0/6. This did not reproduce the older cold-01 red patch; it does not identify the old patch's root cause or prove live OSM imagery is fault-free. The new refreshed-main PR repeats exact-head baseline and screenshot validation. The previous six screenshots were visually inspected; their layout is readable and Cesium attribution remains visible, but the report had `gitWorkingTreeDirty: true`, so that run is not accepted as clean candidate provenance. The refresh workflow now uses `npm ci`, asserts a clean tree after geospatial preparation, and rejects dirty reports.
