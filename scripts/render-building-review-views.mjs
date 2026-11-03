@@ -222,7 +222,6 @@ async function main() {
       files: fileMetadata,
       resolution,
       textureQaSummary,
-      renderProfileMetadata,
     });
     const reportPath = path.join(outputDir, "render-review-manifest.json");
     await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
