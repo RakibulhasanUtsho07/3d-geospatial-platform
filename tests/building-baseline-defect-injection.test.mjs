@@ -8,6 +8,7 @@ import {
   buildControlledBuildingGlb,
   injectDegenerateTriangleDefect,
   injectDimensionScaleDefect,
+  injectNonManifoldEdgeDefect,
 } from "./fixtures/building-baseline-glb.mjs";
 
 const baseline = JSON.parse(await readFile(
@@ -83,6 +84,20 @@ test("deliberately degenerate triangle remains detectable even when the GLB pars
   const qa = analyzeGlbQuality(glb);
   assert.equal(qa.valid, true, "structural validity must not be confused with geometry quality");
   assert.ok(qa.counts.degenerateTriangleCount >= defect.expectedMinimumDegenerateTriangleCount);
+  assert.ok(qa.warnings.includes(defect.expectedWarning));
+  assert.equal(controlledBaselinePasses(glb), false);
+});
+
+test("deliberately non-manifold shared edge remains detectable in a structurally valid GLB", () => {
+  const defect = baseline.defectCases.find((item) => item.id === "non-manifold-shared-edge");
+  assert.ok(defect, "baseline must declare the non-manifold regression case");
+  const glb = injectNonManifoldEdgeDefect(cleanGlb);
+  const qa = analyzeGlbQuality(glb);
+  const topology = qa.meshDetails[0]?.topology;
+  assert.equal(qa.valid, true, "topology defects may remain structurally valid GLBs");
+  assert.equal(qa.counts.degenerateTriangleCount, 0, "injected triangle must remain non-degenerate");
+  assert.equal(topology?.topologyAnalyzed, true);
+  assert.ok(topology.nonManifoldEdgeCount >= defect.expectedMinimumNonManifoldEdgeCount);
   assert.ok(qa.warnings.includes(defect.expectedWarning));
   assert.equal(controlledBaselinePasses(glb), false);
 });
