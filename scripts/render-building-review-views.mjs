@@ -182,7 +182,6 @@ async function main() {
     if (reviewProfilePath && reviewProfileAssessment?.sha256) {
       args.push("--review-profile-json", reviewProfilePath, "--review-profile-sha256", reviewProfileAssessment.sha256);
     }
-    ];
     if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
       args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
     }
