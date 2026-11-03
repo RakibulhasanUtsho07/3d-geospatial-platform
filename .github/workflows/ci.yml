@@ -82,6 +82,7 @@ on:
       - integration/brf48-main-20261103
       - integration/brf14-main-refresh-20261103
       - integration/p37-floorplan-refresh-20261103
+      - integration/p34-main-after-p37-20261103
 
   workflow_dispatch:
   pull_request:
@@ -158,6 +159,8 @@ jobs:
       # Bind P3.6 browser evidence to the proposed source commit, not the
       # synthetic merge SHA that GitHub uses for pull_request workflows.
       P3_6_SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      P3_4_HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      P3_4_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out repository
@@ -180,6 +183,15 @@ jobs:
 
       - name: Test feature pick geometry calculations
         run: npm run test:feature-pick-geometry
+
+      - name: Test privacy-safe imagery tile error diagnostics
+        run: npm run test:imagery-tile-error-diagnostics
+
+      - name: Test map canvas visual anomaly diagnostics
+        run: npm run test:canvas-red-pixel-diagnostics
+
+      - name: Test map viewport UX and Dhaka Home behavior
+        run: npm run test:map-viewport-ux
 
       - name: Test generated model input policy
         run: npm run test:generated-model-policy
@@ -1020,5 +1032,14 @@ jobs:
         with:
           name: p2-6-dynamic-map-workload
           path: artifacts/p2.6-dynamic-map-workload/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload P3.4 map panel layout visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p3-4-map-panel-occlusion-visual-evidence
+          path: artifacts/p3-4-map-panel-occlusion/
           if-no-files-found: warn
           retention-days: 14
