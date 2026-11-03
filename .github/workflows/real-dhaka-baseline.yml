@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - feat/p34-map-panel-occlusion-20261102
+      - integration/p34-main-port-20261103
     paths:
       - "src/app/**"
       - "src/core/map-engine/**"
@@ -17,6 +19,22 @@ on:
       - "tests/real-dhaka-baseline-validation.test.mjs"
       - "tests/offline-road-extract.test.mjs"
       - "tests/prepare-dhaka-road-extract.test.mjs"
+      - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
+      - ".github/workflows/real-dhaka-baseline.yml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/app/**"
+      - "src/core/map-engine/**"
+      - "src/core/geospatial/**"
+      - "src/features/map/**"
+      - "data/overture/**"
+      - "public/data/roads/**"
+      - "scripts/benchmark-map-browser.mjs"
+      - "scripts/validate-real-dhaka-baseline.mjs"
       - "docs/REAL-DHAKA-MAP-PERFORMANCE-BASELINE.md"
       - ".github/workflows/real-dhaka-baseline.yml"
       - "package.json"
@@ -70,10 +88,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "artifacts/real-dhaka-baseline/${GITHUB_SHA}"
+          mkdir -p "$MAP_BENCHMARK_OUT_DIR"
           npm run dev -- --hostname 127.0.0.1 --port 3000 > "$RUNNER_TEMP/next-dev.log" 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; cp "$RUNNER_TEMP/next-dev.log" "artifacts/real-dhaka-baseline/${GITHUB_SHA}/dev-server.log" 2>/dev/null || true' EXIT
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; cp "$RUNNER_TEMP/next-dev.log" "$MAP_BENCHMARK_OUT_DIR/dev-server.log" 2>/dev/null || true' EXIT
 
           ready=0
           for attempt in $(seq 1 90); do
@@ -94,9 +112,11 @@ jobs:
 
       - name: Verify six real-Dhaka cold/warm samples, input hashes, and road rendering
         if: success()
+        env:
+          MAP_BENCHMARK_OUT_DIR: artifacts/real-dhaka-baseline/${{ github.sha }}
         run: >-
           npm run verify:real-dhaka-baseline --
-          "artifacts/real-dhaka-baseline/${GITHUB_SHA}/report.json"
+          "$MAP_BENCHMARK_OUT_DIR/report.json"
           "--expected-commit-sha=${GITHUB_SHA}"
 
       - name: Upload real-Dhaka report, screenshots, and server logs
