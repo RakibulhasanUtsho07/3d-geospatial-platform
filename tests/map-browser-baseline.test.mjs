@@ -247,6 +247,7 @@ test("ignores nested benchmark artifacts but still detects all other changes", a
     await mkdir(output, { recursive: true });
     await writeFile(path.join(output, "report.json"), "{}\\n");
     await writeFile(path.join(output, "cold-01.png"), "synthetic screenshot");
+    await mkdir(path.join(output, "nested"), { recursive: true });
     await writeFile(path.join(output, "nested", "capture.json"), "generated evidence");
     assert.equal(getWorkingTreeDirty(output, root), false);
 
