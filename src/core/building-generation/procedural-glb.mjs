@@ -343,7 +343,7 @@ export function generateProceduralGlb(rawSpec) {
         }
       }
 
-      if(spec.architecture.includeDoor&&ei===front&&floor===0&&!arcade.enabled){
+      if(spec.architecture.includeDoor&&e.len>=2.5&&ei===front&&floor===0&&!arcade.enabled){
         const widthM=Math.min(1.05,e.len*0.25);
         const doorHeight=Math.min(2.16,floorH-0.05);
         const opening={
@@ -358,7 +358,7 @@ export function generateProceduralGlb(rawSpec) {
     }
   }
 
-  if(spec.architecture.includeDoor&&edges[front].len>=2.5){
+  if(spec.architecture.includeDoor&&edges[front].len>=2.5&&!arcade.enabled){
     const e=edges[front];
     const edgePoint={x:(e.p.x+e.n.x)/2,z:(e.p.z+e.n.z)/2};
     const widthM=Math.min(1.05,e.len*0.25),faceClearanceM=0.002;
