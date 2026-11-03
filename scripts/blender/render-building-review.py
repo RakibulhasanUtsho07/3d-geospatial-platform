@@ -1,4 +1,6 @@
 import bpy
+import hashlib
+import re
 import json
 import math
 import os
@@ -38,6 +40,103 @@ def add_area_light(name, position, center, power, size):
     obj.location = position
     obj.rotation_euler = (center - obj.location).to_track_quat("-Z", "Y").to_euler()
     return obj
+
+DEFAULT_REVIEW_PROFILE = {
+    "schemaVersion": "1.0.0",
+    "profileId": "generic-whole-model-v1",
+    "excludeNodeNamePrefixes": [],
+    "frontView": {
+        "includeNodeNames": [],
+        "excludeNodeNames": [],
+        "elevationDegrees": 5,
+        "framingLabel": "whole-model-generic-front",
+    },
+}
+
+
+def normalize_node_name(name):
+    """Remove only Blender's numeric duplicate suffix, preserving other punctuation."""
+    return re.sub(r"\.\d{3}$", "", name)
+
+
+def validate_profile_name_list(value, label):
+    if not isinstance(value, list):
+        raise RuntimeError(label + " must be a list of exact node-name strings")
+    result = []
+    for index, name in enumerate(value):
+        if not isinstance(name, str) or not name.strip() or len(name) > 200 or "*" in name:
+            raise RuntimeError(label + "[" + str(index) + "] must be a non-empty exact node name without wildcards")
+        result.append(name.strip())
+    if len(set(result)) != len(result):
+        raise RuntimeError(label + " must not contain duplicates")
+    return result
+
+
+def read_review_profile(opts):
+    """Load explicit, review-only selectors or the generic whole-model default."""
+    if "--review-profile-json" in opts:
+        profile_path = os.path.abspath(opts["--review-profile-json"])
+        with open(profile_path, "rb") as stream:
+            profile_bytes = stream.read()
+        try:
+            profile = json.loads(profile_bytes.decode("utf-8"))
+        except Exception as error:
+            raise RuntimeError("Review profile JSON is invalid: " + str(error))
+        source = "explicit-file"
+        profile_hash = hashlib.sha256(profile_bytes).hexdigest()
+        expected_hash = opts.get("--review-profile-sha256")
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+            raise RuntimeError("Explicit review profiles require a 64-character preflight SHA-256 digest")
+        if expected_hash != profile_hash:
+            raise RuntimeError("Review profile changed after preflight; SHA-256 does not match")
+    else:
+        profile = json.loads(json.dumps(DEFAULT_REVIEW_PROFILE))
+        profile_bytes = json.dumps(profile, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        profile_hash = hashlib.sha256(profile_bytes).hexdigest()
+        source = "built-in-default"
+
+    if not isinstance(profile, dict):
+        raise RuntimeError("Review profile must be a JSON object")
+    allowed_keys = {"schemaVersion", "profileId", "excludeNodeNamePrefixes", "frontView"}
+    unknown_keys = set(profile) - allowed_keys
+    if unknown_keys:
+        raise RuntimeError("Unsupported review profile field: " + ", ".join(sorted(unknown_keys)))
+    if profile.get("schemaVersion") != "1.0.0":
+        raise RuntimeError("Review profile schemaVersion must be 1.0.0")
+    profile_id = profile.get("profileId")
+    if not isinstance(profile_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}", profile_id):
+        raise RuntimeError("Review profile profileId must be a short stable identifier")
+    exclude_prefixes = validate_profile_name_list(profile.get("excludeNodeNamePrefixes", []), "excludeNodeNamePrefixes")
+    front = profile.get("frontView", {})
+    if not isinstance(front, dict):
+        raise RuntimeError("Review profile frontView must be an object")
+    allowed_front_keys = {"includeNodeNames", "excludeNodeNames", "elevationDegrees", "framingLabel"}
+    unknown_front_keys = set(front) - allowed_front_keys
+    if unknown_front_keys:
+        raise RuntimeError("Unsupported frontView field: " + ", ".join(sorted(unknown_front_keys)))
+    include_names = validate_profile_name_list(front.get("includeNodeNames", []), "frontView.includeNodeNames")
+    exclude_names = validate_profile_name_list(front.get("excludeNodeNames", []), "frontView.excludeNodeNames")
+    overlap = set(include_names).intersection(exclude_names)
+    if overlap:
+        raise RuntimeError("Front-view node names cannot be both included and excluded: " + ", ".join(sorted(overlap)))
+    elevation = front.get("elevationDegrees", 5)
+    if isinstance(elevation, bool) or not isinstance(elevation, (int, float)) or not math.isfinite(elevation) or elevation < 0 or elevation > 60:
+        raise RuntimeError("frontView.elevationDegrees must be between 0 and 60")
+    framing = front.get("framingLabel", "whole-model-generic-front")
+    if not isinstance(framing, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._ -]{0,79}", framing):
+        raise RuntimeError("frontView.framingLabel must be a short human-readable label")
+    return {
+        "schemaVersion": "1.0.0",
+        "profileId": profile_id,
+        "excludeNodeNamePrefixes": exclude_prefixes,
+        "frontView": {
+            "includeNodeNames": include_names,
+            "excludeNodeNames": exclude_names,
+            "elevationDegrees": float(elevation),
+            "framingLabel": framing,
+        },
+    }, {"profileId": profile_id, "source": source, "sha256": profile_hash}
+
 
 def scene_bounds(mesh_objects):
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -190,44 +289,67 @@ def main():
         bpy.data.objects.remove(obj, do_unlink=True)
     bpy.ops.import_scene.gltf(filepath=model_path)
     imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
-    # Keep site context in the source GLB, but hide it for model-detail review.
-    # Large Site_Ground / Site_River planes otherwise make the palace tiny.
-    site_context_meshes = [
+    review_profile, review_profile_evidence = read_review_profile(opts)
+    profile_explicit = "--review-profile-json" in opts
+    if profile_explicit:
+        excluded_prefixes = review_profile["excludeNodeNamePrefixes"]
+    else:
+        # Preserve existing site-context filtering for legacy callers.
+        excluded_prefixes = ["Site_"]
+    excluded_meshes = [
         obj for obj in imported_meshes
-        if obj.name.split(".")[0].startswith("Site_")
+        if any(normalize_node_name(obj.name).startswith(prefix) for prefix in excluded_prefixes)
     ]
-    for obj in site_context_meshes:
+    for obj in excluded_meshes:
         obj.hide_render = True
-    meshes = [obj for obj in imported_meshes if obj not in site_context_meshes]
+    meshes = [obj for obj in imported_meshes if obj not in excluded_meshes]
     if not meshes:
-        raise RuntimeError("The imported GLB has no building meshes after excluding Site_ context nodes")
+        raise RuntimeError("The imported GLB has no renderable meshes after applying the review profile")
     minimum, maximum, dimensions, center = scene_bounds(meshes)
     max_dimension = max(dimensions)
     camera_distance = max_dimension * 3.0
 
-    # Keep the heritage-specific facade framing where its named meshes exist, but
-    # never make those names a prerequisite for reviewing an ordinary building GLB.
-    # Other buildings use the complete non-site mesh set for the canonical front view.
-    # Whole-model views restore it and retain the complete generated roof geometry.
-    rangmahal_review_names = {
-        "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
-        "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
-    }
-    rangmahal_review_meshes = [
-        obj for obj in meshes if obj.name.split(".")[0] in rangmahal_review_names
-    ]
-    focus_rangmahal = bool(rangmahal_review_meshes)
-    if focus_rangmahal:
-        _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
-        front_review_meshes = rangmahal_review_meshes
-        front_review_center = rangmahal_center
-        front_camera_distance = max(rangmahal_dimensions) * 3.0
-        front_view_framing = "rangmahal-south-facade-focused"
+    if profile_explicit:
+        front_profile = review_profile["frontView"]
+        include_names = set(front_profile["includeNodeNames"])
+        exclude_names = set(front_profile["excludeNodeNames"])
+        available_names = {normalize_node_name(obj.name) for obj in meshes}
+        missing_front_names = sorted(include_names - available_names)
+        if missing_front_names:
+            raise RuntimeError("Review profile references missing front-view nodes: " + ", ".join(missing_front_names))
+        front_review_meshes = [
+            obj for obj in meshes
+            if (not include_names or normalize_node_name(obj.name) in include_names)
+            and normalize_node_name(obj.name) not in exclude_names
+        ]
+        if not front_review_meshes:
+            raise RuntimeError("Review profile selects no visible meshes for the front view")
+        _, _, front_review_dimensions, front_review_center = scene_bounds(front_review_meshes)
+        focus_rangmahal = bool(include_names or exclude_names)
+        front_camera_distance = max(front_review_dimensions) * 3.0
+        front_view_framing = front_profile["framingLabel"]
+        front_elevation = math.radians(front_profile["elevationDegrees"])
     else:
-        front_review_meshes = meshes
-        front_review_center = center
-        front_camera_distance = camera_distance
-        front_view_framing = "whole-model-generic-front"
+        rangmahal_review_names = {
+            "Rangmahal_GF", "Rangmahal_FF", "Portico_S", "Portico_N",
+            "Stair_S", "Veranda_S", "Dome_Drum", "Dome", "Finial",
+        }
+        rangmahal_review_meshes = [
+            obj for obj in meshes if normalize_node_name(obj.name) in rangmahal_review_names
+        ]
+        focus_rangmahal = bool(rangmahal_review_meshes)
+        if focus_rangmahal:
+            _, _, rangmahal_dimensions, rangmahal_center = scene_bounds(rangmahal_review_meshes)
+            front_review_meshes = rangmahal_review_meshes
+            front_review_center = rangmahal_center
+            front_camera_distance = max(rangmahal_dimensions) * 3.0
+            front_view_framing = "rangmahal-south-facade-focused"
+        else:
+            front_review_meshes = meshes
+            front_review_center = center
+            front_camera_distance = camera_distance
+            front_view_framing = "whole-model-generic-front"
+        front_elevation = math.radians(5.0)
     scene = bpy.context.scene
     try:
         scene.render.engine = "BLENDER_EEVEE_NEXT"
@@ -269,6 +391,8 @@ def main():
         ("right", Vector((1.0, 0.0, 0.0)), "ORTHO"),
         ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
     ]
+    if profile_explicit:
+        views[0] = ("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO")
     elevation = math.radians(22.0)
     for angle in range(0, 360, 45):
         azimuth = math.radians(angle)
@@ -277,6 +401,7 @@ def main():
                             math.sin(elevation)))
         views.append(("turntable-" + str(angle).zfill(3), direction, "ORTHO"))
 
+    # Whole-model views restore it and retain the complete generated roof geometry.
     original_render_visibility = [(obj, obj.hide_render) for obj in meshes]
     raw_views = []
     for view_id, direction, camera_type in views:
@@ -371,6 +496,7 @@ def main():
             "coordinateUnits": "imported-model-units-unverified",
         },
         "views": raw_views,
+        "reviewProfile": review_profile_evidence,
         "sourceCameraView": source_camera_view,
     }
     raw_path = os.path.join(output_dir, ".blender-render-manifest.raw.json")

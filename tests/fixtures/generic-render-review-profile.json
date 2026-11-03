@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "generic-whole-model-explicit-v1",
+  "excludeNodeNamePrefixes": [],
+  "frontView": {
+    "includeNodeNames": [],
+    "excludeNodeNames": [],
+    "elevationDegrees": 5,
+    "framingLabel": "whole-model-generic-front"
+  }
+}
