@@ -73,9 +73,10 @@ function roundMs(value) {
     : null;
 }
 
-function safeGitValue(args, cwd = projectRoot) {
+function safeGitValue(args, cwd = projectRoot, trimOutput = true) {
   try {
-    return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+    const output = execFileSync("git", args, { cwd, encoding: "utf8" });
+    return trimOutput ? output.trim() : output;
   } catch {
     return null;
   }
@@ -121,7 +122,7 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
     relativeOutput !== ".." &&
     !relativeOutput.startsWith(".." + path.sep) &&
     !path.isAbsolute(relativeOutput);
-  const status = safeGitValue(["status", "--porcelain=v1", "--untracked-files=all", "-z"], root);
+  const status = safeGitValue(["status", "--porcelain=v1", "--untracked-files=all", "-z"], root, false);
   if (status === null) return null;
   if (!isSafeRelativeOutput) return status.length > 0;
 
