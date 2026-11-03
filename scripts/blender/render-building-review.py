@@ -85,7 +85,9 @@ def read_review_profile(opts):
         source = "explicit-file"
         profile_hash = hashlib.sha256(profile_bytes).hexdigest()
         expected_hash = opts.get("--review-profile-sha256")
-        if expected_hash is not None and expected_hash != profile_hash:
+        if not isinstance(expected_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+            raise RuntimeError("Explicit review profiles require a 64-character preflight SHA-256 digest")
+        if expected_hash != profile_hash:
             raise RuntimeError("Review profile changed after preflight; SHA-256 does not match")
     else:
         profile = json.loads(json.dumps(DEFAULT_REVIEW_PROFILE))
