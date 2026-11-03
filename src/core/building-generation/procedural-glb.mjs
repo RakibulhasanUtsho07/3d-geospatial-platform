@@ -111,14 +111,14 @@ export function generateProceduralGlb(rawSpec) {
   if(spec.architecture.frontFacadeEdgeIndex!==undefined){
     front=spec.architecture.frontFacadeEdgeIndex;
     facadeSelectionMethod="explicit-edge-index";
-    frontAxisConfidence="operator-specified";
+    frontAxisConfidence=spec.evidence.find(item=>item.field==="frontFacadeEdgeIndex")?.confidence??"operator-specified";
     frontAxisSource="buildingSpec.architecture.frontFacadeEdgeIndex";
   }else if(azimuthVector!==null){
     front=edges.reduce((best,e,i)=>
       e.out.x*azimuthVector.x+e.out.z*azimuthVector.z >
       edges[best].out.x*azimuthVector.x+edges[best].out.z*azimuthVector.z ? i : best,0);
     facadeSelectionMethod="azimuth-nearest-edge";
-    frontAxisConfidence="operator-specified";
+    frontAxisConfidence=spec.evidence.find(item=>item.field==="frontFacingAzimuthDegrees")?.confidence??"operator-specified";
     frontAxisSource="buildingSpec.architecture.frontFacingAzimuthDegrees";
   }else{
     front=edges.reduce((best,e,i)=>e.len>edges[best].len?i:best,0);
@@ -292,7 +292,7 @@ export function generateProceduralGlb(rawSpec) {
       alignmentDot:azimuthAlignment===null?null:Number(azimuthAlignment.toFixed(6))
     },
     architecturePlacement:{
-      frontFacade:{edgeIndex:front,requestedAzimuthDegrees:requestedFrontAzimuth,actualAzimuthDegrees:actualAzimuthRounded,outwardNormal:{x:Number(frontEdge.out.x.toFixed(5)),z:Number(frontEdge.out.z.toFixed(5))}},
+      frontFacade:{edgeIndex:front,requestedAzimuthDegrees:requestedFrontAzimuth,actualAzimuthDegrees:actualAzimuthRounded,confidence:frontAxisConfidence,source:frontAxisSource,outwardNormal:{x:Number(frontEdge.out.x.toFixed(5)),z:Number(frontEdge.out.z.toFixed(5))}},
       centralDome:domePlacement
     },
     georeference:{longitude:spec.location.longitude,latitude:spec.location.latitude,heightM:spec.location.heightM},
@@ -301,6 +301,7 @@ export function generateProceduralGlb(rawSpec) {
     confidenceSummary:Object.fromEntries(["verified","derived","estimated","ai-proposed","unknown"].map(level=>[level,spec.evidence.filter(e=>e.confidence===level).length])),
     reviewRequired:spec.evidence.some(e=>["estimated","ai-proposed","unknown"].includes(e.confidence))||
       spec.sources.some(s=>!s.licence||s.usageStatus!=="approved")||
+      ["estimated","ai-proposed","unknown"].includes(frontAxisConfidence)||
       (spec.architecture.frontFacadeEdgeIndex===undefined&&requestedFrontAzimuth===null)||
       (azimuthAlignment!==null&&azimuthAlignment<Math.cos(15*Math.PI/180)),
     warnings,limitations:["This is a deterministic parametric mesh, not a photogrammetry or AI reconstruction.","Images and videos are recorded as provenance but are not automatically interpreted in this version.","Hidden elevations, interior rooms, exact structure and measured dimensions require additional evidence and/or a specialist reconstruction route."]
