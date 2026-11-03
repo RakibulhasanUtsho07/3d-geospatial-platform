@@ -97,7 +97,7 @@ const GENERATED_CESIUM_ASSET_PAIRS = [
 ];
 
 function isExactGeneratedCesiumAsset(changedPath, rootDirectory) {
-  const normalizedPath = changedPath.replace(/\\\\/g, "/");
+  const normalizedPath = changedPath;
   const asset = GENERATED_CESIUM_ASSET_PAIRS.find((entry) => entry.generatedPath === normalizedPath);
   if (!asset) return false;
 
@@ -131,7 +131,7 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
 
   const outputPath = relativeOutput.split(path.sep).join("/");
   const changedPaths = [];
-  const records = status.split("\\0").filter(Boolean);
+  const records = status.split("\0").filter(Boolean);
   for (let index = 0; index < records.length; index += 1) {
     const record = records[index];
     const statusCode = record.slice(0, 2);
@@ -142,7 +142,7 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
     }
   }
   return changedPaths.some((changedPath) => {
-    const normalized = changedPath.replace(/\\\\/g, "/");
+    const normalized = changedPath;
     if (normalized === outputPath || normalized.startsWith(outputPath + "/")) return false;
     return !isExactGeneratedCesiumAsset(normalized, root);
   });
