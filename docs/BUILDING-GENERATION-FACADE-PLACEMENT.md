@@ -19,7 +19,13 @@ The normal calculation uses the signed area of the footprint ring, so clockwise 
 
 This task intentionally preserves the repository's existing `coordinateToLocalMeters` behavior: longitude/easting maps to model-local +X and latitude/northing maps to model-local +Z. A front bearing is therefore represented as `(sin(bearing), cos(bearing))` in the current local horizontal plane.
 
-This is **not** a declaration that the current GLB axis convention is a validated canonical right-handed glTF map frame. The orientation conversion proposed by the historical PR #340 (including a +Z-south change and Blender camera changes) is deliberately not ported here. Any future frame migration must be handled as a separate cross-system change with Cesium placement, GLB metadata, renderer, camera, georeference and legacy-asset compatibility tests.
+This does **not** certify the current GLB as a canonical geospatial frame or change any vertex coordinates. Generated GLBs now carry a versioned `extras.building.facadeOrientation` record containing the selected edge, outward normal, azimuth, selector source, confidence and review-required flag. The coordinate frame is explicitly recorded as `glTF-local:+X=east,+Y=up,+Z=north`.
+
+The Blender review wrapper reads that metadata from the exact model bytes and converts the horizontal normal using the glTF-import convention `Blender X = glTF X`, `Blender Y = -glTF Z`, with Blender Z used for camera elevation. The five-degree front camera is aligned to that converted normal; the GLB vertices, Cesium placement, source-camera calibration and other review views are unchanged. The final render manifest records both the source normal and Blender camera direction, and adds a human-review warning when the orientation is not verified.
+
+Legacy GLBs without this metadata retain the previous generic front-camera behavior. A malformed declared orientation is rejected rather than silently guessed. This camera alignment only tells the reviewer which facade the generator selected; it does not prove that the facade faces that compass direction in the real world.
+
+The historical PR #340 +Z-south frame migration remains out of scope. A future full frame migration still requires coordinated Cesium placement, model transforms, georeference and legacy-asset compatibility tests.
 
 ## Surface inserts
 
@@ -45,3 +51,12 @@ The focused BuildingSpec/generator tests cover:
 - preservation of the existing +X east / +Z north local mapping.
 
 The repository's existing `test:building-generation` CI script runs this regression suite. A passing test establishes the tested synthetic placement behavior only. It does not prove a real building's facade bearing, dimensions, orientation, architecture, image-to-model reconstruction, surveyed georeference or publication readiness. Non-verified facade selection keeps review required; `mapReady`, `publicationEligible` and `automaticApproval` remain fail-closed.
+
+
+## GLB orientation metadata and Blender review camera
+
+The generator writes the same `facadeOrientation` object to GLB extras and the generation report. Its versioned record includes the coordinate frame, selection method, edge index, requested/actual azimuth, outward normal, confidence, selector source and review-required flag.
+
+The review wrapper validates the GLB JSON chunk and metadata before launching Blender. It maps the model-local outward normal `(x, z)` to Blender's imported horizontal axes `(x, -z)`, adds a fixed five-degree camera elevation, and passes the result to Blender. The raw render manifest echoes the source normal and converted camera direction; the Node wrapper checks the metadata against the exact input GLB before the final manifest is accepted.
+
+This is a review-camera alignment only. It does not generate a surveyed compass orientation, compare the render to a reference photograph, prove model correctness, or change publication gates. An inferred/operator-specified/non-verified direction is explicitly retained as review-required.

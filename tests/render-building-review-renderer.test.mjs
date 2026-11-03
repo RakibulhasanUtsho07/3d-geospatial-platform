@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
+import { extractGlbFacadeOrientation, toBlenderCameraDirection } from "../src/core/building-generation/glb-facade-orientation.mjs";
 
 const rendererSource = await readFile(new URL("../scripts/blender/render-building-review.py", import.meta.url), "utf8");
 const cameraSetupSource = await readFile(new URL("../scripts/blender/source_camera_camera.py", import.meta.url), "utf8");
@@ -105,4 +106,70 @@ test("finalizes the render manifest from the Blender profile evidence without un
   assert.match(wrapper, /raw\.reviewProfile\?\.sha256 !== reviewProfileAssessment\.sha256/);
   assert.match(manifest, /reviewProfile: rawManifest\.reviewProfile/);
   assert.doesNotMatch(wrapper, /renderProfileMetadata/);
+});
+
+function glbWithDocument(document) {
+  const json = Buffer.from(JSON.stringify(document), "utf8");
+  const paddedLength = Math.ceil(json.length / 4) * 4;
+  const jsonChunk = Buffer.concat([json, Buffer.alloc(paddedLength - json.length, 0x20)]);
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(20 + jsonChunk.length, 8);
+  const chunkHeader = Buffer.alloc(8);
+  chunkHeader.writeUInt32LE(jsonChunk.length, 0);
+  chunkHeader.writeUInt32LE(0x4e4f534a, 4);
+  return Buffer.concat([header, chunkHeader, jsonChunk]);
+}
+
+const eastFacadeMetadata = {
+  schemaVersion: "1.0.0",
+  coordinateFrame: "glTF-local:+X=east,+Y=up,+Z=north",
+  selectionMethod: "azimuth-nearest-edge",
+  edgeIndex: 1,
+  requestedAzimuthDegrees: 90,
+  actualAzimuthDegrees: 90,
+  outwardNormal: { x: 1, z: 0 },
+  confidence: "operator-specified",
+  source: "buildingSpec.architecture.frontFacingAzimuthDegrees",
+  reviewRequired: true,
+};
+
+test("reads validated facade orientation from GLB extras and keeps legacy assets optional", () => {
+  const legacy = glbWithDocument({ asset: { version: "2.0" } });
+  assert.equal(extractGlbFacadeOrientation(legacy), null);
+  const glb = glbWithDocument({ asset: { version: "2.0" }, extras: { building: { facadeOrientation: eastFacadeMetadata } } });
+  assert.deepEqual(extractGlbFacadeOrientation(glb), eastFacadeMetadata);
+  const malformed = glbWithDocument({
+    asset: { version: "2.0" },
+    extras: { building: { facadeOrientation: { ...eastFacadeMetadata, outwardNormal: { x: 0, z: 1 } } } },
+  });
+  assert.throws(() => extractGlbFacadeOrientation(malformed), /azimuth does not match/);
+});
+
+test("maps a GLB facade normal into Blender axes without changing model coordinates", () => {
+  const east = toBlenderCameraDirection(eastFacadeMetadata);
+  assert.ok(Math.abs(east[0] - Math.cos(Math.PI / 36)) < 1e-8);
+  assert.equal(east[1], 0);
+  assert.ok(Math.abs(east[2] - Math.sin(Math.PI / 36)) < 1e-8);
+  const north = toBlenderCameraDirection({
+    ...eastFacadeMetadata,
+    outwardNormal: { x: 0, z: 1 },
+    actualAzimuthDegrees: 0,
+    requestedAzimuthDegrees: 0,
+  });
+  assert.ok(Math.abs(north[0]) < 1e-9);
+  assert.ok(north[1] < -0.99);
+  assert.throws(() => toBlenderCameraDirection(eastFacadeMetadata, 61), /elevationDegrees/);
+});
+
+test("passes the embedded facade direction to Blender and records confidence and provenance", async () => {
+  const wrapper = await readFile(new URL("../scripts/render-building-review-views.mjs", import.meta.url), "utf8");
+  assert.match(wrapper, /extractGlbFacadeOrientation\(modelBytes\)/);
+  assert.match(wrapper, /--front-facade-direction-x/);
+  assert.match(wrapper, /--front-facade-coordinate-frame/);
+  assert.match(wrapper, /renderedOrientation\.source !== facadeOrientation\.source/);
+  assert.match(rendererSource, /def read_facade_orientation\(opts\):/);
+  assert.match(rendererSource, /Vector\(facade_orientation\["blenderCameraDirection"\]\)/);
+  assert.match(rendererSource, /"facadeOrientation": facade_orientation/);
 });

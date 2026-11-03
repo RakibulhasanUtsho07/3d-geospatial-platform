@@ -28,6 +28,12 @@ test("writes a binary GLB with metric geometry, nodes and materials",()=>{
  const model=parseGlb(glb);assert.equal(model.asset.version,"2.0");assert.equal(model.asset.extras.buildingId,fixture.id);assert.ok(model.meshes.length>=3);
  assert.ok(model.accessors.some(a=>a.type==="VEC3"&&a.componentType===5126));assert.ok(model.materials.some(m=>m.name==="Glass"));
  assert.equal(report.output.format,"glb");assert.equal(report.geometry.floorCount,5);assert.equal(report.georeference.longitude,fixture.location.longitude);assert.equal(report.reviewRequired,true);
+ assert.equal(model.extras.building.facadeOrientation.schemaVersion,"1.0.0");
+ assert.equal(model.extras.building.facadeOrientation.coordinateFrame,"glTF-local:+X=east,+Y=up,+Z=north");
+ assert.equal(model.extras.building.facadeOrientation.selectionMethod,"longest-edge-inferred");
+ assert.equal(model.extras.building.facadeOrientation.confidence,"estimated");
+ assert.equal(model.extras.building.facadeOrientation.reviewRequired,true);
+ assert.deepEqual(report.facadeOrientation,model.extras.building.facadeOrientation);
 });
 test("labels media route candidates without claiming photogrammetry ran",()=>{
  const withVisuals={...fixture,sources:[
@@ -172,4 +178,19 @@ test("local latitude increases remain positive model-space northing; facade work
  const east=coordinateToLocalMeters([origin.longitude+0.0001,origin.latitude],origin);
  assert.ok(north.z>0,"northing remains +Z in the existing generator frame");
  assert.ok(east.x>0,"easting remains +X in the existing generator frame");
+});
+
+
+test("embeds the selected facade normal and review provenance in GLB extras",()=>{
+ const result=generateProceduralGlb(facadeTestSpec({architecture:{frontFacingAzimuthDegrees:90}}));
+ const model=parseGlb(result.glb);
+ const metadata=model.extras.building.facadeOrientation;
+ assert.equal(metadata.selectionMethod,"azimuth-nearest-edge");
+ assert.equal(metadata.edgeIndex,1);
+ assert.equal(metadata.requestedAzimuthDegrees,90);
+ assert.equal(metadata.actualAzimuthDegrees,90);
+ assert.deepEqual(metadata.outwardNormal,{x:1,z:0});
+ assert.equal(metadata.confidence,"operator-specified");
+ assert.equal(metadata.reviewRequired,true);
+ assert.deepEqual(metadata,result.report.facadeOrientation);
 });

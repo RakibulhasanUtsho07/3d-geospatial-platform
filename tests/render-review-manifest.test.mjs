@@ -90,3 +90,45 @@ test("rejects invalid hashes, invalid dimensions and incomplete render records",
   assert.ok(report.errors.includes("render-not-complete:front"));
   assert.ok(report.errors.includes("render-sha256-invalid:front"));
 });
+
+
+test("retains the GLB facade orientation and requires review for unverified selection", () => {
+  const data = fixture();
+  data.rawManifest.facadeOrientation = {
+    schemaVersion: "1.0.0",
+    coordinateFrame: "glTF-local:+X=east,+Y=up,+Z=north",
+    selectionMethod: "azimuth-nearest-edge",
+    edgeIndex: 1,
+    actualAzimuthDegrees: 90,
+    confidence: "operator-specified",
+    source: "buildingSpec.architecture.frontFacingAzimuthDegrees",
+    reviewRequired: true,
+    glbOutwardNormal: { x: 1, z: 0 },
+    blenderCameraDirection: [0.996194698, 0, 0.087155743],
+  };
+  const report = finalizeRenderReviewManifest(data);
+  assert.equal(report.valid, true);
+  assert.equal(report.facadeOrientation.edgeIndex, 1);
+  assert.equal(report.facadeOrientation.confidence, "operator-specified");
+  assert.ok(report.warnings.includes("front-facade-orientation-needs-independent-review"));
+  assert.equal(report.publicationEligible, false);
+});
+
+test("rejects malformed facade orientation in the Blender render manifest", () => {
+  const data = fixture();
+  data.rawManifest.facadeOrientation = {
+    schemaVersion: "1.0.0",
+    coordinateFrame: "glTF-local:+X=east,+Y=up,+Z=north",
+    selectionMethod: "azimuth-nearest-edge",
+    edgeIndex: 0,
+    actualAzimuthDegrees: 90,
+    confidence: "verified",
+    source: "fixture",
+    reviewRequired: false,
+    glbOutwardNormal: { x: 0, z: 0 },
+    blenderCameraDirection: [1, 0, 0],
+  };
+  const report = finalizeRenderReviewManifest(data);
+  assert.ok(report.errors.includes("front-facade-orientation-invalid"));
+  assert.equal(report.facadeOrientation, null);
+});
