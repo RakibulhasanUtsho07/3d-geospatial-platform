@@ -62,10 +62,13 @@ def read_front_facing_azimuth(model_path):
     building = (document.get("extras") or {}).get("building") or {}
     angle = building.get("frontFacingAzimuthDegrees")
     if angle is None:
-        return None
+        return None, "unknown"
     if isinstance(angle, bool) or not isinstance(angle, (int, float)) or not math.isfinite(angle) or angle < 0 or angle > 360:
         raise RuntimeError("GLB frontFacingAzimuthDegrees must be a finite bearing from 0 to 360")
-    return float(angle)
+    confidence = building.get("frontAxisConfidence", "unknown")
+    if confidence not in ["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]:
+        raise RuntimeError("GLB frontAxisConfidence is unsupported")
+    return float(angle), confidence
 
 
 
@@ -292,7 +295,7 @@ def main():
 
     # Legacy GLBs without orientation metadata retain the established north-facing front camera.
     # Generated GLBs carry the selected facade bearing in their own model metadata.
-    front_azimuth = read_front_facing_azimuth(model_path)
+    front_azimuth, front_axis_confidence = read_front_facing_azimuth(model_path)
     if front_azimuth is None:
         views = [
             ("front", Vector((0.0, -0.996195, 0.087156)), "ORTHO"),
@@ -302,6 +305,7 @@ def main():
             ("top", Vector((0.0, 0.0, 1.0)), "ORTHO"),
         ]
         front_axis_source = "renderer-default"
+        front_axis_confidence = "unknown"
     else:
         bearing = math.radians(front_azimuth)
         front_elevation = math.radians(5.0)
@@ -412,6 +416,7 @@ def main():
         "width": resolution,
         "height": resolution,
         "frontFacingAzimuthDegrees": front_azimuth,
+        "frontAxisConfidence": front_axis_confidence,
         "frontAxisSource": front_axis_source,
         "sceneBounds": {
             "min": [round(float(value), 8) for value in minimum],
