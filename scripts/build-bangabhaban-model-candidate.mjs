@@ -33,6 +33,7 @@ const candidate = {
   },
   model: {
     path: path.relative(root, modelPath).split(path.sep).join("/"),
+    coordinateFrame: "gltf-right-handed-x-east-y-up-z-south",
     bytes: glb.byteLength,
     sha256,
     format: "glb",
