@@ -76,7 +76,7 @@ function summarizeCapabilityState(capabilities, checkedAt) {
 
 function pythonInventoryProgram() {
   return [
-    "import importlib.metadata, inspect, json, platform, re, sys",
+    "import hashlib, importlib.metadata, inspect, json, platform, re, sys",
     "out = {",
     "  'pythonVersion': platform.python_version(),",
     "  'pythonImplementation': platform.python_implementation(),",
@@ -86,6 +86,7 @@ function pythonInventoryProgram() {
     "  'onnxProviders': [],",
     "  'rembgDefaultModel': None,",
     "  'runnerSyntaxCompiled': False,",
+    "  'runnerSha256Matches': False,",
     "  'probeErrors': [],",
     "}",
     "for package in ('torch', 'onnxruntime', 'rembg', 'huggingface-hub', 'transformers'):",
@@ -118,8 +119,11 @@ function pythonInventoryProgram() {
     "try:",
     "  with open(sys.argv[1], 'rb') as runner_file: runner_bytes = runner_file.read()",
     "  if not runner_bytes: raise ValueError('empty runner')",
-    "  compile(runner_bytes, '<configured-TripoSR-runner>', 'exec', dont_inherit=True)",
-    "  out['runnerSyntaxCompiled'] = True",
+    "  out['runnerSha256Matches'] = len(sys.argv) > 2 and hashlib.sha256(runner_bytes).hexdigest() == sys.argv[2]",
+    "  if not out['runnerSha256Matches']: out['probeErrors'].append('triposr-runner-hash-mismatch')",
+    "  else:",
+    "    compile(runner_bytes, '<configured-TripoSR-runner>', 'exec', dont_inherit=True)",
+    "    out['runnerSyntaxCompiled'] = True",
     "except Exception: out['probeErrors'].append('triposr-runner-syntax-compile-failed')",
     "print(json.dumps(out, separators=(',', ':')))",
   ].join("\n");
@@ -164,6 +168,7 @@ function parsePythonInventory(result) {
       onnxProviders: [],
       rembgDefaultModel: null,
       runnerSyntaxCompiled: false,
+      runnerSha256Matches: false,
       blockers: ["python-runtime-inventory-probe-failed"],
     };
   }
@@ -206,7 +211,8 @@ function parsePythonInventory(result) {
     const coreValid = typeof data.pythonVersion === "string" &&
       typeof data.pythonImplementation === "string" &&
       typeof data.pythonPlatform === "string" &&
-      typeof data.runnerSyntaxCompiled === "boolean";
+      typeof data.runnerSyntaxCompiled === "boolean" &&
+      typeof data.runnerSha256Matches === "boolean";
     if (!coreValid) throw new TypeError("malformed Python inventory core");
     return {
       status: probeErrors.length === 0 && data.runnerSyntaxCompiled ? "ready" : "partial",
@@ -226,6 +232,7 @@ function parsePythonInventory(result) {
         : [],
       rembgDefaultModel,
       runnerSyntaxCompiled: data.runnerSyntaxCompiled === true,
+      runnerSha256Matches: data.runnerSha256Matches === true,
       blockers: probeErrors,
     };
   } catch {
@@ -277,7 +284,7 @@ export async function collectGenerationWorkerHostInventory({
     ...OFFLINE_ENV,
   };
   const probe = runner.status === "present"
-    ? spawnSyncImpl(pythonPath, ["-c", pythonInventoryProgram(), path.resolve(runnerScript)], {
+    ? spawnSyncImpl(pythonPath, ["-c", pythonInventoryProgram(), path.resolve(runnerScript), runner.sha256], {
         encoding: "utf8",
         timeout: commandTimeoutMs,
         maxBuffer: 64 * 1024,
