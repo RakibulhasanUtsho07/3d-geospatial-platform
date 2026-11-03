@@ -84,3 +84,26 @@ test("rejects ambiguous facade selectors and unsupported central-dome anchors", 
   };
   assert.throws(() => generateBuildingModel(invalidBearing), /frontFacingAzimuthDegrees must be between 0 and 360/);
 });
+
+
+test("conflicting orientation evidence is preserved as unknown and requires review", () => {
+  const conflicting = {
+    ...spec,
+    evidence: [
+      ...spec.evidence.filter(item => item.field !== "frontFacingAzimuthDegrees"),
+      {
+        field: "frontFacingAzimuthDegrees",
+        value: 270,
+        confidence: "verified",
+        sourceIds: ["commons-aerial-2006"],
+        notes: "Deliberately conflicting test evidence.",
+      },
+    ],
+  };
+  const result = generateBuildingModel(conflicting);
+  assert.equal(result.report.facadeSelection.confidence, "unknown");
+  assert.ok(result.report.warnings.some(message => message.includes("orientation evidence conflicts")));
+  assert.equal(result.report.reviewRequired, true);
+  const gltf = parseGlbJson(result.glb);
+  assert.equal(gltf.extras.building.frontAxisConfidence, "unknown");
+});
