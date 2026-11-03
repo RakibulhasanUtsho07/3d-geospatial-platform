@@ -383,6 +383,12 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
         relativePath: source.relativePath,
         licence: source.licence,
         permittedOperations: source.permittedOperations,
+        ...(source.author ? { author: source.author } : {}),
+        ...(source.attribution ? { attribution: source.attribution } : {}),
+        ...(source.sourceUrl ? { sourceUrl: source.sourceUrl } : {}),
+        ...(source.capturedAt ? { capturedAt: source.capturedAt } : {}),
+        ...(source.description ? { description: source.description } : {}),
+        ...(source.captureLocation ? { captureLocation: source.captureLocation } : {}),
       })),
     });
     const mediaModelPath = mediaResult?.modelPath;
