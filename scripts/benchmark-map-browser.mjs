@@ -92,14 +92,27 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
     relativeOutput !== ".." &&
     !relativeOutput.startsWith(".." + path.sep) &&
     !path.isAbsolute(relativeOutput);
-  const args = ["status", "--porcelain", "--untracked-files=all"];
-  if (isSafeRelativeOutput) {
-    args.push("--", ".", ":(exclude)" + relativeOutput.split(path.sep).join("/"));
-  }
-  const status = safeGitValue(args, root);
-  return status === null ? null : status.length > 0;
-}
+  const status = safeGitValue(["status", "--porcelain=v1", "--untracked-files=all", "-z"], root);
+  if (status === null) return null;
+  if (!isSafeRelativeOutput) return status.length > 0;
 
+  const outputPath = relativeOutput.split(path.sep).join("/").replace(/\\/$/, "");
+  const changedPaths = [];
+  const records = status.split("\\0").filter(Boolean);
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    const statusCode = record.slice(0, 2);
+    changedPaths.push(record.slice(3));
+    // Porcelain -z emits a second NUL-delimited path for rename/copy records.
+    if (statusCode.includes("R") || statusCode.includes("C")) {
+      if (index + 1 < records.length) changedPaths.push(records[++index]);
+    }
+  }
+  return changedPaths.some((changedPath) => {
+    const normalized = changedPath.replace(/\\/g, "/");
+    return normalized !== outputPath && !normalized.startsWith(outputPath + "/");
+  });
+}
 async function hashFile(relativePath) {
   const absolutePath = path.isAbsolute(relativePath)
     ? relativePath
