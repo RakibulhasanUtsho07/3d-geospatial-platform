@@ -135,7 +135,7 @@
     "test:architectural-geometry-workflow": "node --test tests/architectural-geometry-workflow.test.mjs",
     "test:textured-glb-export": "node --test tests/textured-glb-export.test.mjs",
     "run:architectural-geometry-workflow": "node scripts/run-architectural-geometry-workflow.mjs",
-    "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs tests/generation-worker-status.test.mjs tests/generation-worker-capabilities.test.mjs",
+    "test:generation-queue": "node --test tests/generation-job-queue.test.mjs tests/generation-worker.test.mjs tests/generation-api-auth.test.mjs tests/generation-worker-status.test.mjs tests/generation-worker-capabilities.test.mjs tests/generation-worker-capabilities-python-probe.test.mjs",
     "test:generation-review": "node --test tests/generation-job-review.test.mjs tests/generation-api-auth.test.mjs",
     "run:generation-worker": "node scripts/run-generation-worker.mjs",
     "test:published-model-catalog": "node --test tests/published-model-catalog.test.mjs",
@@ -229,7 +229,12 @@
     "validate:brf26-evidence-bundle": "node scripts/build-brf26-evidence-bundle.mjs",
     "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs",
     "test:floor-plan-raster-trace": "node --test tests/floor-plan-raster-trace.test.mjs tests/floor-plan-raster-trace-job.test.mjs tests/floor-plan-trace-to-vector.test.mjs tests/floor-plan-raster-generation.test.mjs",
-    "test:generation-map-intake": "node --test tests/generation-map-intake.test.mjs"
+    "test:generation-map-intake": "node --test tests/generation-map-intake.test.mjs",
+    "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs",
+    "test:single-image-worker-preflight": "node --test tests/single-image-worker-preflight.test.mjs",
+    "preflight:single-image-worker": "node scripts/preflight-single-image-worker.mjs",
+    "smoke:single-image-runtime": "node scripts/smoke-test-single-image-runtime.mjs",
+    "verify:single-image-runtime-smoke": "node scripts/verify-single-image-runtime-smoke.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",

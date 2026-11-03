@@ -5,10 +5,10 @@ import path from "node:path";
 export const GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION = "1.0.0";
 const REQUIRED_COLMAP_COMMANDS = ["automatic_reconstructor", "model_analyzer", "model_converter", "mesh_texturer"];
 
-function runProbe(executable, args, { cwd, timeoutMs = 10_000, spawnImpl = nodeSpawn } = {}) {
+function runProbe(executable, args, { cwd, env, timeoutMs = 10_000, spawnImpl = nodeSpawn } = {}) {
   return new Promise((resolve) => {
     let child;
-    try { child = spawnImpl(executable, args, { ...(cwd ? { cwd } : {}), stdio: ["ignore", "pipe", "pipe"], windowsHide: true }); }
+    try { child = spawnImpl(executable, args, { ...(cwd ? { cwd } : {}), ...(env ? { env } : {}), stdio: ["ignore", "pipe", "pipe"], windowsHide: true }); }
     catch { resolve({ ok: false, reason: "spawn-error" }); return; }
     let settled = false, stdout = "", stderr = "", killTimer = null;
     const finish = (result) => {
@@ -75,10 +75,13 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
   let probeResult = null;
   if (runner && !blockers.length) {
     const script = [
-      "import os, runpy, sys", "import torch",
+      "import inspect, os, re",
+      "import onnxruntime, rembg, torch",
       "from huggingface_hub import try_to_load_from_cache",
+      "from rembg.sessions import sessions_class",
       "device = " + JSON.stringify(device),
-      "if device.startswith('cuda:'):", "    index = int(device.split(':', 1)[1])",
+      "if device.startswith('cuda:'):",
+      "    index = int(device.split(':', 1)[1])",
       "    if not torch.cuda.is_available() or index >= torch.cuda.device_count(): raise SystemExit('configured CUDA device unavailable')",
       "elif device == 'mps':",
       "    if not (hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()): raise SystemExit('configured MPS device unavailable')",
@@ -86,58 +89,117 @@ async function singleImageProbe({ env, spawnImpl, timeoutMs }) {
       "missing_weights = []",
       "for model_file in ('config.yaml', 'model.ckpt'):",
       "    cached_file = try_to_load_from_cache('stabilityai/TripoSR', model_file)",
-      "    if not isinstance(cached_file, str) or not os.path.isfile(cached_file): missing_weights.append(model_file)",
-      "print('TRIPOSR_WEIGHTS_CACHED' if not missing_weights else 'TRIPOSR_WEIGHTS_MISSING:' + ','.join(missing_weights), flush=True)",
-      "sys.argv = [" + JSON.stringify(runner) + ", '--help']",
-      "try:", "    runpy.run_path(" + JSON.stringify(runner) + ", run_name='__main__')",
-      "except SystemExit as error:", "    if error.code not in (None, 0): raise",
+      "    if not isinstance(cached_file, str) or not os.path.isfile(cached_file) or os.path.getsize(cached_file) <= 0: missing_weights.append(model_file)",
+      "tripo_cache_state = 'TRIPOSR_WEIGHTS_CACHED' if not missing_weights else 'TRIPOSR_WEIGHTS_MISSING:' + ','.join(missing_weights)",
+      "model_parameter = inspect.signature(rembg.new_session).parameters.get('model_name')",
+      "model_name = model_parameter.default if model_parameter else None",
+      "rembg_model_name = model_name if isinstance(model_name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', model_name) else None",
+      "rembg_cache_state = 'REMBG_MODEL_WEIGHTS_UNKNOWN'",
+      "if rembg_model_name is not None:",
+      "    session_class = next((item for item in sessions_class if item.name() == rembg_model_name), None)",
+      "    resolver = getattr(session_class, 'resolve_existing', None) if session_class is not None else None",
+      "    if callable(resolver):",
+      "        model_path = resolver(rembg_model_name + '.onnx')",
+      "        model_path = os.fspath(model_path) if model_path is not None else ''",
+      "        model_cached = bool(model_path) and os.path.isfile(model_path) and os.path.getsize(model_path) > 0",
+      "        rembg_cache_state = 'REMBG_MODEL_WEIGHTS_CACHED' if model_cached else 'REMBG_MODEL_WEIGHTS_MISSING'",
+      "runner_path = " + JSON.stringify(runner),
+      "with open(runner_path, 'rb') as runner_file:",
+      "    runner_source = runner_file.read()",
+      "compile(runner_source, runner_path, 'exec', dont_inherit=True)",
+      "print(tripo_cache_state, flush=True)",
+      "if rembg_model_name is not None: print('REMBG_MODEL_NAME:' + rembg_model_name, flush=True)",
+      "print(rembg_cache_state, flush=True)",
     ].join("\n");
-    probeResult = await runProbe(python, ["-c", script], { cwd: path.dirname(runner), timeoutMs: Math.max(timeoutMs, 15_000), spawnImpl });
+    probeResult = await runProbe(python, ["-c", script], {
+      cwd: path.dirname(runner),
+      env: {
+        ...process.env,
+        ...env,
+        PYTHONDONTWRITEBYTECODE: "1",
+        HF_HUB_OFFLINE: "1",
+        HUGGINGFACE_HUB_OFFLINE: "1",
+        TRANSFORMERS_OFFLINE: "1",
+        HF_DATASETS_OFFLINE: "1",
+        HF_HUB_DISABLE_TELEMETRY: "1",
+      },
+      timeoutMs: Math.max(timeoutMs, 15_000),
+      spawnImpl,
+    });
     if (!probeResult.ok) {
       blockers.push(probeResult.reason === "spawn-error"
         ? "Configured Python executable could not be started; check BUILDING_ENGINE_PYTHON_EXECUTABLE."
         : probeResult.reason === "timeout"
-          ? "TripoSR runner/PyTorch/device readiness probe timed out."
-          : "TripoSR runner imports, PyTorch, or configured compute device failed its readiness probe.");
+          ? "TripoSR/rembg/ONNX Runtime/PyTorch/device readiness probe timed out."
+          : "TripoSR runner, rembg, ONNX Runtime, PyTorch or configured compute device failed its readiness probe.");
     }
   }
-  const modelWeights = blockers.length || !probeResult?.ok
+  const output = probeResult?.ok ? probeResult.stdout : "";
+  const modelWeights = !probeResult?.ok
     ? "unknown"
-    : probeResult.stdout.includes("TRIPOSR_WEIGHTS_CACHED")
-      ? "cached"
-      : "missing";
+    : output.includes("TRIPOSR_WEIGHTS_CACHED") ? "cached"
+      : output.includes("TRIPOSR_WEIGHTS_MISSING") ? "missing" : "unknown";
+  const backgroundRemovalWeights = !probeResult?.ok
+    ? "unknown"
+    : output.includes("REMBG_MODEL_WEIGHTS_CACHED") ? "cached"
+      : output.includes("REMBG_MODEL_WEIGHTS_MISSING") ? "missing" : "unknown";
+  const modelMatch = output.match(/(?:^|\n)REMBG_MODEL_NAME:([A-Za-z0-9][A-Za-z0-9._-]{0,79})(?:\r?\n|$)/);
+  const backgroundRemovalModel = modelMatch?.[1] ?? null;
+  const allModelsCached = modelWeights === "cached" && backgroundRemovalWeights === "cached";
   return {
-    status: blockers.length ? "blocked" : modelWeights === "cached" ? "ready" : "configured",
+    status: blockers.length ? "blocked" : allModelsCached ? "ready" : "configured",
     blockers,
     caveats: [
-      "Runner imports, PyTorch and configured device are checked without generating a model.",
+      "The Python process imports PyTorch, ONNX Runtime and rembg and checks the configured device. The configured TripoSR runner is syntax-compiled in memory but is never executed.",
+      "The preflight deliberately does not invoke the runner's --help handler because a configured script could perform arbitrary side effects. Actual runner behavior is checked only by the D3M-05 smoke.",
       modelWeights === "cached"
         ? "The configured TripoSR config.yaml and model.ckpt files are present in the local Hugging Face cache."
         : modelWeights === "missing"
           ? "The configured TripoSR config.yaml and/or model.ckpt is not cached; this worker will not claim single-image jobs until both files are cached."
-          : "Model cache state could not be verified because the runtime probe did not complete.",
-      "The background-removal model/cache and actual end-to-end inference are still checked only when a real job starts.",
-      "Single-image output remains an AI proposal and requires independent review.",
+          : "TripoSR model cache state could not be verified.",
+      backgroundRemovalWeights === "cached"
+        ? "The installed rembg default model (" + (backgroundRemovalModel ?? "identified model") + ") is present in the local cache."
+        : backgroundRemovalWeights === "missing"
+          ? "The installed rembg default model (" + (backgroundRemovalModel ?? "identified model") + ") is missing from the local cache; this worker will not claim single-image jobs."
+          : "The installed rembg default model or its local cache state could not be identified; single-image jobs remain unclaimable.",
+      "The probe uses the installed rembg session class' read-only cache resolver. It does not construct a session, download weights, verify model licensing or run ONNX inference.",
+      "Actual end-to-end inference, GPU kernels, available memory and GLB quality are checked only by a real job. Single-image output remains an AI proposal and requires independent review.",
     ],
     modelWeights,
+    backgroundRemovalWeights,
+    ...(backgroundRemovalModel ? { backgroundRemovalModel } : {}),
   };
 }
-
-export async function probeGenerationWorkerCapabilities({ env = process.env, spawnImpl = nodeSpawn, now = new Date(), commandTimeoutMs = 10_000 } = {}) {
+export async function probeGenerationWorkerCapabilities({
+  env = process.env,
+  spawnImpl = nodeSpawn,
+  now = new Date(),
+  commandTimeoutMs = 10_000,
+  strategies = ["photogrammetry", "single-image-ai"],
+} = {}) {
   if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 30_000) throw new RangeError("commandTimeoutMs must be an integer from 1000 to 30000.");
+  if (!Array.isArray(strategies) || !strategies.length ||
+      strategies.some((strategy) => !["photogrammetry", "single-image-ai"].includes(strategy)) ||
+      new Set(strategies).size !== strategies.length) {
+    throw new TypeError("strategies must contain unique supported worker strategies.");
+  }
   const checkedAt = new Date(now).toISOString();
   if (!Number.isFinite(Date.parse(checkedAt))) throw new TypeError("now must be a valid timestamp.");
   const [photogrammetry, singleImage] = await Promise.all([
-    photogrammetryProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs }),
-    singleImageProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs }),
+    strategies.includes("photogrammetry")
+      ? photogrammetryProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs })
+      : Promise.resolve(null),
+    strategies.includes("single-image-ai")
+      ? singleImageProbe({ env, spawnImpl, timeoutMs: commandTimeoutMs })
+      : Promise.resolve(null),
   ]);
   return {
     schemaVersion: GENERATION_WORKER_CAPABILITY_SCHEMA_VERSION,
     checkedAt,
     strategies: {
       procedural: { status: "ready", blockers: [], caveats: ["In-process parametric generator; not image-derived facade reconstruction."] },
-      photogrammetry,
-      "single-image-ai": singleImage,
+      ...(photogrammetry ? { photogrammetry } : {}),
+      ...(singleImage ? { "single-image-ai": singleImage } : {}),
     },
   };
 }
@@ -147,6 +209,7 @@ export function getClaimableGenerationStrategies(capabilities) {
   const allowed = ["auto", "procedural"];
   if (capabilities.strategies.photogrammetry?.status === "ready") allowed.push("photogrammetry");
   if (capabilities.strategies["single-image-ai"]?.status === "ready" &&
-      capabilities.strategies["single-image-ai"]?.modelWeights === "cached") allowed.push("single-image-ai");
+      capabilities.strategies["single-image-ai"]?.modelWeights === "cached" &&
+      capabilities.strategies["single-image-ai"]?.backgroundRemovalWeights === "cached") allowed.push("single-image-ai");
   return allowed;
 }

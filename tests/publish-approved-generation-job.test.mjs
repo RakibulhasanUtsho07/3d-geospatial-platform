@@ -1,17 +1,28 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { claimNextGenerationJob, completeGenerationJob, enqueueGenerationJob, getGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
+import { claimNextGenerationJob, completeGenerationJob, enqueueGenerationJob, getGenerationJob, updateGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
 import { reviewGenerationJob, REQUIRED_GENERATION_REVIEW_CHECKS } from "../src/core/building-generation/generation-job-review.mjs";
 import { publishApprovedGenerationJob } from "../src/core/building-generation/publish-approved-generation-job.mjs";
 import { getActivePublishedModels, validatePublishedModelCatalog } from "../src/core/building-generation/published-model-catalog-reader.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const placement = {
+  position: { longitude: 90.406, latitude: 23.7086, height: 12.5 },
+  headingDegrees: 0,
+  pitchDegrees: 0,
+  rollDegrees: 0,
+  scale: 1,
+  upAxis: "Y",
+  forwardAxis: "Z",
+  heightReference: "WGS84-ellipsoid",
+};
 
 function makeGlb(seed = "publish-test") {
   const payload = Buffer.from(JSON.stringify({ asset: { version: "2.0", generator: seed } }));
@@ -61,20 +72,11 @@ async function makeApprovedJob(t) {
       reviewer: "independent-operator",
       notes: "Reviewed reference imagery, dimensions, scale, georeference and generated QA report.",
       checks,
+      placement,
     },
   });
   return { workspaceRoot, jobId: queued.jobId, modelBytes, reviewed };
 }
-
-const placement = {
-  position: { longitude: 90.406, latitude: 23.7086, height: 0 },
-  headingDegrees: 0,
-  pitchDegrees: 0,
-  rollDegrees: 0,
-  scale: 1,
-  upAxis: "Y",
-  forwardAxis: "Z",
-};
 
 test("publishes only an approved, hash-matching review with explicit map placement", async (t) => {
   const setup = await makeApprovedJob(t);
@@ -83,6 +85,9 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(result.mapReady, false);
   assert.equal(result.publicationEligible, false);
   assert.equal(result.placement.longitude, placement.position.longitude);
+  assert.equal(result.placement.height, placement.position.height);
+  assert.equal(result.placementHeightReference, "WGS84-ellipsoid");
+  assert.equal(result.placementSha256, setup.reviewed.review.placementSha256);
   assert.match(result.assetUrl, /^\/models\/generated\//);
   const manifestPath = path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json");
   const catalog = validatePublishedModelCatalog(JSON.parse(await readFile(manifestPath, "utf8")));
@@ -99,9 +104,95 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(unchangedJob.publicationEligible, false);
 });
 
+test("refuses any publication transform that differs from the immutable approved placement", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const variants = [
+    { position: { ...placement.position, longitude: placement.position.longitude + 0.0001 } },
+    { position: { ...placement.position, latitude: placement.position.latitude + 0.0001 } },
+    { position: { ...placement.position, height: placement.position.height + 1 } },
+    { headingDegrees: 1 },
+    { pitchDegrees: 1 },
+    { rollDegrees: 1 },
+    { scale: 1.01 },
+    { upAxis: "X" },
+    { forwardAxis: "X" },
+  ];
+  for (const patch of variants) {
+    const candidate = {
+      ...placement,
+      ...patch,
+      position: patch.position ?? placement.position,
+    };
+    await assert.rejects(
+      publishApprovedGenerationJob({ ...setup, placement: candidate }),
+      /exactly match the immutable approved review placement/i,
+    );
+  }
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("refuses publication when the job summary placement digest differs from its immutable review record", async (t) => {
+  const setup = await makeApprovedJob(t);
+  await updateGenerationJob({
+    workspaceRoot: setup.workspaceRoot,
+    jobId: setup.jobId,
+    update: (state) => {
+      state.review.placementSha256 = "0".repeat(64);
+    },
+  });
+
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /exactly match the immutable approved review placement/i,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("refuses a legacy approved review record with no placement binding", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const currentJob = await getGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: setup.jobId });
+  const recordPath = path.join(setup.workspaceRoot, currentJob.review.recordPath);
+  const record = JSON.parse(await readFile(recordPath, "utf8"));
+  delete record.placement;
+  delete record.placementSha256;
+  const legacyBytes = Buffer.from(JSON.stringify(record, null, 2) + "\n");
+  await writeFile(recordPath, legacyBytes);
+  await updateGenerationJob({
+    workspaceRoot: setup.workspaceRoot,
+    jobId: setup.jobId,
+    update: (state) => {
+      state.review.recordSha256 = hash(legacyBytes);
+      delete state.review.placement;
+      delete state.review.placementSha256;
+    },
+  });
+
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /missing a valid immutable placement binding/i,
+  );
+  await assert.rejects(
+    publishApprovedGenerationJob({
+      ...setup,
+      placement: { ...placement, heightReference: "EGM96" },
+    }),
+    /heightReference must be WGS84-ellipsoid/i,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
 test("refuses publication without placement or without an approved review", async (t) => {
   const setup = await makeApprovedJob(t);
-  await assert.rejects(publishApprovedGenerationJob({ ...setup, placement: {} }), /Explicit model placement/);
+  await assert.rejects(publishApprovedGenerationJob({ ...setup, placement: {} }), /explicit reviewed placement/i);
   const queued = await enqueueGenerationJob({ workspaceRoot: setup.workspaceRoot, input: { buildingSpec: fixture, strategy: "procedural", sources: [] } });
   await assert.rejects(publishApprovedGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: queued.jobId, placement }), /Only completed generation jobs/);
 });
@@ -145,6 +236,44 @@ test("publishes the validated GLB and catalog into a separate application public
   );
   assert.equal(result.mapReady, false);
   assert.equal(result.publicationEligible, false);
+});
+
+test("publishes an approved review through the operator CLI with the same WGS84 ellipsoid placement binding", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const cliPath = path.resolve(process.cwd(), "scripts/publish-approved-generation-job.mjs");
+  const args = [
+    cliPath,
+    setup.workspaceRoot,
+    setup.jobId,
+    "--longitude", String(placement.position.longitude),
+    "--latitude", String(placement.position.latitude),
+    "--height", String(placement.position.height),
+    "--heading", String(placement.headingDegrees),
+    "--pitch", String(placement.pitchDegrees),
+    "--roll", String(placement.rollDegrees),
+    "--scale", String(placement.scale),
+    "--up-axis", placement.upAxis,
+    "--forward-axis", placement.forwardAxis,
+  ];
+  const run = spawnSync(process.execPath, args, {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  const payload = JSON.parse(run.stdout);
+  assert.equal(payload.status, "published-reviewed-version");
+  assert.equal(payload.placementHeightReference, "WGS84-ellipsoid");
+  assert.equal(payload.placementSha256, setup.reviewed.review.placementSha256);
+  assert.equal(payload.placement.longitude, placement.position.longitude);
+  assert.equal(payload.placement.latitude, placement.position.latitude);
+  assert.equal(payload.placement.height, placement.position.height);
+  assert.equal(payload.mapReady, false);
+  assert.equal(payload.publicationEligible, false);
+  const catalogPath = path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json");
+  const active = getActivePublishedModels(JSON.parse(await readFile(catalogPath, "utf8")))[0];
+  assert.equal(active.sha256, payload.modelSha256);
 });
 
 test("refuses a second publication while the model catalog lock is held", async (t) => {
