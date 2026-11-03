@@ -38,7 +38,19 @@ Window panes/frames and front doors/frames are placed in a facade-local frame:
 
 The helper formula is `centerOffset = depth / 2 + faceClearance`. The default face clearance is 0.002 m. It rejects non-positive depths, non-finite values and clearances outside 0–0.05 m.
 
-**Important geometry limitation:** the existing generator still emits solid wall panels. The glass and door meshes are positioned against the exterior face but the generator does not boolean-cut true wall openings. Do not describe this as BIM-grade openings or structural wall geometry.
+## Structural facade openings
+
+The procedural generator now emits wall shells with actual through-openings rather than leaving a solid wall behind every pane/door insert:
+
+- rectangular window openings are cut from each eligible facade bay and continue through the full wall thickness;
+- the ground-floor entrance is cut as a rectangular door opening when the front facade is not configured as an arcade;
+- an enabled frontArcade creates sampled arched through-openings on the selected front facade; the first-storey arch profile is split into 16 deterministic reveal segments;
+- front/back wall faces are omitted inside each opening, and jamb, sill (when raised), arch-head, top/bottom and end-return surfaces close the wall shell;
+- the existing glass/frame/door insert placement retains its 2 mm exterior-face clearance.
+
+For a configured front arcade, the separate default door leaf is suppressed: the arcade opening owns that entrance bay. frontArcade.heightM is limited to floorHeightM - 0.05 for the structural cut. A larger requested height is visibly clamped and produces a warning; multi-storey continuous arch cuts are not implemented in this generator.
+
+The generation report includes geometry.structuralOpeningCount and structuralOpenings. Each record carries edge/floor, kind/shape, along-edge center, width, bottom/top, confidence=estimated, source=procedural-default and reviewRequired=true. These openings use default procedural dimensions and placement. They are not measured from source imagery or a reviewed architectural plan, and they do not constitute BIM-grade structural semantics or architectural truth.
 
 ## Validation
 
@@ -46,8 +58,8 @@ The focused BuildingSpec/generator tests cover:
 
 - explicit edge index, azimuth selection and mutually exclusive/invalid selectors;
 - nearest-edge azimuth matching and the 15-degree warning;
-- door placement on the explicitly selected edge;
-- window pane clearance/depth across every edge for both footprint windings;
+- door placement on the explicitly selected edge and verified absence of wall surface inside rectangular/arched cutouts;
+- window pane clearance/depth across every edge for both footprint windings, plus surface-coverage assertions for generated wall openings;
 - preservation of the existing +X east / +Z north local mapping.
 
 The repository's existing `test:building-generation` CI script runs this regression suite. A passing test establishes the tested synthetic placement behavior only. It does not prove a real building's facade bearing, dimensions, orientation, architecture, image-to-model reconstruction, surveyed georeference or publication readiness. Non-verified facade selection keeps review required; `mapReady`, `publicationEligible` and `automaticApproval` remain fail-closed.
