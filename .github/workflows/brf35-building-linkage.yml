@@ -3,6 +3,8 @@ name: BRF-35 same-building linkage and metric-frame gate
 on:
   push:
     branches:
+      - main
+      - integration/brf48-main-20261103
       - development
       - feat/brf48-six-disjoint-heldout-checkpoints-20261101
     paths:
@@ -16,6 +18,7 @@ on:
       - "package.json"
   pull_request:
     branches:
+      - main
       - development
       - feat/brf47-cross-role-asset-identity-20261031
     paths:
