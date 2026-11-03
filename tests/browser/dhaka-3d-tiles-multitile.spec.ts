@@ -311,8 +311,10 @@ test("loads distinct child GLBs across two viewports without eagerly fetching th
     assert.equal(persistedManifest.commit, expectedSourceHead);
     assert.match(persistedManifest.workflowSha ?? "", /^[a-f0-9]{40}$/);
     assert.ok(
-      persistedManifest.eventName === "push" || persistedManifest.eventName === "pull_request",
-      "Artifact must identify its GitHub event.",
+      persistedManifest.eventName === "push" ||
+        persistedManifest.eventName === "pull_request" ||
+        persistedManifest.eventName === "workflow_dispatch",
+      "Artifact must identify its actual GitHub event.",
     );
   }
 });
