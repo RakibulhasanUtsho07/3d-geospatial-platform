@@ -101,12 +101,16 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
 
   const frontBearing = rawManifest.frontFacingAzimuthDegrees ?? null;
   const frontAxisSource = rawManifest.frontAxisSource ?? "renderer-default";
+  const frontAxisConfidence = rawManifest.frontAxisConfidence ?? "unknown";
+  const validFrontConfidence = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]);
   if (frontBearing !== null &&
       (!finite(frontBearing) || frontBearing < 0 || frontBearing > 360 ||
-       frontAxisSource !== "glb-extras.frontFacingAzimuthDegrees")) {
+       frontAxisSource !== "glb-extras.frontFacingAzimuthDegrees" ||
+       !validFrontConfidence.has(frontAxisConfidence))) {
     errors.push("render-front-bearing-metadata-invalid");
   }
-  if (frontBearing === null && frontAxisSource !== "renderer-default") {
+  if (frontBearing === null &&
+      (frontAxisSource !== "renderer-default" || frontAxisConfidence !== "unknown")) {
     errors.push("render-front-bearing-source-mismatch");
   }
 
@@ -123,6 +127,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     renderResolution: { width: resolution, height: resolution },
     sceneBounds: bounds ?? null,
     frontFacingAzimuthDegrees: frontBearing,
+    frontAxisConfidence,
     frontAxisSource,
     counts: { requiredViews: REQUIRED_REVIEW_VIEWS.length, generatedViews: views.length, errors: errors.length,
       warnings: warnings.length },
