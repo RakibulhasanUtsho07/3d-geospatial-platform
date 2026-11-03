@@ -351,16 +351,41 @@ The comparison counts above describe divergent history from each merge base; the
 
 ### NEXT-02 — BRF-04 controlled GLB regression clean port
 
-- New clean branch: `feat/brf04-controlled-glb-baseline-main-20261103`, created from current main SHA `ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- New clean branch: `feat/brf04-controlled-glb-baseline-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
 - Draft PR #339: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/339
-- Exact head at PR creation: `50f19f26d365f66b42b3ce02bd07025d572762bb`; compare was 6 commits ahead / 0 behind, with 6 changed paths.
-- Adds a synthetic 10×8×6 cuboid GLB fixture, repeatability SHA-256 test, deliberate +20% Y-scale and degenerate-triangle defects, invalid-input checks, npm test script, CI step and documented limits.
-- Reuses current-main `glb-geometry-qa.mjs` and `reference-dimension-validation.mjs`; it does not import or merge the old stacked renderer/evidence branches.
-- Exact-head CI run #41604594271 is still in progress at the last refresh, but the focused **BRF-04 test step #131 has completed successfully**. The job advanced through the full suite to production-server viewport API verification; the overall CI workflow is not yet terminal, so no full-CI pass is claimed.
-- Same-head supplementary checks passed: P3.6 run #41604594440, P3.7 run #41604594280, BRF-05–07 run #41604594463, BRF-14 run #41604594287, and BRF-35 run #41604594347. Real-Dhaka browser baseline #41604594444 remains in progress. BRF-45 run #41604594331 was cancelled; it is not counted as a pass.
-- PR #339's body was updated with this exact status. Keep it Draft. Continue checking terminal results; if Full CI or Real-Dhaka baseline fails, inspect logs and resolve only reproducible failures on a fresh head. Do not claim success until relevant checks are terminal and reviewed.
+- Exact head: `50f19f26d365f66b42b3ce02bd07025d572762bb`; 6 commits ahead / 0 behind, 6 changed paths.
+- Adds a synthetic 10×8×6 cuboid GLB fixture, deterministic SHA-256 regression, +20% Y-scale and degenerate-triangle defect injection, invalid-input checks, npm script, CI step and limitations documentation.
+- Reuses main's `glb-geometry-qa.mjs` and `reference-dimension-validation.mjs`; no old BRF-01/02/03 stack was merged.
+- Exact-head Full CI run #41604594271 **passed**; focused BRF-04 step #131 also passed.
+- Real-Dhaka browser baseline #41604594444 **passed all six cold/warm samples**.
+- Same-head supplementary PR checks passed: P3.6 #41604594440, P3.7 #41604594280, BRF-05–07 #41604594463, BRF-14 #41604594287 and BRF-35 #41604594347. A separate BRF-45 manual dispatch rerun #41604671931 also passed.
+- Separate manual workflow_dispatch CI run #41604663810 and P3.6 browser run #41604666326 failed because the lifecycle evidence test accepted only `push` / `pull_request` even though the repository supports manual `workflow_dispatch`. The failure occurs at the event-name assertion, after the browser lifecycle report itself is produced. This is not a PR-triggered BRF-04 failure; the cross-event contract is tracked separately in PR #341.
+- PR #339 remains Draft/unmerged pending review. Its synthetic checks do not prove real-building fidelity or survey accuracy.
 
-**Immediate next action:** refresh PR #339 head and run #41604594271. Confirm the BRF-04 test step outcome and full CI result. If it passes, inspect the resulting artifacts/logs and update this register; do not merge until required review and exact-head CI are confirmed. Afterward, continue a file-by-file source review of the retained unique work in PR #103 and #185–#189. P3.4 target-device review remains externally blocked.
+### NEXT-03 — explicit facade selection and exterior insert placement
+
+- Current-main gap: `procedural-glb.mjs` always selected the longest footprint edge as the entrance, used a fixed exterior normal regardless of polygon winding, and placed window jambs along global X rather than the facade tangent.
+- Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
+- Draft PR #340: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/340
+- Exact head: `9e2bb3bbba1fe5316429256c5a83101521928f52`; 7 commits ahead / 0 behind, 5 changed paths.
+- Adds validated `architecture.frontFacadeEdgeIndex`; if omitted, preserves longest-edge inference but records it as estimated and review-required.
+- Adds facade-local tangent/outward frame with winding-aware exterior normal; places panes, frames, door and jambs at a 2 mm inner-face clearance, with jamb offsets along facade tangent.
+- Selected front edge is used by front-specific procedural features and recorded in `facadeSelection` report.
+- Adds tests for rotated axes, insert clearance, normal and reversed GeoJSON winding, explicit facade edge, inferred fallback and invalid indexes; documents the BuildingSpec contract.
+- Exact-head CI run #41605913082 is in progress. The focused `Test BuildingSpec validation and procedural GLB generation` step #17 **passed**; the overall job had advanced to production-server viewport API verification with no failure observed at the last refresh.
+- Keep PR #340 Draft until full exact-head CI reaches a successful terminal result and review verifies the generated geometry evidence.
+
+### NEXT-04 — workflow_dispatch evidence event provenance
+
+- Root cause: manual workflow dispatches were supported by the CI/P3.6 workflows, but `tests/browser/dhaka-3d-tiles-controller-lifecycle.spec.ts` required manifest `eventName` to be only `push` or `pull_request`. Runs #41604663810 and #41604666326 failed at this exact assertion; their logs show the controller lifecycle report had been produced and other browser checks completed.
+- Clean branch: `fix/p36-workflow-dispatch-evidence-event-20261103`, based on current main.
+- Draft PR #341: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/341
+- Head: `e7abfcbb294561954d460b85bb021c1c06784df1`; one test-file change. The manifest still records the actual `GITHUB_EVENT_NAME`; the test now accepts `workflow_dispatch` as a legitimate event while rejecting missing/unrecognized event names.
+- Exact-head CI #41606193975 is queued; P3.6 workflow #41606193939 is in progress. A manual dispatch rerun cannot be triggered through the available connector and must be verified separately after merge or by an operator.
+- Keep PR #341 Draft until its PR-triggered CI and P3.6 checks pass; do not claim manual-dispatch validation merely because the pull-request path passes.
+
+**Immediate next action:** refresh PR #340 run #41605913082 and PR #341 runs #41606193975 / #41606193939; inspect the exact changed test steps, all failed jobs and terminal logs. Fix reproducible failures on the corresponding branch. Do not merge any Draft PR until exact-head CI, relevant browser checks and review pass. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate either. After these PRs reach terminal status, continue the remaining PR #103 and #185–#189 code review only for unique, current-main-compatible work.
+
 
 ## 7. Mandatory acceptance checklist for every future work unit
 
