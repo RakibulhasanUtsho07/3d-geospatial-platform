@@ -107,3 +107,13 @@ test("conflicting orientation evidence is preserved as unknown and requires revi
   const gltf = parseGlbJson(result.glb);
   assert.equal(gltf.extras.building.frontAxisConfidence, "unknown");
 });
+
+
+test("candidate report facade metadata comes from the generator facadeSelection contract", () => {
+  const result = generateBuildingModel(spec);
+  const selection = result.report.facadeSelection;
+  assert.ok(selection);
+  assert.equal(selection.actualAzimuthDegrees, 180);
+  assert.equal(selection.confidence, "estimated");
+  assert.equal(selection.source, "buildingSpec.architecture.frontFacingAzimuthDegrees");
+});
