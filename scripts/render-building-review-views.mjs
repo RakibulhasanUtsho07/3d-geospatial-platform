@@ -13,6 +13,7 @@ import {
   finalizeSourceCameraRenderManifest,
 } from "../src/core/building-generation/source-camera-render.mjs";
 import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-texture-binding-qa.mjs";
+import { extractGlbFacadeOrientation, toBlenderCameraDirection } from "../src/core/building-generation/glb-facade-orientation.mjs";
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
@@ -104,6 +105,8 @@ async function main() {
     if (error.code !== "ENOENT") throw error;
   }
   const modelBytes = await readFile(modelPath);
+  const facadeOrientation = extractGlbFacadeOrientation(modelBytes);
+  const blenderFacadeDirection = facadeOrientation ? toBlenderCameraDirection(facadeOrientation) : null;
   let sourceCameraAssessment = null;
   let sourceCameraPath = null;
   if (cameraInputs.every(Boolean)) {
@@ -182,6 +185,23 @@ async function main() {
     if (reviewProfilePath && reviewProfileAssessment?.sha256) {
       args.push("--review-profile-json", reviewProfilePath, "--review-profile-sha256", reviewProfileAssessment.sha256);
     }
+    if (facadeOrientation && blenderFacadeDirection) {
+      const facadeArgs = [
+        ["--front-facade-direction-x", blenderFacadeDirection[0]],
+        ["--front-facade-direction-y", blenderFacadeDirection[1]],
+        ["--front-facade-direction-z", blenderFacadeDirection[2]],
+        ["--front-facade-outward-normal-x", facadeOrientation.outwardNormal.x],
+        ["--front-facade-outward-normal-z", facadeOrientation.outwardNormal.z],
+        ["--front-facade-azimuth-degrees", facadeOrientation.actualAzimuthDegrees],
+        ["--front-facade-selection-method", facadeOrientation.selectionMethod],
+        ["--front-facade-edge-index", facadeOrientation.edgeIndex],
+        ["--front-facade-confidence", facadeOrientation.confidence],
+        ["--front-facade-source", facadeOrientation.source],
+        ["--front-facade-review-required", facadeOrientation.reviewRequired],
+        ["--front-facade-coordinate-frame", facadeOrientation.coordinateFrame],
+      ];
+      for (const [key, value] of facadeArgs) args.push(key, String(value));
+    }
     if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
       args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
     }
@@ -201,6 +221,18 @@ async function main() {
     }
     const rawPath = path.join(outputDir, ".blender-render-manifest.raw.json");
     const raw = JSON.parse(await readFile(rawPath, "utf8"));
+    if (facadeOrientation) {
+      const renderedOrientation = raw.facadeOrientation;
+      if (!renderedOrientation ||
+        renderedOrientation.edgeIndex !== facadeOrientation.edgeIndex ||
+        renderedOrientation.source !== facadeOrientation.source ||
+        renderedOrientation.confidence !== facadeOrientation.confidence ||
+        renderedOrientation.actualAzimuthDegrees !== facadeOrientation.actualAzimuthDegrees) {
+        throw new Error("Blender render manifest facade orientation does not match the input GLB metadata");
+      }
+    } else if (raw.facadeOrientation !== null && raw.facadeOrientation !== undefined) {
+      throw new Error("Blender render manifest declared facade orientation absent from the input GLB");
+    }
     const fileMetadata = {};
     for (const view of raw.views ?? []) {
       if (typeof view.filename !== "string" || path.basename(view.filename) !== view.filename ||
@@ -273,6 +305,7 @@ async function main() {
       resolution: resolution + "x" + resolution,
       errors: report.errors.length,
       warnings: report.warnings.length,
+      facadeOrientation: report.facadeOrientation,
       sourceCamera: sourceCameraReport ? {
         report: path.join(outputDir, "source-camera-render-manifest.json"),
         status: sourceCameraReport.status,

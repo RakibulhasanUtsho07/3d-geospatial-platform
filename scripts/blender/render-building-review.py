@@ -273,6 +273,78 @@ def sample_pixel_statistics(image, resolution):
         "transparentRatio": round(transparent / sampled if sampled else 1.0, 6),
     }
 
+def read_facade_orientation(opts):
+    """Validate GLB-bound facade metadata and the matching Blender camera vector."""
+    keys = [
+        "--front-facade-direction-x", "--front-facade-direction-y", "--front-facade-direction-z",
+        "--front-facade-outward-normal-x", "--front-facade-outward-normal-z",
+        "--front-facade-azimuth-degrees", "--front-facade-selection-method",
+        "--front-facade-edge-index", "--front-facade-confidence",
+        "--front-facade-source", "--front-facade-review-required",
+        "--front-facade-coordinate-frame",
+    ]
+    present = [key for key in keys if key in opts]
+    if not present:
+        return None
+    if len(present) != len(keys):
+        raise RuntimeError("Incomplete GLB facade-orientation arguments")
+    try:
+        direction = [float(opts[key]) for key in keys[:3]]
+        normal = {
+            "x": float(opts["--front-facade-outward-normal-x"]),
+            "z": float(opts["--front-facade-outward-normal-z"]),
+        }
+        azimuth = float(opts["--front-facade-azimuth-degrees"])
+        edge_index = int(opts["--front-facade-edge-index"])
+    except (TypeError, ValueError):
+        raise RuntimeError("GLB facade-orientation numeric arguments are invalid")
+    if any(not math.isfinite(value) for value in direction + [normal["x"], normal["z"], azimuth]):
+        raise RuntimeError("GLB facade-orientation values must be finite")
+    direction_length = math.sqrt(sum(value * value for value in direction))
+    normal_length = math.hypot(normal["x"], normal["z"])
+    if abs(direction_length - 1.0) > 1e-5 or abs(normal_length - 1.0) > 1e-3:
+        raise RuntimeError("GLB facade-orientation vectors must be unit length")
+    if azimuth < 0.0 or azimuth > 360.0 or edge_index < 0:
+        raise RuntimeError("GLB facade-orientation azimuth or edge index is invalid")
+    normal_azimuth = (math.degrees(math.atan2(normal["x"], normal["z"])) + 360.0) % 360.0
+    if abs((normal_azimuth - azimuth + 540.0) % 360.0 - 180.0) > 0.05:
+        raise RuntimeError("GLB facade-orientation azimuth does not match its outward normal")
+    # Node converts glTF +Z north to Blender -Y and adds a fixed five-degree elevation.
+    elevation = math.radians(5.0)
+    expected_direction = [
+        normal["x"] * math.cos(elevation),
+        -normal["z"] * math.cos(elevation),
+        math.sin(elevation),
+    ]
+    if any(abs(direction[index] - expected_direction[index]) > 1e-5 for index in range(3)):
+        raise RuntimeError("Blender camera direction does not match the GLB facade normal")
+    method = opts["--front-facade-selection-method"]
+    confidence = opts["--front-facade-confidence"]
+    source = opts["--front-facade-source"]
+    coordinate_frame = opts["--front-facade-coordinate-frame"]
+    review_required_value = opts["--front-facade-review-required"].lower()
+    if method not in {"explicit-edge-index", "azimuth-nearest-edge", "longest-edge-inferred"}:
+        raise RuntimeError("GLB facade-orientation selection method is unsupported")
+    if confidence not in {"verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"}:
+        raise RuntimeError("GLB facade-orientation confidence is unsupported")
+    if not source or len(source) > 200 or coordinate_frame != "glTF-local:+X=east,+Y=up,+Z=north":
+        raise RuntimeError("GLB facade-orientation provenance or coordinate frame is invalid")
+    if review_required_value not in {"true", "false"}:
+        raise RuntimeError("GLB facade-orientation review-required flag must be boolean")
+    return {
+        "schemaVersion": "1.0.0",
+        "coordinateFrame": coordinate_frame,
+        "selectionMethod": method,
+        "edgeIndex": edge_index,
+        "actualAzimuthDegrees": azimuth,
+        "confidence": confidence,
+        "source": source,
+        "reviewRequired": review_required_value == "true",
+        "glbOutwardNormal": normal,
+        "blenderCameraDirection": direction,
+    }
+
+
 def main():
     opts = parse_args()
     model_path = os.path.abspath(opts["--model"])
@@ -290,6 +362,7 @@ def main():
     bpy.ops.import_scene.gltf(filepath=model_path)
     imported_meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
     review_profile, review_profile_evidence = read_review_profile(opts)
+    facade_orientation = read_facade_orientation(opts)
     profile_explicit = "--review-profile-json" in opts
     if profile_explicit:
         excluded_prefixes = review_profile["excludeNodeNamePrefixes"]
@@ -393,6 +466,9 @@ def main():
     ]
     if profile_explicit:
         views[0] = ("front", Vector((0.0, -math.cos(front_elevation), math.sin(front_elevation))), "ORTHO")
+    if facade_orientation:
+        views[0] = ("front", Vector(facade_orientation["blenderCameraDirection"]), "ORTHO")
+        front_view_framing = "front-facade-edge-" + str(facade_orientation["edgeIndex"]) + "-" + facade_orientation["confidence"]
     elevation = math.radians(22.0)
     for angle in range(0, 360, 45):
         azimuth = math.radians(angle)
@@ -497,6 +573,7 @@ def main():
         },
         "views": raw_views,
         "reviewProfile": review_profile_evidence,
+        "facadeOrientation": facade_orientation,
         "sourceCameraView": source_camera_view,
     }
     raw_path = os.path.join(output_dir, ".blender-render-manifest.raw.json")
