@@ -33,8 +33,10 @@ function hex(value, fallback, label) {
 export function coordinateToLocalMeters(point, origin) {
   const lat0 = origin.latitude * Math.PI / 180;
   return {
+    // glTF map-space is right-handed: +X east, +Y up, +Z south.
+    // Therefore northing is represented by negative model-space Z.
     x: (point[0] - origin.longitude) * Math.PI / 180 * EARTH_RADIUS_M * Math.cos(lat0),
-    z: (point[1] - origin.latitude) * Math.PI / 180 * EARTH_RADIUS_M
+    z: -(point[1] - origin.latitude) * Math.PI / 180 * EARTH_RADIUS_M
   };
 }
 function sourcesOf(value) {
@@ -123,10 +125,26 @@ export function normalizeBuildingSpec(raw) {
   const a = input.architecture === undefined ? {} : obj(input.architecture, "architecture");
   const roofType = (a.roofType || "flat").toLowerCase();
   if (!ROOFS.has(roofType)) throw new TypeError("unsupported roofType");
+  const frontFacadeEdgeIndex = a.frontFacadeEdgeIndex === undefined
+    ? undefined
+    : num(a.frontFacadeEdgeIndex, "frontFacadeEdgeIndex", 0, ring.length - 1);
+  if (frontFacadeEdgeIndex !== undefined && !Number.isInteger(frontFacadeEdgeIndex)) {
+    throw new RangeError("frontFacadeEdgeIndex must be an integer matching an outer footprint edge index");
+  }
+  const frontFacingAzimuthDegrees = a.frontFacingAzimuthDegrees === undefined || a.frontFacingAzimuthDegrees === null
+    ? null
+    : num(a.frontFacingAzimuthDegrees, "frontFacingAzimuthDegrees", 0, 360);
+  if (frontFacadeEdgeIndex !== undefined && frontFacingAzimuthDegrees !== null) {
+    throw new TypeError("specify either frontFacadeEdgeIndex or frontFacingAzimuthDegrees, not both");
+  }
   const balcony = a.balcony === undefined ? {} : obj(a.balcony, "balcony");
   const windows = a.windows === undefined ? {} : obj(a.windows, "windows");
   const dome = a.centralDome === undefined ? {} : obj(a.centralDome, "architecture.centralDome");
   const arcade = a.frontArcade === undefined ? {} : obj(a.frontArcade, "architecture.frontArcade");
+  const domeAnchor = dome.anchor === undefined ? "front-inset" : str(dome.anchor, "centralDome.anchor", 40).toLowerCase();
+  if (!["front-inset", "footprint-bounds-center"].includes(domeAnchor)) {
+    throw new TypeError("unsupported centralDome.anchor");
+  }
   const bool = (value, fallback, label) => {
     if (value === undefined) return fallback;
     if (typeof value !== "boolean") throw new TypeError(label + " must be boolean");
@@ -135,6 +153,8 @@ export function normalizeBuildingSpec(raw) {
   const architecture = {
     style: a.style === undefined ? "dhaka-residential-modern" : str(a.style, "style", 80),
     roofType,
+    ...(frontFacadeEdgeIndex === undefined ? {} : { frontFacadeEdgeIndex }),
+    frontFacingAzimuthDegrees,
     wallColor: hex(a.wallColor, "#D8D2C8", "wallColor"),
     roofColor: hex(a.roofColor, "#B5B8BC", "roofColor"),
     glassColor: hex(a.glassColor, "#536D86", "glassColor"),
@@ -155,6 +175,7 @@ export function normalizeBuildingSpec(raw) {
     },
     centralDome: {
       enabled: bool(dome.enabled, false, "centralDome.enabled"),
+      anchor: domeAnchor,
       radiusM: dome.radiusM === undefined ? 3.5 : num(dome.radiusM, "centralDome.radiusM", 1, 15),
       riseM: dome.riseM === undefined ? 4.5 : num(dome.riseM, "centralDome.riseM", 1, 20),
       drumHeightM: dome.drumHeightM === undefined ? 1.5 : num(dome.drumHeightM, "centralDome.drumHeightM", 0.5, 8),

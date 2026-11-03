@@ -99,6 +99,41 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
   }
   if (rawManifest.width !== resolution || rawManifest.height !== resolution) errors.push("render-manifest-resolution-mismatch");
 
+  const frontBearing = rawManifest.frontFacingAzimuthDegrees ?? null;
+  const modelCoordinateFrame = rawManifest.modelCoordinateFrame ?? null;
+  const expectedCoordinateFrame = "gltf-right-handed-x-east-y-up-z-south";
+  if (modelCoordinateFrame !== null && modelCoordinateFrame !== expectedCoordinateFrame) {
+    errors.push("render-model-coordinate-frame-invalid");
+  }
+  if (frontBearing !== null && modelCoordinateFrame !== expectedCoordinateFrame) {
+    errors.push("render-bearing-requires-right-handed-model-coordinate-frame");
+  }
+  const frontAxisSource = rawManifest.frontAxisSource ?? "renderer-default";
+  const frontAxisConfidence = rawManifest.frontAxisConfidence ?? "unknown";
+  const validFrontConfidence = new Set(["verified", "derived", "estimated", "ai-proposed", "unknown", "operator-specified"]);
+  const validFrontSources = new Set([
+    "buildingSpec.architecture.frontFacingAzimuthDegrees",
+    "buildingSpec.architecture.frontFacadeEdgeIndex",
+    "longest-edge-inferred",
+  ]);
+  if (frontBearing !== null &&
+      (!finite(frontBearing) || frontBearing < 0 || frontBearing > 360 ||
+       !validFrontSources.has(frontAxisSource) ||
+       !validFrontConfidence.has(frontAxisConfidence))) {
+    errors.push("render-front-bearing-metadata-invalid");
+  }
+  if (frontBearing === null &&
+      (frontAxisSource !== "renderer-default" || frontAxisConfidence !== "unknown")) {
+    errors.push("render-front-bearing-source-mismatch");
+  }
+  const effectiveFrontBearing = rawManifest.frontCameraEffectiveBearingDegrees ?? (frontBearing ?? 180);
+  if (!finite(effectiveFrontBearing) || effectiveFrontBearing < 0 || effectiveFrontBearing > 360 ||
+      (frontBearing !== null && Math.abs(effectiveFrontBearing - frontBearing) > 1e-6) ||
+      (frontBearing === null && frontAxisSource === "renderer-default" &&
+       Math.abs(effectiveFrontBearing - 180) > 1e-6)) {
+    errors.push("render-effective-front-bearing-mismatch");
+  }
+
   const status = errors.length ? "failed" : warnings.length ? "review-required" : "render-set-ready-for-human-review";
   return {
     schemaVersion: "1.0.0",
@@ -111,6 +146,11 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
     rendererVersion: rawManifest.rendererVersion ?? null,
     renderResolution: { width: resolution, height: resolution },
     sceneBounds: bounds ?? null,
+    frontFacingAzimuthDegrees: frontBearing,
+    modelCoordinateFrame,
+    frontCameraEffectiveBearingDegrees: effectiveFrontBearing,
+    frontAxisConfidence,
+    frontAxisSource,
     counts: { requiredViews: REQUIRED_REVIEW_VIEWS.length, generatedViews: views.length, errors: errors.length,
       warnings: warnings.length },
     views,
@@ -128,7 +168,7 @@ export function finalizeRenderReviewManifest({ rawManifest, modelSha256, files, 
       ],
     },
     limitations: [
-      "The front/back/left/right labels refer to Blender world axes after GLB import; the script cannot infer the real-world facade direction.",
+      "The front camera uses GLB frontFacingAzimuthDegrees metadata when present and otherwise uses a deterministic renderer default; neither establishes real-world orientation independently.",
       "Image statistics detect only a few technical risks and are not a visual similarity or architectural accuracy score.",
       "Render completion and a clean manifest do not establish metric scale, georeferencing, correct building identity, or source-photo correctness.",
       "Human review against independent source photographs remains required. publicationEligible is always false.",

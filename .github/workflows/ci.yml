@@ -600,8 +600,10 @@ jobs:
       - name: Test multi-building accuracy evidence pack integrity and fail-closed release policy
         run: npm run test:building-accuracy-evidence-pack
 
-      - name: Validate Blender render automation Python syntax
-        run: python3 -m py_compile scripts/blender/render-building-review.py scripts/blender/source_camera_camera.py scripts/blender/test-source-camera-projection.py scripts/blender/prepare-source-camera-fixture.py
+      - name: Validate Blender render automation Python syntax and camera-axis contract
+        run: |
+          python3 -m py_compile scripts/blender/render-building-review.py scripts/blender/source_camera_camera.py scripts/blender/test-source-camera-projection.py scripts/blender/prepare-source-camera-fixture.py
+          python3 tests/blender-camera-direction-policy.test.py
 
       - name: Test textured PLY conversion and COLMAP reconstruction worker contract
         run: npm run test:colmap-worker

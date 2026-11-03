@@ -81,3 +81,31 @@ test("terminates a stalled Blender process and never promotes its partial output
   assert.match(wrapper, /result\.error\.code === "ETIMEDOUT"/);
   assert.match(wrapper, /no render set is accepted/);
 });
+
+
+test("converts right-handed glTF map bearings into Blender's Z-up camera frame", () => {
+  assert.match(rendererSource, /DEFAULT_FRONT_BEARING_DEGREES = 180\.0/);
+  assert.match(rendererSource, /def camera_direction_from_bearing\(bearing_degrees, elevation_degrees=0\.0\):/);
+  assert.match(rendererSource, /math\.sin\(bearing\) \* horizontal,\s*math\.cos\(bearing\) \* horizontal,\s*math\.sin\(elevation\)/);
+  assert.match(rendererSource, /def build_review_view_directions\(/);
+  assert.match(rendererSource, /"top", \(0\.0, 0\.0, 1\.0\)/);
+  assert.match(rendererSource, /build_review_view_directions\(\s*front_azimuth,\s*front_elevation_degrees=front_elevation_degrees/);
+  assert.match(rendererSource, /camera_track_up_axis\(direction\)/);
+  assert.match(rendererSource, /to_track_quat\("-Z", camera_track_up_axis\(direction\)\)/);
+
+  assert.match(rendererSource, /"frontCameraEffectiveBearingDegrees": effective_front_bearing/);
+  assert.match(rendererSource, /coordinate_frame = building.get\("coordinateFrame"\)/);
+  assert.match(rendererSource, /GLB with a geographic front bearing must declare coordinateFrame/);
+  assert.match(rendererSource, /"modelCoordinateFrame": model_coordinate_frame/);
+  assert.match(rendererSource, /"frontFacingAzimuthDegrees": front_azimuth/);
+  assert.match(rendererSource, /"frontAxisConfidence": front_axis_confidence/);
+  assert.match(rendererSource, /confidence = building.get\("frontAxisConfidence", "unknown"\)/);
+  assert.match(rendererSource, /"frontAxisSource": front_axis_source/);
+  assert.match(rendererSource, /front_azimuth, front_axis_confidence, model_coordinate_frame, front_axis_source = read_front_facing_azimuth\(model_path\)/);
+  assert.match(rendererSource, /source = building.get\("frontAxisSource"\)/);
+  assert.doesNotMatch(rendererSource, /front_axis_source = "glb-extras\.frontFacingAzimuthDegrees"/);
+  assert.doesNotMatch(rendererSource, /Vector\(\(0\.0, 1\.0, 0\.0\)\), "ORTHO"\)/);
+  assert.match(rendererSource, /Vector\(\(1\.4, -1\.8, 2\.2\)\)/);
+  assert.match(rendererSource, /Vector\(\(-1\.8, -0\.3, 1\.0\)\)/);
+  assert.match(rendererSource, /Vector\(\(0\.3, 1\.7, 1\.5\)\)/);
+});
