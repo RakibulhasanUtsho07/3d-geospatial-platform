@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
-import { lstat, readFile, stat } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
