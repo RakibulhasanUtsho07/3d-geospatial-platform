@@ -1,6 +1,6 @@
 # D3M-ENGINE-01 — BRF-01–04 Current-Main Integration
 
-**Status:** implementation assembled; exact-head validation and artifact inspection pending  
+**Status:** implementation assembled; exact-head validation rerun pending; prior-head render artifact inspected; human review pending  
 **Latest test repair:** profile unit fixture is now self-contained; rerun required on final commit  
 **Base:** `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`  
 **Branch:** `feat/d3m-engine-01-brf-evidence-20261103`  
@@ -58,3 +58,25 @@ It also includes the new feature branch in its push trigger. A separate `generic
 This package establishes reusable software contracts and synthetic regression behavior. It does **not** demonstrate a real COLMAP/TripoSR reconstruction, measured architectural accuracy, survey-backed dimensions, correct WGS84 placement or a production worker. Do not claim a 90% score from these tests.
 
 `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady`, `automaticApproval` and `dispatchAllowed` remain fail-closed. Do not promote the branch until Full CI and the dedicated Blender renderer workflow pass on the same final head and generated render/manifest artifacts are inspected.
+
+
+## Renderer artifact inspection — 2026-11-03
+
+Prior candidate head `a2ec3bed001f64ce15996b535112c9e7b0d3c8f8` completed Full CI and the dedicated Blender smoke workflow:
+
+- Full CI run [#41623370524](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41623370524): passed.
+- Blender smoke run [#41623370467](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41623370467): passed; artifact [d3m-engine-01-generic-renderer-review-packet](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41623370467/artifacts/13224747915).
+- Artifact ZIP SHA-256: `bd022af54ed5a8a7337a7ec1bdd4d5f9ee3c14c783f97485f1aa9badc4ed6f41`.
+- The ZIP contains the synthetic `demo.glb`, two render directories, two manifests and 26 PNG views (13 per render set).
+- Both manifests report 13/13 views, zero render errors and warnings, and `publicationEligible: false`.
+- Both manifests bind the same GLB SHA-256: `a641b52b4981bb9448b0f4e235a240be9c9d9ae4f0a8e77a8a955aaa526bd1fa`. The explicit profile records `generic-whole-model-explicit-v1` and SHA-256 `998eb07d7c228ce4203b9dd9f0beacfad7369df2d6a2b1274a26e45ea2d10c3e`.
+- The synthetic model has 7 meshes/materials and no texture images or UV accessors. Texture QA is therefore `review-recommended`; all five human-review checklist items remain unchecked.
+- Imported model dimensions are 13.7459 × 10.2231 × 16.05 model units and explicitly unverified. The renderer cannot infer real facade compass direction, metric scale, georeferencing or building identity.
+
+The PNG montage was visually inspected. It is a simple synthetic rectangular building and demonstrates multi-view rendering only. No real-building similarity or architecture score was assigned.
+
+## Follow-up validation repair
+
+A manual `workflow_dispatch` run exposed an event-provenance assertion that only accepted `push` and `pull_request`. The browser evidence test now also accepts `workflow_dispatch`, while still requiring a non-empty supported event name and the source/workflow commit hashes. This is a test-only compatibility repair; exact-head PR CI, P3.6 browser workflow and renderer smoke have been triggered again for the updated head `739778056c543696ee46a9c855e013f046b5e343`.
+
+Do not treat the prior-head artifact as final-head evidence. Re-inspect the new smoke artifact and retain all release flags as false until independent human review and real-building validation are complete.
