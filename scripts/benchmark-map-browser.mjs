@@ -142,7 +142,9 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
     if (normalized === outputPath || normalized.startsWith(outputPath + "/")) return false;
     return !isExactGeneratedCesiumAsset(normalized, root);
   });
-}async function hashFile(relativePath) {
+}
+
+async function hashFile(relativePath) {
   const absolutePath = path.isAbsolute(relativePath)
     ? relativePath
     : path.resolve(projectRoot, relativePath);
