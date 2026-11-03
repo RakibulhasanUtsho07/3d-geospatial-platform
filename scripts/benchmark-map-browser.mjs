@@ -96,9 +96,9 @@ export function getWorkingTreeDirty(outputDirectory, rootDirectory = projectRoot
   if (status === null) return null;
   if (!isSafeRelativeOutput) return status.length > 0;
 
-  const outputPath = relativeOutput.split(path.sep).join("/").replace(/\\/$/, "");
+  const outputPath = relativeOutput.split(path.sep).join("/");
   const changedPaths = [];
-  const records = status.split("\\0").filter(Boolean);
+  const records = status.split("\0").filter(Boolean);
   for (let index = 0; index < records.length; index += 1) {
     const record = records[index];
     const statusCode = record.slice(0, 2);
