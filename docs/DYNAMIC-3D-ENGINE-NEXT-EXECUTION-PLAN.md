@@ -362,26 +362,26 @@ The comparison counts above describe divergent history from each merge base; the
 - Separate manual workflow_dispatch CI run #41604663810 and P3.6 browser run #41604666326 failed because the lifecycle evidence test accepted only `push` / `pull_request` even though the repository supports manual `workflow_dispatch`. The failure occurs at the event-name assertion, after the browser lifecycle report itself is produced. This is not a PR-triggered BRF-04 failure; the cross-event contract is tracked separately in PR #341.
 - PR #339 remains Draft/unmerged pending review. Its synthetic checks do not prove real-building fidelity or survey accuracy.
 
-### NEXT-03 — explicit facade selection, compass orientation and dome anchor
+### NEXT-03 — explicit facade selection, right-handed glTF map frame and Blender review orientation
 
-- Current-main gap: entrance selection fell back to the longest footprint edge; facade normals/insert positions needed winding-aware, facade-local coordinates. GLB/review-rendering had no shared model-front bearing contract. Central domes only supported front-inset placement.
-- Historical sources: facade-local insert placement in stale PR #103; compass front-bearing and dome-bounds-anchor changes in stale PR #185. Neither old PR was merged.
+- Current-main gaps: procedural entrance selection used longest-edge inference only; facade insert placement needed winding-aware local coordinates; GLB/render review lacked one shared geospatial front-bearing and coordinate-frame contract.
+- Historical sources: facade-local insertion from stale PR #103; compass bearing and dome bounds-center policy from stale PR #185. Neither old PR was merged.
 - Clean branch: `feat/explicit-front-facade-and-insert-clearance-main-20261103`, based on `main@ff5f2fed0182e8551f4f77d2ad84178a1906f7ee`.
 - Draft PR #340: https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/340
-- Current head: `6e7bc90eaa9937d7f5fab705f01bbfb841b1683f`; 28 commits ahead / 0 behind, 11 changed paths. The commit count includes successive isolated file updates on this feature branch.
-- Adds validated, mutually exclusive `architecture.frontFacadeEdgeIndex` and `architecture.frontFacingAzimuthDegrees` selectors. Compass bearing is clockwise from north in `x=east,y=up,z=north`; nearest outward footprint edge is selected. A deviation greater than 15 degrees warns and remains review-required.
-- Carries orientation confidence/source through generator report, GLB extras, Blender five-view camera selection and final render-review manifest. If supplied orientation evidence conflicts with the configured selector, confidence becomes `unknown` and review is required.
-- Keeps winding-aware facade-local tangent/normal placement, 2 mm insert clearance and tangent-aligned jamb offsets.
-- Adds central dome anchors: backward-compatible `front-inset` or `footprint-bounds-center`. Report records the selected policy, model-space center and evidence confidence.
-- Bangabhaban's 180-degree south-facing direction and center-anchored dome are explicitly recorded as **estimated** from reference imagery, not surveyed or verified.
-- Tests cover selector ambiguity, invalid bearing/anchor, conflicting evidence, GLB metadata, dome bounds center, render-manifest provenance and renderer legacy fallback.
-- Previous facade-only exact-head CI #41605913082 passed, but it predates the expanded compass/dome/render path and is not acceptance evidence for the current changes.
-- Expanded CI #41608904987 failed at one outdated deep-equality test assertion in the existing facade-selection test. The actual selected-edge/door geometry path passed up to that assertion; the report now adds new metadata fields.
-- The test assertion was updated to check stable report fields while permitting report extension. Run #41609196223 then revealed one more brittle source-comment assertion in `tests/heritage-model.test.mjs`; generator, manifest, Blender syntax, Dhaka tiles and placement tests had passed.
-- Replaced the brittle phrase check with behavior assertions: Rangmahal mesh filtering is confined to front-detail view; all other views preserve whole-model context.
-- Current exact head: `2cade9a10552bb3a1f5dbb1c0fe2cd8b1e159dc4`.
-- Exact-head Full CI #41609731172: BuildingSpec/generator #17 passed, render manifest #117 passed, Blender Python syntax #132 passed, Dhaka tiles generation/placement #155–156 passed, heritage GLB/parameter/map test #187 passed, production build #191 passed, Chromium install #192 passed. At latest refresh only production-server viewport/browser verification #193 was still running, with no failures. No terminal Full CI pass is claimed until run #41609731172 completes.
-- Keep PR #340 Draft until exact-head Full CI and focused generator/render tests pass, followed by code/geometry review. Do not merge automatically.
+- Current exact head: `21da6caca6119862400dcad45d2f3e5fd697516d`; compare is 57 commits ahead / 0 behind, 16 changed paths. The displayed commit count includes several isolated incremental updates on this feature branch.
+- Adds mutually exclusive `architecture.frontFacadeEdgeIndex` and `architecture.frontFacingAzimuthDegrees`; selects the nearest outward footprint normal, warns and keeps review-required if alignment is beyond 15 degrees. Evidence conflicts downgrade orientation confidence to `unknown`.
+- Adds central dome anchors `front-inset` and `footprint-bounds-center`; retains center and evidence confidence. Bangabhaban's 180-degree front and bounds-centered dome remain **estimated**, never promoted to surveyed truth.
+- Maintains winding-aware facade-local tangent/normal placement, 2 mm inner-face clearance and jamb offsets along facade tangent.
+- Coordinate contract now uses a right-handed geospatial glTF frame: `+X=east, +Y=up, +Z=south, -Z=north`. Longitude east maps to positive local X; latitude north maps to negative local Z. Compass bearing (b) is encoded across X/Z as `(sin(b), -cos(b))`.
+- Blender's glTF importer mapping converts `(x,y,z)` to Blender world `(x,-z,y)`: `X=east, Y=north, Z=up`. Review cameras, top-view roll and lighting now follow that frame; missing GLB bearing uses deterministic south-facing 180-degree camera direction but retains `renderer-default/unknown` provenance.
+- Renderer rejects a GLB that supplies geographic bearing without `coordinateFrame=gltf-right-handed-x-east-y-up-z-south`; final manifest separately rejects frame/bearing mismatch and preserves the frame.
+- Added numeric cardinal/elevation/turntable camera tests, right-handed east/north footprint conversion tests, GLB frame assertions, render-manifest mismatch tests, renderer and heritage regression checks.
+- Exact-head Full CI before the coordinate migration: #41609731172 passed on old head `2cade9a...`. This is not acceptance evidence for the migrated frame.
+- Exact-head CI #41614929630 is running on current head `21da6c...`. At last refresh, generator #17, render manifest #117, Python syntax + numeric camera-axis policy #132, heritage suite #187, production build #191 and Chromium install #192 all passed; production-server viewport verification #193 remained in progress, with no failed steps. Do not count it as terminal Full CI success yet.
+- Bangabhaban regeneration attempt #41614461850 rendered all 13 views, built its contact sheet, validated the final render manifest and uploaded a 15.98 MB evidence artifact. Its final commit-back step #12 failed because that run checked out stale head `3a805a...` while the remote branch had advanced to `21da6c...`; GitHub rejected the non-fast-forward push.
+- Intermediate regeneration run #41614888112 failed step #5 due an outdated render-manifest fixture that lacked the new model coordinate-frame field. That fixture has since been updated; current-head render manifest test #117 passed. Neither failed run updated the tracked GLB/report.
+- The tracked Bangabhaban candidate GLB/report therefore remains stale until a fresh regeneration run checks out current head, passes all 13 renders/manifest checks, and commits both files. Verify branch HEAD and generated model/report SHA before declaring it updated.
+- PR #340 stays Draft. No merge, real-building accuracy claim, publication or automatic-approval gate promotion.
 
 ### NEXT-04 — workflow_dispatch evidence event provenance
 
@@ -414,7 +414,8 @@ The comparison counts above describe divergent history from each merge base; the
 - Acceptance: profile schema tests (unknown keys, wildcards, duplicates, include/exclude conflict, invalid elevation, missing selected mesh), deterministic profile hash, Blender receives the exact preflight hash, raw/final manifest records profile metadata, generic synthetic GLB produces 13 views in real Blender smoke, and explicit Rangmahal profile produces a focused front view without changing the GLB.
 - Do not start the implementation until current PR #340 exact-head CI #41609196223 is terminal and reviewed. Then create a dependent PR based on the reviewed #340 branch or first integrate #340; avoid a second clean-main PR that conflicts on the same renderer/manifest files.
 
-**Immediate next action:** monitor PR #340 run #41609196223 and inspect exact-head BuildingSpec/generator, render-manifest, heritage and Full CI steps. If a new failure appears, fix only the reproducible cause and rerun exact-head validation. If it passes, keep #340 Draft for review and begin NEXT-06 profile design/port with the orientation metadata preserved. Separately obtain an operator-run manual `workflow_dispatch` retest for PR #341. P3.4 target-device/deployment review and WP-02 real worker-host smoke remain externally blocked; do not simulate them.
+**Immediate next action:** first refresh CI #41614929630 and ensure production viewport verification #193 reaches terminal success. Then make one small workflow validation update on the PR #340 branch that checks the generated model report's coordinateFrame, the renderer manifest's modelCoordinateFrame and effective/front bearing agree; this will trigger a fresh Bangabhaban regeneration on the current branch head. Verify all 13 views, manifest and licensed reference, then verify that the workflow's commit-back step advances the feature branch with both generated GLB and report. Refresh exact-head CI after the generated commit, and update this plan with the final SHA and artifact hash. Keep PR #340 Draft pending code/geometry review. Only after that, continue NEXT-06 generic profile-driven Blender renderer work. PR #341's manual `workflow_dispatch` retest still needs an operator; P3.4 target-device/deployment review and WP-02 real worker-host smoke remain external blockers.
+
 
 
 
