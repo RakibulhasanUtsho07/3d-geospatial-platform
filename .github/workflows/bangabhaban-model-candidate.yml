@@ -3,10 +3,16 @@ on:
   push:
     branches:
       - rakibul-hasan
+      - feat/explicit-front-facade-and-insert-clearance-main-20261103
     paths:
       - ".github/workflows/bangabhaban-model-candidate.yml"
       - "src/core/building-generation/building-spec.mjs"
       - "src/core/building-generation/procedural-glb.mjs"
+      - "src/core/building-generation/facade-placement.mjs"
+      - "src/core/building-generation/render-review-manifest.mjs"
+      - "scripts/blender/render-building-review.py"
+      - "scripts/render-building-review-views.mjs"
+      - "tests/blender-camera-direction-policy.test.py"
       - "scripts/build-bangabhaban-model-candidate.mjs"
       - "data/heritage/bangabhaban-building-spec.json"
       - "tests/bangabhaban-generation.test.mjs"
@@ -29,8 +35,10 @@ jobs:
           node-version: 24
       - name: Generate model through the repository engine
         run: node scripts/build-bangabhaban-model-candidate.mjs
-      - name: Validate model and candidate gates
-        run: node --test tests/bangabhaban-generation.test.mjs tests/glb-geometry-qa.test.mjs
+      - name: Validate model, coordinate frame and candidate gates
+        run: |
+          node --test tests/bangabhaban-generation.test.mjs tests/building-generation-engine.test.mjs tests/glb-geometry-qa.test.mjs tests/render-review-manifest.test.mjs tests/render-building-review-renderer.test.mjs
+          python3 tests/blender-camera-direction-policy.test.py
       - name: Install Blender and contact-sheet dependencies
         run: |
           sudo apt-get update -qq
