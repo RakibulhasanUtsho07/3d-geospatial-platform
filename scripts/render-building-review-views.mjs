@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { finalizeRenderReviewManifest } from "../src/core/building-generation/render-review-manifest.mjs";
+import { validateRenderReviewProfile } from "../src/core/building-generation/render-review-profile.mjs";
 import { parseRenderOptions } from "../src/core/building-generation/render-review-options.mjs";
 import {
   assessSourceCameraForRender,
@@ -77,6 +78,7 @@ async function main() {
     if (value !== null && !value.trim()) throw new Error("--" + name + " cannot be empty");
     return value;
   };
+  const reviewProfilePathArg = singleFlag("review-profile");
   const sourceCameraPathArg = singleFlag("source-camera");
   const sourceImagePathArg = singleFlag("source-image");
   const calibrationEvidencePathArg = singleFlag("calibration-evidence");
@@ -85,7 +87,7 @@ async function main() {
   if (cameraInputs.some(Boolean) && !cameraInputs.every(Boolean)) {
     throw new Error("--source-camera, --source-image, --calibration-evidence and --frame-alignment-evidence must be supplied together");
   }
-  const cameraFlags = ["--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
+  const cameraFlags = ["--review-profile=", "--source-camera=", "--source-image=", "--calibration-evidence=", "--frame-alignment-evidence="];
   const flags = allFlags.filter((flag) => !cameraFlags.some((prefix) => flag.startsWith(prefix)));
   const { resolution, blender, timeoutMs } = parseRenderOptions(flags);
   const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -134,6 +136,30 @@ async function main() {
       console.error("Source-camera pair is not comparable: " + sourceCameraAssessment.errors.join(", "));
     }
   }
+
+  let reviewProfileAssessment = {
+    profileId: "generic-whole-model-v1",
+    source: "built-in-default",
+    sha256: null,
+  };
+  let reviewProfilePath = null;
+  if (reviewProfilePathArg) {
+    reviewProfilePath = path.resolve(reviewProfilePathArg);
+    const profileBytes = await readFile(reviewProfilePath);
+    let profileInput;
+    try {
+      profileInput = JSON.parse(profileBytes.toString("utf8"));
+    } catch (error) {
+      throw new TypeError("review-profile JSON is invalid: " + (error instanceof Error ? error.message : String(error)));
+    }
+    const validatedProfile = validateRenderReviewProfile(profileInput);
+    reviewProfileAssessment = {
+      profileId: validatedProfile.profileId,
+      source: "explicit-file",
+      sha256: sha256(profileBytes),
+    };
+  }
+
   await mkdir(outputDir, { recursive: false });
 
   let textureQaSummary = null;
@@ -152,6 +178,10 @@ async function main() {
       "--background", "--factory-startup", "--python-exit-code", "17",
       "--python", pythonScript, "--",
       "--model", modelPath, "--output-dir", outputDir, "--resolution", String(resolution),
+    ];
+    if (reviewProfilePath && reviewProfileAssessment?.sha256) {
+      args.push("--review-profile-json", reviewProfilePath, "--review-profile-sha256", reviewProfileAssessment.sha256);
+    }
     ];
     if (sourceCameraAssessment?.sameCameraComparable && sourceCameraPath) {
       args.push("--source-camera-json", sourceCameraPath, "--source-camera-module-dir", path.join(scriptDirectory, "blender"));
@@ -182,6 +212,10 @@ async function main() {
       const bytes = await readFile(imagePath);
       const dimensions = pngDimensions(bytes, view.filename);
       fileMetadata[view.filename] = { ...dimensions, bytes: bytes.length, sha256: sha256(bytes) };
+    }
+    if (reviewProfileAssessment?.source === "explicit-file" &&
+        raw.reviewProfile?.sha256 !== reviewProfileAssessment.sha256) {
+      throw new Error("Blender render manifest review-profile digest does not match the preflight profile bytes");
     }
     const report = finalizeRenderReviewManifest({
       rawManifest: raw,
