@@ -248,3 +248,16 @@ export async function assertStableBuildingReviewPackageVerificationWindow({
     signatureSnapshot: initialSignatureSnapshot,
   };
 }
+
+
+/**
+ * Reads an explicitly supplied legacy verification public key without
+ * following a final-component symlink and with descriptor/path identity checks.
+ * Private keys are never accepted by this verifier-side helper.
+ */
+export async function readStableBuildingReviewPackageLegacyPublicKey(filePath) {
+  if (typeof filePath !== "string" || !filePath.trim()) {
+    throw new TypeError("Legacy trusted public-key file path is required.");
+  }
+  return readStableRegularFile(path.resolve(filePath), "legacy-public-key", 16 * 1024);
+}

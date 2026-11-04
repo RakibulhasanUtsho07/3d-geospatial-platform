@@ -8,6 +8,7 @@ import {
   assertStableBuildingReviewPackageVerificationWindow,
   readBuildingReviewPackageDirectory,
   readBuildingReviewPackageControlFile,
+  readStableBuildingReviewPackageLegacyPublicKey,
   sameBuildingReviewPackageControlFile,
   sameBuildingReviewPackageSnapshot,
 } from "../src/core/building-generation/building-review-package-directory.mjs";
@@ -224,4 +225,34 @@ test("verification-window guard rejects signature content or metadata mutation",
     }),
     /review-package-signature-envelope-changed-during-verification/,
   );
+});
+
+
+test("legacy public-key reader rejects symlinks and oversized key files", async (t) => {
+  const { parent } = await tempPackage(t);
+  const keyPath = path.join(parent, "legacy-public.pem");
+  const external = path.join(parent, "external.pem");
+  await writeFile(external, "-----BEGIN PUBLIC KEY-----\\nfixture\\n-----END PUBLIC KEY-----\\n");
+  await symlink(external, keyPath);
+  await assert.rejects(
+    readStableBuildingReviewPackageLegacyPublicKey(keyPath),
+    /review-package-symlink-not-allowed/,
+  );
+
+  await rm(keyPath);
+  await writeFile(keyPath, Buffer.alloc(16 * 1024 + 1, 0x41));
+  await assert.rejects(
+    readStableBuildingReviewPackageLegacyPublicKey(keyPath),
+    /file-exceeds-size-limit/,
+  );
+});
+
+test("legacy public-key reader returns the exact stable bytes and descriptor identity", async (t) => {
+  const { parent } = await tempPackage(t);
+  const keyPath = path.join(parent, "legacy-public.pem");
+  const bytes = Buffer.from("-----BEGIN PUBLIC KEY-----\\nsynthetic-test-key\\n-----END PUBLIC KEY-----\\n");
+  await writeFile(keyPath, bytes, { mode: 0o600 });
+  const snapshot = await readStableBuildingReviewPackageLegacyPublicKey(keyPath);
+  assert.deepEqual(snapshot.bytes, bytes);
+  assert.equal(snapshot.stat.isFile(), true);
 });

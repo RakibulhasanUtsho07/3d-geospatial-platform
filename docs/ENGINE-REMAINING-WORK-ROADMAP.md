@@ -526,3 +526,6 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 
 
 - Added an injectable deterministic verification-window guard and tests proving unchanged observations pass while package snapshot drift or signature bytes/metadata drift fail closed. This tests the exact serial observation contract without relying on timing-sensitive background file mutation.
+
+
+- Extended stable filesystem reads to the explicitly supplied legacy v1 trusted public-key PEM. The verifier now uses descriptor-pinned no-follow reads, compares descriptor/path identity and bounds the file to 16 KiB; added symlink, oversize and exact-byte tests.

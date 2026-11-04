@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   verifyBuildingReviewPackageSignature,
@@ -9,24 +9,10 @@ import {
   readBuildingReviewPackageDirectory,
   verifyBuildingReviewPackageDirectory,
   readBuildingReviewPackageControlFile,
+  readStableBuildingReviewPackageLegacyPublicKey,
 } from "../src/core/building-generation/building-review-package-directory.mjs";
 
 const REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
-
-async function regularFile(filePath, label) {
-  const details = await lstat(filePath);
-  if (!details.isFile() || details.isSymbolicLink()) throw new Error(label + " must be a regular file, not a symlink");
-  const bytes = await readFile(filePath);
-  if (bytes.length === 0) throw new Error(label + " must not be empty");
-  const after = await lstat(filePath);
-  if (!after.isFile() || after.isSymbolicLink() ||
-      details.dev !== after.dev || details.ino !== after.ino ||
-      details.size !== after.size || details.mtimeMs !== after.mtimeMs ||
-      details.ctimeMs !== after.ctimeMs) {
-    throw new Error(label + " changed while it was being read");
-  }
-  return bytes;
-}
 
 function parseArguments(args) {
   const positional = [];
@@ -86,7 +72,8 @@ async function main() {
     });
   } else if (signatureEnvelope.schemaVersion === "1.0.0") {
     if (!legacyPublicKeyPath) throw new Error("legacy-v1-signature-requires-explicit---legacy-public-key");
-    const publicKeyBytes = await regularFile(legacyPublicKeyPath, "Legacy trusted public key");
+    const publicKeySnapshot = await readStableBuildingReviewPackageLegacyPublicKey(legacyPublicKeyPath);
+    const publicKeyBytes = publicKeySnapshot.bytes;
     signature = verifyBuildingReviewPackageSignature({
       manifestBytes: snapshot.packageManifestBytes,
       signatureEnvelope,

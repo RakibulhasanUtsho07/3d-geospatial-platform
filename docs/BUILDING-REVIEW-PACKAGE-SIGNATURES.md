@@ -84,3 +84,6 @@ After cryptographic verification, the verifier serially takes two additional pac
 
 
 The verification-window guard is covered with deterministic serial-reader tests: an unchanged package/signature succeeds; package snapshot drift and signature byte/metadata drift fail closed. These unit tests complement the end-to-end CLI test with a real materialized signed package and subsequent artifact tampering.
+
+
+Legacy v1 combined verification also reads the explicitly supplied trusted public-key PEM through the descriptor-pinned no-follow reader. The PEM input is bounded to 16 KiB and checked for stable identity before and after reading; a final-component symlink is rejected.
