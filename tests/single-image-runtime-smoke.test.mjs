@@ -197,11 +197,8 @@ async function fakeWorkflowResult(options, root, source, {
   await writeFile(absoluteModelPath, glb);
 
   const outputHash = hash(glb);
-  return {
-    workflowDir: path.dirname(absoluteModelPath),
-    modelPath: absoluteModelPath,
-    reportPath: path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow", "workflow-report.json"),
-    report: {
+  const reportPath = path.join(root, ".building-engine", "jobs", fixture.id, "smoke-job-workflow", "workflow-report.json");
+  const report = {
       jobId: "smoke-job",
       buildingId: fixture.id,
       status: "completed-requires-review",
@@ -241,7 +238,13 @@ async function fakeWorkflowResult(options, root, source, {
       },
       mapReady: false,
       publicationEligible: false,
-    },
+  };
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\\n");
+  return {
+    workflowDir: path.dirname(absoluteModelPath),
+    modelPath: absoluteModelPath,
+    reportPath,
+    report,
   };
 }
 
@@ -453,6 +456,45 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
   assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
   assert.equal(verified.sourceImageLoadEvidenceStatus, "verified-against-source-manifest");
+  assert.equal(verified.generationArtifactReceiptStatus, "verified");
+  assert.equal(verified.generationArtifactReceipt.sha256, result.report.generationArtifactReceipt.sha256);
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receiptBytes = await readFile(receiptPath);
+  const receiptStat = await stat(receiptPath);
+  if (process.platform !== "win32") assert.equal(receiptStat.mode & 0o777, 0o600);
+  const receiptEnvelope = JSON.parse(receiptBytes.toString("utf8"));
+  assert.equal(receiptEnvelope.payload.kind, "single-image-generation-artifact");
+  assert.equal(receiptEnvelope.payload.source.sha256, source.sha256);
+  assert.equal(receiptEnvelope.payload.output.sha256, result.report.output.sha256);
+  assert.equal(receiptEnvelope.payload.workflowReport.sha256, hash(await readFile(
+    path.join(root, ...receiptEnvelope.payload.workflowReport.path.split("/")),
+  )));
+  assert.equal(JSON.stringify(receiptEnvelope).includes(root), false);
+
+  const workflowReportPath = path.join(root, ...receiptEnvelope.payload.workflowReport.path.split("/"));
+  const workflowReportBytes = await readFile(workflowReportPath);
+  const tamperedWorkflowReport = JSON.parse(workflowReportBytes.toString("utf8"));
+  tamperedWorkflowReport.warnings.push("post-receipt tamper");
+  await writeFile(workflowReportPath, JSON.stringify(tamperedWorkflowReport, null, 2) + "\\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /workflow report byte count or SHA-256/i,
+  );
+  await writeFile(workflowReportPath, workflowReportBytes);
+
+  await writeFile(receiptPath, Buffer.concat([receiptBytes, Buffer.from(" ")]));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /receipt byte count or SHA-256/i,
+  );
+  await writeFile(receiptPath, receiptBytes);
+
+  const legacyReport = { ...result.report, schemaVersion: "1.3.0" };
+  delete legacyReport.generationArtifactReceipt;
+  await writeFile(result.reportPath, JSON.stringify(legacyReport, null, 2) + "\\n");
+  const legacyVerified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(legacyVerified.generationArtifactReceiptStatus, "not-recorded-legacy-schema");
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\\n");
 
   const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
