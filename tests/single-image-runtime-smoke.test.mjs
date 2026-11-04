@@ -239,7 +239,7 @@ async function fakeWorkflowResult(options, root, source, {
       mapReady: false,
       publicationEligible: false,
   };
-  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\\n");
+  await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   return {
     workflowDir: path.dirname(absoluteModelPath),
     modelPath: absoluteModelPath,
@@ -475,7 +475,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   const workflowReportBytes = await readFile(workflowReportPath);
   const tamperedWorkflowReport = JSON.parse(workflowReportBytes.toString("utf8"));
   tamperedWorkflowReport.warnings.push("post-receipt tamper");
-  await writeFile(workflowReportPath, JSON.stringify(tamperedWorkflowReport, null, 2) + "\\n");
+  await writeFile(workflowReportPath, JSON.stringify(tamperedWorkflowReport, null, 2) + "\n");
   await assert.rejects(
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /workflow report byte count or SHA-256/i,
@@ -491,10 +491,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
 
   const legacyReport = { ...result.report, schemaVersion: "1.3.0" };
   delete legacyReport.generationArtifactReceipt;
-  await writeFile(result.reportPath, JSON.stringify(legacyReport, null, 2) + "\\n");
+  await writeFile(result.reportPath, JSON.stringify(legacyReport, null, 2) + "\n");
   const legacyVerified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
   assert.equal(legacyVerified.generationArtifactReceiptStatus, "not-recorded-legacy-schema");
-  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\\n");
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
 
   const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
