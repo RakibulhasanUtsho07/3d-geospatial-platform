@@ -124,6 +124,49 @@ function buildVersionId(modelId, candidateHash, placement, evidenceHash, reviewe
   return createHash("sha256").update(stable).digest("hex").slice(0, 16);
 }
 
+const REVIEWER_AUTHENTICATION_FIELDS = Object.freeze([
+  "scheme",
+  "reviewerId",
+  "keyId",
+  "registryId",
+  "reviewedAtUtc",
+  "publicKeyFingerprintSha256",
+  "signatureSha256",
+  "signedPayloadSha256",
+  "signedReviewReceiptSha256",
+]);
+
+function validateReviewerAuthentication(authentication, review) {
+  if (!authentication || typeof authentication !== "object" || Array.isArray(authentication)) {
+    throw new TypeError("A verified Ed25519 reviewer authentication record is required for every catalog publication.");
+  }
+  const keys = Object.keys(authentication);
+  if (keys.length !== REVIEWER_AUTHENTICATION_FIELDS.length ||
+      REVIEWER_AUTHENTICATION_FIELDS.some((key) => !Object.prototype.hasOwnProperty.call(authentication, key)) ||
+      keys.some((key) => !REVIEWER_AUTHENTICATION_FIELDS.includes(key))) {
+    throw new TypeError("Verified reviewer authentication must contain exactly the documented provenance fields.");
+  }
+  if (authentication.scheme !== "Ed25519" ||
+      authentication.reviewerId !== review.reviewer.trim() ||
+      authentication.reviewedAtUtc !== review.reviewedAt ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.reviewerId ?? "") ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.keyId ?? "") ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.registryId ?? "") ||
+      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(authentication.reviewedAtUtc ?? "")) {
+    throw new TypeError("Verified reviewer authentication does not match the attested reviewer and canonical review timestamp.");
+  }
+  for (const field of [
+    "publicKeyFingerprintSha256",
+    "signatureSha256",
+    "signedPayloadSha256",
+    "signedReviewReceiptSha256",
+  ]) {
+    if (typeof authentication[field] !== "string" || !HASH_PATTERN.test(authentication[field])) {
+      throw new TypeError("Verified reviewer authentication " + field + " must be a lowercase SHA-256 hash.");
+    }
+  }
+}
+
 async function resolveWorkspaceFile(root, relativePath, label, allowAbsolute = false) {
   if (!allowAbsolute || !path.isAbsolute(relativePath)) {
     assertSafeRelativePath(relativePath, label);
@@ -255,6 +298,7 @@ export async function publishReviewedBuildingModel({
   }
   if (!isRecord(attestation.review)) throw new TypeError("Attestation review is required.");
   validateReview(attestation.review, "attestation", { requireEvidencePath: true });
+  validateReviewerAuthentication(reviewerAuthentication, attestation.review);
   const evidence = await resolveWorkspaceFile(root, attestation.review.evidencePath, "review evidence");
   const evidenceHash = sha256(await readFile(evidence.real));
   if (evidenceHash !== attestation.review.evidenceSha256.toLowerCase()) {
@@ -352,7 +396,7 @@ export async function publishReviewedBuildingModel({
       evidenceSha256: evidenceHash,
       checks: Object.fromEntries(REQUIRED_REVIEW_CHECKS.map((key) => [key, true])),
       notes: attestation.review.notes.trim(),
-      ...(reviewerAuthentication ? { authentication: { ...reviewerAuthentication } } : {}),
+      authentication: { ...reviewerAuthentication },
     },
   };
 
