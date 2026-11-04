@@ -134,7 +134,7 @@ export function buildBuildingReviewPackageManifest({
       ? singleImageEvidence.verticalDatum === "EPSG:4979-ellipsoidal" &&
         singleImageEvidence.verticalStatus === "calibrated-needs-human-review" &&
         isHash(singleImageEvidence.verticalEvidenceSha256) &&
-        /^WGS 84 \\([A-Za-z0-9._ -]{1,40}\\)$/.test(singleImageEvidence.verticalReferenceFrame ?? "") &&
+        /^WGS 84 \([A-Za-z0-9._ -]{1,40}\)$/.test(singleImageEvidence.verticalReferenceFrame ?? "") &&
         Number.isFinite(singleImageEvidence.verticalCoordinateEpoch) &&
         singleImageEvidence.verticalCoordinateEpoch >= 1980 && singleImageEvidence.verticalCoordinateEpoch <= 2100 &&
         Number.isFinite(singleImageEvidence.verticalHeightOffsetM) &&
