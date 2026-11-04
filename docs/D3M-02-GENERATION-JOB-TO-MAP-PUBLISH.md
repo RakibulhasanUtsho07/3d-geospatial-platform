@@ -82,10 +82,7 @@ The review API's bearer token authorizes the request to record a review; the cal
 After the immutable review record is written, the trusted reviewer signs it locally:
 
 ```powershell
-npm run sign:approved-generation-job-publication-review -- `\
-  "D:\\BuildingEngineWorkspace" "<job-id>" `\
-  --private-key "D:\\ReviewerKeys\\<reviewer-id>-ed25519-private.pem" `\
-  --out "D:\\BuildingEngineWorkspace\\signed-generation-publication-review.json"
+npm run sign:approved-generation-job-publication-review -- "D:\BuildingEngineWorkspace" "<job-id>" --private-key "D:\ReviewerKeys\<reviewer-id>-ed25519-private.pem" --out "D:\BuildingEngineWorkspace\signed-generation-publication-review.json"
 ```
 
 The signing command rechecks the immutable review-record checksum, exact candidate GLB bytes and exact QA-report bytes before preparing the payload. The signature covers the job ID, building ID, exact review-record SHA-256, candidate GLB SHA-256, QA-report SHA-256, reviewed placement SHA-256, reviewer ID, review timestamp and the explicit `approve-for-catalog-handoff` decision. It uses the same canonical UTF-8 JSON signing format as D3M-01 (recursively sorted object keys, array order preserved, compact JSON, no trailing newline).
