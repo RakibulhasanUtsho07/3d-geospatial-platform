@@ -18,8 +18,9 @@ import { spawn as nodeSpawn } from "node:child_process";
 import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
+import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -307,22 +308,76 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
   };
 }
 
-function readinessBlockers(capabilities) {
-  const entry = capabilities?.strategies?.["single-image-ai"];
-  if (entry?.status === "ready" &&
-      entry.modelWeights === "cached" &&
-      entry.backgroundRemovalWeights === "cached") return [];
-  const blockers = Array.isArray(entry?.blockers)
-    ? entry.blockers.filter((item) => typeof item === "string").slice(0, 8)
+function workerFingerprintSnapshot(inventory) {
+  const artifacts = inventory?.modelArtifacts ?? {};
+  const artifact = (value, includeRevision = false) => ({
+    status: value?.status ?? "unknown",
+    bytes: Number.isSafeInteger(value?.bytes) && value.bytes > 0 ? value.bytes : null,
+    sha256: typeof value?.sha256 === "string" && /^[a-f0-9]{64}$/.test(value.sha256)
+      ? value.sha256 : null,
+    ...(includeRevision ? {
+      snapshotRevision: typeof value?.snapshotRevision === "string" &&
+        /^[a-f0-9]{40}$/.test(value.snapshotRevision) ? value.snapshotRevision : null,
+    } : {}),
+  });
+  return {
+    checkedAt: typeof inventory?.checkedAt === "string" ? inventory.checkedAt : null,
+    runner: {
+      bytes: Number.isSafeInteger(inventory?.runner?.bytes) && inventory.runner.bytes > 0
+        ? inventory.runner.bytes : null,
+      sha256: typeof inventory?.runner?.sha256 === "string" &&
+        /^[a-f0-9]{64}$/.test(inventory.runner.sha256) ? inventory.runner.sha256 : null,
+    },
+    backgroundRemovalModel: typeof inventory?.modelReadiness?.backgroundRemovalModel === "string" &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(inventory.modelReadiness.backgroundRemovalModel)
+      ? inventory.modelReadiness.backgroundRemovalModel : null,
+    modelArtifacts: {
+      tripoConfig: artifact(artifacts.tripoConfig, true),
+      tripoCheckpoint: artifact(artifacts.tripoCheckpoint, true),
+      rembgWeights: artifact(artifacts.rembgWeights),
+    },
+  };
+}
+
+function workerFingerprintBlockers(inventory) {
+  const blockers = Array.isArray(inventory?.blockers)
+    ? inventory.blockers.filter((item) => typeof item === "string").slice(0, 20)
     : [];
-  if (entry?.modelWeights !== "cached") {
-    blockers.push("TripoSR config.yaml/model.ckpt cache is not verified as cached.");
+  if (inventory?.status !== "ready-for-operator-smoke") {
+    blockers.push("worker-host-inventory-not-ready");
   }
-  if (entry?.backgroundRemovalWeights !== "cached") {
-    blockers.push("The installed rembg default-model cache is not verified as cached.");
+  if (inventory?.modelReadiness?.status !== "ready" ||
+      inventory?.modelReadiness?.tripoModelWeights !== "cached" ||
+      inventory?.modelReadiness?.backgroundRemovalWeights !== "cached") {
+    blockers.push("single-image-model-readiness-not-verified");
   }
-  if (!blockers.length) blockers.push("Single-image AI strategy readiness is not ready.");
-  return [...new Set(blockers)].slice(0, 8);
+  const snapshot = workerFingerprintSnapshot(inventory);
+  if (inventory?.runner?.status !== "present" || !snapshot.runner.bytes || !snapshot.runner.sha256) {
+    blockers.push("triposr-runner-fingerprint-incomplete");
+  }
+  const config = snapshot.modelArtifacts.tripoConfig;
+  const checkpoint = snapshot.modelArtifacts.tripoCheckpoint;
+  const rembg = snapshot.modelArtifacts.rembgWeights;
+  if (config.status !== "cached" || !config.bytes || !config.sha256 || !config.snapshotRevision) {
+    blockers.push("triposr-config-fingerprint-incomplete");
+  }
+  if (checkpoint.status !== "cached" || !checkpoint.bytes || !checkpoint.sha256 ||
+      !checkpoint.snapshotRevision || checkpoint.snapshotRevision !== config.snapshotRevision) {
+    blockers.push("triposr-checkpoint-fingerprint-incomplete");
+  }
+  if (rembg.status !== "cached" || !rembg.bytes || !rembg.sha256 ||
+      !snapshot.backgroundRemovalModel) {
+    blockers.push("rembg-weight-fingerprint-incomplete");
+  }
+  return [...new Set(blockers)].slice(0, 20);
+}
+
+function workerFingerprintValues(snapshot) {
+  return JSON.stringify({
+    runner: snapshot?.runner ?? null,
+    backgroundRemovalModel: snapshot?.backgroundRemovalModel ?? null,
+    modelArtifacts: snapshot?.modelArtifacts ?? null,
+  });
 }
 
 /**
@@ -417,6 +472,12 @@ export async function runSingleImageRuntimeSmoke(options) {
       backgroundRemovalWeights: "not-checked",
       backgroundRemovalModel: null,
     },
+    workerHost: {
+      inventorySchemaVersion: null,
+      before: null,
+      after: null,
+      stableAcrossInference: null,
+    },
     source: {
       sourceId,
       relativePath: relativePath,
@@ -484,22 +545,37 @@ export async function runSingleImageRuntimeSmoke(options) {
     },
   });
   try {
-    const capabilities = await (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
+    const collectInventory = options.collectWorkerHostInventory ?? collectGenerationWorkerHostInventory;
+    const collectWorkerSnapshot = async () => collectInventory({
       env,
-      spawnImpl: spawnOffline,
-      now: checkedAt,
-      commandTimeoutMs: options.commandTimeoutMs ?? 10_000,
-      strategies: ["single-image-ai"],
+      pythonPath,
+      runnerScript,
+      device,
+      now: new Date().toISOString(),
+      commandTimeoutMs: options.inventoryTimeoutMs ?? 30_000,
+      probeCapabilities: (probeOptions) =>
+        (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
+          ...probeOptions,
+          spawnImpl: spawnOffline,
+        }),
+      ...(options.inventorySpawnSyncImpl ? { spawnSyncImpl: options.inventorySpawnSyncImpl } : {}),
     });
-    report.checkedAt = capabilities?.checkedAt ?? checkedAt;
-    const blockers = readinessBlockers(capabilities);
-    const singleImage = capabilities?.strategies?.["single-image-ai"];
+    const inventoryBefore = await collectWorkerSnapshot();
+    const beforeSnapshot = workerFingerprintSnapshot(inventoryBefore);
+    const blockers = workerFingerprintBlockers(inventoryBefore);
+    report.checkedAt = inventoryBefore?.checkedAt ?? checkedAt;
+    report.workerHost = {
+      inventorySchemaVersion: inventoryBefore?.schemaVersion ?? null,
+      before: beforeSnapshot,
+      after: null,
+      stableAcrossInference: null,
+    };
     report.readiness = {
       strategy: "single-image-ai",
       status: blockers.length ? "blocked" : "ready",
-      tripoModelWeights: singleImage?.modelWeights ?? "unknown",
-      backgroundRemovalWeights: singleImage?.backgroundRemovalWeights ?? "unknown",
-      backgroundRemovalModel: singleImage?.backgroundRemovalModel ?? null,
+      tripoModelWeights: inventoryBefore?.modelReadiness?.tripoModelWeights ?? "unknown",
+      backgroundRemovalWeights: inventoryBefore?.modelReadiness?.backgroundRemovalWeights ?? "unknown",
+      backgroundRemovalModel: inventoryBefore?.modelReadiness?.backgroundRemovalModel ?? null,
       blockers,
     };
     await replaceReportAtomically(reportPath, report);
@@ -603,6 +679,18 @@ export async function runSingleImageRuntimeSmoke(options) {
       throw new TypeError("TripoSR and workflow GLB SHA-256 values do not match.");
     }
 
+    const inventoryAfter = await collectWorkerSnapshot();
+    const afterSnapshot = workerFingerprintSnapshot(inventoryAfter);
+    const afterBlockers = workerFingerprintBlockers(inventoryAfter);
+    const fingerprintsStable = afterBlockers.length === 0 &&
+      workerFingerprintValues(beforeSnapshot) === workerFingerprintValues(afterSnapshot);
+    report.workerHost.after = afterSnapshot;
+    report.workerHost.stableAcrossInference = fingerprintsStable;
+    await replaceReportAtomically(reportPath, report);
+    if (!fingerprintsStable) {
+      throw new TypeError("Worker model artifacts or TripoSR runner fingerprint changed during inference.");
+    }
+
     report.status = "passed";
     report.completedAt = new Date().toISOString();
     report.inference = {
@@ -627,7 +715,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     await replaceReportAtomically(reportPath, report);
     return { report, reportPath, exitCode: 0 };
   } catch (error) {
-    if (!workflowStarted) report.readiness.blockers = ["single-image-readiness-probe-failed"];
+    if (!workflowStarted && !report.readiness.blockers?.length) report.readiness.blockers = ["single-image-readiness-probe-failed"];
     report.status = workflowStarted ? "failed" : "blocked";
     report.completedAt = new Date().toISOString();
     report.inference = {
