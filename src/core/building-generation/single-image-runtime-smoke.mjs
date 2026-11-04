@@ -60,6 +60,18 @@ _ROLE_BY_LOADER = {
     'onnxruntime.InferenceSession': 'rembgWeights',
 }
 _MAX_ONNX_BYTES = 512 * 1024 * 1024
+_SOURCE_RECEIPT = os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH')
+_SOURCE_EXPECTED_PATH = (
+    os.path.realpath(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH'))
+    if os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH') else None
+)
+try:
+    _SOURCE_EXPECTED = json.loads(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON', '{}'))
+except Exception:
+    _SOURCE_EXPECTED = {}
+_SOURCE_BYTES = None
+_SOURCE_RECEIPT_WRITTEN = False
+_MAX_SOURCE_BYTES = 20 * 1024 * 1024
 
 def _signature(item):
     return (
