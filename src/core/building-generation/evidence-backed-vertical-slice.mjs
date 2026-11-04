@@ -401,6 +401,12 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
     if (!mediaReport || mediaReport.mapReady !== false || mediaReport.publicationEligible !== false) {
       throw new TypeError("media-to-model report must retain fail-closed publication gates");
     }
+    if (mediaReport.engine !== "media-to-model-workflow-v1" ||
+        mediaReport.buildingId !== buildingId ||
+        mediaReport.jobId !== mediaJobId ||
+        mediaReport.strategy !== "photogrammetry") {
+      throw new TypeError("media-to-model report identity must match the exact D3M-ENGINE-03 child job, building and photogrammetry profile");
+    }
     if (mediaReport.output?.modelSha256 !== mediaModelFile.sha256) {
       throw new TypeError("media-to-model report model SHA-256 does not match the emitted GLB bytes");
     }
@@ -453,6 +459,13 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
     const geometryReport = geometryResult?.report;
     if (!geometryReport || geometryReport.mapReady !== false || geometryReport.publicationEligible !== false) {
       throw new TypeError("architectural geometry report must retain fail-closed publication gates");
+    }
+    if (typeof geometryReport.workflow !== "string" ||
+        !geometryReport.workflow.trim() ||
+        geometryReport.buildingId !== buildingId ||
+        geometryReport.jobId !== geometryJobId ||
+        geometryReport.input?.relativePath !== geometry.inputPath) {
+      throw new TypeError("architectural-geometry report identity must match the exact D3M-ENGINE-03 child job, building and geometry input path");
     }
     if (geometryReport.input?.sha256 !== evidence.inputSha256) {
       throw new TypeError("architectural geometry report input SHA-256 does not match the preflight geometry input");
