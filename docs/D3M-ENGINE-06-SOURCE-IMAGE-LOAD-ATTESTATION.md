@@ -4,7 +4,7 @@
 **Implementation branch:** `feat/d3m-engine06-source-image-load-attestation-20261104`  
 **Base:** D3M-ENGINE-05 PR [#354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/354), itself stacked on D3M-ENGINE-04 PR #353 and D3M-ENGINE-03 PR #351.  
 **Smoke schema:** `1.3.0`  
-**Status:** implementation and exact-head CI pending.
+**Status:** implementation complete; exact-head PR Full CI passed.
 
 ## Why this is a separate gate
 
