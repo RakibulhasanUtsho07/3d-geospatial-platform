@@ -4,7 +4,8 @@ import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
 const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
@@ -127,6 +128,37 @@ function validateWorkerHostFingerprints(report) {
   return true;
 }
 
+
+function validateModelLoadEvidence(report) {
+  const evidence = report.modelLoadEvidence;
+  if (!evidence || evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified") {
+    throw new TypeError("Smoke report is missing verified process-side model-load evidence.");
+  }
+  const expected = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const loaders = evidence.loaders;
+  if (!loaders || typeof loaders !== "object" || Array.isArray(loaders) ||
+      JSON.stringify(Object.keys(loaders).sort()) !== JSON.stringify(expected.map(([role]) => role).sort())) {
+    throw new TypeError("Smoke report model-load evidence has an invalid loader set.");
+  }
+  for (const [role, loader] of expected) {
+    const observed = loaders[role];
+    const expectedArtifact = report.workerHost?.before?.modelArtifacts?.[role];
+    if (!observed || observed.loader !== loader ||
+        !Number.isSafeInteger(observed.bytes) || observed.bytes <= 0 ||
+        !HASH.test(observed.sha256 ?? "") ||
+        observed.bytes !== expectedArtifact?.bytes ||
+        observed.sha256 !== expectedArtifact?.sha256 ||
+        observed.exactBytesPassed !== true || observed.stable !== true) {
+      throw new TypeError("Smoke report model-load evidence does not match the pre-inference " + role + " fingerprint.");
+    }
+  }
+  return true;
+}
+
 function parseGlb(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 20 ||
       bytes.readUInt32LE(0) !== 0x46546c67 ||
@@ -166,15 +198,21 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   const report = JSON.parse(reportBytes.toString("utf8"));
 
   if (!report || typeof report !== "object" ||
-      ![SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION, LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION].includes(report.schemaVersion) ||
+      ![
+        SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+      ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
       !SAFE_ID.test(report.buildingId ?? "") ||
       report.status !== "passed") {
     throw new TypeError("Smoke evidence report schema, identity or status is invalid.");
   }
-  const hasWorkerFingerprintEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasWorkerFingerprintEvidence = report.schemaVersion !== LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasProcessLoadEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
   if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
+  if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
 
   if (report.readiness?.status !== "ready" ||
       report.readiness.tripoModelWeights !== "cached" ||
@@ -315,7 +353,10 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
     geometryQa: report.geometryQa,
     workerHostFingerprintStatus: hasWorkerFingerprintEvidence
       ? "stable-across-inference" : "not-recorded-legacy-schema",
+    modelLoadEvidenceStatus: hasProcessLoadEvidence
+      ? "verified-against-worker-preflight" : "not-recorded-legacy-schema",
     ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
+    ...(hasProcessLoadEvidence ? { modelLoadEvidence: report.modelLoadEvidence } : {}),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,
