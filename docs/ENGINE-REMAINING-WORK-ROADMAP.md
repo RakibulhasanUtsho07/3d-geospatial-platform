@@ -14,7 +14,7 @@
 
 ## Verified baseline
 
-- Current `main` candidate: `0bf007d2c6749475936d18d0168c168b1ca3fd7e`.
+- Current `main` candidate (2026-11-04 audit): `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
 - Post-merge CI run [#40119673648](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/40119673648) passed lint, production build, automated engine/GLB checks, generated spatial-tile checks, and the production viewport API browser test.
 - P2.6–P2.20 viewport workload, caching, cancellation, cross-process repeatability, performance trend, and geometry-read diagnostics are integrated. Their benchmark reports describe bounded workloads; they do not establish a universal FPS or latency SLA.
 - Existing capabilities include Cesium viewport loading, Overture-derived footprint extrusion, OSM road geometry/nearby services, deterministic procedural GLB, candidate generation/review gates, GLB QA, dimension checking, horizontal WGS84 ground-control fitting, render/reference diagnostic tools, and a measured-vector floor-plan shell generator.
@@ -173,7 +173,7 @@ The codebase still needs real-data validation and product-level completion. The 
 - Added metric-geometry/strategy helper regression tests and a CI step.
 - [x] Baseline exact-head Full CI passed on `e9fd101aca605ef0d8ad6d582df1cb449d09f7eb`: [run #41397515751](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41397515751), 179/179 steps. This validates automated code/build checks, not an actual TripoSR/COLMAP reconstruction, image quality, survey registration or accuracy.
 - Added local Hugging Face cache checks for TripoSR `config.yaml` and `model.ckpt`; single-image AI is claimable only when both files are cached. Any commit added after the cited SHA needs its own exact-head checks.
-- D3M-02 is now merged into main through PR #302 (merge commit `4ec5305108870a2cc30bd203c4a3c8c7ab9613a0`). D3M-03 has been reconciled against that main base in `integration/d3m03-main-reconciled-20261103`; this integrated candidate still requires exact-head CI and code review before merge.
+- D3M-03 was reconciled against current main and promoted through PR #324 on 2026-11-03; its source intake, operator-session, consent gates and job tracking are now part of main. The later D3M-04→D3M-07 cumulative stack was promoted through PR #325.
 - **Limits:** only still images (JPEG/PNG/WebP) are supported by this UI; video/PDF and map-click auto-location are not included. WebP is not a valid selected input for the current single-image AI or COLMAP photogrammetry worker; it is rejected at UI and queue preflight for those strategies. Worker binaries/models and shared persistent workspace remain deployment prerequisites. This does not prove accuracy or rights, and no candidate is automatically approved or placed into the map.
 
 ## D3M-04 — TripoSR background-removal runtime readiness
@@ -187,15 +187,15 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Keep single-image AI unclaimable until both TripoSR weights and the active rembg model weights are cached; unknown API/resolver layouts remain `unknown` and fail closed rather than being mislabeled as missing.
 - [x] Surface missing/unknown background-removal cache state in the operator panel and persist only sanitized model identifiers/state, never cache paths or process output.
 - [x] Add executable Python-probe contract tests for cached/missing/unknown states, missing ONNX Runtime import, legacy worker-status compatibility, and worker-level queue non-consumption (attempt remains zero).
-- [x] Exact-head PR Full CI passed on D3M-04 branch head `d05274f4c30fddc45dc41cd464573c40b6745e58`: [run #41405970254](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41405970254), job `Lint and production build`, 179 workflow steps, no failed steps. PR #306 remains Draft pending independent review.
+- [x] D3M-04 cache-readiness implementation was included in the cumulative main promotion PR #325. The post-promotion main Full CI #41649268743 passed 207/207 steps, including D3M-05/07 and worker inventory checks. The real worker's Python/device/cache state still requires operator preflight on the provisioned host.
 - **Important licensing limit:** rembg package licensing is separate from model-weight licensing. Current upstream rembg documentation identifies `bria-rmbg` as its default; BRIA RMBG 2.0 weights are source-available for non-commercial use unless separately licensed. Deployment must deliberately choose a model and verify applicable rights before commercial use.
 - **No accuracy claim:** readiness does not prove that a real TripoSR run succeeds, that the output matches a building, that scale/georeferencing is correct, or that the candidate is map-ready. Release flags remain fail-closed.
 
 
-## D3M-05 — Offline single-image runtime smoke (implementation candidate)
+## D3M-05 — Offline single-image runtime smoke (implementation integrated; real-host gate pending)
 
 **Tracking issue:** [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307)  
-**Dependency:** D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Source integration:** cumulative D3M-04→D3M-07 promotion PR #325 merged to main; D3M-ENGINE-02 host inventory follow-up merged by PR #347.  
 **Implementation branch:** `feat/d3m05-single-image-runtime-smoke-20261102`  
 **Runbook:** [D3M-05 Single-image Runtime Smoke](D3M-05-SINGLE-IMAGE-RUNTIME-SMOKE.md)
 
@@ -215,12 +215,13 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Post-CI audit found that workflow failure before the TripoSR child-process `spawn` event could be mislabelled as inference failure. Runtime evidence and the independent verifier now distinguish workflow failure, runner launch attempt, actual process spawn and completed output; regression tests cover pre-launch failure and OS process-spawn failure.
 - [x] Exact-head PR Full CI passed on the D3M-05 runner-launch-correction branch head `07e122053ff99059b72661e85e4f2e44b2a3c8ac`: [run #41412587662](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41412587662), job `Lint and production build`, 182 workflow steps, no failed steps. The D3M-06 descendant branch also re-ran the complete suite successfully; this does not replace the still-pending real worker-host inference.
 - [ ] Operator-run one real inference on the provisioned worker host with model licences, source rights, runtime/device and local cache checked; retain the private smoke report and independently review the GLB.
-- **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. No PR in the D3M-02 → D3M-05 stack is merged by this milestone.
+- [x] Implementation stack integrated into main through PR #325; later worker-host inventory tooling added through PR #347. Main Full CI #41649268743 passed 207/207 and includes the D3M-05 contract test and CLI validation.
+- **Explicit limits:** CI tests do not use actual TripoSR/rembg weights or GPU hardware. One successful smoke validates only one inference on one host/input. It does not prove broad building reconstruction accuracy, measured scale, orientation, ground-control registration or map readiness. Source integration is complete; the actual worker-host inference and independent GLB review are not.
 
-## D3M-06 — bind reviewed placement to the map publication transform (implementation candidate)
+## D3M-06 — bind reviewed placement to the map publication transform (integrated into main; operational proof pending)
 
 **Tracking issue:** [#309](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/309)  
-**Dependency:** D3M-05 PR #308 → D3M-04 PR #306 → D3M-03 PR #304 → D3M-02 PR #302  
+**Source integration:** cumulative D3M-04→D3M-07 promotion PR #325 merged to main.  
 **Implementation branch:** `feat/d3m06-reviewed-map-placement-binding-20261102`
 
 - [x] Repository audit confirmed the review API stored boolean metric-scale/georeference checks but no numeric placement; the map publication API independently accepted a new transform after approval.
@@ -232,14 +233,14 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Add an operator CLI end-to-end regression that publishes a synthetic approved job using the exact stored placement digest and WGS84 ellipsoid height reference.
 - [x] Focused review/publication tests, ESLint and production build passed in the exact D3M-06 branch Full CI job on code head `f8b974465ac6d52b32ada50fb2356844a6f126d8`; see PR CI run [#41415299310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41415299310). The run includes the approved-review-to-explicit-map-publication test, review-decision/candidate-integrity/publication-gate tests, and production build.
 - [x] Exact-head PR Full CI passed on `f8b974465ac6d52b32ada50fb2356844a6f126d8`: [run #41415299310](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41415299310), job `Lint and production build`, 182 workflow steps, no failed steps. The run contains successful ESLint, reviewed catalog publishing/rollback, approved generation review-to-map publication, review-decision/candidate-integrity/publication-gate checks, and production build.
-- [ ] Record a separate exact-head Push CI pass before promotion. The available commit-scoped workflow result only exposes PR-triggered runs; no Push CI success is claimed here.
-- [ ] Next operational gate: run the D3M-05 single-image smoke on the provisioned worker host using the real TripoSR/rembg caches and reviewed model/source terms, then independently verify and visually inspect the private GLB/report. This requires access to the actual worker host and must not be replaced by CI fakes.
+- [x] Cumulative D3M-06 code and tests were included in main through PR #325; post-merge main CI #41649268743 passed 207/207.
+- [ ] Operational gate remains the D3M-05 real worker-host smoke, independent verifier and human GLB inspection. Reviewed placement binding does not itself prove survey truth or architectural accuracy.
 - **Limitations:** placement binding prevents a post-review transform change; it does not independently prove the reviewer identity, coordinate truth, rights, architectural accuracy or vertical datum. All release gates remain false.
 
-## D3M-07 — non-inference single-image worker preflight
+## D3M-07 — non-inference single-image worker preflight (integrated into main; real-host run pending)
 
 **Dependency:** D3M-04 worker capability probe and D3M-05 single-image runtime smoke.  
-**Implementation branch:** `feat/d3m07-single-image-worker-preflight-20261102`
+**Source integration:** cumulative main promotion PR #325; inventory hardening follow-up PR #347.
 
 - [x] Add a preflight adapter around the authoritative D3M-04 capability probe; request only `single-image-ai` so this check does not launch unrelated COLMAP commands.
 - [x] Require TripoSR and rembg caches to be explicitly `cached` before returning ready; reject missing, unknown, malformed and blocked states.
@@ -250,22 +251,23 @@ The codebase still needs real-data validation and product-level completion. The 
 - [x] Add unit tests for both model caches, missing/unknown state, malformed capability responses, timestamp validation, secret/path non-disclosure, strategy scoping and a real-Python runner-execution marker check.
 - [x] Add the tests and CLI-help validation to Full CI and add this branch to push/PR workflow filters.
 - [x] Align the D3M-05 real-smoke readiness recheck with the same single-image-only strategy scope; keep actual TripoSR execution inside the authorized inference workflow.
-- [ ] Exact-head Full CI and a separately confirmed Push CI pass must both pass before this checkpoint can be promoted.
-- [ ] Operator must run the preflight on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
+- [x] Promoted into main through PR #325. Main Full CI #41649268743 passed the D3M-07 preflight test and CLI validation; D3M-ENGINE-02 inventory tests also passed on the same main head.
+- [ ] Operator must run the preflight and inventory on the actual worker host, then complete the D3M-05 real inference smoke and independently inspect the GLB.
 - **Safety boundary:** the preflight does not execute the configured TripoSR runner or call model-download/inference APIs. Python imports still execute installed package initialization code and may have package-specific side effects; this is not a hermetic read-only environment, OS sandbox or host firewall. Apply host/network egress and filesystem controls when strict guarantees are required.
 
 ## 2026-11-03 — Promotion state and remaining operational gates
 
 - D3M-02 and D3M-03 are merged to main (PRs #302 and #324).
-- D3M-04 through D3M-07 have successful exact-head PR Full CI on the cumulative source stack head `e60a46162e873846a81122812151be0855ec83d3` ([run #41464331828](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41464331828), 184/184 steps). This is prior-stack validation; a new main-based integration PR must pass its own exact-head CI before promotion.
-- The D3M-01 reviewer-authentication chain (#281, #284, #286, #288, #290, #292) remains a separate unmerged dependency. Production reviewer keys/registry are not provisioned.
+- D3M-04 through D3M-07 were promoted onto main through PR #325; the reviewer-authentication chain was subsequently integrated through PR #326. D3M-ENGINE-02 host inventory tooling was added by PR #347.
+- Current main is `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`; post-merge Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps. Its steps 138–144 cover D3M-05 runtime smoke, D3M-07 preflight, D3M-ENGINE-02 inventory and all corresponding CLI checks.
+- Production reviewer keys/registry provisioning and actual worker-host model provisioning remain separate operator/deployment gates.
 - A real worker-host TripoSR/rembg inference, independently verified GLB and human visual review have not been completed. CI uses synthetic fixtures and does not establish model accuracy.
 - Rights and model-weight licences require an explicit deployment decision. In particular, verify the selected rembg weight licence for the intended use.
 - `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false. No automatic publication or accuracy claim is made.
 
 ## D3M-01 — source-bound review and governed reviewer trust
 
-- **Integration candidate:** `integration/d3m01-main-reconciled-20261103` (PR #326, exact-head CI pending).
+- **Integrated into main:** PR #326 merged on 2026-11-03 (merge commit `fb3537d3199c98b43218b7853303858b5c9c0590`). Production reviewer keys/registry provisioning remains an operational gate.
 - Includes the BRF-05/06 local source-bound mask and architectural-observation review tools, BRF-07 evidence bundle, immutable source-bound candidate hand-off, Ed25519-signed reviewer decision receipt, and D3M-01.F/G public-key registry lifecycle/preflight.
 - Reviewer signatures bind the exact hand-off artifact, candidate GLB and geometry report. Production accepts only the versioned server-configured public-key registry; API callers cannot submit trusted keys. Revoked, expired, malformed, duplicate, orphaned or invalid key chains fail closed.
 - A valid signature proves possession of a key provisioned in the server trust registry only. It does not prove a person's civil identity, legal authority, source rights, survey accuracy or architectural correctness.
@@ -351,3 +353,24 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The prior P3.4 baseline failed its clean-tree provenance gate because the benchmark's own nested artifact directory appeared in Git status. The benchmark now parses NUL-delimited porcelain status and excludes only its own output subtree; tracked edits and all other untracked paths remain dirty. A temp-Git-repository regression test covers nested generated evidence plus unrelated tracked/untracked changes.
 - The P3.4 current-main candidate must still pass exact-head Full CI and the six-sample clean working-tree Real-Dhaka baseline. Until both succeed and the resulting screenshots/report are inspected, P3.4 is not accepted as complete. The diagnostics do not prove that the previous red imagery anomaly has been fixed.
 - The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
+
+
+## D3M current-main status — 2026-11-03 post D3M-ENGINE-02
+
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- D3M-02 and D3M-03 are integrated through PRs #302 and #324; D3M-04 through D3M-07 are integrated through cumulative PR #325; D3M-01 reviewer-authentication source is integrated through PR #326; D3M-ENGINE-02 worker-host inventory is integrated through PR #347.
+- Main post-merge Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) completed successfully (207/207 steps). The same run passed D3M-05 contract tests, D3M-07 preflight tests, D3M-ENGINE-02 host inventory test/CLI and production viewport verification.
+- This is source/automated validation only. No provisioned worker-host inventory, D3M-04 real device/cache report, D3M-05 TripoSR/rembg inference, independent GLB verification or human visual review is recorded.
+- Next operational acceptance remains: provision/review the actual worker host and local caches; run the inventory and preflight; confirm source and model rights; run one fresh D3M-05 inference; verify the exact source/GLB hashes and GLB structure; inspect the private GLB independently; save a sanitized evidence-log record.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until their separate evidence/reviewer gates are completed.
+
+
+## 2026-11-04 — D3M-ENGINE-03 execution checkpoint
+
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`; no milestone change has been merged to `main`.
+- Consolidated PR [#351](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/351) carries the facade/GLB work from #350, unique BRF-04 topology regression from #349 and the D3M-ENGINE-03 source-bound vertical-slice integration. Its execution branch is `feat/d3m-engine03-evidence-backed-vertical-slice-20261103`; current head at this checkpoint: `550d169a3fac0d0cb4f77ab9d9063a86d8f1da2d`.
+- Software workflow: parent report binds the source-image set, image byte hashes, rights scopes, geometry-input hash and two resumable child workflows. The latest hardening requires exact child report engine/profile, building ID, child job ID and geometry input path. Regression tests cover cross-job and cross-building substitution.
+- Exact-head automated evidence on prior head `10a962601e9ed9c0c861f57bb98d0e329ade299d`: BRF-14 source-byte intake, BRF-05–07 reference intake, BRF-35 same-building linkage and P3.7 floor-plan validation succeeded. Full CI failed only in two newly added identity-guard tests because a shared mutable fixture leaked the BuildingSpec mutation from a prior test; the fixture was isolated in `550d169a3fac0d0cb4f77ab9d9063a86d8f1da2d`. Exact-head CI and renderer rerun for this latest head remain pending verification.
+- Generic renderer smoke, Real-Dhaka browser baseline, P3.6 package and BRF-45 real-asset rights admission are independent workflows. A synthetic renderer pass or byte-intake success does not prove real building accuracy or source-owner permission.
+- External blockers remain: real TripoSR/rembg host inference (issue #307), actual COLMAP/multi-view reconstruction on authorized data, model-weight/source rights decisions, independent surveyed/CAD/BIM/LiDAR truth, held-out control points, provisioned trusted reviewer signing identity, surveyed WGS84 placement and vertical datum, and real candidate Cesium browser inspection.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until the matching evidence and authorized review exist. Do not merge #351 or close #349/#350 until exact-head validation and human review are complete.
