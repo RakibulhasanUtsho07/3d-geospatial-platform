@@ -523,3 +523,6 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Combined verification now serially takes two post-crypto package inventories and two post-crypto signature reads. Both package snapshots must match the initially integrity-verified snapshot; signature bytes and full file identity must match on every observation.
 - Added full synthetic package materialization + v2 Ed25519 registry signature + combined CLI success test, followed by artifact tampering rejection. Added signature-file identity/mode/size tests and size-limit/path rejection tests. Fake fixture image headers now expose deterministic dimensions to the same filesystem inventory parser.
 - **Validation pending:** focused exact-head tests, ESLint, production build and Push/PR Full CI. This detects observed changes during the verifier window but is not an OS-level lock; reverify after transfer and keep the directory under controlled write access.
+
+
+- Added an injectable deterministic verification-window guard and tests proving unchanged observations pass while package snapshot drift or signature bytes/metadata drift fail closed. This tests the exact serial observation contract without relying on timing-sensitive background file mutation.

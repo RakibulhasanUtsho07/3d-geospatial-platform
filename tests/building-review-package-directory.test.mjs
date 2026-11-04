@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  assertStableBuildingReviewPackageVerificationWindow,
   readBuildingReviewPackageDirectory,
   readBuildingReviewPackageControlFile,
   sameBuildingReviewPackageControlFile,
@@ -157,5 +158,70 @@ test("rejects oversized signature control files and arbitrary control-file names
   await assert.rejects(
     readBuildingReviewPackageControlFile(packageDir, "package-manifest.json"),
     /Only the detached signature/,
+  );
+});
+
+
+test("verification-window guard accepts stable serial package and signature observations", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  await assertStableBuildingReviewPackageVerificationWindow({
+    initialPackageSnapshot: packageSnapshot,
+    initialSignatureSnapshot: signatureSnapshot,
+    readPackageSnapshot: async () => ({ snapshotToken: "a".repeat(64) }),
+    readSignatureSnapshot: async () => ({
+      bytes: Buffer.from(signatureSnapshot.bytes),
+      stat: { ...signatureSnapshot.stat },
+    }),
+  });
+});
+
+test("verification-window guard rejects package mutation between post-crypto observations", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  let reads = 0;
+  await assert.rejects(
+    assertStableBuildingReviewPackageVerificationWindow({
+      initialPackageSnapshot: packageSnapshot,
+      initialSignatureSnapshot: signatureSnapshot,
+      readPackageSnapshot: async () => ({
+        snapshotToken: ++reads === 1 ? "a".repeat(64) : "b".repeat(64),
+      }),
+      readSignatureSnapshot: async () => ({
+        bytes: Buffer.from(signatureSnapshot.bytes),
+        stat: { ...signatureSnapshot.stat },
+      }),
+    }),
+    /review-package-changed-during-signature-verification/,
+  );
+});
+
+test("verification-window guard rejects signature content or metadata mutation", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  let reads = 0;
+  await assert.rejects(
+    assertStableBuildingReviewPackageVerificationWindow({
+      initialPackageSnapshot: packageSnapshot,
+      initialSignatureSnapshot: signatureSnapshot,
+      readPackageSnapshot: async () => ({ snapshotToken: "a".repeat(64) }),
+      readSignatureSnapshot: async () => ({
+        bytes: Buffer.from(signatureSnapshot.bytes),
+        stat: {
+          ...signatureSnapshot.stat,
+          ...(++reads === 1 ? {} : { ctimeNs: 9n }),
+        },
+      }),
+    }),
+    /review-package-signature-envelope-changed-during-verification/,
   );
 });

@@ -213,3 +213,38 @@ export async function readBuildingReviewPackageControlFile(directoryArg, filenam
   }
   return result;
 }
+
+
+/**
+ * Observe the package and signature again after cryptographic verification.
+ * Readers are injected so race-window behavior can be tested deterministically.
+ */
+export async function assertStableBuildingReviewPackageVerificationWindow({
+  initialPackageSnapshot,
+  initialSignatureSnapshot,
+  readPackageSnapshot,
+  readSignatureSnapshot,
+}) {
+  if (!initialPackageSnapshot || !initialSignatureSnapshot ||
+      typeof readPackageSnapshot !== "function" ||
+      typeof readSignatureSnapshot !== "function") {
+    throw new TypeError("Initial package/signature snapshots and read callbacks are required.");
+  }
+  const finalPackageSnapshot = await readPackageSnapshot();
+  const finalSignatureSnapshot = await readSignatureSnapshot();
+  const confirmationPackageSnapshot = await readPackageSnapshot();
+  const confirmationSignatureSnapshot = await readSignatureSnapshot();
+
+  if (!sameBuildingReviewPackageSnapshot(initialPackageSnapshot, finalPackageSnapshot) ||
+      !sameBuildingReviewPackageSnapshot(finalPackageSnapshot, confirmationPackageSnapshot)) {
+    throw new Error("review-package-changed-during-signature-verification");
+  }
+  if (!sameBuildingReviewPackageControlFile(initialSignatureSnapshot, finalSignatureSnapshot) ||
+      !sameBuildingReviewPackageControlFile(finalSignatureSnapshot, confirmationSignatureSnapshot)) {
+    throw new Error("review-package-signature-envelope-changed-during-verification");
+  }
+  return {
+    packageSnapshot: initialPackageSnapshot,
+    signatureSnapshot: initialSignatureSnapshot,
+  };
+}

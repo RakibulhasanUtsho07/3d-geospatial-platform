@@ -81,3 +81,6 @@ This detects package or signature mutation during verification; it is not a file
 The combined verifier now reads the detached signature through the no-follow stable-file reader, with a 64 KiB envelope limit. The review-package manifest is also reread after artifact enumeration so its exact bytes and descriptor identity must remain unchanged across the inventory.
 
 After cryptographic verification, the verifier serially takes two additional package inventories and rereads the signature envelope after each. It requires both package snapshot tokens to match the originally verified inventory and requires the detached signature bytes plus full file identity (device, inode, size, modification/change timestamps and mode) to remain identical across reads. This detects observed mutation during verification; it is not an OS-level lock and cannot prevent writes after the final read. Rerun verification after transfer or archive extraction.
+
+
+The verification-window guard is covered with deterministic serial-reader tests: an unchanged package/signature succeeds; package snapshot drift and signature byte/metadata drift fail closed. These unit tests complement the end-to-end CLI test with a real materialized signed package and subsequent artifact tampering.

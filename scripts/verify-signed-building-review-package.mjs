@@ -5,8 +5,7 @@ import {
   verifyBuildingReviewPackageSignatureWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
 import {
-  sameBuildingReviewPackageSnapshot,
-  sameBuildingReviewPackageControlFile,
+  assertStableBuildingReviewPackageVerificationWindow,
   readBuildingReviewPackageDirectory,
   verifyBuildingReviewPackageDirectory,
   readBuildingReviewPackageControlFile,
@@ -97,20 +96,14 @@ async function main() {
     throw new Error("unsupported-review-package-signature-schema");
   }
 
-  // Re-read both sides after cryptographic verification. The detached envelope
-  // is intentionally excluded from the artifact inventory, so pin it separately.
-  const finalSnapshot = await readBuildingReviewPackageDirectory(packageDir);
-  const finalSignature = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
-  const confirmationSnapshot = await readBuildingReviewPackageDirectory(packageDir);
-  const confirmationSignature = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
-  if (!sameBuildingReviewPackageSnapshot(snapshot, finalSnapshot) ||
-      !sameBuildingReviewPackageSnapshot(finalSnapshot, confirmationSnapshot)) {
-    throw new Error("review-package-changed-during-signature-verification");
-  }
-  if (!sameBuildingReviewPackageControlFile(signatureSnapshot, finalSignature) ||
-      !sameBuildingReviewPackageControlFile(finalSignature, confirmationSignature)) {
-    throw new Error("review-package-signature-envelope-changed-during-verification");
-  }
+  // The detached envelope is excluded from artifact inventory, so verify
+  // both snapshots serially through the deterministic race-window guard.
+  await assertStableBuildingReviewPackageVerificationWindow({
+    initialPackageSnapshot: snapshot,
+    initialSignatureSnapshot: signatureSnapshot,
+    readPackageSnapshot: () => readBuildingReviewPackageDirectory(packageDir),
+    readSignatureSnapshot: () => readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+  });
   const integrity = snapshot.integrity;
   const valid = integrity.valid === true && signature.valid === true;
   const result = {
