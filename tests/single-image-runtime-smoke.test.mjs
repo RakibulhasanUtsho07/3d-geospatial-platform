@@ -404,8 +404,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
-  assert.equal(result.report.schemaVersion, "1.5.0");
-  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.1.0");
+  assert.equal(result.report.schemaVersion, "1.6.0");
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.2.0");
   assert.equal(result.report.georeferenceEvidence.status, "not-requested");
   assert.equal(result.report.georeferenceEvidence.registration, null);
   assert.ok(result.report.generationArtifactReceipt.bytes > 0);
@@ -619,7 +619,7 @@ test("binds optional control points through the single-image smoke, workflow rep
   assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
   const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
   const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
-  assert.equal(receipt.schemaVersion, "1.1.0");
+  assert.equal(receipt.schemaVersion, "1.2.0");
   assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
 });
 
