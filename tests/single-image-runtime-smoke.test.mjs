@@ -942,4 +942,17 @@ test("enforces the media-to-model workflow's 60-character job ID limit before cr
     stat(path.join(root, ".building-engine", "runtime-smokes")),
     /ENOENT/,
   );
+
+test("refuses to reuse an existing generation artifact receipt path", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const receiptPath = path.join(root, ".building-engine", "runtime-smokes", "smoke-job.artifact.json");
+  await mkdir(path.dirname(receiptPath), { recursive: true });
+  await writeFile(receiptPath, "{}\\n");
+  await assert.rejects(
+    runSingleImageRuntimeSmoke(makeOptions(root, source)),
+    /Generation artifact receipt already exists; use a fresh ID/i,
+  );
+});
+
 });
