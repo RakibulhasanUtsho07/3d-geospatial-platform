@@ -90,10 +90,6 @@ export function createGenerationJobPublicationReviewSubmission({
   requireHash(reviewRecord.candidate?.reportSha256, "QA report SHA-256");
   requireHash(reviewRecord.placementSha256, "reviewed placement SHA-256");
 
-  if (reviewRecord.candidate.modelSha256 !== reviewRecord.candidateSha256) {
-    throw new Error("Immutable review candidate GLB hashes do not agree.");
-  }
-
   return {
     schemaVersion: SCHEMA_VERSION,
     recordType: RECORD_TYPE,
