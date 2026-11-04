@@ -97,6 +97,7 @@ async function fixture(t) {
       jobId: "vertical-slice-001",
       media: {
         ...mediaAttestations,
+        buildingSpec: { ...mediaAttestations.buildingSpec },
         sources,
         strategy: "photogrammetry",
       },
