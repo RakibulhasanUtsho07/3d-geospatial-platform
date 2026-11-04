@@ -270,7 +270,9 @@
     "test:canvas-red-pixel-diagnostics": "node --test tests/canvas-red-pixel-diagnostics.test.mjs",
     "test:map-viewport-ux": "node --test tests/map-viewport-ux.test.mjs",
     "test:evidence-backed-vertical-slice": "node --test tests/evidence-backed-vertical-slice.test.mjs",
-    "run:evidence-backed-vertical-slice": "node scripts/run-evidence-backed-vertical-slice.mjs"
+    "run:evidence-backed-vertical-slice": "node scripts/run-evidence-backed-vertical-slice.mjs",
+    "test:publish-evidence-backed-vertical-slice": "node --test tests/publish-evidence-backed-vertical-slice.test.mjs",
+    "publish:evidence-backed-vertical-slice": "node scripts/publish-evidence-backed-vertical-slice.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
