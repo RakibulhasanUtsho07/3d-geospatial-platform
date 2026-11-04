@@ -93,6 +93,7 @@ on:
       - feat/d3m-engine09-signed-georeference-review-package-20261104
       - feat/d3m-engine10-registry-bound-review-package-signatures-20261104
       - feat/d3m-engine11-signing-integrity-preflight-20261104
+      - feat/d3m-engine12-stable-signature-verification-20261104
 
   workflow_dispatch:
   pull_request:
@@ -627,6 +628,9 @@ jobs:
 
       - name: Test filesystem-safe review package inventory
         run: npm run test:building-review-package-directory
+
+      - name: Test stable signed-package verification snapshot
+        run: npm run test:building-review-package-signature
 
       - name: Test registry-bound Ed25519 review package signatures and CLI
         run: npm run test:building-review-package-signature

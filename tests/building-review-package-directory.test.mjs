@@ -96,3 +96,30 @@ test("does not silently accept a directory swapped or mutated during inventory",
   const after = await readBuildingReviewPackageDirectory(packageDir);
   assert.equal(sameBuildingReviewPackageSnapshot(before, after), false);
 });
+
+
+test("reads detached signature control file through the stable no-follow reader", async (t) => {
+  const { packageDir, parent } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  await writeFile(signaturePath, JSON.stringify({ schemaVersion: "2.0.0" }));
+  const first = await (await import("../src/core/building-generation/building-review-package-directory.mjs"))
+    .readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  assert.equal(first.bytes.toString("utf8"), JSON.stringify({ schemaVersion: "2.0.0" }));
+  assert.equal(first.stat.isFile(), true);
+
+  const outside = path.join(parent, "external-signature.json");
+  await writeFile(outside, "{}");
+  await rm(signaturePath);
+  await symlink(outside, signaturePath);
+  await assert.rejects(
+    (await import("../src/core/building-generation/building-review-package-directory.mjs"))
+      .readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+    /review-package-symlink-not-allowed/,
+  );
+});
+
+test("control-file reader refuses arbitrary names and paths", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const { readBuildingReviewPackageControlFile } = await import("../src/core/building-generation/building-review-package-directory.mjs");
+  await assert.rejects(readBuildingReviewPackageControlFile(packageDir, "../outside"), /Only the detached signature/);
+});

@@ -67,3 +67,10 @@ The v2 signing CLI now takes a filesystem-safe snapshot of the entire package an
 The signer then writes the signature with exclusive-create semantics, inventories the package again, and requires the manifest and every artifact path/hash/byte count to match the pre-signing snapshot. If the package changed during that window, the signer removes only its own unchanged signature file and exits with an error. A warning-only integrity report can still proceed to human review when there are zero integrity errors; the CLI prints the warning count but never turns it into acceptance.
 
 The standalone integrity verifier, combined verifier and signer now share the filesystem-safe inventory reader. It rejects symlinks and special files, unsafe paths, and file identity/size/mtime/ctime drift during reads. This is a signing-time integrity check, not a lock against later filesystem modification: keep packages under controlled write access while signing, and rerun combined verification after transfer or storage.
+
+
+## Stable detached-signature verification (D3M-ENGINE-12)
+
+The combined verifier reads `package-manifest.sig.json` using the same descriptor-pinned, no-follow stable-file reader as package artifacts. After cryptographic verification it inventories the package again and requires the manifest/artifact snapshot token to remain unchanged. It also rereads the detached envelope and requires the exact bytes and file identity to remain unchanged.
+
+This detects package or signature mutation during verification; it is not a filesystem lock and cannot prevent later writes. Re-run verification after transfer and store review packages under controlled write access.
