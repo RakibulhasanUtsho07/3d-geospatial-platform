@@ -185,3 +185,22 @@ A `ready` result is only a precondition. It does not prove that the runner will 
 - The orchestration's media and architectural-geometry outputs remain distinct child candidates; its new parent guard binds each child report to the exact building ID, child job ID and expected workflow/profile. This does not replace the fresh single-image worker smoke described above.
 - The real TripoSR/rembg worker-host inference is still not recorded in issue [#307](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/307). CI uses fixtures/fakes and must not be reported as real inference.
 - Keep D3M-05 runtime acceptance, independent GLB inspection and all production release flags blocked until the actual host run and verifier evidence are supplied.
+
+
+## D3M-ENGINE-05 process-side model-load evidence — 2026-11-04
+
+The smoke report schema is upgraded to `1.2.0`. In addition to D3M-ENGINE-04's pre/post inventory fingerprints, the exact TripoSR runner process receives a private receipt destination and the three expected pre-inference SHA-256/byte-count pairs. A temporary Python `sitecustomize.py` instruments these loader boundaries:
+
+- `omegaconf.OmegaConf.load` for the TripoSR `config.yaml`.
+- `torch.load` for the TripoSR `model.ckpt`.
+- `onnxruntime.InferenceSession` for the active rembg ONNX model.
+
+For TripoSR config/checkpoint, the instrumentation opens the regular file, hashes it through a bounded-memory descriptor, verifies device/inode/size/mtime/ctime identity, and hands that same open descriptor to the loader. It verifies the descriptor again after the loader returns. For rembg ONNX files, it reads a regular file of at most 512 MiB into one immutable bytes object, hashes that object and passes the same object to ONNX Runtime. Missing or unsupported loader behavior fails closed. The smoke requires all three path-redacted receipts to match the D3M-ENGINE-04 pre-inference hashes and byte counts before it can report `passed`.
+
+Only role, loader name, byte count, SHA-256 and stable/exact-bytes booleans are stored in the private receipt/report. No model path, cache path, model bytes or raw loader output is recorded. The receipt file is private (0600 where POSIX mode controls apply) and lives in the temporary directory removed after the smoke.
+
+**Compatibility and limitations:** the independent verifier understands smoke schemas `1.0.0`, `1.1.0` and `1.2.0`. Schema 1.0.0 has no worker model fingerprints; schema 1.1.0 has pre/post fingerprints but no process-side loader receipts; both are explicitly labelled as legacy evidence. Only schema 1.2.0 requires and validates the three loader receipts. This is process-side instrumentation, not signed OS/hardware attestation: a modified or malicious runner could bypass the patched APIs or use an alternate loader. A compatibility change in the installed TripoSR/rembg stack that avoids these hooks must fail closed and be investigated rather than weakening the requirement.
+
+Reading a rembg ONNX model into memory adds up to 512 MiB peak model-buffer memory to the worker; plan RAM headroom accordingly. The instrumented file reads are bounded-memory for TripoSR config/checkpoint; they add I/O proportional to artifact size. This evidence establishes which exact bytes were handed to these instrumented loader APIs. It does not prove licence permission, successful/accurate inference, model trustworthiness, physical building truth, metric scale or georeferencing.
+
+The D3M-ENGINE-05 implementation is tracked in [issue #354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/354) and is stacked on the D3M-ENGINE-04 branch/PR #353. Automated fixtures exercise the loader hooks; they are not a real worker-host inference. Continue to keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false until the separate real-host, rights, reviewer, survey and human-inspection gates are completed.
