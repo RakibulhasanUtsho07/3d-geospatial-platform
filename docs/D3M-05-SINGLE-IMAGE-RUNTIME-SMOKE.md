@@ -213,3 +213,12 @@ Smoke schema `1.3.0` adds a separate `sourceLoadEvidence` object. The exact Trip
 The smoke requires exactly one valid source-image receipt bound to the report's `source.bytes` and `source.sha256`. A changed source, unrecognized loader input, malformed/duplicate receipt, or missing receipt blocks a successful smoke. The three D3M-ENGINE-05 model loader receipts remain separately mandatory.
 
 The independent verifier accepts legacy smoke schemas `1.0.0`, `1.1.0` and `1.2.0`, but labels them as having no source-image loader evidence. Only schema `1.3.0` requires and validates the Pillow receipt. This is process-side loader instrumentation, not OS/hardware attestation; it does not prove rights, building identity, model accuracy, metric scale or georeferencing. See [D3M-ENGINE-06](./D3M-ENGINE-06-SOURCE-IMAGE-LOAD-ATTESTATION.md) for the implementation contract and limits.
+
+
+## D3M-ENGINE-07 generation artifact receipt (smoke schema 1.4.0)
+
+A successful schema `1.4.0` smoke now writes a separate, write-once `.building-engine/runtime-smokes/<jobId>.artifact.json` receipt. The smoke report contains a relative path plus the exact receipt byte count, SHA-256 and canonical payload SHA-256. The receipt joins the on-disk media-to-model `workflow-report.json`, selected source and Pillow decoder evidence, pre/post TripoSR/rembg worker fingerprints, all three D3M-ENGINE-05 process-side model-loader receipts, the emitted GLB bytes/hash/mesh count and the geometry-QA summary. The workflow report is itself re-read and hashed before the receipt is created.
+
+The independent verifier re-hashes the receipt and workflow report, checks their exact identity and cross-bindings, then independently re-hashes the source/GLB and re-computes geometry QA. A missing, substituted, modified or malformed receipt/report fails closed. Smoke schemas `1.0.0`–`1.3.0` remain verifiable and are labelled `not-recorded-legacy-schema` for the new receipt; only `1.4.0` requires it. See [D3M-ENGINE-07](./D3M-ENGINE-07-GENERATION-ARTIFACT-RECEIPT.md).
+
+This local write-once/hash-bound sidecar is not a signature, hardware attestation or tamper-proof storage. It does not prove rights, model licence, accuracy, scale, georeferencing or survey truth. It cannot enable `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` or `automaticApproval`.
