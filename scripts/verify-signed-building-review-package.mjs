@@ -1,49 +1,26 @@
-#!/usr/bin/env node
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { readImageDimensions } from "../src/core/building-generation/image-quality-preflight.mjs";
-import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
 import {
   verifyBuildingReviewPackageSignature,
   verifyBuildingReviewPackageSignatureWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
+import { verifyBuildingReviewPackageDirectory } from "../src/core/building-generation/building-review-package-directory.mjs";
 
 const REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 async function regularFile(filePath, label) {
   const details = await lstat(filePath);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error(label + " must be a regular file, not a symlink");
-  return readFile(filePath);
-}
-
-async function listPackageFiles(root, current = root, files = []) {
-  const entries = await readdir(current, { withFileTypes: true });
-  entries.sort((a, b) => a.name.localeCompare(b.name));
-  for (const entry of entries) {
-    const fullPath = path.join(current, entry.name);
-    const details = await lstat(fullPath);
-    if (details.isSymbolicLink()) throw new Error("Symbolic links are not allowed inside review packages.");
-    if (details.isDirectory()) {
-      await listPackageFiles(root, fullPath, files);
-      continue;
-    }
-    if (!details.isFile()) throw new Error("Unsupported filesystem entry inside review package.");
-    const relativePath = path.relative(root, fullPath).split(path.sep).join("/");
-    if (relativePath === "package-manifest.json" || relativePath === "package-manifest.sig.json") continue;
-    const content = await readFile(fullPath);
-    const image = /\.(?:png|jpe?g)$/i.test(entry.name) ? readImageDimensions(content) : null;
-    files.push({
-      relativePath,
-      sha256: sha256(content),
-      bytes: content.length,
-      content,
-      isRegularFile: true,
-      ...(image ? { width: image.width, height: image.height } : {}),
-    });
+  const bytes = await readFile(filePath);
+  if (bytes.length === 0) throw new Error(label + " must not be empty");
+  const after = await lstat(filePath);
+  if (!after.isFile() || after.isSymbolicLink() ||
+      details.dev !== after.dev || details.ino !== after.ino ||
+      details.size !== after.size || details.mtimeMs !== after.mtimeMs ||
+      details.ctimeMs !== after.ctimeMs) {
+    throw new Error(label + " changed while it was being read");
   }
-  return files;
+  return bytes;
 }
 
 function parseArguments(args) {
@@ -76,24 +53,15 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) {
     console.log("Usage: NODE_ENV=production npm run verify:signed-building-review-package -- <review-package-directory> [verification-report.json] [--legacy-public-key <trusted-public-key.pem>]");
-    console.log("Runs offline artifact integrity and detached-signature verification. Schema 2 signatures use RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON; schema 1 requires the explicit legacy public-key flag.");
+    console.log("Runs the shared filesystem-safe package integrity inventory and detached-signature verification. Schema 2 signatures use RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON; schema 1 requires the explicit legacy public-key flag.");
     return;
   }
   const { packageDir, reportPath: requestedReportPath, legacyPublicKeyPath } = parseArguments(args);
+  const snapshot = await verifyBuildingReviewPackageDirectory(packageDir);
   const manifestPath = path.join(packageDir, "package-manifest.json");
   const signaturePath = path.join(packageDir, "package-manifest.sig.json");
-  const [manifestBytes, signatureBytes] = await Promise.all([
-    regularFile(manifestPath, "Package manifest"),
-    regularFile(signaturePath, "Signature envelope"),
-  ]);
-  const packageManifest = JSON.parse(manifestBytes.toString("utf8"));
+  const signatureBytes = await regularFile(signaturePath, "Signature envelope");
   const signatureEnvelope = JSON.parse(signatureBytes.toString("utf8"));
-  const actualFiles = await listPackageFiles(packageDir);
-  const integrity = verifyBuildingReviewPackage({
-    packageManifest,
-    actualFiles,
-    packageManifestSha256: sha256(manifestBytes),
-  });
 
   let signature;
   if (signatureEnvelope.schemaVersion === "2.0.0") {
@@ -106,7 +74,7 @@ async function main() {
       throw new Error("trusted-reviewer-registry-secret-exceeds-size-limit");
     }
     signature = verifyBuildingReviewPackageSignatureWithTrustedRegistry({
-      manifestBytes,
+      manifestBytes: snapshot.packageManifestBytes,
       signatureEnvelope,
       trustedReviewerRegistry: rawRegistry,
     });
@@ -114,7 +82,7 @@ async function main() {
     if (!legacyPublicKeyPath) throw new Error("legacy-v1-signature-requires-explicit---legacy-public-key");
     const publicKeyBytes = await regularFile(legacyPublicKeyPath, "Legacy trusted public key");
     signature = verifyBuildingReviewPackageSignature({
-      manifestBytes,
+      manifestBytes: snapshot.packageManifestBytes,
       signatureEnvelope,
       trustedPublicKeyPem: publicKeyBytes.toString("utf8"),
     });
@@ -122,14 +90,16 @@ async function main() {
     throw new Error("unsupported-review-package-signature-schema");
   }
 
+  const integrity = snapshot.integrity;
   const valid = integrity.valid === true && signature.valid === true;
   const result = {
     schemaVersion: "1.0.0",
     engine: "signed-building-review-package-verification-v1",
     status: valid ? "verified" : "tampered-or-invalid",
     valid,
-    buildingId: packageManifest.buildingId ?? null,
-    packageManifestSha256: sha256(manifestBytes),
+    buildingId: snapshot.packageManifest.buildingId ?? null,
+    packageManifestSha256: snapshot.packageManifestSha256,
+    packageSnapshotSha256: snapshot.snapshotToken,
     packageIntegrity: {
       status: integrity.status,
       valid: integrity.valid,
@@ -174,6 +144,8 @@ async function main() {
     valid,
     buildingId: result.buildingId,
     packageIntegrity: integrity.status,
+    packageIntegrityWarnings: integrity.counts.warnings,
+    packageSnapshotSha256: snapshot.snapshotToken,
     signature: signature.status,
     reviewerId: result.signature.reviewerId,
     keyId: result.signature.keyId,
