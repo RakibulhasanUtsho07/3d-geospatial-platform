@@ -238,6 +238,7 @@ async function fakeWorkflowResult(options, root, source, {
       },
       mapReady: false,
       publicationEligible: false,
+      warnings: [],
   };
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   return {
