@@ -84,3 +84,40 @@ The following evidence must still be supplied independently:
 6. exact approved GLB hash and placement proven in a browser/Cesium release candidate.
 
 No real-building accuracy percentage, geospatial placement accuracy, publication or production map readiness is claimed until these gates are independently satisfied.
+
+## Explicit Cesium catalog handoff
+
+When the two child workflows finish and the geometry child exports a zero-blocker textured GLB, `publishEvidenceBackedVerticalSlice` can bind that exact output to the repository's existing versioned generated-model catalog. The entry point is `src/core/building-generation/publish-evidence-backed-vertical-slice.mjs`.
+
+It requires:
+- the completed parent `vertical-slice-report.json`;
+- an attestation file inside the same private workspace;
+- `attestation.candidateSha256` equal to the actual textured geometry GLB SHA-256;
+- `attestation.verticalSliceReportSha256` equal to the exact parent-report bytes;
+- `attestation.sourceSetSha256` equal to the source-set hash recorded by the parent report;
+- `attestation.model.id` equal to the parent `buildingId`;
+- an exact review-evidence file path and SHA-256;
+- all six existing publication checks explicitly true, plus a complete WGS84-ellipsoid placement (longitude, latitude, height, orientation, scale, up/forward axes).
+
+Create a JSON configuration file for the operator CLI:
+
+```json
+{
+  "workspaceRoot": "D:/building-workspace",
+  "reportPath": ".building-engine/vertical-slices/building-a/job-a/vertical-slice-report.json",
+  "attestationPath": "review/building-a-publication-attestation.json",
+  "publicRoot": "D:/3d-geospatial-platform"
+}
+```
+
+The attestation must contain the exact parent report SHA-256 and source-set hash as well as the candidate GLB hash. Calculate the parent hash only after its report is final and immutable; any report edit requires a new attestation. Do not copy placeholder coordinates or set checks true without independent evidence.
+
+Run the explicit command from the repository:
+
+```powershell
+npm run publish:evidence-backed-vertical-slice -- .\publish-config.json
+```
+
+The handoff delegates to the existing versioned catalog publisher. It writes a content-addressed GLB under `public/models/generated/` and updates `public/models/generated/manifest.json`; deploy/commit those two public outputs together. The Cesium generated-model layer reads the catalog and uses its active version. This explicit catalog write is public distribution of the GLB, not a preview-only action.
+
+**Trust boundary:** this v1 attestation is operator-supplied. The existing catalog publisher validates the six boolean checks, candidate/evidence hashes and WGS84 placement, but it does not cryptographically authenticate the reviewer or prove that source-owner authority, architectural fidelity, metric scale, independent survey checkpoints or vertical datum are true. The D3M-01 Ed25519 trusted-reviewer registry and the BRF-25 independent-truth process are separate prerequisites. No production reviewer key is provisioned in this PR. A catalog entry must not be created for a real building until those independent gates are satisfied by the platform operator. The parent workflow's `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` flags remain false even after an explicit catalog write; catalog existence is not an accuracy or acceptance assertion.
