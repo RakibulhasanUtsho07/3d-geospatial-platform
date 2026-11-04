@@ -222,3 +222,14 @@ A successful schema `1.4.0` smoke now writes a separate, write-once `.building-e
 The independent verifier re-hashes the receipt and workflow report, checks their exact identity and cross-bindings, then independently re-hashes the source/GLB and re-computes geometry QA. A missing, substituted, modified or malformed receipt/report fails closed. Smoke schemas `1.0.0`–`1.3.0` remain verifiable and are labelled `not-recorded-legacy-schema` for the new receipt; only `1.4.0` requires it. See [D3M-ENGINE-07](./D3M-ENGINE-07-GENERATION-ARTIFACT-RECEIPT.md).
 
 This local write-once/hash-bound sidecar is not a signature, hardware attestation or tamper-proof storage. It does not prove rights, model licence, accuracy, scale, georeferencing or survey truth. It cannot enable `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` or `automaticApproval`.
+
+
+## D3M-ENGINE-08 — optional single-image ground-control evidence (smoke schema 1.5.0)
+
+The single-image runtime smoke accepts an optional workspace-relative control-point manifest JSON file. It binds the building ID, selected source ID and exact source-image SHA-256; declares horizontal CRS EPSG:4326 and horizontal datum WGS84; explicitly leaves vertical datum not-provided; and records survey method/reference/date and declared horizontal accuracy. At least three unique, non-collinear controls are required, and every point must identify the selected source through evidenceSourceId.
+
+The smoke validates and hashes the manifest before model generation, passes the normalized control points and configured RMS/max-residual thresholds into the existing registerModelToWgs84 workflow, then re-reads the manifest after generation and rejects byte/hash drift. The registration is tied to the exact GLB SHA-256 in smoke report schema 1.5.0 and generation-artifact receipt schema 1.1.0.
+
+The independent verifier re-reads and hashes the manifest, validates the building/source binding and recomputes the WGS84 horizontal similarity registration. It rejects altered manifest bytes, changed control points, wrong GLB/source identity, or registration that differs from the workflow report or artifact receipt. Smoke schemas 1.0.0–1.4.0 and receipt schema 1.0.0 remain supported; only schema 1.5.0 requires georeference evidence. No-manifest runs are explicitly labelled not-requested.
+
+Trust limits: survey metadata and control points are operator-supplied, not independently authenticated. A low residual does not prove that points correspond to the correct GLB vertices, prove survey quality, solve height datum or establish model accuracy. Horizontal registration remains human-review-only. Keep groundTruth, acceptanceEligible, publicationEligible, mapReady and automaticApproval false.

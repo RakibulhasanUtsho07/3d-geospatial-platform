@@ -4,12 +4,14 @@ import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
+import { verifySingleImageGeoreferenceEvidence } from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
-const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
-const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
-const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
-const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -225,7 +227,8 @@ async function verifyGenerationArtifactReceipt({
   exactKeys(pointer, ["bytes", "path", "payloadSha256", "schemaVersion", "sha256"], "Generation artifact receipt reference");
   const relativePath = safeRelativePath(pointer.path, "Generation artifact receipt path");
   const expectedReceiptPath = ".building-engine/runtime-smokes/" + jobId + ".artifact.json";
-  if (pointer.schemaVersion !== "1.0.0" || relativePath !== expectedReceiptPath ||
+  const expectedReceiptSchemaVersion = report.schemaVersion === "1.5.0" ? "1.1.0" : "1.0.0";
+  if (pointer.schemaVersion !== expectedReceiptSchemaVersion || relativePath !== expectedReceiptPath ||
       !Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0 || pointer.bytes > 256 * 1024 ||
       !HASH.test(pointer.sha256 ?? "") || !HASH.test(pointer.payloadSha256 ?? "")) {
     throw new TypeError("Generation artifact receipt reference is invalid or does not match this smoke job.");
@@ -244,7 +247,7 @@ async function verifyGenerationArtifactReceipt({
   }
   const envelope = JSON.parse(receiptBytes.toString("utf8"));
   exactKeys(envelope, ["payload", "payloadSha256", "schemaVersion"], "Generation artifact receipt envelope");
-  if (envelope.schemaVersion !== "1.0.0" || !HASH.test(envelope.payloadSha256 ?? "") ||
+  if (envelope.schemaVersion !== pointer.schemaVersion || !HASH.test(envelope.payloadSha256 ?? "") ||
       envelope.payloadSha256 !== pointer.payloadSha256 ||
       sha256(Buffer.from(canonicalJson(envelope.payload), "utf8")) !== envelope.payloadSha256 ||
       !receiptBytes.equals(Buffer.from(JSON.stringify(envelope, null, 2) + "\n", "utf8"))) {
@@ -252,11 +255,13 @@ async function verifyGenerationArtifactReceipt({
   }
 
   const payload = envelope.payload;
+  const receiptHasGeoreference = pointer.schemaVersion === "1.1.0";
   exactKeys(payload, [
     "buildingId", "geometryQa", "jobId", "kind", "modelLoadEvidence",
     "output", "schemaVersion", "source", "workerHost", "workflowReport",
+    ...(receiptHasGeoreference ? ["georeference"] : []),
   ], "Generation artifact receipt payload");
-  if (payload.schemaVersion !== "1.0.0" ||
+  if (payload.schemaVersion !== pointer.schemaVersion ||
       payload.kind !== "single-image-generation-artifact" ||
       payload.jobId !== jobId || payload.buildingId !== report.buildingId) {
     throw new TypeError("Generation artifact receipt payload identity is invalid.");
@@ -308,7 +313,7 @@ async function verifyGenerationArtifactReceipt({
     "counts", "engine", "schemaVersion", "sourceStatus", "status", "valid", "warningCount", "warnings",
   ], "Generation receipt geometry QA binding");
   const expectedPayload = {
-    schemaVersion: "1.0.0",
+    schemaVersion: pointer.schemaVersion,
     kind: "single-image-generation-artifact",
     buildingId: report.buildingId,
     jobId,
@@ -351,6 +356,20 @@ async function verifyGenerationArtifactReceipt({
       counts: report.geometryQa.counts,
     },
   };
+  if (receiptHasGeoreference) {
+    const verifiedGeoreference = await verifySingleImageGeoreferenceEvidence({
+      workspaceRoot: root,
+      evidence: report.georeferenceEvidence,
+      buildingId: report.buildingId,
+      sourceId: report.source.sourceId,
+      sourceSha256: sourceHash,
+      modelSha256: modelHash,
+    });
+    if (canonicalJson(workflowReport.georeference ?? null) !== canonicalJson(verifiedGeoreference.registration)) {
+      throw new TypeError("Generation workflow report georeference differs from independently recomputed control-point registration.");
+    }
+    expectedPayload.georeference = verifiedGeoreference;
+  }
   if (canonicalJson(payload) !== canonicalJson(expectedPayload)) {
     throw new TypeError("Generation artifact receipt is not fully bound to the source, worker, GLB and independent geometry-QA evidence.");
   }
@@ -391,6 +410,7 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
         LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
       ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
@@ -403,17 +423,24 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasProcessLoadEvidence = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasSourceImageLoadEvidence = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
-  const hasGenerationArtifactReceipt = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasGenerationArtifactReceipt = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasGeoreferenceEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
   if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
   if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
   if (hasSourceImageLoadEvidence) validateSourceImageLoadEvidence(report);
@@ -568,6 +595,9 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       ? "verified-against-source-manifest" : "not-recorded-legacy-schema",
     generationArtifactReceiptStatus: hasGenerationArtifactReceipt
       ? "verified" : "not-recorded-legacy-schema",
+    georeferenceEvidenceStatus: hasGeoreferenceEvidence
+      ? report.georeferenceEvidence.status : "not-recorded-legacy-schema",
+    ...(hasGeoreferenceEvidence ? { georeferenceEvidence: report.georeferenceEvidence } : {}),
     ...(generationArtifactReceipt ? { generationArtifactReceipt } : {}),
     ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
     ...(hasProcessLoadEvidence ? { modelLoadEvidence: report.modelLoadEvidence } : {}),
