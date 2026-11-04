@@ -20,7 +20,7 @@ import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilit
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
 import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -32,22 +32,212 @@ const OFFLINE_ENV = Object.freeze({
   HF_DATASETS_OFFLINE: "1",
   HF_HUB_DISABLE_TELEMETRY: "1",
 });
-const OFFLINE_SITE_CUSTOMIZE = [
-  "import socket",
-  "def _deny_runtime_network(*args, **kwargs):",
-  "    raise OSError('network access is disabled by the single-image runtime smoke')",
-  "socket.socket.connect = _deny_runtime_network",
-  "socket.socket.connect_ex = _deny_runtime_network",
-  "socket.socket.send = _deny_runtime_network",
-  "socket.socket.sendall = _deny_runtime_network",
-  "socket.socket.sendto = _deny_runtime_network",
-  "socket.socket.sendmsg = _deny_runtime_network",
-  "socket.create_connection = _deny_runtime_network",
-  "socket.getaddrinfo = _deny_runtime_network",
-  "socket.gethostbyname = _deny_runtime_network",
-  "socket.gethostbyname_ex = _deny_runtime_network",
-  "",
-].join("\n");
+export const SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE = String.raw`import builtins, hashlib, io, json, os, socket, stat, sys
+
+def _deny_runtime_network(*args, **kwargs):
+    raise OSError('network access is disabled by the single-image runtime smoke')
+
+socket.socket.connect = _deny_runtime_network
+socket.socket.connect_ex = _deny_runtime_network
+socket.socket.send = _deny_runtime_network
+socket.socket.sendall = _deny_runtime_network
+socket.socket.sendto = _deny_runtime_network
+socket.socket.sendmsg = _deny_runtime_network
+socket.create_connection = _deny_runtime_network
+socket.getaddrinfo = _deny_runtime_network
+socket.gethostbyname = _deny_runtime_network
+socket.gethostbyname_ex = _deny_runtime_network
+
+_RECEIPT = os.environ.get('BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH')
+try:
+    _EXPECTED = json.loads(os.environ.get('BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON', '{}'))
+except Exception:
+    _EXPECTED = {}
+_PATCHED = set()
+_ROLE_BY_LOADER = {
+    'omegaconf.OmegaConf.load': 'tripoConfig',
+    'torch.load': 'tripoCheckpoint',
+    'onnxruntime.InferenceSession': 'rembgWeights',
+}
+_MAX_ONNX_BYTES = 512 * 1024 * 1024
+
+def _signature(item):
+    return (
+        item.st_dev, item.st_ino, item.st_size,
+        getattr(item, 'st_mtime_ns', int(item.st_mtime * 1000000000)),
+        getattr(item, 'st_ctime_ns', int(item.st_ctime * 1000000000)),
+    )
+
+def _hash_open_file(handle):
+    before = os.fstat(handle.fileno())
+    if not stat.S_ISREG(before.st_mode) or before.st_size <= 0:
+        return None, None, False
+    digest = hashlib.sha256()
+    total = 0
+    handle.seek(0)
+    while True:
+        chunk = handle.read(8 * 1024 * 1024)
+        if not chunk:
+            break
+        digest.update(chunk)
+        total += len(chunk)
+    handle.seek(0)
+    after = os.fstat(handle.fileno())
+    try:
+        path_after = os.stat(handle.name)
+    except Exception:
+        return None, None, False
+    stable = (
+        _signature(before) == _signature(after) == _signature(path_after)
+        and total == after.st_size
+    )
+    return digest.hexdigest(), total, stable
+
+def _append_receipt(loader, digest, byte_count, stable):
+    role = _ROLE_BY_LOADER.get(loader)
+    expected = _EXPECTED.get(role) if role else None
+    if not role or not isinstance(expected, dict):
+        return
+    if not stable:
+        raise OSError('model artifact changed while its loader was reading it')
+    if digest != expected.get('sha256') or byte_count != expected.get('bytes'):
+        return
+    if not isinstance(_RECEIPT, str) or not _RECEIPT:
+        raise OSError('model-load receipt destination is unavailable')
+    event = {
+        'schemaVersion': '1.0.0',
+        'role': role,
+        'loader': loader,
+        'bytes': byte_count,
+        'sha256': digest,
+        'exactBytesPassed': True,
+        'stable': True,
+    }
+    payload = (json.dumps(event, sort_keys=True, separators=(',', ':')) + '\n').encode('utf-8')
+    flags = os.O_WRONLY | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0)
+    descriptor = os.open(_RECEIPT, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError('model-load receipt is not a regular file')
+        written = 0
+        while written < len(payload):
+            written += os.write(descriptor, payload[written:])
+    finally:
+        os.close(descriptor)
+
+def _tracked_file_loader(loader, original, file_value, args, kwargs):
+    if not isinstance(file_value, (str, bytes, os.PathLike)):
+        return original(file_value, *args, **kwargs)
+    if loader == 'torch.load' and kwargs.get('mmap') is True:
+        raise OSError('mmap checkpoint loading is unsupported by model-load attestation')
+    with open(file_value, 'rb') as handle:
+        digest, byte_count, stable = _hash_open_file(handle)
+        role = _ROLE_BY_LOADER[loader]
+        expected = _EXPECTED.get(role, {})
+        if not stable:
+            raise OSError('model artifact could not be fingerprinted through a stable file descriptor')
+        if digest != expected.get('sha256') or byte_count != expected.get('bytes'):
+            return original(file_value, *args, **kwargs)
+        if loader == 'omegaconf.OmegaConf.load':
+            text_handle = io.TextIOWrapper(handle, encoding='utf-8')
+            try:
+                result = original(text_handle, *args, **kwargs)
+            finally:
+                try:
+                    text_handle.detach()
+                except Exception:
+                    pass
+        else:
+            result = original(handle, *args, **kwargs)
+        after_digest, after_bytes, after_stable = _hash_open_file(handle)
+        stable_after_load = (
+            after_stable and digest == after_digest and byte_count == after_bytes
+        )
+        if not stable_after_load:
+            raise OSError('model artifact changed during its loader call')
+        _append_receipt(loader, digest, byte_count, stable_after_load)
+        return result
+
+def _tracked_onnx_session(original, model_path_or_bytes, args, kwargs):
+    if isinstance(model_path_or_bytes, (str, os.PathLike)):
+        model_path = os.fspath(model_path_or_bytes)
+        with open(model_path, 'rb') as handle:
+            before = os.fstat(handle.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_ONNX_BYTES:
+                raise OSError('rembg ONNX model file is not a supported regular file')
+            model_bytes = handle.read(_MAX_ONNX_BYTES + 1)
+            after = os.fstat(handle.fileno())
+            try:
+                path_after = os.stat(model_path)
+            except Exception:
+                raise OSError('rembg ONNX model path changed during read')
+            stable = (
+                _signature(before) == _signature(after) == _signature(path_after)
+                and len(model_bytes) == after.st_size
+                and len(model_bytes) <= _MAX_ONNX_BYTES
+            )
+        if not stable:
+            raise OSError('rembg ONNX model changed while its bytes were captured')
+        digest = hashlib.sha256(model_bytes).hexdigest()
+        expected = _EXPECTED.get('rembgWeights', {})
+        if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
+            return original(model_path_or_bytes, *args, **kwargs)
+        result = original(model_bytes, *args, **kwargs)
+        _append_receipt(
+            'onnxruntime.InferenceSession', digest, len(model_bytes), True
+        )
+        return result
+    if isinstance(model_path_or_bytes, (bytes, bytearray, memoryview)):
+        model_bytes = bytes(model_path_or_bytes)
+        digest = hashlib.sha256(model_bytes).hexdigest()
+        expected = _EXPECTED.get('rembgWeights', {})
+        result = original(model_bytes, *args, **kwargs)
+        if digest == expected.get('sha256') and len(model_bytes) == expected.get('bytes'):
+            _append_receipt(
+                'onnxruntime.InferenceSession', digest, len(model_bytes), True
+            )
+        return result
+    return original(model_path_or_bytes, *args, **kwargs)
+
+def _patch_module(name, module):
+    if not _RECEIPT or module is None or name in _PATCHED:
+        return
+    if name == 'torch' and callable(getattr(module, 'load', None)):
+        original = module.load
+        def tracked_load(file_value, *args, **kwargs):
+            return _tracked_file_loader('torch.load', original, file_value, args, kwargs)
+        module.load = tracked_load
+        _PATCHED.add(name)
+    elif name == 'omegaconf' and getattr(module, 'OmegaConf', None) is not None:
+        config_class = module.OmegaConf
+        original = getattr(config_class, 'load', None)
+        if callable(original):
+            def tracked_config_load(file_value, *args, **kwargs):
+                return _tracked_file_loader(
+                    'omegaconf.OmegaConf.load', original, file_value, args, kwargs
+                )
+            config_class.load = staticmethod(tracked_config_load)
+            _PATCHED.add(name)
+    elif name == 'onnxruntime' and callable(getattr(module, 'InferenceSession', None)):
+        original = module.InferenceSession
+        def tracked_inference_session(model_path_or_bytes, *args, **kwargs):
+            return _tracked_onnx_session(
+                original, model_path_or_bytes, args, kwargs
+            )
+        module.InferenceSession = tracked_inference_session
+        _PATCHED.add(name)
+
+_original_import = builtins.__import__
+def _import_with_model_load_tracking(name, globals=None, locals=None, fromlist=(), level=0):
+    imported = _original_import(name, globals, locals, fromlist, level)
+    module_name = name.split('.', 1)[0]
+    _patch_module(module_name, sys.modules.get(module_name))
+    return imported
+
+if _RECEIPT:
+    builtins.__import__ = _import_with_model_load_tracking
+`;
+const OFFLINE_SITE_CUSTOMIZE = SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE;
 
 function safeId(value, label, maxLength = 80) {
   if (typeof value !== "string" || !SAFE_ID.test(value) || value.length > maxLength) {
@@ -280,6 +470,7 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
   runnerScript,
   onRunnerLaunchAttempt,
   onRunnerProcessStarted,
+  modelLoadAttestation,
 } = {}) {
   return (executable, args, options = {}) => {
     const isRunnerInvocation = executable === pythonPath &&
@@ -299,6 +490,23 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
           process.env.PYTHONPATH,
         ].filter(Boolean).join(path.delimiter),
         ...OFFLINE_ENV,
+        ...(isRunnerInvocation && modelLoadAttestation?.expectedArtifacts ? {
+          BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH: modelLoadAttestation.receiptPath,
+          BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON: JSON.stringify({
+            tripoConfig: {
+              bytes: modelLoadAttestation.expectedArtifacts.tripoConfig.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.tripoConfig.sha256,
+            },
+            tripoCheckpoint: {
+              bytes: modelLoadAttestation.expectedArtifacts.tripoCheckpoint.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.tripoCheckpoint.sha256,
+            },
+            rembgWeights: {
+              bytes: modelLoadAttestation.expectedArtifacts.rembgWeights.bytes,
+              sha256: modelLoadAttestation.expectedArtifacts.rembgWeights.sha256,
+            },
+          }),
+        } : {}),
       },
     });
     if (isRunnerInvocation && typeof child?.once === "function") {
@@ -370,6 +578,76 @@ function workerFingerprintBlockers(inventory) {
     blockers.push("rembg-weight-fingerprint-incomplete");
   }
   return [...new Set(blockers)].slice(0, 20);
+}
+
+
+async function readModelLoadEvidence(receiptPath, expectedSnapshot) {
+  const entry = await lstat(receiptPath);
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size <= 0 || entry.size > 64 * 1024) {
+    throw new TypeError("TripoSR/rembg model-load receipt is missing, unsafe or exceeds its size limit.");
+  }
+  if (process.platform !== "win32" && (entry.mode & 0o077) !== 0) {
+    throw new TypeError("TripoSR/rembg model-load receipt permissions are not private.");
+  }
+  const receiptText = await readFile(receiptPath, "utf8");
+  const events = receiptText.split(/\r?\n/).filter((line) => line.length > 0);
+  if (!events.length || events.length > 64) {
+    throw new TypeError("TripoSR/rembg model-load receipt has no events or too many events.");
+  }
+  const expected = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const loaders = {};
+  for (const [role, loader] of expected) {
+    const artifact = expectedSnapshot?.modelArtifacts?.[role];
+    if (!Number.isSafeInteger(artifact?.bytes) || artifact.bytes <= 0 ||
+        !/^[a-f0-9]{64}$/.test(artifact?.sha256 ?? "")) {
+      throw new TypeError("Pre-inference worker model fingerprint is incomplete for " + role + ".");
+    }
+    const matchingEvents = [];
+    for (const line of events) {
+      let event;
+      try { event = JSON.parse(line); } catch {
+        throw new TypeError("TripoSR/rembg model-load receipt contains malformed JSON.");
+      }
+      const keys = Object.keys(event ?? {}).sort();
+      if (JSON.stringify(keys) !== JSON.stringify([
+        "bytes", "exactBytesPassed", "loader", "role", "schemaVersion", "sha256", "stable",
+      ].sort())) {
+        throw new TypeError("TripoSR/rembg model-load receipt contains unexpected or path-bearing fields.");
+      }
+      if (event.schemaVersion !== "1.0.0" ||
+          !["tripoConfig", "tripoCheckpoint", "rembgWeights"].includes(event.role) ||
+          !["omegaconf.OmegaConf.load", "torch.load", "onnxruntime.InferenceSession"].includes(event.loader) ||
+          !Number.isSafeInteger(event.bytes) || event.bytes <= 0 ||
+          !/^[a-f0-9]{64}$/.test(event.sha256 ?? "") ||
+          event.exactBytesPassed !== true || event.stable !== true) {
+        throw new TypeError("TripoSR/rembg model-load receipt contains an invalid loader event.");
+      }
+      if (event.role === role) matchingEvents.push(event);
+    }
+    if (!matchingEvents.length || matchingEvents.some((event) =>
+      event.loader !== loader ||
+      event.bytes !== artifact.bytes ||
+      event.sha256 !== artifact.sha256
+    )) {
+      throw new TypeError("TripoSR/rembg model-load receipt does not bind " + role + " to the exact pre-inference bytes.");
+    }
+    loaders[role] = {
+      loader,
+      bytes: artifact.bytes,
+      sha256: artifact.sha256,
+      exactBytesPassed: true,
+      stable: true,
+    };
+  }
+  return {
+    schemaVersion: "1.0.0",
+    status: "verified",
+    loaders,
+  };
 }
 
 function workerFingerprintValues(snapshot) {
@@ -482,6 +760,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       after: null,
       stableAcrossInference: null,
     },
+    modelLoadEvidence: null,
     source: {
       sourceId,
       relativePath: relativePath,
@@ -525,11 +804,15 @@ export async function runSingleImageRuntimeSmoke(options) {
     },
   };
   const offlinePythonDirectory = await mkdtemp(path.join(os.tmpdir(), "single-image-offline-"));
+  const modelLoadReceiptPath = path.join(offlinePythonDirectory, "model-load-receipt.jsonl");
+  const modelLoadAttestation = { receiptPath: modelLoadReceiptPath, expectedArtifacts: null };
   try {
     await writeFile(path.join(offlinePythonDirectory, "sitecustomize.py"), OFFLINE_SITE_CUSTOMIZE, {
       flag: "wx",
       mode: 0o600,
     });
+    await writeFile(modelLoadReceiptPath, "", { flag: "wx", mode: 0o600 });
+    await chmod(modelLoadReceiptPath, 0o600);
     await createInitialReport(reportPath, report);
   } catch (error) {
     await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
@@ -541,6 +824,7 @@ export async function runSingleImageRuntimeSmoke(options) {
   const spawnOffline = offlineSpawn(spawnImpl, offlinePythonDirectory, {
     pythonPath,
     runnerScript,
+    modelLoadAttestation,
     onRunnerLaunchAttempt: () => {
       runnerLaunchAttempted = true;
     },
@@ -574,6 +858,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       after: null,
       stableAcrossInference: null,
     };
+    modelLoadAttestation.expectedArtifacts = beforeSnapshot.modelArtifacts;
     report.readiness = {
       strategy: "single-image-ai",
       status: blockers.length ? "blocked" : "ready",
@@ -620,6 +905,8 @@ export async function runSingleImageRuntimeSmoke(options) {
     if (!runnerProcessStarted) {
       throw new TypeError("TripoSR runner did not emit a process-spawn event; runtime inference cannot be confirmed.");
     }
+    report.modelLoadEvidence = await readModelLoadEvidence(modelLoadReceiptPath, beforeSnapshot);
+    await replaceReportAtomically(reportPath, report);
 
     const workflowReport = workflow?.report;
     if (!workflowReport || workflowReport.jobId !== jobId ||
