@@ -227,6 +227,7 @@ test("requires non-collinear ground-control points and explicit no-control mode"
 function manifestWithVertical() {
   const value = manifest();
   value.schemaVersion = "1.1.0";
+  value.verticalDatum = "EPSG:4979-ellipsoidal";
   value.vertical = {
     crs: "EPSG:4979",
     heightType: "ellipsoidal",
