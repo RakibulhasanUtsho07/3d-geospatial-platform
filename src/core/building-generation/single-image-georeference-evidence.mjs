@@ -698,6 +698,9 @@ function createIndependent3DCheckpointEvidence({
   }
   const radians = (degrees) => degrees * Math.PI / 180;
   const wrapRadians = (value) => ((value + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const exactHorizontalErrors = [];
+  const exactVerticalErrors = [];
+  const exactSpatial3dErrors = [];
   const predicted = checkpoints.points.map((point) => {
     const predictedEast = scale * (cosine * point.modelX - sine * point.modelZ) + transform.translationEastM;
     const predictedNorth = scale * (sine * point.modelX + cosine * point.modelZ) + transform.translationNorthM;
@@ -715,6 +718,9 @@ function createIndependent3DCheckpointEvidence({
     const predictedEllipsoidalHeightM = verticalEvidence.heightOffsetM + scale * point.modelY;
     const verticalResidualM = predictedEllipsoidalHeightM - point.ellipsoidalHeightM;
     const spatial3dErrorM = Math.hypot(horizontalErrorM, verticalResidualM);
+    exactHorizontalErrors.push(horizontalErrorM);
+    exactVerticalErrors.push(verticalResidualM);
+    exactSpatial3dErrors.push(spatial3dErrorM);
     return {
       id: point.id, observationId: point.observationId,
       observationRecordSha256: point.observationRecordSha256,
@@ -730,19 +736,13 @@ function createIndependent3DCheckpointEvidence({
       horizontalErrorM: round(horizontalErrorM),
       verticalResidualM: round(verticalResidualM),
       spatial3dErrorM: round(spatial3dErrorM),
-      _horizontalErrorExact: horizontalErrorM,
-      _verticalResidualExact: verticalResidualM,
-      _spatial3dErrorExact: spatial3dErrorM,
       evidence: "manifest-declared-held-out-observation",
     };
   });
-  const horizontalErrors = predicted.map((point) => point._horizontalErrorExact);
-  const verticalErrors = predicted.map((point) => point._verticalResidualExact);
-  const spatialErrors = predicted.map((point) => point._spatial3dErrorExact);
-  const reportPoints = predicted.map((point) => {
-    const { _horizontalErrorExact, _verticalResidualExact, _spatial3dErrorExact, ...reportPoint } = point;
-    return reportPoint;
-  });
+  const horizontalErrors = exactHorizontalErrors;
+  const verticalErrors = exactVerticalErrors;
+  const spatialErrors = exactSpatial3dErrors;
+  const reportPoints = predicted;
   const rms = (values) => Math.sqrt(values.reduce((sum, value) => sum + value ** 2, 0) / values.length);
   const maxAbs = (values) => Math.max(...values.map((value) => Math.abs(value)));
   const horizontalRmsErrorM = rms(horizontalErrors);
