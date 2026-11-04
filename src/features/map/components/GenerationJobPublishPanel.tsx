@@ -227,14 +227,15 @@ export default function GenerationJobPublishPanel({
               accept=".json,application/json"
               required
               onChange={async (event) => {
-                const file = event.currentTarget.files?.[0];
+                const inputElement = event.currentTarget;
+                const file = inputElement.files?.[0];
                 setReviewReceipt(null);
                 setReviewReceiptName("");
                 setError(null);
                 if (!file) return;
                 if (file.size < 1 || file.size > 8 * 1024) {
                   setError("Signed reviewer receipt must be a non-empty JSON file no larger than 8 KiB.");
-                  event.currentTarget.value = "";
+                  inputElement.value = "";
                   return;
                 }
                 try {
@@ -246,7 +247,7 @@ export default function GenerationJobPublishPanel({
                   setReviewReceiptName(file.name);
                 } catch (cause) {
                   setError(cause instanceof Error ? cause.message : "Could not read signed reviewer receipt JSON.");
-                  event.currentTarget.value = "";
+                  inputElement.value = "";
                 }
               }}
               className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-xs text-white file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-zinc-950"
