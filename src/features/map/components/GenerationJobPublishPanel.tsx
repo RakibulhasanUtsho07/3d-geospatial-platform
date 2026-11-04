@@ -56,6 +56,8 @@ export default function GenerationJobPublishPanel({
   const [expanded, setExpanded] = useState(false);
   const [token, setToken] = useState("");
   const [jobId, setJobId] = useState("");
+  const [reviewReceipt, setReviewReceipt] = useState<Record<string, unknown> | null>(null);
+  const [reviewReceiptName, setReviewReceiptName] = useState("");
   const [longitude, setLongitude] = useState("");
   const [latitude, setLatitude] = useState("");
   const [height, setHeight] = useState("");
@@ -77,6 +79,10 @@ export default function GenerationJobPublishPanel({
 
     if (token.length < 32) {
       setError("Enter the configured publication token (at least 32 characters).");
+      return;
+    }
+    if (!reviewReceipt) {
+      setError("Upload the Ed25519-signed reviewer receipt for this exact immutable generation-job review.");
       return;
     }
     if (!confirmPublic) {
@@ -114,7 +120,7 @@ export default function GenerationJobPublishPanel({
             "Authorization": "Bearer " + token,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ placement }),
+          body: JSON.stringify({ placement, reviewReceipt }),
           cache: "no-store",
         },
       );
@@ -182,7 +188,7 @@ export default function GenerationJobPublishPanel({
       </summary>
       <div className="mt-2">
         <p className="text-xs leading-5 text-zinc-400">
-          Use this only after a completed job has an approved review record. Enter the exact longitude, latitude, ellipsoid height, heading, pitch, roll, scale and axes captured by that approval; any difference is rejected. Placement is never inferred from an image or model.
+          Use this only after a completed job has an immutable approved review record. Publication requires an Ed25519 receipt from a trusted reviewer that binds the exact review record, candidate GLB, QA report and placement. Enter the exact longitude, latitude, ellipsoid height, heading, pitch, roll, scale and axes captured by that approval; any difference is rejected.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-3 space-y-3">
@@ -212,6 +218,42 @@ export default function GenerationJobPublishPanel({
               placeholder="gen-..."
               className="mt-1 w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-300/60"
             />
+          </label>
+
+          <label className="block text-xs font-medium text-zinc-300">
+            Signed reviewer receipt (JSON)
+            <input
+              type="file"
+              accept=".json,application/json"
+              required
+              onChange={async (event) => {
+                const file = event.currentTarget.files?.[0];
+                setReviewReceipt(null);
+                setReviewReceiptName("");
+                setError(null);
+                if (!file) return;
+                if (file.size < 1 || file.size > 8 * 1024) {
+                  setError("Signed reviewer receipt must be a non-empty JSON file no larger than 8 KiB.");
+                  event.currentTarget.value = "";
+                  return;
+                }
+                try {
+                  const parsed: unknown = JSON.parse(await file.text());
+                  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+                    throw new TypeError("Receipt must be a JSON object.");
+                  }
+                  setReviewReceipt(parsed as Record<string, unknown>);
+                  setReviewReceiptName(file.name);
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Could not read signed reviewer receipt JSON.");
+                  event.currentTarget.value = "";
+                }
+              }}
+              className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2.5 text-xs text-white file:mr-3 file:rounded-md file:border-0 file:bg-cyan-300 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-zinc-950"
+            />
+            <span className="mt-1 block font-normal text-zinc-500">
+              {reviewReceiptName ? "Loaded: " + reviewReceiptName : "The receipt contains a public-key-verifiable signature, not a private key. Do not upload private-key files."}
+            </span>
           </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -281,7 +323,7 @@ export default function GenerationJobPublishPanel({
         </form>
 
         <p className="mt-3 text-[11px] leading-5 text-zinc-500">
-          The current development review API uses an operator-shared token and human-supplied checks; it does not prove civil identity or legal authority. This operation does not mark groundTruth, acceptanceEligible, publicationEligible, mapReady or automaticApproval as true, and it does not establish reconstruction accuracy.
+          The signed receipt proves possession of a currently trusted Ed25519 key and binds the approval bytes; the platform operator must establish the reviewer&apos;s civil identity and authority separately. This operation does not mark groundTruth, acceptanceEligible, publicationEligible, mapReady or automaticApproval as true, and it does not establish reconstruction accuracy.
         </p>
       </div>
     </details>
