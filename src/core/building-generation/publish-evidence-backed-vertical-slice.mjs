@@ -82,6 +82,8 @@ function verifySignedPublicationReview({
   report,
   reportSha256,
   attestationSha256,
+  attestation,
+  reviewReceiptSha256,
   candidateSha256,
 }) {
   if (!hasExactKeys(receipt, ["submission", "signatureBase64"])) {
@@ -129,11 +131,26 @@ function verifySignedPublicationReview({
     throw new Error("RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required for D3M-ENGINE-03 catalog publication");
   }
   const trustedReviewerKeys = parseTrustedReconstructionReviewerKeys(registryJson);
-  return verifyTrustedReconstructionReviewerSignature({
+  if (attestation.review?.reviewer !== submission.reviewerId ||
+      attestation.review?.reviewedAt !== submission.reviewedAtUtc) {
+    throw new Error("publication attestation reviewer and reviewedAt must exactly match the signed reviewer identity and timestamp");
+  }
+  const verified = verifyTrustedReconstructionReviewerSignature({
     submission,
     signatureBase64: receipt.signatureBase64,
     trustedReviewerKeys,
   });
+  return {
+    scheme: "Ed25519",
+    reviewerId: verified.reviewerId,
+    keyId: verified.keyId,
+    registryId: verified.registryId,
+    reviewedAtUtc: submission.reviewedAtUtc,
+    publicKeyFingerprintSha256: verified.publicKeyFingerprintSha256,
+    signatureSha256: verified.signatureSha256,
+    signedPayloadSha256: verified.payloadSha256,
+    signedReviewReceiptSha256: reviewReceiptSha256,
+  };
 }
 
 /**
@@ -223,15 +240,25 @@ export async function publishEvidenceBackedVerticalSlice({
     report,
     reportSha256: reportFile.sha256,
     attestationSha256: attestationFile.sha256,
+    attestation,
+    reviewReceiptSha256: reviewReceiptFile.sha256,
     candidateSha256: candidate.sha256,
   });
+
+  const effectivePublishedAt = publishedAt ?? new Date().toISOString();
+  const publicationTime = Date.parse(effectivePublishedAt);
+  const signedReviewTime = Date.parse(reviewReceipt.submission.reviewedAtUtc);
+  if (!Number.isFinite(publicationTime) || publicationTime < signedReviewTime) {
+    throw new TypeError("publishedAt must be a valid timestamp no earlier than the signed reviewer decision");
+  }
 
   const published = await publishReviewedBuildingModel({
     workspaceRoot: root,
     candidatePath: candidate.relativePath,
     attestationPath: attestationFile.relativePath,
     publicRoot,
-    ...(publishedAt ? { publishedAt } : {}),
+    publishedAt: effectivePublishedAt,
+    reviewerAuthentication,
   });
   if (published.sha256 !== candidate.sha256 || published.modelId !== report.buildingId) {
     throw new Error("published catalog result does not match the bound D3M-ENGINE-03 candidate");
@@ -243,14 +270,9 @@ export async function publishEvidenceBackedVerticalSlice({
     sourceSetSha256: report.sourceEvidence?.sourceSetSha256 ?? null,
     parentReportSha256: reportFile.sha256,
     publicationAttestationSha256: attestationFile.sha256,
-    signedReviewPayloadSha256: reviewerAuthentication.payloadSha256,
-    reviewerAuthentication: {
-      reviewerId: reviewerAuthentication.reviewerId,
-      keyId: reviewerAuthentication.keyId,
-      registryId: reviewerAuthentication.registryId,
-      publicKeyFingerprintSha256: reviewerAuthentication.publicKeyFingerprintSha256,
-      signatureSha256: reviewerAuthentication.signatureSha256,
-    },
+    signedReviewPayloadSha256: reviewerAuthentication.signedPayloadSha256,
+    signedReviewReceiptSha256: reviewerAuthentication.signedReviewReceiptSha256,
+    reviewerAuthentication,
     mapReady: false,
     publicationEligible: false,
     note: "The exact candidate was written to the static catalog after a trusted Ed25519 publication-review receipt was verified. Key possession is authenticated; civil identity, legal authority, independent survey accuracy and map readiness are not established. Parent release flags remain false.",
