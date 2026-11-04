@@ -736,7 +736,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       summary: !workflowStarted
         ? "Readiness probe failed; no inference was started."
         : error?.message === "Worker model artifacts or TripoSR runner fingerprint changed during inference."
-          ? "Worker model artifact or TripoSR runner fingerprint changed during inference; the candidate remains failed and unpublished."
+          ? "Worker model artifacts or TripoSR runner fingerprint changed during inference; the candidate remains failed and unpublished."
           : error?.message === "Worker host post-inference model artifact fingerprint verification is blocked."
             ? "Post-inference worker model artifact fingerprint verification was blocked; the candidate remains failed and unpublished."
             : runnerProcessStarted
