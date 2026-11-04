@@ -46,7 +46,7 @@ async function main() {
       "",
       "Runs one real TripoSR inference through the same media-to-model workflow as the queue worker.",
       "Requires both TripoSR and rembg model caches to be present; no model downloads are performed.",
-      "Writes a private hash-bound smoke report under .building-engine/runtime-smokes/.",
+      "Writes a private smoke report and a write-once hash-bound generation artifact receipt under .building-engine/runtime-smokes/.",
       "The result is AI-proposed and requires human review; it is never published to /map.",
     ].join("\n"));
     return;
