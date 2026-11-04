@@ -117,8 +117,10 @@ function validateReview(review, label, options = {}) {
   }
 }
 
-function buildVersionId(modelId, candidateHash, placement, evidenceHash) {
-  const stable = JSON.stringify({ modelId, candidateHash, placement, evidenceHash });
+function buildVersionId(modelId, candidateHash, placement, evidenceHash, reviewerAuthentication) {
+  const identity = { modelId, candidateHash, placement, evidenceHash };
+  if (reviewerAuthentication) identity.reviewerAuthentication = reviewerAuthentication;
+  const stable = JSON.stringify(identity);
   return createHash("sha256").update(stable).digest("hex").slice(0, 16);
 }
 
@@ -212,6 +214,7 @@ export async function publishReviewedBuildingModel({
   attestationPath,
   publicRoot = workspaceRoot,
   publishedAt = new Date().toISOString(),
+  reviewerAuthentication,
 }) {
   const root = await realpath(path.resolve(workspaceRoot));
   const candidate = await resolveWorkspaceFile(root, candidatePath, "candidatePath", true);
@@ -306,7 +309,7 @@ export async function publishReviewedBuildingModel({
     }
   }
 
-  const versionId = buildVersionId(attestation.model.id, actualCandidateHash, placement, evidenceHash);
+  const versionId = buildVersionId(attestation.model.id, actualCandidateHash, placement, evidenceHash, reviewerAuthentication);
   const version = {
     versionId,
     url: assetUrl,
@@ -329,6 +332,7 @@ export async function publishReviewedBuildingModel({
       evidenceSha256: evidenceHash,
       checks: Object.fromEntries(REQUIRED_REVIEW_CHECKS.map((key) => [key, true])),
       notes: attestation.review.notes.trim(),
+      ...(reviewerAuthentication ? { authentication: { ...reviewerAuthentication } } : {}),
     },
   };
 
