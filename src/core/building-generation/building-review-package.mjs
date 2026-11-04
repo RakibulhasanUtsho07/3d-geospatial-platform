@@ -264,7 +264,7 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
-      ...(hasVerticalCalibration ? {
+      ...(["1.1.0", "1.2.0"].includes(singleImageEvidence.schemaVersion) ? {
         verticalStatus: singleImageEvidence.verticalStatus,
         verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
         verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
@@ -274,7 +274,7 @@ export function buildBuildingReviewPackageManifest({
         verticalMaxResidualM: singleImageEvidence.verticalMaxResidualM,
         verticalControlPointCount: singleImageEvidence.verticalControlPointCount,
       } : {}),
-      ...(hasIndependentCheckpoints ? {
+      ...(singleImageEvidence.schemaVersion === "1.2.0" ? {
         checkpointValidationStatus: singleImageEvidence.checkpointValidationStatus,
         checkpointEvidenceSha256: singleImageEvidence.checkpointEvidenceSha256.toLowerCase(),
         checkpointReferenceFrame: singleImageEvidence.checkpointReferenceFrame,
