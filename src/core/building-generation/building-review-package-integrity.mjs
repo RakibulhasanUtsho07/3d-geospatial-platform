@@ -409,7 +409,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || metadata.schemaVersion !== "1.0.0") {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
@@ -431,22 +431,41 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
       const receiptPointer = smokeReport.generationArtifactReceipt ?? {};
       const receiptCanonical = Buffer.from(JSON.stringify(receipt, null, 2) + "\n", "utf8");
       const receiptPayloadDigest = digest(Buffer.from(canonicalJson(receiptPayload), "utf8"));
+      const expectedReceiptSchema = smokeReport.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
+      const verticalEvidence = georeference.verticalEvidence ?? null;
+      const verticalMetadataMatches = metadata.schemaVersion === "1.1.0"
+        ? metadata.verticalDatum === "EPSG:4979-ellipsoidal" &&
+          verticalEvidence?.status === "calibrated-needs-human-review" &&
+          metadata.verticalStatus === verticalEvidence.status &&
+          metadata.verticalEvidenceSha256 === digest(Buffer.from(canonicalJson(verticalEvidence), "utf8")) &&
+          metadata.verticalReferenceFrame === verticalEvidence.referenceFrame &&
+          metadata.verticalCoordinateEpoch === verticalEvidence.coordinateEpoch &&
+          metadata.verticalHeightOffsetM === verticalEvidence.heightOffsetM &&
+          metadata.verticalRmsErrorM === verticalEvidence.controls?.rmsErrorM &&
+          metadata.verticalMaxResidualM === verticalEvidence.controls?.maxResidualM &&
+          metadata.verticalControlPointCount === verticalEvidence.controls?.count &&
+          verticalEvidence.modelSha256 === candidate?.sha256 &&
+          verticalEvidence.controlPointManifestSha256 === controlManifestArtifact.sha256 &&
+          verticalEvidence.controls?.thresholdPass === true
+        : metadata.schemaVersion === "1.0.0" &&
+          metadata.verticalDatum === "not-solved" &&
+          verticalEvidence === null;
 
-      if (smokeReport.schemaVersion !== "1.5.0" || smokeReport.kind !== "single-image-runtime-smoke" ||
+      if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
           smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
           !nonEmptyString(metadata.jobId) || smokeReport.jobId !== metadata.jobId ||
           smokeArtifact.relativePath !== "reports/single-image-runtime-smoke.json" ||
           receiptArtifact.relativePath !== "reports/single-image-generation-artifact-receipt.json" ||
           workflowArtifact.relativePath !== "reports/single-image-workflow-report.json" ||
           controlManifestArtifact.relativePath !== "evidence/single-image-control-points.json" ||
-          receipt.schemaVersion !== "1.1.0" || receipt.kind !== undefined ||
+          receipt.schemaVersion !== expectedReceiptSchema || receipt.kind !== undefined ||
           receiptPayload.kind !== "single-image-generation-artifact" ||
-          receiptPayload.schemaVersion !== "1.1.0" || receiptPayload.jobId !== metadata.jobId ||
+          receiptPayload.schemaVersion !== expectedReceiptSchema || receiptPayload.jobId !== metadata.jobId ||
           receiptPayload.buildingId !== packageManifest.buildingId ||
           receiptPayloadShaMismatch(receipt, receiptPayloadDigest) ||
           !receiptBytes.equals(receiptCanonical) ||
           receiptPointer.path !== ".building-engine/runtime-smokes/" + metadata.jobId + ".artifact.json" ||
-          receiptPointer.schemaVersion !== "1.1.0" || receiptPointer.bytes !== receiptBytes.length ||
+          receiptPointer.schemaVersion !== expectedReceiptSchema || receiptPointer.bytes !== receiptBytes.length ||
           receiptPointer.sha256 !== receiptArtifact.sha256 ||
           receiptPointer.payloadSha256 !== receipt.payloadSha256 ||
           receiptPayload.workflowReport?.bytes !== workflowFile.bytes ||
@@ -515,7 +534,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           metadata.smokeReportSha256 !== smokeArtifact.sha256 ||
           metadata.generationArtifactReceiptSha256 !== receiptArtifact.sha256 ||
           metadata.workflowReportSha256 !== workflowArtifact.sha256 ||
-          metadata.verticalDatum !== "not-solved" ||
+          !verticalMetadataMatches ||
           metadata.mapReady !== false || metadata.publicationEligible !== false ||
           metadata.automaticApproval !== false) {
         throw new Error("single-image-evidence-cross-binding-failed");
