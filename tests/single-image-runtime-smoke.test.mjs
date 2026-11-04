@@ -66,8 +66,44 @@ async function workspace(t) {
   return root;
 }
 
-async function startFakeRunner(options) {
-  const child = options.spawnImpl(
+async function writeFakeModelLoadReceipt(spawnOptions = {}) {
+  const env = spawnOptions.env ?? {};
+  const receiptPath = env.BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH;
+  const expected = env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON
+    ? JSON.parse(env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON)
+    : null;
+  if (!receiptPath || !expected) return;
+  const omittedRole = env.BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE ?? null;
+  const loaders = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const events = loaders
+    .filter(([role]) => role !== omittedRole)
+    .map(([role, loader]) => JSON.stringify({
+      schemaVersion: "1.0.0",
+      role,
+      loader,
+      bytes: expected[role].bytes,
+      sha256: expected[role].sha256,
+      exactBytesPassed: true,
+      stable: true,
+    }));
+  await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
+}
+
+async function startFakeRunner(options, { omitModelLoadRole = null } = {}) {
+  const spawnImpl = omitModelLoadRole
+    ? (executable, args, spawnOptions = {}) => options.spawnImpl(executable, args, {
+      ...spawnOptions,
+      env: {
+        ...(spawnOptions.env ?? {}),
+        BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE: omitModelLoadRole,
+      },
+    })
+    : options.spawnImpl;
+  const child = spawnImpl(
     options.pythonPath,
     [options.runnerScript, "--fixture-smoke"],
     {},
@@ -105,7 +141,7 @@ function readyCapabilities() {
   };
 }
 
-async function fakeWorkflowResult(options, root, source) {
+async function fakeWorkflowResult(options, root, source, { omitModelLoadRole = null } = {}) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmSingleViewInference, true);
@@ -117,7 +153,7 @@ async function fakeWorkflowResult(options, root, source) {
     "single-image-ai-reconstruction",
   ]);
 
-  await startFakeRunner(options);
+  await startFakeRunner(options, { omitModelLoadRole });
 
   const glb = makeGlb();
   const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
@@ -226,9 +262,12 @@ async function fakeWorkerHostInventory({ env, now, commandTimeoutMs, probeCapabi
 }
 
 function makeOptions(root, source, overrides = {}) {
-  const spawnImpl = overrides.spawnImpl ?? (() => {
+  const spawnImpl = overrides.spawnImpl ?? ((_executable, _args, spawnOptions = {}) => {
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(spawnOptions);
+      child.emit("spawn");
+    });
     return child;
   });
   return {
@@ -297,7 +336,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     ].join("\n")], { env: options.env, encoding: "utf8", timeout: 5000 });
     assert.equal(offlineProbe.status, 0, offlineProbe.stderr || offlineProbe.stdout);
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(options);
+      child.emit("spawn");
+    });
     return child;
   };
   let workflowCalls = 0;
@@ -319,6 +361,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
   assert.equal(result.report.workerHost.inventorySchemaVersion, "1.1.0");
   assert.equal(result.report.workerHost.stableAcrossInference, true);
+  assert.equal(result.report.modelLoadEvidence.status, "verified");
+  assert.deepEqual(Object.keys(result.report.modelLoadEvidence.loaders).sort(), [
+    "rembgWeights", "tripoCheckpoint", "tripoConfig",
+  ]);
   assert.deepEqual(result.report.workerHost.before.modelArtifacts, result.report.workerHost.after.modelArtifacts);
   assert.equal(result.report.source.sha256, source.sha256);
   const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
@@ -363,6 +409,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.source.sha256, source.sha256);
   assert.equal(verified.model.sha256, result.report.output.sha256);
   assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
+  assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
 
   const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
@@ -371,8 +418,33 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /fingerprints changed across inference/i,
   );
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
+  const tamperedLoadEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedLoadEvidence.modelLoadEvidence.loaders.rembgWeights.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedLoadEvidence, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /model-load evidence does not match/i,
+  );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
+});
+
+
+test("fails closed when the runner does not attest the rembg model loader input", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) =>
+      fakeWorkflowResult(options, root, source, { omitModelLoadRole: "rembgWeights" }),
+  }));
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.summary, /model generation|evidence validation/i);
+  assert.equal(result.report.modelLoadEvidence, null);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
 });
 
 test("blocks before inference when a cached worker model lacks an exact SHA-256", async (t) => {

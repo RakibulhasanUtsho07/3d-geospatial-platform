@@ -103,3 +103,17 @@ A structurally valid GLB and an integrity-verified smoke do not establish archit
 - [ ] No release flag was enabled by the smoke.
 
 **Release state must remain:** `mapReady=false`, `publicationEligible=false`, `automaticApproval=false`. The smoke is one host/input execution only, not an accuracy benchmark.
+
+
+## Process-side model-load evidence (D3M-ENGINE-05)
+
+| Field | Value |
+|---|---|
+| Smoke report schema | `1.0.0` / `1.1.0` / `1.2.0` / `NOT-RECORDED` |
+| Process-side loader evidence status | `verified` / `missing` / `rejected` / `legacy-not-recorded` |
+| TripoSR config loader | `omegaconf.OmegaConf.load` — bytes / SHA-256: `NOT-RECORDED` |
+| TripoSR checkpoint loader | `torch.load` — bytes / SHA-256: `NOT-RECORDED` |
+| rembg ONNX loader | `onnxruntime.InferenceSession` — bytes / SHA-256: `NOT-RECORDED` |
+| All three loader values match pre-inference inventory | `yes` / `no` / `not-applicable` |
+
+Schema 1.0.0 has no worker model fingerprints; schema 1.1.0 has stable before/after worker fingerprints but no process-side loader receipts. Record those as legacy—not as a successful loader attestation. Only schema 1.2.0 is eligible to report all three process-side receipts as verified. Keep detailed private report/receipt paths inside the access-controlled worker workspace; never paste absolute model/cache paths or weights here.
