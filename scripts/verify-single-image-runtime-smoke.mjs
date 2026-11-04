@@ -13,7 +13,7 @@ async function main() {
   });
   if (values.help) {
     console.log("Usage: node scripts/verify-single-image-runtime-smoke.mjs <workspaceRoot> <jobId>");
-    console.log("Re-hashes the recorded source and private GLB, validates the GLB structure, and enforces false release flags.");
+    console.log("Re-hashes the source, workflow report, immutable artifact receipt and private GLB; independently checks geometry QA and false release flags.");
     console.log("This verifies evidence integrity; it does not verify reconstruction accuracy or source/model licences.");
     return;
   }
