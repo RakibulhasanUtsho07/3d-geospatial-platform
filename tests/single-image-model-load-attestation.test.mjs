@@ -34,7 +34,7 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "        with open(file_value, 'rb') as handle: return handle.read()",
     "    return file_value.read()",
     "",
-  ].join("\n"));
+  ].join("\n");
   await writeFile(path.join(root, "omegaconf.py"), [
     "class OmegaConf:",
     "    @staticmethod",
@@ -43,10 +43,11 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "",
   ].join("\n"));
   await writeFile(path.join(root, "onnxruntime.py"), [
-    "def InferenceSession(model_path_or_bytes, *args, **kwargs):",
-    "    if not isinstance(model_path_or_bytes, bytes):",
-    "        raise TypeError('instrumented ONNX model must be immutable bytes')",
-    "    return model_path_or_bytes",
+    "class InferenceSession:",
+    "    def __init__(self, model_path_or_bytes, *args, **kwargs):",
+    "        if not isinstance(model_path_or_bytes, bytes):",
+    "            raise TypeError('instrumented ONNX model must be immutable bytes')",
+    "        self.model_bytes = model_path_or_bytes",
     "",
   ].join("\n"));
   await writeFile(configPath, files.config);
@@ -69,7 +70,7 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "from onnxruntime import InferenceSession",
     "assert OmegaConf.load(sys.argv[1]) == 'model: triposr\\nresolution: 256\\n'",
     "assert torch.load(sys.argv[2]) == b'synthetic-triposr-checkpoint-bytes'",
-    "assert InferenceSession(sys.argv[3]) == b'synthetic-rembg-onnx-model-bytes'",
+    "assert InferenceSession(sys.argv[3]).model_bytes == b'synthetic-rembg-onnx-model-bytes'",
   ].join("\\n");
   const result = spawnSync(process.env.PYTHON || "python3", [
     "-c", script, configPath, checkpointPath, rembgPath,
