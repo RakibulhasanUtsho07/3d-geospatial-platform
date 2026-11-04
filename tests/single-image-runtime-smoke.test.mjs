@@ -411,6 +411,7 @@ test("fails the smoke if model artifact bytes drift during inference", async (t)
       }
       return inventory;
     },
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
   }));
   assert.equal(inventoryCalls, 2);
   assert.equal(result.exitCode, 1);
