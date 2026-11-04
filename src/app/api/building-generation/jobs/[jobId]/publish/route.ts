@@ -39,7 +39,7 @@ async function readBoundedBody(request: Request): Promise<Buffer> {
 
 function errorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : "";
-  if (/RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required/i.test(message)) return 503;
+  if (/RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required|Trusted reviewer registry|Active reviewer key .* outside its validity window|Production requires a versioned reconstruction trusted-reviewer registry/i.test(message)) return 503;
   if (/not found/i.test(message)) return 404;
   if (/already in progress|already being published/i.test(message)) return 409;
   if (error instanceof TypeError || error instanceof RangeError) return 400;
