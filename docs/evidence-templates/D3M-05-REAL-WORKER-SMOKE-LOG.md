@@ -134,3 +134,20 @@ Schema 1.0.0 has no worker model fingerprints; schema 1.1.0 has stable before/af
 
 Only smoke schema `1.3.0` requires and can report the source-image loader receipt as verified. Schemas `1.0.0`, `1.1.0` and `1.2.0` predate this decoder-boundary evidence and must be labelled `legacy-not-recorded`. The Pillow event contains no source path or image bytes. The Python fixture proves the instrumented API contract only; it is not a real TripoSR worker-host inference.
 
+
+
+## Generation artifact receipt (D3M-ENGINE-07)
+
+| Field | Value |
+|---|---|
+| Smoke report schema | `1.4.0` / legacy `1.0.0`–`1.3.0` / `NOT-RECORDED` |
+| Generation artifact receipt status | `verified` / `rejected` / `not-recorded-legacy-schema` |
+| Receipt relative path | `.building-engine/runtime-smokes/<jobId>.artifact.json` / `NOT-RECORDED` |
+| Receipt byte length / file SHA-256 | `NOT-RECORDED` |
+| Canonical payload SHA-256 | `NOT-RECORDED` |
+| Exact workflow-report path / byte length / SHA-256 | `NOT-RECORDED` |
+| Receipt binds source + Pillow, three model loaders, pre/post worker fingerprints | `yes` / `no` / `not-recorded` |
+| Receipt binds GLB path / bytes / SHA-256 / mesh count | `yes` / `no` / `not-recorded` |
+| Receipt binds independent GLB geometry-QA summary | `yes` / `no` / `not-recorded` |
+
+Keep receipt/report files in the restricted worker workspace. Record hashes and relative paths only; do not place source images, GLBs, model weights, absolute worker/cache paths or raw logs in Git. A valid local hash-bound receipt is not a signature, tamper-proof storage, real-world accuracy result or release approval.

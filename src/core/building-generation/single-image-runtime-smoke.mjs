@@ -19,8 +19,9 @@ import { normalizeBuildingSpec } from "./building-spec.mjs";
 import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
 import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
+import { canonicalJson, writeGenerationArtifactReceipt } from "./generation-artifact-receipt.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -464,6 +465,7 @@ async function requireFreshSmokeIdentities(root, buildingId, jobId, sourceId) {
     [".building-engine/jobs/" + buildingId + "/" + jobId, "Smoke job artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow", "Smoke workflow artifact directory"],
     [".building-engine/jobs/" + buildingId + "/" + workerJobId + "-single-view", "TripoSR single-view artifact directory"],
+    [".building-engine/runtime-smokes/" + jobId + ".artifact.json", "Generation artifact receipt"],
   ];
   for (const [relativePath, label] of paths) {
     await assertArtifactPathAbsent(root, relativePath, label);
@@ -577,6 +579,63 @@ function qualitySummary(modelQuality) {
     warningCount: warnings.length,
     warnings,
     counts: safeCounts,
+  };
+}
+
+async function captureWorkflowReportEvidence({ workspaceRoot, workflow, workflowReport, buildingId, jobId }) {
+  if (typeof workflow?.reportPath !== "string" || !workflow.reportPath.trim()) {
+    throw new TypeError("Media-to-model workflow did not return its on-disk generation report path.");
+  }
+  const expectedRelativePath = ".building-engine/jobs/" + buildingId + "/" + jobId + "-workflow/workflow-report.json";
+  const candidate = path.resolve(workflow.reportPath);
+  if (!inside(workspaceRoot, candidate)) {
+    throw new TypeError("Media-to-model workflow report path escapes workspaceRoot.");
+  }
+  const relativePath = path.relative(workspaceRoot, candidate).split(path.sep).join("/");
+  if (relativePath !== expectedRelativePath) {
+    throw new TypeError("Media-to-model workflow report path does not match the exact smoke job.");
+  }
+  let current = workspaceRoot;
+  const segments = relativePath.split("/");
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    const entry = await lstat(current);
+    if (entry.isSymbolicLink()) {
+      throw new TypeError("Media-to-model workflow report must not contain symlink path components.");
+    }
+    const final = index === segments.length - 1;
+    if (!final && !entry.isDirectory()) {
+      throw new TypeError("Media-to-model workflow report path contains a non-directory component.");
+    }
+    if (final && !entry.isFile()) {
+      throw new TypeError("Media-to-model workflow report must be a regular file.");
+    }
+    const actual = await realpath(current);
+    if (!inside(workspaceRoot, actual)) {
+      throw new TypeError("Media-to-model workflow report resolves outside workspaceRoot.");
+    }
+    if (final) current = actual;
+  }
+  const info = await stat(current);
+  if (!info.size || info.size > 1024 * 1024) {
+    throw new RangeError("Media-to-model workflow report is empty or exceeds 1 MiB.");
+  }
+  const bytes = await readFile(current);
+  const onDiskReport = JSON.parse(bytes.toString("utf8"));
+  if (canonicalJson(onDiskReport) !== canonicalJson(workflowReport)) {
+    throw new TypeError("On-disk media-to-model workflow report differs from the returned generation report.");
+  }
+  if (onDiskReport.jobId !== jobId || onDiskReport.buildingId !== buildingId ||
+      onDiskReport.status !== "completed-requires-review" || onDiskReport.mode !== "single-image-ai" ||
+      onDiskReport.mapReady !== false || onDiskReport.publicationEligible !== false) {
+    throw new TypeError("On-disk generation workflow report identity or fail-closed status is invalid.");
+  }
+  return {
+    path: relativePath,
+    bytes: bytes.length,
+    sha256: digest(bytes),
+    status: onDiskReport.status,
+    mode: onDiskReport.mode,
   };
 }
 
@@ -935,6 +994,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     },
     modelLoadEvidence: null,
     sourceLoadEvidence: null,
+    generationArtifactReceipt: null,
     source: {
       sourceId,
       relativePath: relativePath,
@@ -1100,9 +1160,17 @@ export async function runSingleImageRuntimeSmoke(options) {
         workflowReport.mapReady !== false ||
         workflowReport.publicationEligible !== false ||
         !workflowReport.output?.modelPath ||
-        !/^[a-f0-9]{64}$/.test(workflowReport.output.modelSha256 ?? "")) {
+        !/^[a-f0-9]{64}$/.test(workflowReport.output.modelSha256 ?? "") ||
+        !workflow.reportPath) {
       throw new TypeError("Media-to-model workflow did not return a complete fail-closed single-image candidate report.");
     }
+    const workflowReportEvidence = await captureWorkflowReportEvidence({
+      workspaceRoot,
+      workflow,
+      workflowReport,
+      buildingId,
+      jobId,
+    });
     if (!Array.isArray(workflowReport.inputs?.selectedViewIds) ||
         workflowReport.inputs.selectedViewIds.length !== 1 ||
         workflowReport.inputs.selectedViewIds[0] !== sourceId) {
@@ -1184,6 +1252,45 @@ export async function runSingleImageRuntimeSmoke(options) {
       meshCount: glb.meshCount,
     };
     report.geometryQa = qualitySummary(modelReport.modelQuality);
+    const receiptPayload = {
+      schemaVersion: "1.0.0",
+      kind: "single-image-generation-artifact",
+      buildingId,
+      jobId,
+      workflowReport: workflowReportEvidence,
+      source: {
+        sourceId: report.source.sourceId,
+        mimeType: report.source.mimeType,
+        bytes: report.source.bytes,
+        sha256: report.source.sha256,
+        loaderEvidence: report.sourceLoadEvidence,
+      },
+      workerHost: {
+        inventorySchemaVersion: report.workerHost.inventorySchemaVersion,
+        stableAcrossInference: report.workerHost.stableAcrossInference,
+        before: report.workerHost.before,
+        after: report.workerHost.after,
+      },
+      modelLoadEvidence: report.modelLoadEvidence,
+      output: {
+        path: report.output.relativePath,
+        format: "glb",
+        bytes: report.output.bytes,
+        sha256: report.output.sha256,
+        meshCount: report.output.meshCount,
+      },
+      geometryQa: {
+        schemaVersion: "1.0.0",
+        engine: "glb-geometry-qa-v2",
+        ...report.geometryQa,
+      },
+    };
+    report.generationArtifactReceipt = await writeGenerationArtifactReceipt({
+      workspaceRoot,
+      jobId,
+      buildingId,
+      payload: receiptPayload,
+    });
     report.candidateDisposition = "ai-proposed-requires-human-review";
     report.scaleCalibration = modelReport.scaleCalibration?.status ?? "not-calibrated";
     report.georeference = modelReport.georeference?.status ?? "not-solved";
