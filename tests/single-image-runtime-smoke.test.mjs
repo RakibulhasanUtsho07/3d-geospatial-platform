@@ -374,6 +374,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     const child = new EventEmitter();
     queueMicrotask(async () => {
       await writeFakeModelLoadReceipt(options);
+      await writeFakeSourceImageLoadReceipt(options, _args);
       child.emit("spawn");
     });
     return child;
@@ -401,6 +402,11 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.deepEqual(Object.keys(result.report.modelLoadEvidence.loaders).sort(), [
     "rembgWeights", "tripoCheckpoint", "tripoConfig",
   ]);
+  assert.equal(result.report.sourceLoadEvidence.status, "verified");
+  assert.equal(result.report.sourceLoadEvidence.loader, "PIL.Image.open");
+  assert.equal(result.report.sourceLoadEvidence.bytes, source.bytes.length);
+  assert.equal(result.report.sourceLoadEvidence.sha256, source.sha256);
+  assert.equal(result.report.sourceLoadEvidence.eventCount, 1);
   assert.deepEqual(result.report.workerHost.before.modelArtifacts, result.report.workerHost.after.modelArtifacts);
   assert.equal(result.report.source.sha256, source.sha256);
   const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
