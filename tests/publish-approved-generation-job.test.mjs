@@ -312,6 +312,31 @@ test("publishes an approved review through the operator CLI with the same WGS84 
   const setup = await makeApprovedJob(t);
   const signerPath = path.resolve(process.cwd(), "scripts/sign-approved-generation-job-publication-review.mjs");
   const signedReceiptPath = path.join(setup.workspaceRoot, "cli-signed-publication-review.json");
+  const workspacePrivateKeyPath = path.join(setup.workspaceRoot, "incorrect-workspace-private-key.pem");
+  await writeFile(
+    workspacePrivateKeyPath,
+    setup.privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    { mode: 0o600 },
+  );
+  const blockedSignRun = spawnSync(process.execPath, [
+    signerPath,
+    setup.workspaceRoot,
+    setup.jobId,
+    "--private-key", workspacePrivateKeyPath,
+    "--out", path.join(setup.workspaceRoot, "should-not-be-created.json"),
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  assert.notEqual(blockedSignRun.status, 0);
+  assert.match(blockedSignRun.stderr, /private-key must resolve outside the generation workspace/i);
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "should-not-be-created.json")),
+    { code: "ENOENT" },
+  );
+
   const signRun = spawnSync(process.execPath, [
     signerPath,
     setup.workspaceRoot,
