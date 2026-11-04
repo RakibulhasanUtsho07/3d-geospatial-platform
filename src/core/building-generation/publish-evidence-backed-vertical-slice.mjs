@@ -259,6 +259,8 @@ export async function publishEvidenceBackedVerticalSlice({
     publicRoot,
     publishedAt: effectivePublishedAt,
     reviewerAuthentication,
+    expectedCandidateSha256: candidate.sha256,
+    expectedAttestationSha256: attestationFile.sha256,
   });
   if (published.sha256 !== candidate.sha256 || published.modelId !== report.buildingId) {
     throw new Error("published catalog result does not match the bound D3M-ENGINE-03 candidate");
