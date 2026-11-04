@@ -14,7 +14,10 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
+async function runInstrumentedLoaders(t, {
+  mismatchCheckpoint = false,
+  expectFailure = false,
+} = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "single-image-model-loader-"));
   t.after(async () => rm(root, { recursive: true, force: true }));
 
@@ -87,16 +90,20 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
       BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON: JSON.stringify(expected),
     },
   });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  if (expectFailure) {
+    assert.notEqual(result.status, 0, result.stderr || result.stdout);
+  } else {
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
 
   const receiptText = await readFile(receiptPath, "utf8");
   const events = receiptText.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
   assert.equal(JSON.stringify(events).includes(root), false);
-  return events;
+  return { events, result };
 }
 
 test("attests the exact config, checkpoint and rembg bytes handed to the loader APIs", async (t) => {
-  const events = await runInstrumentedLoaders(t);
+  const { events } = await runInstrumentedLoaders(t);
   assert.deepEqual(events.map((event) => event.role).sort(), [
     "rembgWeights", "tripoCheckpoint", "tripoConfig",
   ]);
@@ -114,7 +121,11 @@ test("attests the exact config, checkpoint and rembg bytes handed to the loader 
 });
 
 test("does not attest a checkpoint when loaded bytes differ from the preflight fingerprint", async (t) => {
-  const events = await runInstrumentedLoaders(t, { mismatchCheckpoint: true });
+  const { events, result } = await runInstrumentedLoaders(t, {
+    mismatchCheckpoint: true,
+    expectFailure: true,
+  });
+  assert.match(result.stderr, /model loader input bytes do not match/i);
   assert.deepEqual(events.map((event) => event.role).sort(), [
     "rembgWeights", "tripoConfig",
   ]);
