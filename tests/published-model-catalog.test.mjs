@@ -251,6 +251,78 @@ test("refuses mismatched candidate hashes, unverified checks and tampered review
   }), /Review evidence SHA-256/);
 });
 
+test("refuses candidate or attestation byte drift after upstream review verification", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "published-model-pinned-inputs-"));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "review"), { recursive: true });
+
+  const candidateBytes = makeGlb("pinned-inputs");
+  const evidenceBytes = Buffer.from(JSON.stringify({ reviewerEvidence: "synthetic test fixture" }));
+  const candidatePath = path.join(root, "candidate.glb");
+  const evidencePath = path.join(root, "review", "evidence.json");
+  const attestationPath = path.join(root, "review", "attestation.json");
+  await writeFile(candidatePath, candidateBytes);
+  await writeFile(evidencePath, evidenceBytes);
+
+  const attestationBytes = Buffer.from(JSON.stringify({
+    schemaVersion: "1.0.0",
+    candidateSha256: hash(candidateBytes),
+    model: {
+      id: "pinned-model",
+      name: "Pinned model",
+      position: { longitude: 90.406, latitude: 23.7086, height: 12.5 },
+      headingDegrees: 0,
+      pitchDegrees: 0,
+      rollDegrees: 0,
+      scale: 1,
+      upAxis: "Y",
+      forwardAxis: "Z",
+    },
+    review: {
+      reviewer: "reviewer-test",
+      reviewedAt: "2026-11-04T05:00:00.000Z",
+      evidencePath: "review/evidence.json",
+      evidenceSha256: hash(evidenceBytes),
+      checks: {
+        rightsVerified: true,
+        sourceIdentityVerified: true,
+        architectureReviewed: true,
+        metricScaleVerified: true,
+        horizontalGeoreferenceVerified: true,
+        verticalDatumVerified: true,
+      },
+      notes: "Synthetic fixture for exact-input pinning regression.",
+    },
+  }), "utf8");
+  await writeFile(attestationPath, attestationBytes);
+
+  const common = {
+    workspaceRoot: root,
+    candidatePath: "candidate.glb",
+    attestationPath: "review/attestation.json",
+  };
+  await assert.rejects(
+    publishReviewedBuildingModel({
+      ...common,
+      expectedCandidateSha256: "0".repeat(64),
+      expectedAttestationSha256: hash(attestationBytes),
+    }),
+    /Candidate bytes changed after upstream review verification/,
+  );
+  await assert.rejects(
+    publishReviewedBuildingModel({
+      ...common,
+      expectedCandidateSha256: hash(candidateBytes),
+      expectedAttestationSha256: "0".repeat(64),
+    }),
+    /Attestation bytes changed after upstream review verification/,
+  );
+  await assert.rejects(
+    readFile(path.join(root, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
 test("refuses a version activation after the published asset has been tampered with", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "published-model-integrity-"));
   t.after(async () => rm(root, { recursive: true, force: true }));
