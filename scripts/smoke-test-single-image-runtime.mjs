@@ -64,7 +64,7 @@ async function main() {
   const inventoryTimeoutMs = Number(values["inventory-timeout-ms"]);
   if (!Number.isInteger(timeoutMs) || !Number.isInteger(mcResolution) ||
       !Number.isInteger(inventoryTimeoutMs) || inventoryTimeoutMs < 1000 || inventoryTimeoutMs > 180000) {
-    throw new TypeError("--timeout-ms and --resolution must be integers.");
+    throw new TypeError("--timeout-ms and --resolution must be integers; --inventory-timeout-ms must be an integer from 1000 to 180000.");
   }
 
   const result = await runSingleImageRuntimeSmoke({
