@@ -15,7 +15,10 @@ import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-re
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
-import { signBuildingReviewPackageManifestWithTrustedRegistry } from "../src/core/building-generation/building-review-package-signature.mjs";
+import {
+  signBuildingReviewPackageManifest,
+  signBuildingReviewPackageManifestWithTrustedRegistry,
+} from "../src/core/building-generation/building-review-package-signature.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const semanticDigest = (value) => hash(Buffer.from(JSON.stringify(value)));
@@ -409,12 +412,11 @@ test("combined verifier accepts a fully materialized signed package and rejects 
     { flag: "wx", mode: 0o600 },
   );
 
-  const runVerifier = () => spawnSync(process.execPath, [SIGNED_VERIFY_CLI, packageDir], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-    timeout: 120_000,
-    env: { ...process.env, NODE_ENV: "production", [REVIEWER_REGISTRY_ENV]: registryJson },
-  });
+  const runVerifier = (extraArgs = [], env = { ...process.env, NODE_ENV: "production", [REVIEWER_REGISTRY_ENV]: registryJson }) => spawnSync(
+    process.execPath,
+    [SIGNED_VERIFY_CLI, packageDir, ...extraArgs],
+    { cwd: REPO_ROOT, encoding: "utf8", timeout: 120_000, env },
+  );
   const intact = runVerifier();
   assert.equal(intact.status, 0, intact.stderr);
   const intactSummary = JSON.parse(intact.stdout);
@@ -424,6 +426,28 @@ test("combined verifier accepts a fully materialized signed package and rejects 
   assert.equal(intactSummary.signature, "signature-verified");
   assert.equal(intactSummary.publicationEligible, false);
   assert.equal(intactSummary.mapReady, false);
+
+  // Exercise the explicit legacy v1 combined-verifier path with a key file
+  // outside the package directory; the verifier must use the stable key reader.
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  await rm(signaturePath);
+  const legacyEnvelope = signBuildingReviewPackageManifest({
+    manifestBytes,
+    privateKeyPem,
+    signedAt: iso(0),
+  });
+  await writeFile(signaturePath, JSON.stringify(legacyEnvelope, null, 2) + "\n", { flag: "wx" });
+  const legacyPublicKeyPath = path.join(parent, "legacy-trusted-public.pem");
+  await writeFile(legacyPublicKeyPath, publicKeyPem, { flag: "wx", mode: 0o600 });
+  const legacyVerified = runVerifier(
+    ["--legacy-public-key", legacyPublicKeyPath],
+    { ...process.env, NODE_ENV: "production" },
+  );
+  assert.equal(legacyVerified.status, 0, legacyVerified.stderr);
+  const legacySummary = JSON.parse(legacyVerified.stdout);
+  assert.equal(legacySummary.valid, true);
+  assert.equal(legacySummary.signature, "signature-verified");
+  assert.equal(legacySummary.status, "verified");
 
   const candidateImage = path.join(packageDir, "renders", "front.png");
   await writeFile(candidateImage, Buffer.from("tampered"), { flag: "a" });
