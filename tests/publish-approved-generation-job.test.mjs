@@ -385,6 +385,11 @@ test("fails closed when no server trusted-reviewer registry is configured", asyn
     publishApprovedGenerationJob({ ...setup, placement }),
     /RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required/,
   );
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = "not-json";
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /Trusted reviewer registry is invalid or unavailable/,
+  );
   process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = registry;
   await assert.rejects(
     readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
