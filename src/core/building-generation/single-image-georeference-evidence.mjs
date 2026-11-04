@@ -101,21 +101,23 @@ function canonicalTimestamp(value, label) {
 }
 
 function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
-  if (!isObject(raw) || !["1.0.0", "1.1.0"].includes(raw.schemaVersion)) {
+  if (!isObject(raw) || !["1.0.0", "1.1.0", "1.2.0"].includes(raw.schemaVersion)) {
     throw new TypeError("Control-point manifest schema version is unsupported.");
   }
+  const hasIndependentCheckpoints = raw.schemaVersion === "1.2.0";
   exactKeys(
     raw,
     ["schemaVersion", "kind", "buildingId", "source", "horizontalCrs", "horizontalDatum",
       "verticalDatum", "survey", "controlPoints"],
-    raw.schemaVersion === "1.1.0" ? ["vertical"] : [],
+    raw.schemaVersion === "1.0.0" ? [] :
+      hasIndependentCheckpoints ? ["vertical", "heldOutCheckpoints"] : ["vertical"],
     "Control-point manifest",
   );
   if (raw.kind !== "single-image-control-point-manifest" ||
       raw.buildingId !== buildingId ||
       raw.horizontalCrs !== "EPSG:4326" ||
       raw.horizontalDatum !== "WGS84" ||
-      raw.verticalDatum !== (raw.schemaVersion === "1.1.0" && raw.vertical !== undefined
+      raw.verticalDatum !== (raw.schemaVersion !== "1.0.0" && raw.vertical !== undefined
         ? "EPSG:4979-ellipsoidal" : "not-provided")) {
     throw new TypeError("Control-point manifest schema, building identity or coordinate reference is invalid.");
   }
@@ -136,17 +138,25 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
     throw new RangeError("Control-point manifest must contain 3–100 surveyed control points.");
   }
   const seen = new Set();
+  const fitObservationIds = new Set();
   const controlPoints = raw.controlPoints.map((point, index) => {
     exactKeys(
       point,
       ["id", "modelX", "modelZ", "longitude", "latitude", "evidenceSourceId"],
-      ["description"],
+      hasIndependentCheckpoints ? ["observationId", "description"] : ["description"],
       "controlPoints[" + index + "]",
     );
     if (typeof point.id !== "string" || !SAFE_ID.test(point.id) || seen.has(point.id)) {
       throw new TypeError("Control-point IDs must be valid and unique.");
     }
     seen.add(point.id);
+    if (hasIndependentCheckpoints) {
+      if (typeof point.observationId !== "string" || !SAFE_ID.test(point.observationId) ||
+          fitObservationIds.has(point.observationId)) {
+        throw new TypeError("Schema 1.2.0 fitting control observation IDs must be valid and unique.");
+      }
+      fitObservationIds.add(point.observationId);
+    }
     if (point.evidenceSourceId !== sourceId) {
       throw new TypeError("Every control point must identify the selected source through evidenceSourceId.");
     }
@@ -170,17 +180,18 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
       longitude: point.longitude,
       latitude: point.latitude,
       evidenceSourceId: point.evidenceSourceId,
+      ...(hasIndependentCheckpoints ? { observationId: point.observationId } : {}),
       ...(point.description !== undefined ? { description: point.description } : {}),
     };
   });
 
   let vertical = null;
-  if (raw.schemaVersion === "1.1.0" && raw.vertical === undefined) {
+  if (raw.schemaVersion !== "1.0.0" && raw.vertical === undefined) {
     throw new TypeError("Control-point manifest schema 1.1.0 requires an explicit vertical control section.");
   }
   if (raw.vertical !== undefined) {
-    if (raw.schemaVersion !== "1.1.0") {
-      throw new TypeError("Ellipsoidal-height controls require control-point manifest schema 1.1.0.");
+    if (raw.schemaVersion === "1.0.0") {
+      throw new TypeError("Ellipsoidal-height controls require control-point manifest schema 1.1.0 or 1.2.0.");
     }
     exactKeys(raw.vertical, [
       "crs", "heightType", "unit", "referenceFrame", "coordinateEpoch", "survey", "controlPoints",
@@ -218,14 +229,24 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
     }
     const horizontalIds = new Set(controlPoints.map((point) => point.id));
     const verticalIds = new Set();
+    const horizontalObservationIds = new Map(controlPoints.map((point) => [point.id, point.observationId]));
     const verticalPoints = raw.vertical.controlPoints.map((point, index) => {
-      exactKeys(point, ["horizontalControlPointId", "modelY", "ellipsoidalHeightM", "evidenceSourceId"], [],
-        "vertical.controlPoints[" + index + "]");
+      exactKeys(
+        point,
+        ["horizontalControlPointId", "modelY", "ellipsoidalHeightM", "evidenceSourceId"],
+        hasIndependentCheckpoints ? ["observationId"] : [],
+        "vertical.controlPoints[" + index + "]",
+      );
       const id = point.horizontalControlPointId;
       if (typeof id !== "string" || !SAFE_ID.test(id) || !horizontalIds.has(id) || verticalIds.has(id)) {
         throw new TypeError("Every vertical control must map one-to-one to a unique existing horizontal control ID.");
       }
       verticalIds.add(id);
+      if (hasIndependentCheckpoints &&
+          (typeof point.observationId !== "string" ||
+           point.observationId !== horizontalObservationIds.get(id))) {
+        throw new TypeError("Vertical fitting observations must match the exact horizontal fit observation ID.");
+      }
       if (point.evidenceSourceId !== sourceId) {
         throw new TypeError("Every vertical control must identify the selected source through evidenceSourceId.");
       }
@@ -243,6 +264,7 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
         modelY: point.modelY,
         ellipsoidalHeightM: point.ellipsoidalHeightM,
         evidenceSourceId: point.evidenceSourceId,
+        ...(hasIndependentCheckpoints ? { observationId: point.observationId } : {}),
       };
     });
     if (verticalIds.size !== horizontalIds.size ||
@@ -265,6 +287,105 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
     };
   }
 
+  let heldOutCheckpoints = null;
+  if (hasIndependentCheckpoints) {
+    if (raw.heldOutCheckpoints === undefined || !vertical) {
+      throw new TypeError("Control-point manifest schema 1.2.0 requires vertical fitting controls and held-out 3D checkpoints.");
+    }
+    exactKeys(raw.heldOutCheckpoints, [
+      "crs", "heightType", "unit", "referenceFrame", "coordinateEpoch", "survey", "points",
+    ], [], "heldOutCheckpoints");
+    if (raw.heldOutCheckpoints.crs !== "EPSG:4979" ||
+        raw.heldOutCheckpoints.heightType !== "ellipsoidal" ||
+        raw.heldOutCheckpoints.unit !== "metre" ||
+        raw.heldOutCheckpoints.referenceFrame !== vertical.referenceFrame ||
+        raw.heldOutCheckpoints.coordinateEpoch !== vertical.coordinateEpoch) {
+      throw new TypeError("Held-out checkpoints must use the exact D3M-13 EPSG:4979 frame and coordinate epoch.");
+    }
+    exactKeys(raw.heldOutCheckpoints.survey, [
+      "method", "reference", "observedAtUtc", "horizontalAccuracyM", "verticalAccuracyM",
+    ], [], "heldOutCheckpoints.survey");
+    const checkpointSurvey = raw.heldOutCheckpoints.survey;
+    if (typeof checkpointSurvey.method !== "string" || !checkpointSurvey.method.trim() ||
+        checkpointSurvey.method.length > 120 ||
+        typeof checkpointSurvey.reference !== "string" || !checkpointSurvey.reference.trim() ||
+        checkpointSurvey.reference.length > 300 ||
+        !Number.isFinite(checkpointSurvey.horizontalAccuracyM) ||
+        checkpointSurvey.horizontalAccuracyM <= 0 || checkpointSurvey.horizontalAccuracyM > 100 ||
+        !Number.isFinite(checkpointSurvey.verticalAccuracyM) ||
+        checkpointSurvey.verticalAccuracyM <= 0 || checkpointSurvey.verticalAccuracyM > 100) {
+      throw new TypeError("Held-out checkpoint survey metadata or declared accuracy is invalid.");
+    }
+    canonicalTimestamp(checkpointSurvey.observedAtUtc, "heldOutCheckpoints.survey.observedAtUtc");
+    if (!Array.isArray(raw.heldOutCheckpoints.points) ||
+        raw.heldOutCheckpoints.points.length < 6 ||
+        raw.heldOutCheckpoints.points.length > 100) {
+      throw new RangeError("Independent 3D validation requires 6–100 held-out checkpoints.");
+    }
+    const fitIds = new Set(controlPoints.map((point) => point.id));
+    const checkpointIds = new Set();
+    const checkpointObservationIds = new Set();
+    const checkpointPoints = raw.heldOutCheckpoints.points.map((point, index) => {
+      exactKeys(point, [
+        "id", "observationId", "observationRecordSha256", "modelX", "modelY", "modelZ",
+        "longitude", "latitude", "ellipsoidalHeightM",
+      ], [], "heldOutCheckpoints.points[" + index + "]");
+      if (typeof point.id !== "string" || !SAFE_ID.test(point.id) ||
+          checkpointIds.has(point.id) || fitIds.has(point.id)) {
+        throw new TypeError("Held-out checkpoint IDs must be valid, unique and disjoint from all fitting control IDs.");
+      }
+      if (typeof point.observationId !== "string" || !SAFE_ID.test(point.observationId) ||
+          checkpointObservationIds.has(point.observationId) || fitObservationIds.has(point.observationId)) {
+        throw new TypeError("Held-out observation IDs must be valid, unique and disjoint from fitting observation IDs.");
+      }
+      if (!HASH.test(point.observationRecordSha256 ?? "")) {
+        throw new TypeError("Each held-out checkpoint requires a declared survey observation-record SHA-256.");
+      }
+      checkpointIds.add(point.id);
+      checkpointObservationIds.add(point.observationId);
+      for (const key of ["modelX", "modelY", "modelZ", "longitude", "latitude", "ellipsoidalHeightM"]) {
+        if (typeof point[key] !== "number" || !Number.isFinite(point[key])) {
+          throw new TypeError("heldOutCheckpoints.points[" + index + "]." + key + " must be finite.");
+        }
+      }
+      if (Math.abs(point.modelX) > 100000 || Math.abs(point.modelY) > 100000 ||
+          Math.abs(point.modelZ) > 100000 ||
+          point.longitude < -180 || point.longitude > 180 ||
+          point.latitude < -85 || point.latitude > 85 ||
+          point.ellipsoidalHeightM < -12000 || point.ellipsoidalHeightM > 100000) {
+        throw new RangeError("Held-out checkpoint coordinates are outside the supported model/WGS84/EPSG:4979 ranges.");
+      }
+      return {
+        id: point.id,
+        observationId: point.observationId,
+        observationRecordSha256: point.observationRecordSha256,
+        modelX: point.modelX,
+        modelY: point.modelY,
+        modelZ: point.modelZ,
+        longitude: point.longitude,
+        latitude: point.latitude,
+        ellipsoidalHeightM: point.ellipsoidalHeightM,
+      };
+    });
+    heldOutCheckpoints = {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: vertical.referenceFrame,
+      coordinateEpoch: vertical.coordinateEpoch,
+      survey: {
+        method: checkpointSurvey.method.trim(),
+        reference: checkpointSurvey.reference.trim(),
+        observedAtUtc: checkpointSurvey.observedAtUtc,
+        horizontalAccuracyM: checkpointSurvey.horizontalAccuracyM,
+        verticalAccuracyM: checkpointSurvey.verticalAccuracyM,
+      },
+      points: checkpointPoints,
+    };
+  } else if (raw.heldOutCheckpoints !== undefined) {
+    throw new TypeError("Held-out 3D checkpoints require control-point manifest schema 1.2.0.");
+  }
+
   return {
     schemaVersion: raw.schemaVersion,
     kind: "single-image-control-point-manifest",
@@ -281,6 +402,7 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
     },
     controlPoints,
     ...(vertical ? { vertical } : {}),
+    ...(heldOutCheckpoints ? { heldOutCheckpoints } : {}),
   };
 }
 function validateThresholds(maxGcpRmsErrorM, maxGcpResidualM) {
@@ -311,6 +433,14 @@ function manifestSummary(loaded) {
       coordinateEpoch: manifest.vertical.coordinateEpoch,
       survey: manifest.vertical.survey,
       pointCount: manifest.vertical.controlPoints.length,
+    } } : {}),
+    ...(manifest.heldOutCheckpoints ? { heldOutCheckpoints: {
+      crs: manifest.heldOutCheckpoints.crs,
+      referenceFrame: manifest.heldOutCheckpoints.referenceFrame,
+      coordinateEpoch: manifest.heldOutCheckpoints.coordinateEpoch,
+      survey: manifest.heldOutCheckpoints.survey,
+      pointCount: manifest.heldOutCheckpoints.points.length,
+      observationIds: manifest.heldOutCheckpoints.points.map((point) => point.observationId),
     } } : {}),
   };
 }
@@ -497,8 +627,12 @@ export function createSingleImageGeoreferenceEvidence({
     maxVerticalGcpRmsErrorM,
     maxVerticalGcpResidualM,
   });
+  const independentCheckpointEvidence = createIndependent3DCheckpointEvidence({
+    loadedManifest, modelSha256, horizontalRegistration: registration, verticalEvidence,
+  });
   return {
-    schemaVersion: loadedManifest.manifest.vertical ? "1.1.0" : "1.0.0",
+    schemaVersion: loadedManifest.manifest.heldOutCheckpoints ? "1.2.0" :
+      loadedManifest.manifest.vertical ? "1.1.0" : "1.0.0",
     status: registration.status,
     modelSha256,
     maxGcpRmsErrorM,
@@ -506,8 +640,140 @@ export function createSingleImageGeoreferenceEvidence({
     manifest: manifestSummary(loadedManifest),
     registration,
     ...(loadedManifest.manifest.vertical ? { verticalEvidence } : {}),
+    ...(loadedManifest.manifest.heldOutCheckpoints ? { independentCheckpointEvidence } : {}),
   };
 }
+
+
+function createIndependent3DCheckpointEvidence({
+  loadedManifest,
+  modelSha256,
+  horizontalRegistration,
+  verticalEvidence,
+}) {
+  const checkpoints = loadedManifest?.manifest?.heldOutCheckpoints ?? null;
+  if (!checkpoints) {
+    return {
+      schemaVersion: "1.0.0", status: "not-requested", modelSha256,
+      controlPointManifestSha256: loadedManifest?.sha256 ?? null,
+      mapReady: false, publicationEligible: false, automaticApproval: false,
+    };
+  }
+  if (horizontalRegistration?.status !== "calibrated-needs-human-review" ||
+      verticalEvidence?.status !== "calibrated-needs-human-review") {
+    return {
+      schemaVersion: "1.0.0", status: "blocked-fitting-calibration-failed", modelSha256,
+      controlPointManifestSha256: loadedManifest.sha256,
+      mapReady: false, publicationEligible: false, automaticApproval: false,
+      warnings: ["Held-out evaluation cannot run unless both horizontal and vertical fitting calibration pass."],
+    };
+  }
+  const transform = horizontalRegistration.transform;
+  const scale = transform.metresPerModelUnit;
+  const theta = transform.rotationFromModelXToEastNorthDegrees * Math.PI / 180;
+  const cosine = Math.cos(theta), sine = Math.sin(theta);
+  const origin = horizontalRegistration.referenceOrigin;
+  const lon0 = origin.longitude * Math.PI / 180;
+  const lat0 = origin.latitude * Math.PI / 180;
+  const cosLat0 = Math.cos(lat0);
+  if (!Number.isFinite(scale) || scale <= 0 || !Number.isFinite(cosLat0) || Math.abs(cosLat0) < 1e-6) {
+    throw new TypeError("Held-out evaluation requires the exact valid D3M-13 horizontal transform and local projection origin.");
+  }
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const wrapRadians = (value) => ((value + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  const predicted = checkpoints.points.map((point) => {
+    const predictedEast = scale * (cosine * point.modelX - sine * point.modelZ) + transform.translationEastM;
+    const predictedNorth = scale * (sine * point.modelX + cosine * point.modelZ) + transform.translationNorthM;
+    const targetEast = wrapRadians(radians(point.longitude) - lon0) * 6378137 * cosLat0;
+    const targetNorth = (radians(point.latitude) - lat0) * 6378137;
+    const eastResidualM = predictedEast - targetEast;
+    const northResidualM = predictedNorth - targetNorth;
+    const horizontalErrorM = Math.hypot(eastResidualM, northResidualM);
+    const predictedLongitude = wrapRadians(lon0 + predictedEast / (6378137 * cosLat0)) * 180 / Math.PI;
+    const predictedLatitude = (lat0 + predictedNorth / 6378137) * 180 / Math.PI;
+    const predictedEllipsoidalHeightM = verticalEvidence.heightOffsetM + scale * point.modelY;
+    const verticalResidualM = predictedEllipsoidalHeightM - point.ellipsoidalHeightM;
+    const spatial3dErrorM = Math.hypot(horizontalErrorM, verticalResidualM);
+    return {
+      id: point.id, observationId: point.observationId,
+      observationRecordSha256: point.observationRecordSha256,
+      model: { x: point.modelX, y: point.modelY, z: point.modelZ },
+      surveyed: { longitude: point.longitude, latitude: point.latitude, ellipsoidalHeightM: point.ellipsoidalHeightM },
+      predicted: {
+        longitude: Number(predictedLongitude.toFixed(9)),
+        latitude: Number(predictedLatitude.toFixed(9)),
+        ellipsoidalHeightM: round(predictedEllipsoidalHeightM),
+      },
+      horizontalEastResidualM: round(eastResidualM),
+      horizontalNorthResidualM: round(northResidualM),
+      horizontalErrorM: round(horizontalErrorM),
+      verticalResidualM: round(verticalResidualM),
+      spatial3dErrorM: round(spatial3dErrorM),
+      evidence: "manifest-declared-held-out-observation",
+    };
+  });
+  const horizontalErrors = predicted.map((point) => point.horizontalErrorM);
+  const verticalErrors = predicted.map((point) => point.verticalResidualM);
+  const spatialErrors = predicted.map((point) => point.spatial3dErrorM);
+  const rms = (values) => Math.sqrt(values.reduce((sum, value) => sum + value ** 2, 0) / values.length);
+  const maxAbs = (values) => Math.max(...values.map((value) => Math.abs(value)));
+  const horizontalRmsErrorM = rms(horizontalErrors);
+  const horizontalMaxResidualM = maxAbs(horizontalErrors);
+  const verticalRmsErrorM = rms(verticalErrors);
+  const verticalMaxResidualM = maxAbs(verticalErrors);
+  const spatial3dRmsErrorM = rms(spatialErrors);
+  const spatial3dMaxResidualM = maxAbs(spatialErrors);
+  const maxHorizontalRms = horizontalRegistration.controls.maxRmsErrorM;
+  const maxHorizontalResidual = horizontalRegistration.controls.maxAllowedResidualM;
+  const maxVerticalRms = verticalEvidence.controls.maxRmsErrorM;
+  const maxVerticalResidual = verticalEvidence.controls.maxAllowedResidualM;
+  const maxSpatial3dRms = Math.hypot(maxHorizontalRms, maxVerticalRms);
+  const maxSpatial3dResidual = Math.hypot(maxHorizontalResidual, maxVerticalResidual);
+  const thresholdPass = horizontalRmsErrorM <= maxHorizontalRms &&
+    horizontalMaxResidualM <= maxHorizontalResidual &&
+    verticalRmsErrorM <= maxVerticalRms && verticalMaxResidualM <= maxVerticalResidual &&
+    spatial3dRmsErrorM <= maxSpatial3dRms && spatial3dMaxResidualM <= maxSpatial3dResidual;
+  return {
+    schemaVersion: "1.0.0",
+    status: thresholdPass ? "validated-needs-human-review" : "validation-failed-review-required",
+    modelSha256, controlPointManifestSha256: loadedManifest.sha256,
+    referenceFrame: checkpoints.referenceFrame, coordinateEpoch: checkpoints.coordinateEpoch,
+    survey: checkpoints.survey, fittingControlsExcluded: true,
+    horizontalTransform: {
+      horizontalMetresPerModelUnit: scale,
+      rotationFromModelXToEastNorthDegrees: transform.rotationFromModelXToEastNorthDegrees,
+      translationEastM: transform.translationEastM, translationNorthM: transform.translationNorthM,
+      referenceOrigin: horizontalRegistration.referenceOrigin,
+      fitControlPointIds: horizontalRegistration.controls.ids,
+    },
+    verticalTransform: {
+      verticalDatum: "EPSG:4979-ellipsoidal", heightOffsetM: verticalEvidence.heightOffsetM,
+      horizontalMetresPerModelUnit: scale, fitControlPointIds: verticalEvidence.controls.ids,
+    },
+    controls: {
+      count: predicted.length, ids: predicted.map((point) => point.id),
+      observationIds: predicted.map((point) => point.observationId), residuals: predicted,
+      horizontalRmsErrorM: round(horizontalRmsErrorM),
+      horizontalMaxResidualM: round(horizontalMaxResidualM),
+      maxHorizontalRmsErrorM: maxHorizontalRms, maxHorizontalResidualM: maxHorizontalResidual,
+      verticalRmsErrorM: round(verticalRmsErrorM),
+      verticalMaxResidualM: round(verticalMaxResidualM),
+      maxVerticalRmsErrorM: maxVerticalRms, maxVerticalResidualM: maxVerticalResidual,
+      spatial3dRmsErrorM: round(spatial3dRmsErrorM),
+      spatial3dMaxResidualM: round(spatial3dMaxResidualM),
+      maxSpatial3dRmsErrorM: round(maxSpatial3dRms),
+      maxSpatial3dResidualM: round(maxSpatial3dResidual), thresholdPass,
+    },
+    mapReady: false, publicationEligible: false, automaticApproval: false,
+    warnings: [
+      "Held-out observations are hash-declared inside the exact manifest; original field-book/GNSS bytes are not independently retrieved or verified here.",
+      "Checkpoint model coordinates and physical feature correspondence remain operator-supplied and require independent human adjudication.",
+      "Held-out residuals evaluate only the supplied model coordinates and WGS 84 ellipsoidal observations; they do not establish architectural completeness or source rights.",
+      "Passing synthetic evaluator tests is not a real-world accuracy result and never enables map publication.",
+    ],
+  };
+}
+
 function canonicalObjectJson(value) {
   return JSON.stringify(value, (_key, item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return item;
@@ -528,15 +794,17 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
   sourceSha256,
   modelSha256,
 }) {
-  const hasVerticalEvidence = evidence?.schemaVersion === "1.1.0";
+  const hasVerticalEvidence = ["1.1.0", "1.2.0"].includes(evidence?.schemaVersion);
+  const hasIndependentCheckpoints = evidence?.schemaVersion === "1.2.0";
   exactKeys(
     evidence,
     ["schemaVersion", "status", "modelSha256", "maxGcpRmsErrorM", "maxGcpResidualM",
-      "manifest", "registration", ...(hasVerticalEvidence ? ["verticalEvidence"] : [])],
+      "manifest", "registration", ...(hasVerticalEvidence ? ["verticalEvidence"] : []),
+      ...(hasIndependentCheckpoints ? ["independentCheckpointEvidence"] : [])],
     [],
     "Single-image georeference evidence",
   );
-  if (!["1.0.0", "1.1.0"].includes(evidence.schemaVersion) || evidence.modelSha256 !== modelSha256) {
+  if (!["1.0.0", "1.1.0", "1.2.0"].includes(evidence.schemaVersion) || evidence.modelSha256 !== modelSha256) {
     throw new TypeError("Georeference evidence does not bind this exact GLB candidate.");
   }
 
@@ -553,7 +821,8 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
     exactKeys(
       evidence.manifest,
       ["path", "bytes", "sha256", "pointCount", "horizontalCrs", "horizontalDatum",
-        "verticalDatum", "survey", ...(evidence.schemaVersion === "1.1.0" ? ["vertical"] : [])],
+        "verticalDatum", "survey", ...(hasVerticalEvidence ? ["vertical"] : []),
+        ...(hasIndependentCheckpoints ? ["heldOutCheckpoints"] : [])],
       [],
       "Control-point manifest receipt binding",
     );
