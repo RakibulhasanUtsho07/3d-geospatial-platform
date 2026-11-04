@@ -100,6 +100,7 @@ async function main() {
     inference: result.report.inference,
     output: result.report.output,
     geometryQa: result.report.geometryQa,
+    generationArtifactReceipt: result.report.generationArtifactReceipt,
     mapReady: result.report.mapReady,
     publicationEligible: result.report.publicationEligible,
     automaticApproval: result.report.automaticApproval,
