@@ -1,31 +1,60 @@
 # Signed building review package manifests
 
-Integrity verification detects changes relative to an included package manifest, but an attacker who replaces both the files and that manifest can calculate new hashes. This optional Ed25519 detached signature binds the exact manifest bytes to an independently trusted public key.
+Review-package integrity checks detect changes relative to the included package manifest. A detached Ed25519 signature additionally authenticates the exact manifest bytes. New package signatures use **schema 2.0.0**, which binds the signer to the current versioned trusted-reviewer registry.
 
-## Create a key pair
+## Registry-bound v2 signing
 
-Create the private key on a trusted/offline machine and keep it out of the repository and package directory:
+The production signer reads the public-key-only registry from the server/deployment environment variable:
 
-\`\`\`sh
-openssl genpkey -algorithm ED25519 -out review-package-private.pem
-openssl pkey -in review-package-private.pem -pubout -out review-package-trusted-public.pem
-\`\`\`
+`RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`
 
-Distribute or pin \`review-package-trusted-public.pem\` through a trusted channel. The public-key fingerprint in the signature envelope is not itself a trust anchor; the verifier compares it to the key you explicitly supply.
+Do not pass registry JSON as a command-line argument, write it to shell history, print it, commit it, or attach it to a CI artifact. Configure it only using the deployment secret manager. The registry contains public keys, not private keys or personal identity records.
 
-## Sign and verify
+The signer must retain the reviewer's Ed25519 private key in an approved local secure environment. The CLI derives its public key and requires the fingerprint to match exactly one active entry for the supplied reviewer ID in the strict versioned registry. It rejects expired or not-yet-valid registries, unknown reviewers, revoked keys, invalid key windows, ambiguous identities and key mismatch.
 
-\`\`\`powershell
+~~~powershell
 npm run test:building-review-package-signature
-npm run sign:building-review-package -- ".\\review-package" ".\\review-package-private.pem"
-npm run verify:building-review-package-signature -- ".\\review-package" ".\\review-package-trusted-public.pem" ".\\signature-verification.json"
-npm run verify:building-review-package -- ".\\review-package" ".\\integrity-report.json"
-\`\`\`
+npm run sign:building-review-package -- ".\\review-package" ".\\review-package-private.pem" --reviewer-id "operator-assigned-reviewer-id"
+npm run verify:building-review-package-signature -- ".\\review-package" ".\\signature-verification.json"
+npm run verify:signed-building-review-package -- ".\\review-package" ".\\combined-verification.json"
+~~~
 
-Signing creates \`package-manifest.sig.json\` beside \`package-manifest.json\` and refuses to overwrite an existing signature. The signature covers the exact original manifest bytes. Verification checks the manifest hash, Ed25519 signature and fingerprint of the independently supplied trusted public key.
+The signing CLI requires both the private-key path and `--reviewer-id`. New CLI signing does not fall back to an unregistered PEM key. The registry secret must already be injected by the approved runtime/secret manager.
 
-The normal package integrity command treats the detached signature as verification metadata, not as an unlisted model artifact. Verify the signature and package contents separately.
+## What schema 2.0.0 signs
+
+The v2 Ed25519 message is domain-separated and binds:
+- the exact original `package-manifest.json` bytes and SHA-256;
+- fixed purpose `package-integrity-attestation-not-release-approval`;
+- `reviewerId`, `keyId`, `registryId` and public-key fingerprint;
+- registry issue/expiry and key validity timestamps;
+- canonical UTC `signedAt` timestamp and the fail-closed publication policy.
+
+See `building-review-package-signature-v2.schema.json` for the envelope contract. The detached signature file is written exclusively and cannot overwrite an existing signature.
+
+Verification resolves the signer only through the currently active registry. A revoked or expired key, expired registry, changed registry identity, substituted key or modified signer context fails closed. Key rotation/revocation therefore takes effect for current verification; re-sign a package with a newly provisioned active key when required.
+
+## Combined package verification
+
+`verify:signed-building-review-package` runs both offline package artifact integrity verification and detached signature verification. It returns both sub-results and exits non-zero unless both pass. It never modifies the candidate or changes `mapReady`, `publicationEligible` or `automaticApproval`.
+
+Use the separate commands when diagnosing one layer:
+- `verify:building-review-package` checks packaged files and cross-references.
+- `verify:building-review-package-signature` checks the detached signer envelope and trusted key.
+
+## Legacy v1 packages
+
+Existing schema 1.0.0 signature envelopes remain verifiable, but they do not contain registry-backed reviewer identity or key-lifecycle metadata. Verification requires an explicit legacy key path:
+
+~~~powershell
+npm run verify:building-review-package-signature -- ".\\legacy-review-package" --legacy-public-key ".\\legacy-trusted-public-key.pem"
+npm run verify:signed-building-review-package -- ".\\legacy-review-package" --legacy-public-key ".\\legacy-trusted-public-key.pem"
+~~~
+
+New CLI signing never creates a v1 envelope. Migrate legacy packages by verifying their old signature through the explicit legacy path, reviewing their contents, and re-signing the exact manifest with a currently trusted reviewer key in schema 2.0.0.
 
 ## Limits
 
-The signature proves only that the exact manifest bytes were signed by the private key corresponding to the trusted public key. It does not itself prove that the references are accurate, that rights metadata is legally sufficient, or that a human approved public release. The package remains \`publicationEligible: false\`; never commit or distribute the private key with the package.
+A valid v2 signature establishes possession of the private key corresponding to a currently active, operator-provisioned registry entry. It does **not** prove civil identity, professional qualification, employment, legal authority, surveyor/device authenticity, source rights, survey accuracy, model quality or architectural correctness. The signer identity/authority must be independently verified by the organization that provisions the registry.
+
+The signature purpose is a package-integrity attestation, not a human release decision. The package remains final-human-review-only; `publicationEligible`, `mapReady` and `automaticApproval` remain `false`. The repository contains no production reviewer identities, registry secrets or private keys. CI uses synthetic ephemeral keys only.

@@ -91,6 +91,7 @@ on:
       - feat/d3m-engine07-generation-artifact-receipt-20261104
       - feat/d3m-engine08-georeference-evidence-binding-20261104
       - feat/d3m-engine09-signed-georeference-review-package-20261104
+      - feat/d3m-engine10-registry-bound-review-package-signatures-20261104
 
   workflow_dispatch:
   pull_request:
@@ -103,6 +104,7 @@ on:
       - feat/d3m-engine07-generation-artifact-receipt-20261104
       - feat/d3m-engine08-georeference-evidence-binding-20261104
       - feat/d3m-engine09-signed-georeference-review-package-20261104
+      - feat/d3m-engine10-registry-bound-review-package-signatures-20261104
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -621,8 +623,17 @@ jobs:
       - name: Test offline review package integrity verifier
         run: npm run test:building-review-package-integrity
 
-      - name: Test Ed25519 review package manifest signatures
+      - name: Test registry-bound Ed25519 review package signatures and CLI
         run: npm run test:building-review-package-signature
+
+      - name: Validate signed review package verification CLI
+        run: npm run verify:signed-building-review-package -- --help
+
+      - name: Validate registry-bound review package signing CLI
+        run: npm run sign:building-review-package -- --help
+
+      - name: Validate registry-bound review package signature verifier CLI
+        run: npm run verify:building-review-package-signature -- --help
 
       - name: Test evidence-based building accuracy benchmark
         run: npm run test:building-accuracy-benchmark

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, lstat, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { verifyBuildingReviewPackageSignature } from "../src/core/building-generation/building-review-package-signature.mjs";
+import {
+  verifyBuildingReviewPackageSignature,
+  verifyBuildingReviewPackageSignatureWithTrustedRegistry,
+} from "../src/core/building-generation/building-review-package-signature.mjs";
 
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
 
 async function regularFile(filePath, label) {
   const stat = await lstat(filePath);
@@ -12,35 +14,87 @@ async function regularFile(filePath, label) {
   return readFile(filePath);
 }
 
-async function main() {
-  const [packageDirArg, trustedPublicKeyArg, reportArg] = process.argv.slice(2);
-  if (!packageDirArg || !trustedPublicKeyArg || process.argv.length > 5) {
-    throw new Error("Usage: node scripts/verify-building-review-package-signature.mjs <review-package-directory> <trusted-ed25519-public-key.pem> [signature-verification-report.json]");
+function parseArguments(args) {
+  const positional = [];
+  let legacyPublicKeyPath = null;
+  for (let index = 0; index < args.length; index++) {
+    const value = args[index];
+    if (value === "--legacy-public-key") {
+      if (legacyPublicKeyPath !== null || !args[index + 1] || args[index + 1].startsWith("--")) {
+        throw new Error("--legacy-public-key must be supplied exactly once with a value.");
+      }
+      legacyPublicKeyPath = path.resolve(args[++index]);
+    } else if (value.startsWith("--")) {
+      throw new Error("Unknown signature-verification option: " + value);
+    } else {
+      positional.push(value);
+    }
   }
-  const packageDir = path.resolve(packageDirArg);
+  if (positional.length < 1 || positional.length > 2) {
+    throw new Error("Usage: NODE_ENV=production npm run verify:building-review-package-signature -- <review-package-directory> [signature-verification-report.json] [--legacy-public-key <trusted-public-key.pem>]");
+  }
+  return {
+    packageDir: path.resolve(positional[0]),
+    reportPath: positional[1] ? path.resolve(positional[1]) : null,
+    legacyPublicKeyPath,
+  };
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log("Usage: NODE_ENV=production npm run verify:building-review-package-signature -- <review-package-directory> [signature-verification-report.json] [--legacy-public-key <trusted-public-key.pem>]");
+    console.log("Schema 2.0.0 signatures use RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON. Schema 1.0.0 signatures require the explicit legacy public-key flag.");
+    return;
+  }
+  const { packageDir, reportPath: requestedReportPath, legacyPublicKeyPath } = parseArguments(args);
   const manifestPath = path.join(packageDir, "package-manifest.json");
   const signaturePath = path.join(packageDir, "package-manifest.sig.json");
-  const publicKeyPath = path.resolve(trustedPublicKeyArg);
-  const [manifestBytes, signatureBytes, publicKeyBytes] = await Promise.all([
+  const [manifestBytes, signatureBytes] = await Promise.all([
     regularFile(manifestPath, "Package manifest"),
     regularFile(signaturePath, "Signature envelope"),
-    regularFile(publicKeyPath, "Trusted public key"),
   ]);
   const signatureEnvelope = JSON.parse(signatureBytes.toString("utf8"));
-  const result = verifyBuildingReviewPackageSignature({
-    manifestBytes,
-    signatureEnvelope,
-    trustedPublicKeyPem: publicKeyBytes.toString("utf8"),
-  });
+  let result;
+
+  if (signatureEnvelope.schemaVersion === "2.0.0") {
+    if (legacyPublicKeyPath) throw new Error("Legacy public-key flag is not accepted for a registry-bound v2 signature.");
+    const rawRegistry = process.env[REGISTRY_ENV];
+    if (typeof rawRegistry !== "string" || !rawRegistry.trim()) {
+      throw new Error("trusted-reviewer-registry-secret-missing");
+    }
+    if (Buffer.byteLength(rawRegistry, "utf8") > 64 * 1024) {
+      throw new Error("trusted-reviewer-registry-secret-exceeds-size-limit");
+    }
+    result = verifyBuildingReviewPackageSignatureWithTrustedRegistry({
+      manifestBytes,
+      signatureEnvelope,
+      trustedReviewerRegistry: rawRegistry,
+    });
+  } else if (signatureEnvelope.schemaVersion === "1.0.0") {
+    if (!legacyPublicKeyPath) {
+      throw new Error("legacy-v1-signature-requires-explicit---legacy-public-key");
+    }
+    const publicKeyBytes = await regularFile(legacyPublicKeyPath, "Legacy trusted public key");
+    result = verifyBuildingReviewPackageSignature({
+      manifestBytes,
+      signatureEnvelope,
+      trustedPublicKeyPem: publicKeyBytes.toString("utf8"),
+    });
+  } else {
+    throw new Error("unsupported-review-package-signature-schema");
+  }
 
   let reportPath = null;
-  if (reportArg) {
-    reportPath = path.resolve(reportArg);
+  if (requestedReportPath) {
+    reportPath = requestedReportPath;
     const relativeToPackage = path.relative(packageDir, reportPath);
     if (relativeToPackage === "" || (!relativeToPackage.startsWith("..") && !path.isAbsolute(relativeToPackage))) {
       throw new Error("Signature verification report must be outside the package directory.");
     }
-    if ([manifestPath, signaturePath, publicKeyPath].includes(reportPath)) throw new Error("Report path must differ from signature inputs.");
+    if ([manifestPath, signaturePath, legacyPublicKeyPath].includes(reportPath)) {
+      throw new Error("Report path must differ from signature inputs.");
+    }
     await mkdir(path.dirname(reportPath), { recursive: true });
     await writeFile(reportPath, JSON.stringify(result, null, 2) + "\n", { flag: "wx", mode: 0o600 });
   }
@@ -48,8 +102,13 @@ async function main() {
   console.log(JSON.stringify({
     status: result.status,
     valid: result.valid,
+    schemaVersion: result.schemaVersion,
     manifestSha256: result.manifestSha256,
-    trustedPublicKeyFingerprintSha256: result.trustedPublicKeyFingerprintSha256,
+    reviewerId: result.reviewerId ?? null,
+    keyId: result.keyId ?? null,
+    registryId: result.registryId ?? null,
+    trustedPublicKeyFingerprintSha256: result.trustedPublicKeyFingerprintSha256 ??
+      result.publicKeyFingerprintSha256 ?? null,
     report: reportPath,
     publicationEligible: false,
   }, null, 2));
