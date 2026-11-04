@@ -93,19 +93,51 @@ async function writeFakeModelLoadReceipt(spawnOptions = {}) {
   await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
 }
 
-async function startFakeRunner(options, { omitModelLoadRole = null } = {}) {
-  const spawnImpl = omitModelLoadRole
+
+async function writeFakeSourceImageLoadReceipt(spawnOptions = {}, args = []) {
+  const env = spawnOptions.env ?? {};
+  const receiptPath = env.BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH;
+  const expected = env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON
+    ? JSON.parse(env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON)
+    : null;
+  if (!receiptPath || !expected || env.BUILDING_ENGINE_TEST_OMIT_SOURCE_IMAGE_RECEIPT === "1") return;
+  const sourceArgument = args[1];
+  if (typeof sourceArgument !== "string" ||
+      path.resolve(sourceArgument) !== path.resolve(env.BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH ?? "")) {
+    throw new TypeError("Fake TripoSR source argument does not match the private source-image attestation path.");
+  }
+  await writeFile(receiptPath, JSON.stringify({
+    schemaVersion: "1.0.0",
+    role: "sourceImage",
+    loader: "PIL.Image.open",
+    bytes: expected.bytes,
+    sha256: expected.sha256,
+    exactBytesPassed: true,
+    stable: true,
+  }) + "\n");
+}
+
+async function startFakeRunner(options, {
+  omitModelLoadRole = null,
+  omitSourceImageReceipt = false,
+} = {}) {
+  const spawnImpl = omitModelLoadRole || omitSourceImageReceipt
     ? (executable, args, spawnOptions = {}) => options.spawnImpl(executable, args, {
       ...spawnOptions,
       env: {
         ...(spawnOptions.env ?? {}),
-        BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE: omitModelLoadRole,
+        ...(omitModelLoadRole ? { BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE: omitModelLoadRole } : {}),
+        ...(omitSourceImageReceipt ? { BUILDING_ENGINE_TEST_OMIT_SOURCE_IMAGE_RECEIPT: "1" } : {}),
       },
     })
     : options.spawnImpl;
+  const sourcePath = path.resolve(
+    options.workspaceRoot,
+    ...options.sources[0].relativePath.split("/"),
+  );
   const child = spawnImpl(
     options.pythonPath,
-    [options.runnerScript, "--fixture-smoke"],
+    [options.runnerScript, sourcePath, "--fixture-smoke"],
     {},
   );
   if (!child || typeof child.once !== "function") {
@@ -141,7 +173,10 @@ function readyCapabilities() {
   };
 }
 
-async function fakeWorkflowResult(options, root, source, { omitModelLoadRole = null } = {}) {
+async function fakeWorkflowResult(options, root, source, {
+  omitModelLoadRole = null,
+  omitSourceImageReceipt = false,
+} = {}) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmSingleViewInference, true);
@@ -153,7 +188,7 @@ async function fakeWorkflowResult(options, root, source, { omitModelLoadRole = n
     "single-image-ai-reconstruction",
   ]);
 
-  await startFakeRunner(options, { omitModelLoadRole });
+  await startFakeRunner(options, { omitModelLoadRole, omitSourceImageReceipt });
 
   const glb = makeGlb();
   const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
@@ -266,6 +301,7 @@ function makeOptions(root, source, overrides = {}) {
     const child = new EventEmitter();
     queueMicrotask(async () => {
       await writeFakeModelLoadReceipt(spawnOptions);
+      await writeFakeSourceImageLoadReceipt(spawnOptions, _args);
       child.emit("spawn");
     });
     return child;
@@ -410,6 +446,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.model.sha256, result.report.output.sha256);
   assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
   assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
+  assert.equal(verified.sourceImageLoadEvidenceStatus, "verified-against-source-manifest");
 
   const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
@@ -425,6 +462,13 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   await assert.rejects(
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /model-load evidence does not match/i,
+  );
+  const tamperedSourceEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedSourceEvidence.sourceLoadEvidence.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedSourceEvidence, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /source-image load evidence does not match/i,
   );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
@@ -442,6 +486,23 @@ test("fails closed when the runner does not attest the rembg model loader input"
   assert.equal(result.report.status, "failed");
   assert.match(result.report.failure.summary, /model generation|evidence validation/i);
   assert.equal(result.report.modelLoadEvidence, null);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+});
+
+
+test("fails closed when TripoSR does not attest the exact source image opened by Pillow", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) =>
+      fakeWorkflowResult(options, root, source, { omitSourceImageReceipt: true }),
+  }));
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.summary, /model generation|evidence validation/i);
+  assert.equal(result.report.sourceLoadEvidence, null);
   assert.equal(result.report.mapReady, false);
   assert.equal(result.report.publicationEligible, false);
   assert.equal(result.report.automaticApproval, false);
