@@ -726,12 +726,19 @@ function createIndependent3DCheckpointEvidence({
       horizontalErrorM: round(horizontalErrorM),
       verticalResidualM: round(verticalResidualM),
       spatial3dErrorM: round(spatial3dErrorM),
+      _horizontalErrorExact: horizontalErrorM,
+      _verticalResidualExact: verticalResidualM,
+      _spatial3dErrorExact: spatial3dErrorM,
       evidence: "manifest-declared-held-out-observation",
     };
   });
-  const horizontalErrors = predicted.map((point) => point.horizontalErrorM);
-  const verticalErrors = predicted.map((point) => point.verticalResidualM);
-  const spatialErrors = predicted.map((point) => point.spatial3dErrorM);
+  const horizontalErrors = predicted.map((point) => point._horizontalErrorExact);
+  const verticalErrors = predicted.map((point) => point._verticalResidualExact);
+  const spatialErrors = predicted.map((point) => point._spatial3dErrorExact);
+  const reportPoints = predicted.map((point) => {
+    const { _horizontalErrorExact, _verticalResidualExact, _spatial3dErrorExact, ...reportPoint } = point;
+    return reportPoint;
+  });
   const rms = (values) => Math.sqrt(values.reduce((sum, value) => sum + value ** 2, 0) / values.length);
   const maxAbs = (values) => Math.max(...values.map((value) => Math.abs(value)));
   const horizontalRmsErrorM = rms(horizontalErrors);
@@ -768,8 +775,8 @@ function createIndependent3DCheckpointEvidence({
       horizontalMetresPerModelUnit: scale, fitControlPointIds: verticalEvidence.controls.ids,
     },
     controls: {
-      count: predicted.length, ids: predicted.map((point) => point.id),
-      observationIds: predicted.map((point) => point.observationId), residuals: predicted,
+      count: reportPoints.length, ids: reportPoints.map((point) => point.id),
+      observationIds: reportPoints.map((point) => point.observationId), residuals: reportPoints,
       horizontalRmsErrorM: round(horizontalRmsErrorM),
       horizontalMaxResidualM: round(horizontalMaxResidualM),
       maxHorizontalRmsErrorM: maxHorizontalRms, maxHorizontalResidualM: maxHorizontalResidual,
