@@ -708,6 +708,10 @@ function createIndependent3DCheckpointEvidence({
     const horizontalErrorM = Math.hypot(eastResidualM, northResidualM);
     const predictedLongitude = wrapRadians(lon0 + predictedEast / (6378137 * cosLat0)) * 180 / Math.PI;
     const predictedLatitude = (lat0 + predictedNorth / 6378137) * 180 / Math.PI;
+    if (!Number.isFinite(predictedLongitude) || !Number.isFinite(predictedLatitude) ||
+        predictedLatitude < -85 || predictedLatitude > 85) {
+      throw new RangeError("Held-out checkpoint prediction falls outside the supported local WGS84 latitude range.");
+    }
     const predictedEllipsoidalHeightM = verticalEvidence.heightOffsetM + scale * point.modelY;
     const verticalResidualM = predictedEllipsoidalHeightM - point.ellipsoidalHeightM;
     const spatial3dErrorM = Math.hypot(horizontalErrorM, verticalResidualM);
