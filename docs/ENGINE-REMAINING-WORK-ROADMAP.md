@@ -541,3 +541,12 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Added fixtures for valid vertical offset, scale reuse, residual failure, insufficient vertical spread, wrong CRS/height type, unnamed frame, missing/duplicate/substituted control IDs, non-finite/out-of-range heights, manifest drift, offline byte verification and review-package metadata policy. Added operator documentation at [D3M-ENGINE-13 ellipsoidal-height evidence](D3M-ENGINE-13-ELLIPSOIDAL-HEIGHT-EVIDENCE.md).
 - **Exact-head validation passed:** final head `e6d652bb8e63e68295828d64ca5d6d563cf72597`; Push Full CI [#41853559045](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41853559045) and PR Full CI [#41853571597](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41853571597) both completed successfully with 214/214 steps and zero failures. Both include the vertical GCP/runtime/package tests, ESLint, production build, Chromium and production viewport API/browser verification. PR #362 is Draft/open/unmerged on D3M-ENGINE-12 PR #361; no development/main promotion.
 - **Trust boundary:** vertical observations and physical model-point correspondences are still operator-supplied and not independently authenticated. No geoid/vertical transformation to orthometric/MSL height is included. A horizontal or vertical fit does not prove source rights, surveyor authenticity, model architecture, façade accuracy or real TripoSR inference. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
+
+
+## D3M-ENGINE-14 — independent held-out 3D checkpoint validation
+
+- Tracking issue: [#363](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/363).
+- Branch: `feat/d3m-engine14-independent-3d-checkpoints-20261104`, stacked directly on the D3M-ENGINE-13 feature head.
+- Implemented schema 1.2.0 fitting-observation identities and 6–100 disjoint held-out 3D checkpoint declarations; deterministic horizontal/vertical/combined residual computation; smoke fail-closed guard; review-package metadata and offline integrity binding; synthetic negative and positive tests.
+- Validation status: **pending exact-head Full CI**. No real held-out field-book/GNSS bytes, surveyor authentication, physical feature correspondence or live single-image worker run has been provided. Synthetic fixtures are not real-world accuracy evidence.
+- All release/publication flags remain false. PR will remain Draft and stacked; no promotion to `development` or `main`.
