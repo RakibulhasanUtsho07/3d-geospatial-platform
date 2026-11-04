@@ -115,6 +115,8 @@ async function fixture(t) {
   const attestation = {
     schemaVersion: "1.0.0",
     candidateSha256: candidateSha,
+    verticalSliceReportSha256: sha256(reportBytes),
+    sourceSetSha256: report.sourceEvidence.sourceSetSha256,
     model: {
       id: "demo-building",
       name: "Demo building",
@@ -214,3 +216,19 @@ test("rejects an attestation for a different building before catalog publication
   );
   await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
 });
+test("rejects publication attestation not bound to the exact parent report/source set", async (t) => {
+  const f = await fixture(t);
+  f.attestation.sourceSetSha256 = "0".repeat(64);
+  await writeFile(path.join(f.root, "publication-attestation.json"), JSON.stringify(f.attestation));
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      publicRoot: f.publicRoot,
+    }),
+    /exact parent report and source-set hashes/,
+  );
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
+
