@@ -100,7 +100,7 @@ function makeTestRegistry(publicKeyPem) {
       keyId: "floor-plan-test-key-01",
       status: "active",
       publicKeyPem,
-      validFromUtc: new Date(now - 60_000).toISOString(),
+      validFromUtc: "2026-10-01T00:00:00.000Z",
       validUntilUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
       revokedAtUtc: null,
       replacesKeyId: null,
