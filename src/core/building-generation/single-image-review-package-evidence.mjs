@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
+import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageRuntimeSmoke } from "./verify-single-image-runtime-smoke.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
@@ -139,8 +140,8 @@ export async function prepareSingleImageReviewPackageEvidence({
       manifestBytes.length !== report.georeferenceEvidence.manifest.bytes ||
       workflowReport.jobId !== jobId || workflowReport.buildingId !== buildingId ||
       workflowReport.output?.modelSha256 !== candidateGlbSha256 ||
-      JSON.stringify(workflowReport.georeference) !== JSON.stringify(report.georeferenceEvidence.registration) ||
-      JSON.stringify(receipt.payload.georeference) !== JSON.stringify(report.georeferenceEvidence)) {
+      canonicalJson(workflowReport.georeference) !== canonicalJson(report.georeferenceEvidence.registration) ||
+      canonicalJson(receipt.payload.georeference) !== canonicalJson(report.georeferenceEvidence)) {
     throw new Error("Single-image smoke, generation receipt, workflow report and control-point manifest are not cross-bound.");
   }
 

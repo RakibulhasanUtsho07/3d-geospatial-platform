@@ -453,7 +453,46 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           receiptPayload.workflowReport?.sha256 !== workflowArtifact.sha256 ||
           workflowReport.jobId !== metadata.jobId || workflowReport.buildingId !== packageManifest.buildingId ||
           workflowReport.mode !== "single-image-ai" || workflowReport.status !== "completed-requires-review" ||
+          workflowReport.mapReady !== false || workflowReport.publicationEligible !== false ||
+          workflowReport.output?.modelPath !== smokeReport.output?.relativePath ||
+          workflowReport.output?.modelBytes !== smokeReport.output?.bytes ||
           workflowReport.output?.modelSha256 !== candidate?.sha256 ||
+          !Array.isArray(workflowReport.inputs?.selectedViewIds) ||
+          workflowReport.inputs.selectedViewIds.length !== 1 ||
+          workflowReport.inputs.selectedViewIds[0] !== source.sourceId ||
+          !workflowReport.inputs?.mediaRecords?.some((item) =>
+            item.id === source.sourceId && item.sha256 === source.sha256 &&
+            item.mimeType === source.mimeType && item.usageStatus === "approved") ||
+          workflowReport.modelReport?.source?.sha256 !== source.sha256 ||
+          workflowReport.modelReport?.outputs?.glb?.sha256 !== candidate?.sha256 ||
+          workflowReport.modelReport?.outputs?.glb?.bytes !== smokeReport.output?.bytes ||
+          workflowReport.modelReport?.mapReady !== false ||
+          workflowReport.modelReport?.publicationEligible !== false ||
+          receiptPayload.source?.bytes !== source.bytes ||
+          receiptPayload.source?.mimeType !== source.mimeType ||
+          receiptPayload.source?.loaderEvidence?.sha256 !== source.sha256 ||
+          receiptPayload.output?.bytes !== smokeReport.output?.bytes ||
+          receiptPayload.output?.format !== "glb" ||
+          receiptPayload.output?.path !== smokeReport.output?.relativePath ||
+          receiptPayload.workerHost?.stableAcrossInference !== smokeReport.workerHost?.stableAcrossInference ||
+          canonicalJson(receiptPayload.workerHost) !== canonicalJson({
+            inventorySchemaVersion: smokeReport.workerHost?.inventorySchemaVersion,
+            stableAcrossInference: smokeReport.workerHost?.stableAcrossInference,
+            before: smokeReport.workerHost?.before,
+            after: smokeReport.workerHost?.after,
+          }) ||
+          canonicalJson(receiptPayload.modelLoadEvidence) !== canonicalJson(smokeReport.modelLoadEvidence) ||
+          canonicalJson(receiptPayload.geometryQa) !== canonicalJson({
+            schemaVersion: "1.0.0",
+            engine: smokeReport.geometryQa?.engine,
+            valid: smokeReport.geometryQa?.valid,
+            sourceStatus: smokeReport.geometryQa?.sourceStatus,
+            status: smokeReport.geometryQa?.status,
+            warningCount: smokeReport.geometryQa?.warningCount,
+            warnings: smokeReport.geometryQa?.warnings,
+            counts: smokeReport.geometryQa?.counts,
+          }) ||
+          receiptPayload.output?.meshCount !== smokeReport.output?.meshCount ||
           receiptPayload.output?.sha256 !== candidate?.sha256 ||
           smokeReport.output?.sha256 !== candidate?.sha256 ||
           georeference.status !== "calibrated-needs-human-review" ||
