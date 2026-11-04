@@ -161,6 +161,8 @@ export default function GenerationJobPublishPanel({
       catalogVersionVerified = true;
 
       setToken("");
+      setReviewReceipt(null);
+      setReviewReceiptName("");
       await onPublished(exactVersion.definition);
       setMessage(
         "Published and loaded " + (exactVersion.definition.name ?? exactVersion.definition.id) +
