@@ -9,13 +9,15 @@
 
 1. Create a generation job using the existing authenticated upload/job APIs. The browser queue/worker infrastructure remains separate: `GENERATION_API_TOKEN`, `BUILDING_ENGINE_WORKSPACE`, and a running worker are still required.
 2. Wait for the worker to finish and inspect the exact candidate GLB plus its QA report.
-3. Record the review decision through `POST /api/building-generation/jobs/<jobId>/review`, using `GENERATION_REVIEW_API_TOKEN`. Approval requires every checklist item to be true **and** stores the exact placement that was reviewed.
-4. Open **Generated models** on the 3D map, expand **Publish an approved generation job to this map**, and provide:
+3. Record the review decision through `POST /api/building-generation/jobs/<jobId>/review`, using `GENERATION_REVIEW_API_TOKEN`. Approval requires every checklist item to be true **and** stores the exact placement that was reviewed. The reviewer label is not yet authenticated by this write operation.
+4. On the trusted reviewer's workstation, create an Ed25519 receipt for that exact immutable approval (procedure below). The local signing CLI re-hashes the review record, candidate GLB and QA report; the private key never leaves the reviewer's machine.
+5. Open **Generated models** on the 3D map, expand **Publish an approved generation job to this map**, and provide:
    - The exact completed job ID.
    - The `GENERATION_PUBLISH_API_TOKEN` bearer token.
+   - The signed publication-review JSON receipt.
    - The exact WGS84 longitude/latitude, WGS84-ellipsoid height, heading/pitch/roll, scale and GLB axes captured by the approved review. A changed value is rejected.
    - Confirmation that the generated GLB and public catalog metadata will be served publicly.
-5. Select **Verify, publish and load model**. The server revalidates the approved job and writes the content-addressed GLB plus the new catalog version. The browser then fetches the public catalog with cache disabled, validates it with `getActivePublishedModels`, checks the exact returned model ID/version ID/SHA-256/URL, and only then asks the existing Cesium `GeneratedModelLayer` to load that catalog definition and focus the camera.
+6. Select **Verify, publish and load model**. The server revalidates the approved job and writes the content-addressed GLB plus the new catalog version. The browser then fetches the public catalog with cache disabled, validates it with `getActivePublishedModels`, checks the exact returned model ID/version ID/SHA-256/URL, and only then asks the existing Cesium `GeneratedModelLayer` to load that catalog definition and focus the camera.
 6. The loaded model is part of the current browser map session. The static catalog persists across refreshes; the existing catalog selector can reload it after a page refresh.
 
 ## API contract
@@ -44,6 +46,22 @@ Request body:
     "scale": 1,
     "upAxis": "Y",
     "forwardAxis": "Z"
+  },
+  "reviewReceipt": {
+    "submission": {
+      "schemaVersion": "1.0.0",
+      "recordType": "d3m02-generation-job-signed-publication-review",
+      "jobId": "the-exact-job-id",
+      "buildingId": "the-exact-building-id",
+      "reviewRecordSha256": "64-lowercase-hex-characters",
+      "candidateGlbSha256": "64-lowercase-hex-characters",
+      "qaReportSha256": "64-lowercase-hex-characters",
+      "placementSha256": "64-lowercase-hex-characters",
+      "reviewerId": "trusted-reviewer-id",
+      "reviewedAtUtc": "2026-11-04T05:00:00.000Z",
+      "decision": "approve-for-catalog-handoff"
+    },
+    "signatureBase64": "canonical-64-byte-ed25519-signature"
   }
 }
 ```
@@ -54,7 +72,27 @@ Success returns HTTP 201 with the job/review/model/version identifiers, asset UR
 
 The review API and local publication CLI use the same placement contract. The CLI supplies the fixed `WGS84-ellipsoid` height-reference marker; the human-reviewed values must otherwise match exactly. Legacy approval records without a placement digest are rejected.
 
-The route uses the common timing-safe bearer-token verifier with a distinct server secret. The body is bounded to 16 KiB. Missing server configuration returns 503; invalid/missing credentials return 401; malformed placement returns 400; a missing job returns 404; a busy catalog lock returns 409; review, status or hash failures return 422. Unexpected server errors are sanitized as 500 responses.
+The route uses the common timing-safe bearer-token verifier with a distinct server secret. The body is bounded to 16 KiB and must contain both `placement` and `reviewReceipt`. Missing server configuration or trusted-key registry returns 503; invalid/missing credentials return 401; malformed placement/receipt envelope returns 400; a missing job returns 404; a busy catalog lock returns 409; untrusted/invalid signatures, cross-job receipt substitution, status or hash failures return 422. Unexpected server errors are sanitized as 500 responses.
+
+
+## Trusted Ed25519 publication approval
+
+The review API's bearer token authorizes the request to record a review; the caller-supplied `reviewer` label is not individual identity proof. Therefore the public catalog handoff now requires a second, independently signed decision from a currently trusted D3M-01 reviewer.
+
+After the immutable review record is written, the trusted reviewer signs it locally:
+
+```powershell
+npm run sign:approved-generation-job-publication-review -- `\
+  "D:\\BuildingEngineWorkspace" "<job-id>" `\
+  --private-key "D:\\ReviewerKeys\\<reviewer-id>-ed25519-private.pem" `\
+  --out "D:\\BuildingEngineWorkspace\\signed-generation-publication-review.json"
+```
+
+The signing command rechecks the immutable review-record checksum, exact candidate GLB bytes and exact QA-report bytes before preparing the payload. The signature covers the job ID, building ID, exact review-record SHA-256, candidate GLB SHA-256, QA-report SHA-256, reviewed placement SHA-256, reviewer ID, review timestamp and the explicit `approve-for-catalog-handoff` decision. It uses the same canonical UTF-8 JSON signing format as D3M-01 (recursively sorted object keys, array order preserved, compact JSON, no trailing newline).
+
+Keep the private key only on the trusted reviewer's protected workstation/key store. Do not upload it to the application, put it in the generation workspace, pass it to the publication API, commit it or paste it into logs. The output receipt contains only the submission and public signature; upload that JSON receipt in the map panel. The server reads trust anchors exclusively from `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON`; production requires the versioned, time-bounded, revocable public-key-only registry. An untrusted/revoked/expired key, missing registry, altered review record, candidate, report or placement is rejected before catalog writes.
+
+The catalog version records the authenticated reviewer ID, key ID, registry ID, public-key fingerprint, signed-payload hash, signature hash and receipt hash. A valid signature proves key possession, not the person's civil identity, legal/professional authority, source rights, survey accuracy or vertical datum. Those still require the platform's separate governance and evidence processes.
 
 ## Integrity and filesystem boundaries
 
@@ -69,7 +107,7 @@ The route uses the common timing-safe bearer-token verifier with a distinct serv
 
 ## Trust and release boundary
 
-The `development` branch's existing generation review API is protected by a shared operator token, with a reviewer label and human-supplied checklist. It is not a cryptographically authenticated reviewer identity. This D3M-02 slice does not integrate or promote the separate stacked D3M-01 signed-review registry PR chain; that work remains an explicit dependency before a stronger reviewer-identity claim can be made.
+The generation review-write API is protected by a shared operator token and stores a reviewer label/checklist, but that first write is not individual identity proof. **Catalog publication is now separately gated** by an Ed25519 receipt from the D3M-01 server-configured trusted-reviewer registry, bound to the exact immutable review record, candidate, QA report and placement. A caller cannot publish merely by choosing a reviewer name. The signing key remains on the trusted reviewer's workstation; only the signed receipt is sent to the publication API. The signature authenticates key possession only; the platform operator must establish the reviewer's identity and authority separately.
 
 Publication does not mean independent survey accuracy, rights approval by an external authority, automatic acceptance or production readiness. Job state and response flags remain fail-closed:
 
@@ -87,6 +125,8 @@ Focused suites:
 
 ```bash
 npm run test:publish-approved-generation-job
+npm run sign:approved-generation-job-publication-review -- --help
+npm run publish:approved-generation-job -- --help
 npm run test:published-model-catalog
 npm run test:generated-model-policy
 npm run test:generated-model-layer-boundary
