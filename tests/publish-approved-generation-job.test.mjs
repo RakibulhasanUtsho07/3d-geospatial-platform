@@ -377,6 +377,21 @@ test("requires a trusted signed reviewer receipt before catalog publication", as
   );
 });
 
+test("fails closed when no server trusted-reviewer registry is configured", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const registry = process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  delete process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required/,
+  );
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = registry;
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
 test("rejects a tampered or untrusted generation-job reviewer signature", async (t) => {
   const setup = await makeApprovedJob(t);
   const badReceipt = structuredClone(setup.reviewReceipt);
