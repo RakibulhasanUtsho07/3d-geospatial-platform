@@ -22,6 +22,7 @@ async function main() {
       device: { type: "string", default: "cuda:0" },
       resolution: { type: "string", default: "256" },
       "timeout-ms": { type: "string", default: "1800000" },
+      "inventory-timeout-ms": { type: "string", default: "180000" },
       "confirm-source-rights": { type: "boolean", default: false },
       "confirm-operation-scopes": { type: "boolean", default: false },
       "confirm-single-view-inference": { type: "boolean", default: false },
@@ -41,7 +42,7 @@ async function main() {
       "    --confirm-operation-scopes",
       "    --confirm-single-view-inference",
       "    --confirm-model-licences",
-      "    [--python <python>] [--device cuda:0|mps|cpu] [--resolution 256] [--timeout-ms 1800000]",
+      "    [--python <python>] [--device cuda:0|mps|cpu] [--resolution 256] [--timeout-ms 1800000] [--inventory-timeout-ms 180000]",
       "",
       "Runs one real TripoSR inference through the same media-to-model workflow as the queue worker.",
       "Requires both TripoSR and rembg model caches to be present; no model downloads are performed.",
@@ -60,7 +61,9 @@ async function main() {
   const buildingSpec = JSON.parse(await readFile(path.resolve(specPath), "utf8"));
   const timeoutMs = Number(values["timeout-ms"]);
   const mcResolution = Number(values.resolution);
-  if (!Number.isInteger(timeoutMs) || !Number.isInteger(mcResolution)) {
+  const inventoryTimeoutMs = Number(values["inventory-timeout-ms"]);
+  if (!Number.isInteger(timeoutMs) || !Number.isInteger(mcResolution) ||
+      !Number.isInteger(inventoryTimeoutMs) || inventoryTimeoutMs < 1000 || inventoryTimeoutMs > 180000) {
     throw new TypeError("--timeout-ms and --resolution must be integers.");
   }
 
@@ -80,6 +83,7 @@ async function main() {
     device: values.device,
     mcResolution,
     timeoutMs,
+    inventoryTimeoutMs,
     confirmSourceRights: values["confirm-source-rights"],
     confirmOperationScopes: values["confirm-operation-scopes"],
     confirmSingleViewInference: values["confirm-single-view-inference"],
