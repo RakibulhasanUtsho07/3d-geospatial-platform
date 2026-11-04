@@ -460,8 +460,7 @@ export async function runEvidenceBackedVerticalSlice(options, dependencies = {})
     if (!geometryReport || geometryReport.mapReady !== false || geometryReport.publicationEligible !== false) {
       throw new TypeError("architectural geometry report must retain fail-closed publication gates");
     }
-    if (typeof geometryReport.workflow !== "string" ||
-        !geometryReport.workflow.trim() ||
+    if (geometryReport.workflow !== "architectural-geometry-correspondence-consensus-v6" ||
         geometryReport.buildingId !== buildingId ||
         geometryReport.jobId !== geometryJobId ||
         geometryReport.input?.relativePath !== geometry.inputPath) {
