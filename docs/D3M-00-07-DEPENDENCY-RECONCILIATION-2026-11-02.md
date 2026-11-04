@@ -48,3 +48,26 @@
 ## Release boundary
 
 `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` remain false. A green CI run or cached-model preflight does not establish real building reconstruction accuracy, licence clearance, survey truth or automatic publication.
+
+
+## 2026-11-03 — promotion correction after D3M-ENGINE-02
+
+This section supersedes the earlier snapshot's main SHA and pending-promotion statements.
+
+- Current `main`: `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- D3M-03 reconciliation PR #324 merged to main at `6b3c8e3de3eb1e34685e1a25ab34a95f3a3f1993`.
+- D3M-04 through D3M-07 cumulative source stack merged through PR #325 at `6aeb6d97e719497d957c722260c507e5fedbf8ac`. Its source includes D3M-05 runtime smoke orchestration and verifier, D3M-06 reviewed placement binding and D3M-07 non-inference preflight. The old stacked source PRs were closed as superseded.
+- D3M-01 reviewer-trust integration merged through PR #326 at `fb3537d3199c98b43218b7853303858b5c9c0590`.
+- D3M-ENGINE-02 worker-host inventory and cache-byte fail-closed checks merged through PR #347 at `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`.
+- Post-merge main Full CI [#41649268743](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268743) passed 207/207 steps. It covers the D3M-05 offline smoke contract test, D3M-07 preflight test, D3M-ENGINE-02 inventory tests/CLI and production viewport verification.
+- BRF-35 linkage [#41649268750](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268750) and BRF-45 exact-asset rights [#41649268800](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41649268800) also completed successfully on the same main SHA.
+
+**Remaining operational acceptance:** no actual worker-host inventory report, successful TripoSR/rembg inference, independently verified private GLB or human visual disposition has been recorded. D3M-05 issue #307 remains open. CI fixtures and a cached-model preflight are not real inference evidence. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.
+
+## 2026-11-04 — D3M-ENGINE-03 current-main vertical-slice integration
+
+- Current `main` remains `bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`; PR [#351](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/351) is the consolidated current-main integration for facade structural openings, BRF-04 topology regression and the source-bound building-to-map vertical slice. It carries the unique work from #350 and #349; do not merge either source PR independently ahead of #351.
+- The branch implements a still-image (3–100 views) parent workflow that binds exact source byte hashes, rights scopes, selected view IDs and geometry-input hash to two resumable child jobs. Child reports must now match the exact expected engine/profile, building ID, child job ID and geometry input path; regression tests reject cross-building and cross-job report substitution.
+- On exact head `10a962601e9ed9c0c861f57bb98d0e329ade299d`, BRF-14 byte-intake, BRF-05–07 reference intake, BRF-35 same-building linkage and P3.7 floor-plan validation completed successfully. Full CI, renderer smoke, Real-Dhaka browser baseline, P3.6 package and BRF-45 rights admission were still running or awaiting a fresh completion check at the time of this update.
+- These automation runs validate contracts and code paths only. The real worker-host inference, exact asset rights decision, independent building truth, trusted reviewer signing identity, survey-supported WGS84/vertical datum and real candidate Cesium browser validation remain external acceptance gates.
+- Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. PR #351 is not merged to `main`; merge is a separate action after exact-head checks, artifact review and human approval.
