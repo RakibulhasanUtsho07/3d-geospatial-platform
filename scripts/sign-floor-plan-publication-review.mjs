@@ -98,6 +98,9 @@ async function main() {
   }
 
   const privateKeyPath = path.resolve(parsed.values["private-key"]);
+  if (inside(workspaceRoot, privateKeyPath)) {
+    throw new TypeError("--private-key must be stored outside the generation workspace.");
+  }
   const keyInfo = await lstat(privateKeyPath);
   if (keyInfo.isSymbolicLink() || !keyInfo.isFile() || keyInfo.size < 64 || keyInfo.size > 16 * 1024) {
     throw new TypeError("--private-key must identify a regular private-key PEM between 64 bytes and 16 KiB.");
