@@ -3,6 +3,8 @@ import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
 import { buildBuildingAccuracyBenchmark } from "./building-accuracy-benchmark.mjs";
+import { canonicalJson } from "./generation-artifact-receipt.mjs";
+import { verifySingleImageGeoreferenceEvidenceBytes } from "./single-image-georeference-evidence.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -22,6 +24,8 @@ const isObject = (value) => value !== null && typeof value === "object" && !Arra
 const isHash = (value) => typeof value === "string" && sha256Pattern.test(value);
 const nonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 const semanticDigest = (value) => digest(Buffer.from(JSON.stringify(value)));
+const receiptPayloadShaMismatch = (receipt, expected) =>
+  typeof receipt.payloadSha256 !== "string" || receipt.payloadSha256 !== expected;
 
 function safeRelativePath(value) {
   if (!nonEmptyString(value) || value.includes("\\") || value.startsWith("/")) return false;
@@ -386,6 +390,151 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
       check("verification-no-orphan-task:" + taskId, backlogTasks.some((task) => task.id === taskId),
         "Verification report contains an orphan task: " + taskId + ".");
     }
+  }
+
+  const singleImageTypes = [
+    "single-image-smoke-report",
+    "single-image-generation-artifact-receipt",
+    "single-image-workflow-report",
+    "single-image-control-point-manifest",
+  ];
+  const singleImageItems = singleImageTypes.map((type) => artifact(type));
+  const singleImagePresent = singleImageItems.filter(Boolean).length;
+  if (packageManifest.singleImageEvidence === undefined) {
+    check("single-image-evidence-group-absent-or-complete", singleImagePresent === 0,
+      "Single-image georeference artifacts must not be partially included without signed package metadata.");
+  } else {
+    const metadata = packageManifest.singleImageEvidence;
+    const complete = singleImageItems.length === 4 && singleImagePresent === 4;
+    let passed = false;
+    let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
+    try {
+      if (!complete || !isObject(metadata) || metadata.schemaVersion !== "1.0.0") {
+        throw new Error("single-image-evidence-group-incomplete");
+      }
+      const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
+      const smokeFile = actualByPath.get(smokeArtifact.relativePath);
+      const receiptFile = actualByPath.get(receiptArtifact.relativePath);
+      const workflowFile = actualByPath.get(workflowArtifact.relativePath);
+      const controlManifestFile = actualByPath.get(controlManifestArtifact.relativePath);
+      if (!smokeFile || !receiptFile || !workflowFile || !controlManifestFile) {
+        throw new Error("single-image-evidence-file-missing");
+      }
+      const smokeReport = JSON.parse(smokeFile.content.toString("utf8"));
+      const receiptBytes = receiptFile.content;
+      const receipt = JSON.parse(receiptBytes.toString("utf8"));
+      const workflowReport = JSON.parse(workflowFile.content.toString("utf8"));
+      const manifestBytes = controlManifestFile.content;
+      const source = smokeReport.source ?? {};
+      const georeference = smokeReport.georeferenceEvidence ?? {};
+      const receiptPayload = receipt.payload ?? {};
+      const receiptPointer = smokeReport.generationArtifactReceipt ?? {};
+      const receiptCanonical = Buffer.from(JSON.stringify(receipt, null, 2) + "\n", "utf8");
+      const receiptPayloadDigest = digest(Buffer.from(canonicalJson(receiptPayload), "utf8"));
+
+      if (smokeReport.schemaVersion !== "1.5.0" || smokeReport.kind !== "single-image-runtime-smoke" ||
+          smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
+          !nonEmptyString(metadata.jobId) || smokeReport.jobId !== metadata.jobId ||
+          smokeArtifact.relativePath !== "reports/single-image-runtime-smoke.json" ||
+          receiptArtifact.relativePath !== "reports/single-image-generation-artifact-receipt.json" ||
+          workflowArtifact.relativePath !== "reports/single-image-workflow-report.json" ||
+          controlManifestArtifact.relativePath !== "evidence/single-image-control-points.json" ||
+          receipt.schemaVersion !== "1.1.0" || receipt.kind !== undefined ||
+          receiptPayload.kind !== "single-image-generation-artifact" ||
+          receiptPayload.schemaVersion !== "1.1.0" || receiptPayload.jobId !== metadata.jobId ||
+          receiptPayload.buildingId !== packageManifest.buildingId ||
+          receiptPayloadShaMismatch(receipt, receiptPayloadDigest) ||
+          !receiptBytes.equals(receiptCanonical) ||
+          receiptPointer.path !== ".building-engine/runtime-smokes/" + metadata.jobId + ".artifact.json" ||
+          receiptPointer.schemaVersion !== "1.1.0" || receiptPointer.bytes !== receiptBytes.length ||
+          receiptPointer.sha256 !== receiptArtifact.sha256 ||
+          receiptPointer.payloadSha256 !== receipt.payloadSha256 ||
+          receiptPayload.workflowReport?.bytes !== workflowFile.bytes ||
+          receiptPayload.workflowReport?.sha256 !== workflowArtifact.sha256 ||
+          workflowReport.jobId !== metadata.jobId || workflowReport.buildingId !== packageManifest.buildingId ||
+          workflowReport.mode !== "single-image-ai" || workflowReport.status !== "completed-requires-review" ||
+          workflowReport.mapReady !== false || workflowReport.publicationEligible !== false ||
+          workflowReport.output?.modelPath !== smokeReport.output?.relativePath ||
+          workflowReport.output?.modelBytes !== smokeReport.output?.bytes ||
+          workflowReport.output?.modelSha256 !== candidate?.sha256 ||
+          !Array.isArray(workflowReport.inputs?.selectedViewIds) ||
+          workflowReport.inputs.selectedViewIds.length !== 1 ||
+          workflowReport.inputs.selectedViewIds[0] !== source.sourceId ||
+          !workflowReport.inputs?.mediaRecords?.some((item) =>
+            item.id === source.sourceId && item.sha256 === source.sha256 &&
+            item.mimeType === source.mimeType && item.usageStatus === "approved") ||
+          workflowReport.modelReport?.source?.sha256 !== source.sha256 ||
+          workflowReport.modelReport?.outputs?.glb?.sha256 !== candidate?.sha256 ||
+          workflowReport.modelReport?.outputs?.glb?.bytes !== smokeReport.output?.bytes ||
+          workflowReport.modelReport?.mapReady !== false ||
+          workflowReport.modelReport?.publicationEligible !== false ||
+          receiptPayload.source?.bytes !== source.bytes ||
+          receiptPayload.source?.mimeType !== source.mimeType ||
+          receiptPayload.source?.loaderEvidence?.sha256 !== source.sha256 ||
+          receiptPayload.output?.bytes !== smokeReport.output?.bytes ||
+          receiptPayload.output?.format !== "glb" ||
+          receiptPayload.output?.path !== smokeReport.output?.relativePath ||
+          receiptPayload.workerHost?.stableAcrossInference !== smokeReport.workerHost?.stableAcrossInference ||
+          canonicalJson(receiptPayload.workerHost) !== canonicalJson({
+            inventorySchemaVersion: smokeReport.workerHost?.inventorySchemaVersion,
+            stableAcrossInference: smokeReport.workerHost?.stableAcrossInference,
+            before: smokeReport.workerHost?.before,
+            after: smokeReport.workerHost?.after,
+          }) ||
+          canonicalJson(receiptPayload.modelLoadEvidence) !== canonicalJson(smokeReport.modelLoadEvidence) ||
+          canonicalJson(receiptPayload.geometryQa) !== canonicalJson({
+            schemaVersion: "1.0.0",
+            engine: "glb-geometry-qa-v2",
+            valid: smokeReport.geometryQa?.valid,
+            sourceStatus: smokeReport.geometryQa?.sourceStatus,
+            status: smokeReport.geometryQa?.status,
+            warningCount: smokeReport.geometryQa?.warningCount,
+            warnings: smokeReport.geometryQa?.warnings,
+            counts: smokeReport.geometryQa?.counts,
+          }) ||
+          receiptPayload.output?.meshCount !== smokeReport.output?.meshCount ||
+          receiptPayload.output?.sha256 !== candidate?.sha256 ||
+          smokeReport.output?.sha256 !== candidate?.sha256 ||
+          georeference.status !== "calibrated-needs-human-review" ||
+          georeference.modelSha256 !== candidate?.sha256 ||
+          georeference.manifest?.sha256 !== controlManifestArtifact.sha256 ||
+          georeference.manifest?.bytes !== manifestBytes.length ||
+          canonicalJson(receiptPayload.georeference) !== canonicalJson(georeference) ||
+          canonicalJson(workflowReport.georeference) !== canonicalJson(georeference.registration) ||
+          source.sourceId !== metadata.sourceId || source.sha256 !== metadata.sourceSha256 ||
+          receiptPayload.source?.sourceId !== source.sourceId ||
+          receiptPayload.source?.sha256 !== source.sha256 ||
+          georeference.registration?.vertical?.status !== "not-solved" ||
+          smokeReport.mapReady !== false || smokeReport.publicationEligible !== false ||
+          smokeReport.automaticApproval !== false ||
+          metadata.buildingId !== packageManifest.buildingId ||
+          metadata.candidateGlbSha256 !== candidate?.sha256 ||
+          metadata.sourceSha256 !== source.sha256 ||
+          metadata.georeferenceStatus !== georeference.status ||
+          metadata.controlPointManifestSha256 !== controlManifestArtifact.sha256 ||
+          metadata.smokeReportSha256 !== smokeArtifact.sha256 ||
+          metadata.generationArtifactReceiptSha256 !== receiptArtifact.sha256 ||
+          metadata.workflowReportSha256 !== workflowArtifact.sha256 ||
+          metadata.verticalDatum !== "not-solved" ||
+          metadata.mapReady !== false || metadata.publicationEligible !== false ||
+          metadata.automaticApproval !== false) {
+        throw new Error("single-image-evidence-cross-binding-failed");
+      }
+      verifySingleImageGeoreferenceEvidenceBytes({
+        evidence: georeference,
+        manifestBytes,
+        buildingId: packageManifest.buildingId,
+        sourceId: source.sourceId,
+        sourceSha256: source.sha256,
+        modelSha256: candidate.sha256,
+      });
+      passed = true;
+      detail = "Exact smoke, generation receipt, workflow report and control-point bytes are bound to this candidate; horizontal registration was independently recomputed from the packaged manifest.";
+    } catch (error) {
+      detail = "Single-image georeference evidence failed independent package verification: " +
+        (error instanceof Error ? error.message : String(error));
+    }
+    check("single-image-georeference-recomputed", passed, detail);
   }
 
   const status = errors.length ? "tampered-or-invalid" : warnings.length ? "verified-with-warnings" : "verified";

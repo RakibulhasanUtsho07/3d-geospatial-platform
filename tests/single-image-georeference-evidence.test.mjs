@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +8,7 @@ import {
   createSingleImageGeoreferenceEvidence,
   loadSingleImageControlPointManifest,
   verifySingleImageGeoreferenceEvidence,
+  verifySingleImageGeoreferenceEvidenceBytes,
 } from "../src/core/building-generation/single-image-georeference-evidence.mjs";
 
 const EARTH_RADIUS_M = 6378137;
@@ -105,6 +106,39 @@ test("loads source/building-bound WGS84 controls and creates a human-review hori
     modelSha256: MODEL_HASH,
   });
   assert.deepEqual(verified, evidence);
+
+  const exactManifestBytes = await readFile(path.join(root, "survey", "controls.json"));
+  const offlineVerified = verifySingleImageGeoreferenceEvidenceBytes({
+    evidence,
+    manifestBytes: exactManifestBytes,
+    buildingId: BUILDING,
+    sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH,
+    modelSha256: MODEL_HASH,
+  });
+  assert.deepEqual(offlineVerified, evidence);
+  assert.throws(
+    () => verifySingleImageGeoreferenceEvidenceBytes({
+      evidence,
+      manifestBytes: Buffer.concat([exactManifestBytes, Buffer.from(" ")]),
+      buildingId: BUILDING,
+      sourceId: SOURCE,
+      sourceSha256: SOURCE_HASH,
+      modelSha256: MODEL_HASH,
+    }),
+    /bytes or identity/i,
+  );
+  assert.throws(
+    () => verifySingleImageGeoreferenceEvidenceBytes({
+      evidence,
+      manifestBytes: exactManifestBytes,
+      buildingId: "substituted-building",
+      sourceId: SOURCE,
+      sourceSha256: SOURCE_HASH,
+      modelSha256: MODEL_HASH,
+    }),
+    /building identity/i,
+  );
 });
 
 test("rejects a changed control-point manifest after evidence was recorded", async (t) => {
@@ -124,7 +158,7 @@ test("rejects a changed control-point manifest after evidence was recorded", asy
       sourceSha256: SOURCE_HASH,
       modelSha256: MODEL_HASH,
     }),
-    /bytes or identity changed/i,
+    /bytes or identity/i,
   );
 });
 

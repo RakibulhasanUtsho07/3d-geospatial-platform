@@ -8,6 +8,7 @@ import { reviewGlbTextureBindings } from "../src/core/building-generation/glb-te
 import { verifyRenderCorrectionTasks } from "../src/core/building-generation/render-correction-verification.mjs";
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
+import { prepareSingleImageReviewPackageEvidence } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const semanticDigest = (value) => sha256(Buffer.from(JSON.stringify(value)));
@@ -47,11 +48,30 @@ function addArtifact(artifacts, copyOperations, { artifactType, sourcePath, rela
 }
 
 async function main() {
+  const positional = [];
+  const options = {};
+  const rawArgs = process.argv.slice(2);
+  for (let index = 0; index < rawArgs.length; index++) {
+    const value = rawArgs[index];
+    if (value === "--single-image-smoke-workspace" || value === "--single-image-smoke-job-id") {
+      if (Object.hasOwn(options, value) || !rawArgs[index + 1] || rawArgs[index + 1].startsWith("--")) {
+        throw new Error("Single-image smoke options must each be supplied once with a value.");
+      }
+      options[value] = rawArgs[++index];
+    } else if (value.startsWith("--")) {
+      throw new Error("Unknown review-package option: " + value);
+    } else {
+      positional.push(value);
+    }
+  }
   const [glbArg, renderDirArg, referenceDirArg, reviewArg, backlogArg, verificationArg, accuracyEvidenceArg, readinessArg, outputArg] =
-    process.argv.slice(2);
+    positional;
+  const hasSmokeWorkspace = Object.hasOwn(options, "--single-image-smoke-workspace");
+  const hasSmokeJobId = Object.hasOwn(options, "--single-image-smoke-job-id");
   if (!glbArg || !renderDirArg || !referenceDirArg || !reviewArg || !backlogArg ||
-    !verificationArg || !accuracyEvidenceArg || !readinessArg || !outputArg || process.argv.length !== 11) {
-    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json> <new-output-directory>");
+    !verificationArg || !accuracyEvidenceArg || !readinessArg || !outputArg || positional.length !== 9 ||
+    hasSmokeWorkspace !== hasSmokeJobId) {
+    throw new Error("Usage: node scripts/build-building-review-package.mjs <candidate.glb> <render-directory> <reference-image-directory> <render-reference-review-report.json> <correction-tasks.json> <correction-verification.json> <accuracy-evidence.json> <release-readiness-report.json> <new-output-directory> [--single-image-smoke-workspace <private-workspace> --single-image-smoke-job-id <job-id>]");
   }
 
   const glbPath = path.resolve(glbArg);
@@ -83,6 +103,14 @@ async function main() {
 
   const candidateGlbSha256 = sha256(glbBytes);
   const renderManifestSha256 = sha256(manifestBytes);
+  const singleImageSmokeEvidence = hasSmokeWorkspace
+    ? await prepareSingleImageReviewPackageEvidence({
+      workspaceRoot: options["--single-image-smoke-workspace"],
+      jobId: options["--single-image-smoke-job-id"],
+      buildingId: renderReferenceReview.buildingId,
+      candidateGlbSha256,
+    })
+    : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
   const textureQa = reviewGlbTextureBindings(glbBytes);
   // These are the exact report-file bytes included in the immutable package.
@@ -184,6 +212,17 @@ async function main() {
     });
   }
 
+  if (singleImageSmokeEvidence) {
+    for (const evidenceFile of singleImageSmokeEvidence.files) {
+      addArtifact(artifacts, copyOperations, {
+        artifactType: evidenceFile.artifactType,
+        sourcePath: null,
+        relativePath: evidenceFile.relativePath,
+        bytes: evidenceFile.bytes,
+      });
+    }
+  }
+
   for (const view of renderManifest.views ?? []) {
     const actual = renderFileBytes.get(view.filename);
     if (!actual) continue;
@@ -226,7 +265,12 @@ async function main() {
     "3. Open render images under \`renders/\` beside their corresponding evidence images under \`references/\`.",
     "4. Read \`reports/render-reference-review.json\`, \`reports/correction-tasks.json\` and \`reports/correction-verification.json\`.",
     "5. Review \`reports/geometry-qa.json\` and \`reports/texture-qa.json\`; structural QA cannot prove historical or architectural accuracy.",
-    "6. Record a separate human release decision outside this automated package.",
+    ...(singleImageSmokeEvidence ? [
+      "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and its vertical datum is unresolved.",
+      "7. Record a separate human release decision outside this automated package.",
+    ] : [
+      "6. Record a separate human release decision outside this automated package.",
+    ]),
     "",
     "The packet does not mark the candidate publication-eligible and does not contain an automated publication action.",
     "",
@@ -244,6 +288,7 @@ async function main() {
     readinessReport: recomputedReadiness,
     renderManifestViews: renderManifest.views,
     artifacts,
+    singleImageEvidence: singleImageSmokeEvidence,
   });
   const packageManifestBytes = Buffer.from(JSON.stringify(packageManifest, null, 2) + "\n");
   copyOperations.push({ sourcePath: null, relativePath: "package-manifest.json", bytes: packageManifestBytes });
