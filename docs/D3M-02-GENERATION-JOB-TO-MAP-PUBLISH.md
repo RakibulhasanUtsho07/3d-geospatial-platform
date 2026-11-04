@@ -2,7 +2,7 @@
 
 **Tracking issue:** [#301](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/301)  
 **Implementation branch:** `feat/d3m02-generation-job-map-publish-20261101`  
-**Status:** D3M-02 base publication workflow merged to main through PR #302 (2026-11-03); D3M-06 review-bound placement hardening is included in the D3M-04→D3M-07 integration candidate.  
+**Status:** D3M-02 base publication workflow merged to main through PR #302 (2026-11-03); D3M-06 review-bound placement and the signed catalog publication hardening are included in the current open PR #351 candidate.  
 **Scope:** Explicit operator publication of an already completed and approved generation job, followed by loading the exact active catalog version into the current Cesium session.
 
 ## User flow
@@ -18,7 +18,7 @@
    - The exact WGS84 longitude/latitude, WGS84-ellipsoid height, heading/pitch/roll, scale and GLB axes captured by the approved review. A changed value is rejected.
    - Confirmation that the generated GLB and public catalog metadata will be served publicly.
 6. Select **Verify, publish and load model**. The server revalidates the approved job and writes the content-addressed GLB plus the new catalog version. The browser then fetches the public catalog with cache disabled, validates it with `getActivePublishedModels`, checks the exact returned model ID/version ID/SHA-256/URL, and only then asks the existing Cesium `GeneratedModelLayer` to load that catalog definition and focus the camera.
-6. The loaded model is part of the current browser map session. The static catalog persists across refreshes; the existing catalog selector can reload it after a page refresh.
+7. The loaded model is part of the current browser map session. The static catalog persists across refreshes; the existing catalog selector can reload it after a page refresh.
 
 ## API contract
 
@@ -72,7 +72,7 @@ Success returns HTTP 201 with the job/review/model/version identifiers, asset UR
 
 The review API and local publication CLI use the same placement contract. The CLI supplies the fixed `WGS84-ellipsoid` height-reference marker; the human-reviewed values must otherwise match exactly. Legacy approval records without a placement digest are rejected.
 
-The route uses the common timing-safe bearer-token verifier with a distinct server secret. The body is bounded to 16 KiB and must contain both `placement` and `reviewReceipt`. Missing server configuration or trusted-key registry returns 503; invalid/missing credentials return 401; malformed placement/receipt envelope returns 400; a missing job returns 404; a busy catalog lock returns 409; untrusted/invalid signatures, cross-job receipt substitution, status or hash failures return 422. Unexpected server errors are sanitized as 500 responses.
+The route uses the common timing-safe bearer-token verifier with a distinct server secret. The body is bounded to 16 KiB and must contain both `placement` and `reviewReceipt`. Missing or invalid trusted-key registry configuration returns 503; invalid/missing credentials return 401; malformed placement/receipt envelope returns 400; a missing job returns 404; a busy catalog lock returns 409; untrusted/invalid signatures, cross-job receipt substitution, status or hash failures return 422. Unexpected server errors are sanitized as 500 responses.
 
 
 ## Trusted Ed25519 publication approval
