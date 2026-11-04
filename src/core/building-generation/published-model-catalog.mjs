@@ -215,6 +215,8 @@ export async function publishReviewedBuildingModel({
   publicRoot = workspaceRoot,
   publishedAt = new Date().toISOString(),
   reviewerAuthentication,
+  expectedCandidateSha256,
+  expectedAttestationSha256,
 }) {
   const root = await realpath(path.resolve(workspaceRoot));
   const candidate = await resolveWorkspaceFile(root, candidatePath, "candidatePath", true);
@@ -222,7 +224,25 @@ export async function publishReviewedBuildingModel({
   const candidateBytes = await readFile(candidate.real);
   assertPlausibleGlb2(candidateBytes);
   const actualCandidateHash = sha256(candidateBytes);
-  const attestation = JSON.parse(await readFile(attestationFile.real, "utf8"));
+  if (expectedCandidateSha256 !== undefined) {
+    if (!isHash(expectedCandidateSha256)) {
+      throw new TypeError("expectedCandidateSha256 must be a lowercase SHA-256 hash.");
+    }
+    if (actualCandidateHash !== expectedCandidateSha256) {
+      throw new Error("Candidate bytes changed after upstream review verification; refusing publication.");
+    }
+  }
+  const attestationBytes = await readFile(attestationFile.real);
+  const actualAttestationHash = sha256(attestationBytes);
+  if (expectedAttestationSha256 !== undefined) {
+    if (!isHash(expectedAttestationSha256)) {
+      throw new TypeError("expectedAttestationSha256 must be a lowercase SHA-256 hash.");
+    }
+    if (actualAttestationHash !== expectedAttestationSha256) {
+      throw new Error("Attestation bytes changed after upstream review verification; refusing publication.");
+    }
+  }
+  const attestation = JSON.parse(attestationBytes.toString("utf8"));
   if (!isRecord(attestation) || attestation.schemaVersion !== "1.0.0") {
     throw new TypeError("Attestation schemaVersion must be 1.0.0.");
   }
