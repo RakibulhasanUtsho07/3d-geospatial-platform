@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +9,10 @@ import test from "node:test";
 import { claimNextGenerationJob, completeGenerationJob, enqueueGenerationJob, getGenerationJob, updateGenerationJob } from "../src/core/building-generation/generation-job-queue.mjs";
 import { reviewGenerationJob, REQUIRED_GENERATION_REVIEW_CHECKS } from "../src/core/building-generation/generation-job-review.mjs";
 import { publishApprovedGenerationJob } from "../src/core/building-generation/publish-approved-generation-job.mjs";
+import {
+  canonicalGenerationJobPublicationReviewBytes,
+  createGenerationJobPublicationReviewSubmission,
+} from "../src/core/building-generation/generation-job-publication-review.mjs";
 import { getActivePublishedModels, validatePublishedModelCatalog } from "../src/core/building-generation/published-model-catalog-reader.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
@@ -37,6 +41,27 @@ function makeGlb(seed = "publish-test") {
   glb.writeUInt32LE(0x4e4f534a, 16);
   chunk.copy(glb, 20);
   return glb;
+}
+
+function makeTestRegistry(publicKeyPem) {
+  const now = Date.now();
+  return JSON.stringify({
+    schemaVersion: "1.0.0",
+    recordType: "reconstruction-trusted-reviewer-key-registry",
+    registryId: "d3m02-publication-test-registry",
+    issuedAtUtc: new Date(now - 60_000).toISOString(),
+    expiresAtUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    entries: [{
+      reviewerId: "independent-operator",
+      keyId: "d3m02-test-key-01",
+      status: "active",
+      publicKeyPem,
+      validFromUtc: new Date(now - 60_000).toISOString(),
+      validUntilUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  });
 }
 
 async function makeApprovedJob(t) {
@@ -75,7 +100,45 @@ async function makeApprovedJob(t) {
       placement,
     },
   });
-  return { workspaceRoot, jobId: queued.jobId, modelBytes, reviewed };
+
+  const originalRegistry = process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  const keyPair = generateKeyPairSync("ed25519");
+  const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const privateKeyPem = keyPair.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = makeTestRegistry(publicKeyPem);
+  t.after(() => {
+    if (originalRegistry === undefined) delete process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+    else process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = originalRegistry;
+  });
+
+  const record = reviewed.review;
+  const submission = createGenerationJobPublicationReviewSubmission({
+    jobId: queued.jobId,
+    buildingId: fixture.id,
+    reviewRecord: record,
+    reviewRecordSha256: reviewed.job.review.recordSha256,
+  });
+  const signatureBase64 = sign(
+    null,
+    canonicalGenerationJobPublicationReviewBytes(submission),
+    keyPair.privateKey,
+  ).toString("base64");
+  const reviewReceipt = { submission, signatureBase64 };
+  const reviewReceiptPath = path.join(workspaceRoot, "signed-generation-publication-review.json");
+  await writeFile(reviewReceiptPath, JSON.stringify(reviewReceipt, null, 2), { mode: 0o600 });
+  const privateKeyPath = path.join(workspaceRoot, "test-reviewer-private-key.pem");
+  await writeFile(privateKeyPath, privateKeyPem, { mode: 0o600 });
+
+  return {
+    workspaceRoot,
+    jobId: queued.jobId,
+    modelBytes,
+    reviewed,
+    reviewReceipt,
+    reviewReceiptPath,
+    privateKey: keyPair.privateKey,
+    privateKeyPath,
+  };
 }
 
 test("publishes only an approved, hash-matching review with explicit map placement", async (t) => {
@@ -96,6 +159,11 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(active.definition.id, fixture.id);
   assert.equal(active.sha256, result.modelSha256);
   assert.equal(active.review.reviewer, "independent-operator");
+  assert.equal(active.review.authentication.reviewerId, "independent-operator");
+  assert.equal(active.review.authentication.keyId, "d3m02-test-key-01");
+  assert.equal(active.review.authentication.registryId, "d3m02-publication-test-registry");
+  assert.equal(active.review.authentication.scheme, "Ed25519");
+  assert.match(active.review.authentication.signedReviewReceiptSha256, /^[a-f0-9]{64}$/);
   const asset = await readFile(path.join(setup.workspaceRoot, "public", result.assetUrl.slice(1)));
   assert.equal(hash(asset), result.modelSha256);
   const unchangedJob = await getGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: setup.jobId });
@@ -240,6 +308,24 @@ test("publishes the validated GLB and catalog into a separate application public
 
 test("publishes an approved review through the operator CLI with the same WGS84 ellipsoid placement binding", async (t) => {
   const setup = await makeApprovedJob(t);
+  const signerPath = path.resolve(process.cwd(), "scripts/sign-approved-generation-job-publication-review.mjs");
+  const signedReceiptPath = path.join(setup.workspaceRoot, "cli-signed-publication-review.json");
+  const signRun = spawnSync(process.execPath, [
+    signerPath,
+    setup.workspaceRoot,
+    setup.jobId,
+    "--private-key", setup.privateKeyPath,
+    "--out", signedReceiptPath,
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  assert.equal(signRun.status, 0, signRun.stderr || signRun.stdout);
+  const signedReceipt = JSON.parse(await readFile(signedReceiptPath, "utf8"));
+  assert.equal(signedReceipt.submission.reviewRecordSha256, setup.reviewed.job.review.recordSha256);
+
   const cliPath = path.resolve(process.cwd(), "scripts/publish-approved-generation-job.mjs");
   const args = [
     cliPath,
@@ -254,6 +340,7 @@ test("publishes an approved review through the operator CLI with the same WGS84 
     "--scale", String(placement.scale),
     "--up-axis", placement.upAxis,
     "--forward-axis", placement.forwardAxis,
+    "--review-receipt", signedReceiptPath,
   ];
   const run = spawnSync(process.execPath, args, {
     cwd: process.cwd(),
@@ -274,6 +361,61 @@ test("publishes an approved review through the operator CLI with the same WGS84 
   const catalogPath = path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json");
   const active = getActivePublishedModels(JSON.parse(await readFile(catalogPath, "utf8")))[0];
   assert.equal(active.sha256, payload.modelSha256);
+});
+
+
+test("requires a trusted signed reviewer receipt before catalog publication", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const { reviewReceipt: _receipt, ...withoutReceipt } = setup;
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...withoutReceipt, placement }),
+    /signed generation-job review receipt must contain exactly submission and signatureBase64/,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("rejects a tampered or untrusted generation-job reviewer signature", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const badReceipt = structuredClone(setup.reviewReceipt);
+  badReceipt.signatureBase64 = Buffer.alloc(64, 0).toString("base64");
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement, reviewReceipt: badReceipt }),
+    /Ed25519 signature is invalid/,
+  );
+
+  const untrusted = generateKeyPairSync("ed25519");
+  const untrustedPublicKey = untrusted.publicKey.export({ type: "spki", format: "pem" }).toString();
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = makeTestRegistry(untrustedPublicKey);
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement }),
+    /Ed25519 signature is invalid/,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
+});
+
+test("rejects a signed receipt that substitutes a different placement or review-record hash", async (t) => {
+  const setup = await makeApprovedJob(t);
+  const altered = structuredClone(setup.reviewReceipt);
+  altered.submission.placementSha256 = "0".repeat(64);
+  altered.signatureBase64 = sign(
+    null,
+    canonicalGenerationJobPublicationReviewBytes(altered.submission),
+    setup.privateKey,
+  ).toString("base64");
+  await assert.rejects(
+    publishApprovedGenerationJob({ ...setup, placement, reviewReceipt: altered }),
+    /bind the exact immutable review record, GLB, QA report, placement, reviewer and timestamp/,
+  );
+  await assert.rejects(
+    readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
+    { code: "ENOENT" },
+  );
 });
 
 test("refuses a second publication while the model catalog lock is held", async (t) => {
