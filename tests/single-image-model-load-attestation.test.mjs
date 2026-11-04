@@ -16,6 +16,7 @@ function sha256(bytes) {
 
 async function runInstrumentedLoaders(t, {
   mismatchCheckpoint = false,
+  mismatchRembg = false,
   expectFailure = false,
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "single-image-model-loader-"));
@@ -64,7 +65,10 @@ async function runInstrumentedLoaders(t, {
       bytes: files.checkpoint.length,
       sha256: mismatchCheckpoint ? "0".repeat(64) : sha256(files.checkpoint),
     },
-    rembgWeights: { bytes: files.rembg.length, sha256: sha256(files.rembg) },
+    rembgWeights: {
+      bytes: files.rembg.length,
+      sha256: mismatchRembg ? "f".repeat(64) : sha256(files.rembg),
+    },
   };
   const script = [
     "import sys, importlib",
@@ -127,7 +131,19 @@ test("does not attest a checkpoint when loaded bytes differ from the preflight f
   });
   assert.match(result.stderr, /model loader input bytes do not match/i);
   assert.deepEqual(events.map((event) => event.role).sort(), [
-    "rembgWeights", "tripoConfig",
+    "tripoConfig",
   ]);
   assert.equal(events.some((event) => event.role === "tripoCheckpoint"), false);
+});
+
+test("aborts rembg loading when ONNX bytes differ from the preflight fingerprint", async (t) => {
+  const { events, result } = await runInstrumentedLoaders(t, {
+    mismatchRembg: true,
+    expectFailure: true,
+  });
+  assert.match(result.stderr, /rembg model-loader bytes do not match/i);
+  assert.deepEqual(events.map((event) => event.role).sort(), [
+    "tripoCheckpoint", "tripoConfig",
+  ]);
+  assert.equal(events.some((event) => event.role === "rembgWeights"), false);
 });
