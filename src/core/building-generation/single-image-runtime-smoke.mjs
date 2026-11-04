@@ -274,24 +274,6 @@ def _tracked_pil_image_open(original, fp, *args, **kwargs):
             if len(source_bytes) != expected_bytes or digest != expected_sha256:
                 raise OSError('source image decoder input does not match the pre-inference source fingerprint')
             _SOURCE_BYTES = source_bytes
-    elif hasattr(fp, 'read'):
-        if _SOURCE_BYTES is None:
-            try:
-                original_position = fp.tell()
-                fp.seek(0)
-                source_bytes = fp.read(_MAX_SOURCE_BYTES + 1)
-                fp.seek(original_position)
-                descriptor_stat = os.fstat(fp.fileno()) if hasattr(fp, 'fileno') else None
-            except Exception:
-                raise OSError('source image stream cannot be safely captured for attestation')
-            if descriptor_stat is not None and not stat.S_ISREG(descriptor_stat.st_mode):
-                raise OSError('source image stream is not backed by a regular file')
-            if not isinstance(source_bytes, (bytes, bytearray)) or not source_bytes or len(source_bytes) > _MAX_SOURCE_BYTES:
-                raise OSError('source image stream is empty or exceeds the supported size limit')
-            digest = hashlib.sha256(source_bytes).hexdigest()
-            if len(source_bytes) != expected_bytes or digest != expected_sha256:
-                raise OSError('source image decoder stream does not match the pre-inference source fingerprint')
-            _SOURCE_BYTES = bytes(source_bytes)
     else:
         raise OSError('PIL.Image.open received an unsupported source-image input type')
 
