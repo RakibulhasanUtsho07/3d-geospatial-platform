@@ -20,7 +20,7 @@ import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilit
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
 import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -60,6 +60,18 @@ _ROLE_BY_LOADER = {
     'onnxruntime.InferenceSession': 'rembgWeights',
 }
 _MAX_ONNX_BYTES = 512 * 1024 * 1024
+_SOURCE_RECEIPT = os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH')
+_SOURCE_EXPECTED_PATH = (
+    os.path.realpath(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH'))
+    if os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH') else None
+)
+try:
+    _SOURCE_EXPECTED = json.loads(os.environ.get('BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON', '{}'))
+except Exception:
+    _SOURCE_EXPECTED = {}
+_SOURCE_BYTES = None
+_SOURCE_RECEIPT_WRITTEN = False
+_MAX_SOURCE_BYTES = 20 * 1024 * 1024
 
 def _signature(item):
     return (
@@ -232,21 +244,111 @@ def _patch_module(name, module):
             session_class.__init__ = tracked_inference_session_init
             _PATCHED.add(name)
 
+
+def _tracked_pil_image_open(original, fp, *args, **kwargs):
+    global _SOURCE_BYTES, _SOURCE_RECEIPT_WRITTEN
+    if not _SOURCE_EXPECTED_PATH or not _SOURCE_RECEIPT:
+        raise OSError('source-image attestation configuration is unavailable')
+    expected_bytes = _SOURCE_EXPECTED.get('bytes')
+    expected_sha256 = _SOURCE_EXPECTED.get('sha256')
+    if not isinstance(expected_bytes, int) or expected_bytes <= 0 or expected_bytes > _MAX_SOURCE_BYTES:
+        raise OSError('source image expected byte count is invalid')
+    if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
+        raise OSError('source image expected SHA-256 is invalid')
+
+    candidate = fp if isinstance(fp, (str, bytes, os.PathLike)) else getattr(fp, 'name', None)
+    if isinstance(candidate, (str, bytes, os.PathLike)):
+        try:
+            candidate_path = os.path.realpath(os.fsdecode(candidate))
+        except Exception:
+            raise OSError('source image path cannot be resolved')
+        if candidate_path != _SOURCE_EXPECTED_PATH:
+            raise OSError('PIL.Image.open attempted to decode an image other than the attested source path')
+        if _SOURCE_BYTES is None:
+            with open(candidate_path, 'rb') as handle:
+                before = os.fstat(handle.fileno())
+                if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_SOURCE_BYTES:
+                    raise OSError('source image is not a supported regular file')
+                source_bytes = handle.read(_MAX_SOURCE_BYTES + 1)
+                after = os.fstat(handle.fileno())
+                try:
+                    path_after = os.stat(candidate_path)
+                except Exception:
+                    raise OSError('source image path changed during capture')
+                stable = (
+                    _signature(before) == _signature(after) == _signature(path_after)
+                    and len(source_bytes) == after.st_size
+                    and len(source_bytes) <= _MAX_SOURCE_BYTES
+                )
+            if not stable:
+                raise OSError('source image changed while its bytes were captured')
+            digest = hashlib.sha256(source_bytes).hexdigest()
+            if len(source_bytes) != expected_bytes or digest != expected_sha256:
+                raise OSError('source image decoder input does not match the pre-inference source fingerprint')
+            _SOURCE_BYTES = source_bytes
+    else:
+        raise OSError('PIL.Image.open received an unsupported source-image input type')
+
+    digest = hashlib.sha256(_SOURCE_BYTES).hexdigest()
+    if len(_SOURCE_BYTES) != expected_bytes or digest != expected_sha256:
+        raise OSError('cached source image bytes no longer match the pre-inference source fingerprint')
+    result = original(io.BytesIO(_SOURCE_BYTES), *args, **kwargs)
+    try:
+        result.filename = _SOURCE_EXPECTED_PATH
+    except Exception:
+        pass
+    if not _SOURCE_RECEIPT_WRITTEN:
+        event = {
+            'schemaVersion': '1.0.0',
+            'role': 'sourceImage',
+            'loader': 'PIL.Image.open',
+            'bytes': len(_SOURCE_BYTES),
+            'sha256': digest,
+            'exactBytesPassed': True,
+            'stable': True,
+        }
+        payload = (json.dumps(event, sort_keys=True, separators=(',', ':')) + '\n').encode('utf-8')
+        flags = os.O_WRONLY | os.O_APPEND | getattr(os, 'O_NOFOLLOW', 0)
+        descriptor = os.open(_SOURCE_RECEIPT, flags)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError('source-image receipt is not a regular file')
+            written = 0
+            while written < len(payload):
+                written += os.write(descriptor, payload[written:])
+        finally:
+            os.close(descriptor)
+        _SOURCE_RECEIPT_WRITTEN = True
+    return result
+
+def _patch_pil_image(module):
+    if module is None or 'PIL.Image' in _PATCHED:
+        return
+    original = getattr(module, 'open', None)
+    if callable(original):
+        def tracked_image_open(fp, *args, **kwargs):
+            return _tracked_pil_image_open(original, fp, *args, **kwargs)
+        module.open = tracked_image_open
+        _PATCHED.add('PIL.Image')
+
+
 _original_import = builtins.__import__
 _original_import_module = importlib.import_module
 def _import_with_model_load_tracking(name, globals=None, locals=None, fromlist=(), level=0):
     imported = _original_import(name, globals, locals, fromlist, level)
     module_name = name.split('.', 1)[0]
     _patch_module(module_name, sys.modules.get(module_name))
+    _patch_pil_image(sys.modules.get('PIL.Image'))
     return imported
 
 def _import_module_with_model_load_tracking(name, package=None):
     imported = _original_import_module(name, package)
     module_name = name.split('.', 1)[0]
     _patch_module(module_name, sys.modules.get(module_name))
+    _patch_pil_image(sys.modules.get('PIL.Image'))
     return imported
 
-if _RECEIPT:
+if _RECEIPT or _SOURCE_RECEIPT:
     builtins.__import__ = _import_with_model_load_tracking
     importlib.import_module = _import_module_with_model_load_tracking
 `;
@@ -484,6 +586,7 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
   onRunnerLaunchAttempt,
   onRunnerProcessStarted,
   modelLoadAttestation,
+  sourceImageAttestation,
 } = {}) {
   return (executable, args, options = {}) => {
     const isRunnerInvocation = executable === pythonPath &&
@@ -520,6 +623,20 @@ function offlineSpawn(spawnImpl, offlinePythonDirectory, {
             },
           }),
         } : {}),
+        ...(isRunnerInvocation && sourceImageAttestation ? (() => {
+          const sourceArgument = args[1];
+          if (typeof sourceArgument !== "string" || !sourceArgument.trim()) {
+            throw new TypeError("TripoSR runner invocation is missing its exact source-image path argument.");
+          }
+          return {
+            BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH: sourceImageAttestation.receiptPath,
+            BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH: path.resolve(sourceArgument),
+            BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON: JSON.stringify({
+              bytes: sourceImageAttestation.bytes,
+              sha256: sourceImageAttestation.sha256,
+            }),
+          };
+        })() : {}),
       },
     });
     if (isRunnerInvocation && typeof child?.once === "function") {
@@ -663,6 +780,49 @@ async function readModelLoadEvidence(receiptPath, expectedSnapshot) {
   };
 }
 
+
+async function readSourceImageLoadEvidence(receiptPath, expectedSource) {
+  const entry = await lstat(receiptPath);
+  if (entry.isSymbolicLink() || !entry.isFile() || entry.size <= 0 || entry.size > 16 * 1024) {
+    throw new TypeError("TripoSR source-image loader receipt is missing, unsafe or exceeds its size limit.");
+  }
+  if (process.platform !== "win32" && (entry.mode & 0o077) !== 0) {
+    throw new TypeError("TripoSR source-image loader receipt permissions are not private.");
+  }
+  const lines = (await readFile(receiptPath, "utf8")).split(/\r?\n/).filter(Boolean);
+  if (lines.length !== 1) {
+    throw new TypeError("TripoSR source-image loader receipt must contain exactly one successful source event.");
+  }
+  let event;
+  try { event = JSON.parse(lines[0]); } catch {
+    throw new TypeError("TripoSR source-image loader receipt is malformed JSON.");
+  }
+  const keys = Object.keys(event ?? {}).sort();
+  if (JSON.stringify(keys) !== JSON.stringify([
+    "bytes", "exactBytesPassed", "loader", "role", "schemaVersion", "sha256", "stable",
+  ].sort())) {
+    throw new TypeError("TripoSR source-image loader receipt contains unexpected or path-bearing fields.");
+  }
+  if (event.schemaVersion !== "1.0.0" || event.role !== "sourceImage" ||
+      event.loader !== "PIL.Image.open" || !Number.isSafeInteger(event.bytes) ||
+      event.bytes <= 0 || !/^[a-f0-9]{64}$/.test(event.sha256 ?? "") ||
+      event.exactBytesPassed !== true || event.stable !== true ||
+      event.bytes !== expectedSource?.bytes || event.sha256 !== expectedSource?.sha256) {
+    throw new TypeError("TripoSR source-image loader receipt does not match the exact pre-inference source bytes.");
+  }
+  return {
+    schemaVersion: "1.0.0",
+    status: "verified",
+    loader: "PIL.Image.open",
+    bytes: event.bytes,
+    sha256: event.sha256,
+    exactBytesPassed: true,
+    stable: true,
+    eventCount: 1,
+  };
+}
+
+
 function workerFingerprintValues(snapshot) {
   return JSON.stringify({
     runner: snapshot?.runner ?? null,
@@ -774,6 +934,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       stableAcrossInference: null,
     },
     modelLoadEvidence: null,
+    sourceLoadEvidence: null,
     source: {
       sourceId,
       relativePath: relativePath,
@@ -818,7 +979,13 @@ export async function runSingleImageRuntimeSmoke(options) {
   };
   const offlinePythonDirectory = await mkdtemp(path.join(os.tmpdir(), "single-image-offline-"));
   const modelLoadReceiptPath = path.join(offlinePythonDirectory, "model-load-receipt.jsonl");
+  const sourceImageReceiptPath = path.join(offlinePythonDirectory, "source-image-load-receipt.jsonl");
   const modelLoadAttestation = { receiptPath: modelLoadReceiptPath, expectedArtifacts: null };
+  const sourceImageAttestation = {
+    receiptPath: sourceImageReceiptPath,
+    bytes: source.bytes,
+    sha256: source.sha256,
+  };
   try {
     await writeFile(path.join(offlinePythonDirectory, "sitecustomize.py"), OFFLINE_SITE_CUSTOMIZE, {
       flag: "wx",
@@ -826,6 +993,8 @@ export async function runSingleImageRuntimeSmoke(options) {
     });
     await writeFile(modelLoadReceiptPath, "", { flag: "wx", mode: 0o600 });
     await chmod(modelLoadReceiptPath, 0o600);
+    await writeFile(sourceImageReceiptPath, "", { flag: "wx", mode: 0o600 });
+    await chmod(sourceImageReceiptPath, 0o600);
     await createInitialReport(reportPath, report);
   } catch (error) {
     await rm(offlinePythonDirectory, { recursive: true, force: true }).catch(() => {});
@@ -838,6 +1007,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     pythonPath,
     runnerScript,
     modelLoadAttestation,
+    sourceImageAttestation,
     onRunnerLaunchAttempt: () => {
       runnerLaunchAttempted = true;
     },
@@ -919,6 +1089,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       throw new TypeError("TripoSR runner did not emit a process-spawn event; runtime inference cannot be confirmed.");
     }
     report.modelLoadEvidence = await readModelLoadEvidence(modelLoadReceiptPath, beforeSnapshot);
+    report.sourceLoadEvidence = await readSourceImageLoadEvidence(sourceImageReceiptPath, source);
     await replaceReportAtomically(reportPath, report);
 
     const workflowReport = workflow?.report;

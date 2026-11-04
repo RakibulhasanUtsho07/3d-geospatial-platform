@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -146,4 +146,134 @@ test("aborts rembg loading when ONNX bytes differ from the preflight fingerprint
     "tripoCheckpoint", "tripoConfig",
   ]);
   assert.equal(events.some((event) => event.role === "rembgWeights"), false);
+});
+
+
+async function runInstrumentedSourceImage(t, {
+  mismatchSource = false,
+  mismatchPath = false,
+  importStyle = "from",
+} = {}) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "single-image-source-loader-"));
+  t.after(async () => rm(root, { recursive: true, force: true }));
+  const sourceBytes = Buffer.from([0xff, 0xd8, 0xff, 0x10, 0x20, 0x30, 0x40]);
+  const sourcePath = path.join(root, "source.jpg");
+  const alternatePath = path.join(root, "alternate-source.jpg");
+  const receiptPath = path.join(root, "source-load-receipt.jsonl");
+  const pilDirectory = path.join(root, "PIL");
+  await mkdir(pilDirectory);
+  await writeFile(sourcePath, sourceBytes);
+  await writeFile(alternatePath, sourceBytes);
+  await writeFile(path.join(root, "sitecustomize.py"), SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE);
+  await writeFile(path.join(pilDirectory, "__init__.py"), "from . import Image\n");
+  await writeFile(path.join(pilDirectory, "Image.py"), [
+    "import io",
+    "class DecodedImage:",
+    "    def __init__(self, fp):",
+    "        if not isinstance(fp, io.BytesIO):",
+    "            raise TypeError('decoder must receive in-memory bytes, not a path')",
+    "        self.payload = fp.read()",
+    "        self.filename = None",
+    "def open(fp, *args, **kwargs):",
+    "    return DecodedImage(fp)",
+    "",
+  ].join("\n"));
+  await writeFile(receiptPath, "", { mode: 0o600 });
+
+  const expected = {
+    bytes: sourceBytes.length,
+    sha256: mismatchSource ? "0".repeat(64) : sha256(sourceBytes),
+  };
+  const importLines = importStyle === "dynamic"
+    ? [
+      "import importlib",
+      "Image = importlib.import_module('PIL.Image')",
+    ]
+    : importStyle === "module"
+      ? [
+        "import PIL.Image",
+        "Image = PIL.Image",
+      ]
+      : [
+        "from PIL import Image",
+      ];
+  const sourceArgument = mismatchPath ? alternatePath : sourcePath;
+  const script = [
+    "import os, sys",
+    ...importLines,
+    "first = Image.open(sys.argv[1])",
+    "assert first.payload == bytes([255, 216, 255, 16, 32, 48, 64])",
+    "assert first.filename == os.path.realpath(sys.argv[1])",
+    "second = Image.open(sys.argv[1])",
+    "assert second.payload == first.payload",
+  ].join("\n");
+  const result = spawnSync(process.env.PYTHON || "python3", [
+    "-c", script, sourceArgument,
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 15_000,
+    env: {
+      ...process.env,
+      PYTHONPATH: root,
+      BUILDING_ENGINE_SOURCE_IMAGE_RECEIPT_PATH: receiptPath,
+      BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_PATH: sourcePath,
+      BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON: JSON.stringify(expected),
+    },
+  });
+  if (mismatchSource || mismatchPath) {
+    assert.notEqual(result.status, 0, result.stderr || result.stdout);
+    if (mismatchSource) {
+      assert.match(result.stderr, /source image decoder input does not match/i);
+    }
+    if (mismatchPath) {
+      assert.match(result.stderr, /other than the attested source path/i);
+    }
+  } else {
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
+  const receiptText = await readFile(receiptPath, "utf8");
+  const events = receiptText.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(receiptText.includes(root), false);
+  return { events, result, sourceBytes };
+}
+
+test("attests the exact source-image bytes handed to PIL.Image.open and reuses one immutable buffer", async (t) => {
+  const { events } = await runInstrumentedSourceImage(t);
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0], {
+    bytes: 7,
+    exactBytesPassed: true,
+    loader: "PIL.Image.open",
+    role: "sourceImage",
+    schemaVersion: "1.0.0",
+    sha256: sha256(Buffer.from([0xff, 0xd8, 0xff, 0x10, 0x20, 0x30, 0x40])),
+    stable: true,
+  });
+});
+
+test("supports PIL.Image dynamic import without weakening source-image byte identity", async (t) => {
+  const { events } = await runInstrumentedSourceImage(t, { importStyle: "dynamic" });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].loader, "PIL.Image.open");
+  assert.equal(events[0].exactBytesPassed, true);
+});
+
+test("supports the PIL.Image module import form", async (t) => {
+  const { events } = await runInstrumentedSourceImage(t, { importStyle: "module" });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].loader, "PIL.Image.open");
+});
+
+test("rejects source-image digest mismatch before the original Pillow decoder runs", async (t) => {
+  const { events, result } = await runInstrumentedSourceImage(t, { mismatchSource: true });
+  assert.notEqual(result.status, 0);
+  assert.deepEqual(events, []);
+});
+
+test("rejects a different source-image path before the original Pillow decoder runs", async (t) => {
+  const { events, result } = await runInstrumentedSourceImage(t, { mismatchPath: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /other than the attested source path/i);
+  assert.deepEqual(events, []);
 });

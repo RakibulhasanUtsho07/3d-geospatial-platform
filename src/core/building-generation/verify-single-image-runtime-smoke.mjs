@@ -4,9 +4,10 @@ import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
-const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
-const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -159,6 +160,28 @@ function validateModelLoadEvidence(report) {
   return true;
 }
 
+
+function validateSourceImageLoadEvidence(report) {
+  const evidence = report.sourceLoadEvidence;
+  const expectedKeys = [
+    "bytes", "eventCount", "exactBytesPassed", "loader", "schemaVersion",
+    "sha256", "stable", "status",
+  ];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence) ||
+      JSON.stringify(Object.keys(evidence).sort()) !== JSON.stringify(expectedKeys) ||
+      evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified" ||
+      evidence.loader !== "PIL.Image.open" || evidence.exactBytesPassed !== true ||
+      evidence.stable !== true || evidence.eventCount !== 1 ||
+      evidence.bytes !== report.source?.bytes ||
+      evidence.sha256 !== report.source?.sha256 ||
+      !Number.isSafeInteger(evidence.bytes) || evidence.bytes <= 0 ||
+      !HASH.test(evidence.sha256 ?? "")) {
+    throw new TypeError("Smoke report source-image load evidence does not match the exact source image bytes.");
+  }
+  return true;
+}
+
+
 function parseGlb(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 20 ||
       bytes.readUInt32LE(0) !== 0x46546c67 ||
@@ -202,6 +225,7 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
         SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
       ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
@@ -209,10 +233,19 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       report.status !== "passed") {
     throw new TypeError("Smoke evidence report schema, identity or status is invalid.");
   }
-  const hasWorkerFingerprintEvidence = report.schemaVersion !== LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
-  const hasProcessLoadEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasWorkerFingerprintEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasProcessLoadEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasSourceImageLoadEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
   if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
   if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
+  if (hasSourceImageLoadEvidence) validateSourceImageLoadEvidence(report);
 
   if (report.readiness?.status !== "ready" ||
       report.readiness.tripoModelWeights !== "cached" ||
@@ -355,8 +388,11 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       ? "stable-across-inference" : "not-recorded-legacy-schema",
     modelLoadEvidenceStatus: hasProcessLoadEvidence
       ? "verified-against-worker-preflight" : "not-recorded-legacy-schema",
+    sourceImageLoadEvidenceStatus: hasSourceImageLoadEvidence
+      ? "verified-against-source-manifest" : "not-recorded-legacy-schema",
     ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
     ...(hasProcessLoadEvidence ? { modelLoadEvidence: report.modelLoadEvidence } : {}),
+    ...(hasSourceImageLoadEvidence ? { sourceLoadEvidence: report.sourceLoadEvidence } : {}),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,
