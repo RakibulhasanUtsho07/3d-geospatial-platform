@@ -4,7 +4,11 @@ import {
   verifyBuildingReviewPackageSignature,
   verifyBuildingReviewPackageSignatureWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
-import { verifyBuildingReviewPackageDirectory } from "../src/core/building-generation/building-review-package-directory.mjs";
+import {
+  sameBuildingReviewPackageSnapshot,
+  verifyBuildingReviewPackageDirectory,
+  readBuildingReviewPackageControlFile,
+} from "../src/core/building-generation/building-review-package-directory.mjs";
 
 const REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
 
@@ -60,7 +64,8 @@ async function main() {
   const snapshot = await verifyBuildingReviewPackageDirectory(packageDir);
   const manifestPath = path.join(packageDir, "package-manifest.json");
   const signaturePath = path.join(packageDir, "package-manifest.sig.json");
-  const signatureBytes = await regularFile(signaturePath, "Signature envelope");
+  const signatureSnapshot = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  const signatureBytes = signatureSnapshot.bytes;
   const signatureEnvelope = JSON.parse(signatureBytes.toString("utf8"));
 
   let signature;
@@ -90,16 +95,30 @@ async function main() {
     throw new Error("unsupported-review-package-signature-schema");
   }
 
-  const integrity = snapshot.integrity;
+  // Re-read both sides after cryptographic verification. The detached envelope
+  // is intentionally excluded from the artifact inventory, so pin it separately.
+  const [finalSnapshot, finalSignature] = await Promise.all([
+    verifyBuildingReviewPackageDirectory(packageDir),
+    readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+  ]);
+  if (!sameBuildingReviewPackageSnapshot(snapshot, finalSnapshot)) {
+    throw new Error("review-package-changed-during-signature-verification");
+  }
+  if (!signatureBytes.equals(finalSignature.bytes) ||
+      signatureSnapshot.stat.dev !== finalSignature.stat.dev ||
+      signatureSnapshot.stat.ino !== finalSignature.stat.ino) {
+    throw new Error("review-package-signature-envelope-changed-during-verification");
+  }
+  const integrity = finalSnapshot.integrity;
   const valid = integrity.valid === true && signature.valid === true;
   const result = {
     schemaVersion: "1.0.0",
     engine: "signed-building-review-package-verification-v1",
     status: valid ? "verified" : "tampered-or-invalid",
     valid,
-    buildingId: snapshot.packageManifest.buildingId ?? null,
-    packageManifestSha256: snapshot.packageManifestSha256,
-    packageSnapshotSha256: snapshot.snapshotToken,
+    buildingId: finalSnapshot.packageManifest.buildingId ?? null,
+    packageManifestSha256: finalSnapshot.packageManifestSha256,
+    packageSnapshotSha256: finalSnapshot.snapshotToken,
     packageIntegrity: {
       status: integrity.status,
       valid: integrity.valid,
@@ -145,7 +164,7 @@ async function main() {
     buildingId: result.buildingId,
     packageIntegrity: integrity.status,
     packageIntegrityWarnings: integrity.counts.warnings,
-    packageSnapshotSha256: snapshot.snapshotToken,
+    packageSnapshotSha256: finalSnapshot.snapshotToken,
     signature: signature.status,
     reviewerId: result.signature.reviewerId,
     keyId: result.signature.keyId,

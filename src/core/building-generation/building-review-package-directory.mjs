@@ -166,3 +166,21 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg) {
 export function sameBuildingReviewPackageSnapshot(left, right) {
   return Boolean(left && right && left.snapshotToken === right.snapshotToken);
 }
+
+
+/**
+ * Reads a root-level detached signature control file with the same descriptor-
+ * pinned no-follow and identity checks as package artifacts.
+ */
+export async function readBuildingReviewPackageControlFile(directoryArg, filename) {
+  if (typeof directoryArg !== "string" || !directoryArg.trim()) {
+    throw new TypeError("Review-package directory path is required.");
+  }
+  if (filename !== "package-manifest.sig.json") {
+    throw new TypeError("Only the detached signature control file may be read here.");
+  }
+  const packageDir = path.resolve(directoryArg);
+  const root = await statPath(packageDir, "root-directory");
+  if (!root.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
+  return readStableRegularFile(path.join(packageDir, filename), filename);
+}
