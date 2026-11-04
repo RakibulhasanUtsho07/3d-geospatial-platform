@@ -139,7 +139,16 @@ export function verifyGenerationJobPublicationReview({
   if (typeof registryJson !== "string" || !registryJson.trim()) {
     throw new Error("RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required for approved generation-job publication.");
   }
-  const trustedReviewerKeys = parseTrustedReconstructionReviewerKeys(registryJson);
+  let trustedReviewerKeys;
+  try {
+    trustedReviewerKeys = parseTrustedReconstructionReviewerKeys(registryJson);
+  } catch (error) {
+    throw new Error(
+      "Trusted reviewer registry is invalid or unavailable: " +
+      (error instanceof Error ? error.message : String(error)),
+      { cause: error },
+    );
+  }
   const reviewedAt = Date.parse(receipt.submission.reviewedAtUtc);
   if (!Number.isFinite(reviewedAt) || reviewedAt > Date.now() + 5 * 60 * 1000) {
     throw new TypeError("Signed generation-job review timestamp must be valid and not in the future.");
