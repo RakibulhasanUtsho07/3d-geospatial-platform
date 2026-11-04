@@ -484,7 +484,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           canonicalJson(receiptPayload.modelLoadEvidence) !== canonicalJson(smokeReport.modelLoadEvidence) ||
           canonicalJson(receiptPayload.geometryQa) !== canonicalJson({
             schemaVersion: "1.0.0",
-            engine: smokeReport.geometryQa?.engine,
+            engine: "glb-geometry-qa-v2",
             valid: smokeReport.geometryQa?.valid,
             sourceStatus: smokeReport.geometryQa?.sourceStatus,
             status: smokeReport.geometryQa?.status,
