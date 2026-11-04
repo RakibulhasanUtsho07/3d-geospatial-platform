@@ -9,7 +9,7 @@
 
 1. Create a generation job using the existing authenticated upload/job APIs. The browser queue/worker infrastructure remains separate: `GENERATION_API_TOKEN`, `BUILDING_ENGINE_WORKSPACE`, and a running worker are still required.
 2. Wait for the worker to finish and inspect the exact candidate GLB plus its QA report.
-3. Record the review decision through `POST /api/building-generation/jobs/<jobId>/review`, using `GENERATION_REVIEW_API_TOKEN`. Approval requires every checklist item to be true **and** stores the exact placement that was reviewed. The reviewer label is not yet authenticated by this write operation.
+3. Record the review decision through `POST /api/building-generation/jobs/<jobId>/review`, using `GENERATION_REVIEW_API_TOKEN`. Approval requires every checklist item to be true **and** stores the exact placement that was reviewed. Set the `reviewer` field to the exact `reviewerId` registered in the server trust registry (a safe ID, not a display name). The review-write endpoint itself is still only protected by a shared service token; the later signature binds the immutable record to the trusted key.
 4. On the trusted reviewer's workstation, create an Ed25519 receipt for that exact immutable approval (procedure below). The local signing CLI re-hashes the review record, candidate GLB and QA report; the private key never leaves the reviewer's machine.
 5. Open **Generated models** on the 3D map, expand **Publish an approved generation job to this map**, and provide:
    - The exact completed job ID.
@@ -77,7 +77,7 @@ The route uses the common timing-safe bearer-token verifier with a distinct serv
 
 ## Trusted Ed25519 publication approval
 
-The review API's bearer token authorizes the request to record a review; the caller-supplied `reviewer` label is not individual identity proof. Therefore the public catalog handoff now requires a second, independently signed decision from a currently trusted D3M-01 reviewer.
+The review API's bearer token authorizes the request to record a review; the caller-supplied `reviewer` field is not individual identity proof. It must be set to the registered safe `reviewerId` so the later receipt can bind to that registry identity. The public catalog handoff requires a second, independently signed decision from a currently trusted D3M-01 reviewer. Existing immutable review records whose reviewer field is a display name rather than a registered ID cannot be signed; create a replacement generation job and record a fresh review rather than editing the immutable record.
 
 After the immutable review record is written, the trusted reviewer signs it locally:
 
