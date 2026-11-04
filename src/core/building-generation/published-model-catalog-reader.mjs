@@ -76,7 +76,7 @@ function validateReview(review, label) {
         auth.reviewerId !== review.reviewer ||
         !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(auth.keyId ?? "") ||
         !/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(auth.registryId ?? "") ||
-        !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(auth.reviewedAtUtc ?? "") ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(auth.reviewedAtUtc ?? "") ||
         auth.reviewedAtUtc !== review.reviewedAt ||
         !isHash(auth.publicKeyFingerprintSha256) ||
         !isHash(auth.signatureSha256) ||
