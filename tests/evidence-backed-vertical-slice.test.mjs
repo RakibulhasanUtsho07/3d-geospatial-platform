@@ -125,6 +125,10 @@ function createWorkflowStubs(f, { geometryBlockers = [], geometryOutput = true }
         modelPath: mediaModelPath,
         reportPath: path.join(f.root, "outputs", "media-report.json"),
         report: {
+          engine: "media-to-model-workflow-v1",
+          buildingId: f.options.buildingId,
+          jobId: options.jobId,
+          strategy: options.strategy,
           status: "completed-requires-review",
           inputs: {
             mediaRecords: f.sources.map((source, index) => ({
@@ -163,8 +167,14 @@ function createWorkflowStubs(f, { geometryBlockers = [], geometryOutput = true }
       return {
         reportPath: path.join(f.root, "outputs", "geometry-report.json"),
         report: {
+          workflow: "architectural-geometry-correspondence-consensus-v6",
+          buildingId: options.buildingId,
+          jobId: options.jobId,
           status: geometryBlockers.length ? "review-required" : "technical-checks-passed-requires-human-review",
-          input: { sha256: sha256(Buffer.from(JSON.stringify(f.geometryInput, null, 2))) },
+          input: {
+            relativePath: options.inputPath,
+            sha256: sha256(Buffer.from(JSON.stringify(f.geometryInput, null, 2))),
+          },
           blockers: geometryBlockers,
           checks: { glbTextureBindingQaValid: geometryOutput && geometryBlockers.length === 0 },
           output: { texturedModel },
