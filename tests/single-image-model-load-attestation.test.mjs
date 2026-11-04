@@ -73,7 +73,7 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "session = InferenceSession(sys.argv[3])",
     "assert isinstance(session, InferenceSession)",
     "assert session.model_bytes == b'synthetic-rembg-onnx-model-bytes'",
-  ].join("\\n");
+  ].join("\n");
   const result = spawnSync(process.env.PYTHON || "python3", [
     "-c", script, configPath, checkpointPath, rembgPath,
   ], {
