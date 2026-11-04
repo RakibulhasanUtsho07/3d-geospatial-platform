@@ -1289,6 +1289,10 @@ export async function runSingleImageRuntimeSmoke(options) {
         georeferenceEvidence.verticalEvidence?.status !== "calibrated-needs-human-review") {
       throw new Error("Vertical ellipsoidal-height control residuals did not pass; the candidate remains failed and unpublished.");
     }
+    if (controlPointManifestAfter?.manifest.heldOutCheckpoints &&
+        georeferenceEvidence.independentCheckpointEvidence?.status !== "validated-needs-human-review") {
+      throw new Error("Independent held-out 3D checkpoint validation did not pass; the candidate remains failed and unpublished.");
+    }
 
     const inventoryAfter = await collectWorkerSnapshot();
     const afterSnapshot = workerFingerprintSnapshot(inventoryAfter);
