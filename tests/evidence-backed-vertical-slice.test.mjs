@@ -315,3 +315,41 @@ test("rejects a geometry child report bound to a different building", async (t) 
   assert.equal(result.report.acceptance.publicationEligible, false);
 });
 
+test("rejects a media child report from a different reconstruction profile", async (t) => {
+  const f = await fixture(t);
+  const stubs = createWorkflowStubs(f);
+  const runMedia = stubs.runMediaToModelWorkflow.bind(stubs);
+  stubs.runMediaToModelWorkflow = async (options) => {
+    const result = await runMedia(options);
+    result.report.strategy = "single-image-ai";
+    return result;
+  };
+
+  const result = await runEvidenceBackedVerticalSlice(f.options, stubs);
+  assert.equal(stubs.calls.media, 1);
+  assert.equal(stubs.calls.geometry, 0);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.message, /photogrammetry profile/);
+  assert.equal(result.report.acceptance.publicationEligible, false);
+});
+
+test("rejects a geometry child report from a different workflow engine", async (t) => {
+  const f = await fixture(t);
+  const stubs = createWorkflowStubs(f);
+  const runGeometry = stubs.runArchitecturalGeometryWorkflow.bind(stubs);
+  stubs.runArchitecturalGeometryWorkflow = async (options) => {
+    const result = await runGeometry(options);
+    result.report.workflow = "another-geometry-workflow-v1";
+    return result;
+  };
+
+  const result = await runEvidenceBackedVerticalSlice(f.options, stubs);
+  assert.equal(stubs.calls.media, 1);
+  assert.equal(stubs.calls.geometry, 1);
+  assert.equal(result.report.status, "failed");
+  assert.equal(result.report.childJobs.media.status, "completed-requires-review");
+  assert.equal(result.report.childJobs.geometry.status, "failed");
+  assert.match(result.report.failure.message, /architectural-geometry report identity/);
+  assert.equal(result.report.acceptance.publicationEligible, false);
+});
+
