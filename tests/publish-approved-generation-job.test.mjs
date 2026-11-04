@@ -369,7 +369,7 @@ test("requires a trusted signed reviewer receipt before catalog publication", as
   const { reviewReceipt: _receipt, ...withoutReceipt } = setup;
   await assert.rejects(
     publishApprovedGenerationJob({ ...withoutReceipt, placement }),
-    /signed generation-job review receipt must contain exactly submission and signatureBase64/,
+    /generation-job signed review receipt must contain exactly submission and signatureBase64/,
   );
   await assert.rejects(
     readFile(path.join(setup.workspaceRoot, "public", "models", "generated", "manifest.json")),
