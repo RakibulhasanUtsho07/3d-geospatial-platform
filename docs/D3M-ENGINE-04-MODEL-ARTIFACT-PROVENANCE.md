@@ -49,3 +49,10 @@ Real worker-host inference, asset/model licence approval, independent survey/CAD
 - Feature branch: `feat/d3m-engine04-model-artifact-provenance-20261104`.
 - Tracking issue: #352.
 - Do not merge #351 or this stacked change automatically. Require exact-head CI, independent code review and the parent PR's approval path.
+
+
+## Exact-head validation and follow-on boundary — 2026-11-04
+
+The D3M-ENGINE-04 head `53f9887834cfe960ea8875d6fc7d074430400611` completed exact-head Full CI successfully in [run #41789187557](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41789187557). The full Lint and production build job, including production viewport/API/browser verification, ended successfully. This validates the D3M-ENGINE-04 software contract and synthetic test paths only. PR #353 remains open/draft and stacked on PR #351; no merge to `main` was performed.
+
+The remaining evidence boundary identified by the next audit is tracked separately in [D3M-ENGINE-05 issue #354](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/354): D3M-ENGINE-04 pre/post cache fingerprints do not alone prove which exact bytes the inference process handed to model-loader APIs. D3M-ENGINE-05 adds process-side loader receipts in smoke schema 1.2.0. See `docs/D3M-ENGINE-05-PROCESS-MODEL-LOAD-ATTESTATION.md` for its separate contract and limitations. Neither change constitutes real worker-host inference, independent review or publication eligibility.
