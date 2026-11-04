@@ -152,7 +152,7 @@ function validateReviewerAuthentication(authentication, review) {
       !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.reviewerId ?? "") ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.keyId ?? "") ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(authentication.registryId ?? "") ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(authentication.reviewedAtUtc ?? "")) {
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(authentication.reviewedAtUtc ?? "")) {
     throw new TypeError("Verified reviewer authentication does not match the attested reviewer and canonical review timestamp.");
   }
   for (const field of [
