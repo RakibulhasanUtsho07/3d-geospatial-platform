@@ -216,6 +216,7 @@ test("publishes the exact reviewed geometry GLB to the Cesium catalog and preser
     workspaceRoot: f.root,
     reportPath: f.reportPath,
     attestationPath: "publication-attestation.json",
+    reviewReceiptPath: f.reviewReceiptPath,
     publicRoot: f.publicRoot,
     publishedAt: "2026-11-04T00:01:00.000Z",
   });
