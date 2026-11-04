@@ -125,7 +125,7 @@ async function makeApprovedJob(t) {
   ).toString("base64");
   const reviewReceipt = { submission, signatureBase64 };
   const reviewReceiptPath = path.join(workspaceRoot, "signed-generation-publication-review.json");
-  await writeFile(reviewReceiptPath, JSON.stringify(reviewReceipt, null, 2), { mode: 0o600 });
+  await writeFile(reviewReceiptPath, JSON.stringify(reviewReceipt, null, 2) + "\n", { mode: 0o600 });
   const privateKeyRoot = await mkdtemp(path.join(os.tmpdir(), "d3m02-reviewer-private-key-"));
   t.after(() => rm(privateKeyRoot, { recursive: true, force: true }));
   const privateKeyPath = path.join(privateKeyRoot, "test-reviewer-private-key.pem");
@@ -165,7 +165,10 @@ test("publishes only an approved, hash-matching review with explicit map placeme
   assert.equal(active.review.authentication.keyId, "d3m02-test-key-01");
   assert.equal(active.review.authentication.registryId, "d3m02-publication-test-registry");
   assert.equal(active.review.authentication.scheme, "Ed25519");
-  assert.match(active.review.authentication.signedReviewReceiptSha256, /^[a-f0-9]{64}$/);
+  assert.equal(
+    active.review.authentication.signedReviewReceiptSha256,
+    hash(await readFile(setup.reviewReceiptPath)),
+  );
   const asset = await readFile(path.join(setup.workspaceRoot, "public", result.assetUrl.slice(1)));
   assert.equal(hash(asset), result.modelSha256);
   const unchangedJob = await getGenerationJob({ workspaceRoot: setup.workspaceRoot, jobId: setup.jobId });
