@@ -116,6 +116,10 @@ export async function publishEvidenceBackedVerticalSlice({
       attestation.candidateSha256 !== candidate.sha256) {
     throw new Error("publication attestation must bind the exact D3M-ENGINE-03 textured GLB hash");
   }
+  if (attestation.verticalSliceReportSha256 !== reportFile.sha256 ||
+      attestation.sourceSetSha256 !== report.sourceEvidence?.sourceSetSha256) {
+    throw new Error("publication attestation must bind the exact parent report and source-set hashes");
+  }
   if (!attestation.model || attestation.model.id !== report.buildingId) {
     throw new Error("publication attestation model.id must exactly match the parent buildingId");
   }
