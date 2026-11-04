@@ -170,6 +170,9 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
   });
 
   let vertical = null;
+  if (raw.schemaVersion === "1.1.0" && raw.vertical === undefined) {
+    throw new TypeError("Control-point manifest schema 1.1.0 requires an explicit vertical control section.");
+  }
   if (raw.vertical !== undefined) {
     if (raw.schemaVersion !== "1.1.0") {
       throw new TypeError("Ellipsoidal-height controls require control-point manifest schema 1.1.0.");
@@ -461,14 +464,13 @@ export function createSingleImageGeoreferenceEvidence({
   if (!HASH.test(modelSha256 ?? "")) throw new TypeError("modelSha256 must be a SHA-256 digest.");
   if (!loadedManifest) {
     return {
-      schemaVersion: "1.1.0",
+      schemaVersion: "1.0.0",
       status: "not-requested",
       modelSha256,
       maxGcpRmsErrorM: null,
       maxGcpResidualM: null,
       manifest: null,
       registration: null,
-      verticalEvidence: createVerticalHeightEvidence({ loadedManifest: null, modelSha256, horizontalRegistration: null }),
     };
   }
   validateThresholds(maxGcpRmsErrorM, maxGcpResidualM);
@@ -489,14 +491,14 @@ export function createSingleImageGeoreferenceEvidence({
     maxVerticalGcpResidualM,
   });
   return {
-    schemaVersion: "1.1.0",
+    schemaVersion: loadedManifest.manifest.vertical ? "1.1.0" : "1.0.0",
     status: registration.status,
     modelSha256,
     maxGcpRmsErrorM,
     maxGcpResidualM,
     manifest: manifestSummary(loadedManifest),
     registration,
-    verticalEvidence,
+    ...(loadedManifest.manifest.vertical ? { verticalEvidence } : {}),
   };
 }
 function canonicalObjectJson(value) {
@@ -573,7 +575,7 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
     loadedManifest,
     modelSha256,
     maxGcpRmsErrorM: evidence.maxGcpRmsErrorM,
-    maxGcpResidualM: evidence.verticalEvidence?.controls?.maxRmsErrorM ?? 0.5,
+    maxGcpResidualM: evidence.maxGcpResidualM,
     maxVerticalGcpRmsErrorM: evidence.verticalEvidence?.controls?.maxRmsErrorM ?? 0.5,
     maxVerticalGcpResidualM: evidence.verticalEvidence?.controls?.maxAllowedResidualM ?? 1.0,
   });
