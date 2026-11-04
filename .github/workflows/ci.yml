@@ -88,6 +88,7 @@ on:
       - feat/d3m-engine04-model-artifact-provenance-20261104
       - feat/d3m-engine05-process-model-load-attestation-20261104
       - feat/d3m-engine06-source-image-load-attestation-20261104
+      - feat/d3m-engine07-generation-artifact-receipt-20261104
 
   workflow_dispatch:
   pull_request:
@@ -96,6 +97,7 @@ on:
       - feat/d3m-engine03-evidence-backed-vertical-slice-20261103
       - feat/d3m-engine04-model-artifact-provenance-20261104
       - feat/d3m-engine05-process-model-load-attestation-20261104
+      - feat/d3m-engine06-source-image-load-attestation-20261104
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
