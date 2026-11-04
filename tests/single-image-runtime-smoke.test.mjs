@@ -395,6 +395,11 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
+  assert.equal(result.report.schemaVersion, "1.4.0");
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.0.0");
+  assert.ok(result.report.generationArtifactReceipt.bytes > 0);
+  assert.match(result.report.generationArtifactReceipt.sha256, /^[a-f0-9]{64}$/);
+  assert.match(result.report.generationArtifactReceipt.payloadSha256, /^[a-f0-9]{64}$/);
   assert.equal(result.report.inference.runnerLaunchAttempted, true);
   assert.equal(result.report.inference.runnerProcessStarted, true);
   assert.equal(result.report.readiness.status, "ready");
@@ -466,6 +471,11 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(receiptEnvelope.payload.kind, "single-image-generation-artifact");
   assert.equal(receiptEnvelope.payload.source.sha256, source.sha256);
   assert.equal(receiptEnvelope.payload.output.sha256, result.report.output.sha256);
+  assert.equal(receiptEnvelope.payload.geometryQa.engine, "glb-geometry-qa-v2");
+  assert.equal(receiptEnvelope.payload.workerHost.stableAcrossInference, true);
+  assert.deepEqual(Object.keys(receiptEnvelope.payload.modelLoadEvidence.loaders).sort(), [
+    "rembgWeights", "tripoCheckpoint", "tripoConfig",
+  ]);
   assert.equal(receiptEnvelope.payload.workflowReport.sha256, hash(await readFile(
     path.join(root, ...receiptEnvelope.payload.workflowReport.path.split("/")),
   )));
