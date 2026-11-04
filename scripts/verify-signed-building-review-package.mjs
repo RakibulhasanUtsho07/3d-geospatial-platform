@@ -6,6 +6,8 @@ import {
 } from "../src/core/building-generation/building-review-package-signature.mjs";
 import {
   sameBuildingReviewPackageSnapshot,
+  sameBuildingReviewPackageControlFile,
+  readBuildingReviewPackageDirectory,
   verifyBuildingReviewPackageDirectory,
   readBuildingReviewPackageControlFile,
 } from "../src/core/building-generation/building-review-package-directory.mjs";
@@ -97,28 +99,28 @@ async function main() {
 
   // Re-read both sides after cryptographic verification. The detached envelope
   // is intentionally excluded from the artifact inventory, so pin it separately.
-  const [finalSnapshot, finalSignature] = await Promise.all([
-    verifyBuildingReviewPackageDirectory(packageDir),
-    readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
-  ]);
-  if (!sameBuildingReviewPackageSnapshot(snapshot, finalSnapshot)) {
+  const finalSnapshot = await readBuildingReviewPackageDirectory(packageDir);
+  const finalSignature = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  const confirmationSnapshot = await readBuildingReviewPackageDirectory(packageDir);
+  const confirmationSignature = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  if (!sameBuildingReviewPackageSnapshot(snapshot, finalSnapshot) ||
+      !sameBuildingReviewPackageSnapshot(finalSnapshot, confirmationSnapshot)) {
     throw new Error("review-package-changed-during-signature-verification");
   }
-  if (!signatureBytes.equals(finalSignature.bytes) ||
-      signatureSnapshot.stat.dev !== finalSignature.stat.dev ||
-      signatureSnapshot.stat.ino !== finalSignature.stat.ino) {
+  if (!sameBuildingReviewPackageControlFile(signatureSnapshot, finalSignature) ||
+      !sameBuildingReviewPackageControlFile(finalSignature, confirmationSignature)) {
     throw new Error("review-package-signature-envelope-changed-during-verification");
   }
-  const integrity = finalSnapshot.integrity;
+  const integrity = snapshot.integrity;
   const valid = integrity.valid === true && signature.valid === true;
   const result = {
     schemaVersion: "1.0.0",
     engine: "signed-building-review-package-verification-v1",
     status: valid ? "verified" : "tampered-or-invalid",
     valid,
-    buildingId: finalSnapshot.packageManifest.buildingId ?? null,
-    packageManifestSha256: finalSnapshot.packageManifestSha256,
-    packageSnapshotSha256: finalSnapshot.snapshotToken,
+    buildingId: snapshot.packageManifest.buildingId ?? null,
+    packageManifestSha256: snapshot.packageManifestSha256,
+    packageSnapshotSha256: snapshot.snapshotToken,
     packageIntegrity: {
       status: integrity.status,
       valid: integrity.valid,
@@ -164,7 +166,7 @@ async function main() {
     buildingId: result.buildingId,
     packageIntegrity: integrity.status,
     packageIntegrityWarnings: integrity.counts.warnings,
-    packageSnapshotSha256: finalSnapshot.snapshotToken,
+    packageSnapshotSha256: snapshot.snapshotToken,
     signature: signature.status,
     reviewerId: result.signature.reviewerId,
     keyId: result.signature.keyId,

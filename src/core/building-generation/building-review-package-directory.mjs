@@ -15,6 +15,7 @@ function identity(stat) {
     stat.size.toString(),
     stat.mtimeNs.toString(),
     stat.ctimeNs.toString(),
+    stat.mode.toString(),
   ].join(":");
 }
 
@@ -118,7 +119,8 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
   if (!rootBefore.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
 
   const manifestPath = path.join(packageDir, "package-manifest.json");
-  const { bytes: packageManifestBytes } = await readStableRegularFile(manifestPath, "package-manifest.json");
+  const manifestSnapshot = await readStableRegularFile(manifestPath, "package-manifest.json");
+  const packageManifestBytes = manifestSnapshot.bytes;
   let packageManifest;
   try {
     packageManifest = JSON.parse(packageManifestBytes.toString("utf8"));
@@ -129,6 +131,15 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
   const actualFiles = [];
   await walkDirectory(packageDir, packageDir, actualFiles);
   actualFiles.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+
+  // The manifest is a package control file and is intentionally excluded from
+  // actualFiles. Re-read it after walking all artifacts so a concurrent
+  // replacement cannot leave the inventory bound to stale manifest bytes.
+  const finalManifestSnapshot = await readStableRegularFile(manifestPath, "package-manifest.json");
+  if (!manifestSnapshot.bytes.equals(finalManifestSnapshot.bytes) ||
+      identity(manifestSnapshot.stat) !== identity(finalManifestSnapshot.stat)) {
+    throw new Error("review-package-manifest-changed-during-inventory");
+  }
 
   const rootAfter = await statPath(packageDir, "root-directory");
   if (identity(rootBefore) !== identity(rootAfter)) {
@@ -167,6 +178,14 @@ export function sameBuildingReviewPackageSnapshot(left, right) {
   return Boolean(left && right && left.snapshotToken === right.snapshotToken);
 }
 
+export function sameBuildingReviewPackageControlFile(left, right) {
+  return Boolean(left && right &&
+    Buffer.isBuffer(left.bytes) && Buffer.isBuffer(right.bytes) &&
+    left.bytes.equals(right.bytes) &&
+    left.stat && right.stat &&
+    identity(left.stat) === identity(right.stat));
+}
+
 
 /**
  * Reads a root-level detached signature control file with the same descriptor-
@@ -182,5 +201,8 @@ export async function readBuildingReviewPackageControlFile(directoryArg, filenam
   const packageDir = path.resolve(directoryArg);
   const root = await statPath(packageDir, "root-directory");
   if (!root.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
-  return readStableRegularFile(path.join(packageDir, filename), filename);
+  const result = await readStableRegularFile(path.join(packageDir, filename), filename);
+  if (result.bytes.length === 0) throw new Error("review-package-signature-envelope-empty");
+  if (result.bytes.length > 64 * 1024) throw new Error("review-package-signature-envelope-exceeds-64-KiB");
+  return result;
 }

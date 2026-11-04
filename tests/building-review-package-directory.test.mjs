@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import {
   readBuildingReviewPackageDirectory,
+  readBuildingReviewPackageControlFile,
+  sameBuildingReviewPackageControlFile,
   sameBuildingReviewPackageSnapshot,
 } from "../src/core/building-generation/building-review-package-directory.mjs";
 
@@ -122,4 +124,38 @@ test("control-file reader refuses arbitrary names and paths", async (t) => {
   const { packageDir } = await tempPackage(t);
   const { readBuildingReviewPackageControlFile } = await import("../src/core/building-generation/building-review-package-directory.mjs");
   await assert.rejects(readBuildingReviewPackageControlFile(packageDir, "../outside"), /Only the detached signature/);
+});
+
+
+test("stable control-file comparison binds bytes and the full file identity", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  const signatureBytes = Buffer.from(JSON.stringify({ schemaVersion: "2.0.0" }));
+  await writeFile(signaturePath, signatureBytes);
+  const first = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  const second = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  assert.equal(sameBuildingReviewPackageControlFile(first, second), true);
+  assert.equal(sameBuildingReviewPackageControlFile(first, { ...second, bytes: Buffer.from("{}") }), false);
+  assert.equal(sameBuildingReviewPackageControlFile(first, {
+    ...second,
+    stat: { ...second.stat, ctimeNs: second.stat.ctimeNs + 1n },
+  }), false);
+  assert.equal(sameBuildingReviewPackageControlFile(first, {
+    ...second,
+    stat: { ...second.stat, mode: second.stat.mode ^ 0o100n },
+  }), false);
+});
+
+test("rejects oversized signature control files and arbitrary control-file names", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  await writeFile(signaturePath, Buffer.alloc(64 * 1024 + 1, 0x20));
+  await assert.rejects(
+    readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+    /exceeds-64-KiB/,
+  );
+  await assert.rejects(
+    readBuildingReviewPackageControlFile(packageDir, "package-manifest.json"),
+    /Only the detached signature/,
+  );
 });

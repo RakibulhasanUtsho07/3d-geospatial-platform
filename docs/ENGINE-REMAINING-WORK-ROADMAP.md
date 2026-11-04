@@ -513,3 +513,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Combined verification re-inventories after signature verification and requires both package snapshot token and exact signature bytes/file identity to remain unchanged.
 - Added focused control-file stable-read and symlink/path rejection tests; CI and documentation updated.
 - **Validation pending:** focused tests, lint, production build and exact-head Push/PR Full CI. This is mutation detection during verification, not an OS-level lock or evidence of survey truth/reviewer authority. All release gates remain false.
+
+
+## 2026-11-04 — D3M-ENGINE-12 stable signature verification hardening
+
+- Re-audit found two gaps in the initial implementation: (1) package-manifest bytes were read before the artifact walk but not reread afterward; (2) combined verification only compared signature bytes and device/inode, not full stat identity, and its final inventory/signature reads ran concurrently.
+- The inventory reader now rereads the manifest after artifact traversal and requires exact bytes plus full descriptor/path identity to remain unchanged. File identity includes device, inode, size, mtime, ctime and mode.
+- The detached signature control file is restricted to 64 KiB and is read with the shared no-follow descriptor reader.
+- Combined verification now serially takes two post-crypto package inventories and two post-crypto signature reads. Both package snapshots must match the initially integrity-verified snapshot; signature bytes and full file identity must match on every observation.
+- Added full synthetic package materialization + v2 Ed25519 registry signature + combined CLI success test, followed by artifact tampering rejection. Added signature-file identity/mode/size tests and size-limit/path rejection tests. Fake fixture image headers now expose deterministic dimensions to the same filesystem inventory parser.
+- **Validation pending:** focused exact-head tests, ESLint, production build and Push/PR Full CI. This detects observed changes during the verifier window but is not an OS-level lock; reverify after transfer and keep the directory under controlled write access.

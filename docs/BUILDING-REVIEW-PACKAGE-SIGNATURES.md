@@ -74,3 +74,10 @@ The standalone integrity verifier, combined verifier and signer now share the fi
 The combined verifier reads `package-manifest.sig.json` using the same descriptor-pinned, no-follow stable-file reader as package artifacts. After cryptographic verification it inventories the package again and requires the manifest/artifact snapshot token to remain unchanged. It also rereads the detached envelope and requires the exact bytes and file identity to remain unchanged.
 
 This detects package or signature mutation during verification; it is not a filesystem lock and cannot prevent later writes. Re-run verification after transfer and store review packages under controlled write access.
+
+
+### Verification-time stable snapshot (D3M-ENGINE-12 hardening)
+
+The combined verifier now reads the detached signature through the no-follow stable-file reader, with a 64 KiB envelope limit. The review-package manifest is also reread after artifact enumeration so its exact bytes and descriptor identity must remain unchanged across the inventory.
+
+After cryptographic verification, the verifier serially takes two additional package inventories and rereads the signature envelope after each. It requires both package snapshot tokens to match the originally verified inventory and requires the detached signature bytes plus full file identity (device, inode, size, modification/change timestamps and mode) to remain identical across reads. This detects observed mutation during verification; it is not an OS-level lock and cannot prevent writes after the final read. Rerun verification after transfer or archive extraction.

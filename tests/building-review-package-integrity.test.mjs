@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { generateKeyPairSync } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
@@ -10,11 +15,36 @@ import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-re
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
+import { signBuildingReviewPackageManifestWithTrustedRegistry } from "../src/core/building-generation/building-review-package-signature.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const semanticDigest = (value) => hash(Buffer.from(JSON.stringify(value)));
 const JSON_BYTES = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
 const EARTH_RADIUS_M = 6378137;
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SIGNED_VERIFY_CLI = path.join(REPO_ROOT, "scripts/verify-signed-building-review-package.mjs");
+const REVIEWER_REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
+
+function fakePng(width, height, label) {
+  const suffix = Buffer.from(label);
+  const bytes = Buffer.alloc(24 + suffix.length);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(bytes, 0);
+  bytes.writeUInt32BE(width, 16);
+  bytes.writeUInt32BE(height, 20);
+  suffix.copy(bytes, 24);
+  return bytes;
+}
+
+function fakeJpeg(width, height, label) {
+  const suffix = Buffer.from(label);
+  const bytes = Buffer.alloc(24 + suffix.length);
+  bytes[0] = 0xff; bytes[1] = 0xd8; bytes[2] = 0xff; bytes[3] = 0xc0;
+  bytes.writeUInt16BE(17, 4);
+  bytes.writeUInt16BE(height, 7);
+  bytes.writeUInt16BE(width, 9);
+  suffix.copy(bytes, 24);
+  return bytes;
+}
 
 function makeAccuracyEvidence(candidateHash, geometryQa) {
   const dimensions = geometryQa.bounds.dimensions;
@@ -68,7 +98,7 @@ async function createFixture() {
   const renderBuffers = new Map();
   const views = REQUIRED_REVIEW_VIEWS.map((id) => {
     const filename = id + ".png";
-    const bytes = Buffer.from("fake-render-payload:" + id);
+    const bytes = fakePng(512, 512, "fake-render-payload:" + id);
     renderBuffers.set(id, { filename, bytes, sha256: hash(bytes), width: 512, height: 512 });
     return {
       id, filename, width: 512, height: 512, bytes: bytes.length,
@@ -95,7 +125,7 @@ async function createFixture() {
   const referenceImages = REQUIRED_REVIEW_VIEWS.map((viewId) => {
     const id = "reference-" + viewId;
     const filename = id + ".jpg";
-    const bytes = Buffer.from("fake-reference-payload:" + viewId);
+    const bytes = fakeJpeg(512, 512, "fake-reference-payload:" + viewId);
     const reference = {
       id, filename, sha256: hash(bytes), width: 512, height: 512, bytes: bytes.length,
       sourceDescription: "Independently supplied test reference for " + viewId,
@@ -325,4 +355,82 @@ test("rejects a partial single-image evidence group when the signed package meta
   });
   assert.equal(report.valid, false);
   assert.ok(report.errors.some((item) => item.id === "single-image-evidence-group-absent-or-complete"));
+});
+
+
+test("combined verifier accepts a fully materialized signed package and rejects later artifact tampering", async (t) => {
+  const { packageManifest, actualFiles } = await createFixture();
+  const parent = await mkdtemp(path.join(os.tmpdir(), "d3m12-combined-verifier-"));
+  const packageDir = path.join(parent, "review-package");
+  await mkdir(packageDir, { recursive: true });
+  t.after(() => rm(parent, { recursive: true, force: true }));
+
+  for (const file of actualFiles) {
+    const destination = path.join(packageDir, file.relativePath);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, file.content, { flag: "wx" });
+  }
+  const manifestBytes = JSON_BYTES(packageManifest);
+  await writeFile(path.join(packageDir, "package-manifest.json"), manifestBytes, { flag: "wx" });
+
+  const pair = generateKeyPairSync("ed25519");
+  const privateKeyPem = pair.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const publicKeyPem = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const now = Date.now();
+  const iso = (offset) => new Date(now + offset).toISOString();
+  const trustedRegistry = {
+    schemaVersion: "1.0.0",
+    recordType: "reconstruction-trusted-reviewer-key-registry",
+    registryId: "combined-verifier-test-registry",
+    issuedAtUtc: iso(-60_000),
+    expiresAtUtc: iso(86_400_000),
+    entries: [{
+      reviewerId: "combined-verifier-reviewer",
+      keyId: "combined-verifier-key",
+      status: "active",
+      publicKeyPem,
+      validFromUtc: iso(-60_000),
+      validUntilUtc: iso(86_400_000),
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  };
+  const registryJson = JSON.stringify(trustedRegistry);
+  const envelope = signBuildingReviewPackageManifestWithTrustedRegistry({
+    manifestBytes,
+    privateKeyPem,
+    reviewerId: "combined-verifier-reviewer",
+    trustedReviewerRegistry: trustedRegistry,
+    signedAt: iso(0),
+  });
+  await writeFile(
+    path.join(packageDir, "package-manifest.sig.json"),
+    JSON.stringify(envelope, null, 2) + "\\n",
+    { flag: "wx", mode: 0o600 },
+  );
+
+  const runVerifier = () => spawnSync(process.execPath, [SIGNED_VERIFY_CLI, packageDir], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+    timeout: 120_000,
+    env: { ...process.env, NODE_ENV: "production", [REVIEWER_REGISTRY_ENV]: registryJson },
+  });
+  const intact = runVerifier();
+  assert.equal(intact.status, 0, intact.stderr);
+  const intactSummary = JSON.parse(intact.stdout);
+  assert.equal(intactSummary.status, "verified");
+  assert.equal(intactSummary.valid, true);
+  assert.equal(intactSummary.packageIntegrity, "verified");
+  assert.equal(intactSummary.signature, "signature-verified");
+  assert.equal(intactSummary.publicationEligible, false);
+  assert.equal(intactSummary.mapReady, false);
+
+  const candidateImage = path.join(packageDir, "renders", "front.png");
+  await writeFile(candidateImage, Buffer.from("tampered"), { flag: "a" });
+  const tampered = runVerifier();
+  assert.equal(tampered.status, 2, tampered.stderr);
+  const tamperedSummary = JSON.parse(tampered.stdout);
+  assert.equal(tamperedSummary.valid, false);
+  assert.equal(tamperedSummary.signature, "signature-verified");
+  assert.equal(tamperedSummary.packageIntegrity, "tampered-or-invalid");
 });
