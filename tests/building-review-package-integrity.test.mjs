@@ -451,7 +451,10 @@ test("combined verifier accepts a fully materialized signed package and rejects 
 
   const candidateImage = path.join(packageDir, "renders", "front.png");
   await writeFile(candidateImage, Buffer.from("tampered"), { flag: "a" });
-  const tampered = runVerifier();
+  const tampered = runVerifier(
+    ["--legacy-public-key", legacyPublicKeyPath],
+    { ...process.env, NODE_ENV: "production" },
+  );
   assert.equal(tampered.status, 2, tampered.stderr);
   const tamperedSummary = JSON.parse(tampered.stdout);
   assert.equal(tamperedSummary.valid, false);
