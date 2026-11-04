@@ -95,8 +95,10 @@ async function main() {
   }
   const record = JSON.parse(recordBytes.toString("utf8"));
   if (!record || record.jobId !== jobId || record.buildingId !== job.buildingId ||
-      record.reviewId !== job.review.reviewId || record.decision !== "approved") {
-    throw new Error("Approved review record identity does not match the generation job.");
+      record.reviewId !== job.review.reviewId || record.decision !== "approved" ||
+      record.candidate?.modelPath !== job.result?.modelPath ||
+      record.candidate?.reportPath !== job.result?.reportPath) {
+    throw new Error("Approved review record identity/candidate paths do not match the generation job.");
   }
 
   const candidateBytes = await readWorkspaceFile(workspaceRoot, record.candidate?.modelPath ?? job.result?.modelPath, "Reviewed candidate GLB", 512 * 1024 * 1024);
