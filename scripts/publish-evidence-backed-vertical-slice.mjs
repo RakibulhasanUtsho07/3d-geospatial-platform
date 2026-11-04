@@ -6,7 +6,8 @@ import { publishEvidenceBackedVerticalSlice } from "../src/core/building-generat
 const args = process.argv.slice(2);
 if (args.includes("--help") || args.length !== 1) {
   console.log("Usage: node scripts/publish-evidence-backed-vertical-slice.mjs <publication-config.json>");
-  console.log("The config must provide workspaceRoot, reportPath, attestationPath and publicRoot.");
+  console.log("The config must provide workspaceRoot, reportPath, attestationPath, reviewReceiptPath and publicRoot.");
+  console.log("Set RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON in the runtime environment; never put keys in the config.");
   process.exit(args.includes("--help") ? 0 : 2);
 }
 
@@ -25,6 +26,8 @@ console.log(JSON.stringify({
   sha256: result.sha256,
   parentReportSha256: result.parentReportSha256,
   sourceSetSha256: result.sourceSetSha256,
+  signedReviewPayloadSha256: result.signedReviewPayloadSha256,
+  reviewerAuthentication: result.reviewerAuthentication,
   mapReady: false,
   publicationEligible: false,
   note: result.note,
