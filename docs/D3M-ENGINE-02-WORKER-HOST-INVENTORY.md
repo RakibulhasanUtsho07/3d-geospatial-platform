@@ -4,7 +4,7 @@
 
 ## Why this task exists
 
-D3M-04/05/07 already provide a bounded single-image readiness probe, a hash-bound one-image runtime smoke, and an independent smoke verifier. They do not produce a consolidated host snapshot with CPU/RAM/GPU, Python/package versions, ONNX providers, a runner source hash and exact local TripoSR/rembg cache states. Operators otherwise need to assemble these facts manually, increasing the risk of mismatched Python environments or incomplete evidence.
+D3M-04/05/07 already provide a bounded single-image readiness probe, a hash-bound one-image runtime smoke, and an independent smoke verifier. D3M-ENGINE-02 adds a consolidated host snapshot with CPU/RAM/GPU, Python/package versions, ONNX providers, runner source hash and exact local TripoSR/rembg cache states. D3M-ENGINE-04 extends that inventory with SHA-256 fingerprints of the actual TripoSR config/checkpoint and active rembg weight bytes. Operators otherwise need to assemble these facts manually, increasing the risk of mismatched Python environments or incomplete evidence.
 
 This inventory is a preflight aid. It does not replace the D3M-04 readiness gate or D3M-05 real inference smoke.
 
@@ -31,9 +31,10 @@ node scripts/collect-generation-worker-host-inventory.mjs --help
 - Installed Torch, ONNX Runtime, rembg, Hugging Face Hub and Transformers package versions when available.
 - CUDA availability/runtime and visible GPU names, total VRAM and compute capability; ROCm version; Apple MPS availability; ONNX execution providers.
 - TripoSR runner regular-file status, byte length and SHA-256; the Python probe checks that the bytes it syntax-compiles still match that Node-side fingerprint.
-- TripoSR `config.yaml` and `model.ckpt` cache byte lengths and their shared Hugging Face snapshot revision (40-character commit); the file paths are never returned.
-- rembg default model ID and cached weight byte length from the session class' read-only resolver.
-- D3M-04 strategy readiness and cache statuses; missing cache identity or mismatched TripoSR snapshot revisions fail closed.
+- TripoSR `config.yaml` and `model.ckpt` cache byte lengths, SHA-256 fingerprints and their shared Hugging Face snapshot revision (40-character commit); the file paths are never returned.
+- rembg default model ID, cached weight byte length and SHA-256 fingerprint from the session class' read-only resolver.
+- Model files are hashed as regular files in 8 MiB chunks. File identity, size, modification time and change time are checked before and after the read; a concurrent replacement/change yields an unknown fingerprint and blocks readiness.
+- D3M-04 strategy readiness and cache statuses; missing cache identity, malformed hashes, invalid byte lengths or mismatched TripoSR snapshot revisions fail closed.
 
 The report deliberately excludes hostname, username, executable/runner/cache paths, environment values, credentials and raw stdout/stderr. It stores no model weights and performs no model inference.
 
@@ -41,9 +42,10 @@ The report deliberately excludes hostname, username, executable/runner/cache pat
 
 - The tool invokes the authoritative D3M-04 capability probe for only `single-image-ai`; it does not execute unrelated COLMAP readiness checks.
 - Imports of PyTorch, ONNX Runtime and rembg execute installed package initialization and can have package-specific side effects. The process sets Hugging Face offline/telemetry flags, but this is not a kernel network firewall, an OS sandbox or a hermetic no-write guarantee.
-- A `ready-for-operator-smoke` result means only that this snapshot observed the configured runtime/device and both caches as ready. It does not show that the TripoSR process can complete, that model-weight licensing is approved, or that the resulting GLB is architecturally accurate.
+- A `ready-for-operator-smoke` result means only that this snapshot observed the configured runtime/device, both caches and their exact file fingerprints as ready. It does not show that the TripoSR process can complete, that model-weight licensing is approved, or that the resulting GLB is architecturally accurate.
+- Fingerprints establish the bytes observed during this inventory run. They do not prove that inference consumed only those bytes or that a model is authentic, licensed, performant or accurate. Hashing adds I/O and CPU time proportional to model-file size; it uses bounded memory rather than loading whole model weights.
 - Model and checkpoint licences remain separate operator/legal gates. Review the exact TripoSR code/checkpoint and active rembg weight terms before smoke execution.
-- The runner SHA-256 binds the script file bytes. The TripoSR snapshot revision identifies the cached config/checkpoint revision but is not a byte hash of the weight file; the rembg entry records model ID and byte length but not a weight-file hash. Record the actual repository revision, model identifiers and licence basis separately in the D3M-05 evidence log.
+- The runner SHA-256 binds the script file bytes. The config/checkpoint/rembg SHA-256 values bind the exact file bytes observed by the inventory; the TripoSR snapshot revision separately identifies the upstream cache revision. D3M-05 captures a pre-inference and post-inference inventory and fails if the runner/model fingerprints differ. This stability check does not prove which bytes a process actually opened, and it is not a substitute for signed provenance or model licence review.
 - A fresh D3M-05 smoke must still use fresh job/source IDs, an already-stored rights-cleared JPEG/PNG image, four independent operator confirmations, cached weights and the independent smoke verifier.
 
 ## Operator evidence sequence
