@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -34,7 +34,7 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "        with open(file_value, 'rb') as handle: return handle.read()",
     "    return file_value.read()",
     "",
-  ].join("\n");
+  ].join("\n"));
   await writeFile(path.join(root, "omegaconf.py"), [
     "class OmegaConf:",
     "    @staticmethod",
