@@ -3,11 +3,13 @@ import { lstat, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
+import { canonicalJson } from "./generation-artifact-receipt.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
-const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
-const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
-const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -201,9 +203,171 @@ function parseGlb(bytes) {
   return { meshCount: json.meshes.length };
 }
 
+function exactKeys(value, expected, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...expected].sort())) {
+    throw new TypeError(label + " has an invalid field set.");
+  }
+}
+
+async function verifyGenerationArtifactReceipt({
+  root,
+  jobId,
+  report,
+  sourceBytes,
+  sourceHash,
+  modelBytes,
+  modelHash,
+  glb,
+  independentQa,
+}) {
+  const pointer = report.generationArtifactReceipt;
+  exactKeys(pointer, ["bytes", "path", "payloadSha256", "schemaVersion", "sha256"], "Generation artifact receipt reference");
+  const relativePath = safeRelativePath(pointer.path, "Generation artifact receipt path");
+  const expectedReceiptPath = ".building-engine/runtime-smokes/" + jobId + ".artifact.json";
+  if (pointer.schemaVersion !== "1.0.0" || relativePath !== expectedReceiptPath ||
+      !Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0 || pointer.bytes > 256 * 1024 ||
+      !HASH.test(pointer.sha256 ?? "") || !HASH.test(pointer.payloadSha256 ?? "")) {
+    throw new TypeError("Generation artifact receipt reference is invalid or does not match this smoke job.");
+  }
+  const receiptFile = path.join(root, ...relativePath.split("/"));
+  const receiptEntry = await lstat(receiptFile);
+  if (receiptEntry.isSymbolicLink() || !receiptEntry.isFile()) {
+    throw new TypeError("Generation artifact receipt must be a regular non-symlink file.");
+  }
+  if (process.platform !== "win32" && (receiptEntry.mode & 0o077) !== 0) {
+    throw new TypeError("Generation artifact receipt permissions are not private.");
+  }
+  const receiptBytes = await readRegularWorkspaceFile(root, relativePath, "Generation artifact receipt", 256 * 1024);
+  if (receiptBytes.length !== pointer.bytes || sha256(receiptBytes) !== pointer.sha256) {
+    throw new Error("Generation artifact receipt byte count or SHA-256 does not match its report reference.");
+  }
+  const envelope = JSON.parse(receiptBytes.toString("utf8"));
+  exactKeys(envelope, ["payload", "payloadSha256", "schemaVersion"], "Generation artifact receipt envelope");
+  if (envelope.schemaVersion !== "1.0.0" || !HASH.test(envelope.payloadSha256 ?? "") ||
+      envelope.payloadSha256 !== pointer.payloadSha256 ||
+      sha256(Buffer.from(canonicalJson(envelope.payload), "utf8")) !== envelope.payloadSha256 ||
+      !receiptBytes.equals(Buffer.from(JSON.stringify(envelope, null, 2) + "\n", "utf8"))) {
+    throw new TypeError("Generation artifact receipt envelope is non-canonical or its payload digest is invalid.");
+  }
+
+  const payload = envelope.payload;
+  exactKeys(payload, [
+    "buildingId", "geometryQa", "jobId", "kind", "modelLoadEvidence",
+    "output", "schemaVersion", "source", "workerHost", "workflowReport",
+  ], "Generation artifact receipt payload");
+  if (payload.schemaVersion !== "1.0.0" ||
+      payload.kind !== "single-image-generation-artifact" ||
+      payload.jobId !== jobId || payload.buildingId !== report.buildingId) {
+    throw new TypeError("Generation artifact receipt payload identity is invalid.");
+  }
+
+  const expectedWorkflowPath = ".building-engine/jobs/" + report.buildingId + "/" + jobId + "-workflow/workflow-report.json";
+  exactKeys(payload.workflowReport, ["bytes", "mode", "path", "sha256", "status"], "Generation workflow report binding");
+  if (payload.workflowReport.path !== expectedWorkflowPath ||
+      !Number.isSafeInteger(payload.workflowReport.bytes) || payload.workflowReport.bytes <= 0 ||
+      payload.workflowReport.bytes > 1024 * 1024 || !HASH.test(payload.workflowReport.sha256 ?? "") ||
+      payload.workflowReport.status !== "completed-requires-review" ||
+      payload.workflowReport.mode !== "single-image-ai") {
+    throw new TypeError("Generation artifact receipt workflow-report binding is invalid.");
+  }
+  const workflowBytes = await readRegularWorkspaceFile(
+    root,
+    expectedWorkflowPath,
+    "Media-to-model generation workflow report",
+    1024 * 1024,
+  );
+  if (workflowBytes.length !== payload.workflowReport.bytes ||
+      sha256(workflowBytes) !== payload.workflowReport.sha256) {
+    throw new Error("On-disk generation workflow report byte count or SHA-256 does not match the artifact receipt.");
+  }
+  const workflowReport = JSON.parse(workflowBytes.toString("utf8"));
+  const selectedViews = workflowReport.inputs?.selectedViewIds;
+  const mediaRecord = workflowReport.inputs?.mediaRecords?.find((item) => item.id === report.source.sourceId);
+  if (workflowReport.jobId !== jobId || workflowReport.buildingId !== report.buildingId ||
+      workflowReport.status !== "completed-requires-review" || workflowReport.mode !== "single-image-ai" ||
+      workflowReport.mapReady !== false || workflowReport.publicationEligible !== false ||
+      !Array.isArray(selectedViews) || selectedViews.length !== 1 || selectedViews[0] !== report.source.sourceId ||
+      !mediaRecord || mediaRecord.sha256 !== sourceHash || mediaRecord.mimeType !== report.source.mimeType ||
+      mediaRecord.usageStatus !== "approved" ||
+      workflowReport.output?.modelPath !== report.output.relativePath ||
+      workflowReport.output?.modelBytes !== modelBytes.length ||
+      workflowReport.output?.modelSha256 !== modelHash ||
+      workflowReport.modelReport?.source?.sha256 !== sourceHash ||
+      workflowReport.modelReport?.outputs?.glb?.sha256 !== modelHash ||
+      workflowReport.modelReport?.outputs?.glb?.bytes !== modelBytes.length ||
+      workflowReport.modelReport?.mapReady !== false ||
+      workflowReport.modelReport?.publicationEligible !== false) {
+    throw new TypeError("On-disk generation workflow report does not bind this exact source and GLB candidate.");
+  }
+
+  exactKeys(payload.source, ["bytes", "loaderEvidence", "mimeType", "sha256", "sourceId"], "Generation receipt source binding");
+  exactKeys(payload.workerHost, ["after", "before", "inventorySchemaVersion", "stableAcrossInference"], "Generation receipt worker binding");
+  exactKeys(payload.output, ["bytes", "format", "meshCount", "path", "sha256"], "Generation receipt GLB binding");
+  exactKeys(payload.geometryQa, [
+    "counts", "engine", "schemaVersion", "sourceStatus", "status", "valid", "warningCount", "warnings",
+  ], "Generation receipt geometry QA binding");
+  const expectedPayload = {
+    schemaVersion: "1.0.0",
+    kind: "single-image-generation-artifact",
+    buildingId: report.buildingId,
+    jobId,
+    workflowReport: {
+      path: expectedWorkflowPath,
+      bytes: workflowBytes.length,
+      sha256: sha256(workflowBytes),
+      status: workflowReport.status,
+      mode: workflowReport.mode,
+    },
+    source: {
+      sourceId: report.source.sourceId,
+      mimeType: sourceBytes.length ? report.source.mimeType : null,
+      bytes: sourceBytes.length,
+      sha256: sourceHash,
+      loaderEvidence: report.sourceLoadEvidence,
+    },
+    workerHost: {
+      inventorySchemaVersion: report.workerHost.inventorySchemaVersion,
+      stableAcrossInference: report.workerHost.stableAcrossInference,
+      before: report.workerHost.before,
+      after: report.workerHost.after,
+    },
+    modelLoadEvidence: report.modelLoadEvidence,
+    output: {
+      path: report.output.relativePath,
+      format: "glb",
+      bytes: modelBytes.length,
+      sha256: modelHash,
+      meshCount: glb.meshCount,
+    },
+    geometryQa: {
+      schemaVersion: "1.0.0",
+      engine: independentQa.engine,
+      valid: independentQa.valid,
+      sourceStatus: independentQa.status,
+      status: report.geometryQa.status,
+      warningCount: report.geometryQa.warningCount,
+      warnings: report.geometryQa.warnings,
+      counts: report.geometryQa.counts,
+    },
+  };
+  if (canonicalJson(payload) !== canonicalJson(expectedPayload)) {
+    throw new TypeError("Generation artifact receipt is not fully bound to the source, worker, GLB and independent geometry-QA evidence.");
+  }
+  return {
+    verified: true,
+    schemaVersion: pointer.schemaVersion,
+    path: relativePath,
+    bytes: receiptBytes.length,
+    sha256: pointer.sha256,
+    payloadSha256: pointer.payloadSha256,
+    workflowReportSha256: payload.workflowReport.sha256,
+  };
+}
+
 /**
- * Independently re-checks the on-disk source and GLB hashes recorded by a successful
- * runtime smoke report. It never changes the report or publication/release flags.
+ * Independently re-checks the on-disk source, generation report, receipt and GLB hashes.
+ * It never changes the report or publication/release flags.
  */
 export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   safeId(jobId, "jobId");
@@ -226,6 +390,7 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
         PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
       ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
@@ -237,12 +402,18 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasProcessLoadEvidence = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
-  const hasSourceImageLoadEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasSourceImageLoadEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
+  const hasGenerationArtifactReceipt = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
   if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
   if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
   if (hasSourceImageLoadEvidence) validateSourceImageLoadEvidence(report);
@@ -362,6 +533,11 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       reportedQa.status !== expectedQaStatus) {
     throw new Error("Smoke GLB byte/hash/geometry-QA evidence does not match an independent disk analysis.");
   }
+  const generationArtifactReceipt = hasGenerationArtifactReceipt
+    ? await verifyGenerationArtifactReceipt({
+      root, jobId, report, sourceBytes, sourceHash, modelBytes, modelHash, glb, independentQa,
+    })
+    : null;
 
   return {
     verified: true,
@@ -390,6 +566,9 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       ? "verified-against-worker-preflight" : "not-recorded-legacy-schema",
     sourceImageLoadEvidenceStatus: hasSourceImageLoadEvidence
       ? "verified-against-source-manifest" : "not-recorded-legacy-schema",
+    generationArtifactReceiptStatus: hasGenerationArtifactReceipt
+      ? "verified" : "not-recorded-legacy-schema",
+    ...(generationArtifactReceipt ? { generationArtifactReceipt } : {}),
     ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
     ...(hasProcessLoadEvidence ? { modelLoadEvidence: report.modelLoadEvidence } : {}),
     ...(hasSourceImageLoadEvidence ? { sourceLoadEvidence: report.sourceLoadEvidence } : {}),
