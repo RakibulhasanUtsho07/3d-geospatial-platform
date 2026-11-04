@@ -414,3 +414,14 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Updated the D3M-02 runbook with receipt format, signing and upload procedure, error statuses and trust boundaries. No reviewer has been production-onboarded by this code change: the deployment operator must still provision a real versioned registry and establish reviewer identity/authority separately.
 - **Validation pending:** focused `test:publish-approved-generation-job`, ESLint, production build and exact-head PR/Push CI must pass on the final source head. No merge to `main` is authorized until those checks and review are complete.
 
+
+## 2026-11-04 — D3M-ENGINE-04 exact worker model-artifact provenance
+
+- Tracking issue [#352](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/352); implementation is stacked on D3M-ENGINE-03 PR #351, not based directly on main.
+- Verified gap: D3M-ENGINE-02 recorded cached model byte lengths and TripoSR snapshot revision, but not SHA-256 of the actual TripoSR config/checkpoint or rembg weight bytes. D3M-05 did not bind model cache identity across the inference window.
+- Added worker inventory schema 1.1.0 with streaming 8 MiB SHA-256 and file identity/size/mtime/ctime checks for TripoSR config, checkpoint and active rembg weight. Missing/malformed/unstable file fingerprints fail closed; cache paths and model bytes are never written to evidence.
+- Added D3M-05 smoke schema 1.1.0 with redacted pre/post worker-host fingerprints; the smoke requires stable runner and model hashes across the workflow. Independent verifier checks schema, digest formats, byte lengths, TripoSR snapshot consistency and pre/post equality. Legacy 1.0.0 reports remain verifiable but are labelled as not containing model fingerprint evidence.
+- Added tests for generated Python probe syntax, actual chunked file hashing, malformed/missing fingerprints, before/after drift, pre-inference block and verifier tampering. Exact-head CI has not yet been run on this feature branch.
+- Hashing adds I/O proportional to model-file sizes; inventory timeout is configurable and bounded at 180 seconds. This evidence is byte identity only; it does not prove which bytes a model process opened, model authenticity/licence, successful inference or accuracy.
+- Current branch: `feat/d3m-engine04-model-artifact-provenance-20261104`; issue #352. Require exact-head Full CI and review before calling the software slice complete.
+- Real worker inference, rights decisions, independent surveyed truth, production reviewer provisioning, WGS84/vertical datum and Cesium candidate inspection remain external gates. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false.

@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilities.mjs";
 
-export const GENERATION_WORKER_HOST_INVENTORY_SCHEMA_VERSION = "1.0.0";
+export const GENERATION_WORKER_HOST_INVENTORY_SCHEMA_VERSION = "1.1.0";
 const SAFE_DEVICE = /^(cpu|mps|cuda:\d+)$/;
 const SAFE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const OFFLINE_ENV = Object.freeze({
@@ -76,7 +76,7 @@ function summarizeCapabilityState(capabilities, checkedAt) {
 
 export function buildPythonInventoryProgram() {
   return [
-    "import hashlib, importlib.metadata, inspect, json, os, platform, re, sys",
+    "import hashlib, importlib.metadata, inspect, json, os, platform, re, stat, sys",
     "out = {",
     "  'pythonVersion': platform.python_version(),",
     "  'pythonImplementation': platform.python_implementation(),",
@@ -85,7 +85,7 @@ export function buildPythonInventoryProgram() {
     "  'accelerators': {'cudaAvailable': False, 'cudaRuntime': None, 'hipRuntime': None, 'cudaDevices': [], 'mpsAvailable': False},",
     "  'onnxProviders': [],",
     "  'rembgDefaultModel': None,",
-    "  'modelArtifacts': {'tripoConfig': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'tripoCheckpoint': {'status': 'unknown', 'bytes': None, 'snapshotRevision': None}, 'rembgWeights': {'status': 'unknown', 'bytes': None}},",
+    "  'modelArtifacts': {'tripoConfig': {'status': 'unknown', 'bytes': None, 'sha256': None, 'snapshotRevision': None}, 'tripoCheckpoint': {'status': 'unknown', 'bytes': None, 'sha256': None, 'snapshotRevision': None}, 'rembgWeights': {'status': 'unknown', 'bytes': None, 'sha256': None}},",
     "  'runnerSyntaxCompiled': False,",
     "  'runnerSha256Matches': False,",
     "  'probeErrors': [],",
@@ -94,12 +94,32 @@ export function buildPythonInventoryProgram() {
     "  try: out['packages'][package] = importlib.metadata.version(package)",
     "  except Exception: out['packages'][package] = None",
     "def file_summary(file_path, include_revision=False):",
-    "  if not isinstance(file_path, str) or not os.path.isfile(file_path) or os.path.getsize(file_path) <= 0: return {'status': 'missing', 'bytes': None, 'snapshotRevision': None} if include_revision else {'status': 'missing', 'bytes': None}",
-    "  result = {'status': 'cached', 'bytes': int(os.path.getsize(file_path))}",
-    "  if include_revision:",
-    "    revision = os.path.basename(os.path.dirname(file_path))",
-    "    result['snapshotRevision'] = revision if re.fullmatch(r'[a-f0-9]{40}', revision) else None",
-    "  return result",
+    "  missing = {'status': 'missing', 'bytes': None, 'sha256': None}",
+    "  if include_revision: missing['snapshotRevision'] = None",
+    "  if not isinstance(file_path, str) or not file_path: return dict(missing)",
+    "  try:",
+    "    with open(file_path, 'rb') as handle:",
+    "      before = os.fstat(handle.fileno())",
+    "      if not stat.S_ISREG(before.st_mode) or before.st_size <= 0: return {'status': 'unknown', 'bytes': None, 'sha256': None, **({'snapshotRevision': None} if include_revision else {})}",
+    "      digest = hashlib.sha256()",
+    "      total = 0",
+    "      while True:",
+    "        chunk = handle.read(8 * 1024 * 1024)",
+    "        if not chunk: break",
+    "        digest.update(chunk)",
+    "        total += len(chunk)",
+    "      after = os.fstat(handle.fileno())",
+    "    path_after = os.stat(file_path)",
+    "    signature = lambda item: (item.st_dev, item.st_ino, item.st_size, getattr(item, 'st_mtime_ns', None), getattr(item, 'st_ctime_ns', None))",
+    "    if signature(before) != signature(after) or signature(after) != signature(path_after) or total != after.st_size:",
+    "      return {'status': 'unknown', 'bytes': None, 'sha256': None, **({'snapshotRevision': None} if include_revision else {})}",
+    "    result = {'status': 'cached', 'bytes': total, 'sha256': digest.hexdigest()}",
+    "    if include_revision:",
+    "      revision = os.path.basename(os.path.dirname(file_path))",
+    "      result['snapshotRevision'] = revision if re.fullmatch(r'[a-f0-9]{40}', revision) else None",
+    "    return result",
+    "  except FileNotFoundError: return dict(missing)",
+    "  except Exception: return {'status': 'unknown', 'bytes': None, 'sha256': None, **({'snapshotRevision': None} if include_revision else {})}",
     "try:",
     "  import torch",
     "  out['accelerators']['cudaAvailable'] = bool(torch.cuda.is_available())",
@@ -232,6 +252,8 @@ function parsePythonInventory(result) {
     const parseArtifact = (item, includeRevision = false) => ({
       status: ["cached", "missing", "unknown"].includes(item?.status) ? item.status : "unknown",
       bytes: Number.isSafeInteger(item?.bytes) && item.bytes > 0 ? item.bytes : null,
+      sha256: typeof item?.sha256 === "string" && /^[a-f0-9]{64}$/.test(item.sha256)
+        ? item.sha256 : null,
       ...(includeRevision ? {
         snapshotRevision: typeof item?.snapshotRevision === "string" && /^[a-f0-9]{40}$/.test(item.snapshotRevision)
           ? item.snapshotRevision : null,
@@ -254,12 +276,15 @@ function parsePythonInventory(result) {
     if (modelArtifacts.tripoConfig.bytes === null || modelArtifacts.tripoCheckpoint.bytes === null) {
       probeErrors.push("triposr-cache-artifact-size-invalid");
     }
+    if (modelArtifacts.tripoConfig.sha256 === null) probeErrors.push("triposr-config-artifact-sha256-invalid");
+    if (modelArtifacts.tripoCheckpoint.sha256 === null) probeErrors.push("triposr-checkpoint-artifact-sha256-invalid");
     if (modelArtifacts.rembgWeights.status !== "cached") {
       probeErrors.push("rembg-cache-artifact-identity-incomplete");
     }
     if (modelArtifacts.rembgWeights.bytes === null) {
       probeErrors.push("rembg-cache-artifact-size-invalid");
     }
+    if (modelArtifacts.rembgWeights.sha256 === null) probeErrors.push("rembg-model-artifact-sha256-invalid");
     const coreValid = safeText(data.pythonVersion, 40) !== null &&
       safeText(data.pythonImplementation, 40) !== null &&
       safeText(data.pythonPlatform, 80) !== null &&
@@ -305,9 +330,9 @@ function parsePythonInventory(result) {
       onnxProviders: [],
       rembgDefaultModel: null,
       modelArtifacts: {
-        tripoConfig: { status: "unknown", bytes: null, snapshotRevision: null },
-        tripoCheckpoint: { status: "unknown", bytes: null, snapshotRevision: null },
-        rembgWeights: { status: "unknown", bytes: null },
+        tripoConfig: { status: "unknown", bytes: null, sha256: null, snapshotRevision: null },
+        tripoCheckpoint: { status: "unknown", bytes: null, sha256: null, snapshotRevision: null },
+        rembgWeights: { status: "unknown", bytes: null, sha256: null },
       },
       runnerSyntaxCompiled: false,
       runnerSha256Matches: false,
@@ -328,15 +353,15 @@ export async function collectGenerationWorkerHostInventory({
   runnerScript = env.BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT,
   device = env.BUILDING_ENGINE_DEVICE || "cuda:0",
   now = new Date(),
-  commandTimeoutMs = 15_000,
+  commandTimeoutMs = 180_000,
   spawnSyncImpl = nodeSpawnSync,
   probeCapabilities = probeGenerationWorkerCapabilities,
   host = os,
 } = {}) {
   if (typeof pythonPath !== "string" || !pythonPath.trim()) throw new TypeError("pythonPath is required.");
   if (!SAFE_DEVICE.test(device)) throw new TypeError("device must be cpu, mps or cuda:N.");
-  if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 60_000) {
-    throw new RangeError("commandTimeoutMs must be an integer between 1000 and 60000.");
+  if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 180_000) {
+    throw new RangeError("commandTimeoutMs must be an integer between 1000 and 180000.");
   }
   const checkedAt = validTimestamp(now);
   const runner = await inspectRunner(runnerScript);
@@ -433,9 +458,9 @@ export async function collectGenerationWorkerHostInventory({
       sha256MatchedInProbe: python.runnerSha256Matches,
     },
     modelArtifacts: python.modelArtifacts ?? {
-      tripoConfig: { status: "unknown", bytes: null, snapshotRevision: null },
-      tripoCheckpoint: { status: "unknown", bytes: null, snapshotRevision: null },
-      rembgWeights: { status: "unknown", bytes: null },
+      tripoConfig: { status: "unknown", bytes: null, sha256: null, snapshotRevision: null },
+      tripoCheckpoint: { status: "unknown", bytes: null, sha256: null, snapshotRevision: null },
+      rembgWeights: { status: "unknown", bytes: null, sha256: null },
     },
     modelReadiness: {
       status: capabilities.status,
@@ -449,7 +474,7 @@ export async function collectGenerationWorkerHostInventory({
     caveats: [
       "This inventory is a preflight snapshot, not proof that a real inference process completed.",
       "The configured TripoSR runner is syntax-compiled in memory but is never executed; a successful preflight does not prove runner behavior.",
-      "Model cache state is read-only metadata readiness; model-weight licensing is a separate operator/legal review.",
+      "Model cache readiness includes streaming SHA-256 fingerprints of the configured config/checkpoint/rembg weight bytes; hashing identity does not establish model licence or quality.",
       "The Python probe imports installed packages. Package initialization may have package-specific side effects; offline flags are not an OS firewall or hermetic sandbox.",
       "No hostname, username, absolute path, environment value, credential, raw subprocess output or private cache path is stored in this report.",
     ],

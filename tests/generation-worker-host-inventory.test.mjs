@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -53,9 +54,9 @@ function pythonResult(overrides = {}) {
       onnxProviders: ["CUDAExecutionProvider", "CPUExecutionProvider"],
       rembgDefaultModel: "isnet-general-use",
       modelArtifacts: {
-        tripoConfig: { status: "cached", bytes: 512, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-        tripoCheckpoint: { status: "cached", bytes: 480000000, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-        rembgWeights: { status: "cached", bytes: 176000000 },
+        tripoConfig: { status: "cached", bytes: 512, sha256: "c".repeat(64), snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        tripoCheckpoint: { status: "cached", bytes: 480000000, sha256: "a".repeat(64), snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        rembgWeights: { status: "cached", bytes: 176000000, sha256: "b".repeat(64) },
       },
       runnerSyntaxCompiled: true,
       runnerSha256Matches: true,
@@ -91,12 +92,46 @@ test("generated Python inventory probe has valid syntax and initializes model ar
   assert.ok(source.includes("try_to_load_from_cache('stabilityai/TripoSR'"));
   assert.ok(source.includes("resolve_existing"));
   assert.ok(source.includes("runnerSha256Matches"));
+  assert.ok(source.includes("handle.read(8 * 1024 * 1024)"));
+  assert.ok(source.includes("signature(before) != signature(after)"));
   const result = spawnSync("python3", ["-c", "import ast,sys; ast.parse(sys.stdin.read())"], {
     input: source,
     encoding: "utf8",
     timeout: 5000,
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test("Python inventory hashes exact model bytes in bounded chunks and reports no cache path", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "generation-model-hash-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const revision = "a".repeat(40);
+  const revisionDirectory = path.join(root, revision);
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(revisionDirectory));
+  const artifact = path.join(revisionDirectory, "model.ckpt");
+  const bytes = Buffer.alloc(8 * 1024 * 1024 + 17, 0x5a);
+  await writeFile(artifact, bytes);
+
+  const sourceLines = buildPythonInventoryProgram().split("\n");
+  const start = sourceLines.findIndex((line) => line === "def file_summary(file_path, include_revision=False):");
+  const end = sourceLines.findIndex((line, index) => index > start && line === "try:");
+  assert.ok(start >= 0 && end > start);
+  const harness = [
+    "import hashlib, json, os, re, stat, sys",
+    ...sourceLines.slice(start, end),
+    "print(json.dumps(file_summary(sys.argv[1], include_revision=True), sort_keys=True))",
+  ].join("\n");
+  const result = spawnSync("python3", ["-c", harness, artifact], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const summary = JSON.parse(result.stdout.trim());
+  assert.equal(summary.status, "cached");
+  assert.equal(summary.bytes, bytes.length);
+  assert.equal(summary.sha256, createHash("sha256").update(bytes).digest("hex"));
+  assert.equal(summary.snapshotRevision, revision);
+  assert.equal(JSON.stringify(summary).includes(artifact), false);
 });
 
 test("collects a ready redacted host inventory with runtime, GPU, cache and runner fingerprints", async (t) => {
@@ -125,7 +160,11 @@ test("collects a ready redacted host inventory with runtime, GPU, cache and runn
   assert.equal(report.modelReadiness.backgroundRemovalModel, "isnet-general-use");
   assert.equal(report.modelArtifacts.tripoCheckpoint.snapshotRevision, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   assert.equal(report.modelArtifacts.tripoCheckpoint.bytes, 480000000);
+  assert.match(report.modelArtifacts.tripoConfig.sha256, /^[a-f0-9]{64}$/);
+  assert.match(report.modelArtifacts.tripoCheckpoint.sha256, /^[a-f0-9]{64}$/);
+  assert.match(report.modelArtifacts.rembgWeights.sha256, /^[a-f0-9]{64}$/);
   assert.equal(report.modelArtifacts.rembgWeights.status, "cached");
+  assert.equal(report.schemaVersion, "1.1.0");
   assert.deepEqual(capabilityArgs.strategies, ["single-image-ai"]);
   assert.equal(spawn[1][0], "-c");
   assert.equal(spawn[1][3], report.runner.sha256);
@@ -250,6 +289,30 @@ test("blocks cached model artifacts with missing or invalid byte lengths", async
   assert.equal(report.modelArtifacts.rembgWeights.bytes, null);
 });
 
+test("blocks cached model artifacts when any exact-byte SHA-256 is absent or malformed", async (t) => {
+  const { runner } = await runnerFixture(t);
+  const inventory = JSON.parse(pythonResult().stdout);
+  inventory.modelArtifacts.tripoConfig.sha256 = "not-a-sha";
+  inventory.modelArtifacts.tripoCheckpoint.sha256 = null;
+  inventory.modelArtifacts.rembgWeights.sha256 = undefined;
+  const report = await collectGenerationWorkerHostInventory({
+    pythonPath: "python-fixture",
+    runnerScript: runner,
+    device: "cpu",
+    now: NOW,
+    spawnSyncImpl: () => ({ status: 0, stdout: JSON.stringify(inventory) }),
+    probeCapabilities: async () => capabilities(),
+    host: fakeHost(),
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("triposr-config-artifact-sha256-invalid"));
+  assert.ok(report.blockers.includes("triposr-checkpoint-artifact-sha256-invalid"));
+  assert.ok(report.blockers.includes("rembg-model-artifact-sha256-invalid"));
+  assert.equal(report.modelArtifacts.tripoConfig.sha256, null);
+  assert.equal(report.modelArtifacts.tripoCheckpoint.sha256, null);
+  assert.equal(report.modelArtifacts.rembgWeights.sha256, null);
+});
+
 test("blocks malformed runtime inventory core records instead of reporting ready", async (t) => {
   const { runner } = await runnerFixture(t);
   const report = await collectGenerationWorkerHostInventory({
@@ -325,8 +388,8 @@ test("records a partial inventory when optional packages or acceleration provide
       onnxProviders: [],
       rembgDefaultModel: null,
       modelArtifacts: {
-        tripoConfig: { status: "cached", bytes: 512, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-        tripoCheckpoint: { status: "cached", bytes: 480000000, snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        tripoConfig: { status: "cached", bytes: 512, sha256: "c".repeat(64), snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        tripoCheckpoint: { status: "cached", bytes: 480000000, sha256: "a".repeat(64), snapshotRevision: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
         rembgWeights: { status: "missing", bytes: null },
       },
       runnerSyntaxCompiled: true,

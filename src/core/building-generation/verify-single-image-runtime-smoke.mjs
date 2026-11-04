@@ -4,7 +4,8 @@ import path from "node:path";
 
 import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -76,6 +77,56 @@ function detectImageMimeType(bytes) {
   return null;
 }
 
+
+function canonicalTimestamp(value) {
+  return typeof value === "string" &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value;
+}
+
+function validateWorkerHostFingerprints(report) {
+  const workerHost = report.workerHost;
+  if (!workerHost || workerHost.inventorySchemaVersion !== "1.1.0" ||
+      workerHost.stableAcrossInference !== true) {
+    throw new TypeError("Smoke report is missing stable worker-host model artifact fingerprints.");
+  }
+  const validateSnapshot = (snapshot, label) => {
+    if (!snapshot || !canonicalTimestamp(snapshot.checkedAt) ||
+        !Number.isSafeInteger(snapshot.runner?.bytes) || snapshot.runner.bytes <= 0 ||
+        !HASH.test(snapshot.runner?.sha256 ?? "") ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(snapshot.backgroundRemovalModel ?? "")) {
+      throw new TypeError(label + " worker-host runner/model identity is malformed.");
+    }
+    const config = snapshot.modelArtifacts?.tripoConfig;
+    const checkpoint = snapshot.modelArtifacts?.tripoCheckpoint;
+    const rembg = snapshot.modelArtifacts?.rembgWeights;
+    const validArtifact = (item) => item?.status === "cached" &&
+      Number.isSafeInteger(item.bytes) && item.bytes > 0 && HASH.test(item.sha256 ?? "");
+    if (!validArtifact(config) || !/^[a-f0-9]{40}$/.test(config.snapshotRevision ?? "")) {
+      throw new TypeError(label + " TripoSR config fingerprint is invalid.");
+    }
+    if (!validArtifact(checkpoint) ||
+        !/^[a-f0-9]{40}$/.test(checkpoint.snapshotRevision ?? "") ||
+        checkpoint.snapshotRevision !== config.snapshotRevision) {
+      throw new TypeError(label + " TripoSR checkpoint fingerprint is invalid.");
+    }
+    if (!validArtifact(rembg)) {
+      throw new TypeError(label + " rembg model-weight fingerprint is invalid.");
+    }
+  };
+  validateSnapshot(workerHost.before, "Pre-inference");
+  validateSnapshot(workerHost.after, "Post-inference");
+  const fingerprintValues = (snapshot) => JSON.stringify({
+    runner: snapshot.runner,
+    backgroundRemovalModel: snapshot.backgroundRemovalModel,
+    modelArtifacts: snapshot.modelArtifacts,
+  });
+  if (fingerprintValues(workerHost.before) !== fingerprintValues(workerHost.after)) {
+    throw new TypeError("Smoke report worker-host model fingerprints changed across inference.");
+  }
+  return true;
+}
+
 function parseGlb(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length < 20 ||
       bytes.readUInt32LE(0) !== 0x46546c67 ||
@@ -115,13 +166,16 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
   const report = JSON.parse(reportBytes.toString("utf8"));
 
   if (!report || typeof report !== "object" ||
-      report.schemaVersion !== SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION ||
+      ![SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION, LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
       !SAFE_ID.test(report.buildingId ?? "") ||
       report.status !== "passed") {
     throw new TypeError("Smoke evidence report schema, identity or status is invalid.");
   }
+  const hasWorkerFingerprintEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
+
   if (report.readiness?.status !== "ready" ||
       report.readiness.tripoModelWeights !== "cached" ||
       report.readiness.backgroundRemovalWeights !== "cached" ||
@@ -259,6 +313,9 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
       meshCount: glb.meshCount,
     },
     geometryQa: report.geometryQa,
+    workerHostFingerprintStatus: hasWorkerFingerprintEvidence
+      ? "stable-across-inference" : "not-recorded-legacy-schema",
+    ...(hasWorkerFingerprintEvidence ? { workerHost: report.workerHost } : {}),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,

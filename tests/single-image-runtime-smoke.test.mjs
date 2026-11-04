@@ -174,6 +174,57 @@ async function fakeWorkflowResult(options, root, source) {
   };
 }
 
+
+async function fakeWorkerHostInventory({ env, now, commandTimeoutMs, probeCapabilities }) {
+  const capabilities = await probeCapabilities({
+    env,
+    now,
+    commandTimeoutMs,
+    strategies: ["single-image-ai"],
+  });
+  const entry = capabilities?.strategies?.["single-image-ai"] ?? {};
+  const ready = entry.status === "ready" &&
+    entry.modelWeights === "cached" &&
+    entry.backgroundRemovalWeights === "cached" &&
+    typeof entry.backgroundRemovalModel === "string";
+  return {
+    schemaVersion: "1.1.0",
+    kind: "generation-worker-host-inventory",
+    checkedAt: now,
+    status: ready ? "ready-for-operator-smoke" : "blocked",
+    runner: { status: "present", bytes: 128, sha256: hash(Buffer.from("fixture-triposr-runner")) },
+    modelArtifacts: {
+      tripoConfig: {
+        status: "cached", bytes: 512,
+        sha256: hash(Buffer.from("fixture-triposr-config")),
+        snapshotRevision: "a".repeat(40),
+      },
+      tripoCheckpoint: {
+        status: "cached", bytes: 480000000,
+        sha256: hash(Buffer.from("fixture-triposr-checkpoint")),
+        snapshotRevision: "a".repeat(40),
+      },
+      rembgWeights: {
+        status: "cached", bytes: 176000000,
+        sha256: hash(Buffer.from("fixture-rembg-weights")),
+      },
+    },
+    runtimePackages: { torch: "2.5.1", onnxruntime: "1.20.1", rembg: "2.0.60" },
+    acceleration: { selectedDevice: "cpu" },
+    modelReadiness: {
+      status: ready ? "ready" : "blocked",
+      strategyStatus: entry.status ?? "unknown",
+      tripoModelWeights: entry.modelWeights ?? "unknown",
+      backgroundRemovalWeights: entry.backgroundRemovalWeights ?? "unknown",
+      backgroundRemovalModel: entry.backgroundRemovalModel ?? null,
+    },
+    blockers: ready ? [] : (entry.blockers ?? ["single-image-readiness-not-ready"]),
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+}
+
 function makeOptions(root, source, overrides = {}) {
   const spawnImpl = overrides.spawnImpl ?? (() => {
     const child = new EventEmitter();
@@ -199,6 +250,7 @@ function makeOptions(root, source, overrides = {}) {
     confirmOperationScopes: true,
     confirmSingleViewInference: true,
     confirmModelLicences: true,
+    collectWorkerHostInventory: fakeWorkerHostInventory,
     probeCapabilities: async ({ env, spawnImpl, strategies }) => {
       assert.deepEqual(strategies, ["single-image-ai"]);
       assert.equal(env.HF_HUB_OFFLINE, "1");
@@ -265,6 +317,9 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(result.report.inference.runnerProcessStarted, true);
   assert.equal(result.report.readiness.status, "ready");
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
+  assert.equal(result.report.workerHost.inventorySchemaVersion, "1.1.0");
+  assert.equal(result.report.workerHost.stableAcrossInference, true);
+  assert.deepEqual(result.report.workerHost.before.modelArtifacts, result.report.workerHost.after.modelArtifacts);
   assert.equal(result.report.source.sha256, source.sha256);
   const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
   assert.equal(result.report.output.sha256, hash(await readFile(actualModelPath)));
@@ -307,8 +362,65 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.verified, true);
   assert.equal(verified.source.sha256, source.sha256);
   assert.equal(verified.model.sha256, result.report.output.sha256);
+  assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
+
+  const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedReport, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /fingerprints changed across inference/i,
+  );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
+});
+
+test("blocks before inference when a cached worker model lacks an exact SHA-256", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  let workflowCalls = 0;
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    collectWorkerHostInventory: async (options) => {
+      const inventory = await fakeWorkerHostInventory(options);
+      inventory.modelArtifacts.rembgWeights.sha256 = null;
+      return inventory;
+    },
+    runWorkflow: async () => {
+      workflowCalls += 1;
+      throw new Error("workflow must not run without exact model-byte identity");
+    },
+  }));
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.report.status, "blocked");
+  assert.ok(result.report.readiness.blockers.includes("rembg-weight-fingerprint-incomplete"));
+  assert.equal(workflowCalls, 0);
+  assert.equal(result.report.output, null);
+  assert.equal(result.report.mapReady, false);
+});
+
+test("fails the smoke if model artifact bytes drift during inference", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  let inventoryCalls = 0;
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    collectWorkerHostInventory: async (options) => {
+      const inventory = await fakeWorkerHostInventory(options);
+      inventoryCalls += 1;
+      if (inventoryCalls === 2) {
+        inventory.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
+      }
+      return inventory;
+    },
+    runWorkflow: async (options) => fakeWorkflowResult(options, root, source),
+  }));
+  assert.equal(inventoryCalls, 2);
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.equal(result.report.workerHost.stableAcrossInference, false);
+  assert.match(result.report.failure.summary, /model artifacts or TripoSR runner fingerprint changed/i);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
 });
 
 test("blocks before workflow execution when rembg cache is missing", async (t) => {
