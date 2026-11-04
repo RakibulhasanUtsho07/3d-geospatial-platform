@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -99,6 +100,38 @@ test("generated Python inventory probe has valid syntax and initializes model ar
     timeout: 5000,
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test("Python inventory hashes exact model bytes in bounded chunks and reports no cache path", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "generation-model-hash-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const revision = "a".repeat(40);
+  const revisionDirectory = path.join(root, revision);
+  await import("node:fs/promises").then(({ mkdir }) => mkdir(revisionDirectory));
+  const artifact = path.join(revisionDirectory, "model.ckpt");
+  const bytes = Buffer.alloc(8 * 1024 * 1024 + 17, 0x5a);
+  await writeFile(artifact, bytes);
+
+  const sourceLines = buildPythonInventoryProgram().split("\n");
+  const start = sourceLines.findIndex((line) => line === "def file_summary(file_path, include_revision=False):");
+  const end = sourceLines.findIndex((line, index) => index > start && line === "try:");
+  assert.ok(start >= 0 && end > start);
+  const harness = [
+    "import hashlib, json, os, re, stat, sys",
+    ...sourceLines.slice(start, end),
+    "print(json.dumps(file_summary(sys.argv[1], include_revision=True), sort_keys=True))",
+  ].join("\n");
+  const result = spawnSync("python3", ["-c", harness, artifact], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const summary = JSON.parse(result.stdout.trim());
+  assert.equal(summary.status, "cached");
+  assert.equal(summary.bytes, bytes.length);
+  assert.equal(summary.sha256, createHash("sha256").update(bytes).digest("hex"));
+  assert.equal(summary.snapshotRevision, revision);
+  assert.equal(JSON.stringify(summary).includes(artifact), false);
 });
 
 test("collects a ready redacted host inventory with runtime, GPU, cache and runner fingerprints", async (t) => {
