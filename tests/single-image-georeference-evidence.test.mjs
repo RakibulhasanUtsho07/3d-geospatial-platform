@@ -463,6 +463,34 @@ test("validates six held-out 3D checkpoints without refitting horizontal or vert
     evidence.independentCheckpointEvidence.verticalTransform.horizontalMetresPerModelUnit,
     evidence.registration.transform.metresPerModelUnit,
   );
+  assert.equal(
+    evidence.independentCheckpointEvidence.horizontalTransform.rotationFromModelXToEastNorthDegrees,
+    evidence.registration.transform.rotationFromModelXToEastNorthDegrees,
+  );
+  assert.equal(
+    evidence.independentCheckpointEvidence.horizontalTransform.translationEastM,
+    evidence.registration.transform.translationEastM,
+  );
+  assert.equal(
+    evidence.independentCheckpointEvidence.horizontalTransform.translationNorthM,
+    evidence.registration.transform.translationNorthM,
+  );
+  assert.deepEqual(
+    evidence.independentCheckpointEvidence.horizontalTransform.referenceOrigin,
+    evidence.registration.referenceOrigin,
+  );
+  assert.equal(
+    evidence.independentCheckpointEvidence.verticalTransform.heightOffsetM,
+    evidence.verticalEvidence.heightOffsetM,
+  );
+  assert.deepEqual(
+    evidence.independentCheckpointEvidence.horizontalTransform.fitControlPointIds,
+    evidence.registration.controls.ids,
+  );
+  assert.deepEqual(
+    evidence.independentCheckpointEvidence.verticalTransform.fitControlPointIds,
+    evidence.verticalEvidence.controls.ids,
+  );
   assert.deepEqual(
     evidence.independentCheckpointEvidence.controls.observationIds,
     loaded.manifest.heldOutCheckpoints.points.map((point) => point.observationId),
