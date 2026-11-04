@@ -668,8 +668,25 @@ function createIndependent3DCheckpointEvidence({
       warnings: ["Held-out evaluation cannot run unless both horizontal and vertical fitting calibration pass."],
     };
   }
+  const modelXs = checkpoints.points.map((point) => point.modelX);
+  const modelZs = checkpoints.points.map((point) => point.modelZ);
+  const meanX = modelXs.reduce((sum, value) => sum + value, 0) / modelXs.length;
+  const meanZ = modelZs.reduce((sum, value) => sum + value, 0) / modelZs.length;
+  let xx = 0, zz = 0, xz = 0;
+  for (let index = 0; index < checkpoints.points.length; index++) {
+    const x = modelXs[index] - meanX, z = modelZs[index] - meanZ;
+    xx += x * x; zz += z * z; xz += x * z;
+  }
+  if (xx + zz < 0.01 || xx * zz - xz * xz < 1e-8) {
+    throw new RangeError("Held-out checkpoints must cover a two-dimensional, non-collinear model X/Z area.");
+  }
   const transform = horizontalRegistration.transform;
   const scale = transform.metresPerModelUnit;
+  const modelYValues = checkpoints.points.map((point) => point.modelY);
+  const modelYSpanM = (Math.max(...modelYValues) - Math.min(...modelYValues)) * scale;
+  if (!Number.isFinite(modelYSpanM) || modelYSpanM < 1) {
+    throw new RangeError("Held-out 3D checkpoints must span at least 1 metre in the exact horizontal model scale.");
+  }
   const theta = transform.rotationFromModelXToEastNorthDegrees * Math.PI / 180;
   const cosine = Math.cos(theta), sine = Math.sin(theta);
   const origin = horizontalRegistration.referenceOrigin;
