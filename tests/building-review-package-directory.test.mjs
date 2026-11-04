@@ -153,7 +153,7 @@ test("rejects oversized signature control files and arbitrary control-file names
   await writeFile(signaturePath, Buffer.alloc(64 * 1024 + 1, 0x20));
   await assert.rejects(
     readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
-    /exceeds-64-KiB/,
+    /file-exceeds-size-limit/,
   );
   await assert.rejects(
     readBuildingReviewPackageControlFile(packageDir, "package-manifest.json"),
