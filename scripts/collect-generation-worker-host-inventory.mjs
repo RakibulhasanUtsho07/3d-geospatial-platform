@@ -14,7 +14,7 @@ async function main() {
       python: { type: "string" },
       "runner-script": { type: "string" },
       device: { type: "string" },
-      "timeout-ms": { type: "string", default: "15000" },
+      "timeout-ms": { type: "string", default: "180000" },
     },
   });
   if (values.help) {
