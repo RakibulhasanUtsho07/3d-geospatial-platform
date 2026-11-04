@@ -6,12 +6,13 @@ import { analyzeGlbQuality } from "./glb-geometry-qa.mjs";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageGeoreferenceEvidence } from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
-const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
-const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
-const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
-const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
-const EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.6.0";
+const PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
+const LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
+const OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.3.0";
+const OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.2.0";
+const EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.1.0";
+const EARLIER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.0.0";
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
@@ -227,7 +228,8 @@ async function verifyGenerationArtifactReceipt({
   exactKeys(pointer, ["bytes", "path", "payloadSha256", "schemaVersion", "sha256"], "Generation artifact receipt reference");
   const relativePath = safeRelativePath(pointer.path, "Generation artifact receipt path");
   const expectedReceiptPath = ".building-engine/runtime-smokes/" + jobId + ".artifact.json";
-  const expectedReceiptSchemaVersion = report.schemaVersion === "1.5.0" ? "1.1.0" : "1.0.0";
+  const expectedReceiptSchemaVersion = report.schemaVersion === "1.6.0" ? "1.2.0" :
+    report.schemaVersion === "1.5.0" ? "1.1.0" : "1.0.0";
   if (pointer.schemaVersion !== expectedReceiptSchemaVersion || relativePath !== expectedReceiptPath ||
       !Number.isSafeInteger(pointer.bytes) || pointer.bytes <= 0 || pointer.bytes > 256 * 1024 ||
       !HASH.test(pointer.sha256 ?? "") || !HASH.test(pointer.payloadSha256 ?? "")) {
@@ -255,7 +257,7 @@ async function verifyGenerationArtifactReceipt({
   }
 
   const payload = envelope.payload;
-  const receiptHasGeoreference = pointer.schemaVersion === "1.1.0";
+  const receiptHasGeoreference = ["1.1.0", "1.2.0"].includes(pointer.schemaVersion);
   exactKeys(payload, [
     "buildingId", "geometryQa", "jobId", "kind", "modelLoadEvidence",
     "output", "schemaVersion", "source", "workerHost", "workflowReport",
@@ -411,6 +413,7 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
         OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
         EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+        EARLIER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
       ].includes(report.schemaVersion) ||
       report.kind !== "single-image-runtime-smoke" ||
       report.jobId !== jobId ||
@@ -424,23 +427,30 @@ export async function verifySingleImageRuntimeSmoke({ workspaceRoot, jobId }) {
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    EARLIEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasProcessLoadEvidence = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDEST_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasSourceImageLoadEvidence = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    OLDER_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
   const hasGenerationArtifactReceipt = [
     SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
     PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    LEGACY_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
   ].includes(report.schemaVersion);
-  const hasGeoreferenceEvidence = report.schemaVersion === SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION;
+  const hasGeoreferenceEvidence = [
+    SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+    PREVIOUS_SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION,
+  ].includes(report.schemaVersion);
   if (hasWorkerFingerprintEvidence) validateWorkerHostFingerprints(report);
   if (hasProcessLoadEvidence) validateModelLoadEvidence(report);
   if (hasSourceImageLoadEvidence) validateSourceImageLoadEvidence(report);

@@ -4,7 +4,7 @@ import path from "node:path";
 
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
-export const GENERATION_ARTIFACT_RECEIPT_SCHEMA_VERSION = "1.1.0";
+export const GENERATION_ARTIFACT_RECEIPT_SCHEMA_VERSION = "1.2.0";
 const MAX_RECEIPT_BYTES = 256 * 1024;
 
 function sha256(bytes) {

@@ -222,3 +222,171 @@ test("requires non-collinear ground-control points and explicit no-control mode"
   assert.equal(noControls.maxGcpRmsErrorM, null);
   assert.equal(noControls.maxGcpResidualM, null);
 });
+
+
+function manifestWithVertical() {
+  const value = manifest();
+  value.schemaVersion = "1.1.0";
+  value.verticalDatum = "EPSG:4979-ellipsoidal";
+  value.vertical = {
+    crs: "EPSG:4979",
+    heightType: "ellipsoidal",
+    unit: "metre",
+    referenceFrame: "WGS 84 (G2139)",
+    coordinateEpoch: 2022.25,
+    survey: {
+      method: "RTK GNSS ellipsoidal-height observation",
+      reference: "vertical-survey-run-2026-11-04",
+      observedAtUtc: "2026-11-04T10:30:00.000Z",
+      verticalAccuracyM: 0.04,
+    },
+    controlPoints: value.controlPoints.map((point, index) => ({
+      horizontalControlPointId: point.id,
+      modelY: index * 1.5,
+      ellipsoidalHeightM: 135 + index * 3.75,
+      evidenceSourceId: SOURCE,
+    })),
+  };
+  return value;
+}
+
+test("binds surveyed EPSG:4979 ellipsoidal heights to the exact horizontal fit without fitting a second scale", async (t) => {
+  const root = await workspace(t);
+  const sourceManifest = manifestWithVertical();
+  await writeManifest(root, sourceManifest);
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded,
+    modelSha256: MODEL_HASH,
+  });
+
+  assert.equal(evidence.schemaVersion, "1.1.0");
+  assert.equal(evidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.equal(evidence.verticalEvidence.verticalCrs, "EPSG:4979");
+  assert.equal(evidence.verticalEvidence.heightType, "ellipsoidal");
+  assert.equal(evidence.verticalEvidence.referenceFrame, "WGS 84 (G2139)");
+  assert.equal(evidence.verticalEvidence.coordinateEpoch, 2022.25);
+  assert.equal(evidence.verticalEvidence.horizontalMetresPerModelUnit,
+    evidence.registration.transform.metresPerModelUnit);
+  assert.equal(evidence.verticalEvidence.verticalScalePolicy,
+    "reuses-exact-horizontal-scale-no-independent-y-scale");
+  assert.equal(evidence.verticalEvidence.heightOffsetM, 135);
+  assert.equal(evidence.verticalEvidence.controls.thresholdPass, true);
+  assert.equal(evidence.verticalEvidence.mapReady, false);
+  assert.equal(evidence.verticalEvidence.publicationEligible, false);
+  assert.equal(evidence.verticalEvidence.automaticApproval, false);
+
+  const exactBytes = await readFile(path.join(root, "survey", "controls.json"));
+  const offline = verifySingleImageGeoreferenceEvidenceBytes({
+    evidence, manifestBytes: exactBytes, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  });
+  assert.deepEqual(offline, evidence);
+  const online = await verifySingleImageGeoreferenceEvidence({
+    workspaceRoot: root, evidence, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  });
+  assert.deepEqual(online, evidence);
+
+  assert.throws(() => verifySingleImageGeoreferenceEvidenceBytes({
+    evidence: { ...evidence, verticalEvidence: {
+      ...evidence.verticalEvidence, horizontalMetresPerModelUnit: 9,
+    } },
+    manifestBytes: exactBytes, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  }), /independently recomputed/i);
+});
+
+test("fails vertical calibration when independent height residuals exceed tolerance", async (t) => {
+  const root = await workspace(t);
+  const value = manifestWithVertical();
+  value.vertical.controlPoints[3].ellipsoidalHeightM += 2;
+  await writeManifest(root, value);
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded, modelSha256: MODEL_HASH,
+    maxVerticalGcpRmsErrorM: 0.5, maxVerticalGcpResidualM: 1,
+  });
+  assert.equal(evidence.status, "calibrated-needs-human-review");
+  assert.equal(evidence.verticalEvidence.status, "calibration-failed-review-required");
+  assert.equal(evidence.verticalEvidence.controls.thresholdPass, false);
+  assert.ok(evidence.verticalEvidence.controls.rmsErrorM > 0.5);
+  assert.ok(evidence.verticalEvidence.controls.maxResidualM > 1);
+});
+
+test("rejects non-ellipsoidal heights, CRS substitution, and an unnamed realization", async (t) => {
+  const root = await workspace(t);
+  const wrongHeightType = manifestWithVertical();
+  wrongHeightType.vertical.heightType = "orthometric";
+  await writeManifest(root, wrongHeightType);
+  await assert.rejects(load(root), /ellipsoidal|orthometric/i);
+
+  const wrongCrs = manifestWithVertical();
+  wrongCrs.vertical.crs = "EPSG:3855";
+  await writeManifest(root, wrongCrs);
+  await assert.rejects(load(root), /EPSG:4979/i);
+
+  const unnamedFrame = manifestWithVertical();
+  unnamedFrame.vertical.referenceFrame = "WGS84";
+  await writeManifest(root, unnamedFrame);
+  await assert.rejects(load(root), /named WGS 84 realization/i);
+});
+
+test("rejects vertical controls that do not map one-to-one to horizontal control IDs", async (t) => {
+  const root = await workspace(t);
+  const duplicate = manifestWithVertical();
+  duplicate.vertical.controlPoints[1].horizontalControlPointId =
+    duplicate.vertical.controlPoints[0].horizontalControlPointId;
+  await writeManifest(root, duplicate);
+  await assert.rejects(load(root), /one-to-one/i);
+
+  const missing = manifestWithVertical();
+  missing.vertical.controlPoints.pop();
+  await writeManifest(root, missing);
+  await assert.rejects(load(root), /exactly one measurement/i);
+
+  const substituted = manifestWithVertical();
+  substituted.vertical.controlPoints[0].evidenceSourceId = "another-image";
+  await writeManifest(root, substituted);
+  await assert.rejects(load(root), /selected source/i);
+});
+
+test("rejects insufficient vertical spread and non-finite/out-of-range vertical measurements", async (t) => {
+  const root = await workspace(t);
+  const narrow = manifestWithVertical();
+  narrow.vertical.controlPoints.forEach((point, index) => {
+    point.modelY = index * 0.1;
+    point.ellipsoidalHeightM = 135 + index * 0.25;
+  });
+  await writeManifest(root, narrow);
+  const narrowLoaded = await load(root);
+  assert.throws(() => createSingleImageGeoreferenceEvidence({
+    loadedManifest: narrowLoaded, modelSha256: MODEL_HASH,
+  }), /span at least 1 metre/i);
+
+  const nonFinite = manifestWithVertical();
+  nonFinite.vertical.controlPoints[0].ellipsoidalHeightM = Number.NaN;
+  await writeManifest(root, nonFinite);
+  await assert.rejects(load(root), /ellipsoidal height must be finite/i);
+
+  const outside = manifestWithVertical();
+  outside.vertical.controlPoints[0].ellipsoidalHeightM = 120000;
+  await writeManifest(root, outside);
+  await assert.rejects(load(root), /physical range/i);
+});
+
+test("rejects a vertical manifest that drifts after the evidence snapshot", async (t) => {
+  const root = await workspace(t);
+  await writeManifest(root, manifestWithVertical());
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded, modelSha256: MODEL_HASH,
+  });
+  const altered = manifestWithVertical();
+  altered.vertical.coordinateEpoch = 2023.0;
+  await writeManifest(root, altered);
+  await assert.rejects(verifySingleImageGeoreferenceEvidence({
+    workspaceRoot: root, evidence, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  }), /bytes or identity/i);
+});

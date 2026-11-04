@@ -404,8 +404,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
-  assert.equal(result.report.schemaVersion, "1.5.0");
-  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.1.0");
+  assert.equal(result.report.schemaVersion, "1.6.0");
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.2.0");
   assert.equal(result.report.georeferenceEvidence.status, "not-requested");
   assert.equal(result.report.georeferenceEvidence.registration, null);
   assert.ok(result.report.generationArtifactReceipt.bytes > 0);
@@ -619,7 +619,7 @@ test("binds optional control points through the single-image smoke, workflow rep
   assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
   const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
   const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
-  assert.equal(receipt.schemaVersion, "1.1.0");
+  assert.equal(receipt.schemaVersion, "1.2.0");
   assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
 });
 
@@ -1052,5 +1052,109 @@ test("refuses to reuse an existing generation artifact receipt path", async (t) 
   await assert.rejects(
     runSingleImageRuntimeSmoke(makeOptions(root, source)),
     /Generation artifact receipt already exists; use a fresh ID/i,
+  );
+});
+
+
+test("binds optional ellipsoidal vertical GCPs through smoke, receipt and offline verifier", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  await mkdir(path.join(root, "survey"), { recursive: true });
+  const earthRadiusM = 6378137;
+  const baseLongitude = 90.4;
+  const baseLatitude = 23.7;
+  const controls = [[-10, -8], [10, -8], [10, 8], [-10, 8]].map(([modelX, modelZ], index) => ({
+    id: "gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    longitude: baseLongitude + (2 * modelX - modelZ + 100) /
+      (earthRadiusM * Math.cos(baseLatitude * Math.PI / 180)) * 180 / Math.PI,
+    latitude: baseLatitude + (modelX + 2 * modelZ + 200) /
+      earthRadiusM * 180 / Math.PI,
+    evidenceSourceId: "facade-photo",
+  }));
+  const horizontalScale = Math.sqrt(5);
+  const manifest = {
+    schemaVersion: "1.1.0",
+    kind: "single-image-control-point-manifest",
+    buildingId: fixture.id,
+    source: { sourceId: "facade-photo", sha256: source.sha256 },
+    horizontalCrs: "EPSG:4326",
+    horizontalDatum: "WGS84",
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    survey: {
+      method: "RTK GNSS",
+      reference: "horizontal-survey-fixture-2026-11-04",
+      observedAtUtc: "2026-11-04T10:00:00.000Z",
+      horizontalAccuracyM: 0.05,
+    },
+    controlPoints: controls,
+    vertical: {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: "WGS 84 (G2139)",
+      coordinateEpoch: 2022.25,
+      survey: {
+        method: "RTK GNSS ellipsoidal-height observation",
+        reference: "vertical-survey-fixture-2026-11-04",
+        observedAtUtc: "2026-11-04T10:30:00.000Z",
+        verticalAccuracyM: 0.04,
+      },
+      controlPoints: controls.map((point, index) => ({
+        horizontalControlPointId: point.id,
+        modelY: index * 1.5,
+        ellipsoidalHeightM: 135 + horizontalScale * index * 1.5,
+        evidenceSourceId: "facade-photo",
+      })),
+    },
+  };
+  const manifestPath = path.join(root, "survey", "controls.json");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    controlPointManifestPath: "survey/controls.json",
+    spawnImpl: (_executable, _args, options) => {
+      const child = new EventEmitter();
+      queueMicrotask(async () => {
+        await writeFakeModelLoadReceipt(options);
+        await writeFakeSourceImageLoadReceipt(options, _args);
+        child.emit("spawn");
+      });
+      return child;
+    },
+    runWorkflow: async (options) => {
+      assert.deepEqual(options.controlPoints, controls);
+      return fakeWorkflowResult(options, root, source);
+    },
+  }));
+  assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
+  assert.equal(result.report.status, "passed");
+  assert.equal(result.report.schemaVersion, "1.6.0");
+  assert.equal(result.report.georeferenceEvidence.schemaVersion, "1.1.0");
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.heightOffsetM, 135);
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.controls.thresholdPass, true);
+  assert.equal(result.report.georeferenceEvidence.verticalEvidence.mapReady, false);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.2.0");
+
+  const verified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(verified.verified, true);
+  assert.equal(verified.georeferenceEvidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
+
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  assert.equal(receipt.schemaVersion, "1.2.0");
+  assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
+
+  manifest.vertical.coordinateEpoch = 2023.0;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /manifest bytes or identity/i,
   );
 });

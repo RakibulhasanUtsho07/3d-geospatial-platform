@@ -266,7 +266,11 @@ async function main() {
     "4. Read \`reports/render-reference-review.json\`, \`reports/correction-tasks.json\` and \`reports/correction-verification.json\`.",
     "5. Review \`reports/geometry-qa.json\` and \`reports/texture-qa.json\`; structural QA cannot prove historical or architectural accuracy.",
     ...(singleImageSmokeEvidence ? [
-      "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and its vertical datum is unresolved.",
+      ...(singleImageSmokeEvidence.verticalDatum === "EPSG:4979-ellipsoidal" ? [
+        "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal and ellipsoidal-height offsets reuse one scale and remain human-review-only. Vertical survey observations are operator-supplied, not independently authenticated.",
+      ] : [
+        "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
+      ]),
       "7. Record a separate human release decision outside this automated package.",
     ] : [
       "6. Record a separate human release decision outside this automated package.",

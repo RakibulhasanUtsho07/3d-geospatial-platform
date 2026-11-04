@@ -26,6 +26,8 @@ async function main() {
       "control-point-manifest": { type: "string" },
       "max-gcp-rms-error-m": { type: "string", default: "0.5" },
       "max-gcp-residual-m": { type: "string", default: "1" },
+      "max-vertical-gcp-rms-error-m": { type: "string", default: "0.5" },
+      "max-vertical-gcp-residual-m": { type: "string", default: "1" },
       "confirm-source-rights": { type: "boolean", default: false },
       "confirm-operation-scopes": { type: "boolean", default: false },
       "confirm-single-view-inference": { type: "boolean", default: false },
@@ -43,6 +45,7 @@ async function main() {
       "    --rembg-licence-review <rembg weight licence basis>",
       "    [--control-point-manifest <workspace-relative-WGS84-JSON>]",
       "    [--max-gcp-rms-error-m 0.5] [--max-gcp-residual-m 1]",
+      "    [--max-vertical-gcp-rms-error-m 0.5] [--max-vertical-gcp-residual-m 1]",
       "    --confirm-source-rights",
       "    --confirm-operation-scopes",
       "    --confirm-single-view-inference",
@@ -53,7 +56,9 @@ async function main() {
       "Requires both TripoSR and rembg model caches to be present; no model downloads are performed.",
       "Writes a private smoke report and a write-once hash-bound generation artifact receipt under .building-engine/runtime-smokes/.",
       "An optional control-point manifest must bind the exact building/source and use surveyed WGS84 horizontal coordinates.",
-      "Horizontal registration remains human-review-only; vertical datum is not solved and no output is published to /map.",
+      "Vertical controls, when supplied, must be surveyed EPSG:4979 WGS 84 ellipsoidal heights in metres with a named realization and coordinate epoch.",
+      "The vertical fit reuses the horizontal scale exactly and solves only height offset; orthometric/MSL/AGL heights and geoid conversion are not supported.",
+      "All georeference evidence is human-review-only; no output is published to /map.",
     ].join("\n"));
     return;
   }
@@ -70,10 +75,14 @@ async function main() {
   const inventoryTimeoutMs = Number(values["inventory-timeout-ms"]);
   const maxGcpRmsErrorM = Number(values["max-gcp-rms-error-m"]);
   const maxGcpResidualM = Number(values["max-gcp-residual-m"]);
+  const maxVerticalGcpRmsErrorM = Number(values["max-vertical-gcp-rms-error-m"]);
+  const maxVerticalGcpResidualM = Number(values["max-vertical-gcp-residual-m"]);
   if (!Number.isInteger(timeoutMs) || !Number.isInteger(mcResolution) ||
       !Number.isInteger(inventoryTimeoutMs) || inventoryTimeoutMs < 1000 || inventoryTimeoutMs > 180000 ||
       !Number.isFinite(maxGcpRmsErrorM) || maxGcpRmsErrorM <= 0 || maxGcpRmsErrorM > 100 ||
-      !Number.isFinite(maxGcpResidualM) || maxGcpResidualM <= 0 || maxGcpResidualM > 100) {
+      !Number.isFinite(maxGcpResidualM) || maxGcpResidualM <= 0 || maxGcpResidualM > 100 ||
+      !Number.isFinite(maxVerticalGcpRmsErrorM) || maxVerticalGcpRmsErrorM <= 0 || maxVerticalGcpRmsErrorM > 100 ||
+      !Number.isFinite(maxVerticalGcpResidualM) || maxVerticalGcpResidualM <= 0 || maxVerticalGcpResidualM > 100) {
     throw new TypeError("Timeout/resolution/inventory values or GCP residual thresholds are invalid.");
   }
 
@@ -97,6 +106,8 @@ async function main() {
     controlPointManifestPath: values["control-point-manifest"],
     maxGcpRmsErrorM,
     maxGcpResidualM,
+    maxVerticalGcpRmsErrorM,
+    maxVerticalGcpResidualM,
     confirmSourceRights: values["confirm-source-rights"],
     confirmOperationScopes: values["confirm-operation-scopes"],
     confirmSingleViewInference: values["confirm-single-view-inference"],

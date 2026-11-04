@@ -104,7 +104,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   const reportPath = ".building-engine/runtime-smokes/" + jobId + ".json";
   const reportBytes = await readStableWorkspaceFile(root, reportPath, "Single-image smoke report", MAX_REPORT_BYTES);
   const report = parseJson(reportBytes, "Single-image smoke report");
-  if (report.schemaVersion !== "1.5.0" || report.kind !== "single-image-runtime-smoke" ||
+  if (!["1.5.0", "1.6.0"].includes(report.schemaVersion) || report.kind !== "single-image-runtime-smoke" ||
       report.status !== "passed" || report.jobId !== jobId || report.buildingId !== buildingId ||
       report.output?.sha256 !== candidateGlbSha256 ||
       before.model?.sha256 !== candidateGlbSha256 ||
@@ -114,6 +114,8 @@ export async function prepareSingleImageReviewPackageEvidence({
       report.georeferenceEvidence?.modelSha256 !== candidateGlbSha256 ||
       report.georeferenceEvidence?.manifest === null ||
       report.georeferenceEvidence?.registration?.vertical?.status !== "not-solved" ||
+      (report.georeferenceEvidence?.verticalEvidence?.status !== undefined &&
+       !["not-requested", "calibrated-needs-human-review"].includes(report.georeferenceEvidence.verticalEvidence.status)) ||
       report.mapReady !== false || report.publicationEligible !== false || report.automaticApproval !== false) {
     throw new Error("Single-image smoke must be a verified D3M-08 run with successful horizontal control-point registration for the exact candidate GLB.");
   }
@@ -127,7 +129,8 @@ export async function prepareSingleImageReviewPackageEvidence({
   const manifestPath = safeRelativePath(report.georeferenceEvidence.manifest.path, "Control-point manifest path");
   const manifestBytes = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
 
-  if (receipt.schemaVersion !== "1.1.0" || receipt.payload?.georeference === undefined ||
+  const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
+  if (receipt.schemaVersion !== expectedReceiptSchema || receipt.payload?.georeference === undefined ||
       receipt.payload?.buildingId !== buildingId || receipt.payload?.jobId !== jobId ||
       receipt.payload?.output?.sha256 !== candidateGlbSha256 ||
       receipt.payload?.source?.sourceId !== report.source?.sourceId ||
@@ -164,8 +167,10 @@ export async function prepareSingleImageReviewPackageEvidence({
     addFile("single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes),
     addFile("single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes),
   ];
+  const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
+  const hasVerticalCalibration = verticalEvidence?.status === "calibrated-needs-human-review";
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -176,7 +181,17 @@ export async function prepareSingleImageReviewPackageEvidence({
     smokeReportSha256: sha256(reportBytes),
     generationArtifactReceiptSha256: sha256(receiptBytes),
     workflowReportSha256: sha256(workflowBytes),
-    verticalDatum: "not-solved",
+    verticalDatum: hasVerticalCalibration ? "EPSG:4979-ellipsoidal" : "not-solved",
+    ...(hasVerticalCalibration ? {
+      verticalStatus: verticalEvidence.status,
+      verticalEvidenceSha256: sha256(Buffer.from(canonicalJson(verticalEvidence), "utf8")),
+      verticalReferenceFrame: verticalEvidence.referenceFrame,
+      verticalCoordinateEpoch: verticalEvidence.coordinateEpoch,
+      verticalHeightOffsetM: verticalEvidence.heightOffsetM,
+      verticalRmsErrorM: verticalEvidence.controls.rmsErrorM,
+      verticalMaxResidualM: verticalEvidence.controls.maxResidualM,
+      verticalControlPointCount: verticalEvidence.controls.count,
+    } : {}),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,

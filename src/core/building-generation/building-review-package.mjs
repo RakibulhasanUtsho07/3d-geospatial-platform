@@ -129,14 +129,29 @@ export function buildBuildingReviewPackageManifest({
   if (singleImageEvidence === null) {
     if (singleImageArtifactCount !== 0) throw new Error("review-package-single-image-evidence-metadata-missing");
   } else {
-    if (!isObject(singleImageEvidence) || singleImageEvidence.schemaVersion !== "1.0.0" ||
+    const hasVerticalCalibration = singleImageEvidence?.schemaVersion === "1.1.0";
+    const verticalMetadataValid = hasVerticalCalibration
+      ? singleImageEvidence.verticalDatum === "EPSG:4979-ellipsoidal" &&
+        singleImageEvidence.verticalStatus === "calibrated-needs-human-review" &&
+        isHash(singleImageEvidence.verticalEvidenceSha256) &&
+        /^WGS 84 \([A-Za-z0-9._ -]{1,40}\)$/.test(singleImageEvidence.verticalReferenceFrame ?? "") &&
+        Number.isFinite(singleImageEvidence.verticalCoordinateEpoch) &&
+        singleImageEvidence.verticalCoordinateEpoch >= 1980 && singleImageEvidence.verticalCoordinateEpoch <= 2100 &&
+        Number.isFinite(singleImageEvidence.verticalHeightOffsetM) &&
+        Number.isFinite(singleImageEvidence.verticalRmsErrorM) && singleImageEvidence.verticalRmsErrorM >= 0 &&
+        Number.isFinite(singleImageEvidence.verticalMaxResidualM) && singleImageEvidence.verticalMaxResidualM >= 0 &&
+        Number.isSafeInteger(singleImageEvidence.verticalControlPointCount) && singleImageEvidence.verticalControlPointCount >= 3
+      : singleImageEvidence?.schemaVersion === "1.0.0" &&
+        singleImageEvidence.verticalDatum === "not-solved" &&
+        !Object.hasOwn(singleImageEvidence, "verticalEvidenceSha256");
+    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0"].includes(singleImageEvidence.schemaVersion) ||
         !nonEmptyString(singleImageEvidence.jobId) || !nonEmptyString(singleImageEvidence.sourceId) ||
         !isHash(singleImageEvidence.sourceSha256) || !isHash(singleImageEvidence.candidateGlbSha256) ||
         !isHash(singleImageEvidence.controlPointManifestSha256) || !isHash(singleImageEvidence.smokeReportSha256) ||
         !isHash(singleImageEvidence.generationArtifactReceiptSha256) || !isHash(singleImageEvidence.workflowReportSha256) ||
         singleImageEvidence.buildingId !== buildingId ||
         singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
-        singleImageEvidence.verticalDatum !== "not-solved" ||
+        !verticalMetadataValid ||
         singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
         singleImageEvidence.automaticApproval !== false ||
         singleImageEvidence.candidateGlbSha256.toLowerCase() !==
@@ -234,6 +249,16 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
+      ...(singleImageEvidence.schemaVersion === "1.1.0" ? {
+        verticalStatus: singleImageEvidence.verticalStatus,
+        verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
+        verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
+        verticalCoordinateEpoch: singleImageEvidence.verticalCoordinateEpoch,
+        verticalHeightOffsetM: singleImageEvidence.verticalHeightOffsetM,
+        verticalRmsErrorM: singleImageEvidence.verticalRmsErrorM,
+        verticalMaxResidualM: singleImageEvidence.verticalMaxResidualM,
+        verticalControlPointCount: singleImageEvidence.verticalControlPointCount,
+      } : {}),
       mapReady: false,
       publicationEligible: false,
       automaticApproval: false,
