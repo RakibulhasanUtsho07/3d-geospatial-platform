@@ -70,7 +70,9 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     "from onnxruntime import InferenceSession",
     "assert OmegaConf.load(sys.argv[1]) == 'model: triposr\\nresolution: 256\\n'",
     "assert torch.load(sys.argv[2]) == b'synthetic-triposr-checkpoint-bytes'",
-    "assert InferenceSession(sys.argv[3]).model_bytes == b'synthetic-rembg-onnx-model-bytes'",
+    "session = InferenceSession(sys.argv[3])",
+    "assert isinstance(session, InferenceSession)",
+    "assert session.model_bytes == b'synthetic-rembg-onnx-model-bytes'",
   ].join("\\n");
   const result = spawnSync(process.env.PYTHON || "python3", [
     "-c", script, configPath, checkpointPath, rembgPath,
