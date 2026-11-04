@@ -66,38 +66,50 @@ async function workspace(t) {
   return root;
 }
 
+async function writeFakeModelLoadReceipt(spawnOptions = {}) {
+  const env = spawnOptions.env ?? {};
+  const receiptPath = env.BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH;
+  const expected = env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON
+    ? JSON.parse(env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON)
+    : null;
+  if (!receiptPath || !expected) return;
+  const omittedRole = env.BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE ?? null;
+  const loaders = [
+    ["tripoConfig", "omegaconf.OmegaConf.load"],
+    ["tripoCheckpoint", "torch.load"],
+    ["rembgWeights", "onnxruntime.InferenceSession"],
+  ];
+  const events = loaders
+    .filter(([role]) => role !== omittedRole)
+    .map(([role, loader]) => JSON.stringify({
+      schemaVersion: "1.0.0",
+      role,
+      loader,
+      bytes: expected[role].bytes,
+      sha256: expected[role].sha256,
+      exactBytesPassed: true,
+      stable: true,
+    }));
+  await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
+}
+
 async function startFakeRunner(options, { omitModelLoadRole = null } = {}) {
-  const childOptions = {};
-  const child = options.spawnImpl(
+  const spawnImpl = omitModelLoadRole
+    ? (executable, args, spawnOptions = {}) => options.spawnImpl(executable, args, {
+      ...spawnOptions,
+      env: {
+        ...(spawnOptions.env ?? {}),
+        BUILDING_ENGINE_TEST_OMIT_MODEL_LOAD_ROLE: omitModelLoadRole,
+      },
+    })
+    : options.spawnImpl;
+  const child = spawnImpl(
     options.pythonPath,
     [options.runnerScript, "--fixture-smoke"],
-    childOptions,
+    {},
   );
   if (!child || typeof child.once !== "function") {
     throw new TypeError("Fake TripoSR runner must return an EventEmitter child.");
-  }
-  const receiptPath = childOptions.env?.BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH;
-  const expected = childOptions.env?.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON
-    ? JSON.parse(childOptions.env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON)
-    : null;
-  if (receiptPath && expected) {
-    const loaders = [
-      ["tripoConfig", "omegaconf.OmegaConf.load"],
-      ["tripoCheckpoint", "torch.load"],
-      ["rembgWeights", "onnxruntime.InferenceSession"],
-    ];
-    const events = loaders
-      .filter(([role]) => role !== omitModelLoadRole)
-      .map(([role, loader]) => JSON.stringify({
-        schemaVersion: "1.0.0",
-        role,
-        loader,
-        bytes: expected[role].bytes,
-        sha256: expected[role].sha256,
-        exactBytesPassed: true,
-        stable: true,
-      }));
-    await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
   }
   await new Promise((resolve, reject) => {
     child.once("error", reject);
@@ -250,9 +262,12 @@ async function fakeWorkerHostInventory({ env, now, commandTimeoutMs, probeCapabi
 }
 
 function makeOptions(root, source, overrides = {}) {
-  const spawnImpl = overrides.spawnImpl ?? (() => {
+  const spawnImpl = overrides.spawnImpl ?? ((_executable, _args, spawnOptions = {}) => {
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(spawnOptions);
+      child.emit("spawn");
+    });
     return child;
   });
   return {
@@ -321,7 +336,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     ].join("\n")], { env: options.env, encoding: "utf8", timeout: 5000 });
     assert.equal(offlineProbe.status, 0, offlineProbe.stderr || offlineProbe.stdout);
     const child = new EventEmitter();
-    queueMicrotask(() => child.emit("spawn"));
+    queueMicrotask(async () => {
+      await writeFakeModelLoadReceipt(options);
+      child.emit("spawn");
+    });
     return child;
   };
   let workflowCalls = 0;
