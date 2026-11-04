@@ -92,6 +92,7 @@ When the two child workflows finish and the geometry child exports a zero-blocke
 It requires:
 - the completed parent `vertical-slice-report.json`;
 - an attestation file inside the same private workspace;
+- a separate `reviewReceiptPath` containing an Ed25519-signed reviewer decision receipt;
 - `attestation.candidateSha256` equal to the actual textured geometry GLB SHA-256;
 - `attestation.verticalSliceReportSha256` equal to the exact parent-report bytes;
 - `attestation.sourceSetSha256` equal to the source-set hash recorded by the parent report;
@@ -106,11 +107,18 @@ Create a JSON configuration file for the operator CLI:
   "workspaceRoot": "D:/building-workspace",
   "reportPath": ".building-engine/vertical-slices/building-a/job-a/vertical-slice-report.json",
   "attestationPath": "review/building-a-publication-attestation.json",
+  "reviewReceiptPath": "review/building-a-signed-publication-review.json",
   "publicRoot": "D:/3d-geospatial-platform"
 }
 ```
 
 The attestation must contain the exact parent report SHA-256 and source-set hash as well as the candidate GLB hash. Calculate the parent hash only after its report is final and immutable; any report edit requires a new attestation. Do not copy placeholder coordinates or set checks true without independent evidence.
+
+The signed-review receipt is a JSON envelope with exactly `submission` and `signatureBase64`. Its submission has exactly these fields: `schemaVersion`, `recordType` (`d3m-engine-03-signed-publication-review`), `buildingId`, `verticalSliceReportSha256`, `sourceSetSha256`, `candidateGlbSha256`, `publicationAttestationSha256`, `reviewerId`, `reviewedAtUtc` (canonical UTC ISO timestamp with milliseconds), and `decision` (`approve-for-catalog-handoff`). The Ed25519 signature is over the canonical submission bytes used by D3M-01: recursively sorted object keys, original array order, compact JSON, UTF-8, no trailing newline. All four SHA-256 bindings must match the exact report, source set, GLB and attestation bytes. The attestation's `review.reviewer` and `review.reviewedAt` must exactly match the signed reviewer ID and timestamp.
+
+The publisher reads `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` only from its runtime environment. Production must receive the versioned public-key-only registry through the deployment secret manager; legacy key arrays are rejected in production. Do not place private keys, registry JSON or public keys in the publication config, repository or CLI arguments. A valid signature proves possession of the key currently trusted by the registry; the platform operator must establish reviewer identity and authority separately.
+
+The verified signature provenance (reviewer ID, key ID, registry ID, public-key fingerprint, signature hash, signed-payload hash and receipt-file hash) is retained in the versioned catalog review metadata. It is integrity/audit evidence, not proof of source rights, survey accuracy or architectural correctness.
 
 Run the explicit command from the repository:
 
@@ -120,4 +128,4 @@ npm run publish:evidence-backed-vertical-slice -- .\publish-config.json
 
 The handoff delegates to the existing versioned catalog publisher. It writes a content-addressed GLB under `public/models/generated/` and updates `public/models/generated/manifest.json`; deploy/commit those two public outputs together. The Cesium generated-model layer reads the catalog and uses its active version. This explicit catalog write is public distribution of the GLB, not a preview-only action.
 
-**Trust boundary:** this v1 attestation is operator-supplied. The existing catalog publisher validates the six boolean checks, candidate/evidence hashes and WGS84 placement, but it does not cryptographically authenticate the reviewer or prove that source-owner authority, architectural fidelity, metric scale, independent survey checkpoints or vertical datum are true. The D3M-01 Ed25519 trusted-reviewer registry and the BRF-25 independent-truth process are separate prerequisites. No production reviewer key is provisioned in this PR. A catalog entry must not be created for a real building until those independent gates are satisfied by the platform operator. The parent workflow's `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` flags remain false even after an explicit catalog write; catalog existence is not an accuracy or acceptance assertion.
+**Trust boundary:** this implementation now verifies an Ed25519 receipt against the server-configured D3M-01 trusted-reviewer registry before writing the D3M-ENGINE-03 catalog entry. It no longer treats a plain operator-supplied boolean attestation as sufficient on its own. However, a valid signature proves key possession only; no production reviewer has been onboarded or production registry provisioned in this PR. The signature does not prove civil identity, professional/legal authority, source-owner rights, architectural fidelity, metric scale, independent survey checkpoints or vertical datum. The platform operator must establish reviewer identity/authority through its governance process and complete the BRF-25 independent-truth process. The parent workflow's `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` flags remain false even after an explicit catalog write; catalog existence is not an accuracy or acceptance assertion.
