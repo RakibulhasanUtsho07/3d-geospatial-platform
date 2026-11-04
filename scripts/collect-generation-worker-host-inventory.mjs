@@ -23,7 +23,7 @@ async function main() {
       "  --python <python>              Python executable in the worker environment",
       "  --runner-script <path>         Installed TripoSR run.py to fingerprint and syntax-compile",
       "  --device cpu|mps|cuda:N        Selected device (defaults to BUILDING_ENGINE_DEVICE or cuda:0)",
-      "  --timeout-ms <1000..60000>     Bounded probe timeout (default: 15000)",
+      "  --timeout-ms <1000..180000>    Bounded probe/hash timeout (default: 180000)",
       "",
       "Writes a redacted JSON inventory to stdout. Redirect stdout to a private operator-controlled file if needed.",
       "Imports runtime packages, checks local model-cache readiness and compiles run.py in memory.",
@@ -36,8 +36,8 @@ async function main() {
   }
   if (positionals.length) throw new TypeError("Unexpected positional arguments. Run with --help.");
   const timeoutMs = Number(values["timeout-ms"]);
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60000) {
-    throw new TypeError("--timeout-ms must be an integer from 1000 to 60000.");
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 180000) {
+    throw new TypeError("--timeout-ms must be an integer from 1000 to 180000.");
   }
   const env = {
     ...process.env,
