@@ -429,6 +429,10 @@ export async function runSingleImageRuntimeSmoke(options) {
     throw new RangeError("mcResolution must be an integer from 64 to 512.");
   }
   const timeoutMs = options.timeoutMs ?? 1_800_000;
+  const inventoryTimeoutMs = options.inventoryTimeoutMs ?? 180_000;
+  if (!Number.isInteger(inventoryTimeoutMs) || inventoryTimeoutMs < 1_000 || inventoryTimeoutMs > 180_000) {
+    throw new RangeError("inventoryTimeoutMs must be an integer from 1000 to 180000.");
+  }
   if (!Number.isInteger(timeoutMs) || timeoutMs < 10_000 || timeoutMs > 7_200_000) {
     throw new RangeError("timeoutMs must be an integer from 10000 to 7200000.");
   }
@@ -552,7 +556,7 @@ export async function runSingleImageRuntimeSmoke(options) {
       runnerScript,
       device,
       now: new Date().toISOString(),
-      commandTimeoutMs: options.inventoryTimeoutMs ?? 30_000,
+      commandTimeoutMs: inventoryTimeoutMs,
       probeCapabilities: (probeOptions) =>
         (options.probeCapabilities ?? probeGenerationWorkerCapabilities)({
           ...probeOptions,
@@ -687,6 +691,9 @@ export async function runSingleImageRuntimeSmoke(options) {
     report.workerHost.after = afterSnapshot;
     report.workerHost.stableAcrossInference = fingerprintsStable;
     await replaceReportAtomically(reportPath, report);
+    if (afterBlockers.length) {
+      throw new TypeError("Worker host post-inference model artifact fingerprint verification is blocked.");
+    }
     if (!fingerprintsStable) {
       throw new TypeError("Worker model artifacts or TripoSR runner fingerprint changed during inference.");
     }
@@ -728,7 +735,11 @@ export async function runSingleImageRuntimeSmoke(options) {
       code: error instanceof Error && SAFE_ID.test(error.name) ? error.name : "RuntimeSmokeError",
       summary: !workflowStarted
         ? "Readiness probe failed; no inference was started."
-        : runnerProcessStarted
+        : error?.message === "Worker model artifacts or TripoSR runner fingerprint changed during inference."
+          ? "Worker model artifact or TripoSR runner fingerprint changed during inference; the candidate remains failed and unpublished."
+          : error?.message === "Worker host post-inference model artifact fingerprint verification is blocked."
+            ? "Post-inference worker model artifact fingerprint verification was blocked; the candidate remains failed and unpublished."
+            : runnerProcessStarted
           ? "The TripoSR runner process started, but model generation, GLB export or evidence validation failed; inspect the private workflow report for diagnostics."
           : runnerLaunchAttempted
             ? "The workflow attempted to launch TripoSR, but the operating-system process never started; inference was not started."
