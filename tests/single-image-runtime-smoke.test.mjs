@@ -1081,7 +1081,7 @@ test("binds optional ellipsoidal vertical GCPs through smoke, receipt and offlin
     source: { sourceId: "facade-photo", sha256: source.sha256 },
     horizontalCrs: "EPSG:4326",
     horizontalDatum: "WGS84",
-    verticalDatum: "not-provided",
+    verticalDatum: "EPSG:4979-ellipsoidal",
     survey: {
       method: "RTK GNSS",
       reference: "horizontal-survey-fixture-2026-11-04",
