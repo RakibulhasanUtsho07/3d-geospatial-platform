@@ -353,15 +353,15 @@ export async function collectGenerationWorkerHostInventory({
   runnerScript = env.BUILDING_ENGINE_TRIPOSR_RUNNER_SCRIPT,
   device = env.BUILDING_ENGINE_DEVICE || "cuda:0",
   now = new Date(),
-  commandTimeoutMs = 15_000,
+  commandTimeoutMs = 180_000,
   spawnSyncImpl = nodeSpawnSync,
   probeCapabilities = probeGenerationWorkerCapabilities,
   host = os,
 } = {}) {
   if (typeof pythonPath !== "string" || !pythonPath.trim()) throw new TypeError("pythonPath is required.");
   if (!SAFE_DEVICE.test(device)) throw new TypeError("device must be cpu, mps or cuda:N.");
-  if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 60_000) {
-    throw new RangeError("commandTimeoutMs must be an integer between 1000 and 60000.");
+  if (!Number.isInteger(commandTimeoutMs) || commandTimeoutMs < 1000 || commandTimeoutMs > 180_000) {
+    throw new RangeError("commandTimeoutMs must be an integer between 1000 and 180000.");
   }
   const checkedAt = validTimestamp(now);
   const runner = await inspectRunner(runnerScript);
