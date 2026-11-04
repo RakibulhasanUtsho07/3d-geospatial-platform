@@ -63,11 +63,14 @@ async function runInstrumentedLoaders(t, { mismatchCheckpoint = false } = {}) {
     rembgWeights: { bytes: files.rembg.length, sha256: sha256(files.rembg) },
   };
   const script = [
-    "import sys, torch, omegaconf, onnxruntime",
-    "assert omegaconf.OmegaConf.load(sys.argv[1]) == 'model: triposr\\nresolution: 256\\n'",
-    "assert torch.load(sys.argv[2]) == b'synthetic-triposr-checkpoint-bytes'",
-    "assert onnxruntime.InferenceSession(sys.argv[3]) == b'synthetic-rembg-onnx-model-bytes'",
-  ].join("\n");
+    "import sys",
+    "from omegaconf import OmegaConf",
+    "from torch import load as torch_load",
+    "from onnxruntime import InferenceSession",
+    "assert OmegaConf.load(sys.argv[1]) == 'model: triposr\\nresolution: 256\\n'",
+    "assert torch_load(sys.argv[2]) == b'synthetic-triposr-checkpoint-bytes'",
+    "assert InferenceSession(sys.argv[3]) == b'synthetic-rembg-onnx-model-bytes'",
+  ].join("\\n");
   const result = spawnSync(process.env.PYTHON || "python3", [
     "-c", script, configPath, checkpointPath, rembgPath,
   ], {
