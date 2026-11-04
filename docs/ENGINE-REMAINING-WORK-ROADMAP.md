@@ -503,3 +503,29 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Added tests for stable snapshot hashing/change, symlinked root/manifest/artifact, non-directory root, unsafe filenames, and CLI refusal to sign incomplete package content without leaving a signature. Existing v2 signer/verifier and v1 explicit legacy tests remain in place.
 - **Validation pending:** focused filesystem/signature CLI tests, ESLint, production build, and exact-head Push/PR Full CI must finish successfully before the increment is considered validated.
 - Trust limits unchanged: a snapshot is not an OS-level filesystem lock and cannot prevent privileged writes after signing. Keep the package under controlled write access and rerun combined verification after transfer. Signature/registry do not prove civil identity, reviewer authority, legal rights, survey truth, vertical datum or architecture accuracy. Keep mapReady/publicationEligible/automaticApproval false.
+
+
+## 2026-11-04 — D3M-ENGINE-12 stable signature verification snapshot
+
+- Tracking issue #361; branch `feat/d3m-engine12-stable-signature-verification-20261104`, stacked on D3M-ENGINE-11 PR #360 exact head `91f75bd85797a2f19c7d0516adff2958a9a4429d`.
+- Audit gap: combined verification read the detached signature through a separate path and did not re-inventory the package after cryptographic verification.
+- Added a root-control-file reader using the shared descriptor-pinned no-follow reader; signature envelope reads now reject symlinks and identity/size/time drift.
+- Combined verification re-inventories after signature verification and requires both package snapshot token and exact signature bytes/file identity to remain unchanged.
+- Added focused control-file stable-read and symlink/path rejection tests; CI and documentation updated.
+- **Validation pending:** focused tests, lint, production build and exact-head Push/PR Full CI. This is mutation detection during verification, not an OS-level lock or evidence of survey truth/reviewer authority. All release gates remain false.
+
+
+## 2026-11-04 — D3M-ENGINE-12 stable signature verification hardening
+
+- Re-audit found two gaps in the initial implementation: (1) package-manifest bytes were read before the artifact walk but not reread afterward; (2) combined verification only compared signature bytes and device/inode, not full stat identity, and its final inventory/signature reads ran concurrently.
+- The inventory reader now rereads the manifest after artifact traversal and requires exact bytes plus full descriptor/path identity to remain unchanged. File identity includes device, inode, size, mtime, ctime and mode.
+- The detached signature control file is restricted to 64 KiB and is read with the shared no-follow descriptor reader.
+- Combined verification now serially takes two post-crypto package inventories and two post-crypto signature reads. Both package snapshots must match the initially integrity-verified snapshot; signature bytes and full file identity must match on every observation.
+- Added full synthetic package materialization + v2 Ed25519 registry signature + combined CLI success test, followed by artifact tampering rejection. Added signature-file identity/mode/size tests and size-limit/path rejection tests. Fake fixture image headers now expose deterministic dimensions to the same filesystem inventory parser.
+- **Validation pending:** focused exact-head tests, ESLint, production build and Push/PR Full CI. This detects observed changes during the verifier window but is not an OS-level lock; reverify after transfer and keep the directory under controlled write access.
+
+
+- Added an injectable deterministic verification-window guard and tests proving unchanged observations pass while package snapshot drift or signature bytes/metadata drift fail closed. This tests the exact serial observation contract without relying on timing-sensitive background file mutation.
+
+
+- Extended stable filesystem reads to the explicitly supplied legacy v1 trusted public-key PEM. The verifier now uses descriptor-pinned no-follow reads, compares descriptor/path identity and bounds the file to 16 KiB; added symlink, oversize and exact-byte tests.

@@ -5,7 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  assertStableBuildingReviewPackageVerificationWindow,
   readBuildingReviewPackageDirectory,
+  readBuildingReviewPackageControlFile,
+  readStableBuildingReviewPackageLegacyPublicKey,
+  sameBuildingReviewPackageControlFile,
   sameBuildingReviewPackageSnapshot,
 } from "../src/core/building-generation/building-review-package-directory.mjs";
 
@@ -95,4 +99,160 @@ test("does not silently accept a directory swapped or mutated during inventory",
   await writeFile(path.join(packageDir, "nested", "two.bin"), "two");
   const after = await readBuildingReviewPackageDirectory(packageDir);
   assert.equal(sameBuildingReviewPackageSnapshot(before, after), false);
+});
+
+
+test("reads detached signature control file through the stable no-follow reader", async (t) => {
+  const { packageDir, parent } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  await writeFile(signaturePath, JSON.stringify({ schemaVersion: "2.0.0" }));
+  const first = await (await import("../src/core/building-generation/building-review-package-directory.mjs"))
+    .readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  assert.equal(first.bytes.toString("utf8"), JSON.stringify({ schemaVersion: "2.0.0" }));
+  assert.equal(first.stat.isFile(), true);
+
+  const outside = path.join(parent, "external-signature.json");
+  await writeFile(outside, "{}");
+  await rm(signaturePath);
+  await symlink(outside, signaturePath);
+  await assert.rejects(
+    (await import("../src/core/building-generation/building-review-package-directory.mjs"))
+      .readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+    /review-package-symlink-not-allowed/,
+  );
+});
+
+test("control-file reader refuses arbitrary names and paths", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const { readBuildingReviewPackageControlFile } = await import("../src/core/building-generation/building-review-package-directory.mjs");
+  await assert.rejects(readBuildingReviewPackageControlFile(packageDir, "../outside"), /Only the detached signature/);
+});
+
+
+test("stable control-file comparison binds bytes and the full file identity", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  const signatureBytes = Buffer.from(JSON.stringify({ schemaVersion: "2.0.0" }));
+  await writeFile(signaturePath, signatureBytes);
+  const first = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  const second = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  assert.equal(sameBuildingReviewPackageControlFile(first, second), true);
+  assert.equal(sameBuildingReviewPackageControlFile(first, { ...second, bytes: Buffer.from("{}") }), false);
+  assert.equal(sameBuildingReviewPackageControlFile(first, {
+    ...second,
+    stat: { ...second.stat, ctimeNs: second.stat.ctimeNs + 1n },
+  }), false);
+  assert.equal(sameBuildingReviewPackageControlFile(first, {
+    ...second,
+    stat: { ...second.stat, mode: second.stat.mode ^ 0o100n },
+  }), false);
+});
+
+test("rejects oversized signature control files and arbitrary control-file names", async (t) => {
+  const { packageDir } = await tempPackage(t);
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
+  await writeFile(signaturePath, Buffer.alloc(64 * 1024 + 1, 0x20));
+  await assert.rejects(
+    readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+    /file-exceeds-size-limit/,
+  );
+  await assert.rejects(
+    readBuildingReviewPackageControlFile(packageDir, "package-manifest.json"),
+    /Only the detached signature/,
+  );
+});
+
+
+test("verification-window guard accepts stable serial package and signature observations", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  await assertStableBuildingReviewPackageVerificationWindow({
+    initialPackageSnapshot: packageSnapshot,
+    initialSignatureSnapshot: signatureSnapshot,
+    readPackageSnapshot: async () => ({ snapshotToken: "a".repeat(64) }),
+    readSignatureSnapshot: async () => ({
+      bytes: Buffer.from(signatureSnapshot.bytes),
+      stat: { ...signatureSnapshot.stat },
+    }),
+  });
+});
+
+test("verification-window guard rejects package mutation between post-crypto observations", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  let reads = 0;
+  await assert.rejects(
+    assertStableBuildingReviewPackageVerificationWindow({
+      initialPackageSnapshot: packageSnapshot,
+      initialSignatureSnapshot: signatureSnapshot,
+      readPackageSnapshot: async () => ({
+        snapshotToken: ++reads === 1 ? "a".repeat(64) : "b".repeat(64),
+      }),
+      readSignatureSnapshot: async () => ({
+        bytes: Buffer.from(signatureSnapshot.bytes),
+        stat: { ...signatureSnapshot.stat },
+      }),
+    }),
+    /review-package-changed-during-signature-verification/,
+  );
+});
+
+test("verification-window guard rejects signature content or metadata mutation", async () => {
+  const packageSnapshot = { snapshotToken: "a".repeat(64) };
+  const signatureSnapshot = {
+    bytes: Buffer.from("signature-envelope"),
+    stat: { dev: 1n, ino: 2n, size: 18n, mtimeNs: 3n, ctimeNs: 4n, mode: 0o100600n },
+  };
+  let reads = 0;
+  await assert.rejects(
+    assertStableBuildingReviewPackageVerificationWindow({
+      initialPackageSnapshot: packageSnapshot,
+      initialSignatureSnapshot: signatureSnapshot,
+      readPackageSnapshot: async () => ({ snapshotToken: "a".repeat(64) }),
+      readSignatureSnapshot: async () => ({
+        bytes: Buffer.from(signatureSnapshot.bytes),
+        stat: {
+          ...signatureSnapshot.stat,
+          ...(++reads === 1 ? {} : { ctimeNs: 9n }),
+        },
+      }),
+    }),
+    /review-package-signature-envelope-changed-during-verification/,
+  );
+});
+
+
+test("legacy public-key reader rejects symlinks and oversized key files", async (t) => {
+  const { parent } = await tempPackage(t);
+  const keyPath = path.join(parent, "legacy-public.pem");
+  const external = path.join(parent, "external.pem");
+  await writeFile(external, "-----BEGIN PUBLIC KEY-----\\nfixture\\n-----END PUBLIC KEY-----\\n");
+  await symlink(external, keyPath);
+  await assert.rejects(
+    readStableBuildingReviewPackageLegacyPublicKey(keyPath),
+    /review-package-symlink-not-allowed/,
+  );
+
+  await rm(keyPath);
+  await writeFile(keyPath, Buffer.alloc(16 * 1024 + 1, 0x41));
+  await assert.rejects(
+    readStableBuildingReviewPackageLegacyPublicKey(keyPath),
+    /file-exceeds-size-limit/,
+  );
+});
+
+test("legacy public-key reader returns the exact stable bytes and descriptor identity", async (t) => {
+  const { parent } = await tempPackage(t);
+  const keyPath = path.join(parent, "legacy-public.pem");
+  const bytes = Buffer.from("-----BEGIN PUBLIC KEY-----\\nsynthetic-test-key\\n-----END PUBLIC KEY-----\\n");
+  await writeFile(keyPath, bytes, { mode: 0o600 });
+  const snapshot = await readStableBuildingReviewPackageLegacyPublicKey(keyPath);
+  assert.deepEqual(snapshot.bytes, bytes);
+  assert.equal(snapshot.stat.isFile(), true);
 });

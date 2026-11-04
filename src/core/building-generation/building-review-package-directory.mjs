@@ -15,6 +15,7 @@ function identity(stat) {
     stat.size.toString(),
     stat.mtimeNs.toString(),
     stat.ctimeNs.toString(),
+    stat.mode.toString(),
   ].join(":");
 }
 
@@ -29,9 +30,12 @@ async function statPath(filePath, label) {
   return stat;
 }
 
-async function readStableRegularFile(filePath, label) {
+async function readStableRegularFile(filePath, label, maxBytes = null) {
   const pathBefore = await statPath(filePath, label);
   if (!pathBefore.isFile()) throw new Error("review-package-entry-must-be-regular-file:" + label);
+  if (maxBytes !== null && pathBefore.size > BigInt(maxBytes)) {
+    throw new Error("review-package-file-exceeds-size-limit:" + label);
+  }
 
   const noFollow = constants.O_NOFOLLOW ?? 0;
   let handle;
@@ -47,7 +51,8 @@ async function readStableRegularFile(filePath, label) {
     if (!descriptorAfter.isFile() ||
         identity(descriptorBefore) !== identity(descriptorAfter) ||
         identity(descriptorAfter) !== identity(pathAfter) ||
-        BigInt(bytes.length) !== descriptorAfter.size) {
+        BigInt(bytes.length) !== descriptorAfter.size ||
+        (maxBytes !== null && descriptorAfter.size > BigInt(maxBytes))) {
       throw new Error("review-package-file-changed-during-read:" + label);
     }
     return { bytes, stat: descriptorAfter };
@@ -118,7 +123,8 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
   if (!rootBefore.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
 
   const manifestPath = path.join(packageDir, "package-manifest.json");
-  const { bytes: packageManifestBytes } = await readStableRegularFile(manifestPath, "package-manifest.json");
+  const manifestSnapshot = await readStableRegularFile(manifestPath, "package-manifest.json");
+  const packageManifestBytes = manifestSnapshot.bytes;
   let packageManifest;
   try {
     packageManifest = JSON.parse(packageManifestBytes.toString("utf8"));
@@ -129,6 +135,15 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
   const actualFiles = [];
   await walkDirectory(packageDir, packageDir, actualFiles);
   actualFiles.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+
+  // The manifest is a package control file and is intentionally excluded from
+  // actualFiles. Re-read it after walking all artifacts so a concurrent
+  // replacement cannot leave the inventory bound to stale manifest bytes.
+  const finalManifestSnapshot = await readStableRegularFile(manifestPath, "package-manifest.json");
+  if (!manifestSnapshot.bytes.equals(finalManifestSnapshot.bytes) ||
+      identity(manifestSnapshot.stat) !== identity(finalManifestSnapshot.stat)) {
+    throw new Error("review-package-manifest-changed-during-inventory");
+  }
 
   const rootAfter = await statPath(packageDir, "root-directory");
   if (identity(rootBefore) !== identity(rootAfter)) {
@@ -165,4 +180,84 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg) {
 
 export function sameBuildingReviewPackageSnapshot(left, right) {
   return Boolean(left && right && left.snapshotToken === right.snapshotToken);
+}
+
+export function sameBuildingReviewPackageControlFile(left, right) {
+  return Boolean(left && right &&
+    Buffer.isBuffer(left.bytes) && Buffer.isBuffer(right.bytes) &&
+    left.bytes.equals(right.bytes) &&
+    left.stat && right.stat &&
+    identity(left.stat) === identity(right.stat));
+}
+
+
+/**
+ * Reads a root-level detached signature control file with the same descriptor-
+ * pinned no-follow and identity checks as package artifacts.
+ */
+export async function readBuildingReviewPackageControlFile(directoryArg, filename) {
+  if (typeof directoryArg !== "string" || !directoryArg.trim()) {
+    throw new TypeError("Review-package directory path is required.");
+  }
+  if (filename !== "package-manifest.sig.json") {
+    throw new TypeError("Only the detached signature control file may be read here.");
+  }
+  const packageDir = path.resolve(directoryArg);
+  const rootBefore = await statPath(packageDir, "root-directory");
+  if (!rootBefore.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
+  const result = await readStableRegularFile(path.join(packageDir, filename), filename, 64 * 1024);
+  if (result.bytes.length === 0) throw new Error("review-package-signature-envelope-empty");
+  const rootAfter = await statPath(packageDir, "root-directory");
+  if (identity(rootBefore) !== identity(rootAfter)) {
+    throw new Error("review-package-root-changed-during-control-file-read");
+  }
+  return result;
+}
+
+
+/**
+ * Observe the package and signature again after cryptographic verification.
+ * Readers are injected so race-window behavior can be tested deterministically.
+ */
+export async function assertStableBuildingReviewPackageVerificationWindow({
+  initialPackageSnapshot,
+  initialSignatureSnapshot,
+  readPackageSnapshot,
+  readSignatureSnapshot,
+}) {
+  if (!initialPackageSnapshot || !initialSignatureSnapshot ||
+      typeof readPackageSnapshot !== "function" ||
+      typeof readSignatureSnapshot !== "function") {
+    throw new TypeError("Initial package/signature snapshots and read callbacks are required.");
+  }
+  const finalPackageSnapshot = await readPackageSnapshot();
+  const finalSignatureSnapshot = await readSignatureSnapshot();
+  const confirmationPackageSnapshot = await readPackageSnapshot();
+  const confirmationSignatureSnapshot = await readSignatureSnapshot();
+
+  if (!sameBuildingReviewPackageSnapshot(initialPackageSnapshot, finalPackageSnapshot) ||
+      !sameBuildingReviewPackageSnapshot(finalPackageSnapshot, confirmationPackageSnapshot)) {
+    throw new Error("review-package-changed-during-signature-verification");
+  }
+  if (!sameBuildingReviewPackageControlFile(initialSignatureSnapshot, finalSignatureSnapshot) ||
+      !sameBuildingReviewPackageControlFile(finalSignatureSnapshot, confirmationSignatureSnapshot)) {
+    throw new Error("review-package-signature-envelope-changed-during-verification");
+  }
+  return {
+    packageSnapshot: initialPackageSnapshot,
+    signatureSnapshot: initialSignatureSnapshot,
+  };
+}
+
+
+/**
+ * Reads an explicitly supplied legacy verification public key without
+ * following a final-component symlink and with descriptor/path identity checks.
+ * Private keys are never accepted by this verifier-side helper.
+ */
+export async function readStableBuildingReviewPackageLegacyPublicKey(filePath) {
+  if (typeof filePath !== "string" || !filePath.trim()) {
+    throw new TypeError("Legacy trusted public-key file path is required.");
+  }
+  return readStableRegularFile(path.resolve(filePath), "legacy-public-key", 16 * 1024);
 }

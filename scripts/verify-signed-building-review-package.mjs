@@ -1,27 +1,18 @@
-import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   verifyBuildingReviewPackageSignature,
   verifyBuildingReviewPackageSignatureWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
-import { verifyBuildingReviewPackageDirectory } from "../src/core/building-generation/building-review-package-directory.mjs";
+import {
+  assertStableBuildingReviewPackageVerificationWindow,
+  readBuildingReviewPackageDirectory,
+  verifyBuildingReviewPackageDirectory,
+  readBuildingReviewPackageControlFile,
+  readStableBuildingReviewPackageLegacyPublicKey,
+} from "../src/core/building-generation/building-review-package-directory.mjs";
 
 const REGISTRY_ENV = "RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON";
-
-async function regularFile(filePath, label) {
-  const details = await lstat(filePath);
-  if (!details.isFile() || details.isSymbolicLink()) throw new Error(label + " must be a regular file, not a symlink");
-  const bytes = await readFile(filePath);
-  if (bytes.length === 0) throw new Error(label + " must not be empty");
-  const after = await lstat(filePath);
-  if (!after.isFile() || after.isSymbolicLink() ||
-      details.dev !== after.dev || details.ino !== after.ino ||
-      details.size !== after.size || details.mtimeMs !== after.mtimeMs ||
-      details.ctimeMs !== after.ctimeMs) {
-    throw new Error(label + " changed while it was being read");
-  }
-  return bytes;
-}
 
 function parseArguments(args) {
   const positional = [];
@@ -60,7 +51,8 @@ async function main() {
   const snapshot = await verifyBuildingReviewPackageDirectory(packageDir);
   const manifestPath = path.join(packageDir, "package-manifest.json");
   const signaturePath = path.join(packageDir, "package-manifest.sig.json");
-  const signatureBytes = await regularFile(signaturePath, "Signature envelope");
+  const signatureSnapshot = await readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json");
+  const signatureBytes = signatureSnapshot.bytes;
   const signatureEnvelope = JSON.parse(signatureBytes.toString("utf8"));
 
   let signature;
@@ -80,7 +72,8 @@ async function main() {
     });
   } else if (signatureEnvelope.schemaVersion === "1.0.0") {
     if (!legacyPublicKeyPath) throw new Error("legacy-v1-signature-requires-explicit---legacy-public-key");
-    const publicKeyBytes = await regularFile(legacyPublicKeyPath, "Legacy trusted public key");
+    const publicKeySnapshot = await readStableBuildingReviewPackageLegacyPublicKey(legacyPublicKeyPath);
+    const publicKeyBytes = publicKeySnapshot.bytes;
     signature = verifyBuildingReviewPackageSignature({
       manifestBytes: snapshot.packageManifestBytes,
       signatureEnvelope,
@@ -90,6 +83,14 @@ async function main() {
     throw new Error("unsupported-review-package-signature-schema");
   }
 
+  // The detached envelope is excluded from artifact inventory, so verify
+  // both snapshots serially through the deterministic race-window guard.
+  await assertStableBuildingReviewPackageVerificationWindow({
+    initialPackageSnapshot: snapshot,
+    initialSignatureSnapshot: signatureSnapshot,
+    readPackageSnapshot: () => readBuildingReviewPackageDirectory(packageDir),
+    readSignatureSnapshot: () => readBuildingReviewPackageControlFile(packageDir, "package-manifest.sig.json"),
+  });
   const integrity = snapshot.integrity;
   const valid = integrity.valid === true && signature.valid === true;
   const result = {
