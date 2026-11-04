@@ -278,9 +278,21 @@ export function createSingleImageGeoreferenceEvidence({
   };
 }
 
-export async function verifySingleImageGeoreferenceEvidence({
-  workspaceRoot,
+function canonicalObjectJson(value) {
+  return JSON.stringify(value, (_key, item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+    return Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]]));
+  });
+}
+
+/**
+ * Re-verifies a D3M-08 georeference record using the exact manifest bytes.
+ * This pure-byte entry point lets offline review packages repeat the fit
+ * without relying on the original worker workspace path.
+ */
+export function verifySingleImageGeoreferenceEvidenceBytes({
   evidence,
+  manifestBytes = null,
   buildingId,
   sourceId,
   sourceSha256,
@@ -296,13 +308,17 @@ export async function verifySingleImageGeoreferenceEvidence({
   if (evidence.schemaVersion !== "1.0.0" || evidence.modelSha256 !== modelSha256) {
     throw new TypeError("Georeference evidence does not bind this exact GLB candidate.");
   }
+
   let loadedManifest = null;
   if (evidence.manifest === null) {
-    if (evidence.status !== "not-requested" || evidence.registration !== null ||
+    if (manifestBytes !== null || evidence.status !== "not-requested" || evidence.registration !== null ||
         evidence.maxGcpRmsErrorM !== null || evidence.maxGcpResidualM !== null) {
       throw new TypeError("Unrequested georeference evidence has unexpected calibration data.");
     }
   } else {
+    if (!Buffer.isBuffer(manifestBytes) || manifestBytes.length < 1) {
+      throw new TypeError("The exact control-point manifest bytes are required for verification.");
+    }
     exactKeys(
       evidence.manifest,
       ["path", "bytes", "sha256", "pointCount", "horizontalCrs", "horizontalDatum",
@@ -310,28 +326,59 @@ export async function verifySingleImageGeoreferenceEvidence({
       [],
       "Control-point manifest receipt binding",
     );
-    loadedManifest = await loadSingleImageControlPointManifest({
-      workspaceRoot,
-      relativePath: evidence.manifest.path,
-      buildingId,
-      sourceId,
-      sourceSha256,
-    });
+    const relativePath = safeRelativePath(evidence.manifest.path);
+    let raw;
+    try {
+      raw = JSON.parse(manifestBytes.toString("utf8"));
+    } catch {
+      throw new TypeError("Packaged control-point manifest is not valid UTF-8 JSON.");
+    }
+    const manifest = normalizeManifest(raw, { buildingId, sourceId, sourceSha256 });
+    loadedManifest = {
+      path: relativePath,
+      bytes: manifestBytes.length,
+      sha256: sha256(manifestBytes),
+      manifest,
+    };
     if (loadedManifest.bytes !== evidence.manifest.bytes ||
         loadedManifest.sha256 !== evidence.manifest.sha256 ||
         loadedManifest.manifest.controlPoints.length !== evidence.manifest.pointCount) {
-      throw new Error("Control-point manifest bytes or identity changed after the georeference receipt was written.");
+      throw new Error("Control-point manifest bytes or identity do not match the georeference receipt.");
     }
   }
+
   const expected = createSingleImageGeoreferenceEvidence({
     loadedManifest,
     modelSha256,
     maxGcpRmsErrorM: evidence.maxGcpRmsErrorM,
     maxGcpResidualM: evidence.maxGcpResidualM,
   });
-  const { canonicalJson } = await import("./generation-artifact-receipt.mjs");
-  if (canonicalJson(expected) !== canonicalJson(evidence)) {
+  if (canonicalObjectJson(expected) !== canonicalObjectJson(evidence)) {
     throw new TypeError("Single-image georeference evidence does not match independently recomputed control-point registration.");
   }
   return expected;
+}
+
+export async function verifySingleImageGeoreferenceEvidence({
+  workspaceRoot,
+  evidence,
+  buildingId,
+  sourceId,
+  sourceSha256,
+  modelSha256,
+}) {
+  let manifestBytes = null;
+  if (evidence?.manifest !== null) {
+    const root = await realpath(path.resolve(workspaceRoot));
+    const relativePath = safeRelativePath(evidence.manifest.path);
+    manifestBytes = await readStableManifest(root, relativePath);
+  }
+  return verifySingleImageGeoreferenceEvidenceBytes({
+    evidence,
+    manifestBytes,
+    buildingId,
+    sourceId,
+    sourceSha256,
+    modelSha256,
+  });
 }

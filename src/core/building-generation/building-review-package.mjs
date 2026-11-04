@@ -38,6 +38,7 @@ export function buildBuildingReviewPackageManifest({
   artifacts,
   requiredRenderViews = REQUIRED_REVIEW_VIEWS,
   renderManifestViews = [],
+  singleImageEvidence = null,
   generatedAt = new Date().toISOString(),
 }) {
   if (!nonEmptyString(buildingId)) throw new TypeError("buildingId is required");
@@ -117,6 +118,48 @@ export function buildBuildingReviewPackageManifest({
     if (!renderViews.has(viewId)) throw new Error("review-package-required-render-view-missing:" + viewId);
   }
 
+  const singleImageArtifactTypes = [
+    "single-image-smoke-report",
+    "single-image-generation-artifact-receipt",
+    "single-image-workflow-report",
+    "single-image-control-point-manifest",
+  ];
+  const singleImageCounts = new Map(singleImageArtifactTypes.map((type) => [type, byType.get(type) ?? 0]));
+  const singleImageArtifactCount = [...singleImageCounts.values()].reduce((sum, count) => sum + count, 0);
+  if (singleImageEvidence === null) {
+    if (singleImageArtifactCount !== 0) throw new Error("review-package-single-image-evidence-metadata-missing");
+  } else {
+    if (!isObject(singleImageEvidence) || singleImageEvidence.schemaVersion !== "1.0.0" ||
+        !nonEmptyString(singleImageEvidence.jobId) || !nonEmptyString(singleImageEvidence.sourceId) ||
+        !isHash(singleImageEvidence.sourceSha256) || !isHash(singleImageEvidence.candidateGlbSha256) ||
+        !isHash(singleImageEvidence.controlPointManifestSha256) || !isHash(singleImageEvidence.smokeReportSha256) ||
+        !isHash(singleImageEvidence.generationArtifactReceiptSha256) || !isHash(singleImageEvidence.workflowReportSha256) ||
+        singleImageEvidence.buildingId !== buildingId ||
+        singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
+        singleImageEvidence.verticalDatum !== "not-solved" ||
+        singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
+        singleImageEvidence.automaticApproval !== false ||
+        singleImageEvidence.candidateGlbSha256.toLowerCase() !==
+          artifacts.find((item) => item.artifactType === "candidate-glb")?.sha256.toLowerCase()) {
+      throw new Error("review-package-single-image-evidence-metadata-invalid");
+    }
+    for (const [type, count] of singleImageCounts) {
+      if (count !== 1) throw new Error("review-package-requires-exactly-one-" + type);
+    }
+    const expectedDigests = new Map([
+      ["single-image-smoke-report", singleImageEvidence.smokeReportSha256],
+      ["single-image-generation-artifact-receipt", singleImageEvidence.generationArtifactReceiptSha256],
+      ["single-image-workflow-report", singleImageEvidence.workflowReportSha256],
+      ["single-image-control-point-manifest", singleImageEvidence.controlPointManifestSha256],
+    ]);
+    for (const [type, expected] of expectedDigests) {
+      const actual = artifacts.find((entry) => entry.artifactType === type);
+      if (actual?.sha256.toLowerCase() !== expected.toLowerCase()) {
+        throw new Error("review-package-single-image-evidence-digest-mismatch:" + type);
+      }
+    }
+  }
+
   const readyProvenance = readinessReport.provenance ?? {};
   const expectedDigests = new Map([
     ["render-manifest", { expected: readyProvenance.renderManifestSha256, field: "sha256" }],
@@ -178,6 +221,23 @@ export function buildBuildingReviewPackageManifest({
       totalBytes,
     },
     artifacts: cleanArtifacts,
+    ...(singleImageEvidence ? { singleImageEvidence: {
+      schemaVersion: singleImageEvidence.schemaVersion,
+      jobId: singleImageEvidence.jobId,
+      buildingId: singleImageEvidence.buildingId,
+      sourceId: singleImageEvidence.sourceId,
+      sourceSha256: singleImageEvidence.sourceSha256.toLowerCase(),
+      candidateGlbSha256: singleImageEvidence.candidateGlbSha256.toLowerCase(),
+      georeferenceStatus: singleImageEvidence.georeferenceStatus,
+      controlPointManifestSha256: singleImageEvidence.controlPointManifestSha256.toLowerCase(),
+      smokeReportSha256: singleImageEvidence.smokeReportSha256.toLowerCase(),
+      generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
+      workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
+      verticalDatum: singleImageEvidence.verticalDatum,
+      mapReady: false,
+      publicationEligible: false,
+      automaticApproval: false,
+    } } : {}),
     policy: {
       candidateModified: false,
       assetPublished: false,

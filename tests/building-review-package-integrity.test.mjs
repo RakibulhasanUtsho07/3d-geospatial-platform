@@ -300,3 +300,29 @@ test("detects JSON content-digest changes and refuses unsafe manifest entries", 
   assert.equal(unsafeReport.valid, false);
   assert.ok(unsafeReport.errors.some((item) => item.id === "manifest-artifact:0"));
 });
+
+
+test("rejects a partial single-image evidence group when the signed package metadata is absent", async () => {
+  const { packageManifest, actualFiles } = await createFixture();
+  const bytes = Buffer.from("partial-smoke-report");
+  packageManifest.artifacts.push({
+    artifactType: "single-image-smoke-report",
+    relativePath: "reports/single-image-runtime-smoke.json",
+    sha256: hash(bytes),
+    bytes: bytes.length,
+  });
+  actualFiles.push({
+    relativePath: "reports/single-image-runtime-smoke.json",
+    sha256: hash(bytes),
+    bytes: bytes.length,
+    content: bytes,
+    isRegularFile: true,
+  });
+  const report = verifyBuildingReviewPackage({
+    packageManifest,
+    actualFiles,
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.id === "single-image-evidence-group-absent-or-complete"));
+});
