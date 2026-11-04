@@ -204,6 +204,7 @@ test("records an immutable approved review and publishes only through the explic
   );
 
   const reviewReceipt = await makeSignedPublicationReceipt(setup, t);
+  const expectedReceiptSha256 = hash(Buffer.from(JSON.stringify(reviewReceipt, null, 2) + "\n", "utf8"));
   const published = await publishReviewedFloorPlanModelCandidate({
     workspaceRoot: setup.root,
     buildingId: setup.candidate.buildingId,
@@ -214,6 +215,7 @@ test("records an immutable approved review and publishes only through the explic
   assert.equal(published.modelId, publication.modelId);
   assert.equal(published.assetUrl.startsWith("/models/generated/"), true);
   assert.equal(published.sha256, setup.candidate.modelSha256);
+  assert.equal(published.reviewerAuthentication.signedReviewReceiptSha256, expectedReceiptSha256);
   assert.equal(published.mapReady, false);
   assert.equal(published.publicationEligible, false);
 
