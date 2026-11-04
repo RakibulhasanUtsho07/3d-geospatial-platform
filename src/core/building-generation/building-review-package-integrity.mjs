@@ -469,7 +469,8 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           checkpointEvidence.controlPointManifestSha256 === controlManifestArtifact.sha256 &&
           checkpointEvidence.fittingControlsExcluded === true &&
           checkpointEvidence.controls?.thresholdPass === true
-        : checkpointEvidence === null;
+        : checkpointEvidence === null &&
+          !Object.keys(metadata).some((key) => key.startsWith("checkpoint"));
 
       if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
           smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
