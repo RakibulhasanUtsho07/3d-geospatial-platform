@@ -134,6 +134,7 @@ async function fixture(t) {
     reviewerNotes: "Synthetic test evidence only.",
   }, null, 2));
   await writeFile(path.join(evidenceDir, "review-evidence.json"), evidenceBytes);
+  const reviewerReviewedAtUtc = new Date().toISOString();
   const attestation = {
     schemaVersion: "1.0.0",
     candidateSha256: candidateSha,
@@ -151,8 +152,8 @@ async function fixture(t) {
       forwardAxis: "Z",
     },
     review: {
-      reviewer: "synthetic-reviewer-fixture",
-      reviewedAt: "2026-11-04T00:00:00.000Z",
+      reviewer: "reviewer-test-01",
+      reviewedAt: reviewerReviewedAtUtc,
       evidenceId: "synthetic-d3m03-review-evidence",
       evidencePath: "evidence/review-evidence.json",
       evidenceSha256: sha256(evidenceBytes),
@@ -181,7 +182,7 @@ async function fixture(t) {
     candidateGlbSha256: candidateSha,
     publicationAttestationSha256: sha256(attestationBytes),
     reviewerId: "reviewer-test-01",
-    reviewedAtUtc: new Date().toISOString(),
+    reviewedAtUtc: reviewerReviewedAtUtc,
     decision: "approve-for-catalog-handoff",
   };
   const signatureBase64 = sign(
@@ -218,7 +219,7 @@ test("publishes the exact reviewed geometry GLB to the Cesium catalog and preser
     attestationPath: "publication-attestation.json",
     reviewReceiptPath: f.reviewReceiptPath,
     publicRoot: f.publicRoot,
-    publishedAt: "2026-11-04T00:01:00.000Z",
+    publishedAt: new Date().toISOString(),
   });
 
   assert.equal(result.modelId, "demo-building");
@@ -233,6 +234,9 @@ test("publishes the exact reviewed geometry GLB to the Cesium catalog and preser
   const active = getActivePublishedModels(JSON.parse(await readFile(result.manifestPath, "utf8")));
   assert.equal(active.length, 1);
   assert.equal(active[0].definition.id, "demo-building");
+  assert.equal(active[0].review.authentication.reviewerId, "reviewer-test-01");
+  assert.equal(active[0].review.authentication.keyId, "d3m03-test-key-01");
+  assert.equal(active[0].review.authentication.scheme, "Ed25519");
   assert.equal(active[0].sha256, f.candidateSha);
   assert.equal(active[0].definition.url, result.assetUrl);
   const publishedBytes = await readFile(path.join(f.publicRoot, "public", result.assetUrl.slice(1)));
