@@ -151,16 +151,19 @@ test("aborts rembg loading when ONNX bytes differ from the preflight fingerprint
 
 async function runInstrumentedSourceImage(t, {
   mismatchSource = false,
+  mismatchPath = false,
   importStyle = "from",
 } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "single-image-source-loader-"));
   t.after(async () => rm(root, { recursive: true, force: true }));
   const sourceBytes = Buffer.from([0xff, 0xd8, 0xff, 0x10, 0x20, 0x30, 0x40]);
   const sourcePath = path.join(root, "source.jpg");
+  const alternatePath = path.join(root, "alternate-source.jpg");
   const receiptPath = path.join(root, "source-load-receipt.jsonl");
   const pilDirectory = path.join(root, "PIL");
   await mkdir(pilDirectory);
   await writeFile(sourcePath, sourceBytes);
+  await writeFile(alternatePath, sourceBytes);
   await writeFile(path.join(root, "sitecustomize.py"), SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE);
   await writeFile(path.join(pilDirectory, "__init__.py"), "from . import Image\n");
   await writeFile(path.join(pilDirectory, "Image.py"), [
@@ -194,6 +197,7 @@ async function runInstrumentedSourceImage(t, {
       : [
         "from PIL import Image",
       ];
+  const sourceArgument = mismatchPath ? alternatePath : sourcePath;
   const script = [
     "import os, sys",
     ...importLines,
@@ -204,7 +208,7 @@ async function runInstrumentedSourceImage(t, {
     "assert second.payload == first.payload",
   ].join("\n");
   const result = spawnSync(process.env.PYTHON || "python3", [
-    "-c", script, sourcePath,
+    "-c", script, sourceArgument,
   ], {
     cwd: root,
     encoding: "utf8",
@@ -250,8 +254,21 @@ test("supports PIL.Image dynamic import without weakening source-image byte iden
   assert.equal(events[0].exactBytesPassed, true);
 });
 
+test("supports the PIL.Image module import form", async (t) => {
+  const { events } = await runInstrumentedSourceImage(t, { importStyle: "module" });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].loader, "PIL.Image.open");
+});
+
 test("rejects source-image digest mismatch before the original Pillow decoder runs", async (t) => {
   const { events, result } = await runInstrumentedSourceImage(t, { mismatchSource: true });
   assert.notEqual(result.status, 0);
+  assert.deepEqual(events, []);
+});
+
+test("rejects a different source-image path before the original Pillow decoder runs", async (t) => {
+  const { events, result } = await runInstrumentedSourceImage(t, { mismatchPath: true });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /other than the attested source path/i);
   assert.deepEqual(events, []);
 });
