@@ -126,7 +126,9 @@ async function makeApprovedJob(t) {
   const reviewReceipt = { submission, signatureBase64 };
   const reviewReceiptPath = path.join(workspaceRoot, "signed-generation-publication-review.json");
   await writeFile(reviewReceiptPath, JSON.stringify(reviewReceipt, null, 2), { mode: 0o600 });
-  const privateKeyPath = path.join(workspaceRoot, "test-reviewer-private-key.pem");
+  const privateKeyRoot = await mkdtemp(path.join(os.tmpdir(), "d3m02-reviewer-private-key-"));
+  t.after(() => rm(privateKeyRoot, { recursive: true, force: true }));
+  const privateKeyPath = path.join(privateKeyRoot, "test-reviewer-private-key.pem");
   await writeFile(privateKeyPath, privateKeyPem, { mode: 0o600 });
 
   return {
