@@ -158,7 +158,7 @@ def _tracked_file_loader(loader, original, file_value, args, kwargs):
         _append_receipt(loader, digest, byte_count, stable_after_load)
         return result
 
-def _tracked_onnx_session(original, model_path_or_bytes, args, kwargs):
+def _tracked_onnx_session(original_init, instance, model_path_or_bytes, args, kwargs):
     if isinstance(model_path_or_bytes, (str, os.PathLike)):
         model_path = os.fspath(model_path_or_bytes)
         with open(model_path, 'rb') as handle:
@@ -181,8 +181,8 @@ def _tracked_onnx_session(original, model_path_or_bytes, args, kwargs):
         digest = hashlib.sha256(model_bytes).hexdigest()
         expected = _EXPECTED.get('rembgWeights', {})
         if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
-            return original(model_path_or_bytes, *args, **kwargs)
-        result = original(model_bytes, *args, **kwargs)
+            return original_init(instance, model_path_or_bytes, *args, **kwargs)
+        result = original_init(instance, model_bytes, *args, **kwargs)
         _append_receipt(
             'onnxruntime.InferenceSession', digest, len(model_bytes), True
         )
@@ -191,13 +191,13 @@ def _tracked_onnx_session(original, model_path_or_bytes, args, kwargs):
         model_bytes = bytes(model_path_or_bytes)
         digest = hashlib.sha256(model_bytes).hexdigest()
         expected = _EXPECTED.get('rembgWeights', {})
-        result = original(model_bytes, *args, **kwargs)
+        result = original_init(instance, model_bytes, *args, **kwargs)
         if digest == expected.get('sha256') and len(model_bytes) == expected.get('bytes'):
             _append_receipt(
                 'onnxruntime.InferenceSession', digest, len(model_bytes), True
             )
         return result
-    return original(model_path_or_bytes, *args, **kwargs)
+    return original_init(instance, model_path_or_bytes, *args, **kwargs)
 
 def _patch_module(name, module):
     if not _RECEIPT or module is None or name in _PATCHED:
@@ -218,14 +218,16 @@ def _patch_module(name, module):
                 )
             config_class.load = staticmethod(tracked_config_load)
             _PATCHED.add(name)
-    elif name == 'onnxruntime' and callable(getattr(module, 'InferenceSession', None)):
-        original = module.InferenceSession
-        def tracked_inference_session(model_path_or_bytes, *args, **kwargs):
-            return _tracked_onnx_session(
-                original, model_path_or_bytes, args, kwargs
-            )
-        module.InferenceSession = tracked_inference_session
-        _PATCHED.add(name)
+    elif name == 'onnxruntime' and isinstance(getattr(module, 'InferenceSession', None), type):
+        session_class = module.InferenceSession
+        original_init = getattr(session_class, '__init__', None)
+        if callable(original_init):
+            def tracked_inference_session_init(instance, model_path_or_bytes, *args, **kwargs):
+                return _tracked_onnx_session(
+                    original_init, instance, model_path_or_bytes, args, kwargs
+                )
+            session_class.__init__ = tracked_inference_session_init
+            _PATCHED.add(name)
 
 _original_import = builtins.__import__
 _original_import_module = importlib.import_module
