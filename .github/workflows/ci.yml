@@ -270,6 +270,9 @@ jobs:
       - name: Test evidence-backed building-to-map vertical slice
         run: npm run test:evidence-backed-vertical-slice
 
+      - name: Test exact reviewed vertical-slice publication to Cesium catalog
+        run: npm run test:publish-evidence-backed-vertical-slice
+
       - name: Test durable generation queue, authenticated API gate and end-to-end worker
         run: npm run test:generation-queue
 
