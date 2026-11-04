@@ -256,11 +256,13 @@ export function createSingleImageGeoreferenceEvidence({
     };
   }
   validateThresholds(maxGcpRmsErrorM, maxGcpResidualM);
-  const registration = registerModelToWgs84({
+  // Match the exact JSON representation stored in the workflow/report files.
+  // JSON serialization canonicalizes negative zero to zero.
+  const registration = JSON.parse(JSON.stringify(registerModelToWgs84({
     controlPoints: loadedManifest.manifest.controlPoints,
     maxRmsErrorM: maxGcpRmsErrorM,
     maxResidualM: maxGcpResidualM,
-  });
+  })));
   if (registration.vertical?.status !== "not-solved" ||
       registration.mapReady !== false || registration.publicationEligible !== false) {
     throw new TypeError("Ground-control registration changed its unresolved vertical/release boundary.");
