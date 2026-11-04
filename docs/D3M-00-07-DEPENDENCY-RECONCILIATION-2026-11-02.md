@@ -71,3 +71,41 @@ This section supersedes the earlier snapshot's main SHA and pending-promotion st
 - On exact head `10a962601e9ed9c0c861f57bb98d0e329ade299d`, BRF-14 byte-intake, BRF-05–07 reference intake, BRF-35 same-building linkage and P3.7 floor-plan validation completed successfully. Full CI, renderer smoke, Real-Dhaka browser baseline, P3.6 package and BRF-45 rights admission were still running or awaiting a fresh completion check at the time of this update.
 - These automation runs validate contracts and code paths only. The real worker-host inference, exact asset rights decision, independent building truth, trusted reviewer signing identity, survey-supported WGS84/vertical datum and real candidate Cesium browser validation remain external acceptance gates.
 - Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. PR #351 is not merged to `main`; merge is a separate action after exact-head checks, artifact review and human approval.
+
+## 2026-11-04 — D3M-ENGINE-03 acceptance evidence snapshot
+
+**Current base:** `main@bf00588e0a63c3b60cca036de3a4ad6637a2bc5d`  
+**Integration PR:** [#351](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/351)  
+**Current branch head at this record:** `b3a040e1a4f7466f591585fa0cb760cc996f647b` (59 commits ahead / 0 behind; PR remains open and unmerged).
+
+### Software implementation and automation
+
+- PR #351 consolidates the unique topology regression from #349 and replaces the facade-opening implementation in #350 with an integrated wall-shell builder in `procedural-glb.mjs`. The standalone #350 `facade-wall-openings.mjs` file is not copied; the required rectangle/arch, full-depth reveal and both-winding behavior is implemented and covered by GLB-level tests in the integrated generator.
+- The generated-output topology test checks both footprint windings with an arched first-storey arcade and requires zero degenerate triangles and zero non-manifold edges across all generated GLB mesh primitives. On prior exact code head `80e54a3b494f468eb57fbde13563d25d03ada698`, Full CI steps 20 (BuildingSpec/procedural GLB) and 37 (D3M-ENGINE-03 vertical-slice orchestration) passed. Exact-child-profile guards and tests were added afterwards; latest exact-head Full CI on `b3a040e1a4f7466f591585fa0cb760cc996f647b` is running and is the required final code validation.
+- Parent orchestration binds exact source/image hashes, rights operation scopes, source IDs/paths/licences, selected-view IDs, geometry-input hash, media candidate hash and textured-geometry candidate hash. It requires the exact media engine + photogrammetry profile and exact architectural-geometry engine version, building ID, child job ID and geometry input path. Cross-job, cross-building and cross-profile substitution tests are included.
+- The catalog handoff remains explicit, exact-hash bound and fail-closed. It does not automatically publish or change `acceptanceEligible`, `publicationEligible`, `mapReady` or `automaticApproval`.
+
+### Map/browser baseline (real Dhaka data, not the reconstructed sample building)
+
+- Real-Dhaka Browser Baseline [run #41775485573](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41775485573) succeeded on code head `80e54a3b494f468eb57fbde13563d25d03ada698`: 3 cold + 3 warm samples; all six staged 3,000 buildings and rendered 478 offline road entities; all six samples reached map-ready and roads-rendered; working tree was clean; the canvas-only saturated-red detector flagged 0/6 samples.
+- Cold map-ready median was approximately 28.9 s; warm median approximately 27.6 s. This is a bounded Linux/Chromium CI baseline, not a device-wide performance SLA.
+- Human screenshot inspection of the baseline shows the large floating panels still cover significant map area and buildings remain mostly boxy footprint extrusions. Record these as visual-quality defects; the baseline pass does not accept the generated heritage architecture or prove D3M-ENGINE-03 real-building accuracy.
+- P3.6 bounded Dhaka package [run #41775659942](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41775659942) passed on the same prior head. Latest-head re-run is pending/in progress.
+
+### Multi-view building sample — byte verification is not rights or reconstruction approval
+
+- BRF-14 packet [run #41775662451](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41775662451) verified all 16 selected JPEG source files by exact SHA-256 and byte count: 181,235,712 bytes total, zero byte-verification blockers. A human-review packet and pairwise overlap report were produced.
+- This sample is the upstream flat-roof drone-building dataset at approximately latitude 45.05, longitude -93.39 (Minnesota, USA); it is **not a Dhaka building** and cannot be used as a Dhaka placement example. The dataset declares CC BY 4.0 for imagery, but exact owner authority and permitted derivative/public-display scope are not independently established by that declaration.
+- All 16 rows in the BRF-45 exact-asset rights admission record remain `pending`. The BRF-45 action success means the policy/evidence contract was evaluated, not that rights were granted. The human review manifest is still `pending-human-review`; same-building identity, image overlap, facade/roof coverage and camera up-axis have not been accepted by a reviewer.
+- Pairwise image triage evaluated all 120 possible pairs and reported 14 candidate overlap edges; four views have no candidate edge. These are review hints only, not a same-building proof or a camera calibration.
+- Reconstruction preflight remains `blocked`: rights rows are pending, the decision template has no valid reviewer identity/decision, and the configured COLMAP 4.2.1 executable was not found. `reconstructionExecuted=false`; no candidate GLB was generated; no independent reference was verified.
+
+### External acceptance blockers remain active
+
+- No fresh TripoSR/rembg inference on a provisioned real worker host; D3M-05 issue #307 remains the tracking gate. CI fakes and the inventory/preflight code are not real inference.
+- No authorized rights-cleared source set with reviewer-confirmed same-building identity, visual overlap and up-axis; no successful authorized multi-view/COLMAP reconstruction run.
+- No independently surveyed/CAD/BIM/LiDAR dimensions, held-out checkpoints or accepted horizontal/vertical residuals for the candidate building. No real-building accuracy score may be reported.
+- D3M-01 reviewer-authentication code exists, but no real reviewer identity/authority has been onboarded and no production Ed25519 public-key registry has been provisioned/verified. Synthetic CI signing keys do not satisfy that gate.
+- No surveyed WGS84 placement/vertical datum or human-inspected real candidate GLB rendered in Cesium with an exact approved model hash.
+
+**Acceptance status:** software integration and bounded synthetic/CI contracts are progressing; real-world source, worker, independent truth, authorized reviewer, survey placement and publication gates remain **blocked**. Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. PR #351 remains separate from `main` until latest exact-head CI/renderer checks and human review pass; no automatic main merge is performed.
