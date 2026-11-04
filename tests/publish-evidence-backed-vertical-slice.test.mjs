@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { getActivePublishedModels } from "../src/core/building-generation/published-model-catalog-reader.mjs";
 import { publishEvidenceBackedVerticalSlice } from "../src/core/building-generation/publish-evidence-backed-vertical-slice.mjs";
+import { canonicalSourceBoundReviewSubmissionBytes } from "../src/core/building-generation/source-bound-authenticated-review.mjs";
 
 const REQUIRED_CHECKS = {
   rightsVerified: true,
@@ -18,6 +19,27 @@ const REQUIRED_CHECKS = {
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function makeTestRegistry(publicKeyPem) {
+  const now = Date.now();
+  return JSON.stringify({
+    schemaVersion: "1.0.0",
+    recordType: "reconstruction-trusted-reviewer-key-registry",
+    registryId: "d3m03-publication-test-registry",
+    issuedAtUtc: new Date(now - 60_000).toISOString(),
+    expiresAtUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    entries: [{
+      reviewerId: "reviewer-test-01",
+      keyId: "d3m03-test-key-01",
+      status: "active",
+      publicKeyPem,
+      validFromUtc: new Date(now - 60_000).toISOString(),
+      validUntilUtc: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  });
 }
 
 function createGlb() {
@@ -138,8 +160,54 @@ async function fixture(t) {
       notes: "Synthetic test attestation. Never use as real review.",
     },
   };
-  await writeFile(path.join(root, "publication-attestation.json"), JSON.stringify(attestation, null, 2));
-  return { root, publicRoot, reportPath: "vertical-slice-report.json", candidatePath, candidateSha, attestation };
+  const attestationBytes = Buffer.from(JSON.stringify(attestation, null, 2));
+  await writeFile(path.join(root, "publication-attestation.json"), attestationBytes);
+
+  const originalRegistry = process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  const keyPair = generateKeyPairSync("ed25519");
+  const publicKeyPem = keyPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = makeTestRegistry(publicKeyPem);
+  t.after(() => {
+    if (originalRegistry === undefined) delete process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+    else process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = originalRegistry;
+  });
+
+  const submission = {
+    schemaVersion: "1.0.0",
+    recordType: "d3m-engine-03-signed-publication-review",
+    buildingId: report.buildingId,
+    verticalSliceReportSha256: sha256(reportBytes),
+    sourceSetSha256: report.sourceEvidence.sourceSetSha256,
+    candidateGlbSha256: candidateSha,
+    publicationAttestationSha256: sha256(attestationBytes),
+    reviewerId: "reviewer-test-01",
+    reviewedAtUtc: new Date().toISOString(),
+    decision: "approve-for-catalog-handoff",
+  };
+  const signatureBase64 = sign(
+    null,
+    canonicalSourceBoundReviewSubmissionBytes(submission),
+    keyPair.privateKey,
+  ).toString("base64");
+  const reviewReceiptPath = "signed-publication-review.json";
+  await writeFile(path.join(root, reviewReceiptPath), JSON.stringify({
+    submission,
+    signatureBase64,
+  }, null, 2));
+
+  return {
+    root,
+    publicRoot,
+    reportPath: "vertical-slice-report.json",
+    candidatePath,
+    candidateSha,
+    attestation,
+    submission,
+    signatureBase64,
+    publicKeyPem,
+    privateKey: keyPair.privateKey,
+    reviewReceiptPath,
+  };
 }
 
 test("publishes the exact reviewed geometry GLB to the Cesium catalog and preserves fail-closed parent flags", async (t) => {
@@ -158,6 +226,9 @@ test("publishes the exact reviewed geometry GLB to the Cesium catalog and preser
   assert.equal(result.assetUrl.startsWith("/models/generated/demo-building-"), true);
   assert.equal(result.mapReady, false);
   assert.equal(result.publicationEligible, false);
+  assert.equal(result.reviewerAuthentication.reviewerId, "reviewer-test-01");
+  assert.equal(result.reviewerAuthentication.keyId, "d3m03-test-key-01");
+  assert.match(result.reviewerAuthentication.signatureSha256, /^[a-f0-9]{64}$/);
   const active = getActivePublishedModels(JSON.parse(await readFile(result.manifestPath, "utf8")));
   assert.equal(active.length, 1);
   assert.equal(active[0].definition.id, "demo-building");
@@ -175,6 +246,7 @@ test("rejects a candidate whose exact bytes changed after the parent report was 
       workspaceRoot: f.root,
       reportPath: f.reportPath,
       attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
       publicRoot: f.publicRoot,
     }),
     /SHA-256 does not match the parent report/,
@@ -194,6 +266,7 @@ test("rejects a blocked geometry candidate even when an attestation file exists"
       workspaceRoot: f.root,
       reportPath: f.reportPath,
       attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
       publicRoot: f.publicRoot,
     }),
     /technical and source-binding checks must pass/,
@@ -210,6 +283,7 @@ test("rejects an attestation for a different building before catalog publication
       workspaceRoot: f.root,
       reportPath: f.reportPath,
       attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
       publicRoot: f.publicRoot,
     }),
     /model.id must exactly match the parent buildingId/,
@@ -225,6 +299,7 @@ test("rejects publication attestation not bound to the exact parent report/sourc
       workspaceRoot: f.root,
       reportPath: f.reportPath,
       attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
       publicRoot: f.publicRoot,
     }),
     /exact parent report and source-set hashes/,
@@ -232,3 +307,108 @@ test("rejects publication attestation not bound to the exact parent report/sourc
   await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
 });
 
+test("requires the signed review receipt and a server-configured trusted reviewer registry", async (t) => {
+  const f = await fixture(t);
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      publicRoot: f.publicRoot,
+    }),
+    /reviewReceiptPath.*required/,
+  );
+  const registry = process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  delete process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
+      publicRoot: f.publicRoot,
+    }),
+    /RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required/,
+  );
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = registry;
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
+
+test("rejects a tampered Ed25519 publication-review signature", async (t) => {
+  const f = await fixture(t);
+  const receiptPath = path.join(f.root, f.reviewReceiptPath);
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  receipt.signatureBase64 = Buffer.alloc(64, 0).toString("base64");
+  await writeFile(receiptPath, JSON.stringify(receipt, null, 2));
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
+      publicRoot: f.publicRoot,
+    }),
+    /Ed25519 signature is invalid/,
+  );
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
+
+test("rejects a correctly signed receipt from a key outside the trusted registry", async (t) => {
+  const f = await fixture(t);
+  const untrusted = generateKeyPairSync("ed25519");
+  const publicKeyPem = untrusted.publicKey.export({ type: "spki", format: "pem" }).toString();
+  process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON = makeTestRegistry(publicKeyPem);
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
+      publicRoot: f.publicRoot,
+    }),
+    /Ed25519 signature is invalid/,
+  );
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
+
+test("rejects a publication attestation changed after the reviewer signed its exact bytes", async (t) => {
+  const f = await fixture(t);
+  f.attestation.review.notes = "Changed after signing.";
+  await writeFile(path.join(f.root, "publication-attestation.json"), JSON.stringify(f.attestation, null, 2));
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
+      publicRoot: f.publicRoot,
+    }),
+    /signed publication review must bind the exact building, parent report, source set, candidate GLB and publication attestation hashes/,
+  );
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
+
+test("rejects a signed hold decision even when the Ed25519 signature is valid", async (t) => {
+  const f = await fixture(t);
+  const heldSubmission = { ...f.submission, decision: "hold" };
+  const signatureBase64 = sign(
+    null,
+    canonicalSourceBoundReviewSubmissionBytes(heldSubmission),
+    f.privateKey,
+  ).toString("base64");
+  await writeFile(path.join(f.root, f.reviewReceiptPath), JSON.stringify({
+    submission: heldSubmission,
+    signatureBase64,
+  }, null, 2));
+  await assert.rejects(
+    publishEvidenceBackedVerticalSlice({
+      workspaceRoot: f.root,
+      reportPath: f.reportPath,
+      attestationPath: "publication-attestation.json",
+      reviewReceiptPath: f.reviewReceiptPath,
+      publicRoot: f.publicRoot,
+    }),
+    /decision must be approve-for-catalog-handoff/,
+  );
+  await assert.rejects(readFile(path.join(f.publicRoot, "public", "models", "generated", "manifest.json")));
+});
