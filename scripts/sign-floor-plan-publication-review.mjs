@@ -98,14 +98,15 @@ async function main() {
   }
 
   const privateKeyPath = path.resolve(parsed.values["private-key"]);
-  if (inside(workspaceRoot, privateKeyPath)) {
-    throw new TypeError("--private-key must be stored outside the generation workspace.");
+  const realPrivateKeyPath = await realpath(privateKeyPath);
+  if (inside(workspaceRoot, privateKeyPath) || inside(workspaceRoot, realPrivateKeyPath)) {
+    throw new TypeError("--private-key must resolve outside the generation workspace.");
   }
   const keyInfo = await lstat(privateKeyPath);
   if (keyInfo.isSymbolicLink() || !keyInfo.isFile() || keyInfo.size < 64 || keyInfo.size > 16 * 1024) {
     throw new TypeError("--private-key must identify a regular private-key PEM between 64 bytes and 16 KiB.");
   }
-  const privateKey = createPrivateKey(await readFile(privateKeyPath));
+  const privateKey = createPrivateKey(await readFile(realPrivateKeyPath));
   if (privateKey.asymmetricKeyType !== "ed25519") {
     throw new TypeError("--private-key must contain an Ed25519 private key.");
   }
