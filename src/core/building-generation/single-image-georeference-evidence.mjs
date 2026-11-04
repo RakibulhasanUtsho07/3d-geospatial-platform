@@ -115,7 +115,8 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
       raw.buildingId !== buildingId ||
       raw.horizontalCrs !== "EPSG:4326" ||
       raw.horizontalDatum !== "WGS84" ||
-      raw.verticalDatum !== "not-provided") {
+      raw.verticalDatum !== (raw.schemaVersion === "1.1.0" && raw.vertical !== undefined
+        ? "EPSG:4979-ellipsoidal" : "not-provided")) {
     throw new TypeError("Control-point manifest schema, building identity or coordinate reference is invalid.");
   }
   exactKeys(raw.source, ["sourceId", "sha256"], [], "Control-point source binding");
@@ -271,7 +272,7 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
     source: { sourceId, sha256: sourceSha256 },
     horizontalCrs: "EPSG:4326",
     horizontalDatum: "WGS84",
-    verticalDatum: "not-provided",
+    verticalDatum: vertical ? "EPSG:4979-ellipsoidal" : "not-provided",
     survey: {
       method: raw.survey.method.trim(),
       reference: raw.survey.reference.trim(),
@@ -406,19 +407,20 @@ function createVerticalHeightEvidence({
     point.ellipsoidalHeightM - horizontalScale * point.modelY
   );
   const heightOffsetM = offsets.reduce((sum, value) => sum + value, 0) / offsets.length;
-  const residuals = heights.map((point) => {
-    const predicted = heightOffsetM + horizontalScale * point.modelY;
-    return {
-      horizontalControlPointId: point.horizontalControlPointId,
-      modelY: point.modelY,
-      surveyedEllipsoidalHeightM: point.ellipsoidalHeightM,
-      predictedEllipsoidalHeightM: round(predicted),
-      residualM: round(predicted - point.ellipsoidalHeightM),
-      evidenceSourceId: point.evidenceSourceId,
-    };
-  });
-  const rmsErrorM = Math.sqrt(residuals.reduce((sum, point) => sum + point.residualM ** 2, 0) / residuals.length);
-  const maxErrorM = Math.max(...residuals.map((point) => Math.abs(point.residualM)));
+  const exactResiduals = heights.map((point) => ({
+    point,
+    residualM: heightOffsetM + horizontalScale * point.modelY - point.ellipsoidalHeightM,
+  }));
+  const residuals = exactResiduals.map(({ point, residualM }) => ({
+    horizontalControlPointId: point.horizontalControlPointId,
+    modelY: point.modelY,
+    surveyedEllipsoidalHeightM: point.ellipsoidalHeightM,
+    predictedEllipsoidalHeightM: round(heightOffsetM + horizontalScale * point.modelY),
+    residualM: round(residualM),
+    evidenceSourceId: point.evidenceSourceId,
+  }));
+  const rmsErrorM = Math.sqrt(exactResiduals.reduce((sum, item) => sum + item.residualM ** 2, 0) / exactResiduals.length);
+  const maxErrorM = Math.max(...exactResiduals.map((item) => Math.abs(item.residualM)));
   const thresholdPass = rmsErrorM <= maxVerticalGcpRmsErrorM && maxErrorM <= maxVerticalGcpResidualM;
   return {
     schemaVersion: "1.0.0",
