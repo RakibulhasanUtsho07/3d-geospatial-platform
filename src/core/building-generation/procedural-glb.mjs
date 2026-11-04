@@ -83,11 +83,15 @@ function wallPoint(edge, alongM, y, inwardM) {
 
 // Emit a closed wall shell with actual through-openings. The front/back wall
 // surfaces are split at opening boundaries; reveal surfaces bridge wall depth.
-function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings) {
+function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings, {
+  sharedBreaks = [],
+  capTop = true,
+  capBottom = true,
+} = {}) {
   const topY = baseY + heightM;
   const startU = -wallThicknessM * 0.175;
   const endU = edge.len + wallThicknessM * 0.175;
-  const breaks = new Set([startU, endU]);
+  const breaks = new Set([startU, endU, ...sharedBreaks]);
   const addBreak = (u) => {
     if (Number.isFinite(u) && u > startU + 1e-8 && u < endU - 1e-8) breaks.add(u);
   };
@@ -149,12 +153,16 @@ function addWallWithOpenings(geo, edge, baseY, heightM, wallThicknessM, openings
       }
     }
 
-    // Close the top and (where material exists) bottom of this wall section.
-    geo.quad("wall",
-      wallPoint(edge, u0, topY, 0), wallPoint(edge, u1, topY, 0),
-      wallPoint(edge, u1, topY, wallThicknessM), wallPoint(edge, u0, topY, wallThicknessM),
-      [0, 1, 0]);
-    if (!opening || opening.bottomM > baseY + 1e-8) {
+    // Only the building's exterior top and bottom are capped. Storey interfaces
+    // remain continuous wall surfaces; duplicated inter-storey caps create
+    // coincident internal faces and non-manifold edge uses.
+    if (capTop) {
+      geo.quad("wall",
+        wallPoint(edge, u0, topY, 0), wallPoint(edge, u1, topY, 0),
+        wallPoint(edge, u1, topY, wallThicknessM), wallPoint(edge, u0, topY, wallThicknessM),
+        [0, 1, 0]);
+    }
+    if (capBottom && (!opening || opening.bottomM > baseY + 1e-8)) {
       geo.quad("wall",
         wallPoint(edge, u0, baseY, 0), wallPoint(edge, u0, baseY, wallThicknessM),
         wallPoint(edge, u1, baseY, wallThicknessM), wallPoint(edge, u1, baseY, 0),
@@ -286,6 +294,10 @@ export function generateProceduralGlb(rawSpec) {
   const arcadeSpringY=arcadeHeight-arcadeOuterRadius;
   const arcadeOpeningRadius=Math.max(0.3,arcadeInnerRadius-0.08);
   const structuralOpenings=[];
+  const wallOpeningsByFloorAndEdge = Array.from(
+    { length: floorCount },
+    () => edges.map(() => []),
+  );
   if(arcade.enabled&&arcade.heightM>floorH-0.05){
     warnings.push("frontArcade.heightM is limited to the first storey for structural openings; the emitted arch requires review.");
   }
@@ -354,7 +366,42 @@ export function generateProceduralGlb(rawSpec) {
         structuralOpenings.push(opening);
       }
 
-      addWallWithOpenings(geo,e,floorY,floorH,wt,openings);
+      wallOpeningsByFloorAndEdge[floor][ei] = openings;
+    }
+  }
+
+  // Build each facade from storey panels without duplicate internal caps. All
+  // floors on an edge share the union of opening breakpoints so adjacent
+  // storey surfaces meet without T-junctions.
+  for (let ei = 0; ei < edges.length; ei += 1) {
+    const sharedBreaks = new Set();
+    for (let floor = 0; floor < floorCount; floor += 1) {
+      for (const opening of wallOpeningsByFloorAndEdge[floor][ei]) {
+        const left = opening.centerAlongEdgeM - opening.widthM / 2;
+        const right = opening.centerAlongEdgeM + opening.widthM / 2;
+        sharedBreaks.add(left);
+        sharedBreaks.add(right);
+        if (opening.shape === "arched") {
+          for (let step = 1; step < 16; step += 1) {
+            sharedBreaks.add(left + opening.widthM * step / 16);
+          }
+        }
+      }
+    }
+    for (let floor = 0; floor < floorCount; floor += 1) {
+      addWallWithOpenings(
+        geo,
+        edges[ei],
+        floor * floorH,
+        floorH,
+        wt,
+        wallOpeningsByFloorAndEdge[floor][ei],
+        {
+          sharedBreaks,
+          capTop: floor === floorCount - 1,
+          capBottom: floor === 0,
+        },
+      );
     }
   }
 
