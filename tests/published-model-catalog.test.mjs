@@ -31,6 +31,20 @@ function makeGlb(seed = "") {
   return bytes;
 }
 
+function reviewerAuthenticationFor(reviewerId, reviewedAtUtc) {
+  return {
+    scheme: "Ed25519",
+    reviewerId,
+    keyId: "catalog-test-key-01",
+    registryId: "catalog-test-registry",
+    reviewedAtUtc,
+    publicKeyFingerprintSha256: "1".repeat(64),
+    signatureSha256: "2".repeat(64),
+    signedPayloadSha256: "3".repeat(64),
+    signedReviewReceiptSha256: "4".repeat(64),
+  };
+}
+
 function validCatalog() {
   const bytes = makeGlb();
   const sha256 = hash(bytes);
@@ -166,6 +180,7 @@ test("publishes a candidate with matching checksums, preserves versions and supp
     workspaceRoot: root,
     candidatePath: ".building-engine/jobs/demo/model.glb",
     attestationPath: "review/attestation.json",
+    reviewerAuthentication: reviewerAuthenticationFor("reviewer-id", "2026-10-22T10:00:00.000Z"),
     publishedAt: "2026-10-22T10:02:00.000Z",
   });
   assert.equal(first.modelId, "test-building");
@@ -183,6 +198,7 @@ test("publishes a candidate with matching checksums, preserves versions and supp
     workspaceRoot: root,
     candidatePath: ".building-engine/jobs/demo/model.glb",
     attestationPath: "review/attestation.json",
+    reviewerAuthentication: reviewerAuthenticationFor("reviewer-id", "2026-10-22T10:00:00.000Z"),
     publishedAt: "2026-10-22T10:03:00.000Z",
   });
   assert.notEqual(firstVersion, second.versionId);
@@ -247,7 +263,10 @@ test("refuses mismatched candidate hashes, unverified checks and tampered review
   await writeFile(path.join(root, "review", "attestation.json"), JSON.stringify(base));
   await writeFile(path.join(root, "review", "evidence.json"), "tampered");
   await assert.rejects(publishReviewedBuildingModel({
-    workspaceRoot: root, candidatePath: "candidate.glb", attestationPath: "review/attestation.json",
+    workspaceRoot: root,
+    candidatePath: "candidate.glb",
+    attestationPath: "review/attestation.json",
+    reviewerAuthentication: reviewerAuthenticationFor("reviewer", "2026-10-22T10:00:00.000Z"),
   }), /Review evidence SHA-256/);
 });
 
