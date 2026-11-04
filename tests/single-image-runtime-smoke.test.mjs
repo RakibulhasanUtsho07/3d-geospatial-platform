@@ -469,6 +469,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /model-load evidence does not match/i,
   );
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
   const tamperedSourceEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedSourceEvidence.sourceLoadEvidence.sha256 = "f".repeat(64);
   await writeFile(result.reportPath, JSON.stringify(tamperedSourceEvidence, null, 2) + "\n");
