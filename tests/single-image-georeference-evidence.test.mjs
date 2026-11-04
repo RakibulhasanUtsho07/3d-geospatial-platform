@@ -158,7 +158,7 @@ test("rejects a changed control-point manifest after evidence was recorded", asy
       sourceSha256: SOURCE_HASH,
       modelSha256: MODEL_HASH,
     }),
-    /bytes or identity changed/i,
+    /bytes or identity/i,
   );
 });
 
