@@ -159,10 +159,12 @@ export function verifyGenerationJobPublicationReview({
     signatureBase64: receipt.signatureBase64,
     trustedReviewerKeys,
   });
+  // Match the offline signer receipt envelope exactly: submission first,
+  // signatureBase64 second, two-space JSON indentation and one final newline.
   const receiptBytes = Buffer.from(JSON.stringify({
+    submission: receipt.submission,
     signatureBase64: receipt.signatureBase64,
-    submission: JSON.parse(payloadBytes.toString("utf8")),
-  }), "utf8");
+  }, null, 2) + "\n", "utf8");
 
   return {
     scheme: "Ed25519",
