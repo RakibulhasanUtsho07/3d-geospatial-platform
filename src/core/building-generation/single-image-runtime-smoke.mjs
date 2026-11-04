@@ -32,7 +32,7 @@ const OFFLINE_ENV = Object.freeze({
   HF_DATASETS_OFFLINE: "1",
   HF_HUB_DISABLE_TELEMETRY: "1",
 });
-export const SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE = String.raw`import builtins, hashlib, io, json, os, socket, stat, sys
+export const SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE = String.raw`import builtins, hashlib, importlib, io, json, os, socket, stat, sys
 
 def _deny_runtime_network(*args, **kwargs):
     raise OSError('network access is disabled by the single-image runtime smoke')
@@ -228,14 +228,22 @@ def _patch_module(name, module):
         _PATCHED.add(name)
 
 _original_import = builtins.__import__
+_original_import_module = importlib.import_module
 def _import_with_model_load_tracking(name, globals=None, locals=None, fromlist=(), level=0):
     imported = _original_import(name, globals, locals, fromlist, level)
     module_name = name.split('.', 1)[0]
     _patch_module(module_name, sys.modules.get(module_name))
     return imported
 
+def _import_module_with_model_load_tracking(name, package=None):
+    imported = _original_import_module(name, package)
+    module_name = name.split('.', 1)[0]
+    _patch_module(module_name, sys.modules.get(module_name))
+    return imported
+
 if _RECEIPT:
     builtins.__import__ = _import_with_model_load_tracking
+    importlib.import_module = _import_module_with_model_load_tracking
 `;
 const OFFLINE_SITE_CUSTOMIZE = SINGLE_IMAGE_MODEL_LOAD_ATTESTATION_SITE_CUSTOMIZE;
 
