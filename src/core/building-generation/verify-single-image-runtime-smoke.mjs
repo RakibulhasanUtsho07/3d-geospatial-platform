@@ -163,7 +163,13 @@ function validateModelLoadEvidence(report) {
 
 function validateSourceImageLoadEvidence(report) {
   const evidence = report.sourceLoadEvidence;
-  if (!evidence || evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified" ||
+  const expectedKeys = [
+    "bytes", "eventCount", "exactBytesPassed", "loader", "schemaVersion",
+    "sha256", "stable", "status",
+  ];
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence) ||
+      JSON.stringify(Object.keys(evidence).sort()) !== JSON.stringify(expectedKeys) ||
+      evidence.schemaVersion !== "1.0.0" || evidence.status !== "verified" ||
       evidence.loader !== "PIL.Image.open" || evidence.exactBytesPassed !== true ||
       evidence.stable !== true || evidence.eventCount !== 1 ||
       evidence.bytes !== report.source?.bytes ||
