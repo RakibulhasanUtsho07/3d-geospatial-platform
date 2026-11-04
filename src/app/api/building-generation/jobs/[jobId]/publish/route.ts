@@ -39,10 +39,11 @@ async function readBoundedBody(request: Request): Promise<Buffer> {
 
 function errorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : "";
+  if (/RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON is required|Trusted reviewer registry|Active reviewer key .* outside its validity window|Production requires a versioned reconstruction trusted-reviewer registry/i.test(message)) return 503;
   if (/not found/i.test(message)) return 404;
   if (/already in progress|already being published/i.test(message)) return 409;
   if (error instanceof TypeError || error instanceof RangeError) return 400;
-  if (/Only completed|approved review|required review check|checksum mismatch|changed after approval|does not match|invalid or does not match|refusing publication|placement must exactly match/i.test(message)) return 422;
+  if (/Only completed|approved review|required review check|checksum mismatch|changed after approval|does not match|invalid or does not match|refusing publication|placement must exactly match|signed generation-job review|trusted reviewer|Ed25519 signature|signature is invalid|reviewerId/i.test(message)) return 422;
   return 500;
 }
 
@@ -79,8 +80,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (!input || typeof input !== "object" || Array.isArray(input) ||
       !("placement" in input) || !input.placement || typeof input.placement !== "object" ||
-      Array.isArray(input.placement)) {
-    return NextResponse.json({ error: "A placement object is required." }, { status: 400 });
+      Array.isArray(input.placement) ||
+      !("reviewReceipt" in input) || !input.reviewReceipt ||
+      typeof input.reviewReceipt !== "object" || Array.isArray(input.reviewReceipt)) {
+    return NextResponse.json({ error: "A placement object and signed reviewer receipt are required." }, { status: 400 });
   }
 
   const { jobId } = await context.params;
@@ -93,6 +96,7 @@ export async function POST(request: Request, context: RouteContext) {
       publicRoot: process.cwd(),
       jobId,
       placement: input.placement,
+      reviewReceipt: input.reviewReceipt,
     });
 
     return NextResponse.json({
@@ -104,6 +108,9 @@ export async function POST(request: Request, context: RouteContext) {
       modelSha256: result.modelSha256,
       reportSha256: result.reportSha256,
       placement: result.placement,
+      reviewerAuthentication: result.reviewerAuthentication,
+      signedReviewPayloadSha256: result.signedReviewPayloadSha256,
+      signedReviewReceiptSha256: result.signedReviewReceiptSha256,
       mapReady: false,
       publicationEligible: false,
       note: result.note,

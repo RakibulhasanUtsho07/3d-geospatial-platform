@@ -128,3 +128,46 @@ export function injectDegenerateTriangleDefect(glb, { triangleIndex = 0 } = {}) 
   binary.writeUInt16LE(binary.readUInt16LE(first), first + 2);
   return encodeGlb(gltf, binary);
 }
+
+
+/**
+ * Convert an existing non-degenerate triangle into a third use of a known
+ * shared edge in the controlled cuboid. The resulting GLB remains parseable,
+ * but the edge-use count must exceed two and trigger topology review.
+ */
+export function injectNonManifoldEdgeDefect(glb) {
+  const { gltf, binary } = splitGlb(glb);
+  const primitive = gltf.meshes?.[0]?.primitives?.[0];
+  const positionAccessor = gltf.accessors?.[primitive?.attributes?.POSITION];
+  const indexAccessor = gltf.accessors?.[primitive?.indices];
+  const view = gltf.bufferViews?.[indexAccessor?.bufferView];
+  if (!positionAccessor ||
+      positionAccessor.componentType !== 5126 ||
+      positionAccessor.type !== "VEC3" ||
+      positionAccessor.count < 7) {
+    throw new TypeError("fixture needs at least seven float32 VEC3 positions");
+  }
+  if (!indexAccessor ||
+      !view ||
+      indexAccessor.componentType !== 5123 ||
+      indexAccessor.type !== "SCALAR") {
+    throw new TypeError("fixture needs an embedded uint16 SCALAR index accessor");
+  }
+
+  // The first two triangles already use edge (0, 2). Replacing triangle 2
+  // with (0, 2, 6) makes that same edge appear a third time without
+  // introducing a repeated index in the injected triangle.
+  const triangleIndex = 2;
+  const triangleOffset = triangleIndex * 3;
+  if (triangleOffset + 2 >= indexAccessor.count) {
+    throw new RangeError("non-manifold defect triangle is outside the index accessor");
+  }
+  const first = (view.byteOffset ?? 0) + (indexAccessor.byteOffset ?? 0) + triangleOffset * 2;
+  if (!Number.isSafeInteger(first) || first < 0 || first + 6 > binary.length) {
+    throw new RangeError("non-manifold defect indices exceed the binary chunk");
+  }
+  binary.writeUInt16LE(0, first);
+  binary.writeUInt16LE(2, first + 2);
+  binary.writeUInt16LE(6, first + 4);
+  return encodeGlb(gltf, binary);
+}

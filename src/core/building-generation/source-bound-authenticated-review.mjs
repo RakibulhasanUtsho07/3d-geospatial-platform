@@ -703,6 +703,31 @@ function validateSubmission(submission, prepared, recordedAtUtc) {
   return JSON.parse(JSON.stringify(canonicalValue(submission)));
 }
 
+/**
+ * Verify a canonical Ed25519 receipt using the same server-controlled D3M-01
+ * public-key registry used by source-bound reconstruction review. Callers must
+ * validate the receipt's own schema and exact hash bindings before using this
+ * generic cryptographic primitive.
+ */
+export function verifyTrustedReconstructionReviewerSignature({
+  submission,
+  signatureBase64,
+  trustedReviewerKeys,
+}) {
+  if (!isObject(submission)) {
+    throw new TypeError("Signed reviewer submission must be a JSON object.");
+  }
+  safeId(submission.reviewerId, "reviewerId");
+  if (!isCanonicalUtcTimestamp(submission.reviewedAtUtc)) {
+    throw new TypeError("reviewedAtUtc must be a canonical ISO-8601 UTC timestamp with milliseconds.");
+  }
+  return verifyReviewerSignature({
+    submission,
+    signatureBase64,
+    reviewerKeys: trustedReviewerKeys,
+  });
+}
+
 function verifyReviewerSignature({ submission, signatureBase64, reviewerKeys }) {
   if (!Array.isArray(reviewerKeys) || reviewerKeys.length < 1) {
     throw new TypeError("Trusted reviewer public keys are not configured.");

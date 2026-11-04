@@ -14,6 +14,7 @@ import path from "node:path";
 import { loadVerifiedSource } from "./source-workflow.mjs";
 import { normalizeSourceOperationScopes } from "./source-operation-scopes.mjs";
 import { publishReviewedBuildingModel, validatePublishedModelCatalog } from "./published-model-catalog.mjs";
+import { verifyFloorPlanPublicationReview } from "./floor-plan-publication-review.mjs";
 import { loadFloorPlanModelCandidate } from "./floor-plan-model-job.mjs";
 
 export const FLOOR_PLAN_REVIEW_DECISIONS = Object.freeze(["approved", "rejected", "changes_requested"]);
@@ -514,7 +515,7 @@ export async function reviewFloorPlanModelCandidate({ workspaceRoot, buildingId,
  * geometry, report and model hashes. The existing catalog publisher rechecks
  * the attestation and evidence bytes and writes a versioned public GLB manifest.
  */
-export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, buildingId, candidateId, publishedAt }) {
+export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, buildingId, candidateId, reviewReceipt, publishedAt }) {
   const bid = safeId(buildingId, "buildingId");
   const cid = safeId(candidateId, "candidateId");
   const root = await realpath(path.resolve(workspaceRoot));
@@ -588,6 +589,14 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     throw error;
   }
 
+  const attestationSha256 = sha256(attestationBytes);
+  const reviewerAuthentication = verifyFloorPlanPublicationReview({
+    receipt: reviewReceipt,
+    reviewRecord: review,
+    reviewRecordSha256: actualReviewHash,
+    publicationAttestationSha256: attestationSha256,
+  });
+
   const receiptPath = path.join(directory, "publication.json");
   let previousReceipt;
   try {
@@ -603,6 +612,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
         previous.candidateId !== cid || previous.buildingId !== bid ||
         previous.reviewId !== review.reviewId ||
         previous.reviewSha256 !== actualReviewHash ||
+        previous.reviewerAuthentication?.signatureSha256 !== reviewerAuthentication.signatureSha256 ||
         previous.modelSha256 !== candidate.modelSha256 ||
         previous.reportSha256 !== candidate.reportSha256 ||
         previous.geometrySha256 !== candidate.geometrySha256 ||
@@ -664,6 +674,9 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     candidatePath: path.posix.join(".building-engine", "floor-plan-candidates", bid, cid, "model.glb"),
     attestationPath: path.posix.join(".building-engine", "floor-plan-candidates", bid, cid, "attestation.json"),
     publishedAt: publicationTimestamp,
+    reviewerAuthentication,
+    expectedCandidateSha256: candidate.modelSha256,
+    expectedAttestationSha256: attestationSha256,
   });
   const receipt = {
     schemaVersion: "1.0.0",
@@ -675,6 +688,7 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     modelSha256: candidate.modelSha256,
     reportSha256: candidate.reportSha256,
     geometrySha256: candidate.geometrySha256,
+    reviewerAuthentication,
     publication: {
       modelId: result.modelId,
       versionId: result.versionId,
@@ -691,6 +705,8 @@ export async function publishReviewedFloorPlanModelCandidate({ workspaceRoot, bu
     candidateId: cid,
     reviewId: review.reviewId,
     reviewSha256: actualReviewHash,
+    reviewerAuthentication,
+    signedReviewReceiptSha256: reviewerAuthentication.signedReviewReceiptSha256,
     mapReady: false,
     publicationEligible: false,
     alreadyPublished: false,
