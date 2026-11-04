@@ -390,3 +390,221 @@ test("rejects a vertical manifest that drifts after the evidence snapshot", asyn
     sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
   }), /bytes or identity/i);
 });
+
+
+function manifestWithHeldOutCheckpoints() {
+  const value = manifestWithVertical();
+  value.schemaVersion = "1.2.0";
+  value.controlPoints.forEach((point, index) => {
+    point.observationId = "fit-observation-" + (index + 1);
+  });
+  value.vertical.controlPoints.forEach((point, index) => {
+    point.observationId = "fit-observation-" + (index + 1);
+  });
+  const theta = 30 * Math.PI / 180;
+  const scale = 2.5;
+  const model = [
+    [-8, 0.25, -6],
+    [-4, 0.75, 5],
+    [0, 1.5, -2],
+    [4, 2.25, 7],
+    [8, 3.25, -5],
+    [12, 4, 3],
+  ];
+  value.heldOutCheckpoints = {
+    crs: "EPSG:4979",
+    heightType: "ellipsoidal",
+    unit: "metre",
+    referenceFrame: "WGS 84 (G2139)",
+    coordinateEpoch: 2022.25,
+    survey: {
+      method: "independent RTK GNSS checkpoint survey",
+      reference: "held-out-survey-run-2026-11-04",
+      observedAtUtc: "2026-11-04T11:00:00.000Z",
+      horizontalAccuracyM: 0.03,
+      verticalAccuracyM: 0.04,
+    },
+    points: model.map(([modelX, modelY, modelZ], index) => {
+      const east = scale * (Math.cos(theta) * modelX - Math.sin(theta) * modelZ) + 100;
+      const north = scale * (Math.sin(theta) * modelX + Math.cos(theta) * modelZ) + 200;
+      return {
+        id: "checkpoint-" + (index + 1),
+        observationId: "heldout-observation-" + (index + 1),
+        observationRecordSha256: String(index + 1).padStart(2, "0").repeat(32),
+        modelX,
+        modelY,
+        modelZ,
+        ...lonLat(east, north, 90.4, 23.7),
+        ellipsoidalHeightM: 135 + scale * modelY,
+      };
+    }),
+  };
+  return value;
+}
+
+test("validates six held-out 3D checkpoints without refitting horizontal or vertical transforms", async (t) => {
+  const root = await workspace(t);
+  await writeManifest(root, manifestWithHeldOutCheckpoints());
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded,
+    modelSha256: MODEL_HASH,
+  });
+
+  assert.equal(evidence.schemaVersion, "1.2.0");
+  assert.equal(evidence.independentCheckpointEvidence.status, "validated-needs-human-review");
+  assert.equal(evidence.independentCheckpointEvidence.controls.count, 6);
+  assert.equal(evidence.independentCheckpointEvidence.fittingControlsExcluded, true);
+  assert.equal(
+    evidence.independentCheckpointEvidence.horizontalTransform.horizontalMetresPerModelUnit,
+    evidence.registration.transform.metresPerModelUnit,
+  );
+  assert.equal(
+    evidence.independentCheckpointEvidence.verticalTransform.horizontalMetresPerModelUnit,
+    evidence.registration.transform.metresPerModelUnit,
+  );
+  assert.deepEqual(
+    evidence.independentCheckpointEvidence.controls.observationIds,
+    loaded.manifest.heldOutCheckpoints.points.map((point) => point.observationId),
+  );
+  assert.equal(evidence.independentCheckpointEvidence.controls.thresholdPass, true);
+  assert.equal(evidence.independentCheckpointEvidence.mapReady, false);
+  assert.equal(evidence.independentCheckpointEvidence.publicationEligible, false);
+  assert.equal(evidence.independentCheckpointEvidence.automaticApproval, false);
+
+  const bytes = await readFile(path.join(root, "survey", "controls.json"));
+  const offline = verifySingleImageGeoreferenceEvidenceBytes({
+    evidence, manifestBytes: bytes, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  });
+  assert.deepEqual(offline, evidence);
+  const online = await verifySingleImageGeoreferenceEvidence({
+    workspaceRoot: root, evidence, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  });
+  assert.deepEqual(online, evidence);
+  assert.throws(() => verifySingleImageGeoreferenceEvidenceBytes({
+    evidence: {
+      ...evidence,
+      independentCheckpointEvidence: {
+        ...evidence.independentCheckpointEvidence,
+        modelSha256: "c".repeat(64),
+      },
+    },
+    manifestBytes: bytes, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  }), /independently recomputed/i);
+});
+
+test("fails held-out 3D checkpoint validation when an independent point exceeds residual limits", async (t) => {
+  const root = await workspace(t);
+  const value = manifestWithHeldOutCheckpoints();
+  value.heldOutCheckpoints.points[5].ellipsoidalHeightM += 2;
+  await writeManifest(root, value);
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded,
+    modelSha256: MODEL_HASH,
+  });
+  assert.equal(evidence.status, "calibrated-needs-human-review");
+  assert.equal(evidence.independentCheckpointEvidence.status, "validation-failed-review-required");
+  assert.equal(evidence.independentCheckpointEvidence.controls.thresholdPass, false);
+  assert.ok(evidence.independentCheckpointEvidence.controls.verticalRmsErrorM > 0.5);
+  assert.ok(evidence.independentCheckpointEvidence.controls.verticalMaxResidualM > 1);
+  assert.equal(evidence.independentCheckpointEvidence.mapReady, false);
+});
+
+test("rejects fewer than six, duplicated, or fitting-overlapping held-out checkpoint IDs", async (t) => {
+  const root = await workspace(t);
+  const tooFew = manifestWithHeldOutCheckpoints();
+  tooFew.heldOutCheckpoints.points.pop();
+  await writeManifest(root, tooFew);
+  await assert.rejects(load(root), /6–100 held-out checkpoints/i);
+
+  const duplicate = manifestWithHeldOutCheckpoints();
+  duplicate.heldOutCheckpoints.points[1].id = duplicate.heldOutCheckpoints.points[0].id;
+  await writeManifest(root, duplicate);
+  await assert.rejects(load(root), /checkpoint IDs.*unique/i);
+
+  const overlap = manifestWithHeldOutCheckpoints();
+  overlap.heldOutCheckpoints.points[0].id = overlap.controlPoints[0].id;
+  await writeManifest(root, overlap);
+  await assert.rejects(load(root), /disjoint.*fitting control IDs/i);
+});
+
+test("rejects held-out observation reuse, malformed hashes, and vertical fit-observation mismatch", async (t) => {
+  const root = await workspace(t);
+  const duplicateObservation = manifestWithHeldOutCheckpoints();
+  duplicateObservation.heldOutCheckpoints.points[1].observationId =
+    duplicateObservation.heldOutCheckpoints.points[0].observationId;
+  await writeManifest(root, duplicateObservation);
+  await assert.rejects(load(root), /observation IDs.*unique/i);
+
+  const overlapObservation = manifestWithHeldOutCheckpoints();
+  overlapObservation.heldOutCheckpoints.points[0].observationId =
+    overlapObservation.controlPoints[0].observationId;
+  await writeManifest(root, overlapObservation);
+  await assert.rejects(load(root), /disjoint from fitting observation IDs/i);
+
+  const invalidHash = manifestWithHeldOutCheckpoints();
+  invalidHash.heldOutCheckpoints.points[0].observationRecordSha256 = "not-a-sha";
+  await writeManifest(root, invalidHash);
+  await assert.rejects(load(root), /observation-record SHA-256/i);
+
+  const mismatchedFitObservation = manifestWithHeldOutCheckpoints();
+  mismatchedFitObservation.vertical.controlPoints[0].observationId = "different-fit-record";
+  await writeManifest(root, mismatchedFitObservation);
+  await assert.rejects(load(root), /exact horizontal fit observation ID/i);
+});
+
+test("requires held-out checkpoints to use the identical ellipsoidal frame and epoch", async (t) => {
+  const root = await workspace(t);
+  const wrongFrame = manifestWithHeldOutCheckpoints();
+  wrongFrame.heldOutCheckpoints.referenceFrame = "WGS 84 (G1762)";
+  await writeManifest(root, wrongFrame);
+  await assert.rejects(load(root), /exact D3M-13.*frame and coordinate epoch/i);
+
+  const wrongEpoch = manifestWithHeldOutCheckpoints();
+  wrongEpoch.heldOutCheckpoints.coordinateEpoch = 2023.0;
+  await writeManifest(root, wrongEpoch);
+  await assert.rejects(load(root), /exact D3M-13.*frame and coordinate epoch/i);
+});
+
+test("requires independent checkpoints to cover a 2D footprint and at least one metre vertically", async (t) => {
+  const root = await workspace(t);
+  const collinear = manifestWithHeldOutCheckpoints();
+  collinear.heldOutCheckpoints.points.forEach((point, index) => {
+    point.modelX = index * 2;
+    point.modelZ = 0;
+  });
+  await writeManifest(root, collinear);
+  const collinearLoaded = await load(root);
+  assert.throws(() => createSingleImageGeoreferenceEvidence({
+    loadedManifest: collinearLoaded, modelSha256: MODEL_HASH,
+  }), /two-dimensional, non-collinear/i);
+
+  const noVerticalSpread = manifestWithHeldOutCheckpoints();
+  noVerticalSpread.heldOutCheckpoints.points.forEach((point) => {
+    point.modelY = 2;
+    point.ellipsoidalHeightM = 140;
+  });
+  await writeManifest(root, noVerticalSpread);
+  const noVerticalSpreadLoaded = await load(root);
+  assert.throws(() => createSingleImageGeoreferenceEvidence({
+    loadedManifest: noVerticalSpreadLoaded, modelSha256: MODEL_HASH,
+  }), /span at least 1 metre/i);
+});
+
+test("rejects a schema 1.2 checkpoint manifest that drifts after its evidence snapshot", async (t) => {
+  const root = await workspace(t);
+  const original = manifestWithHeldOutCheckpoints();
+  await writeManifest(root, original);
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({ loadedManifest: loaded, modelSha256: MODEL_HASH });
+  original.heldOutCheckpoints.points[0].longitude += 0.0001;
+  await writeManifest(root, original);
+  await assert.rejects(verifySingleImageGeoreferenceEvidence({
+    workspaceRoot: root, evidence, buildingId: BUILDING, sourceId: SOURCE,
+    sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
+  }), /bytes or identity/i);
+});
