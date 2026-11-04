@@ -13,10 +13,10 @@ This inventory is a preflight aid. It does not replace the D3M-04 readiness gate
 From the repository root on the actual provisioned worker host:
 
 ~~~powershell
-node scripts/collect-generation-worker-host-inventory.mjs --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cuda:0
+node scripts/collect-generation-worker-host-inventory.mjs --python "<worker-python>" --runner-script "<TripoSR-run.py>" --device cuda:0 --timeout-ms 180000
 ~~~
 
-Use `--device cpu` or `--device mps` when appropriate. The tool writes one sanitized JSON report to stdout. Save it only in the access-controlled private worker workspace; do not commit it or upload raw source/model artifacts to GitHub.
+Use `--device cpu` or `--device mps` when appropriate. `--timeout-ms` is bounded from 1,000 to 180,000 ms (default 180,000 ms) because hashing large model artifacts requires reading their full contents. The tool writes one sanitized JSON report to stdout. Save it only in the access-controlled private worker workspace; do not commit it or upload raw source/model artifacts to GitHub.
 
 To check syntax and usage without running a probe:
 
