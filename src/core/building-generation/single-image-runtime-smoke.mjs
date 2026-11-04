@@ -127,7 +127,7 @@ def _append_receipt(loader, digest, byte_count, stable):
 
 def _tracked_file_loader(loader, original, file_value, args, kwargs):
     if not isinstance(file_value, (str, bytes, os.PathLike)):
-        return original(file_value, *args, **kwargs)
+        raise OSError('model loader received an unsupported file-object input; exact loader bytes cannot be attested')
     if loader == 'torch.load' and kwargs.get('mmap') is True:
         raise OSError('mmap checkpoint loading is unsupported by model-load attestation')
     with open(file_value, 'rb') as handle:
@@ -137,7 +137,7 @@ def _tracked_file_loader(loader, original, file_value, args, kwargs):
         if not stable:
             raise OSError('model artifact could not be fingerprinted through a stable file descriptor')
         if digest != expected.get('sha256') or byte_count != expected.get('bytes'):
-            return original(file_value, *args, **kwargs)
+            raise OSError('model loader input bytes do not match the pre-inference fingerprint')
         if loader == 'omegaconf.OmegaConf.load':
             text_handle = io.TextIOWrapper(handle, encoding='utf-8')
             try:
@@ -181,7 +181,7 @@ def _tracked_onnx_session(original_init, instance, model_path_or_bytes, args, kw
         digest = hashlib.sha256(model_bytes).hexdigest()
         expected = _EXPECTED.get('rembgWeights', {})
         if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
-            return original_init(instance, model_path_or_bytes, *args, **kwargs)
+            raise OSError('rembg model-loader bytes do not match the pre-inference fingerprint')
         result = original_init(instance, model_bytes, *args, **kwargs)
         _append_receipt(
             'onnxruntime.InferenceSession', digest, len(model_bytes), True
@@ -189,15 +189,18 @@ def _tracked_onnx_session(original_init, instance, model_path_or_bytes, args, kw
         return result
     if isinstance(model_path_or_bytes, (bytes, bytearray, memoryview)):
         model_bytes = bytes(model_path_or_bytes)
+        if not model_bytes or len(model_bytes) > _MAX_ONNX_BYTES:
+            raise OSError('rembg ONNX model bytes exceed the supported size limit')
         digest = hashlib.sha256(model_bytes).hexdigest()
         expected = _EXPECTED.get('rembgWeights', {})
+        if digest != expected.get('sha256') or len(model_bytes) != expected.get('bytes'):
+            raise OSError('rembg model-loader bytes do not match the pre-inference fingerprint')
         result = original_init(instance, model_bytes, *args, **kwargs)
-        if digest == expected.get('sha256') and len(model_bytes) == expected.get('bytes'):
-            _append_receipt(
-                'onnxruntime.InferenceSession', digest, len(model_bytes), True
-            )
+        _append_receipt(
+            'onnxruntime.InferenceSession', digest, len(model_bytes), True
+        )
         return result
-    return original_init(instance, model_path_or_bytes, *args, **kwargs)
+    raise OSError('rembg model loader received an unsupported input type')
 
 def _patch_module(name, module):
     if not _RECEIPT or module is None or name in _PATCHED:
