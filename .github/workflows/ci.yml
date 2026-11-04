@@ -629,8 +629,8 @@ jobs:
       - name: Test filesystem-safe review package inventory
         run: npm run test:building-review-package-directory
 
-      - name: Test stable signed-package verification snapshot
-        run: npm run test:building-review-package-signature
+      - name: Test stable signed-package verification-window race guards
+        run: node --test --test-name-pattern="verification-window guard" tests/building-review-package-directory.test.mjs
 
       - name: Test registry-bound Ed25519 review package signatures and CLI
         run: npm run test:building-review-package-signature
