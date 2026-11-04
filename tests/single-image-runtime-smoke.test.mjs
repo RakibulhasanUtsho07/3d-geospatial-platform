@@ -582,7 +582,7 @@ test("binds optional control points through the single-image smoke, workflow rep
     controlPoints: controls,
   };
   const manifestPath = path.join(root, "survey", "controls.json");
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\\n");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 
   const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
     controlPointManifestPath: "survey/controls.json",
