@@ -53,7 +53,7 @@ function requireHash(value, label) {
 
 function requireCanonicalUtc(value, label) {
   if (typeof value !== "string" ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value)) {
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
     throw new TypeError(label + " must be a canonical UTC timestamp with milliseconds.");
   }
   const parsed = new Date(value);
