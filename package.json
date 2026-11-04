@@ -152,6 +152,7 @@
     "generate:floor-plan-model": "node scripts/generate-floor-plan-model.mjs",
     "test:floor-plan-model-api": "node --test tests/floor-plan-model-job.test.mjs",
     "test:floor-plan-review": "node --test tests/floor-plan-model-review.test.mjs",
+    "sign:floor-plan-publication-review": "node scripts/sign-floor-plan-publication-review.mjs",
     "publish:floor-plan-candidate": "node scripts/publish-floor-plan-candidate.mjs",
     "test:floor-plan-raster-line-proposals": "node --test tests/floor-plan-raster-line-proposals.test.mjs",
     "test:floor-plan-raster-line-job": "node --test tests/floor-plan-raster-line-job.test.mjs",
