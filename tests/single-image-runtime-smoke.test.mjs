@@ -363,6 +363,14 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.source.sha256, source.sha256);
   assert.equal(verified.model.sha256, result.report.output.sha256);
   assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
+
+  const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedReport, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /fingerprints changed across inference/i,
+  );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
 });
