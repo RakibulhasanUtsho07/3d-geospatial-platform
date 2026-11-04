@@ -405,7 +405,7 @@ test("combined verifier accepts a fully materialized signed package and rejects 
   });
   await writeFile(
     path.join(packageDir, "package-manifest.sig.json"),
-    JSON.stringify(envelope, null, 2) + "\\n",
+    JSON.stringify(envelope, null, 2) + "\n",
     { flag: "wx", mode: 0o600 },
   );
 

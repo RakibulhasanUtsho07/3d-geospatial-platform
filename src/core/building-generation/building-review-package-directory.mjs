@@ -30,9 +30,12 @@ async function statPath(filePath, label) {
   return stat;
 }
 
-async function readStableRegularFile(filePath, label) {
+async function readStableRegularFile(filePath, label, maxBytes = null) {
   const pathBefore = await statPath(filePath, label);
   if (!pathBefore.isFile()) throw new Error("review-package-entry-must-be-regular-file:" + label);
+  if (maxBytes !== null && pathBefore.size > BigInt(maxBytes)) {
+    throw new Error("review-package-file-exceeds-size-limit:" + label);
+  }
 
   const noFollow = constants.O_NOFOLLOW ?? 0;
   let handle;
@@ -48,7 +51,8 @@ async function readStableRegularFile(filePath, label) {
     if (!descriptorAfter.isFile() ||
         identity(descriptorBefore) !== identity(descriptorAfter) ||
         identity(descriptorAfter) !== identity(pathAfter) ||
-        BigInt(bytes.length) !== descriptorAfter.size) {
+        BigInt(bytes.length) !== descriptorAfter.size ||
+        (maxBytes !== null && descriptorAfter.size > BigInt(maxBytes))) {
       throw new Error("review-package-file-changed-during-read:" + label);
     }
     return { bytes, stat: descriptorAfter };
@@ -199,10 +203,13 @@ export async function readBuildingReviewPackageControlFile(directoryArg, filenam
     throw new TypeError("Only the detached signature control file may be read here.");
   }
   const packageDir = path.resolve(directoryArg);
-  const root = await statPath(packageDir, "root-directory");
-  if (!root.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
-  const result = await readStableRegularFile(path.join(packageDir, filename), filename);
+  const rootBefore = await statPath(packageDir, "root-directory");
+  if (!rootBefore.isDirectory()) throw new Error("review-package-root-must-be-a-directory");
+  const result = await readStableRegularFile(path.join(packageDir, filename), filename, 64 * 1024);
   if (result.bytes.length === 0) throw new Error("review-package-signature-envelope-empty");
-  if (result.bytes.length > 64 * 1024) throw new Error("review-package-signature-envelope-exceeds-64-KiB");
+  const rootAfter = await statPath(packageDir, "root-directory");
+  if (identity(rootBefore) !== identity(rootAfter)) {
+    throw new Error("review-package-root-changed-during-control-file-read");
+  }
   return result;
 }
