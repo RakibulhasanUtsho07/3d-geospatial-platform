@@ -11,6 +11,7 @@ import test from "node:test";
 import { runSingleImageRuntimeSmoke } from "../src/core/building-generation/single-image-runtime-smoke.mjs";
 import { verifySingleImageRuntimeSmoke } from "../src/core/building-generation/verify-single-image-runtime-smoke.mjs";
 import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
+import { registerModelToWgs84 } from "../src/core/building-generation/ground-control-registration.mjs";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json", import.meta.url), "utf8"));
 
@@ -240,6 +241,13 @@ async function fakeWorkflowResult(options, root, source, {
       publicationEligible: false,
       warnings: [],
   };
+  if (Array.isArray(options.controlPoints)) {
+    report.georeference = registerModelToWgs84({
+      controlPoints: options.controlPoints,
+      maxRmsErrorM: options.maxGcpRmsErrorM,
+      maxResidualM: options.maxGcpResidualM,
+    });
+  }
   await writeFile(reportPath, JSON.stringify(report, null, 2) + "\n");
   return {
     workflowDir: path.dirname(absoluteModelPath),
@@ -396,8 +404,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(workflowCalls, 1);
   assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
   assert.equal(result.report.status, "passed");
-  assert.equal(result.report.schemaVersion, "1.4.0");
-  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.0.0");
+  assert.equal(result.report.schemaVersion, "1.5.0");
+  assert.equal(result.report.generationArtifactReceipt.schemaVersion, "1.1.0");
+  assert.equal(result.report.georeferenceEvidence.status, "not-requested");
+  assert.equal(result.report.georeferenceEvidence.registration, null);
   assert.ok(result.report.generationArtifactReceipt.bytes > 0);
   assert.match(result.report.generationArtifactReceipt.sha256, /^[a-f0-9]{64}$/);
   assert.match(result.report.generationArtifactReceipt.payloadSha256, /^[a-f0-9]{64}$/);
@@ -463,6 +473,8 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
   assert.equal(verified.sourceImageLoadEvidenceStatus, "verified-against-source-manifest");
   assert.equal(verified.generationArtifactReceiptStatus, "verified");
+  assert.equal(verified.georeferenceEvidenceStatus, "not-requested");
+  assert.equal(verified.georeferenceEvidence.status, "not-requested");
   assert.equal(verified.generationArtifactReceipt.sha256, result.report.generationArtifactReceipt.sha256);
   const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
   const receiptBytes = await readFile(receiptPath);
@@ -534,6 +546,82 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.publicationEligible, false);
 });
 
+
+
+test("binds optional control points through the single-image smoke, workflow report and artifact receipt", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  await mkdir(path.join(root, "survey"), { recursive: true });
+  const earthRadiusM = 6378137;
+  const baseLongitude = 90.4;
+  const baseLatitude = 23.7;
+  const controls = [[-10, -8], [10, -8], [10, 8], [-10, 8]].map(([modelX, modelZ], index) => ({
+    id: "gcp-" + (index + 1),
+    modelX,
+    modelZ,
+    longitude: baseLongitude + (2 * modelX - modelZ + 100) /
+      (earthRadiusM * Math.cos(baseLatitude * Math.PI / 180)) * 180 / Math.PI,
+    latitude: baseLatitude + (modelX + 2 * modelZ + 200) /
+      earthRadiusM * 180 / Math.PI,
+    evidenceSourceId: "facade-photo",
+  }));
+  const manifest = {
+    schemaVersion: "1.0.0",
+    kind: "single-image-control-point-manifest",
+    buildingId: fixture.id,
+    source: { sourceId: "facade-photo", sha256: source.sha256 },
+    horizontalCrs: "EPSG:4326",
+    horizontalDatum: "WGS84",
+    verticalDatum: "not-provided",
+    survey: {
+      method: "RTK GNSS",
+      reference: "integration-fixture-2026-11-04",
+      observedAtUtc: "2026-11-04T10:00:00.000Z",
+      horizontalAccuracyM: 0.05,
+    },
+    controlPoints: controls,
+  };
+  const manifestPath = path.join(root, "survey", "controls.json");
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    controlPointManifestPath: "survey/controls.json",
+    spawnImpl: (_executable, _args, options) => {
+      const child = new EventEmitter();
+      queueMicrotask(async () => {
+        await writeFakeModelLoadReceipt(options);
+        await writeFakeSourceImageLoadReceipt(options, _args);
+        child.emit("spawn");
+      });
+      return child;
+    },
+    runWorkflow: async (options) => {
+      assert.deepEqual(options.controlPoints, controls);
+      assert.equal(options.maxGcpRmsErrorM, 0.5);
+      assert.equal(options.maxGcpResidualM, 1);
+      return fakeWorkflowResult(options, root, source);
+    },
+  }));
+  assert.equal(result.exitCode, 0, JSON.stringify(result.report.failure ?? result.report));
+  assert.equal(result.report.status, "passed");
+  assert.equal(result.report.georeferenceEvidence.status, "calibrated-needs-human-review");
+  assert.equal(result.report.georeferenceEvidence.modelSha256, result.report.output.sha256);
+  assert.equal(result.report.georeferenceEvidence.manifest.sha256, hash(await readFile(manifestPath)));
+  assert.equal(result.report.georeferenceEvidence.registration.vertical.status, "not-solved");
+  assert.equal(result.report.georeferenceEvidence.registration.mapReady, false);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
+
+  const verified = await verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" });
+  assert.equal(verified.verified, true);
+  assert.equal(verified.georeferenceEvidenceStatus, "calibrated-needs-human-review");
+  assert.deepEqual(verified.georeferenceEvidence, result.report.georeferenceEvidence);
+  const receiptPath = path.join(root, ...result.report.generationArtifactReceipt.path.split("/"));
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  assert.equal(receipt.schemaVersion, "1.1.0");
+  assert.deepEqual(receipt.payload.georeference, result.report.georeferenceEvidence);
+});
 
 test("fails closed when the runner does not attest the rembg model loader input", async (t) => {
   const root = await workspace(t);

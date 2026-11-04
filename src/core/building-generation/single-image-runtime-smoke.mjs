@@ -20,8 +20,12 @@ import { probeGenerationWorkerCapabilities } from "./generation-worker-capabilit
 import { runMediaToModelWorkflow } from "./media-to-model-workflow.mjs";
 import { collectGenerationWorkerHostInventory } from "./generation-worker-host-inventory.mjs";
 import { canonicalJson, writeGenerationArtifactReceipt } from "./generation-artifact-receipt.mjs";
+import {
+  createSingleImageGeoreferenceEvidence,
+  loadSingleImageControlPointManifest,
+} from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.4.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -952,6 +956,20 @@ export async function runSingleImageRuntimeSmoke(options) {
   const buildingId = safeId(buildingSpec.id, "buildingSpec.id");
   await requireFreshSmokeIdentities(workspaceRoot, buildingId, jobId, sourceId);
   const source = await inspectSource(workspaceRoot, relativePath);
+  const controlPointManifestPath = options.controlPointManifestPath === undefined
+    ? null
+    : safeRelativePath(options.controlPointManifestPath, "controlPointManifestPath");
+  const maxGcpRmsErrorM = options.maxGcpRmsErrorM ?? 0.5;
+  const maxGcpResidualM = options.maxGcpResidualM ?? 1.0;
+  const controlPointManifestBefore = controlPointManifestPath
+    ? await loadSingleImageControlPointManifest({
+      workspaceRoot,
+      relativePath: controlPointManifestPath,
+      buildingId,
+      sourceId,
+      sourceSha256: source.sha256,
+    })
+    : null;
   const pythonPath = options.pythonPath ||
     process.env.BUILDING_ENGINE_PYTHON_EXECUTABLE ||
     process.env.TRIPOSR_PYTHON ||
@@ -995,6 +1013,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     modelLoadEvidence: null,
     sourceLoadEvidence: null,
     generationArtifactReceipt: null,
+    georeferenceEvidence: null,
     source: {
       sourceId,
       relativePath: relativePath,
@@ -1143,6 +1162,11 @@ export async function runSingleImageRuntimeSmoke(options) {
       pretrainedModelNameOrPath: MODEL_ID,
       singleImageTimeoutMs: timeoutMs,
       spawnImpl: spawnOffline,
+      ...(controlPointManifestBefore ? {
+        controlPoints: controlPointManifestBefore.manifest.controlPoints,
+        maxGcpRmsErrorM,
+        maxGcpResidualM,
+      } : {}),
     });
 
     if (!runnerProcessStarted) {
@@ -1222,6 +1246,34 @@ export async function runSingleImageRuntimeSmoke(options) {
       throw new TypeError("TripoSR and workflow GLB SHA-256 values do not match.");
     }
 
+    const controlPointManifestAfter = controlPointManifestPath
+      ? await loadSingleImageControlPointManifest({
+        workspaceRoot,
+        relativePath: controlPointManifestPath,
+        buildingId,
+        sourceId,
+        sourceSha256: source.sha256,
+      })
+      : null;
+    if (controlPointManifestBefore &&
+        (controlPointManifestAfter.bytes !== controlPointManifestBefore.bytes ||
+         controlPointManifestAfter.sha256 !== controlPointManifestBefore.sha256)) {
+      throw new Error("Control-point manifest changed during single-image generation.");
+    }
+    const georeferenceEvidence = createSingleImageGeoreferenceEvidence({
+      loadedManifest: controlPointManifestAfter,
+      modelSha256,
+      ...(controlPointManifestAfter ? { maxGcpRmsErrorM, maxGcpResidualM } : {}),
+    });
+    if (controlPointManifestAfter) {
+      if (canonicalJson(workflowReport.georeference) !== canonicalJson(georeferenceEvidence.registration)) {
+        throw new TypeError("Media-to-model workflow georeference does not match the supplied control-point manifest.");
+      }
+    } else if (workflowReport.georeference !== undefined) {
+      throw new TypeError("Workflow report contains an unrequested ground-control registration.");
+    }
+    report.georeferenceEvidence = georeferenceEvidence;
+
     const inventoryAfter = await collectWorkerSnapshot();
     const afterSnapshot = workerFingerprintSnapshot(inventoryAfter);
     const afterBlockers = workerFingerprintBlockers(inventoryAfter);
@@ -1253,7 +1305,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     };
     report.geometryQa = qualitySummary(modelReport.modelQuality);
     const receiptPayload = {
-      schemaVersion: "1.0.0",
+      schemaVersion: "1.1.0",
       kind: "single-image-generation-artifact",
       buildingId,
       jobId,
@@ -1284,6 +1336,7 @@ export async function runSingleImageRuntimeSmoke(options) {
         engine: "glb-geometry-qa-v2",
         ...report.geometryQa,
       },
+      georeference: report.georeferenceEvidence,
     };
     report.generationArtifactReceipt = await writeGenerationArtifactReceipt({
       workspaceRoot,

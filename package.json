@@ -235,7 +235,7 @@
     "test:brf29-rights-request-packet": "node --test tests/brf29-rights-clarification-request.test.mjs",
     "test:floor-plan-raster-trace": "node --test tests/floor-plan-raster-trace.test.mjs tests/floor-plan-raster-trace-job.test.mjs tests/floor-plan-trace-to-vector.test.mjs tests/floor-plan-raster-generation.test.mjs",
     "test:generation-map-intake": "node --test tests/generation-map-intake.test.mjs",
-    "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs tests/single-image-model-load-attestation.test.mjs",
+    "test:single-image-runtime-smoke": "node --test tests/single-image-runtime-smoke.test.mjs tests/single-image-model-load-attestation.test.mjs tests/single-image-georeference-evidence.test.mjs",
     "test:single-image-worker-preflight": "node --test tests/single-image-worker-preflight.test.mjs",
     "test:generation-worker-host-inventory": "node --test tests/generation-worker-host-inventory.test.mjs",
     "inventory:building-worker-host": "node scripts/collect-generation-worker-host-inventory.mjs",
