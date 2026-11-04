@@ -97,15 +97,17 @@ function canonicalTimestamp(value, label) {
 }
 
 function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
+  if (!isObject(raw) || !["1.0.0", "1.1.0"].includes(raw.schemaVersion)) {
+    throw new TypeError("Control-point manifest schema version is unsupported.");
+  }
   exactKeys(
     raw,
     ["schemaVersion", "kind", "buildingId", "source", "horizontalCrs", "horizontalDatum",
       "verticalDatum", "survey", "controlPoints"],
-    [],
+    raw.schemaVersion === "1.1.0" ? ["vertical"] : [],
     "Control-point manifest",
   );
-  if (raw.schemaVersion !== "1.0.0" ||
-      raw.kind !== "single-image-control-point-manifest" ||
+  if (raw.kind !== "single-image-control-point-manifest" ||
       raw.buildingId !== buildingId ||
       raw.horizontalCrs !== "EPSG:4326" ||
       raw.horizontalDatum !== "WGS84" ||
@@ -166,8 +168,97 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
       ...(point.description !== undefined ? { description: point.description } : {}),
     };
   });
+
+  let vertical = null;
+  if (raw.vertical !== undefined) {
+    if (raw.schemaVersion !== "1.1.0") {
+      throw new TypeError("Ellipsoidal-height controls require control-point manifest schema 1.1.0.");
+    }
+    exactKeys(raw.vertical, [
+      "crs", "heightType", "unit", "referenceFrame", "coordinateEpoch", "survey", "controlPoints",
+    ], [], "Vertical control section");
+    if (raw.vertical.crs !== "EPSG:4979" ||
+        raw.vertical.heightType !== "ellipsoidal" ||
+        raw.vertical.unit !== "metre") {
+      throw new TypeError("Vertical controls must use EPSG:4979 ellipsoidal heights in metres; orthometric/MSL/AGL heights are unsupported.");
+    }
+    if (typeof raw.vertical.referenceFrame !== "string" ||
+        !/^WGS 84 \\([A-Za-z0-9._ -]{1,40}\\)$/.test(raw.vertical.referenceFrame.trim())) {
+      throw new TypeError("Vertical controls require a named WGS 84 realization/reference frame such as WGS 84 (G2139).");
+    }
+    if (typeof raw.vertical.coordinateEpoch !== "number" ||
+        !Number.isFinite(raw.vertical.coordinateEpoch) ||
+        raw.vertical.coordinateEpoch < 1980 || raw.vertical.coordinateEpoch > 2100) {
+      throw new RangeError("Vertical coordinateEpoch must be a finite decimal year from 1980 to 2100.");
+    }
+    exactKeys(raw.vertical.survey, ["method", "reference", "observedAtUtc", "verticalAccuracyM"], [],
+      "Vertical survey metadata");
+    if (typeof raw.vertical.survey.method !== "string" || !raw.vertical.survey.method.trim() ||
+        raw.vertical.survey.method.length > 120 ||
+        typeof raw.vertical.survey.reference !== "string" || !raw.vertical.survey.reference.trim() ||
+        raw.vertical.survey.reference.length > 300 ||
+        typeof raw.vertical.survey.verticalAccuracyM !== "number" ||
+        !Number.isFinite(raw.vertical.survey.verticalAccuracyM) ||
+        raw.vertical.survey.verticalAccuracyM <= 0 || raw.vertical.survey.verticalAccuracyM > 100) {
+      throw new TypeError("Vertical survey method, reference or declared accuracy is invalid.");
+    }
+    canonicalTimestamp(raw.vertical.survey.observedAtUtc, "vertical.survey.observedAtUtc");
+    if (!Array.isArray(raw.vertical.controlPoints) ||
+        raw.vertical.controlPoints.length !== controlPoints.length ||
+        raw.vertical.controlPoints.length < 3 || raw.vertical.controlPoints.length > 100) {
+      throw new RangeError("Vertical controls must provide exactly one measurement for every horizontal control point.");
+    }
+    const horizontalIds = new Set(controlPoints.map((point) => point.id));
+    const verticalIds = new Set();
+    const verticalPoints = raw.vertical.controlPoints.map((point, index) => {
+      exactKeys(point, ["horizontalControlPointId", "modelY", "ellipsoidalHeightM", "evidenceSourceId"], [],
+        "vertical.controlPoints[" + index + "]");
+      const id = point.horizontalControlPointId;
+      if (typeof id !== "string" || !SAFE_ID.test(id) || !horizontalIds.has(id) || verticalIds.has(id)) {
+        throw new TypeError("Every vertical control must map one-to-one to a unique existing horizontal control ID.");
+      }
+      verticalIds.add(id);
+      if (point.evidenceSourceId !== sourceId) {
+        throw new TypeError("Every vertical control must identify the selected source through evidenceSourceId.");
+      }
+      if (typeof point.modelY !== "number" || !Number.isFinite(point.modelY) ||
+          Math.abs(point.modelY) > 100000) {
+        throw new RangeError("Vertical control modelY must be finite and within the supported GLB model range.");
+      }
+      if (typeof point.ellipsoidalHeightM !== "number" ||
+          !Number.isFinite(point.ellipsoidalHeightM) ||
+          point.ellipsoidalHeightM < -12000 || point.ellipsoidalHeightM > 100000) {
+        throw new RangeError("Ellipsoidal height must be finite and within the supported physical range.");
+      }
+      return {
+        horizontalControlPointId: id,
+        modelY: point.modelY,
+        ellipsoidalHeightM: point.ellipsoidalHeightM,
+        evidenceSourceId: point.evidenceSourceId,
+      };
+    });
+    if (verticalIds.size !== horizontalIds.size ||
+        [...horizontalIds].some((id) => !verticalIds.has(id))) {
+      throw new TypeError("Vertical controls must match the complete horizontal control ID set.");
+    }
+    vertical = {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: raw.vertical.referenceFrame.trim(),
+      coordinateEpoch: raw.vertical.coordinateEpoch,
+      survey: {
+        method: raw.vertical.survey.method.trim(),
+        reference: raw.vertical.survey.reference.trim(),
+        observedAtUtc: raw.vertical.survey.observedAtUtc,
+        verticalAccuracyM: raw.vertical.survey.verticalAccuracyM,
+      },
+      controlPoints: verticalPoints,
+    };
+  }
+
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: raw.schemaVersion,
     kind: "single-image-control-point-manifest",
     buildingId,
     source: { sourceId, sha256: sourceSha256 },
@@ -181,9 +272,9 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
       horizontalAccuracyM: raw.survey.horizontalAccuracyM,
     },
     controlPoints,
+    ...(vertical ? { vertical } : {}),
   };
 }
-
 function validateThresholds(maxGcpRmsErrorM, maxGcpResidualM) {
   if (!Number.isFinite(maxGcpRmsErrorM) || maxGcpRmsErrorM <= 0 || maxGcpRmsErrorM > 100) {
     throw new RangeError("maxGcpRmsErrorM must be in (0,100].");
@@ -204,6 +295,15 @@ function manifestSummary(loaded) {
     horizontalDatum: manifest.horizontalDatum,
     verticalDatum: manifest.verticalDatum,
     survey: manifest.survey,
+    ...(manifest.vertical ? { vertical: {
+      crs: manifest.vertical.crs,
+      heightType: manifest.vertical.heightType,
+      unit: manifest.vertical.unit,
+      referenceFrame: manifest.vertical.referenceFrame,
+      coordinateEpoch: manifest.vertical.coordinateEpoch,
+      survey: manifest.vertical.survey,
+      pointCount: manifest.vertical.controlPoints.length,
+    } } : {}),
   };
 }
 
@@ -237,27 +337,141 @@ export async function loadSingleImageControlPointManifest({
   };
 }
 
+function round(value) {
+  return Number(value.toFixed(4));
+}
+
+function createVerticalHeightEvidence({
+  loadedManifest,
+  modelSha256,
+  horizontalRegistration,
+  maxVerticalGcpRmsErrorM = 0.5,
+  maxVerticalGcpResidualM = 1.0,
+}) {
+  const vertical = loadedManifest?.manifest?.vertical ?? null;
+  if (!vertical) {
+    return {
+      schemaVersion: "1.0.0",
+      status: "not-requested",
+      modelSha256,
+      controlPointManifestSha256: loadedManifest?.sha256 ?? null,
+      horizontalMetresPerModelUnit: horizontalRegistration?.transform?.metresPerModelUnit ?? null,
+      mapReady: false,
+      publicationEligible: false,
+      automaticApproval: false,
+    };
+  }
+  if (!Number.isFinite(maxVerticalGcpRmsErrorM) ||
+      maxVerticalGcpRmsErrorM <= 0 || maxVerticalGcpRmsErrorM > 100 ||
+      !Number.isFinite(maxVerticalGcpResidualM) ||
+      maxVerticalGcpResidualM <= 0 || maxVerticalGcpResidualM > 100) {
+    throw new RangeError("Vertical GCP residual thresholds must be finite values in (0,100].");
+  }
+  const horizontalScale = horizontalRegistration?.transform?.metresPerModelUnit;
+  if (!Number.isFinite(horizontalScale) || horizontalScale <= 0) {
+    throw new TypeError("Vertical calibration requires the exact positive horizontal registration scale.");
+  }
+  if (horizontalRegistration.status !== "calibrated-needs-human-review") {
+    return {
+      schemaVersion: "1.0.0",
+      status: "blocked-horizontal-registration-failed",
+      modelSha256,
+      controlPointManifestSha256: loadedManifest.sha256,
+      horizontalMetresPerModelUnit: horizontalScale,
+      verticalCrs: vertical.crs,
+      heightType: vertical.heightType,
+      unit: vertical.unit,
+      referenceFrame: vertical.referenceFrame,
+      coordinateEpoch: vertical.coordinateEpoch,
+      mapReady: false,
+      publicationEligible: false,
+      automaticApproval: false,
+    };
+  }
+  const heights = vertical.controlPoints;
+  const modelYs = heights.map((point) => point.modelY);
+  const modelYSpanM = (Math.max(...modelYs) - Math.min(...modelYs)) * horizontalScale;
+  if (!Number.isFinite(modelYSpanM) || modelYSpanM < 1) {
+    throw new RangeError("Vertical controls must span at least 1 metre in the exact horizontal model scale.");
+  }
+  // Reuse the horizontal scale exactly; solve only the ellipsoidal-height offset.
+  const offsets = heights.map((point) =>
+    point.ellipsoidalHeightM - horizontalScale * point.modelY
+  );
+  const heightOffsetM = offsets.reduce((sum, value) => sum + value, 0) / offsets.length;
+  const residuals = heights.map((point) => {
+    const predicted = heightOffsetM + horizontalScale * point.modelY;
+    return {
+      horizontalControlPointId: point.horizontalControlPointId,
+      modelY: point.modelY,
+      surveyedEllipsoidalHeightM: point.ellipsoidalHeightM,
+      predictedEllipsoidalHeightM: round(predicted),
+      residualM: round(predicted - point.ellipsoidalHeightM),
+      evidenceSourceId: point.evidenceSourceId,
+    };
+  });
+  const rmsErrorM = Math.sqrt(residuals.reduce((sum, point) => sum + point.residualM ** 2, 0) / residuals.length);
+  const maxErrorM = Math.max(...residuals.map((point) => Math.abs(point.residualM)));
+  const thresholdPass = rmsErrorM <= maxVerticalGcpRmsErrorM && maxErrorM <= maxVerticalGcpResidualM;
+  return {
+    schemaVersion: "1.0.0",
+    status: thresholdPass ? "calibrated-needs-human-review" : "calibration-failed-review-required",
+    modelSha256,
+    controlPointManifestSha256: loadedManifest.sha256,
+    verticalCrs: vertical.crs,
+    heightType: vertical.heightType,
+    unit: vertical.unit,
+    referenceFrame: vertical.referenceFrame,
+    coordinateEpoch: vertical.coordinateEpoch,
+    survey: vertical.survey,
+    horizontalMetresPerModelUnit: horizontalScale,
+    verticalScalePolicy: "reuses-exact-horizontal-scale-no-independent-y-scale",
+    modelYSpanM: round(modelYSpanM),
+    heightOffsetM: round(heightOffsetM),
+    controls: {
+      count: heights.length,
+      ids: heights.map((point) => point.horizontalControlPointId),
+      residuals,
+      rmsErrorM: round(rmsErrorM),
+      maxResidualM: round(maxErrorM),
+      maxRmsErrorM: maxVerticalGcpRmsErrorM,
+      maxAllowedResidualM: maxVerticalGcpResidualM,
+      thresholdPass,
+    },
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+    warnings: [
+      "Ellipsoidal height is operator-supplied and not independently authenticated.",
+      "The vertical solution assumes the supplied modelY values identify the same physical control points as the horizontal observations.",
+      "EPSG:4979 ellipsoidal heights are not orthometric/MSL/AGL heights; no geoid conversion is performed.",
+      "This vertical offset is human-review-only and never enables map publication.",
+    ],
+  };
+}
+
 export function createSingleImageGeoreferenceEvidence({
   loadedManifest,
   modelSha256,
   maxGcpRmsErrorM = 0.5,
   maxGcpResidualM = 1.0,
+  maxVerticalGcpRmsErrorM = 0.5,
+  maxVerticalGcpResidualM = 1.0,
 }) {
   if (!HASH.test(modelSha256 ?? "")) throw new TypeError("modelSha256 must be a SHA-256 digest.");
   if (!loadedManifest) {
     return {
-      schemaVersion: "1.0.0",
+      schemaVersion: "1.1.0",
       status: "not-requested",
       modelSha256,
       maxGcpRmsErrorM: null,
       maxGcpResidualM: null,
       manifest: null,
       registration: null,
+      verticalEvidence: createVerticalHeightEvidence({ loadedManifest: null, modelSha256, horizontalRegistration: null }),
     };
   }
   validateThresholds(maxGcpRmsErrorM, maxGcpResidualM);
-  // Match the exact JSON representation stored in the workflow/report files.
-  // JSON serialization canonicalizes negative zero to zero.
   const registration = JSON.parse(JSON.stringify(registerModelToWgs84({
     controlPoints: loadedManifest.manifest.controlPoints,
     maxRmsErrorM: maxGcpRmsErrorM,
@@ -267,17 +481,24 @@ export function createSingleImageGeoreferenceEvidence({
       registration.mapReady !== false || registration.publicationEligible !== false) {
     throw new TypeError("Ground-control registration changed its unresolved vertical/release boundary.");
   }
+  const verticalEvidence = createVerticalHeightEvidence({
+    loadedManifest,
+    modelSha256,
+    horizontalRegistration: registration,
+    maxVerticalGcpRmsErrorM,
+    maxVerticalGcpResidualM,
+  });
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     status: registration.status,
     modelSha256,
     maxGcpRmsErrorM,
     maxGcpResidualM,
     manifest: manifestSummary(loadedManifest),
     registration,
+    verticalEvidence,
   };
 }
-
 function canonicalObjectJson(value) {
   return JSON.stringify(value, (_key, item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) return item;
@@ -298,14 +519,15 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
   sourceSha256,
   modelSha256,
 }) {
+  const hasVerticalEvidence = evidence?.schemaVersion === "1.1.0";
   exactKeys(
     evidence,
     ["schemaVersion", "status", "modelSha256", "maxGcpRmsErrorM", "maxGcpResidualM",
-      "manifest", "registration"],
+      "manifest", "registration", ...(hasVerticalEvidence ? ["verticalEvidence"] : [])],
     [],
     "Single-image georeference evidence",
   );
-  if (evidence.schemaVersion !== "1.0.0" || evidence.modelSha256 !== modelSha256) {
+  if (!["1.0.0", "1.1.0"].includes(evidence.schemaVersion) || evidence.modelSha256 !== modelSha256) {
     throw new TypeError("Georeference evidence does not bind this exact GLB candidate.");
   }
 
@@ -322,7 +544,7 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
     exactKeys(
       evidence.manifest,
       ["path", "bytes", "sha256", "pointCount", "horizontalCrs", "horizontalDatum",
-        "verticalDatum", "survey"],
+        "verticalDatum", "survey", ...(evidence.schemaVersion === "1.1.0" ? ["vertical"] : [])],
       [],
       "Control-point manifest receipt binding",
     );
@@ -351,14 +573,15 @@ export function verifySingleImageGeoreferenceEvidenceBytes({
     loadedManifest,
     modelSha256,
     maxGcpRmsErrorM: evidence.maxGcpRmsErrorM,
-    maxGcpResidualM: evidence.maxGcpResidualM,
+    maxGcpResidualM: evidence.verticalEvidence?.controls?.maxRmsErrorM ?? 0.5,
+    maxVerticalGcpRmsErrorM: evidence.verticalEvidence?.controls?.maxRmsErrorM ?? 0.5,
+    maxVerticalGcpResidualM: evidence.verticalEvidence?.controls?.maxAllowedResidualM ?? 1.0,
   });
   if (canonicalObjectJson(expected) !== canonicalObjectJson(evidence)) {
-    throw new TypeError("Single-image georeference evidence does not match independently recomputed control-point registration.");
+    throw new TypeError("Single-image georeference evidence does not match independently recomputed horizontal and vertical control-point registration.");
   }
   return expected;
 }
-
 export async function verifySingleImageGeoreferenceEvidence({
   workspaceRoot,
   evidence,
