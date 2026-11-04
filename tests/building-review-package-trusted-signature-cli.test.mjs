@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile, lstat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import {
+  signBuildingReviewPackageManifestWithTrustedRegistry,
+  signBuildingReviewPackageManifest,
+} from "../src/core/building-generation/building-review-package-signature.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SIGN_CLI = path.join(ROOT, "scripts/sign-building-review-package.mjs");
@@ -51,7 +55,7 @@ function run(script, args, env) {
 }
 
 async function makePackage(t) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "d3m10-signed-review-package-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m11-signed-review-package-"));
   const packageDir = path.join(root, "review-package");
   await mkdir(packageDir, { recursive: true });
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -77,29 +81,38 @@ async function makePackage(t) {
   return { root, packageDir, manifestBytes };
 }
 
-test("signing and verification CLIs use the injected registry without printing registry or private-key material", async (t) => {
+test("signing CLI refuses to sign an incomplete package; registry signature verifier still verifies signature-only path", async (t) => {
   const pair = keyPair();
   const trustedRegistry = registry(pair.publicKeyPem);
   const registryJson = JSON.stringify(trustedRegistry);
-  const { packageDir } = await makePackage(t);
+  const { packageDir, manifestBytes } = await makePackage(t);
   const privateKeyPath = path.join(path.dirname(packageDir), "reviewer-private.pem");
+  const signaturePath = path.join(packageDir, "package-manifest.sig.json");
   await writeFile(privateKeyPath, pair.privateKeyPem, { mode: 0o600 });
   const env = { NODE_ENV: "production", [REGISTRY_ENV]: registryJson };
 
-  const signed = run(SIGN_CLI, [
+  const refused = run(SIGN_CLI, [
     packageDir,
     privateKeyPath,
     "--reviewer-id",
     "reviewer-cli-test",
   ], env);
-  assert.equal(signed.status, 0, signed.stderr);
-  assert.equal(signed.error, undefined);
-  assert.equal(signed.stdout.includes(registryJson), false);
-  assert.equal(signed.stdout.includes(pair.privateKeyPem), false);
-  const envelope = JSON.parse(await readFile(path.join(packageDir, "package-manifest.sig.json"), "utf8"));
-  assert.equal(envelope.schemaVersion, "2.0.0");
-  assert.equal(envelope.reviewerId, "reviewer-cli-test");
-  assert.equal(envelope.keyId, "reviewer-cli-key-01");
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /review-package-integrity-preflight-failed:before-signing/);
+  assert.equal(refused.stdout.includes(registryJson), false);
+  assert.equal(refused.stderr.includes(pair.privateKeyPem), false);
+  await assert.rejects(lstat(signaturePath), { code: "ENOENT" });
+
+  // Exercise the independent signature verifier with a synthetic envelope;
+  // signer CLI itself correctly refuses this incomplete package.
+  const envelope = signBuildingReviewPackageManifestWithTrustedRegistry({
+    manifestBytes,
+    privateKeyPem: pair.privateKeyPem,
+    reviewerId: "reviewer-cli-test",
+    trustedReviewerRegistry: trustedRegistry,
+    signedAt: "2026-11-04T13:00:00.000Z",
+  });
+  await writeFile(signaturePath, JSON.stringify(envelope, null, 2) + "\n", { flag: "wx" });
 
   const verified = run(VERIFY_CLI, [packageDir], env);
   assert.equal(verified.status, 0, verified.stderr);
@@ -119,9 +132,9 @@ test("signing and verification CLIs use the injected registry without printing r
   assert.equal(combined.stdout.includes(pair.privateKeyPem), false);
 });
 
-test("signing and verifying fail closed when the trusted registry secret is missing", async (t) => {
+test("signing and signature verification fail closed when the trusted registry secret is missing", async (t) => {
   const pair = keyPair();
-  const { packageDir } = await makePackage(t);
+  const { packageDir, manifestBytes } = await makePackage(t);
   const privateKeyPath = path.join(path.dirname(packageDir), "reviewer-private.pem");
   await writeFile(privateKeyPath, pair.privateKeyPem, { mode: 0o600 });
   const env = { NODE_ENV: "production", [REGISTRY_ENV]: "" };
@@ -133,16 +146,17 @@ test("signing and verifying fail closed when the trusted registry secret is miss
     "reviewer-cli-test",
   ], env);
   assert.equal(signAttempt.status, 1);
-  assert.match(signAttempt.stderr, /trusted-reviewer-registry-secret-missing/);
+  assert.match(signAttempt.stderr, /review-package-integrity-preflight-failed:before-signing/);
   assert.equal(signAttempt.stderr.includes(pair.privateKeyPem), false);
 
-  const signed = run(SIGN_CLI, [
-    packageDir,
-    privateKeyPath,
-    "--reviewer-id",
-    "reviewer-cli-test",
-  ], { NODE_ENV: "production", [REGISTRY_ENV]: JSON.stringify(registry(pair.publicKeyPem)) });
-  assert.equal(signed.status, 0, signed.stderr);
+  const envelope = signBuildingReviewPackageManifestWithTrustedRegistry({
+    manifestBytes,
+    privateKeyPem: pair.privateKeyPem,
+    reviewerId: "reviewer-cli-test",
+    trustedReviewerRegistry: registry(pair.publicKeyPem),
+    signedAt: "2026-11-04T13:00:00.000Z",
+  });
+  await writeFile(path.join(packageDir, "package-manifest.sig.json"), JSON.stringify(envelope, null, 2) + "\n", { flag: "wx" });
 
   const verifyAttempt = run(VERIFY_CLI, [packageDir], env);
   assert.equal(verifyAttempt.status, 1);
@@ -152,11 +166,7 @@ test("signing and verifying fail closed when the trusted registry secret is miss
 
 test("legacy v1 verification requires an explicit public-key path", async (t) => {
   const pair = keyPair();
-  const { packageDir } = await makePackage(t);
-  const manifestBytes = await readFile(path.join(packageDir, "package-manifest.json"));
-  const { signBuildingReviewPackageManifest } = await import(
-    "../src/core/building-generation/building-review-package-signature.mjs"
-  );
+  const { packageDir, manifestBytes } = await makePackage(t);
   const legacy = signBuildingReviewPackageManifest({
     manifestBytes,
     privateKeyPem: pair.privateKeyPem,

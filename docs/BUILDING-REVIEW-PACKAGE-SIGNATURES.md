@@ -58,3 +58,12 @@ New CLI signing never creates a v1 envelope. Migrate legacy packages by verifyin
 A valid v2 signature establishes possession of the private key corresponding to a currently active, operator-provisioned registry entry. It does **not** prove civil identity, professional qualification, employment, legal authority, surveyor/device authenticity, source rights, survey accuracy, model quality or architectural correctness. The signer identity/authority must be independently verified by the organization that provisions the registry.
 
 The signature purpose is a package-integrity attestation, not a human release decision. The package remains final-human-review-only; `publicationEligible`, `mapReady` and `automaticApproval` remain `false`. The repository contains no production reviewer identities, registry secrets or private keys. CI uses synthetic ephemeral keys only.
+
+
+## Signing-time artifact integrity gate (D3M-ENGINE-11)
+
+The v2 signing CLI now takes a filesystem-safe snapshot of the entire package and runs the same offline artifact-integrity verifier used by the combined verifier **before** creating the detached signature. It refuses to sign incomplete or tampered packages, invalid reference-rights metadata, extra/missing artifacts, broken cross-references or packages whose bundled GLB geometry/texture QA no longer recomputes successfully.
+
+The signer then writes the signature with exclusive-create semantics, inventories the package again, and requires the manifest and every artifact path/hash/byte count to match the pre-signing snapshot. If the package changed during that window, the signer removes only its own unchanged signature file and exits with an error. A warning-only integrity report can still proceed to human review when there are zero integrity errors; the CLI prints the warning count but never turns it into acceptance.
+
+The standalone integrity verifier, combined verifier and signer now share the filesystem-safe inventory reader. It rejects symlinks and special files, unsafe paths, and file identity/size/mtime/ctime drift during reads. This is a signing-time integrity check, not a lock against later filesystem modification: keep packages under controlled write access while signing, and rerun combined verification after transfer or storage.
