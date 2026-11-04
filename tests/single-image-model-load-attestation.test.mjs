@@ -221,9 +221,14 @@ async function runInstrumentedSourceImage(t, {
       BUILDING_ENGINE_SOURCE_IMAGE_EXPECTED_JSON: JSON.stringify(expected),
     },
   });
-  if (mismatchSource) {
+  if (mismatchSource || mismatchPath) {
     assert.notEqual(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stderr, /source image decoder input does not match/i);
+    if (mismatchSource) {
+      assert.match(result.stderr, /source image decoder input does not match/i);
+    }
+    if (mismatchPath) {
+      assert.match(result.stderr, /other than the attested source path/i);
+    }
   } else {
     assert.equal(result.status, 0, result.stderr || result.stdout);
   }
