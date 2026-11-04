@@ -5,6 +5,7 @@ import { coordinateToLocalMeters, normalizeBuildingSpec } from "../src/core/buil
 import { createFacadeFrame } from "../src/core/building-generation/facade-placement.mjs";
 import { generateBuildingModel, planGeneration } from "../src/core/building-generation/generation-engine.mjs";
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
+import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-qa.mjs";
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
 const buildingSpecSchema=JSON.parse(await readFile(new URL("../building-generation-spec.schema.json",import.meta.url),"utf8"));
 function parseGlb(buffer){
@@ -394,5 +395,25 @@ test("cuts sampled arched front-arcade openings and preserves wall above the arc
   "the wall above the arched opening must remain closed");
  assert.ok(result.report.structuralOpenings.some(item=>item.shape==="arched"));
  assert.ok(result.report.warnings.some(item=>item.includes("structural openings")));
+});
+
+test("audits generated facade openings for degenerate and non-manifold triangles in both footprint windings", () => {
+ for (const reverseWinding of [false, true]) {
+  const result = generateProceduralGlb(facadeTestSpec({
+   reverseWinding,
+   architecture: { frontArcade: { enabled: true, heightM: 2.8, bayCount: 3 } },
+  }));
+  const qa = analyzeGlbQuality(result.glb);
+  assert.equal(qa.valid, true);
+  assert.equal(qa.counts.degenerateTriangleCount, 0,
+   "facade openings must not introduce degenerate triangles (reversed=" + reverseWinding + ")");
+  for (const mesh of qa.meshDetails) {
+   assert.equal(mesh.topology.topologyAnalyzed, true,
+    "topology must be analyzed for mesh " + mesh.meshIndex);
+   assert.equal(mesh.topology.nonManifoldEdgeCount, 0,
+    "facade openings must not introduce non-manifold edges in mesh " + mesh.meshIndex +
+    " (reversed=" + reverseWinding + ")");
+  }
+ }
 });
 
