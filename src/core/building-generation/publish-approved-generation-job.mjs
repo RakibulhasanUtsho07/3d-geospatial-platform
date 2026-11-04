@@ -200,12 +200,16 @@ export async function publishApprovedGenerationJob({ workspaceRoot, publicRoot =
   };
 
   try {
-    await writeFile(attestationPath, JSON.stringify(attestation, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    const attestationBytes = Buffer.from(JSON.stringify(attestation, null, 2) + "\n", "utf8");
+    const attestationSha256 = sha256(attestationBytes);
+    await writeFile(attestationPath, attestationBytes, { flag: "wx", mode: 0o600 });
     const published = await publishReviewedBuildingModel({
       workspaceRoot: root,
       publicRoot,
       candidatePath: job.result.modelPath,
       attestationPath,
+      expectedCandidateSha256: modelHash,
+      expectedAttestationSha256: attestationSha256,
     });
     return {
       ...published,
