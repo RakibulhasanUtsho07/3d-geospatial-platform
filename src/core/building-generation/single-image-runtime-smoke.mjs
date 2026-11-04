@@ -25,7 +25,7 @@ import {
   loadSingleImageControlPointManifest,
 } from "./single-image-georeference-evidence.mjs";
 
-export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.5.0";
+export const SINGLE_IMAGE_RUNTIME_SMOKE_SCHEMA_VERSION = "1.6.0";
 const MODEL_ID = "stabilityai/TripoSR";
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_MODEL_BYTES = 500 * 1024 * 1024;
@@ -961,6 +961,16 @@ export async function runSingleImageRuntimeSmoke(options) {
     : safeRelativePath(options.controlPointManifestPath, "controlPointManifestPath");
   const maxGcpRmsErrorM = options.maxGcpRmsErrorM ?? 0.5;
   const maxGcpResidualM = options.maxGcpResidualM ?? 1.0;
+  const maxVerticalGcpRmsErrorM = options.maxVerticalGcpRmsErrorM ?? 0.5;
+  const maxVerticalGcpResidualM = options.maxVerticalGcpResidualM ?? 1.0;
+  for (const [label, value] of [
+    ["maxGcpRmsErrorM", maxGcpRmsErrorM], ["maxGcpResidualM", maxGcpResidualM],
+    ["maxVerticalGcpRmsErrorM", maxVerticalGcpRmsErrorM], ["maxVerticalGcpResidualM", maxVerticalGcpResidualM],
+  ]) {
+    if (!Number.isFinite(value) || value <= 0 || value > 100) {
+      throw new RangeError(label + " must be a finite value in (0,100].");
+    }
+  }
   const controlPointManifestBefore = controlPointManifestPath
     ? await loadSingleImageControlPointManifest({
       workspaceRoot,
@@ -1263,7 +1273,9 @@ export async function runSingleImageRuntimeSmoke(options) {
     const georeferenceEvidence = createSingleImageGeoreferenceEvidence({
       loadedManifest: controlPointManifestAfter,
       modelSha256,
-      ...(controlPointManifestAfter ? { maxGcpRmsErrorM, maxGcpResidualM } : {}),
+      ...(controlPointManifestAfter ? {
+        maxGcpRmsErrorM, maxGcpResidualM, maxVerticalGcpRmsErrorM, maxVerticalGcpResidualM,
+      } : {}),
     });
     if (controlPointManifestAfter) {
       if (canonicalJson(workflowReport.georeference) !== canonicalJson(georeferenceEvidence.registration)) {
@@ -1273,6 +1285,10 @@ export async function runSingleImageRuntimeSmoke(options) {
       throw new TypeError("Workflow report contains an unrequested ground-control registration.");
     }
     report.georeferenceEvidence = georeferenceEvidence;
+    if (controlPointManifestAfter?.manifest.vertical &&
+        georeferenceEvidence.verticalEvidence?.status !== "calibrated-needs-human-review") {
+      throw new Error("Vertical ellipsoidal-height control residuals did not pass; the candidate remains failed and unpublished.");
+    }
 
     const inventoryAfter = await collectWorkerSnapshot();
     const afterSnapshot = workerFingerprintSnapshot(inventoryAfter);
@@ -1305,7 +1321,7 @@ export async function runSingleImageRuntimeSmoke(options) {
     };
     report.geometryQa = qualitySummary(modelReport.modelQuality);
     const receiptPayload = {
-      schemaVersion: "1.1.0",
+      schemaVersion: "1.2.0",
       kind: "single-image-generation-artifact",
       buildingId,
       jobId,
