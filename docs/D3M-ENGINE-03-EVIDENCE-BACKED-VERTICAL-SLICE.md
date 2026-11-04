@@ -43,7 +43,7 @@ It records:
 - geometry child job ID, exact geometry input SHA-256, output textured GLB SHA-256, texture counts, QA checks and blockers;
 - failed/blocked stage details while preserving any already-created candidate artifact.
 
-The media model and the final architectural geometry model are reported independently. The orchestration rejects mismatched source IDs, path, licence or byte hashes, re-checks both GLB file hashes, re-checks the geometry input after the child run, and never infers that a successful CI test is a real worker run.
+The media model and the final architectural geometry model are reported independently. The orchestration rejects mismatched source IDs, path, licence or byte hashes, re-checks both GLB file hashes, re-checks the geometry input after the child run, and never infers that a successful CI test is a real worker run. It also validates each child report's exact workflow engine/profile, `buildingId`, deterministic child `jobId`, and (for geometry) the exact input path before accepting that child result; cross-building and cross-job report substitution is rejected by regression tests.
 
 The report always keeps these values false:
 
