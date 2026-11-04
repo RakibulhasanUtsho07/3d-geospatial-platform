@@ -346,7 +346,8 @@ export async function loadSingleImageControlPointManifest({
 }
 
 function round(value) {
-  return Number(value.toFixed(4));
+  const rounded = Number(value.toFixed(4));
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function createVerticalHeightEvidence({
