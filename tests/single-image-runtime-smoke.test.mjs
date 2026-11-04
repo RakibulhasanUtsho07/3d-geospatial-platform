@@ -66,14 +66,38 @@ async function workspace(t) {
   return root;
 }
 
-async function startFakeRunner(options) {
+async function startFakeRunner(options, { omitModelLoadRole = null } = {}) {
+  const childOptions = {};
   const child = options.spawnImpl(
     options.pythonPath,
     [options.runnerScript, "--fixture-smoke"],
-    {},
+    childOptions,
   );
   if (!child || typeof child.once !== "function") {
     throw new TypeError("Fake TripoSR runner must return an EventEmitter child.");
+  }
+  const receiptPath = childOptions.env?.BUILDING_ENGINE_MODEL_LOAD_RECEIPT_PATH;
+  const expected = childOptions.env?.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON
+    ? JSON.parse(childOptions.env.BUILDING_ENGINE_MODEL_LOAD_EXPECTED_JSON)
+    : null;
+  if (receiptPath && expected) {
+    const loaders = [
+      ["tripoConfig", "omegaconf.OmegaConf.load"],
+      ["tripoCheckpoint", "torch.load"],
+      ["rembgWeights", "onnxruntime.InferenceSession"],
+    ];
+    const events = loaders
+      .filter(([role]) => role !== omitModelLoadRole)
+      .map(([role, loader]) => JSON.stringify({
+        schemaVersion: "1.0.0",
+        role,
+        loader,
+        bytes: expected[role].bytes,
+        sha256: expected[role].sha256,
+        exactBytesPassed: true,
+        stable: true,
+      }));
+    await writeFile(receiptPath, events.length ? events.join("\n") + "\n" : "");
   }
   await new Promise((resolve, reject) => {
     child.once("error", reject);
@@ -105,7 +129,7 @@ function readyCapabilities() {
   };
 }
 
-async function fakeWorkflowResult(options, root, source) {
+async function fakeWorkflowResult(options, root, source, { omitModelLoadRole = null } = {}) {
   assert.equal(options.strategy, "single-image-ai");
   assert.equal(options.confirmRights, true);
   assert.equal(options.confirmSingleViewInference, true);
@@ -117,7 +141,7 @@ async function fakeWorkflowResult(options, root, source) {
     "single-image-ai-reconstruction",
   ]);
 
-  await startFakeRunner(options);
+  await startFakeRunner(options, { omitModelLoadRole });
 
   const glb = makeGlb();
   const relativeModelPath = ".building-engine/jobs/" + fixture.id + "/smoke-job-workflow/model.glb";
@@ -319,6 +343,10 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(result.report.readiness.backgroundRemovalModel, "bria-rmbg");
   assert.equal(result.report.workerHost.inventorySchemaVersion, "1.1.0");
   assert.equal(result.report.workerHost.stableAcrossInference, true);
+  assert.equal(result.report.modelLoadEvidence.status, "verified");
+  assert.deepEqual(Object.keys(result.report.modelLoadEvidence.loaders).sort(), [
+    "rembgWeights", "tripoCheckpoint", "tripoConfig",
+  ]);
   assert.deepEqual(result.report.workerHost.before.modelArtifacts, result.report.workerHost.after.modelArtifacts);
   assert.equal(result.report.source.sha256, source.sha256);
   const actualModelPath = path.join(root, ...result.report.output.relativePath.split("/"));
@@ -363,6 +391,7 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
   assert.equal(verified.source.sha256, source.sha256);
   assert.equal(verified.model.sha256, result.report.output.sha256);
   assert.equal(verified.workerHostFingerprintStatus, "stable-across-inference");
+  assert.equal(verified.modelLoadEvidenceStatus, "verified-against-worker-preflight");
 
   const tamperedReport = JSON.parse(await readFile(result.reportPath, "utf8"));
   tamperedReport.workerHost.after.modelArtifacts.tripoCheckpoint.sha256 = "f".repeat(64);
@@ -371,8 +400,33 @@ test("runs the shared media-to-model workflow and writes hash-bound private smok
     verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
     /fingerprints changed across inference/i,
   );
+  await writeFile(result.reportPath, JSON.stringify(result.report, null, 2) + "\n");
+  const tamperedLoadEvidence = JSON.parse(await readFile(result.reportPath, "utf8"));
+  tamperedLoadEvidence.modelLoadEvidence.loaders.rembgWeights.sha256 = "f".repeat(64);
+  await writeFile(result.reportPath, JSON.stringify(tamperedLoadEvidence, null, 2) + "\n");
+  await assert.rejects(
+    verifySingleImageRuntimeSmoke({ workspaceRoot: root, jobId: "smoke-job" }),
+    /model-load evidence does not match/i,
+  );
   assert.equal(verified.mapReady, false);
   assert.equal(verified.publicationEligible, false);
+});
+
+
+test("fails closed when the runner does not attest the rembg model loader input", async (t) => {
+  const root = await workspace(t);
+  const source = await writeInput(root);
+  const result = await runSingleImageRuntimeSmoke(makeOptions(root, source, {
+    runWorkflow: async (options) =>
+      fakeWorkflowResult(options, root, source, { omitModelLoadRole: "rembgWeights" }),
+  }));
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.status, "failed");
+  assert.match(result.report.failure.summary, /model generation|evidence validation/i);
+  assert.equal(result.report.modelLoadEvidence, null);
+  assert.equal(result.report.mapReady, false);
+  assert.equal(result.report.publicationEligible, false);
+  assert.equal(result.report.automaticApproval, false);
 });
 
 test("blocks before inference when a cached worker model lacks an exact SHA-256", async (t) => {
