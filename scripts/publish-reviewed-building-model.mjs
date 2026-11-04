@@ -1,39 +1,15 @@
 #!/usr/bin/env node
-import path from "node:path";
-import { publishReviewedBuildingModel } from "../src/core/building-generation/published-model-catalog.mjs";
 
 function usage() {
-  console.log("Publish a human-reviewed GLB to the versioned public model catalog.");
+  console.log("Direct unsigned publication from a plain JSON attestation has been retired.");
   console.log("");
-  console.log("Usage:");
-  console.log("  npm run publish:building-model -- <workspaceRoot> <candidate.glb> <review-attestation.json>");
+  console.log("Use a signed, workflow-specific publication path instead:");
+  console.log("  - approved generation job: npm run sign:approved-generation-job-publication-review");
+  console.log("  - floor-plan candidate: npm run sign:floor-plan-publication-review");
+  console.log("  - evidence-backed vertical slice: npm run publish:evidence-backed-vertical-slice");
   console.log("");
-  console.log("The candidate and review evidence must be files inside workspaceRoot.");
-  console.log("Every required review check must be explicitly true; candidate and evidence hashes are verified.");
-  console.log("This command records an operator attestation; it does not independently verify architecture, rights, scale or georeferencing.");
+  console.log("Every catalog writer call now requires verified Ed25519 reviewer authentication from the server-configured D3M-01 trust registry.");
 }
 
-const args = process.argv.slice(2);
-if (args.includes("--help") || args.length !== 3) {
-  usage();
-  process.exit(args.includes("--help") ? 0 : 2);
-}
-
-try {
-  const result = await publishReviewedBuildingModel({
-    workspaceRoot: path.resolve(args[0]),
-    candidatePath: args[1],
-    attestationPath: args[2],
-  });
-  console.log(JSON.stringify({
-    status: "published",
-    modelId: result.modelId,
-    versionId: result.versionId,
-    assetUrl: result.assetUrl,
-    sha256: result.sha256,
-    manifest: path.relative(path.resolve(args[0]), result.manifestPath),
-  }, null, 2));
-} catch (error) {
-  console.error("Model publication refused:", error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-}
+usage();
+process.exitCode = process.argv.includes("--help") ? 0 : 2;
