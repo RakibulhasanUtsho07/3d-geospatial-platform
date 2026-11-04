@@ -236,56 +236,74 @@ def _patch_module(name, module):
 def _tracked_pil_image_open(original, fp, *args, **kwargs):
     global _SOURCE_BYTES, _SOURCE_RECEIPT_WRITTEN
     if not _SOURCE_EXPECTED_PATH or not _SOURCE_RECEIPT:
-        return original(fp, *args, **kwargs)
-    candidate = fp if isinstance(fp, (str, bytes, os.PathLike)) else getattr(fp, 'name', None)
-    if not isinstance(candidate, (str, bytes, os.PathLike)):
-        return original(fp, *args, **kwargs)
-    try:
-        candidate_path = os.path.realpath(os.fsdecode(candidate))
-    except Exception:
-        return original(fp, *args, **kwargs)
-    if candidate_path != _SOURCE_EXPECTED_PATH:
-        return original(fp, *args, **kwargs)
+        raise OSError('source-image attestation configuration is unavailable')
     expected_bytes = _SOURCE_EXPECTED.get('bytes')
     expected_sha256 = _SOURCE_EXPECTED.get('sha256')
     if not isinstance(expected_bytes, int) or expected_bytes <= 0 or expected_bytes > _MAX_SOURCE_BYTES:
         raise OSError('source image expected byte count is invalid')
     if not isinstance(expected_sha256, str) or len(expected_sha256) != 64:
         raise OSError('source image expected SHA-256 is invalid')
-    if _SOURCE_BYTES is None:
-        with open(_SOURCE_EXPECTED_PATH, 'rb') as handle:
-            before = os.fstat(handle.fileno())
-            if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_SOURCE_BYTES:
-                raise OSError('source image is not a supported regular file')
-            source_bytes = handle.read(_MAX_SOURCE_BYTES + 1)
-            after = os.fstat(handle.fileno())
+
+    candidate = fp if isinstance(fp, (str, bytes, os.PathLike)) else getattr(fp, 'name', None)
+    if isinstance(candidate, (str, bytes, os.PathLike)):
+        try:
+            candidate_path = os.path.realpath(os.fsdecode(candidate))
+        except Exception:
+            raise OSError('source image path cannot be resolved')
+        if candidate_path != _SOURCE_EXPECTED_PATH:
+            raise OSError('PIL.Image.open attempted to decode an image other than the attested source path')
+        if _SOURCE_BYTES is None:
+            with open(candidate_path, 'rb') as handle:
+                before = os.fstat(handle.fileno())
+                if not stat.S_ISREG(before.st_mode) or before.st_size <= 0 or before.st_size > _MAX_SOURCE_BYTES:
+                    raise OSError('source image is not a supported regular file')
+                source_bytes = handle.read(_MAX_SOURCE_BYTES + 1)
+                after = os.fstat(handle.fileno())
+                try:
+                    path_after = os.stat(candidate_path)
+                except Exception:
+                    raise OSError('source image path changed during capture')
+                stable = (
+                    _signature(before) == _signature(after) == _signature(path_after)
+                    and len(source_bytes) == after.st_size
+                    and len(source_bytes) <= _MAX_SOURCE_BYTES
+                )
+            if not stable:
+                raise OSError('source image changed while its bytes were captured')
+            digest = hashlib.sha256(source_bytes).hexdigest()
+            if len(source_bytes) != expected_bytes or digest != expected_sha256:
+                raise OSError('source image decoder input does not match the pre-inference source fingerprint')
+            _SOURCE_BYTES = source_bytes
+    elif hasattr(fp, 'read'):
+        if _SOURCE_BYTES is None:
             try:
-                path_after = os.stat(_SOURCE_EXPECTED_PATH)
+                original_position = fp.tell()
+                fp.seek(0)
+                source_bytes = fp.read(_MAX_SOURCE_BYTES + 1)
+                fp.seek(original_position)
+                descriptor_stat = os.fstat(fp.fileno()) if hasattr(fp, 'fileno') else None
             except Exception:
-                raise OSError('source image path changed during capture')
-            stable = (
-                _signature(before) == _signature(after) == _signature(path_after)
-                and len(source_bytes) == after.st_size
-                and len(source_bytes) <= _MAX_SOURCE_BYTES
-            )
-        if not stable:
-            raise OSError('source image changed while its bytes were captured')
-        digest = hashlib.sha256(source_bytes).hexdigest()
-        if len(source_bytes) != expected_bytes or digest != expected_sha256:
-            raise OSError('source image decoder input does not match the pre-inference source fingerprint')
-        _SOURCE_BYTES = source_bytes
+                raise OSError('source image stream cannot be safely captured for attestation')
+            if descriptor_stat is not None and not stat.S_ISREG(descriptor_stat.st_mode):
+                raise OSError('source image stream is not backed by a regular file')
+            if not isinstance(source_bytes, (bytes, bytearray)) or not source_bytes or len(source_bytes) > _MAX_SOURCE_BYTES:
+                raise OSError('source image stream is empty or exceeds the supported size limit')
+            digest = hashlib.sha256(source_bytes).hexdigest()
+            if len(source_bytes) != expected_bytes or digest != expected_sha256:
+                raise OSError('source image decoder stream does not match the pre-inference source fingerprint')
+            _SOURCE_BYTES = bytes(source_bytes)
     else:
-        digest = hashlib.sha256(_SOURCE_BYTES).hexdigest()
-        if len(_SOURCE_BYTES) != expected_bytes or digest != expected_sha256:
-            raise OSError('cached source image bytes no longer match the pre-inference source fingerprint')
+        raise OSError('PIL.Image.open received an unsupported source-image input type')
+
+    digest = hashlib.sha256(_SOURCE_BYTES).hexdigest()
+    if len(_SOURCE_BYTES) != expected_bytes or digest != expected_sha256:
+        raise OSError('cached source image bytes no longer match the pre-inference source fingerprint')
     result = original(io.BytesIO(_SOURCE_BYTES), *args, **kwargs)
     try:
         result.filename = _SOURCE_EXPECTED_PATH
     except Exception:
         pass
     if not _SOURCE_RECEIPT_WRITTEN:
-        if not isinstance(_SOURCE_RECEIPT, str) or not _SOURCE_RECEIPT:
-            raise OSError('source-image receipt destination is unavailable')
         event = {
             'schemaVersion': '1.0.0',
             'role': 'sourceImage',
@@ -308,7 +326,6 @@ def _tracked_pil_image_open(original, fp, *args, **kwargs):
             os.close(descriptor)
         _SOURCE_RECEIPT_WRITTEN = True
     return result
-
 
 def _patch_pil_image(module):
     if module is None or 'PIL.Image' in _PATCHED:
