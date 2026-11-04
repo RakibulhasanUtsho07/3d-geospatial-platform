@@ -12,6 +12,10 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function exactKeys(value, required, optional, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError(label + " must be an object.");
@@ -186,7 +190,7 @@ function normalizeManifest(raw, { buildingId, sourceId, sourceSha256 }) {
       throw new TypeError("Vertical controls must use EPSG:4979 ellipsoidal heights in metres; orthometric/MSL/AGL heights are unsupported.");
     }
     if (typeof raw.vertical.referenceFrame !== "string" ||
-        !/^WGS 84 \\([A-Za-z0-9._ -]{1,40}\\)$/.test(raw.vertical.referenceFrame.trim())) {
+        !/^WGS 84 \([A-Za-z0-9._ -]{1,40}\)$/.test(raw.vertical.referenceFrame.trim())) {
       throw new TypeError("Vertical controls require a named WGS 84 realization/reference frame such as WGS 84 (G2139).");
     }
     if (typeof raw.vertical.coordinateEpoch !== "number" ||
