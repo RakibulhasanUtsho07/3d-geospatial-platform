@@ -608,3 +608,23 @@ test("rejects a schema 1.2 checkpoint manifest that drifts after its evidence sn
     sourceSha256: SOURCE_HASH, modelSha256: MODEL_HASH,
   }), /bytes or identity/i);
 });
+
+
+test("fails held-out validation when horizontal checkpoint placement exceeds its independent limit", async (t) => {
+  const root = await workspace(t);
+  const value = manifestWithHeldOutCheckpoints();
+  value.heldOutCheckpoints.points[4].longitude += 0.0001;
+  await writeManifest(root, value);
+  const loaded = await load(root);
+  const evidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest: loaded,
+    modelSha256: MODEL_HASH,
+  });
+  const heldOut = evidence.independentCheckpointEvidence;
+  assert.equal(evidence.verticalEvidence.status, "calibrated-needs-human-review");
+  assert.equal(heldOut.status, "validation-failed-review-required");
+  assert.equal(heldOut.controls.thresholdPass, false);
+  assert.ok(heldOut.controls.horizontalRmsErrorM > heldOut.controls.maxHorizontalRmsErrorM);
+  assert.ok(heldOut.controls.horizontalMaxResidualM > heldOut.controls.maxHorizontalResidualM);
+  assert.equal(heldOut.mapReady, false);
+});
