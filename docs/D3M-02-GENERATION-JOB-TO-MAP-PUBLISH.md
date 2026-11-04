@@ -95,3 +95,11 @@ npm run build
 ```
 
 Synthetic tests validate the queue/review/publisher contract. They do not constitute a real building reconstruction, real rights decision, survey control or accuracy result. Exact-head GitHub Actions is required before this branch can be treated as validated.
+
+## Exact-input pinning at the catalog writer boundary — 2026-11-04
+
+The reviewed-job publisher now computes SHA-256 for the exact candidate GLB and the exact attestation bytes it creates, then passes both digests as required expected-input guards to the generic catalog writer. The writer re-reads the two files and checks those digests **before** parsing the attestation, creating a content-addressed asset or writing the manifest.
+
+This closes a filesystem TOCTOU gap between upstream review/placement validation and the catalog writer's own file reads. If either the candidate or attestation changes between those operations, publication fails before any public catalog write. The generic writer keeps these expected digests optional for existing direct callers; the D3M-02 approved-job flow always supplies both.
+
+Regression coverage injects mismatching expected candidate and attestation hashes and verifies that no catalog manifest is created. This proves the final-read guard; it is not a replacement for private workspace ACLs, a trusted reviewer identity, source rights, or independent survey evidence.
