@@ -126,6 +126,15 @@ test("offline verifier rejects missing, orphaned, tampered and wrong-inventory r
       return { ...file, content };
     }),
   }), /SHA-256/);
+  const duplicateArtifactPaths = [...artifacts];
+  duplicateArtifactPaths[0] = {
+    ...duplicateArtifactPaths[0],
+    relativePath: duplicateArtifactPaths[1].relativePath,
+  };
+  assert.throws(() => verifyPackagedSingleImageSurveyObservationRecords({
+    ...expected, packageArtifacts: duplicateArtifactPaths,
+  }), /invalid or duplicated/);
+
   const orphan = Buffer.from("orphan");
   assert.throws(() => verifyPackagedSingleImageSurveyObservationRecords({
     ...expected,
