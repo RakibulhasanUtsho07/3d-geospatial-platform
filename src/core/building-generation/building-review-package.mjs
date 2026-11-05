@@ -265,6 +265,13 @@ export function buildBuildingReviewPackageManifest({
               file.observationId === entry.observationId && file.checkpointId === entry.checkpointId &&
               artifact && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
           });
+      } else {
+        surveyObservationDeviceAttestationsValid =
+          deviceAttestationArtifacts.length === 0 &&
+          deviceAttestationFiles.length === 0 &&
+          !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationDeviceAttestation")) &&
+          !Object.hasOwn(singleImageEvidence ?? {}, "surveyObservationDeviceAttestationStatus") &&
+          !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceRegistryId");
       }
       if (singleImageEvidence.schemaVersion === "1.6.0") {
         const devicePairs = new Map();

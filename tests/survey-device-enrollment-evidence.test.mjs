@@ -252,7 +252,7 @@ test("keeps the JSON schemas strict and versioned", async () => {
   assert.equal(registrySchema.additionalProperties, false);
   assert.equal(registrySchema.properties.schemaVersion.const, "1.0.0");
   assert.equal(evidenceSchema.additionalProperties, false);
-  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-hardware-identity-enrollment-only");
+  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-key-enrollment-association-only");
   assert.equal(evidenceSchema.required.includes("keyId"), false);
   assert.equal(evidenceSchema.required.includes("devicePublicKeyFingerprintSha256"), false);
   assert.equal(evidenceSchema.properties.publicationEligible.const, false);
