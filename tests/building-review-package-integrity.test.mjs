@@ -1589,6 +1589,18 @@ test("binds original held-out survey record bytes through the complete review pa
     trustRegistrySnapshotsSha256: trustRegistryInventory.sha256,
     trustRegistrySnapshots: trustRegistryInventory.entries,
   };
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: enrolledPackageManifest.artifacts,
+    singleImageEvidence: {
+      ...snapshotEvidence,
+      trustedSurveyorRegistryId: "wrong-snapshot-role-id",
+    },
+    generatedAt: registryNow.toISOString(),
+  }));
+
   const snapshotPackageManifest = buildBuildingReviewPackageManifest({
     buildingId,
     readinessReport: readiness,
@@ -1608,6 +1620,10 @@ test("binds original held-out survey record bytes through the complete review pa
   assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotCount, 3);
   assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotBytes, trustRegistryInventory.totalBytes);
   assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotsSha256, trustRegistryInventory.sha256);
+  assert.doesNotMatch(JSON.stringify(snapshotPackageManifest), /BEGIN PUBLIC KEY|BEGIN PRIVATE KEY/);
+  assert.deepEqual(Object.keys(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshots[0]), [
+    "role", "recordType", "registryId", "schemaVersion", "sha256", "bytes",
+  ]);
   assert.equal(snapshotReport.publicationEligible, false);
   assert.ok(snapshotReport.checks.some((item) =>
     item.id === "single-image-georeference-recomputed" && item.status === "passed"));
