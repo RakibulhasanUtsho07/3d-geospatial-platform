@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash, sign } from "node:crypto";
+import { createHash, createPublicKey, sign } from "node:crypto";
 import { readFile, mkdtemp, mkdir, rm, writeFile, symlink, truncate } from "node:fs/promises";
 import { generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -41,11 +41,10 @@ import {
   surveyObservationDeviceAttestationPath,
 } from "../src/core/building-generation/survey-observation-device-attestation.mjs";
 import {
-  SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
+  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   surveyDeviceEnrollmentEvidenceSigningBytes,
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
-import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -1206,17 +1205,21 @@ test("binds original held-out survey record bytes through the complete review pa
       replacesKeyId: null,
     }],
   };
+  const devicePublicKeyFingerprintSha256 = hash(createPublicKey(devicePublicKeyPem)
+    .export({ type: "spki", format: "der" }));
   const enrollmentUnsigned = {
     schemaVersion: "1.0.0",
     recordType: "survey-device-enrollment-evidence",
     engine: "survey-device-enrollment-evidence-v1",
     signatureAlgorithm: "Ed25519",
-    signaturePurpose: "survey-device-hardware-identity-enrollment-only",
+    signaturePurpose: "survey-device-key-enrollment-association-only",
     enrollmentId: "synthetic-enrollment-record-01",
     deviceId: "synthetic-receiver-01",
     manufacturerId: "synthetic-vendor",
     modelId: "synthetic-gnss-model",
     deviceSerialCommitmentSha256: trustedDeviceRegistry.entries[0].deviceSerialCommitmentSha256,
+    keyId: "synthetic-receiver-key-01",
+    devicePublicKeyFingerprintSha256,
     authorityId: "synthetic-survey-enrollment-office",
     authorityType: "independent-enrollment-authority",
     authorityKeyId: "synthetic-enrollment-authority-key-01",
@@ -1227,7 +1230,7 @@ test("binds original held-out survey record bytes through the complete review pa
     validFromUtc: registryIssued,
     validUntilUtc: registryExpires,
     publicationEligible: false,
-    note: SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
+    note: "This authority signature associates a device key and privacy-preserving identity commitments with an enrollment statement only. It does not establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval.",
     signatureBase64: "",
   };
   const enrollmentEvidence = {
@@ -1236,10 +1239,13 @@ test("binds original held-out survey record bytes through the complete review pa
   };
   const enrollmentEvidenceBytes = Buffer.from(canonicalJson(enrollmentEvidence), "utf8");
   trustedDeviceRegistry.entries[0].enrollmentEvidenceSha256 = hash(enrollmentEvidenceBytes);
-  const enrollmentEvidenceRelativePath = surveyDeviceEnrollmentEvidencePath("synthetic-receiver-01");
+  const enrollmentEvidenceRelativePath = surveyDeviceEnrollmentEvidencePath(
+    "synthetic-receiver-01", "synthetic-receiver-key-01",
+  );
   const enrollmentEvidenceArtifact = {
     artifactType: "single-image-survey-device-enrollment-evidence",
     deviceId: "synthetic-receiver-01",
+    keyId: "synthetic-receiver-key-01",
     authorityId: "synthetic-survey-enrollment-office",
     authorityType: "independent-enrollment-authority",
     authorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,
@@ -1249,6 +1255,7 @@ test("binds original held-out survey record bytes through the complete review pa
   };
   const enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory([{
     deviceId: enrollmentEvidenceArtifact.deviceId,
+    keyId: enrollmentEvidenceArtifact.keyId,
     relativePath: enrollmentEvidenceArtifact.relativePath,
     sha256: enrollmentEvidenceArtifact.sha256,
     bytes: enrollmentEvidenceBytes.length,
@@ -1366,6 +1373,7 @@ test("binds original held-out survey record bytes through the complete review pa
   const enrollmentEvidenceFileMetadata = {
     artifactType: enrollmentEvidenceArtifact.artifactType,
     deviceId: enrollmentEvidenceArtifact.deviceId,
+    keyId: enrollmentEvidenceArtifact.keyId,
     authorityId: enrollmentEvidenceArtifact.authorityId,
     authorityType: enrollmentEvidenceArtifact.authorityType,
     authorityRegistryId: enrollmentEvidenceArtifact.authorityRegistryId,
@@ -1474,10 +1482,11 @@ test("binds original held-out survey record bytes through the complete review pa
   assert.equal(wrongAuthority.valid, false);
 
   const orphanEvidenceBytes = Buffer.from("orphaned-enrollment-evidence");
-  const orphanRelativePath = "evidence/device-enrollments/orphan-device.enrollment.json";
+  const orphanRelativePath = "evidence/device-enrollments/orphan-device.orphan-key.enrollment.json";
   const orphanArtifact = {
     artifactType: "single-image-survey-device-enrollment-evidence",
     deviceId: "orphan-device",
+    keyId: "orphan-key",
     authorityId: "synthetic-survey-enrollment-office",
     authorityType: "independent-enrollment-authority",
     authorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,

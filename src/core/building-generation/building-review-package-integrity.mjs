@@ -20,10 +20,10 @@ import {
   verifySurveyObservationDeviceAttestation,
 } from "./survey-observation-device-attestation.mjs";
 import {
+  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   verifySurveyDeviceEnrollmentEvidence,
 } from "./survey-device-enrollment-evidence.mjs";
-import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -687,7 +687,7 @@ export function verifyBuildingReviewPackage({
         if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100) {
           throw new Error("single-image-device-enrollment-checkpoint-inventory-incomplete");
         }
-        const devices = new Map();
+        const devicePairs = new Map();
         for (const checkpoint of checkpoints) {
           const sidecarPath = surveyObservationDeviceAttestationPath(checkpoint.observationId);
           const sidecarFile = actualByPath.get(sidecarPath);
@@ -704,27 +704,30 @@ export function verifyBuildingReviewPackage({
           if (typeof deviceId !== "string" || typeof keyId !== "string") {
             throw new Error("single-image-device-enrollment-device-identity-missing:" + checkpoint.observationId);
           }
-          devices.set(deviceId, { deviceId });
+          const pairKey = deviceId + "\0" + keyId;
+          devicePairs.set(pairKey, { deviceId, keyId });
         }
-        if (surveyDeviceEnrollmentEvidenceArtifacts.length !== devices.size) {
+        if (surveyDeviceEnrollmentEvidenceArtifacts.length !== devicePairs.size) {
           throw new Error("single-image-device-enrollment-evidence-inventory-incomplete-or-extra");
         }
         const verifiedEnrollmentEntries = [];
-        for (const device of [...devices.values()].sort((a, b) => a.deviceId.localeCompare(b.deviceId))) {
-          const relativePath = surveyDeviceEnrollmentEvidencePath(device.deviceId);
+        for (const pair of [...devicePairs.values()].sort((a, b) =>
+          a.deviceId.localeCompare(b.deviceId) || a.keyId.localeCompare(b.keyId))) {
+          const relativePath = surveyDeviceEnrollmentEvidencePath(pair.deviceId, pair.keyId);
           const artifact = artifactByPath.get(relativePath);
           const actual = actualByPath.get(relativePath);
           if (!artifact || artifact.artifactType !== "single-image-survey-device-enrollment-evidence" ||
               !actual || actual.content.length > 32 * 1024 || actual.content.length !== artifact.bytes ||
               digest(actual.content) !== artifact.sha256 ||
-              artifact.deviceId !== device.deviceId) {
-            throw new Error("single-image-device-enrollment-evidence-byte-binding-failed:" + device.deviceId);
+              artifact.deviceId !== pair.deviceId || artifact.keyId !== pair.keyId) {
+            throw new Error("single-image-device-enrollment-evidence-byte-binding-failed:" + pair.deviceId + "/" + pair.keyId);
           }
           const result = verifySurveyDeviceEnrollmentEvidence({
             evidenceBytes: actual.content,
             trustedDeviceRegistry,
             trustedEnrollmentAuthorityRegistry,
-            deviceId: device.deviceId,
+            deviceId: pair.deviceId,
+            keyId: pair.keyId,
           });
           if (!result.valid || result.evidenceSha256 !== artifact.sha256 ||
               result.authorityRegistryId !== metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId ||
@@ -749,7 +752,7 @@ export function verifyBuildingReviewPackage({
           ? metadata.surveyDeviceEnrollmentEvidence : [];
         surveyDeviceEnrollmentEvidenceMetadataMatches =
           inventory.count === metadata.surveyDeviceEnrollmentEvidenceCount &&
-          inventory.count === devices.size &&
+          inventory.count === devicePairs.size &&
           inventory.totalBytes === metadata.surveyDeviceEnrollmentEvidenceBytes &&
           inventory.sha256 === metadata.surveyDeviceEnrollmentEvidenceSha256 &&
           canonicalJson(inventory.entries) === canonicalJson(metadataEntries) &&

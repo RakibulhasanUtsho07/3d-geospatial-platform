@@ -3,7 +3,7 @@ import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { buildSingleImageSurveyObservationRecordInventory } from "./single-image-survey-observation-records.mjs";
 import { buildSurveyObservationAttributionInventory } from "./survey-observation-attribution-attestation.mjs";
 import { buildSurveyObservationDeviceAttestationInventory } from "./survey-observation-device-attestation.mjs";
-import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -274,23 +274,25 @@ export function buildBuildingReviewPackageManifest({
           !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceRegistryId");
       }
       if (singleImageEvidence.schemaVersion === "1.6.0") {
-        const devices = new Map();
+        const devicePairs = new Map();
         for (const item of deviceAttestationFiles) {
-          if (typeof item.deviceId !== "string") {
-            throw new Error("device-attestation file metadata omits device identity");
+          if (typeof item.deviceId !== "string" || typeof item.keyId !== "string") {
+            throw new Error("device-attestation file metadata omits device/key identity");
           }
-          devices.set(item.deviceId, { deviceId: item.deviceId });
+          devicePairs.set(item.deviceId + "\0" + item.keyId, {
+            deviceId: item.deviceId, keyId: item.keyId,
+          });
         }
         enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(
           enrollmentEvidenceFiles.map((item) => ({
-            deviceId: item.deviceId, relativePath: item.relativePath,
+            deviceId: item.deviceId, keyId: item.keyId, relativePath: item.relativePath,
             sha256: item.sha256, bytes: item.bytes, authorityId: item.authorityId,
             authorityType: item.authorityType, authorityRegistryId: item.authorityRegistryId,
           })),
         );
         surveyDeviceEnrollmentEvidenceValid =
           enrollmentEvidenceInventory.count === singleImageEvidence.surveyDeviceEnrollmentEvidenceCount &&
-          enrollmentEvidenceInventory.count === devices.size &&
+          enrollmentEvidenceInventory.count === devicePairs.size &&
           enrollmentEvidenceInventory.totalBytes === singleImageEvidence.surveyDeviceEnrollmentEvidenceBytes &&
           enrollmentEvidenceInventory.sha256 === singleImageEvidence.surveyDeviceEnrollmentEvidenceSha256 &&
           typeof singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId === "string" &&
@@ -299,12 +301,12 @@ export function buildBuildingReviewPackageManifest({
           enrollmentEvidenceArtifacts.length === enrollmentEvidenceInventory.count &&
           enrollmentEvidenceFiles.length === enrollmentEvidenceInventory.count &&
           enrollmentEvidenceInventory.entries.every((entry) => {
-            const device = devices.get(entry.deviceId);
+            const pair = devicePairs.get(entry.deviceId + "\0" + entry.keyId);
             const file = enrollmentEvidenceFiles.find((item) => item.relativePath === entry.relativePath);
             const artifact = enrollmentEvidenceArtifacts.find((item) => item.relativePath === entry.relativePath);
-            return device && file && Buffer.isBuffer(file.bytes) && file.bytes.length === entry.bytes &&
+            return pair && file && Buffer.isBuffer(file.bytes) && file.bytes.length === entry.bytes &&
               hash(file.bytes) === entry.sha256 && file.sha256 === entry.sha256 &&
-              file.deviceId === entry.deviceId &&
+              file.deviceId === entry.deviceId && file.keyId === entry.keyId &&
               file.authorityId === entry.authorityId && file.authorityType === entry.authorityType &&
               file.authorityRegistryId === entry.authorityRegistryId &&
               artifact && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
