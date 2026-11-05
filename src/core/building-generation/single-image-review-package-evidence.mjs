@@ -80,6 +80,29 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
   }
 }
 
+
+/**
+ * Descriptor-pinned read for operator tooling that consumes existing smoke
+ * evidence. It applies the same no-symlink, workspace-containment and
+ * before/after file-identity checks as review-package preparation.
+ */
+export async function readStableSingleImageWorkspaceEvidenceFile({
+  workspaceRoot,
+  relativePath,
+  label = "Single-image workspace evidence",
+  maxBytes = MAX_MANIFEST_BYTES,
+}) {
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new TypeError("Single-image smoke workspace root is required.");
+  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new TypeError("Workspace evidence byte limit must be a positive safe integer.");
+  }
+  const root = await realpath(path.resolve(workspaceRoot));
+  const safePath = safeRelativePath(relativePath, label + " path");
+  return readStableWorkspaceFile(root, safePath, label, maxBytes);
+}
+
 export async function readStableSingleImageSurveyObservationRecord({ workspaceRoot, observationId }) {
   if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
     throw new TypeError("Survey observation workspace root is required.");
