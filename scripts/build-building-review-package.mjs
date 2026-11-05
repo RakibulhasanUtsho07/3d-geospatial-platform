@@ -272,7 +272,11 @@ async function main() {
       ] : [
         "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
       ]),
-      ...(singleImageSmokeEvidence.schemaVersion === "1.3.0" ? [
+      ...(singleImageSmokeEvidence.schemaVersion === "1.4.0" ? [
+        "7. Inspect each byte-preserved held-out survey observation and its adjacent `*.attestation.json` sidecar under `evidence/survey-observations/`. Offline package verification requires the external `SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON` registry and confirms exact record/manifest/checkpoint binding plus active Ed25519 key signatures.",
+        "8. A valid signature attributes the exact record/checkpoint statement to a registered key; it does not prove civil identity, surveyor qualification, receiver hardware authenticity, rights, CRS correctness, measurement accuracy or physical feature correspondence.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.3.0" ? [
         "7. Inspect every byte-preserved original held-out survey observation under `evidence/survey-observations/`; compare observation IDs and SHA-256 values with the control-point manifest. These bytes are hash-bound, not independently authenticated.",
         "8. Record a separate human release decision outside this automated package.",
       ] : [
