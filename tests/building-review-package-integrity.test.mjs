@@ -788,7 +788,9 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   assert.ok(report.checks.some((item) =>
     item.id === "single-image-georeference-recomputed" && item.status === "passed"));
   assert.equal(report.publicationEligible, false);
-  assert.equal(report.mapReady, false);
+  assert.equal(packageManifest.singleImageEvidence.mapReady, false);
+  assert.equal(packageManifest.singleImageEvidence.publicationEligible, false);
+  assert.equal(packageManifest.singleImageEvidence.automaticApproval, false);
 
   const forgedMetadata = {
     ...packageManifest,
