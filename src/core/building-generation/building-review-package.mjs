@@ -311,7 +311,10 @@ export function buildBuildingReviewPackageManifest({
           snapshot.count === singleImageEvidence.trustRegistrySnapshotCount &&
           snapshot.totalBytes === singleImageEvidence.trustRegistrySnapshotBytes &&
           snapshot.sha256 === singleImageEvidence.trustRegistrySnapshotsSha256 &&
-          snapshot.entries.length === 3;
+          snapshot.entries.length === 3 &&
+          snapshot.entries[0]?.registryId === singleImageEvidence.trustedSurveyorRegistryId &&
+          snapshot.entries[1]?.registryId === singleImageEvidence.trustedSurveyDeviceRegistryId &&
+          snapshot.entries[2]?.registryId === singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId;
       } else {
         trustRegistrySnapshotValid =
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("trustRegistrySnapshot")) &&
