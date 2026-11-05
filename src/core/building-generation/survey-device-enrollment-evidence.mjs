@@ -6,12 +6,12 @@ export const SURVEY_DEVICE_ENROLLMENT_EVIDENCE_SCHEMA_VERSION = "1.0.0";
 export const MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES = 64 * 1024;
 export const MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES = 32 * 1024;
 export const MAX_SURVEY_DEVICE_ENROLLMENT_AUTHORITIES = 100;
-export const SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE = "This authority signature associates a device key and privacy-preserving identity commitments with an enrollment statement only. It does not establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval.";
+export const SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE = "This authority signature attests device-level hardware identity enrollment commitments only. It does not associate a particular device public key or establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval."
 
 const REGISTRY_TYPE = "trusted-survey-device-enrollment-authority-public-key-registry";
 const EVIDENCE_TYPE = "survey-device-enrollment-evidence";
 const ENGINE = "survey-device-enrollment-evidence-v1";
-const PURPOSE = "survey-device-key-enrollment-association-only";
+const PURPOSE = "survey-device-hardware-identity-enrollment-only";
 const DOMAIN = Buffer.from("3d-geospatial-platform/survey-device-enrollment-evidence/v1\0", "utf8");
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -20,10 +20,9 @@ const REGISTRY_FIELDS = ["schemaVersion", "recordType", "registryId", "issuedAtU
 const AUTHORITY_FIELDS = ["authorityId", "authorityType", "keyId", "status", "publicKeyPem", "validFromUtc", "validUntilUtc", "revokedAtUtc", "replacesKeyId"];
 const EVIDENCE_FIELDS = [
   "schemaVersion", "recordType", "engine", "signatureAlgorithm", "signaturePurpose", "enrollmentId",
-  "deviceId", "manufacturerId", "modelId", "deviceSerialCommitmentSha256", "keyId",
-  "devicePublicKeyFingerprintSha256", "authorityId", "authorityType", "authorityKeyId", "authorityRegistryId",
-  "authorityRegistryIssuedAtUtc", "authorityRegistryExpiresAtUtc", "issuedAtUtc", "validFromUtc", "validUntilUtc",
-  "publicationEligible", "note", "signatureBase64",
+  "deviceId", "manufacturerId", "modelId", "deviceSerialCommitmentSha256", "authorityId", "authorityType",
+  "authorityKeyId", "authorityRegistryId", "authorityRegistryIssuedAtUtc", "authorityRegistryExpiresAtUtc",
+  "issuedAtUtc", "validFromUtc", "validUntilUtc", "publicationEligible", "note", "signatureBase64",
 ];
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -253,15 +252,12 @@ export function surveyDeviceEnrollmentEvidenceSigningBytes(evidence) {
   return Buffer.concat([DOMAIN, Buffer.from(canonicalJson(unsignedContext(evidence)), "utf8")]);
 }
 
-export function surveyDeviceEnrollmentEvidencePath(deviceId, keyId) {
+export function surveyDeviceEnrollmentEvidencePath(deviceId) {
   safeId(deviceId, "deviceId");
-  safeId(keyId, "keyId");
-  for (const value of [deviceId, keyId]) {
-    if (/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(value.split(".")[0])) {
-      throw new TypeError("Device enrollment evidence identifier is unsafe for a cross-platform file path.");
-    }
+  if (/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(deviceId.split(".")[0])) {
+    throw new TypeError("Device enrollment evidence identifier is unsafe for a cross-platform file path.");
   }
-  return "evidence/device-enrollments/" + deviceId + "." + keyId + ".enrollment.json";
+  return "evidence/device-enrollments/" + deviceId + ".enrollment.json";
 }
 
 export function verifySurveyDeviceEnrollmentEvidence({
@@ -269,14 +265,12 @@ export function verifySurveyDeviceEnrollmentEvidence({
   trustedDeviceRegistry,
   trustedEnrollmentAuthorityRegistry,
   deviceId,
-  keyId,
   now: nowInput,
 }) {
   if (!Buffer.isBuffer(evidenceBytes) || evidenceBytes.length < 1 || evidenceBytes.length > MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES) {
     throw new RangeError("Device enrollment evidence must be a non-empty Buffer no larger than 32 KiB.");
   }
   safeId(deviceId, "deviceId");
-  safeId(keyId, "keyId");
   const now = normalizeNow(nowInput);
   const checks = [];
   const errors = [];
@@ -296,43 +290,47 @@ export function verifySurveyDeviceEnrollmentEvidence({
 
   let deviceRegistry = null;
   try {
-    // D3M-17's parser accepts a JSON string or object, not a Buffer. The CLI
-    // deliberately performs bounded stable reads and passes immutable bytes.
+    // D3M-17's parser accepts JSON text or an object, not a Buffer. The CLI
+    // performs bounded stable reads and passes immutable bytes.
     const deviceRegistryInput = Buffer.isBuffer(trustedDeviceRegistry)
       ? trustedDeviceRegistry.toString("utf8")
       : trustedDeviceRegistry;
     deviceRegistry = parseTrustedSurveyDeviceRegistry(deviceRegistryInput, { now });
+  } catch (error) {
+    check("trusted-device-registry", false, error instanceof Error ? error.message : "Trusted device registry is invalid.");
   }
-  catch (error) { check("trusted-device-registry", false, error instanceof Error ? error.message : "Trusted device registry is invalid."); }
-  const deviceMatches = deviceRegistry?.activeEntries.filter((entry) => entry.deviceId === deviceId && entry.keyId === keyId) ?? [];
+  const deviceHistory = deviceRegistry?.entries.filter((entry) => entry.deviceId === deviceId) ?? [];
+  const deviceMatches = deviceRegistry?.activeEntries.filter((entry) => entry.deviceId === deviceId) ?? [];
   const deviceEntry = deviceMatches.length === 1 ? deviceMatches[0] : null;
-  check("active-device-registry-entry", Boolean(deviceEntry), "Device and key must resolve to one currently active D3M-17 registry entry.");
+  check("active-device-registry-entry", Boolean(deviceEntry),
+    "Device ID must resolve to exactly one currently active D3M-17 device key; key rotation remains governed by D3M-17.");
 
   const shapeValid = fieldsValid && evidence.schemaVersion === SURVEY_DEVICE_ENROLLMENT_EVIDENCE_SCHEMA_VERSION &&
     evidence.recordType === EVIDENCE_TYPE && evidence.engine === ENGINE && evidence.signatureAlgorithm === "Ed25519" &&
     evidence.signaturePurpose === PURPOSE && isSafeId(evidence.enrollmentId) &&
     isSafeId(evidence.deviceId) && isSafeId(evidence.manufacturerId) && isSafeId(evidence.modelId) &&
-    HASH.test(evidence.deviceSerialCommitmentSha256 ?? "") && isSafeId(evidence.keyId) &&
-    HASH.test(evidence.devicePublicKeyFingerprintSha256 ?? "") && isSafeId(evidence.authorityId) &&
+    HASH.test(evidence.deviceSerialCommitmentSha256 ?? "") && isSafeId(evidence.authorityId) &&
     ["manufacturer", "independent-enrollment-authority"].includes(evidence.authorityType) &&
     isSafeId(evidence.authorityKeyId) && isSafeId(evidence.authorityRegistryId) &&
     [evidence.authorityRegistryIssuedAtUtc, evidence.authorityRegistryExpiresAtUtc, evidence.issuedAtUtc,
       evidence.validFromUtc, evidence.validUntilUtc].every(canonicalUtc) &&
     evidence.publicationEligible === false && evidence.note === SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE &&
     typeof evidence.signatureBase64 === "string" && SIGNATURE.test(evidence.signatureBase64);
-  check("evidence-envelope", shapeValid, "Enrollment evidence identifiers, purpose, digests, timestamps and signature encoding must be canonical.");
-  check("evidence-request-binding", shapeValid && evidence.deviceId === deviceId && evidence.keyId === keyId,
-    "Enrollment evidence must name the requested device and key.");
+  check("evidence-envelope", shapeValid,
+    "Enrollment evidence identifiers, identity commitments, purpose, timestamps and signature encoding must be canonical.");
+  check("evidence-request-binding", shapeValid && evidence.deviceId === deviceId,
+    "Enrollment evidence must name the requested device identity.");
+
   const evidenceDigest = sha256(evidenceBytes);
-  check("registry-evidence-digest", Boolean(deviceEntry) && deviceEntry.enrollmentEvidenceSha256 === evidenceDigest,
-    "Exact enrollment evidence bytes must match the digest in the D3M-17 device registry.");
+  const registeredEvidenceDigests = new Set(deviceHistory.map((entry) => entry.enrollmentEvidenceSha256));
+  check("registry-evidence-digest", Boolean(deviceEntry) && registeredEvidenceDigests.size === 1 &&
+    registeredEvidenceDigests.has(evidenceDigest),
+    "Exact device-level enrollment evidence bytes must match the stable D3M-17 digest across the device's key-rotation history.");
 
   check("device-identity-binding", Boolean(deviceEntry && shapeValid) &&
     evidence.manufacturerId === deviceEntry.manufacturerId && evidence.modelId === deviceEntry.modelId &&
-    evidence.deviceSerialCommitmentSha256 === deviceEntry.deviceSerialCommitmentSha256 &&
-    evidence.devicePublicKeyFingerprintSha256 === deviceEntry.keyFingerprintSha256 &&
-    evidence.validFromUtc === deviceEntry.validFromUtc && evidence.validUntilUtc === deviceEntry.validUntilUtc,
-    "Enrollment evidence must bind the exact D3M-17 manufacturer/model, serial commitment, public-key fingerprint and key-validity interval.");
+    evidence.deviceSerialCommitmentSha256 === deviceEntry.deviceSerialCommitmentSha256,
+    "Enrollment evidence must bind the D3M-17 manufacturer/model and privacy-preserving device serial commitment, independent of device key rotation.");
 
   let authorityRegistry = null;
   try { authorityRegistry = parseTrustedSurveyDeviceEnrollmentAuthorityRegistry(trustedEnrollmentAuthorityRegistry, { now }); }
@@ -353,11 +351,11 @@ export function verifySurveyDeviceEnrollmentEvidence({
   const validFrom = shapeValid ? Date.parse(evidence.validFromUtc) : NaN;
   const validUntil = shapeValid ? Date.parse(evidence.validUntilUtc) : NaN;
   const timeValid = Boolean(authority && deviceEntry) &&
-    issuedAt >= Date.parse(authority.validFromUtc) && issuedAt < Date.parse(authority.validUntilUtc) && issuedAt <= now.getTime() &&
-    issuedAt >= validFrom && issuedAt < validUntil && validFrom <= now.getTime() && validUntil > now.getTime() &&
-    validFrom === Date.parse(deviceEntry.validFromUtc) && validUntil === Date.parse(deviceEntry.validUntilUtc);
+    issuedAt >= Date.parse(authority.validFromUtc) && issuedAt < Date.parse(authority.validUntilUtc) &&
+    issuedAt <= now.getTime() && issuedAt >= validFrom && issuedAt < validUntil &&
+    validFrom <= now.getTime() && validUntil > now.getTime();
   check("enrollment-evidence-time-window", timeValid,
-    "Enrollment evidence must be currently valid and issued inside the authority-key window; its validity must match the registered device key.");
+    "Device enrollment evidence must be currently valid and issued inside the authority-key window.");
 
   let signatureValid = false;
   if (authority && shapeValid && canonicalBytes && timeValid) {
@@ -368,7 +366,7 @@ export function verifySurveyDeviceEnrollmentEvidence({
     } catch { signatureValid = false; }
   }
   check("enrollment-authority-ed25519-signature", signatureValid,
-    "Ed25519 authority signature must authenticate the canonical device enrollment statement.");
+    "Ed25519 authority signature must authenticate the canonical device-level enrollment statement.");
 
   return {
     schemaVersion: "1.0.0",
@@ -378,13 +376,13 @@ export function verifySurveyDeviceEnrollmentEvidence({
     evidenceSha256: evidenceDigest,
     enrollmentId: shapeValid ? evidence.enrollmentId : null,
     deviceId,
-    keyId,
+    activeDeviceRegistryKeyId: deviceEntry?.keyId ?? null,
     authorityId: authority?.authorityId ?? null,
     authorityType: authority?.authorityType ?? null,
     authorityRegistryId: authorityRegistry?.registryId ?? null,
     checks,
     errors,
     publicationEligible: false,
-    note: "Verification establishes that an operator-provisioned authority key signed this exact enrollment statement and that it matches the current D3M-17 device registry. It does not independently establish manufacturer certification, hardware identity, secure-element custody, genuine receiver capture, firmware integrity or measurement accuracy.",
+    note: "Verification establishes that an operator-provisioned authority key signed this exact device-level enrollment statement and that it matches the D3M-17 device identity and stable enrollment-evidence digest. It does not bind a particular device public key; device-key possession, validity and rotation remain independently attested by D3M-17. It does not establish manufacturer certification, hardware identity, secure-element custody, genuine receiver capture, firmware integrity or measurement accuracy.",
   };
 }
