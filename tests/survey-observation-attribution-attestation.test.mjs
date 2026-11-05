@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync } from "node:crypto";\nimport { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createSurveyObservationAttributionAttestation,
@@ -304,4 +304,26 @@ test("rejects unsafe identifiers and oversized record or manifest inputs", () =>
     trustedSurveyorRegistry: trusted,
     attestedAtUtc: ATTESTED_AT,
   }), /1 MiB/);
+});
+
+test("keeps the registry and attestation JSON schemas strict and versioned", async () => {
+  const registrySchema = JSON.parse(await readFile(
+    new URL("../trusted-surveyor-public-key-registry.schema.json", import.meta.url),
+    "utf8",
+  ));
+  const attestationSchema = JSON.parse(await readFile(
+    new URL("../survey-observation-attribution-attestation.schema.json", import.meta.url),
+    "utf8",
+  ));
+
+  assert.equal(registrySchema.additionalProperties, false);
+  assert.equal(registrySchema.properties.schemaVersion.const, "1.0.0");
+  assert.equal(registrySchema.properties.recordType.const, "trusted-surveyor-public-key-registry");
+  assert.ok(registrySchema.properties.entries.items.required.includes("publicKeyPem"));
+  assert.equal(attestationSchema.additionalProperties, false);
+  assert.equal(attestationSchema.properties.schemaVersion.const, "1.0.0");
+  assert.equal(attestationSchema.properties.algorithm.const, "Ed25519");
+  assert.equal(attestationSchema.properties.publicationEligible.const, false);
+  assert.ok(attestationSchema.required.includes("controlPointManifestSha256"));
+  assert.ok(attestationSchema.required.includes("recordSha256"));
 });
