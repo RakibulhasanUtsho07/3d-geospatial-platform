@@ -271,7 +271,12 @@ async function main() {
       ] : [
         "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
       ]),
-      "7. Record a separate human release decision outside this automated package.",
+      ...(singleImageSmokeEvidence.schemaVersion === "1.3.0" ? [
+        "7. Inspect every byte-preserved original held-out survey observation under `evidence/survey-observations/`; compare observation IDs and SHA-256 values with the control-point manifest. These bytes are hash-bound, not independently authenticated.",
+        "8. Record a separate human release decision outside this automated package.",
+      ] : [
+        "7. Record a separate human release decision outside this automated package.",
+      ]),
     ] : [
       "6. Record a separate human release decision outside this automated package.",
     ]),
