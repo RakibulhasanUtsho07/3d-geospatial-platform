@@ -149,6 +149,10 @@ test("rejects missing, non-string, malformed, wrong-type and wrong-version regis
       "../unsafe",
     ),
   }), /unexpected record type/);
+  assert.throws(() => buildTrustRegistrySnapshotInventory({
+    ...valid,
+    trustedOtherRegistry: valid.trustedDeviceRegistry,
+  }), /exactly the surveyor, device and enrollment-authority registries/);
 });
 
 test("requires different registry IDs for the three independent trust roles", () => {
