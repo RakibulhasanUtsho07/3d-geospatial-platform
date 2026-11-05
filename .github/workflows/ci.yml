@@ -99,6 +99,7 @@ on:
       - feat/d3m-engine15-byte-verified-survey-records-20261105
       - feat/d3m-engine16-surveyor-record-attestations-20261105
       - feat/d3m-engine17-device-record-attestations-20261105
+      - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
 
   workflow_dispatch:
   pull_request:
@@ -214,6 +215,12 @@ jobs:
 
       - name: Validate survey observation device-attestation signing CLI
         run: npm run sign:survey-observation-device-attestation -- --help
+
+      - name: Test authority-signed survey-device enrollment evidence
+        run: npm run test:survey-device-enrollment-evidence
+
+      - name: Validate survey-device enrollment evidence verifier CLI
+        run: npm run verify:survey-device-enrollment-evidence -- --help
 
       - name: Test feature picking controller lifecycle
         run: npm run test:feature-picking-controller

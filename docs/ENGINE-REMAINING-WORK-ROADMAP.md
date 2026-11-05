@@ -598,3 +598,16 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - The initial signature failure was traced to the trusted registry parser storing the `publicKey` helper instead of the parsed Ed25519 `KeyObject`; the parser now stores `publicKey: key`. Focused registry/signature tests and package-integrity regression pass.
 - Trust boundary remains unchanged: CI uses synthetic keys; no manufacturer certificate, secure-element custody, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy is proven. All publication/map-ready/automatic-approval flags remain false.
 - PR #370 remains Draft/open/unmerged, stacked on #368. Do not promote this stack to `development` or `main` before independent review and external enrollment evidence.
+
+## D3M-ENGINE-18 — authority-signed survey-device hardware enrollment evidence
+
+- **Tracking issue:** [#371](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/371).
+- **Implementation branch:** `feat/d3m-engine18-signed-device-enrollment-evidence-20261105`; stacked on D3M-ENGINE-17 PR #370 exact head `3cde93738045e47da1b09e453573ed6bedda61a3`.
+- Verifies an exact-byte, canonical, domain-separated Ed25519 **device-level** hardware-enrollment statement. Its SHA-256 must match the one stable `enrollmentEvidenceSha256` value shared across the device's D3M-17 key-rotation history.
+- Important D3M-17 compatibility finding: D3M-17 deliberately requires `enrollmentEvidenceSha256` to remain stable when a device key rotates. Therefore the enrollment statement does **not** bind an individual device key ID/fingerprint. D3M-17 remains responsible for device-key possession, validity, revocation and rotation.
+- Adds a separate public-key-only enrollment-authority registry, validity/revocation and linear key-rotation checks, and binding to device ID, manufacturer/model and privacy-preserving keyed serial commitment.
+- Adds an offline bounded-input CLI that rejects symlinks and changing files and prints only sanitized verification results. The authority registry is an operator-provisioned trust anchor, separate from reviewer/surveyor/device registries. An operator-assigned `manufacturer` authority type does not prove legal manufacturer identity or certificate-chain validation.
+- Adds schemas, synthetic-key adversarial tests including D3M-17 key-rotation reuse, CLI tests, CI test/help wiring and runbook `docs/D3M-ENGINE-18-DEVICE-ENROLLMENT-EVIDENCE.md`.
+- **Scope limit:** this increment verifies a device-level external signed evidence document but does not yet embed it in review-package schema 1.6.0 or make it a release/publication gate. No production authority key, device serial, enrollment document or signing secret is included. It does not prove secure-element custody, manufacturer certification, firmware integrity, genuine capture or measurement accuracy.
+- **Validation status:** the initial key-specific binding design was corrected to preserve the D3M-17 rotation invariant. Exact-head Push/PR Full CI must pass before validation is claimed.
+- PR #370 and its dependency chain #368 → #366 → #363 remain Draft/open/unmerged. Do not merge, retarget or promote this stack to `development`/`main`. All publication/map-ready/automatic-approval flags remain false.
