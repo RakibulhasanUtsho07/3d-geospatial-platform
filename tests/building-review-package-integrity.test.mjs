@@ -1402,6 +1402,10 @@ test("binds original held-out survey record bytes through the complete review pa
     singleImageEvidence: enrolledEvidence,
     generatedAt: registryNow.toISOString(),
   });
+  const packagedEnrollmentArtifact = enrolledPackageManifest.artifacts.find((item) =>
+    item.artifactType === enrollmentEvidenceArtifact.artifactType);
+  assert.equal(packagedEnrollmentArtifact.deviceId, enrollmentEvidenceArtifact.deviceId);
+  assert.equal(Object.hasOwn(packagedEnrollmentArtifact, "keyId"), false);
   const enrolledActualFiles = [
     ...deviceActualFiles,
     {

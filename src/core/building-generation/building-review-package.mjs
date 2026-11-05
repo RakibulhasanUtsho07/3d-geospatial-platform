@@ -111,7 +111,6 @@ export function buildBuildingReviewPackageManifest({
       ...(artifact.rightsStatus ? { rightsStatus: artifact.rightsStatus } : {}),
       ...(artifact.artifactType === "single-image-survey-device-enrollment-evidence" ? {
         deviceId: artifact.deviceId,
-        keyId: artifact.keyId,
         authorityId: artifact.authorityId,
         authorityType: artifact.authorityType,
         authorityRegistryId: artifact.authorityRegistryId,
