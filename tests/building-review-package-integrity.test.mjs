@@ -1029,7 +1029,7 @@ test("binds original held-out survey record bytes through the complete review pa
     })),
   );
   const signedEvidence = {
-    ...packageManifest.singleImageEvidence,
+    ...singleImageEvidence,
     schemaVersion: "1.4.0",
     surveyObservationAttestationCount: attestationInventory.count,
     surveyObservationAttestationBytes: attestationInventory.totalBytes,
@@ -1038,7 +1038,7 @@ test("binds original held-out survey record bytes through the complete review pa
     surveyObservationAttributionStatus: "attribution-signatures-verified",
     trustedSurveyorRegistryId: trustedSurveyorRegistry.registryId,
     files: [
-      ...packageManifest.singleImageEvidence.files,
+      ...singleImageEvidence.files,
       ...attestationSidecars.map((item) => ({
         artifactType: item.artifactType,
         observationId: item.observationId,
