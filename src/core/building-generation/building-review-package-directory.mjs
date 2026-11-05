@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { readImageDimensions } from "./image-quality-preflight.mjs";
 import { verifyBuildingReviewPackage } from "./building-review-package-integrity.mjs";
+import { trustRegistryGovernanceKeyFingerprint } from "./trust-registry-governance-attestation.mjs";
+import {
+  advanceTrustRegistryGovernanceState,
+  loadOrInitializeTrustRegistryGovernanceState,
+} from "./trust-registry-governance-state.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const PACKAGE_CONTROL_FILES = new Set(["package-manifest.json", "package-manifest.sig.json"]);
@@ -175,8 +180,41 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
   trustRegistryGovernanceAttestation = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_ATTESTATION_JSON ?? null,
   trustRegistryGovernancePublicKeyPem = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_PUBLIC_KEY_PEM ?? null,
   minimumTrustRegistrySequence = process.env.SURVEY_TRUST_REGISTRY_MINIMUM_SEQUENCE ?? null,
+  trustRegistryGovernanceStateFilePath = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_STATE_FILE || null,
+  trustRegistryGovernanceNow = undefined,
 } = {}) {
   const snapshot = await readBuildingReviewPackageDirectory(directoryArg);
+  const governance = snapshot.packageManifest?.singleImageEvidence?.schemaVersion === "1.8.0"
+    ? snapshot.packageManifest.singleImageEvidence.trustRegistryGovernance
+    : null;
+  let governanceState = null;
+  let effectiveMinimumSequence = minimumTrustRegistrySequence;
+
+  if (governance && trustRegistryGovernanceStateFilePath) {
+    if (typeof trustRegistryGovernancePublicKeyPem !== "string" || !trustRegistryGovernancePublicKeyPem) {
+      throw new Error("Persisted governance state requires the independently pinned governance public key.");
+    }
+    const pinnedFingerprint = trustRegistryGovernanceKeyFingerprint(trustRegistryGovernancePublicKeyPem);
+    if (governance.governanceKeyFingerprintSha256 !== pinnedFingerprint) {
+      throw new Error("Package governance key fingerprint does not match the independently pinned public key.");
+    }
+    const loaded = await loadOrInitializeTrustRegistryGovernanceState({
+      stateFilePath: trustRegistryGovernanceStateFilePath,
+      registrySetId: governance.registrySetId,
+      governanceKeyFingerprintSha256: pinnedFingerprint,
+      bootstrapMinimumSequence: minimumTrustRegistrySequence,
+      now: trustRegistryGovernanceNow,
+    });
+    governanceState = loaded.state;
+    const configuredFloor = minimumTrustRegistrySequence === null ||
+      minimumTrustRegistrySequence === undefined || minimumTrustRegistrySequence === ""
+      ? governanceState.minimumAcceptedSequence
+      : Number(minimumTrustRegistrySequence);
+    effectiveMinimumSequence = Number.isSafeInteger(configuredFloor)
+      ? Math.max(configuredFloor, governanceState.minimumAcceptedSequence)
+      : minimumTrustRegistrySequence;
+  }
+
   const integrity = verifyBuildingReviewPackage({
     packageManifest: snapshot.packageManifest,
     actualFiles: snapshot.actualFiles,
@@ -186,9 +224,54 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     trustedEnrollmentAuthorityRegistry,
     trustRegistryGovernanceAttestation,
     trustRegistryGovernancePublicKeyPem,
-    minimumTrustRegistrySequence,
+    minimumTrustRegistrySequence: effectiveMinimumSequence,
+    trustRegistryGovernanceNow,
   });
-  return { ...snapshot, integrity };
+
+  if (integrity.valid && governance && governanceState && trustRegistryGovernanceStateFilePath) {
+    try {
+      const advanced = await advanceTrustRegistryGovernanceState({
+        stateFilePath: trustRegistryGovernanceStateFilePath,
+        registrySetId: governance.registrySetId,
+        governanceKeyFingerprintSha256: governance.governanceKeyFingerprintSha256,
+        expectedRevision: governanceState.revision,
+        acceptedSequence: governance.sequence,
+        acceptedAttestationSha256: governance.attestationSha256,
+        acceptedSnapshotSha256: governance.snapshotSha256,
+        now: trustRegistryGovernanceNow,
+      });
+      governanceState = advanced.state;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      integrity.errors.push({
+        id: "trust-registry-governance-state-advance-failed",
+        message,
+      });
+      integrity.checks.push({
+        id: "trust-registry-governance-state-advance",
+        status: "failed",
+        message,
+      });
+      integrity.counts.errors += 1;
+      integrity.valid = false;
+      integrity.status = "tampered-or-invalid";
+    }
+  }
+
+  return {
+    ...snapshot,
+    integrity,
+    ...(governanceState ? {
+      governanceState: {
+        schemaVersion: governanceState.schemaVersion,
+        registrySetId: governanceState.registrySetId,
+        governanceKeyFingerprintSha256: governanceState.governanceKeyFingerprintSha256,
+        minimumAcceptedSequence: governanceState.minimumAcceptedSequence,
+        revision: governanceState.revision,
+        stateSha256: governanceState.stateSha256,
+      },
+    } : {}),
+  };
 }
 
 export function sameBuildingReviewPackageSnapshot(left, right) {

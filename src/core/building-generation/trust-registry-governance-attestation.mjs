@@ -84,6 +84,11 @@ function parsePrivateKey(value) {
 }
 const keyFingerprint = (key) => sha256(key.export({ type: "spki", format: "der" }));
 
+/** Compute the fingerprint of an operator-pinned Ed25519 public key. */
+export function trustRegistryGovernanceKeyFingerprint(governancePublicKeyPem) {
+  return keyFingerprint(parsePublicKey(governancePublicKeyPem));
+}
+
 function assertSnapshot(snapshot) {
   if (!isObject(snapshot) || snapshot.schemaVersion !== "1.0.0" ||
       snapshot.count !== 3 || !Number.isSafeInteger(snapshot.totalBytes) ||
