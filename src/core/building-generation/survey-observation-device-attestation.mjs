@@ -164,6 +164,10 @@ function unsignedContext(envelope) {
   return context;
 }
 function signingBytes(context){return Buffer.concat([DOMAIN,Buffer.from(canonicalJson(context),"utf8")]);}
+export function surveyObservationDeviceAttestationSigningBytes(envelope) {
+  if (!exactFields(envelope, ATTESTATION_FIELDS)) throw new TypeError("Device attestation envelope fields are invalid.");
+  return signingBytes(unsignedContext(envelope));
+}
 
 export function createSurveyObservationDeviceAttestation({
   recordBytes,controlPointManifestBytes,observationId,checkpointId,buildingId,deviceId,privateKeyPem,trustedDeviceRegistry,attestedAtUtc,
