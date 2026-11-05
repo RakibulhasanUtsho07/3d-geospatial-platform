@@ -25,7 +25,7 @@ function syntheticProvider({ ignoreCompareAndSetVersion = false, corruptAnchor =
     stateSha256: next.stateSha256,
   });
 
-  return {
+  const createClient = () => ({
     providerId: "synthetic-conformance-provider",
     async readState(identity) {
       if (state === null) return null;
@@ -55,19 +55,20 @@ function syntheticProvider({ ignoreCompareAndSetVersion = false, corruptAnchor =
       if (corruptAnchor) anchor.revision += 1;
       return { updated: true, ...snapshot() };
     },
-  };
+  });
+  return { provider: createClient(), reopenProvider: async () => createClient() };
 }
 
 test("provider conformance suite accepts an atomic synthetic provider", async () => {
-  const report = await runTrustRegistryGovernanceProviderConformance({
-    provider: syntheticProvider(),
-  });
+  const fixture = syntheticProvider();
+  const report = await runTrustRegistryGovernanceProviderConformance(fixture);
   assert.deepEqual({
     initializeContenders: report.initializeContenders,
     initializeWinners: report.initializeWinners,
     casContenders: report.casContenders,
     casWinners: report.casWinners,
     staleCasRejected: report.staleCasRejected,
+    freshProviderReopened: report.freshProviderReopened,
     freshReadMatched: report.freshReadMatched,
     ambiguousCommitRecovered: report.ambiguousCommitRecovered,
     finalRevision: report.finalRevision,
@@ -78,6 +79,7 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
     casContenders: 8,
     casWinners: 1,
     staleCasRejected: true,
+    freshProviderReopened: true,
     freshReadMatched: true,
     ambiguousCommitRecovered: true,
     finalRevision: 2,
@@ -88,7 +90,7 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
 test("provider conformance suite rejects a provider that permits competing stale CAS writers", async () => {
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
-      provider: syntheticProvider({ ignoreCompareAndSetVersion: true }),
+      ...syntheticProvider({ ignoreCompareAndSetVersion: true }),
     }),
     /exactly one writer may win/i,
   );
@@ -97,7 +99,7 @@ test("provider conformance suite rejects a provider that permits competing stale
 test("provider conformance suite rejects an anchor that does not bind its initial state", async () => {
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
-      provider: syntheticProvider({ corruptAnchor: true }),
+      ...syntheticProvider({ corruptAnchor: true }),
     }),
     /anchor must independently match/i,
   );
@@ -107,6 +109,7 @@ test("provider conformance suite rejects providers with missing contract methods
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
       provider: { providerId: "incomplete-provider", readState() {} },
+      reopenProvider: async () => ({ providerId: "incomplete-provider" }),
     }),
     /initializeStateIfAbsent/i,
   );
