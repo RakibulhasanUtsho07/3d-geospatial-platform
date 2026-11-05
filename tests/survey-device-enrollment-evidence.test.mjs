@@ -122,7 +122,7 @@ test("verifies exact device-level enrollment bytes against D3M-17 identity and o
   assert.equal(result.evidenceSha256, fixture.deviceRegistry.entries[0].enrollmentEvidenceSha256);
   assert.equal(result.publicationEligible, false);
   assert.equal(parseTrustedSurveyDeviceEnrollmentAuthorityRegistry(fixture.authorityRegistry, { now: NOW }).activeEntries.length, 1);
-  assert.equal(surveyDeviceEnrollmentEvidencePath("receiver-01"), "evidence/device-enrollments/receiver-01.receiver-key-01.enrollment.json");
+  assert.equal(surveyDeviceEnrollmentEvidencePath("receiver-01"), "evidence/device-enrollments/receiver-01.enrollment.json");
   assert.throws(() => surveyDeviceEnrollmentEvidencePath("con"), /cross-platform/);
 });
 
