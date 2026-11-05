@@ -3,6 +3,7 @@ import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { buildSingleImageSurveyObservationRecordInventory } from "./single-image-survey-observation-records.mjs";
 import { buildSurveyObservationAttributionInventory } from "./survey-observation-attribution-attestation.mjs";
 import { buildSurveyObservationDeviceAttestationInventory } from "./survey-observation-device-attestation.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -108,6 +109,12 @@ export function buildBuildingReviewPackageManifest({
       ...(artifact.width ? { width: artifact.width } : {}),
       ...(artifact.height ? { height: artifact.height } : {}),
       ...(artifact.rightsStatus ? { rightsStatus: artifact.rightsStatus } : {}),
+      ...(artifact.artifactType === "single-image-survey-device-enrollment-evidence" ? {
+        deviceId: artifact.deviceId,
+        authorityId: artifact.authorityId,
+        authorityType: artifact.authorityType,
+        authorityRegistryId: artifact.authorityRegistryId,
+      } : {}),
     });
   }
 
@@ -133,13 +140,14 @@ export function buildBuildingReviewPackageManifest({
     if (singleImageArtifactCount !== 0 ||
         (byType.get("single-image-survey-observation-record") ?? 0) !== 0 ||
         (byType.get("single-image-survey-observation-attestation") ?? 0) !== 0 ||
-        (byType.get("single-image-survey-observation-device-attestation") ?? 0) !== 0) {
+        (byType.get("single-image-survey-observation-device-attestation") ?? 0) !== 0 ||
+        (byType.get("single-image-survey-device-enrollment-evidence") ?? 0) !== 0) {
       throw new Error("review-package-single-image-evidence-metadata-missing");
     }
   } else {
-    const hasVerticalCalibration = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence?.schemaVersion);
-    const hasIndependentCheckpoints = ["1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence?.schemaVersion);
-    const hasByteVerifiedObservationRecords = ["1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasVerticalCalibration = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasIndependentCheckpoints = ["1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasByteVerifiedObservationRecords = ["1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence?.schemaVersion);
     const recordArtifacts = artifacts.filter((item) =>
       item.artifactType === "single-image-survey-observation-record");
     const recordFiles = Array.isArray(singleImageEvidence?.files)
@@ -158,12 +166,20 @@ export function buildBuildingReviewPackageManifest({
       ? singleImageEvidence.files.filter((item) =>
         item.artifactType === "single-image-survey-observation-device-attestation")
       : [];
+    const enrollmentEvidenceArtifacts = artifacts.filter((item) =>
+      item.artifactType === "single-image-survey-device-enrollment-evidence");
+    const enrollmentEvidenceFiles = Array.isArray(singleImageEvidence?.files)
+      ? singleImageEvidence.files.filter((item) =>
+        item.artifactType === "single-image-survey-device-enrollment-evidence")
+      : [];
     let recordInventory = null;
     let surveyObservationRecordsValid = false;
     let attestationInventory = null;
     let surveyObservationAttestationsValid = false;
     let deviceAttestationInventory = null;
     let surveyObservationDeviceAttestationsValid = false;
+    let enrollmentEvidenceInventory = null;
+    let surveyDeviceEnrollmentEvidenceValid = false;
     try {
       if (hasByteVerifiedObservationRecords) {
         recordInventory = buildSingleImageSurveyObservationRecordInventory(
@@ -192,7 +208,7 @@ export function buildBuildingReviewPackageManifest({
           recordFiles.length === 0 &&
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationRecord"));
       }
-      if (["1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion)) {
+      if (["1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion)) {
         attestationInventory = buildSurveyObservationAttributionInventory(
           singleImageEvidence.surveyObservationAttestations,
         );
@@ -226,7 +242,7 @@ export function buildBuildingReviewPackageManifest({
           !Object.hasOwn(singleImageEvidence ?? {}, "surveyObservationAttributionStatus") &&
           !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyorRegistryId");
       }
-      if (singleImageEvidence.schemaVersion === "1.5.0") {
+      if (["1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion)) {
         deviceAttestationInventory = buildSurveyObservationDeviceAttestationInventory(
           singleImageEvidence.surveyObservationDeviceAttestations,
         );
@@ -250,10 +266,41 @@ export function buildBuildingReviewPackageManifest({
           });
       } else {
         surveyObservationDeviceAttestationsValid =
-          deviceAttestationArtifacts.length === 0 && deviceAttestationFiles.length === 0 &&
+          deviceAttestationArtifacts.length === 0 &&
+          deviceAttestationFiles.length === 0 &&
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationDeviceAttestation")) &&
           !Object.hasOwn(singleImageEvidence ?? {}, "surveyObservationDeviceAttestationStatus") &&
           !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceRegistryId");
+      }
+      if (singleImageEvidence.schemaVersion === "1.6.0") {
+        const deviceIds = new Set();
+        for (const item of deviceAttestationFiles) {
+          if (typeof item.deviceId !== "string" || typeof item.keyId !== "string") throw new Error("device-attestation file metadata omits device/key identity");
+          deviceIds.add(item.deviceId);
+        }
+        enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(enrollmentEvidenceFiles.map((item) => ({
+          deviceId: item.deviceId, relativePath: item.relativePath, sha256: item.sha256, bytes: item.bytes,
+          authorityId: item.authorityId, authorityType: item.authorityType, authorityRegistryId: item.authorityRegistryId,
+        })));
+        surveyDeviceEnrollmentEvidenceValid = enrollmentEvidenceInventory.count === singleImageEvidence.surveyDeviceEnrollmentEvidenceCount &&
+          enrollmentEvidenceInventory.count === deviceIds.size && enrollmentEvidenceInventory.totalBytes === singleImageEvidence.surveyDeviceEnrollmentEvidenceBytes &&
+          enrollmentEvidenceInventory.sha256 === singleImageEvidence.surveyDeviceEnrollmentEvidenceSha256 &&
+          typeof singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId === "string" &&
+          /^[a-z0-9][a-z0-9._-]{0,79}$/.test(singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId) &&
+          singleImageEvidence.surveyDeviceEnrollmentEvidenceStatus === "enrollment-authority-evidence-verified" &&
+          enrollmentEvidenceArtifacts.length === enrollmentEvidenceInventory.count && enrollmentEvidenceFiles.length === enrollmentEvidenceInventory.count &&
+          enrollmentEvidenceInventory.entries.every((entry) => {
+            const file = enrollmentEvidenceFiles.find((item) => item.relativePath === entry.relativePath);
+            const artifact = enrollmentEvidenceArtifacts.find((item) => item.relativePath === entry.relativePath);
+            return deviceIds.has(entry.deviceId) && file && Number.isSafeInteger(file.bytes) && file.bytes === entry.bytes &&
+              file.sha256 === entry.sha256 && file.deviceId === entry.deviceId && !Object.hasOwn(file, "keyId") &&
+              file.authorityId === entry.authorityId && file.authorityType === entry.authorityType && file.authorityRegistryId === entry.authorityRegistryId &&
+              artifact && artifact.deviceId === entry.deviceId && !Object.hasOwn(artifact, "keyId") && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
+          }) && enrollmentEvidenceInventory.entries.every((entry) => entry.authorityRegistryId === singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId);
+      } else {
+        surveyDeviceEnrollmentEvidenceValid = enrollmentEvidenceArtifacts.length === 0 && enrollmentEvidenceFiles.length === 0 &&
+          !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyDeviceEnrollmentEvidence")) &&
+          !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceEnrollmentAuthorityRegistryId");
       }
     } catch {
       surveyObservationRecordsValid = false;
@@ -288,7 +335,7 @@ export function buildBuildingReviewPackageManifest({
           "checkpoint3dRmsErrorM", "checkpoint3dMaxResidualM"].every((key) =>
           Number.isFinite(singleImageEvidence[key]) && singleImageEvidence[key] >= 0)
       : !Object.keys(singleImageEvidence).some((key) => key.startsWith("checkpoint"));
-    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ||
+    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ||
         !nonEmptyString(singleImageEvidence.jobId) || !nonEmptyString(singleImageEvidence.sourceId) ||
         !isHash(singleImageEvidence.sourceSha256) || !isHash(singleImageEvidence.candidateGlbSha256) ||
         !isHash(singleImageEvidence.controlPointManifestSha256) || !isHash(singleImageEvidence.smokeReportSha256) ||
@@ -297,6 +344,7 @@ export function buildBuildingReviewPackageManifest({
         singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
         !verticalMetadataValid || !checkpointMetadataValid || !surveyObservationRecordsValid || !surveyObservationAttestationsValid ||
         !surveyObservationDeviceAttestationsValid ||
+        !surveyDeviceEnrollmentEvidenceValid ||
         singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
         singleImageEvidence.automaticApproval !== false ||
         singleImageEvidence.candidateGlbSha256.toLowerCase() !==
@@ -394,7 +442,7 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
-      ...(["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         verticalStatus: singleImageEvidence.verticalStatus,
         verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
         verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
@@ -404,7 +452,7 @@ export function buildBuildingReviewPackageManifest({
         verticalMaxResidualM: singleImageEvidence.verticalMaxResidualM,
         verticalControlPointCount: singleImageEvidence.verticalControlPointCount,
       } : {}),
-      ...(["1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         checkpointValidationStatus: singleImageEvidence.checkpointValidationStatus,
         checkpointEvidenceSha256: singleImageEvidence.checkpointEvidenceSha256.toLowerCase(),
         checkpointReferenceFrame: singleImageEvidence.checkpointReferenceFrame,
@@ -417,12 +465,12 @@ export function buildBuildingReviewPackageManifest({
         checkpoint3dRmsErrorM: singleImageEvidence.checkpoint3dRmsErrorM,
         checkpoint3dMaxResidualM: singleImageEvidence.checkpoint3dMaxResidualM,
       } : {}),
-      ...(["1.3.0", "1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         surveyObservationRecordCount: singleImageEvidence.surveyObservationRecordCount,
         surveyObservationRecordBytes: singleImageEvidence.surveyObservationRecordBytes,
         surveyObservationRecordsSha256: singleImageEvidence.surveyObservationRecordsSha256.toLowerCase(),
       } : {}),
-      ...(["1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         surveyObservationAttestationCount: singleImageEvidence.surveyObservationAttestationCount,
         surveyObservationAttestationBytes: singleImageEvidence.surveyObservationAttestationBytes,
         surveyObservationAttestationsSha256: singleImageEvidence.surveyObservationAttestationsSha256.toLowerCase(),
@@ -430,13 +478,21 @@ export function buildBuildingReviewPackageManifest({
         surveyObservationAttributionStatus: singleImageEvidence.surveyObservationAttributionStatus,
         trustedSurveyorRegistryId: singleImageEvidence.trustedSurveyorRegistryId,
       } : {}),
-      ...(singleImageEvidence.schemaVersion === "1.5.0" ? {
+      ...(["1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         surveyObservationDeviceAttestationCount: singleImageEvidence.surveyObservationDeviceAttestationCount,
         surveyObservationDeviceAttestationBytes: singleImageEvidence.surveyObservationDeviceAttestationBytes,
         surveyObservationDeviceAttestationsSha256: singleImageEvidence.surveyObservationDeviceAttestationsSha256.toLowerCase(),
         surveyObservationDeviceAttestations: singleImageEvidence.surveyObservationDeviceAttestations,
         surveyObservationDeviceAttestationStatus: singleImageEvidence.surveyObservationDeviceAttestationStatus,
         trustedSurveyDeviceRegistryId: singleImageEvidence.trustedSurveyDeviceRegistryId,
+      } : {}),
+      ...(singleImageEvidence.schemaVersion === "1.6.0" ? {
+        surveyDeviceEnrollmentEvidenceCount: singleImageEvidence.surveyDeviceEnrollmentEvidenceCount,
+        surveyDeviceEnrollmentEvidenceBytes: singleImageEvidence.surveyDeviceEnrollmentEvidenceBytes,
+        surveyDeviceEnrollmentEvidenceSha256: singleImageEvidence.surveyDeviceEnrollmentEvidenceSha256.toLowerCase(),
+        surveyDeviceEnrollmentEvidence: singleImageEvidence.surveyDeviceEnrollmentEvidence,
+        surveyDeviceEnrollmentEvidenceStatus: singleImageEvidence.surveyDeviceEnrollmentEvidenceStatus,
+        trustedSurveyDeviceEnrollmentAuthorityRegistryId: singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId,
       } : {}),
       mapReady: false,
       publicationEligible: false,

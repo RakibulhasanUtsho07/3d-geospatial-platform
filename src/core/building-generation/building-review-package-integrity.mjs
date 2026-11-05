@@ -19,6 +19,11 @@ import {
   surveyObservationDeviceAttestationPath,
   verifySurveyObservationDeviceAttestation,
 } from "./survey-observation-device-attestation.mjs";
+import {
+  surveyDeviceEnrollmentEvidencePath,
+  verifySurveyDeviceEnrollmentEvidence,
+} from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -56,6 +61,7 @@ function safeRelativePath(value) {
 export function verifyBuildingReviewPackage({
   packageManifest, actualFiles, packageManifestSha256,
   trustedSurveyorRegistry = null, trustedDeviceRegistry = null,
+  trustedEnrollmentAuthorityRegistry = null,
 }) {
   if (!isObject(packageManifest) || packageManifest.schemaVersion !== "1.0.0" ||
     packageManifest.engine !== "building-review-package-v1" ||
@@ -422,15 +428,16 @@ export function verifyBuildingReviewPackage({
       singleImagePresent === 0 &&
         (artifactByType.get("single-image-survey-observation-record") ?? []).length === 0 &&
         (artifactByType.get("single-image-survey-observation-attestation") ?? []).length === 0 &&
-        (artifactByType.get("single-image-survey-observation-device-attestation") ?? []).length === 0,
-      "Single-image georeference, survey observation record, surveyor or device attestation artifacts must not be partially included without metadata.");
+        (artifactByType.get("single-image-survey-observation-device-attestation") ?? []).length === 0 &&
+        (artifactByType.get("single-image-survey-device-enrollment-evidence") ?? []).length === 0,
+      "Single-image georeference, survey observation record, surveyor, device attestation or device enrollment artifacts must not be included without metadata.");
   } else {
     const metadata = packageManifest.singleImageEvidence;
     const complete = singleImageItems.length === 4 && singleImagePresent === 4;
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(metadata.schemaVersion)) {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
@@ -455,7 +462,7 @@ export function verifyBuildingReviewPackage({
       const expectedReceiptSchema = smokeReport.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
       const verticalEvidence = georeference.verticalEvidence ?? null;
       const checkpointEvidence = georeference.independentCheckpointEvidence ?? null;
-      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(metadata.schemaVersion)
+      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(metadata.schemaVersion)
         ? metadata.verticalDatum === "EPSG:4979-ellipsoidal" &&
           verticalEvidence?.status === "calibrated-needs-human-review" &&
           metadata.verticalStatus === verticalEvidence.status &&
@@ -472,7 +479,7 @@ export function verifyBuildingReviewPackage({
         : metadata.schemaVersion === "1.0.0" &&
           metadata.verticalDatum === "not-solved" &&
           verticalEvidence === null;
-      const checkpointMetadataMatches = ["1.2.0", "1.3.0", "1.4.0", "1.5.0"].includes(metadata.schemaVersion)
+      const checkpointMetadataMatches = ["1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(metadata.schemaVersion)
         ? checkpointEvidence?.status === "validated-needs-human-review" &&
           metadata.checkpointValidationStatus === checkpointEvidence.status &&
           metadata.checkpointEvidenceSha256 === digest(Buffer.from(canonicalJson(checkpointEvidence), "utf8")) &&
@@ -497,7 +504,7 @@ export function verifyBuildingReviewPackage({
       let surveyObservationRecordsMetadataMatches = false;
       let controlManifest = null;
       let checkpoints = null;
-      if (["1.3.0", "1.4.0", "1.5.0"].includes(metadata.schemaVersion)) {
+      if (["1.3.0", "1.4.0", "1.5.0", "1.6.0"].includes(metadata.schemaVersion)) {
         controlManifest = JSON.parse(manifestBytes.toString("utf8"));
         checkpoints = controlManifest.heldOutCheckpoints?.points;
         if (controlManifest.schemaVersion !== "1.2.0" ||
@@ -536,7 +543,7 @@ export function verifyBuildingReviewPackage({
 
       const surveyAttestationArtifacts = artifactByType.get("single-image-survey-observation-attestation") ?? [];
       let surveyObservationAttestationsMetadataMatches = false;
-      if (["1.4.0", "1.5.0"].includes(metadata.schemaVersion)) {
+      if (["1.4.0", "1.5.0", "1.6.0"].includes(metadata.schemaVersion)) {
         if (!trustedSurveyorRegistry) {
           throw new Error("trusted-surveyor-registry-required-for-package-schema-1.4.0");
         }
@@ -613,7 +620,7 @@ export function verifyBuildingReviewPackage({
 
       const surveyDeviceAttestationArtifacts = artifactByType.get("single-image-survey-observation-device-attestation") ?? [];
       let surveyObservationDeviceAttestationsMetadataMatches = false;
-      if (metadata.schemaVersion === "1.5.0") {
+      if (["1.5.0", "1.6.0"].includes(metadata.schemaVersion)) {
         if (!trustedDeviceRegistry) {
           throw new Error("trusted-survey-device-registry-required-for-package-schema-1.5.0");
         }
@@ -666,10 +673,62 @@ export function verifyBuildingReviewPackage({
           metadata.surveyObservationDeviceAttestationStatus === "device-key-attestations-verified" &&
           deviceAttestations.length === surveyDeviceAttestationArtifacts.length;
       } else {
+        // Schemas before D3M-ENGINE-17 remain valid only when they contain no
+        // device-attestation artifacts or device-trust metadata. Do not let a
+        // legacy schema silently downgrade an included device attestation.
         surveyObservationDeviceAttestationsMetadataMatches =
           surveyDeviceAttestationArtifacts.length === 0 &&
-          !Object.keys(metadata).some((key) => key.startsWith("surveyObservationDeviceAttestation")) &&
+          !Object.keys(metadata).some((key) =>
+            key.startsWith("surveyObservationDeviceAttestation")) &&
           !Object.hasOwn(metadata, "trustedSurveyDeviceRegistryId");
+      }
+
+      const surveyDeviceEnrollmentEvidenceArtifacts =
+        artifactByType.get("single-image-survey-device-enrollment-evidence") ?? [];
+      let surveyDeviceEnrollmentEvidenceMetadataMatches = false;
+      if (metadata.schemaVersion === "1.6.0") {
+        if (!trustedDeviceRegistry) throw new Error("trusted-survey-device-registry-required-for-package-schema-1.6.0");
+        if (!trustedEnrollmentAuthorityRegistry) throw new Error("trusted-survey-device-enrollment-authority-registry-required-for-package-schema-1.6.0");
+        if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100) throw new Error("single-image-device-enrollment-checkpoint-inventory-incomplete");
+        const deviceIds = new Set();
+        for (const checkpoint of checkpoints) {
+          const sidecarPath = surveyObservationDeviceAttestationPath(checkpoint.observationId);
+          const sidecarFile = actualByPath.get(sidecarPath);
+          const sidecarArtifact = artifactByPath.get(sidecarPath);
+          if (!sidecarFile || !sidecarArtifact || sidecarArtifact.artifactType !== "single-image-survey-observation-device-attestation") throw new Error("single-image-device-enrollment-device-attestation-missing:" + checkpoint.observationId);
+          let sidecar;
+          try { sidecar = JSON.parse(sidecarFile.content.toString("utf8")); }
+          catch { throw new Error("single-image-device-enrollment-device-attestation-json-invalid:" + checkpoint.observationId); }
+          if (typeof sidecar?.deviceId !== "string") throw new Error("single-image-device-enrollment-device-identity-missing:" + checkpoint.observationId);
+          deviceIds.add(sidecar.deviceId);
+        }
+        if (surveyDeviceEnrollmentEvidenceArtifacts.length !== deviceIds.size) throw new Error("single-image-device-enrollment-evidence-inventory-incomplete-or-extra");
+        const verifiedEnrollmentEntries = [];
+        for (const deviceId of [...deviceIds].sort()) {
+          const relativePath = surveyDeviceEnrollmentEvidencePath(deviceId);
+          const artifact = artifactByPath.get(relativePath);
+          const actual = actualByPath.get(relativePath);
+          if (!artifact || artifact.artifactType !== "single-image-survey-device-enrollment-evidence" || !actual ||
+              actual.content.length > 32 * 1024 || actual.content.length !== artifact.bytes || digest(actual.content) !== artifact.sha256 ||
+              artifact.deviceId !== deviceId || Object.hasOwn(artifact, "keyId")) throw new Error("single-image-device-enrollment-evidence-byte-binding-failed:" + deviceId);
+          const result = verifySurveyDeviceEnrollmentEvidence({ evidenceBytes: actual.content, trustedDeviceRegistry, trustedEnrollmentAuthorityRegistry, deviceId });
+          if (!result.valid || result.evidenceSha256 !== artifact.sha256 || result.authorityRegistryId !== metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId ||
+              result.authorityId !== artifact.authorityId || result.authorityType !== artifact.authorityType || artifact.authorityRegistryId !== result.authorityRegistryId) {
+            throw new Error("single-image-device-enrollment-authority-signature-invalid:" + deviceId + ": " + result.errors.map((item) => item.id).join(","));
+          }
+          verifiedEnrollmentEntries.push({ deviceId, relativePath, sha256: artifact.sha256, bytes: artifact.bytes,
+            authorityId: result.authorityId, authorityType: result.authorityType, authorityRegistryId: result.authorityRegistryId });
+        }
+        const inventory = buildSurveyDeviceEnrollmentEvidenceInventory(verifiedEnrollmentEntries);
+        const metadataEntries = Array.isArray(metadata.surveyDeviceEnrollmentEvidence) ? metadata.surveyDeviceEnrollmentEvidence : [];
+        surveyDeviceEnrollmentEvidenceMetadataMatches = inventory.count === metadata.surveyDeviceEnrollmentEvidenceCount && inventory.count === deviceIds.size &&
+          inventory.totalBytes === metadata.surveyDeviceEnrollmentEvidenceBytes && inventory.sha256 === metadata.surveyDeviceEnrollmentEvidenceSha256 &&
+          canonicalJson(inventory.entries) === canonicalJson(metadataEntries) && metadata.surveyDeviceEnrollmentEvidenceStatus === "enrollment-authority-evidence-verified" &&
+          inventory.entries.every((entry) => entry.authorityRegistryId === metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId);
+      } else {
+        surveyDeviceEnrollmentEvidenceMetadataMatches = surveyDeviceEnrollmentEvidenceArtifacts.length === 0 &&
+          !Object.keys(metadata).some((key) => key.startsWith("surveyDeviceEnrollmentEvidence")) &&
+          !Object.hasOwn(metadata, "trustedSurveyDeviceEnrollmentAuthorityRegistryId");
       }
 
       if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
@@ -760,6 +819,7 @@ export function verifyBuildingReviewPackage({
           !surveyObservationRecordsMetadataMatches ||
           !surveyObservationAttestationsMetadataMatches ||
           !surveyObservationDeviceAttestationsMetadataMatches ||
+          !surveyDeviceEnrollmentEvidenceMetadataMatches ||
           metadata.mapReady !== false || metadata.publicationEligible !== false ||
           metadata.automaticApproval !== false) {
         throw new Error("single-image-evidence-cross-binding-failed");
@@ -773,7 +833,9 @@ export function verifyBuildingReviewPackage({
         modelSha256: candidate.sha256,
       });
       passed = true;
-      detail = metadata.schemaVersion === "1.5.0"
+      detail = metadata.schemaVersion === "1.6.0"
+        ? "Exact held-out records, surveyor and device signatures, and one exact-byte enrollment statement per distinct device key are independently verified against current trusted registries. Enrollment-authority verification is evidence association only; it does not prove hardware authenticity, manufacturer certification or measurement accuracy."
+        : metadata.schemaVersion === "1.5.0"
         ? "Exact smoke, receipt, manifest, original held-out record bytes, surveyor attribution and current-registry device-key attestations are verified against packaged bytes. Device-key association does not prove manufacturer certification, genuine receiver capture or measurement accuracy."
         : metadata.schemaVersion === "1.4.0"
         ? "Exact smoke, generation receipt, workflow report, control-point manifest, original held-out record bytes and current-registry Ed25519 attribution attestations are independently verified; this does not certify survey accuracy or physical feature correspondence."

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, sign } from "node:crypto";
 import { readFile, mkdtemp, mkdir, rm, writeFile, symlink, truncate } from "node:fs/promises";
 import { generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -40,6 +40,12 @@ import {
   createSurveyObservationDeviceAttestation,
   surveyObservationDeviceAttestationPath,
 } from "../src/core/building-generation/survey-observation-device-attestation.mjs";
+import {
+  surveyDeviceEnrollmentEvidencePath,
+  surveyDeviceEnrollmentEvidenceSigningBytes,
+  SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
+} from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -1169,7 +1175,7 @@ test("binds original held-out survey record bytes through the complete review pa
       manufacturerId: "synthetic-vendor",
       modelId: "synthetic-gnss-model",
       deviceSerialCommitmentSha256: hash(Buffer.from("synthetic-keyed-serial-commitment")),
-      enrollmentEvidenceSha256: hash(Buffer.from("synthetic-device-enrollment-evidence")),
+      enrollmentEvidenceSha256: "0".repeat(64),
       keyId: "synthetic-receiver-key-01",
       status: "active",
       publicKeyPem: devicePublicKeyPem,
@@ -1179,6 +1185,84 @@ test("binds original held-out survey record bytes through the complete review pa
       replacesKeyId: null,
     }],
   };
+  const authorityPair = generateKeyPairSync("ed25519");
+  const authorityPrivateKey = authorityPair.privateKey;
+  const authorityPublicKeyPem = authorityPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const trustedEnrollmentAuthorityRegistry = {
+    schemaVersion: "1.0.0",
+    recordType: "trusted-survey-device-enrollment-authority-public-key-registry",
+    registryId: "synthetic-enrollment-authorities-test-registry",
+    issuedAtUtc: registryIssued,
+    expiresAtUtc: registryExpires,
+    entries: [{
+      authorityId: "synthetic-survey-enrollment-office",
+      authorityType: "independent-enrollment-authority",
+      keyId: "synthetic-enrollment-authority-key-01",
+      status: "active",
+      publicKeyPem: authorityPublicKeyPem,
+      validFromUtc: registryIssued,
+      validUntilUtc: registryExpires,
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  };
+  const enrollmentUnsigned = {
+    schemaVersion: "1.0.0",
+    recordType: "survey-device-enrollment-evidence",
+    engine: "survey-device-enrollment-evidence-v1",
+    signatureAlgorithm: "Ed25519",
+    signaturePurpose: "survey-device-hardware-identity-enrollment-only",
+    enrollmentId: "synthetic-enrollment-record-01",
+    deviceId: "synthetic-receiver-01",
+    manufacturerId: "synthetic-vendor",
+    modelId: "synthetic-gnss-model",
+    deviceSerialCommitmentSha256: trustedDeviceRegistry.entries[0].deviceSerialCommitmentSha256,
+    authorityId: "synthetic-survey-enrollment-office",
+    authorityType: "independent-enrollment-authority",
+    authorityKeyId: "synthetic-enrollment-authority-key-01",
+    authorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,
+    authorityRegistryIssuedAtUtc: trustedEnrollmentAuthorityRegistry.issuedAtUtc,
+    authorityRegistryExpiresAtUtc: trustedEnrollmentAuthorityRegistry.expiresAtUtc,
+    issuedAtUtc: registryNow.toISOString(),
+    validFromUtc: registryIssued,
+    validUntilUtc: registryExpires,
+    publicationEligible: false,
+    note: SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
+    signatureBase64: "",
+  };
+  const enrollmentEvidence = {
+    ...enrollmentUnsigned,
+    signatureBase64: sign(null, surveyDeviceEnrollmentEvidenceSigningBytes(enrollmentUnsigned), authorityPrivateKey).toString("base64"),
+  };
+  const enrollmentEvidenceBytes = Buffer.from(canonicalJson(enrollmentEvidence), "utf8");
+  trustedDeviceRegistry.entries[0].enrollmentEvidenceSha256 = hash(enrollmentEvidenceBytes);
+  const enrollmentEvidenceRelativePath = surveyDeviceEnrollmentEvidencePath("synthetic-receiver-01");
+  const enrollmentEvidenceArtifact = {
+    artifactType: "single-image-survey-device-enrollment-evidence",
+    deviceId: "synthetic-receiver-01",
+    authorityId: "synthetic-survey-enrollment-office",
+    authorityType: "independent-enrollment-authority",
+    authorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,
+    relativePath: enrollmentEvidenceRelativePath,
+    sha256: hash(enrollmentEvidenceBytes),
+    bytes: enrollmentEvidenceBytes,
+  };
+  const enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory([{
+    deviceId: enrollmentEvidenceArtifact.deviceId,
+    relativePath: enrollmentEvidenceArtifact.relativePath,
+    sha256: enrollmentEvidenceArtifact.sha256,
+    bytes: enrollmentEvidenceBytes.length,
+    authorityId: enrollmentEvidenceArtifact.authorityId,
+    authorityType: enrollmentEvidenceArtifact.authorityType,
+    authorityRegistryId: enrollmentEvidenceArtifact.authorityRegistryId,
+  }]);
+  assert.throws(
+    () => buildSurveyDeviceEnrollmentEvidenceInventory([
+      ...enrollmentEvidenceInventory.entries,
+      ...enrollmentEvidenceInventory.entries,
+    ]),
+    /duplicated device or path/,
+  );
   const deviceSidecars = recordInputs.map((record) => {
     const checkpoint = manifest.heldOutCheckpoints.points.find(
       (item) => item.observationId === record.observationId,
@@ -1200,6 +1284,8 @@ test("binds original held-out survey record bytes through the complete review pa
       artifactType: "single-image-survey-observation-device-attestation",
       observationId: checkpoint.observationId,
       checkpointId: checkpoint.id,
+      deviceId: attestation.deviceId,
+      keyId: attestation.keyId,
       relativePath,
       sha256: hash(bytes),
       bytes,
@@ -1229,6 +1315,8 @@ test("binds original held-out survey record bytes through the complete review pa
         artifactType: item.artifactType,
         observationId: item.observationId,
         checkpointId: item.checkpointId,
+        deviceId: item.deviceId,
+        keyId: item.keyId,
         relativePath: item.relativePath,
         sha256: item.sha256,
         bytes: item.bytes,
@@ -1245,6 +1333,8 @@ test("binds original held-out survey record bytes through the complete review pa
         artifactType: item.artifactType,
         observationId: item.observationId,
         checkpointId: item.checkpointId,
+        deviceId: item.deviceId,
+        keyId: item.keyId,
         relativePath: item.relativePath,
         sha256: item.sha256,
         bytes: item.bytes.length,
@@ -1277,6 +1367,156 @@ test("binds original held-out survey record bytes through the complete review pa
   assert.equal(deviceReport.publicationEligible, false);
   assert.ok(deviceReport.checks.some((item) =>
     item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  // D3M-ENGINE-19: package one immutable signed enrollment statement per distinct
+  // device identity; D3M-17 retains per-key attestation and rotation checks.
+  const enrollmentEvidenceFileMetadata = {
+    artifactType: enrollmentEvidenceArtifact.artifactType,
+    deviceId: enrollmentEvidenceArtifact.deviceId,
+    authorityId: enrollmentEvidenceArtifact.authorityId,
+    authorityType: enrollmentEvidenceArtifact.authorityType,
+    authorityRegistryId: enrollmentEvidenceArtifact.authorityRegistryId,
+    relativePath: enrollmentEvidenceArtifact.relativePath,
+    sha256: enrollmentEvidenceArtifact.sha256,
+    bytes: enrollmentEvidenceBytes.length,
+  };
+  const enrolledEvidence = {
+    ...deviceEvidence,
+    schemaVersion: "1.6.0",
+    surveyDeviceEnrollmentEvidenceCount: enrollmentEvidenceInventory.count,
+    surveyDeviceEnrollmentEvidenceBytes: enrollmentEvidenceInventory.totalBytes,
+    surveyDeviceEnrollmentEvidenceSha256: enrollmentEvidenceInventory.sha256,
+    surveyDeviceEnrollmentEvidence: enrollmentEvidenceInventory.entries,
+    surveyDeviceEnrollmentEvidenceStatus: "enrollment-authority-evidence-verified",
+    trustedSurveyDeviceEnrollmentAuthorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,
+    files: [...deviceEvidence.files, enrollmentEvidenceFileMetadata],
+  };
+  const enrolledPackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: [
+      ...devicePackageManifest.artifacts,
+      { ...enrollmentEvidenceFileMetadata },
+    ],
+    singleImageEvidence: enrolledEvidence,
+    generatedAt: registryNow.toISOString(),
+  });
+  const packagedEnrollmentArtifact = enrolledPackageManifest.artifacts.find((item) =>
+    item.artifactType === enrollmentEvidenceArtifact.artifactType);
+  assert.equal(packagedEnrollmentArtifact.deviceId, enrollmentEvidenceArtifact.deviceId);
+  assert.equal(Object.hasOwn(packagedEnrollmentArtifact, "keyId"), false);
+  const enrolledActualFiles = [
+    ...deviceActualFiles,
+    {
+      relativePath: enrollmentEvidenceArtifact.relativePath,
+      sha256: enrollmentEvidenceArtifact.sha256,
+      bytes: enrollmentEvidenceBytes.length,
+      content: enrollmentEvidenceBytes,
+      isRegularFile: true,
+    },
+  ];
+  const enrolledReport = verifyBuildingReviewPackage({
+    packageManifest: enrolledPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(enrolledPackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry,
+  });
+  assert.equal(enrolledReport.valid, true, JSON.stringify(enrolledReport.errors));
+  assert.equal(enrolledPackageManifest.singleImageEvidence.schemaVersion, "1.6.0");
+  assert.equal(enrolledPackageManifest.singleImageEvidence.surveyDeviceEnrollmentEvidenceCount, 1);
+  assert.equal(enrolledPackageManifest.singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId,
+    trustedEnrollmentAuthorityRegistry.registryId);
+  assert.equal(enrolledReport.publicationEligible, false);
+  assert.ok(enrolledReport.checks.some((item) =>
+    item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  const missingAuthorityRegistry = verifyBuildingReviewPackage({
+    packageManifest: enrolledPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(enrolledPackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+  });
+  assert.equal(missingAuthorityRegistry.valid, false);
+  assert.ok(missingAuthorityRegistry.errors.some((item) =>
+    item.message.includes("trusted-survey-device-enrollment-authority-registry-required-for-package-schema-1.6.0")));
+
+  const missingEnrollmentEvidence = verifyBuildingReviewPackage({
+    packageManifest: enrolledPackageManifest,
+    actualFiles: enrolledActualFiles.filter((item) => item.relativePath !== enrollmentEvidenceArtifact.relativePath),
+    packageManifestSha256: hash(JSON_BYTES(enrolledPackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry,
+  });
+  assert.equal(missingEnrollmentEvidence.valid, false);
+
+  const tamperedEnrollmentEvidence = verifyBuildingReviewPackage({
+    packageManifest: enrolledPackageManifest,
+    actualFiles: enrolledActualFiles.map((item) => item.relativePath === enrollmentEvidenceArtifact.relativePath
+      ? { ...item, content: Buffer.concat([item.content, Buffer.from("tampered")]) }
+      : item),
+    packageManifestSha256: hash(JSON_BYTES(enrolledPackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry,
+  });
+  assert.equal(tamperedEnrollmentEvidence.valid, false);
+
+  const wrongAuthorityPair = generateKeyPairSync("ed25519");
+  const wrongAuthorityRegistry = {
+    ...trustedEnrollmentAuthorityRegistry,
+    entries: [{
+      ...trustedEnrollmentAuthorityRegistry.entries[0],
+      publicKeyPem: wrongAuthorityPair.publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }],
+  };
+  const wrongAuthority = verifyBuildingReviewPackage({
+    packageManifest: enrolledPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(enrolledPackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry: wrongAuthorityRegistry,
+  });
+  assert.equal(wrongAuthority.valid, false);
+
+  const orphanEvidenceBytes = Buffer.from("orphaned-enrollment-evidence");
+  const orphanRelativePath = "evidence/device-enrollments/orphan-device.enrollment.json";
+  const orphanArtifact = {
+    artifactType: "single-image-survey-device-enrollment-evidence",
+    deviceId: "orphan-device",
+    authorityId: "synthetic-survey-enrollment-office",
+    authorityType: "independent-enrollment-authority",
+    authorityRegistryId: trustedEnrollmentAuthorityRegistry.registryId,
+    relativePath: orphanRelativePath,
+    sha256: hash(orphanEvidenceBytes),
+    bytes: orphanEvidenceBytes.length,
+  };
+  const orphanPackage = {
+    ...enrolledPackageManifest,
+    counts: {
+      ...enrolledPackageManifest.counts,
+      artifacts: enrolledPackageManifest.counts.artifacts + 1,
+      totalBytes: enrolledPackageManifest.counts.totalBytes + orphanEvidenceBytes.length,
+    },
+    artifacts: [...enrolledPackageManifest.artifacts, orphanArtifact],
+  };
+  const orphanReport = verifyBuildingReviewPackage({
+    packageManifest: orphanPackage,
+    actualFiles: [...enrolledActualFiles, {
+      relativePath: orphanRelativePath, sha256: orphanArtifact.sha256,
+      bytes: orphanEvidenceBytes.length, content: orphanEvidenceBytes, isRegularFile: true,
+    }],
+    packageManifestSha256: hash(JSON_BYTES(orphanPackage)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry,
+  });
+  assert.equal(orphanReport.valid, false);
 
   const deviceWithoutRegistry = verifyBuildingReviewPackage({
     packageManifest: devicePackageManifest,

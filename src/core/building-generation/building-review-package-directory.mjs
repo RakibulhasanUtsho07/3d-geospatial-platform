@@ -171,6 +171,7 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
 export async function verifyBuildingReviewPackageDirectory(directoryArg, {
   trustedSurveyorRegistry = process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
   trustedDeviceRegistry = process.env.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON ?? null,
+  trustedEnrollmentAuthorityRegistry = process.env.SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON ?? null,
 } = {}) {
   const snapshot = await readBuildingReviewPackageDirectory(directoryArg);
   const integrity = verifyBuildingReviewPackage({
@@ -179,6 +180,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     packageManifestSha256: snapshot.packageManifestSha256,
     trustedSurveyorRegistry,
     trustedDeviceRegistry,
+    trustedEnrollmentAuthorityRegistry,
   });
   return { ...snapshot, integrity };
 }

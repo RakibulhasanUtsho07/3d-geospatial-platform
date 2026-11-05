@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:3d-geospatial-platform:schema:survey-device-enrollment-evidence:1.0.0",
   "title": "Survey-device enrollment evidence",
-  "description": "Canonical Ed25519 authority-signed statement binding device-level hardware identity commitments. It deliberately does not bind a particular device public key so the D3M-17 device-key rotation contract remains stable.",
+  "description": "Canonical Ed25519 statement attesting device-level hardware identity enrollment commitments. It does not associate an individual device public key and remains stable across D3M-17 key rotation.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -107,7 +107,7 @@
       "const": false
     },
     "note": {
-      "const": "This authority signature associates a device key and privacy-preserving identity commitments with an enrollment statement only. It does not establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval."
+      "const": "This authority signature attests device-level hardware identity enrollment commitments only. It does not associate a particular device public key or establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval."
     },
     "signatureBase64": {
       "type": "string",

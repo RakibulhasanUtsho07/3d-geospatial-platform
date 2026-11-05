@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, open, realpath } from "node:fs/promises";
+import { lstat, open, realpath, readdir } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageRuntimeSmoke } from "./verify-single-image-runtime-smoke.mjs";
@@ -22,6 +22,13 @@ import {
   verifySurveyObservationDeviceAttestation,
   MAX_TRUSTED_SURVEY_DEVICE_REGISTRY_BYTES,
 } from "./survey-observation-device-attestation.mjs";
+import {
+  surveyDeviceEnrollmentEvidencePath,
+  verifySurveyDeviceEnrollmentEvidence,
+  MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
+  MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES,
+} from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -153,6 +160,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   candidateGlbSha256,
   trustedSurveyorRegistry = null,
   trustedDeviceRegistry = null,
+  trustedEnrollmentAuthorityRegistry = null,
 }) {
   if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) throw new TypeError("single-image smoke workspace is required.");
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("single-image smoke jobId is invalid.");
@@ -349,6 +357,60 @@ export async function prepareSingleImageReviewPackageEvidence({
       }
     }
 
+  const hasTrustedEnrollmentAuthorityRegistry =
+    typeof trustedEnrollmentAuthorityRegistry === "string" && trustedEnrollmentAuthorityRegistry.trim().length > 0;
+  if (hasTrustedEnrollmentAuthorityRegistry &&
+      Buffer.byteLength(trustedEnrollmentAuthorityRegistry, "utf8") > MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES) {
+    throw new RangeError("Trusted survey-device enrollment-authority registry exceeds the 64 KiB limit.");
+  }
+  const enrollmentEvidenceFiles = [];
+  let enrollmentEvidenceInventory = null;
+  const distinctDevices = new Map();
+  for (const sidecar of observationDeviceAttestationFiles) {
+    const existing = distinctDevices.get(sidecar.deviceId);
+    if (existing && (existing.enrollmentEvidenceSha256 !== sidecar.enrollmentEvidenceSha256 || existing.registryId !== sidecar.registryId)) {
+      throw new Error("One device identity resolves to conflicting enrollment evidence or device registries.");
+    }
+    distinctDevices.set(sidecar.deviceId, sidecar);
+  }
+  const expectedEnrollmentPaths = [...distinctDevices.values()].map((entry) => surveyDeviceEnrollmentEvidencePath(entry.deviceId)).sort();
+  const enrollmentDirectory = path.join(root, "evidence", "device-enrollments");
+  let enrollmentDirectoryEntries = [];
+  try {
+    const directoryInfo = await lstat(enrollmentDirectory);
+    if (directoryInfo.isSymbolicLink() || !directoryInfo.isDirectory()) throw new TypeError("Device enrollment evidence directory must be a regular directory.");
+    enrollmentDirectoryEntries = await readdir(enrollmentDirectory);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    if (expectedEnrollmentPaths.length > 0 && hasTrustedEnrollmentAuthorityRegistry) throw new Error("D3M-ENGINE-18 device enrollment evidence directory is missing.");
+  }
+  const expectedEnrollmentNames = new Set(expectedEnrollmentPaths.map((value) => path.posix.basename(value)));
+  for (const name of enrollmentDirectoryEntries) {
+    if (!expectedEnrollmentNames.has(name)) throw new Error("Unexpected or orphaned device enrollment evidence file: " + name);
+    const itemInfo = await lstat(path.join(enrollmentDirectory, name));
+    if (itemInfo.isSymbolicLink() || !itemInfo.isFile()) throw new TypeError("Device enrollment evidence must be a regular file: " + name);
+  }
+  if (hasTrustedEnrollmentAuthorityRegistry) {
+    if (!hasTrustedDeviceRegistry || distinctDevices.size < 1) throw new Error("D3M-ENGINE-18 enrollment evidence requires verified D3M-17 device attestations and the trusted device registry.");
+    for (const entry of [...distinctDevices.values()].sort((x, y) => x.deviceId.localeCompare(y.deviceId))) {
+      const relativePath = surveyDeviceEnrollmentEvidencePath(entry.deviceId);
+      const evidenceBytes = await readStableWorkspaceFile(root, relativePath, "Device enrollment evidence " + entry.deviceId, MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES);
+      const result = verifySurveyDeviceEnrollmentEvidence({ evidenceBytes, trustedDeviceRegistry, trustedEnrollmentAuthorityRegistry, deviceId: entry.deviceId });
+      if (!result.valid || result.evidenceSha256 !== entry.enrollmentEvidenceSha256 || result.authorityRegistryId === null) {
+        throw new Error("Device enrollment evidence verification failed for " + entry.deviceId + ": " + result.errors.map((item) => item.id).join(","));
+      }
+      enrollmentEvidenceFiles.push({ artifactType: "single-image-survey-device-enrollment-evidence", deviceId: entry.deviceId,
+        authorityId: result.authorityId, authorityType: result.authorityType, authorityRegistryId: result.authorityRegistryId,
+        relativePath, sha256: sha256(evidenceBytes), bytes: evidenceBytes });
+    }
+    enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(enrollmentEvidenceFiles.map((file) => ({
+      deviceId: file.deviceId, relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes.length,
+      authorityId: file.authorityId, authorityType: file.authorityType, authorityRegistryId: file.authorityRegistryId,
+    })));
+    if (enrollmentEvidenceFiles.length !== enrollmentDirectoryEntries.length) throw new Error("Device enrollment evidence directory inventory is incomplete or contains orphaned files.");
+  } else if (enrollmentDirectoryEntries.length > 0) {
+    throw new Error("Device enrollment evidence files exist but SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON was not supplied.");
+  }
   const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
   if (receipt.schemaVersion !== expectedReceiptSchema || receipt.payload?.georeference === undefined ||
       receipt.payload?.buildingId !== buildingId || receipt.payload?.jobId !== jobId ||
@@ -386,6 +448,13 @@ export async function prepareSingleImageReviewPackageEvidence({
       root, file.relativePath, "Survey observation attribution attestation " + file.observationId, 32 * 1024,
     ));
   }
+  const enrollmentEvidenceBytesAfter = [];
+  for (const file of enrollmentEvidenceFiles) {
+    enrollmentEvidenceBytesAfter.push(await readStableWorkspaceFile(
+      root, file.relativePath, "Device enrollment evidence " + file.deviceId + "/" + file.keyId,
+      MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
+    ));
+  }
   const observationDeviceAttestationBytesAfter = [];
   for (const file of observationDeviceAttestationFiles) {
     observationDeviceAttestationBytesAfter.push(await readStableWorkspaceFile(
@@ -406,7 +475,10 @@ export async function prepareSingleImageReviewPackageEvidence({
         !bytes.equals(observationAttestationFiles[index].bytes)) ||
       observationDeviceAttestationBytesAfter.some((bytes, index) =>
         sha256(bytes) !== observationDeviceAttestationFiles[index].sha256 ||
-        !bytes.equals(observationDeviceAttestationFiles[index].bytes))) {
+        !bytes.equals(observationDeviceAttestationFiles[index].bytes)) ||
+      enrollmentEvidenceBytesAfter.some((bytes, index) =>
+        sha256(bytes) !== enrollmentEvidenceFiles[index].sha256 ||
+        !bytes.equals(enrollmentEvidenceFiles[index].bytes))) {
     throw new Error("Single-image smoke or survey observation evidence changed during review-package preparation.");
   }
 
@@ -428,6 +500,12 @@ export async function prepareSingleImageReviewPackageEvidence({
     })),
     ...observationDeviceAttestationFiles.map((file) => ({
       artifactType: file.artifactType, observationId: file.observationId, checkpointId: file.checkpointId,
+      deviceId: file.deviceId, keyId: file.keyId,
+      relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes,
+    })),
+    ...enrollmentEvidenceFiles.map((file) => ({
+      artifactType: file.artifactType, deviceId: file.deviceId, keyId: file.keyId,
+      authorityId: file.authorityId, authorityType: file.authorityType, authorityRegistryId: file.authorityRegistryId,
       relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes,
     })),
   ];
@@ -436,7 +514,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: observationDeviceAttestationInventory ? "1.5.0" : observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: enrollmentEvidenceInventory ? "1.6.0" : observationDeviceAttestationInventory ? "1.5.0" : observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -491,6 +569,14 @@ export async function prepareSingleImageReviewPackageEvidence({
         surveyObservationDeviceAttestations: observationDeviceAttestationInventory.entries,
         surveyObservationDeviceAttestationStatus: "device-key-attestations-verified",
         trustedSurveyDeviceRegistryId: observationDeviceAttestationFiles[0]?.registryId ?? null,
+      } : {}),
+      ...(enrollmentEvidenceInventory ? {
+        surveyDeviceEnrollmentEvidenceCount: enrollmentEvidenceInventory.count,
+        surveyDeviceEnrollmentEvidenceBytes: enrollmentEvidenceInventory.totalBytes,
+        surveyDeviceEnrollmentEvidenceSha256: enrollmentEvidenceInventory.sha256,
+        surveyDeviceEnrollmentEvidence: enrollmentEvidenceInventory.entries,
+        surveyDeviceEnrollmentEvidenceStatus: "enrollment-authority-evidence-verified",
+        trustedSurveyDeviceEnrollmentAuthorityRegistryId: enrollmentEvidenceFiles[0]?.authorityRegistryId ?? null,
       } : {}),
     } : {}),
     mapReady: false,
