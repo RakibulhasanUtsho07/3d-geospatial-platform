@@ -6,7 +6,6 @@ import {
   validateTrustRegistryGovernanceState,
 } from "../../src/core/building-generation/trust-registry-governance-state.mjs";
 
-const HASH = /^[a-f0-9]{64}$/;
 const VERSION = /^[A-Za-z0-9._~:-]{1,256}$/;
 const clone = (value) => structuredClone(value);
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
