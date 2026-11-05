@@ -16,6 +16,11 @@ import { buildBuildingReleaseReadiness } from "../src/core/building-generation/b
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
 import {
+  createSingleImageGeoreferenceEvidence,
+  loadSingleImageControlPointManifest,
+} from "../src/core/building-generation/single-image-georeference-evidence.mjs";
+import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
+import {
   signBuildingReviewPackageManifest,
   signBuildingReviewPackageManifestWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
@@ -460,4 +465,371 @@ test("combined verifier accepts a fully materialized signed package and rejects 
   assert.equal(tamperedSummary.valid, false);
   assert.equal(tamperedSummary.signature, "signature-verified");
   assert.equal(tamperedSummary.packageIntegrity, "tampered-or-invalid");
+});
+
+
+function makeHeldOutManifest(sourceSha256) {
+  const theta = 30 * Math.PI / 180;
+  const scale = 2.5;
+  const baseLongitude = 90.4;
+  const baseLatitude = 23.7;
+  const earthRadius = 6378137;
+  const lonLat = (east, north) => ({
+    longitude: baseLongitude + east / (earthRadius * Math.cos(baseLatitude * Math.PI / 180)) * 180 / Math.PI,
+    latitude: baseLatitude + north / earthRadius * 180 / Math.PI,
+  });
+  const fitModel = [[-10, -8], [10, -8], [10, 8], [-10, 8]];
+  const controlPoints = fitModel.map(([modelX, modelZ], index) => ({
+    id: "fit-gcp-" + (index + 1),
+    observationId: "fit-observation-" + (index + 1),
+    modelX,
+    modelZ,
+    ...lonLat(
+      scale * (Math.cos(theta) * modelX - Math.sin(theta) * modelZ) + 100,
+      scale * (Math.sin(theta) * modelX + Math.cos(theta) * modelZ) + 200,
+    ),
+    evidenceSourceId: "front-image",
+  }));
+  const model = [
+    [-8, 0.25, -6], [-4, 0.75, 5], [0, 1.5, -2],
+    [4, 2.25, 7], [8, 3.25, -5], [12, 4, 3],
+  ];
+  return {
+    schemaVersion: "1.2.0",
+    kind: "single-image-control-point-manifest",
+    buildingId: "integrity-test-building",
+    source: { sourceId: "front-image", sha256: sourceSha256 },
+    horizontalCrs: "EPSG:4326",
+    horizontalDatum: "WGS84",
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    survey: {
+      method: "RTK GNSS",
+      reference: "package-fit-survey-2026-11-04",
+      observedAtUtc: "2026-11-04T10:00:00.000Z",
+      horizontalAccuracyM: 0.03,
+    },
+    controlPoints,
+    vertical: {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: "WGS 84 (G2139)",
+      coordinateEpoch: 2022.25,
+      survey: {
+        method: "RTK GNSS ellipsoidal-height observation",
+        reference: "package-vertical-survey-2026-11-04",
+        observedAtUtc: "2026-11-04T10:30:00.000Z",
+        verticalAccuracyM: 0.04,
+      },
+      controlPoints: controlPoints.map((point, index) => ({
+        horizontalControlPointId: point.id,
+        observationId: point.observationId,
+        modelY: index * 1.5,
+        ellipsoidalHeightM: 135 + scale * index * 1.5,
+        evidenceSourceId: "front-image",
+      })),
+    },
+    heldOutCheckpoints: {
+      crs: "EPSG:4979",
+      heightType: "ellipsoidal",
+      unit: "metre",
+      referenceFrame: "WGS 84 (G2139)",
+      coordinateEpoch: 2022.25,
+      survey: {
+        method: "independent RTK GNSS checkpoint survey",
+        reference: "package-heldout-survey-2026-11-04",
+        observedAtUtc: "2026-11-04T11:00:00.000Z",
+        horizontalAccuracyM: 0.03,
+        verticalAccuracyM: 0.04,
+      },
+      points: model.map(([modelX, modelY, modelZ], index) => ({
+        id: "heldout-" + (index + 1),
+        observationId: "heldout-observation-" + (index + 1),
+        observationRecordSha256: String(index + 1).padStart(2, "0").repeat(32),
+        modelX, modelY, modelZ,
+        ...lonLat(
+          scale * (Math.cos(theta) * modelX - Math.sin(theta) * modelZ) + 100,
+          scale * (Math.sin(theta) * modelX + Math.cos(theta) * modelZ) + 200,
+        ),
+        ellipsoidalHeightM: 135 + scale * modelY,
+      })),
+    },
+  };
+}
+
+test("recomputes held-out 3D checkpoints from exact packaged bytes through the complete review package", async (t) => {
+  const base = await createFixture();
+  const candidate = base.packageManifest.artifacts.find((item) => item.artifactType === "candidate-glb");
+  const candidateFile = base.actualFiles.find((item) => item.relativePath === candidate.relativePath);
+  const candidateBytes = candidateFile.content;
+  const candidateSha256 = hash(candidateBytes);
+  const sourceBytes = Buffer.from("fixture source facade image bytes");
+  const sourceSha256 = hash(sourceBytes);
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m14-package-e2e-"));
+  await mkdir(path.join(root, "survey"), { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const manifest = makeHeldOutManifest(sourceSha256);
+  const manifestBytes = JSON_BYTES(manifest);
+  await writeFile(path.join(root, "survey", "controls.json"), manifestBytes, { flag: "wx" });
+  const loadedManifest = await loadSingleImageControlPointManifest({
+    workspaceRoot: root,
+    relativePath: "survey/controls.json",
+    buildingId: "integrity-test-building",
+    sourceId: "front-image",
+    sourceSha256,
+  });
+  const georeferenceEvidence = createSingleImageGeoreferenceEvidence({
+    loadedManifest,
+    modelSha256: candidateSha256,
+  });
+  assert.equal(georeferenceEvidence.schemaVersion, "1.2.0");
+  assert.equal(georeferenceEvidence.independentCheckpointEvidence.status, "validated-needs-human-review");
+
+  const jobId = "smoke-job-checkpoints";
+  const buildingId = "integrity-test-building";
+  const outputPath = candidate.relativePath;
+  const outputMeshCount = 1;
+  const source = {
+    sourceId: "front-image",
+    sha256: sourceSha256,
+    bytes: sourceBytes.length,
+    mimeType: "image/jpeg",
+  };
+  const workerHost = {
+    inventorySchemaVersion: "1.1.0",
+    stableAcrossInference: true,
+    before: { python: "3.11.9", torch: "2.5.1", device: "cpu" },
+    after: { python: "3.11.9", torch: "2.5.1", device: "cpu" },
+  };
+  const modelLoadEvidence = { status: "verified", roles: ["tripoConfig", "tripoCheckpoint", "rembgWeights"] };
+  const geometryQa = {
+    valid: true,
+    sourceStatus: "candidate",
+    status: "passed",
+    warningCount: 0,
+    warnings: [],
+    counts: { meshes: 1, vertices: 3, triangles: 1 },
+  };
+  const geometryReceiptSummary = {
+    schemaVersion: "1.0.0",
+    engine: "glb-geometry-qa-v2",
+    valid: geometryQa.valid,
+    sourceStatus: geometryQa.sourceStatus,
+    status: geometryQa.status,
+    warningCount: geometryQa.warningCount,
+    warnings: geometryQa.warnings,
+    counts: geometryQa.counts,
+  };
+  const workflowReport = {
+    jobId,
+    buildingId,
+    mode: "single-image-ai",
+    status: "completed-requires-review",
+    inputs: {
+      selectedViewIds: ["front-image"],
+      mediaRecords: [{
+        id: "front-image",
+        sha256: sourceSha256,
+        mimeType: "image/jpeg",
+        usageStatus: "approved",
+      }],
+    },
+    output: {
+      modelPath: outputPath,
+      modelBytes: candidateBytes.length,
+      modelSha256: candidateSha256,
+    },
+    modelReport: {
+      source: { sha256: sourceSha256 },
+      outputs: { glb: { sha256: candidateSha256, bytes: candidateBytes.length, meshCount: outputMeshCount } },
+      mapReady: false,
+      publicationEligible: false,
+    },
+    georeference: georeferenceEvidence.registration,
+    mapReady: false,
+    publicationEligible: false,
+  };
+  const workflowBytes = JSON_BYTES(workflowReport);
+  const workflowSha256 = hash(workflowBytes);
+  const smokeReport = {
+    schemaVersion: "1.6.0",
+    kind: "single-image-runtime-smoke",
+    status: "passed",
+    jobId,
+    buildingId,
+    source,
+    output: {
+      relativePath: outputPath,
+      bytes: candidateBytes.length,
+      sha256: candidateSha256,
+      meshCount: outputMeshCount,
+    },
+    workerHost,
+    modelLoadEvidence,
+    geometryQa,
+    georeferenceEvidence,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  const receiptPayload = {
+    kind: "single-image-generation-artifact",
+    schemaVersion: "1.2.0",
+    jobId,
+    buildingId,
+    source: {
+      sourceId: source.sourceId,
+      sha256: sourceSha256,
+      bytes: source.bytes,
+      mimeType: source.mimeType,
+      loaderEvidence: { sha256: sourceSha256 },
+    },
+    output: {
+      path: outputPath,
+      bytes: candidateBytes.length,
+      format: "glb",
+      sha256: candidateSha256,
+      meshCount: outputMeshCount,
+    },
+    workflowReport: {
+      path: ".building-engine/jobs/integrity-test-building/smoke-job-checkpoints/workflow-report.json",
+      bytes: workflowBytes.length,
+      sha256: workflowSha256,
+    },
+    workerHost,
+    modelLoadEvidence,
+    geometryQa: geometryReceiptSummary,
+    georeference: georeferenceEvidence,
+  };
+  const payloadSha256 = hash(Buffer.from(canonicalJson(receiptPayload), "utf8"));
+  const receipt = { schemaVersion: "1.2.0", payload: receiptPayload, payloadSha256 };
+  const receiptBytes = Buffer.from(JSON.stringify(receipt, null, 2) + "\n", "utf8");
+  const receiptSha256 = hash(receiptBytes);
+  smokeReport.generationArtifactReceipt = {
+    path: ".building-engine/runtime-smokes/" + jobId + ".artifact.json",
+    schemaVersion: "1.2.0",
+    bytes: receiptBytes.length,
+    sha256: receiptSha256,
+    payloadSha256,
+  };
+
+  const groupFiles = [
+    ["single-image-smoke-report", "reports/single-image-runtime-smoke.json", JSON_BYTES(smokeReport)],
+    ["single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", receiptBytes],
+    ["single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes],
+    ["single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes],
+  ];
+  const newArtifacts = groupFiles.map(([artifactType, relativePath, bytes]) => ({
+    artifactType, relativePath, sha256: hash(bytes), bytes: bytes.length,
+  }));
+  const newFiles = groupFiles.map(([, relativePath, bytes]) => ({
+    relativePath, sha256: hash(bytes), bytes: bytes.length, content: bytes, isRegularFile: true,
+  }));
+  const artifactDescriptors = [...base.packageManifest.artifacts, ...newArtifacts];
+  const verticalEvidence = georeferenceEvidence.verticalEvidence;
+  const checkpointEvidence = georeferenceEvidence.independentCheckpointEvidence;
+  const singleImageEvidence = {
+    schemaVersion: "1.2.0",
+    jobId,
+    buildingId,
+    sourceId: source.sourceId,
+    sourceSha256,
+    candidateGlbSha256: candidateSha256,
+    georeferenceStatus: georeferenceEvidence.status,
+    controlPointManifestSha256: hash(manifestBytes),
+    smokeReportSha256: hash(groupFiles[0][2]),
+    generationArtifactReceiptSha256: receiptSha256,
+    workflowReportSha256: workflowSha256,
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    verticalStatus: verticalEvidence.status,
+    verticalEvidenceSha256: hash(Buffer.from(canonicalJson(verticalEvidence), "utf8")),
+    verticalReferenceFrame: verticalEvidence.referenceFrame,
+    verticalCoordinateEpoch: verticalEvidence.coordinateEpoch,
+    verticalHeightOffsetM: verticalEvidence.heightOffsetM,
+    verticalRmsErrorM: verticalEvidence.controls.rmsErrorM,
+    verticalMaxResidualM: verticalEvidence.controls.maxResidualM,
+    verticalControlPointCount: verticalEvidence.controls.count,
+    checkpointValidationStatus: checkpointEvidence.status,
+    checkpointEvidenceSha256: hash(Buffer.from(canonicalJson(checkpointEvidence), "utf8")),
+    checkpointReferenceFrame: checkpointEvidence.referenceFrame,
+    checkpointCoordinateEpoch: checkpointEvidence.coordinateEpoch,
+    checkpointCount: checkpointEvidence.controls.count,
+    checkpointHorizontalRmsErrorM: checkpointEvidence.controls.horizontalRmsErrorM,
+    checkpointHorizontalMaxResidualM: checkpointEvidence.controls.horizontalMaxResidualM,
+    checkpointVerticalRmsErrorM: checkpointEvidence.controls.verticalRmsErrorM,
+    checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
+    checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
+    checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  const readiness = JSON.parse(base.actualFiles.find((item) =>
+    item.relativePath === "reports/release-readiness.json").content.toString("utf8"));
+  const renderManifest = JSON.parse(base.actualFiles.find((item) =>
+    item.relativePath === "renders/render-review-manifest.json").content.toString("utf8"));
+  const packageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: artifactDescriptors,
+    singleImageEvidence,
+    generatedAt: "2026-11-04T12:00:00.000Z",
+  });
+  const actualFiles = [...base.actualFiles, ...newFiles];
+  const report = verifyBuildingReviewPackage({
+    packageManifest,
+    actualFiles,
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(report.valid, true, JSON.stringify(report.errors));
+  assert.equal(report.status, "verified");
+  assert.ok(report.checks.some((item) =>
+    item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+  assert.equal(report.publicationEligible, false);
+  assert.equal(packageManifest.singleImageEvidence.mapReady, false);
+  assert.equal(packageManifest.singleImageEvidence.publicationEligible, false);
+  assert.equal(packageManifest.singleImageEvidence.automaticApproval, false);
+
+  const forgedMetadata = {
+    ...packageManifest,
+    singleImageEvidence: {
+      ...packageManifest.singleImageEvidence,
+      checkpoint3dRmsErrorM: packageManifest.singleImageEvidence.checkpoint3dRmsErrorM + 0.01,
+    },
+  };
+  const forgedReport = verifyBuildingReviewPackage({
+    packageManifest: forgedMetadata,
+    actualFiles,
+    packageManifestSha256: hash(JSON_BYTES(forgedMetadata)),
+  });
+  assert.equal(forgedReport.valid, false);
+  assert.ok(forgedReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+
+  const driftedManifest = JSON.parse(manifestBytes.toString("utf8"));
+  driftedManifest.heldOutCheckpoints.points[0].ellipsoidalHeightM += 0.25;
+  const driftedBytes = JSON_BYTES(driftedManifest);
+  const driftedFiles = actualFiles.map((file) => file.relativePath === "evidence/single-image-control-points.json"
+    ? { ...file, content: driftedBytes, bytes: driftedBytes.length, sha256: hash(driftedBytes) }
+    : file);
+  const driftedArtifacts = packageManifest.artifacts.map((artifact) =>
+    artifact.relativePath === "evidence/single-image-control-points.json"
+      ? { ...artifact, bytes: driftedBytes.length, sha256: hash(driftedBytes) }
+      : artifact);
+  const driftedPackage = {
+    ...packageManifest,
+    counts: {
+      ...packageManifest.counts,
+      totalBytes: packageManifest.counts.totalBytes - manifestBytes.length + driftedBytes.length,
+    },
+    artifacts: driftedArtifacts,
+  };
+  const driftedReport = verifyBuildingReviewPackage({
+    packageManifest: driftedPackage,
+    actualFiles: driftedFiles,
+    packageManifestSha256: hash(JSON_BYTES(driftedPackage)),
+  });
+  assert.equal(driftedReport.valid, false);
+  assert.ok(driftedReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
 });

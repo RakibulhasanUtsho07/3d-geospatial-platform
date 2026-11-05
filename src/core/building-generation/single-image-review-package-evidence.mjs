@@ -116,6 +116,8 @@ export async function prepareSingleImageReviewPackageEvidence({
       report.georeferenceEvidence?.registration?.vertical?.status !== "not-solved" ||
       (report.georeferenceEvidence?.verticalEvidence?.status !== undefined &&
        !["not-requested", "calibrated-needs-human-review"].includes(report.georeferenceEvidence.verticalEvidence.status)) ||
+      (report.georeferenceEvidence?.schemaVersion === "1.2.0" &&
+       report.georeferenceEvidence?.independentCheckpointEvidence?.status !== "validated-needs-human-review") ||
       report.mapReady !== false || report.publicationEligible !== false || report.automaticApproval !== false) {
     throw new Error("Single-image smoke must be a verified D3M-08 run with successful horizontal control-point registration for the exact candidate GLB.");
   }
@@ -169,8 +171,10 @@ export async function prepareSingleImageReviewPackageEvidence({
   ];
   const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
   const hasVerticalCalibration = verticalEvidence?.status === "calibrated-needs-human-review";
+  const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
+  const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: hasIndependentCheckpoints ? "1.2.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -191,6 +195,19 @@ export async function prepareSingleImageReviewPackageEvidence({
       verticalRmsErrorM: verticalEvidence.controls.rmsErrorM,
       verticalMaxResidualM: verticalEvidence.controls.maxResidualM,
       verticalControlPointCount: verticalEvidence.controls.count,
+    } : {}),
+    ...(hasIndependentCheckpoints ? {
+      checkpointValidationStatus: checkpointEvidence.status,
+      checkpointEvidenceSha256: sha256(Buffer.from(canonicalJson(checkpointEvidence), "utf8")),
+      checkpointReferenceFrame: checkpointEvidence.referenceFrame,
+      checkpointCoordinateEpoch: checkpointEvidence.coordinateEpoch,
+      checkpointCount: checkpointEvidence.controls.count,
+      checkpointHorizontalRmsErrorM: checkpointEvidence.controls.horizontalRmsErrorM,
+      checkpointHorizontalMaxResidualM: checkpointEvidence.controls.horizontalMaxResidualM,
+      checkpointVerticalRmsErrorM: checkpointEvidence.controls.verticalRmsErrorM,
+      checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
+      checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
+      checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
     } : {}),
     mapReady: false,
     publicationEligible: false,
