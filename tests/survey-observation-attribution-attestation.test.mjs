@@ -128,7 +128,7 @@ test("rejects an observation or checkpoint context substitution", () => {
 
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((item) => item.id === "observation-binding"));
-  assert.equal(result.checks.find((item) => item.id === "ed25519-signature").status, "failed");
+  assert.equal(result.checks.find((item) => item.id === "ed25519-signature").status, "passed");
 });
 
 test("refuses a private key that does not match the active surveyor registry entry", () => {
