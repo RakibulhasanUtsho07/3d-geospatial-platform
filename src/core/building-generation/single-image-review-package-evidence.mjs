@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
@@ -57,7 +58,7 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
   }
   const actual = await realpath(current);
   if (!inside(root, actual)) throw new TypeError(label + " resolves outside the smoke workspace.");
-  const handle = await open(actual, "r");
+  const handle = await open(actual, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size < 1 || before.size > maxBytes) {
@@ -65,8 +66,9 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
     }
     const bytes = await handle.readFile();
     const after = await handle.stat();
+    const actualAfter = await realpath(current);
     const pathAfter = await lstat(actual);
-    if (pathAfter.isSymbolicLink() || !pathAfter.isFile() ||
+    if (actualAfter !== actual || pathAfter.isSymbolicLink() || !pathAfter.isFile() ||
         fileSignature(before) !== fileSignature(after) ||
         fileSignature(after) !== fileSignature(pathAfter) ||
         bytes.length !== after.size) {
