@@ -8,6 +8,7 @@ import { trustRegistryGovernanceKeyFingerprint } from "./trust-registry-governan
 import {
   advanceTrustRegistryGovernanceState,
   loadOrInitializeTrustRegistryGovernanceState,
+  validateTrustRegistryGovernanceState,
 } from "./trust-registry-governance-state.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -181,6 +182,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
   trustRegistryGovernancePublicKeyPem = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_PUBLIC_KEY_PEM ?? null,
   minimumTrustRegistrySequence = process.env.SURVEY_TRUST_REGISTRY_MINIMUM_SEQUENCE ?? null,
   trustRegistryGovernanceStateFilePath = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_STATE_FILE || null,
+  trustRegistryGovernanceStateStore = null,
   trustRegistryGovernanceNow = undefined,
 } = {}) {
   const snapshot = await readBuildingReviewPackageDirectory(directoryArg);
@@ -188,9 +190,13 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     ? snapshot.packageManifest.singleImageEvidence.trustRegistryGovernance
     : null;
   let governanceState = null;
+  let governanceStateProviderVersion = null;
   let effectiveMinimumSequence = minimumTrustRegistrySequence;
 
-  if (governance && trustRegistryGovernanceStateFilePath) {
+  if (trustRegistryGovernanceStateStore && trustRegistryGovernanceStateFilePath) {
+    throw new Error("Configure either the external governance state store or the local state file, never both.");
+  }
+  if (governance && (trustRegistryGovernanceStateFilePath || trustRegistryGovernanceStateStore)) {
     if (typeof trustRegistryGovernancePublicKeyPem !== "string" || !trustRegistryGovernancePublicKeyPem) {
       throw new Error("Persisted governance state requires the independently pinned governance public key.");
     }
@@ -198,14 +204,37 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     if (governance.governanceKeyFingerprintSha256 !== pinnedFingerprint) {
       throw new Error("Package governance key fingerprint does not match the independently pinned public key.");
     }
-    const loaded = await loadOrInitializeTrustRegistryGovernanceState({
-      stateFilePath: trustRegistryGovernanceStateFilePath,
+
+    let loaded;
+    if (trustRegistryGovernanceStateStore) {
+      if (typeof trustRegistryGovernanceStateStore.loadOrInitialize !== "function" ||
+          typeof trustRegistryGovernanceStateStore.advance !== "function" ||
+          typeof trustRegistryGovernanceStateStore.providerId !== "string") {
+        throw new TypeError("External governance state store adapter is invalid.");
+      }
+      loaded = await trustRegistryGovernanceStateStore.loadOrInitialize({
+        registrySetId: governance.registrySetId,
+        governanceKeyFingerprintSha256: pinnedFingerprint,
+        bootstrapMinimumSequence: minimumTrustRegistrySequence,
+        now: trustRegistryGovernanceNow,
+      });
+      if (typeof loaded?.version !== "string" || !loaded.version) {
+        throw new Error("External governance state store returned no version token.");
+      }
+      governanceStateProviderVersion = loaded.version;
+    } else {
+      loaded = await loadOrInitializeTrustRegistryGovernanceState({
+        stateFilePath: trustRegistryGovernanceStateFilePath,
+        registrySetId: governance.registrySetId,
+        governanceKeyFingerprintSha256: pinnedFingerprint,
+        bootstrapMinimumSequence: minimumTrustRegistrySequence,
+        now: trustRegistryGovernanceNow,
+      });
+    }
+    governanceState = validateTrustRegistryGovernanceState(loaded?.state, {
       registrySetId: governance.registrySetId,
       governanceKeyFingerprintSha256: pinnedFingerprint,
-      bootstrapMinimumSequence: minimumTrustRegistrySequence,
-      now: trustRegistryGovernanceNow,
     });
-    governanceState = loaded.state;
     const configuredFloor = minimumTrustRegistrySequence === null ||
       minimumTrustRegistrySequence === undefined || minimumTrustRegistrySequence === ""
       ? governanceState.minimumAcceptedSequence
@@ -228,19 +257,41 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     trustRegistryGovernanceNow,
   });
 
-  if (integrity.valid && governance && governanceState && trustRegistryGovernanceStateFilePath) {
+  if (integrity.valid && governance && governanceState &&
+      (trustRegistryGovernanceStateFilePath || trustRegistryGovernanceStateStore)) {
     try {
-      const advanced = await advanceTrustRegistryGovernanceState({
-        stateFilePath: trustRegistryGovernanceStateFilePath,
+      let advanced;
+      if (trustRegistryGovernanceStateStore) {
+        advanced = await trustRegistryGovernanceStateStore.advance({
+          registrySetId: governance.registrySetId,
+          governanceKeyFingerprintSha256: governance.governanceKeyFingerprintSha256,
+          expectedRevision: governanceState.revision,
+          expectedVersion: governanceStateProviderVersion,
+          acceptedSequence: governance.sequence,
+          acceptedAttestationSha256: governance.attestationSha256,
+          acceptedSnapshotSha256: governance.snapshotSha256,
+          now: trustRegistryGovernanceNow,
+        });
+        if (typeof advanced?.version !== "string" || !advanced.version) {
+          throw new Error("External governance state store returned no post-update version token.");
+        }
+        governanceStateProviderVersion = advanced.version;
+      } else {
+        advanced = await advanceTrustRegistryGovernanceState({
+          stateFilePath: trustRegistryGovernanceStateFilePath,
+          registrySetId: governance.registrySetId,
+          governanceKeyFingerprintSha256: governance.governanceKeyFingerprintSha256,
+          expectedRevision: governanceState.revision,
+          acceptedSequence: governance.sequence,
+          acceptedAttestationSha256: governance.attestationSha256,
+          acceptedSnapshotSha256: governance.snapshotSha256,
+          now: trustRegistryGovernanceNow,
+        });
+      }
+      governanceState = validateTrustRegistryGovernanceState(advanced?.state, {
         registrySetId: governance.registrySetId,
         governanceKeyFingerprintSha256: governance.governanceKeyFingerprintSha256,
-        expectedRevision: governanceState.revision,
-        acceptedSequence: governance.sequence,
-        acceptedAttestationSha256: governance.attestationSha256,
-        acceptedSnapshotSha256: governance.snapshotSha256,
-        now: trustRegistryGovernanceNow,
       });
-      governanceState = advanced.state;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       integrity.errors.push({
@@ -269,6 +320,10 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
         minimumAcceptedSequence: governanceState.minimumAcceptedSequence,
         revision: governanceState.revision,
         stateSha256: governanceState.stateSha256,
+        ...(trustRegistryGovernanceStateStore ? {
+          storeType: "external",
+          providerId: trustRegistryGovernanceStateStore.providerId,
+        } : { storeType: "local-file" }),
       },
     } : {}),
   };
