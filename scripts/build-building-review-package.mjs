@@ -109,6 +109,7 @@ async function main() {
       jobId: options["--single-image-smoke-job-id"],
       buildingId: renderReferenceReview.buildingId,
       candidateGlbSha256,
+      trustedSurveyorRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
     })
     : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
