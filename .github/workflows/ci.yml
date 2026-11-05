@@ -124,6 +124,7 @@ on:
       - feat/d3m-engine17-device-record-attestations-20261105
       - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
       - feat/d3m-engine19-review-package-enrollment-evidence-20261105
+      - feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
