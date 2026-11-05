@@ -195,7 +195,7 @@ test("accepts bounded device-registry bytes and JSON text through the D3M-17 par
   assert.equal(verifyFixture(fixture, { trustedDeviceRegistry: bytes.toString("utf8") }).valid, true);
 });
 
-test("rejects enrollment statements issued outside the registered device-key validity window", () => {
+test("rejects enrollment statements issued outside their device-level validity window", () => {
   const fixture = makeFixture();
   const evidence = JSON.parse(fixture.evidenceBytes.toString("utf8"));
   evidence.issuedAtUtc = "2026-10-31T23:59:59.000Z";
@@ -251,7 +251,7 @@ test("offline CLI prints help, verifies a fixture and rejects symlink inputs", a
     assert.equal(JSON.parse(good.stdout).activeDeviceRegistryKeyId, "receiver-key-01");
     const linked = path.join(directory, "device-link.json");
     await symlink(devices, linked);
-    const bad = spawnSync(process.execPath, [script.pathname, linked, authorities, evidence, "--device-id", "receiver-01", "--key-id", "receiver-key-01", "--now", NOW], { encoding: "utf8" });
+    const bad = spawnSync(process.execPath, [script.pathname, linked, authorities, evidence, "--device-id", "receiver-01", "--now", NOW], { encoding: "utf8" });
     assert.equal(bad.status, 2);
     assert.match(bad.stderr, /symlink/);
   } finally {
