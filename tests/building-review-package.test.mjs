@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-review-manifest.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
+import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -391,5 +392,91 @@ test("rejects missing or under-count held-out 3D checkpoint metadata", () => {
   assert.throws(() => buildBuildingReviewPackageManifest({
     buildingId: "test-building", readinessReport: readiness, artifacts,
     renderManifestViews, singleImageEvidence: evidence,
+  }), /single-image-evidence-metadata-invalid/);
+});
+
+test("requires a byte-verified raw survey observation inventory for D3M-15 packages", () => {
+  const { readiness, artifacts, renderManifestViews } = fixture();
+  const candidateHash = artifacts.find((item) => item.artifactType === "candidate-glb").sha256;
+  const evidenceBodies = [
+    ["single-image-smoke-report", "reports/single-image-runtime-smoke.json", "smoke-report"],
+    ["single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", "generation-receipt"],
+    ["single-image-workflow-report", "reports/single-image-workflow-report.json", "workflow-report"],
+    ["single-image-control-point-manifest", "evidence/single-image-control-points.json", "control-point-manifest"],
+  ];
+  const evidenceHashes = {};
+  for (const [artifactType, relativePath, body] of evidenceBodies) {
+    const bytes = Buffer.from(body);
+    evidenceHashes[artifactType] = hash(bytes);
+    artifacts.push({ artifactType, relativePath, sha256: evidenceHashes[artifactType], bytes: bytes.length });
+  }
+  const records = Array.from({ length: 6 }, (_, index) => {
+    const observationId = "heldout-observation-" + (index + 1);
+    const relativePath = "evidence/survey-observations/" + observationId + ".record";
+    const bytes = Buffer.from("opaque-original-survey-export-" + observationId);
+    const sha256 = hash(bytes);
+    artifacts.push({ artifactType: "single-image-survey-observation-record", relativePath, sha256, bytes: bytes.length });
+    return { observationId, relativePath, bytes: bytes.length, sha256 };
+  }).sort((a, b) => a.observationId.localeCompare(b.observationId));
+  const totalBytes = records.reduce((sum, item) => sum + item.bytes, 0);
+  const inventorySha256 = hash(Buffer.from(canonicalJson(records), "utf8"));
+  const singleImageEvidence = {
+    schemaVersion: "1.3.0",
+    jobId: "smoke-job-checkpoints",
+    buildingId: "test-building",
+    sourceId: "front-image",
+    sourceSha256: hash("source-image"),
+    candidateGlbSha256: candidateHash,
+    georeferenceStatus: "calibrated-needs-human-review",
+    controlPointManifestSha256: evidenceHashes["single-image-control-point-manifest"],
+    smokeReportSha256: evidenceHashes["single-image-smoke-report"],
+    generationArtifactReceiptSha256: evidenceHashes["single-image-generation-artifact-receipt"],
+    workflowReportSha256: evidenceHashes["single-image-workflow-report"],
+    verticalDatum: "EPSG:4979-ellipsoidal",
+    verticalStatus: "calibrated-needs-human-review",
+    verticalEvidenceSha256: hash("canonical-vertical-evidence"),
+    verticalReferenceFrame: "WGS 84 (G2139)",
+    verticalCoordinateEpoch: 2022.25,
+    verticalHeightOffsetM: 135.5,
+    verticalRmsErrorM: 0.025,
+    verticalMaxResidualM: 0.041,
+    verticalControlPointCount: 4,
+    checkpointValidationStatus: "validated-needs-human-review",
+    checkpointEvidenceSha256: hash("canonical-checkpoint-evidence"),
+    checkpointReferenceFrame: "WGS 84 (G2139)",
+    checkpointCoordinateEpoch: 2022.25,
+    checkpointCount: 6,
+    checkpointHorizontalRmsErrorM: 0.04,
+    checkpointHorizontalMaxResidualM: 0.08,
+    checkpointVerticalRmsErrorM: 0.03,
+    checkpointVerticalMaxResidualM: 0.07,
+    checkpoint3dRmsErrorM: 0.05,
+    checkpoint3dMaxResidualM: 0.1,
+    surveyObservationRecordCount: records.length,
+    surveyObservationRecordTotalBytes: totalBytes,
+    surveyObservationRecordInventorySha256: inventorySha256,
+    mapReady: false,
+    publicationEligible: false,
+    automaticApproval: false,
+  };
+  const result = buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts,
+    renderManifestViews, singleImageEvidence,
+    generatedAt: "2026-10-21T12:00:00Z",
+  });
+  assert.equal(result.singleImageEvidence.schemaVersion, "1.3.0");
+  assert.equal(result.singleImageEvidence.surveyObservationRecordCount, 6);
+  assert.equal(result.singleImageEvidence.surveyObservationRecordTotalBytes, totalBytes);
+  assert.equal(result.singleImageEvidence.surveyObservationRecordInventorySha256, inventorySha256);
+
+  const missingArtifact = artifacts.filter((item) => item.artifactType !== "single-image-survey-observation-record" ||
+    item.relativePath !== records[0].relativePath);
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts: missingArtifact,
+    renderManifestViews, singleImageEvidence,
+  }), /single-image-evidence-metadata-invalid/);
+  assert.throws(() => buildBuildingReviewPackageManifest({
+    buildingId: "test-building", readinessReport: readiness, artifacts, renderManifestViews,
+    singleImageEvidence: { ...singleImageEvidence, surveyObservationRecordInventorySha256: hash("forged") },
   }), /single-image-evidence-metadata-invalid/);
 });
