@@ -12,7 +12,6 @@ import {
   verifySurveyDeviceEnrollmentEvidence,
   SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
-import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 
 const ISSUED = "2026-11-01T00:00:00.000Z";
 const NOW = "2026-11-05T14:00:00.000Z";
@@ -196,7 +195,7 @@ test("accepts bounded device-registry bytes and JSON text through the D3M-17 par
   assert.equal(verifyFixture(fixture, { trustedDeviceRegistry: bytes.toString("utf8") }).valid, true);
 });
 
-test("rejects enrollment statements issued outside the registered device-key validity window", () => {
+test("rejects enrollment statements issued outside their device-level validity window", () => {
   const fixture = makeFixture();
   const evidence = JSON.parse(fixture.evidenceBytes.toString("utf8"));
   evidence.issuedAtUtc = "2026-10-31T23:59:59.000Z";
@@ -216,43 +215,13 @@ test("rejects authority registry expiry, malformed key and broken rotation chain
   assert.throws(() => parseTrustedSurveyDeviceEnrollmentAuthorityRegistry({ ...fixture.authorityRegistry, unexpected: true }, { now: NOW }), /exact versioned/);
 });
 
-test("device enrollment package inventory is deterministic, unique and bounded", () => {
-  const entries = [
-    {
-      deviceId: "receiver-02",
-      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-02"),
-      sha256: "b".repeat(64), bytes: 240,
-      authorityId: "authority-01", authorityType: "independent-enrollment-authority",
-      authorityRegistryId: "authority-registry-01",
-    },
-    {
-      deviceId: "receiver-01",
-      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-01"),
-      sha256: "a".repeat(64), bytes: 180,
-      authorityId: "authority-01", authorityType: "independent-enrollment-authority",
-      authorityRegistryId: "authority-registry-01",
-    },
-  ];
-  const first = buildSurveyDeviceEnrollmentEvidenceInventory(entries);
-  const second = buildSurveyDeviceEnrollmentEvidenceInventory([...entries].reverse());
-  assert.equal(first.sha256, second.sha256);
-  assert.equal(first.count, 2);
-  assert.equal(first.totalBytes, 420);
-  assert.deepEqual(first.entries.map((item) => item.deviceId), ["receiver-01", "receiver-02"]);
-  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory([...entries, entries[0]]), /duplicated/);
-  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory(entries.map((item, index) =>
-    index === 0 ? { ...item, relativePath: "evidence/device-enrollments/other.json" } : item)), /invalid/);
-  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory(entries.map((item, index) =>
-    index === 0 ? { ...item, authorityRegistryId: "different-registry" } : item)), /same authority registry/);
-});
-
 test("keeps the JSON schemas strict and versioned", async () => {
   const registrySchema = JSON.parse(await readFile(new URL("../trusted-survey-device-enrollment-authority-public-key-registry.schema.json", import.meta.url), "utf8"));
   const evidenceSchema = JSON.parse(await readFile(new URL("../survey-device-enrollment-evidence.schema.json", import.meta.url), "utf8"));
   assert.equal(registrySchema.additionalProperties, false);
   assert.equal(registrySchema.properties.schemaVersion.const, "1.0.0");
   assert.equal(evidenceSchema.additionalProperties, false);
-  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-key-enrollment-association-only");
+  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-hardware-identity-enrollment-only");
   assert.equal(evidenceSchema.required.includes("keyId"), false);
   assert.equal(evidenceSchema.required.includes("devicePublicKeyFingerprintSha256"), false);
   assert.equal(evidenceSchema.properties.publicationEligible.const, false);
@@ -282,7 +251,7 @@ test("offline CLI prints help, verifies a fixture and rejects symlink inputs", a
     assert.equal(JSON.parse(good.stdout).activeDeviceRegistryKeyId, "receiver-key-01");
     const linked = path.join(directory, "device-link.json");
     await symlink(devices, linked);
-    const bad = spawnSync(process.execPath, [script.pathname, linked, authorities, evidence, "--device-id", "receiver-01", "--key-id", "receiver-key-01", "--now", NOW], { encoding: "utf8" });
+    const bad = spawnSync(process.execPath, [script.pathname, linked, authorities, evidence, "--device-id", "receiver-01", "--now", NOW], { encoding: "utf8" });
     assert.equal(bad.status, 2);
     assert.match(bad.stderr, /symlink/);
   } finally {
