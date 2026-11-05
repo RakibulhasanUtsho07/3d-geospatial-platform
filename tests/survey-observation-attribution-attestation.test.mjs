@@ -225,7 +225,7 @@ test("rejects duplicate key IDs, duplicate public-key fingerprints and forked ro
   const forked = registry([
     entry(first, { status: "revoked", revokedAtUtc: REVOKED_AT }),
     entry(second, { keyId: "surveyor-key-02", validFromUtc: REVOKED_AT, replacesKeyId: "surveyor-key-01" }),
-    entry(keys(), { keyId: "surveyor-key-03", validFromUtc: REVOKED_AT, replacesKeyId: "surveyor-key-01" }),
+    entry(keys(), { keyId: "surveyor-key-03", status: "revoked", revokedAtUtc: REVOKED_AT, replacesKeyId: "surveyor-key-01" }),
   ]);
   assert.throws(() => parseTrustedSurveyorRegistry(forked, { now: NOW }), /replace one earlier revoked key/);
 });
