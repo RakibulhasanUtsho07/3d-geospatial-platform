@@ -37,6 +37,7 @@ export function validateTrustRegistrySnapshotInventoryEntries(entries) {
   if (!Array.isArray(entries) || entries.length !== REQUIRED_ROLES.length) {
     throw new RangeError("Trust registry snapshot inventory must contain exactly three registry entries.");
   }
+  const registryIds = new Set();
   const normalized = entries.map((entry, index) => {
     const expected = REQUIRED_ROLES[index];
     if (!isObject(entry) ||
@@ -45,11 +46,13 @@ export function validateTrustRegistrySnapshotInventoryEntries(entries) {
         entry.role !== expected.role ||
         entry.recordType !== ROLE_TYPES.get(expected.role) ||
         typeof entry.registryId !== "string" || !SAFE_ID.test(entry.registryId) ||
+        registryIds.has(entry.registryId) ||
         entry.schemaVersion !== "1.0.0" ||
         !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") ||
         !Number.isSafeInteger(entry.bytes) || entry.bytes < 1 || entry.bytes > MAX_TRUST_REGISTRY_SNAPSHOT_BYTES) {
       throw new TypeError("Trust registry snapshot inventory entry " + index + " is invalid or out of canonical order.");
     }
+    registryIds.add(entry.registryId);
     return {
       role: entry.role,
       recordType: entry.recordType,
@@ -122,6 +125,10 @@ export function buildTrustRegistrySnapshotInventory({
     trustedEnrollmentAuthorityRegistry,
   };
   const entries = REQUIRED_ROLES.map((role) => parseRegistrySnapshot(role, values[role.input]));
+  const registryIds = new Set(entries.map((entry) => entry.registryId));
+  if (registryIds.size !== REQUIRED_ROLES.length) {
+    throw new TypeError("Surveyor, device and enrollment-authority registries must use distinct registry IDs.");
+  }
   return validateTrustRegistrySnapshotInventoryEntries(entries);
 }
 
