@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";
+import { createPublicKey, generateKeyPairSync, verify as verifyRawEd25519 } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
@@ -17,9 +17,17 @@ function registry(entries,overrides={}){return {schemaVersion:"1.0.0",recordType
 function signFixture(k, trusted=registry([entry(k)]), overrides={}){return createSurveyObservationDeviceAttestation({recordBytes,controlPointManifestBytes,observationId:"obs-001",checkpointId:"check-001",buildingId:"building-001",deviceId:"receiver-01",privateKeyPem:k.privateKeyPem,trustedDeviceRegistry:trusted,attestedAtUtc:SIGNED,...overrides});}
 function verifyFixture(a,trusted=registry([entryFromAttestation(a)]),overrides={}){return verifySurveyObservationDeviceAttestation({attestation:a,recordBytes,controlPointManifestBytes,observationId:"obs-001",checkpointId:"check-001",buildingId:"building-001",trustedDeviceRegistry:trusted,now:NOW,...overrides});}
 function entryFromAttestation(a){return {deviceId:a.deviceId,manufacturerId:a.manufacturerId,modelId:a.modelId,deviceSerialCommitmentSha256:a.deviceSerialCommitmentSha256,enrollmentEvidenceSha256:a.enrollmentEvidenceSha256,keyId:a.keyId,status:"active",publicKeyPem:activePublicKey,validFromUtc:a.keyValidFromUtc,validUntilUtc:a.keyValidUntilUtc,revokedAtUtc:null,replacesKeyId:null};}
+function sortedJson(value){if(Array.isArray(value))return value.map(sortedJson);if(value&&typeof value==="object")return Object.fromEntries(Object.keys(value).sort().map(k=>[k,sortedJson(value[k])]));return value;}
+function rawSignatureCheck(attestation,publicKeyPem){
+ const {signatureBase64,...unsigned}=attestation;
+ const domain=Buffer.from("3d-geospatial-platform/survey-observation-device-attestation/v1\\0","utf8");
+ const payload=Buffer.concat([domain,Buffer.from(JSON.stringify(sortedJson(unsigned)),"utf8")]);
+ return verifyRawEd25519(null,payload,createPublicKey(publicKeyPem),Buffer.from(signatureBase64,"base64"));
+}
 let activePublicKey;
 test("creates and verifies a device-key attestation bound to exact opaque record and manifest",()=>{
  const k=keys();activePublicKey=k.publicKeyPem;const r=registry([entry(k)]),a=signFixture(k,r),v=verifyFixture(a,r);
+ assert.equal(rawSignatureCheck(a,k.publicKeyPem),true,"Direct Ed25519 verification must pass for the creator's original public key.");
  assert.equal(a.algorithm,"Ed25519");assert.equal(a.publicationEligible,false);assert.equal(v.valid,true,JSON.stringify(v.checks));assert.equal(v.deviceId,"receiver-01");assert.equal(v.publicationEligible,false);
 });
 test("rejects record bytes and manifest substitution",()=>{
