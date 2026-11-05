@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
@@ -37,7 +38,7 @@ async function readStableObservationRecord(root, relativePath) {
   }
   const actual = await realpath(current);
   if (!inside(root, actual)) throw new TypeError("Survey observation record resolves outside the private workspace.");
-  const handle = await open(actual, "r");
+  const handle = await open(actual, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size < 1 ||
