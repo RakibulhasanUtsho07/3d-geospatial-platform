@@ -6,7 +6,7 @@ export const TRUST_REGISTRY_GOVERNANCE_PURPOSE = "approve-exact-survey-trust-reg
 export const MAX_TRUST_REGISTRY_GOVERNANCE_ATTESTATION_BYTES = 16 * 1024;
 export const MAX_TRUST_REGISTRY_GOVERNANCE_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 
-const DOMAIN = Buffer.from("3d-geospatial-platform/trust-registry-governance/v1\\0", "utf8");
+const DOMAIN = Buffer.from("3d-geospatial-platform/trust-registry-governance/v1\0", "utf8");
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const SIGNATURE = /^[A-Za-z0-9+/]{86}==$/;
@@ -55,12 +55,12 @@ const canonicalJson = (value) => JSON.stringify(canonicalize(value));
 
 function canonicalUtc(value) {
   if (typeof value !== "string" ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value)) return false;
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
 function parseMinimumSequence(value) {
-  const parsed = typeof value === "string" && /^(?:0|[1-9]\\d*)$/.test(value) ? Number(value) : value;
+  const parsed = typeof value === "string" && /^(?:0|[1-9]\d*)$/.test(value) ? Number(value) : value;
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
     throw new TypeError("A separately provisioned positive minimum registry sequence is required.");
   }
