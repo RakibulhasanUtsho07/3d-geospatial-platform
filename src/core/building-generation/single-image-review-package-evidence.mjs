@@ -132,8 +132,8 @@ export async function prepareSingleImageReviewPackageEvidence({
   const manifestPath = safeRelativePath(report.georeferenceEvidence.manifest.path, "Control-point manifest path");
   const manifestBytes = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
   const rawControlManifest = parseJson(manifestBytes, "Control-point manifest");
-  const hasIndependentCheckpoints = report.georeferenceEvidence?.schemaVersion === "1.2.0";
-  const surveyObservationRecords = hasIndependentCheckpoints
+  const hasCheckpointManifest = report.georeferenceEvidence?.schemaVersion === "1.2.0";
+  const surveyObservationRecords = hasCheckpointManifest
     ? await collectSingleImageSurveyObservationRecords({
       workspaceRoot: root,
       checkpoints: rawControlManifest.heldOutCheckpoints?.points,
