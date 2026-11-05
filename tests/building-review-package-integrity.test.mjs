@@ -47,6 +47,10 @@ import {
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
 import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 import { buildTrustRegistrySnapshotInventory } from "../src/core/building-generation/trust-registry-snapshot.mjs";
+import {
+  signTrustRegistryGovernanceAttestation,
+  verifyTrustRegistryGovernanceAttestation,
+} from "../src/core/building-generation/trust-registry-governance-attestation.mjs";
 
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -1696,6 +1700,95 @@ test("binds original held-out survey record bytes through the complete review pa
     ...trustRegistryRaw,
   });
   assert.equal(missingSnapshotEntry.valid, false);
+
+  // D3M-21: sign and independently verify governance approval for the exact
+  // D3M-20 inventory, using an external pinned key and a persisted sequence floor.
+  const governancePair = generateKeyPairSync("ed25519");
+  const governancePublicKeyPem = governancePair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const governanceExpiresAt = new Date(registryNow.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString();
+  const governanceAttestation = signTrustRegistryGovernanceAttestation({
+    snapshotInventory: trustRegistryInventory,
+    registrySetId: "survey-trust-q4-2026",
+    sequence: 41,
+    issuedAtUtc: registryNow.toISOString(),
+    expiresAtUtc: governanceExpiresAt,
+    governanceKeyId: "synthetic-trust-governance-root-01",
+    privateKey: governancePair.privateKey,
+  });
+  const governanceResult = verifyTrustRegistryGovernanceAttestation({
+    attestation: governanceAttestation,
+    governancePublicKeyPem,
+    minimumSequence: 41,
+    snapshotInventory: trustRegistryInventory,
+    now: registryNow,
+  });
+  assert.equal(governanceResult.valid, true, JSON.stringify(governanceResult.errors));
+
+  const governedEvidence = {
+    ...snapshotEvidence,
+    schemaVersion: "1.8.0",
+    trustRegistryGovernance: governanceResult.metadata,
+  };
+  const governedPackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: enrolledPackageManifest.artifacts,
+    singleImageEvidence: governedEvidence,
+    generatedAt: registryNow.toISOString(),
+  });
+  const governedReport = verifyBuildingReviewPackage({
+    packageManifest: governedPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(governedPackageManifest)),
+    ...trustRegistryRaw,
+    trustRegistryGovernanceAttestation: governanceAttestation,
+    trustRegistryGovernancePublicKeyPem: governancePublicKeyPem,
+    minimumTrustRegistrySequence: 41,
+    trustRegistryGovernanceNow: registryNow,
+  });
+  assert.equal(governedReport.valid, true, JSON.stringify(governedReport.errors));
+  assert.equal(governedPackageManifest.singleImageEvidence.schemaVersion, "1.8.0");
+  assert.equal(governedReport.publicationEligible, false);
+  assert.doesNotMatch(JSON.stringify(governedPackageManifest), /BEGIN PRIVATE KEY|BEGIN PUBLIC KEY/);
+
+  const missingGovernanceTrust = verifyBuildingReviewPackage({
+    packageManifest: governedPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(governedPackageManifest)),
+    ...trustRegistryRaw,
+    trustRegistryGovernanceNow: registryNow,
+  });
+  assert.equal(missingGovernanceTrust.valid, false);
+
+  const rollbackReport = verifyBuildingReviewPackage({
+    packageManifest: governedPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(governedPackageManifest)),
+    ...trustRegistryRaw,
+    trustRegistryGovernanceAttestation: governanceAttestation,
+    trustRegistryGovernancePublicKeyPem: governancePublicKeyPem,
+    minimumTrustRegistrySequence: 42,
+    trustRegistryGovernanceNow: registryNow,
+  });
+  assert.equal(rollbackReport.valid, false);
+  assert.ok(rollbackReport.errors.some((item) =>
+    item.message.includes("trust-registry-governance-verification-failed")));
+
+  const tamperedGovernanceEnvelope = JSON.parse(governanceAttestation);
+  tamperedGovernanceEnvelope.sequence = 42;
+  const tamperedGovernanceAttestation = JSON.stringify(tamperedGovernanceEnvelope);
+  const tamperedGovernanceReport = verifyBuildingReviewPackage({
+    packageManifest: governedPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(governedPackageManifest)),
+    ...trustRegistryRaw,
+    trustRegistryGovernanceAttestation: tamperedGovernanceAttestation,
+    trustRegistryGovernancePublicKeyPem: governancePublicKeyPem,
+    minimumTrustRegistrySequence: 41,
+    trustRegistryGovernanceNow: registryNow,
+  });
+  assert.equal(tamperedGovernanceReport.valid, false);
 });
 
 
