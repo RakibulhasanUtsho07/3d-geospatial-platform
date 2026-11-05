@@ -455,9 +455,9 @@ export function verifySurveyObservationAttributionAttestation({
   now: nowInput,
 }) {
   validateBytes({ recordBytes, controlPointManifestBytes });
-  safeId(observationId, "observationId");
-  safeId(checkpointId, "checkpointId");
-  safeId(buildingId, "buildingId");
+  safeContextId(observationId, "observationId");
+  safeContextId(checkpointId, "checkpointId");
+  safeContextId(buildingId, "buildingId");
   const now = normalizeNow(nowInput);
   const checks = [];
   const errors = [];
@@ -479,9 +479,9 @@ export function verifySurveyObservationAttributionAttestation({
     attestation.engine === ATTESTATION_ENGINE &&
     attestation.algorithm === "Ed25519" &&
     attestation.signaturePurpose === SURVEY_OBSERVATION_ATTESTATION_PURPOSE &&
-    SAFE_ID.test(attestation.observationId ?? "") &&
-    SAFE_ID.test(attestation.checkpointId ?? "") &&
-    SAFE_ID.test(attestation.buildingId ?? "") &&
+    SAFE_CONTEXT_ID.test(attestation.observationId ?? "") &&
+    SAFE_CONTEXT_ID.test(attestation.checkpointId ?? "") &&
+    SAFE_CONTEXT_ID.test(attestation.buildingId ?? "") &&
     HASH.test(attestation.recordSha256 ?? "") &&
     Number.isSafeInteger(attestation.recordBytes) && attestation.recordBytes > 0 &&
     HASH.test(attestation.controlPointManifestSha256 ?? "") &&
@@ -588,4 +588,54 @@ export function verifySurveyObservationAttributionAttestation({
 export function surveyObservationAttributionAttestationPath(observationId) {
   safeContextId(observationId, "observationId");
   return "evidence/survey-observations/" + observationId + ".attestation.json";
+}
+
+
+/**
+ * Canonical inventory for detached signature sidecars. The inventory binds
+ * each observation/checkpoint pair to the exact deterministic package path,
+ * sidecar SHA-256 and byte count; the sidecar itself binds record+manifest.
+ */
+export function buildSurveyObservationAttributionInventory(entries) {
+  if (!Array.isArray(entries) || entries.length < 6 || entries.length > 100) {
+    throw new RangeError("Survey observation attribution inventory requires 6–100 entries.");
+  }
+  const observations = new Set();
+  const checkpoints = new Set();
+  const paths = new Set();
+  const normalized = entries.map((entry, index) => {
+    if (!isObject(entry) ||
+        typeof entry.observationId !== "string" || !SAFE_CONTEXT_ID.test(entry.observationId) ||
+        typeof entry.checkpointId !== "string" || !SAFE_CONTEXT_ID.test(entry.checkpointId) ||
+        observations.has(entry.observationId.toLowerCase()) ||
+        checkpoints.has(entry.checkpointId.toLowerCase()) ||
+        typeof entry.relativePath !== "string" ||
+        entry.relativePath !== surveyObservationAttributionAttestationPath(entry.observationId) ||
+        paths.has(entry.relativePath.toLowerCase()) ||
+        typeof entry.sha256 !== "string" || !HASH.test(entry.sha256) ||
+        !Number.isSafeInteger(entry.bytes) || entry.bytes < 1 || entry.bytes > 32 * 1024) {
+      throw new TypeError("Survey observation attribution inventory entry " + index + " is invalid.");
+    }
+    observations.add(entry.observationId.toLowerCase());
+    checkpoints.add(entry.checkpointId.toLowerCase());
+    paths.add(entry.relativePath.toLowerCase());
+    return {
+      observationId: entry.observationId,
+      checkpointId: entry.checkpointId,
+      relativePath: entry.relativePath,
+      sha256: entry.sha256,
+      bytes: entry.bytes,
+    };
+  }).sort((left, right) =>
+    left.observationId < right.observationId ? -1 :
+      left.observationId > right.observationId ? 1 :
+        left.checkpointId < right.checkpointId ? -1 :
+          left.checkpointId > right.checkpointId ? 1 : 0);
+  const bytes = Buffer.from(JSON.stringify(normalized), "utf8");
+  return {
+    count: normalized.length,
+    totalBytes: normalized.reduce((sum, entry) => sum + entry.bytes, 0),
+    sha256: sha256(bytes),
+    entries: normalized,
+  };
 }
