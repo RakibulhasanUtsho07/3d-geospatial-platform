@@ -80,6 +80,21 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
   }
 }
 
+export async function readStableSingleImageSurveyObservationRecord({ workspaceRoot, observationId }) {
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new TypeError("Survey observation workspace root is required.");
+  }
+  const root = await realpath(path.resolve(workspaceRoot));
+  const relativePath = singleImageSurveyObservationRecordPath(observationId);
+  const bytes = await readStableWorkspaceFile(
+    root,
+    relativePath,
+    "Held-out survey observation record " + observationId,
+    MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+  );
+  return { observationId, relativePath, sha256: sha256(bytes), bytes };
+}
+
 function parseJson(bytes, label) {
   try {
     return JSON.parse(bytes.toString("utf8"));
@@ -150,18 +165,15 @@ export async function prepareSingleImageReviewPackageEvidence({
     }
     let totalRecordBytes = 0;
     for (const checkpoint of checkpoints) {
-      const relativePath = singleImageSurveyObservationRecordPath(checkpoint.observationId);
+      const record = await readStableSingleImageSurveyObservationRecord({
+        workspaceRoot: root,
+        observationId: checkpoint.observationId,
+      });
+      const { relativePath, bytes: recordBytes, sha256: actualSha256 } = record;
       if (typeof checkpoint.observationRecordSha256 !== "string" ||
           !/^[a-f0-9]{64}$/.test(checkpoint.observationRecordSha256)) {
         throw new Error("Held-out checkpoint is missing a valid observation-record SHA-256: " + checkpoint.id);
       }
-      const recordBytes = await readStableWorkspaceFile(
-        root,
-        relativePath,
-        "Held-out survey observation record " + checkpoint.observationId,
-        MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
-      );
-      const actualSha256 = sha256(recordBytes);
       if (actualSha256 !== checkpoint.observationRecordSha256) {
         throw new Error("Held-out survey observation record SHA-256 does not match checkpoint " + checkpoint.id + ".");
       }
@@ -214,21 +226,20 @@ export async function prepareSingleImageReviewPackageEvidence({
   const manifestBytesAfter = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
   const observationRecordBytesAfter = [];
   for (const file of observationRecordFiles) {
-    observationRecordBytesAfter.push(await readStableWorkspaceFile(
-      root,
-      file.relativePath,
-      "Held-out survey observation record " + file.observationId,
-      MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
-    ));
+    observationRecordBytesAfter.push(await readStableSingleImageSurveyObservationRecord({
+      workspaceRoot: root,
+      observationId: file.observationId,
+    }));
   }
   if (after.model?.sha256 !== candidateGlbSha256 ||
       sha256(reportBytesAfter) !== sha256(reportBytes) ||
       sha256(receiptBytesAfter) !== sha256(receiptBytes) ||
       sha256(workflowBytesAfter) !== sha256(workflowBytes) ||
       sha256(manifestBytesAfter) !== sha256(manifestBytes) ||
-      observationRecordBytesAfter.some((bytes, index) =>
-        bytes.length !== observationRecordFiles[index].bytes.length ||
-        sha256(bytes) !== observationRecordFiles[index].sha256)) {
+      observationRecordBytesAfter.some((record, index) =>
+        record.relativePath !== observationRecordFiles[index].relativePath ||
+        record.bytes.length !== observationRecordFiles[index].bytes.length ||
+        record.sha256 !== observationRecordFiles[index].sha256)) {
     throw new Error("Single-image smoke or survey observation evidence changed during review-package preparation.");
   }
 
