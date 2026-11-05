@@ -419,7 +419,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(metadata.schemaVersion)) {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
