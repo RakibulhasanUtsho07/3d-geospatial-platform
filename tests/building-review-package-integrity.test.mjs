@@ -46,6 +46,7 @@ import {
   SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
 import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
+import { buildTrustRegistrySnapshotInventory } from "../src/core/building-generation/trust-registry-snapshot.mjs";
 
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -1570,6 +1571,116 @@ test("binds original held-out survey record bytes through the complete review pa
     trustedDeviceRegistry: wrongDeviceRegistry,
   });
   assert.equal(wrongDeviceSigner.valid, false);
+
+  // D3M-20: bind the exact raw bytes for all three external registries. The
+  // registries remain external; the package records only ID/type/schema/hash/size.
+  const trustRegistryRaw = {
+    trustedSurveyorRegistry: JSON.stringify(trustedSurveyorRegistry),
+    trustedDeviceRegistry: JSON.stringify(trustedDeviceRegistry),
+    trustedEnrollmentAuthorityRegistry: JSON.stringify(trustedEnrollmentAuthorityRegistry),
+  };
+  const trustRegistryInventory = buildTrustRegistrySnapshotInventory(trustRegistryRaw);
+  const snapshotEvidence = {
+    ...enrolledEvidence,
+    schemaVersion: "1.7.0",
+    trustRegistrySnapshotSchemaVersion: trustRegistryInventory.schemaVersion,
+    trustRegistrySnapshotCount: trustRegistryInventory.count,
+    trustRegistrySnapshotBytes: trustRegistryInventory.totalBytes,
+    trustRegistrySnapshotsSha256: trustRegistryInventory.sha256,
+    trustRegistrySnapshots: trustRegistryInventory.entries,
+  };
+  const snapshotPackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: enrolledPackageManifest.artifacts,
+    singleImageEvidence: snapshotEvidence,
+    generatedAt: registryNow.toISOString(),
+  });
+  const snapshotReport = verifyBuildingReviewPackage({
+    packageManifest: snapshotPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(snapshotPackageManifest)),
+    ...trustRegistryRaw,
+  });
+  assert.equal(snapshotReport.valid, true, JSON.stringify(snapshotReport.errors));
+  assert.equal(snapshotPackageManifest.singleImageEvidence.schemaVersion, "1.7.0");
+  assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotCount, 3);
+  assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotBytes, trustRegistryInventory.totalBytes);
+  assert.equal(snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotsSha256, trustRegistryInventory.sha256);
+  assert.equal(snapshotReport.publicationEligible, false);
+  assert.ok(snapshotReport.checks.some((item) =>
+    item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  const missingDeviceRegistrySnapshot = verifyBuildingReviewPackage({
+    packageManifest: snapshotPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(snapshotPackageManifest)),
+    trustedSurveyorRegistry: trustRegistryRaw.trustedSurveyorRegistry,
+    trustedEnrollmentAuthorityRegistry: trustRegistryRaw.trustedEnrollmentAuthorityRegistry,
+  });
+  assert.equal(missingDeviceRegistrySnapshot.valid, false);
+  assert.ok(missingDeviceRegistrySnapshot.errors.some((item) =>
+    item.message.includes("trust-registry-snapshot-verification-failed")));
+
+  // JSON semantics and registryId remain the same, but a trailing newline
+  // changes the exact external registry bytes and must invalidate schema 1.7.
+  const whitespaceChangedSurveyorRegistry = trustRegistryRaw.trustedSurveyorRegistry + "\n";
+  const changedRegistrySnapshot = verifyBuildingReviewPackage({
+    packageManifest: snapshotPackageManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(snapshotPackageManifest)),
+    ...trustRegistryRaw,
+    trustedSurveyorRegistry: whitespaceChangedSurveyorRegistry,
+  });
+  assert.equal(changedRegistrySnapshot.valid, false);
+  assert.ok(changedRegistrySnapshot.errors.some((item) =>
+    item.message.includes("trust-registry-snapshot-verification-failed")));
+
+  const forgedSnapshotDigestManifest = {
+    ...snapshotPackageManifest,
+    singleImageEvidence: {
+      ...snapshotPackageManifest.singleImageEvidence,
+      trustRegistrySnapshotsSha256: "f".repeat(64),
+    },
+  };
+  const forgedSnapshotDigest = verifyBuildingReviewPackage({
+    packageManifest: forgedSnapshotDigestManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(forgedSnapshotDigestManifest)),
+    ...trustRegistryRaw,
+  });
+  assert.equal(forgedSnapshotDigest.valid, false);
+
+  const forgedSnapshotBytesManifest = {
+    ...snapshotPackageManifest,
+    singleImageEvidence: {
+      ...snapshotPackageManifest.singleImageEvidence,
+      trustRegistrySnapshotBytes: snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshotBytes + 1,
+    },
+  };
+  const forgedSnapshotBytes = verifyBuildingReviewPackage({
+    packageManifest: forgedSnapshotBytesManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(forgedSnapshotBytesManifest)),
+    ...trustRegistryRaw,
+  });
+  assert.equal(forgedSnapshotBytes.valid, false);
+
+  const missingSnapshotEntryManifest = {
+    ...snapshotPackageManifest,
+    singleImageEvidence: {
+      ...snapshotPackageManifest.singleImageEvidence,
+      trustRegistrySnapshots: snapshotPackageManifest.singleImageEvidence.trustRegistrySnapshots.slice(1),
+    },
+  };
+  const missingSnapshotEntry = verifyBuildingReviewPackage({
+    packageManifest: missingSnapshotEntryManifest,
+    actualFiles: enrolledActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(missingSnapshotEntryManifest)),
+    ...trustRegistryRaw,
+  });
+  assert.equal(missingSnapshotEntry.valid, false);
 });
 
 
