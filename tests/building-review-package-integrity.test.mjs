@@ -1892,6 +1892,13 @@ test("binds original held-out survey record bytes through the complete review pa
   assert.equal(externalStoreVerification.governanceState.providerId, "test-only-memory-anchor");
   assert.equal(externalStoreVerification.governanceState.minimumAcceptedSequence, 41);
   assert.equal(externalStoreVerification.governanceState.revision, 1);
+  await assert.rejects(
+    verifyBuildingReviewPackageDirectory(governedDirectory, {
+      ...externalStoreVerifyArgs,
+      trustRegistryGovernanceStateFilePath: stateFilePath,
+    }),
+    /Configure either the external governance state store or the local state file/i,
+  );
   const externalStoreRestart = await verifyBuildingReviewPackageDirectory(
     governedDirectory,
     externalStoreVerifyArgs,
