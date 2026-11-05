@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
+import { canonicalJson } from "./generation-artifact-receipt.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -17,6 +18,9 @@ const hash = (value) => createHash("sha256").update(value).digest("hex");
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const nonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 const isHash = (value) => typeof value === "string" && sha256Pattern.test(value);
+const SURVEY_RECORD_TYPE = "single-image-survey-observation-record";
+const MAX_SURVEY_RECORD_BYTES = 8 * 1024 * 1024;
+const MAX_SURVEY_RECORD_TOTAL_BYTES = 64 * 1024 * 1024;
 
 function safeRelativePath(value) {
   if (!nonEmptyString(value) || value.includes("\\") || value.startsWith("/")) return false;
@@ -126,11 +130,39 @@ export function buildBuildingReviewPackageManifest({
   ];
   const singleImageCounts = new Map(singleImageArtifactTypes.map((type) => [type, byType.get(type) ?? 0]));
   const singleImageArtifactCount = [...singleImageCounts.values()].reduce((sum, count) => sum + count, 0);
+  const surveyRecordArtifacts = artifacts.filter((item) => item.artifactType === SURVEY_RECORD_TYPE);
+  const surveyRecordInventory = surveyRecordArtifacts.map((item) => {
+    const filename = item.relativePath.split("/").at(-1) ?? "";
+    const observationId = filename.endsWith(".record") ? filename.slice(0, -7) : "";
+    return { observationId, relativePath: item.relativePath, bytes: item.bytes, sha256: item.sha256.toLowerCase() };
+  }).sort((a, b) => a.observationId.localeCompare(b.observationId));
+  const surveyRecordIds = new Set(surveyRecordInventory.map((item) => item.observationId));
+  const surveyRecordPathsValid = surveyRecordInventory.every((item) =>
+    /^[a-z0-9][a-z0-9._-]{0,79}$/i.test(item.observationId) &&
+    item.relativePath === "evidence/survey-observations/" + item.observationId + ".record" &&
+    item.bytes <= MAX_SURVEY_RECORD_BYTES
+  ) && surveyRecordIds.size === surveyRecordInventory.length;
+  const surveyRecordTotalBytes = surveyRecordArtifacts.reduce((sum, item) => sum + item.bytes, 0);
+  const surveyRecordInventorySha256 = hash(Buffer.from(canonicalJson(surveyRecordInventory), "utf8"));
   if (singleImageEvidence === null) {
-    if (singleImageArtifactCount !== 0) throw new Error("review-package-single-image-evidence-metadata-missing");
+    if (singleImageArtifactCount !== 0 || surveyRecordArtifacts.length !== 0) {
+      throw new Error("review-package-single-image-evidence-metadata-missing");
+    }
   } else {
-    const hasVerticalCalibration = ["1.1.0", "1.2.0"].includes(singleImageEvidence?.schemaVersion);
-    const hasIndependentCheckpoints = singleImageEvidence?.schemaVersion === "1.2.0";
+    const hasVerticalCalibration = ["1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasIndependentCheckpoints = ["1.2.0", "1.3.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasByteVerifiedSurveyRecords = singleImageEvidence?.schemaVersion === "1.3.0";
+    const surveyRecordMetadataValid = hasByteVerifiedSurveyRecords
+      ? surveyRecordPathsValid &&
+        surveyRecordArtifacts.length === singleImageEvidence.checkpointCount &&
+        singleImageEvidence.surveyObservationRecordCount === surveyRecordArtifacts.length &&
+        Number.isSafeInteger(singleImageEvidence.surveyObservationRecordTotalBytes) &&
+        singleImageEvidence.surveyObservationRecordTotalBytes === surveyRecordTotalBytes &&
+        surveyRecordTotalBytes > 0 && surveyRecordTotalBytes <= MAX_SURVEY_RECORD_TOTAL_BYTES &&
+        isHash(singleImageEvidence.surveyObservationRecordInventorySha256) &&
+        singleImageEvidence.surveyObservationRecordInventorySha256 === surveyRecordInventorySha256
+      : surveyRecordArtifacts.length === 0 &&
+        !Object.keys(singleImageEvidence).some((key) => key.startsWith("surveyObservationRecord"));
     const verticalMetadataValid = hasVerticalCalibration
       ? singleImageEvidence.verticalDatum === "EPSG:4979-ellipsoidal" &&
         singleImageEvidence.verticalStatus === "calibrated-needs-human-review" &&
@@ -159,14 +191,14 @@ export function buildBuildingReviewPackageManifest({
           "checkpoint3dRmsErrorM", "checkpoint3dMaxResidualM"].every((key) =>
           Number.isFinite(singleImageEvidence[key]) && singleImageEvidence[key] >= 0)
       : !Object.keys(singleImageEvidence).some((key) => key.startsWith("checkpoint"));
-    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0"].includes(singleImageEvidence.schemaVersion) ||
+    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ||
         !nonEmptyString(singleImageEvidence.jobId) || !nonEmptyString(singleImageEvidence.sourceId) ||
         !isHash(singleImageEvidence.sourceSha256) || !isHash(singleImageEvidence.candidateGlbSha256) ||
         !isHash(singleImageEvidence.controlPointManifestSha256) || !isHash(singleImageEvidence.smokeReportSha256) ||
         !isHash(singleImageEvidence.generationArtifactReceiptSha256) || !isHash(singleImageEvidence.workflowReportSha256) ||
         singleImageEvidence.buildingId !== buildingId ||
         singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
-        !verticalMetadataValid || !checkpointMetadataValid ||
+        !verticalMetadataValid || !checkpointMetadataValid || !surveyRecordMetadataValid ||
         singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
         singleImageEvidence.automaticApproval !== false ||
         singleImageEvidence.candidateGlbSha256.toLowerCase() !==
@@ -264,7 +296,7 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
-      ...(["1.1.0", "1.2.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ? {
         verticalStatus: singleImageEvidence.verticalStatus,
         verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
         verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
@@ -274,7 +306,7 @@ export function buildBuildingReviewPackageManifest({
         verticalMaxResidualM: singleImageEvidence.verticalMaxResidualM,
         verticalControlPointCount: singleImageEvidence.verticalControlPointCount,
       } : {}),
-      ...(singleImageEvidence.schemaVersion === "1.2.0" ? {
+      ...(["1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ? {
         checkpointValidationStatus: singleImageEvidence.checkpointValidationStatus,
         checkpointEvidenceSha256: singleImageEvidence.checkpointEvidenceSha256.toLowerCase(),
         checkpointReferenceFrame: singleImageEvidence.checkpointReferenceFrame,
@@ -286,6 +318,11 @@ export function buildBuildingReviewPackageManifest({
         checkpointVerticalMaxResidualM: singleImageEvidence.checkpointVerticalMaxResidualM,
         checkpoint3dRmsErrorM: singleImageEvidence.checkpoint3dRmsErrorM,
         checkpoint3dMaxResidualM: singleImageEvidence.checkpoint3dMaxResidualM,
+      } : {}),
+      ...(singleImageEvidence.schemaVersion === "1.3.0" ? {
+        surveyObservationRecordCount: singleImageEvidence.surveyObservationRecordCount,
+        surveyObservationRecordTotalBytes: singleImageEvidence.surveyObservationRecordTotalBytes,
+        surveyObservationRecordInventorySha256: singleImageEvidence.surveyObservationRecordInventorySha256.toLowerCase(),
       } : {}),
       mapReady: false,
       publicationEligible: false,
