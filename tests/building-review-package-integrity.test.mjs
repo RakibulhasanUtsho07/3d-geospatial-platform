@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, rm, writeFile, symlink, truncate } from "node:fs/promises";
 import { generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -15,6 +15,7 @@ import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-re
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
+import { readStableSingleImageSurveyObservationRecord } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
 import {
   buildSingleImageSurveyObservationRecordInventory,
   singleImageSurveyObservationRecordPath,
@@ -1007,4 +1008,53 @@ test("canonical survey observation inventory is deterministic, bounded and rejec
       bytes: 1,
     })),
   ), /6–100/i);
+});
+
+
+test("stable survey record workspace reader preserves bytes and rejects missing, unsafe, symlink and oversized inputs", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m15-survey-record-reader-"));
+  const evidenceDir = path.join(root, "evidence", "survey-observations");
+  await mkdir(evidenceDir, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const observationId = "stable-read-observation";
+  const relativePath = singleImageSurveyObservationRecordPath(observationId);
+  const filePath = path.join(root, ...relativePath.split("/"));
+  const originalBytes = Buffer.from([0, 1, 2, 10, 13, 127, 128, 255]);
+  await writeFile(filePath, originalBytes, { flag: "wx" });
+
+  const result = await readStableSingleImageSurveyObservationRecord({
+    workspaceRoot: root,
+    observationId,
+  });
+  assert.equal(result.relativePath, relativePath);
+  assert.equal(result.sha256, hash(originalBytes));
+  assert.deepEqual(result.bytes, originalBytes);
+
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: "missing-record" }),
+  );
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: "../outside" }),
+    /invalid/i,
+  );
+
+  const symlinkId = "symlink-observation";
+  const symlinkPath = path.join(root, ...singleImageSurveyObservationRecordPath(symlinkId).split("/"));
+  const targetPath = path.join(evidenceDir, "target.record");
+  await writeFile(targetPath, Buffer.from("target"), { flag: "wx" });
+  await symlink(targetPath, symlinkPath);
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: symlinkId }),
+    /symbolic links/i,
+  );
+
+  const oversizedId = "oversized-observation";
+  const oversizedPath = path.join(root, ...singleImageSurveyObservationRecordPath(oversizedId).split("/"));
+  await writeFile(oversizedPath, Buffer.from("x"), { flag: "wx" });
+  await truncate(oversizedPath, MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES + 1);
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: oversizedId }),
+    /size limit/i,
+  );
 });
