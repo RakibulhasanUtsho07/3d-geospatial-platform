@@ -16,6 +16,7 @@ import { buildBuildingReleaseReadiness } from "../src/core/building-generation/b
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
 import { verifyBuildingReviewPackageDirectory } from "../src/core/building-generation/building-review-package-directory.mjs";
+import { createExternalTrustRegistryGovernanceStateStore } from "../src/core/building-generation/trust-registry-governance-external-store.mjs";
 import { readStableSingleImageSurveyObservationRecord } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
 import {
   buildSingleImageSurveyObservationRecordInventory,
@@ -1827,6 +1828,78 @@ test("binds original held-out survey record bytes through the complete review pa
     JSON.stringify(restartedDirectoryVerification.integrity.errors));
   assert.equal(restartedDirectoryVerification.governanceState.minimumAcceptedSequence, 41);
   assert.equal(restartedDirectoryVerification.governanceState.revision, 1);
+
+
+  // D3M-23: the package verifier can use an injected external store whose
+  // monotonic anchor is maintained separately from its state document.
+  let remoteRecord = null;
+  let remoteVersion = 0;
+  const clone = (value) => structuredClone(value);
+  const anchorFor = (state) => ({
+    revision: state.revision,
+    minimumAcceptedSequence: state.minimumAcceptedSequence,
+    stateSha256: state.stateSha256,
+  });
+  const remoteProvider = {
+    providerId: "test-only-memory-anchor",
+    async readState(identity) {
+      if (!remoteRecord) return null;
+      assert.equal(remoteRecord.state.registrySetId, identity.registrySetId);
+      assert.equal(remoteRecord.state.governanceKeyFingerprintSha256,
+        identity.governanceKeyFingerprintSha256);
+      return clone(remoteRecord);
+    },
+    async initializeStateIfAbsent({ identity, state }) {
+      if (remoteRecord) {
+        assert.equal(remoteRecord.state.registrySetId, identity.registrySetId);
+        return { created: false, ...clone(remoteRecord) };
+      }
+      remoteVersion += 1;
+      remoteRecord = {
+        version: "remote-v" + remoteVersion,
+        state: clone(state),
+        anchor: anchorFor(state),
+      };
+      return { created: true, ...clone(remoteRecord) };
+    },
+    async compareAndSetState({ expectedVersion, expectedStateSha256, nextState }) {
+      if (!remoteRecord || remoteRecord.version !== expectedVersion ||
+          remoteRecord.state.stateSha256 !== expectedStateSha256) {
+        return { updated: false, ...clone(remoteRecord) };
+      }
+      remoteVersion += 1;
+      remoteRecord = {
+        version: "remote-v" + remoteVersion,
+        state: clone(nextState),
+        anchor: anchorFor(nextState),
+      };
+      return { updated: true, ...clone(remoteRecord) };
+    },
+  };
+  const externalStore = createExternalTrustRegistryGovernanceStateStore({ provider: remoteProvider });
+  const externalStoreVerifyArgs = {
+    ...directoryVerifyArgs,
+    trustRegistryGovernanceStateFilePath: null,
+    trustRegistryGovernanceStateStore: externalStore,
+  };
+  const externalStoreVerification = await verifyBuildingReviewPackageDirectory(
+    governedDirectory,
+    externalStoreVerifyArgs,
+  );
+  assert.equal(externalStoreVerification.integrity.valid, true,
+    JSON.stringify(externalStoreVerification.integrity.errors));
+  assert.equal(externalStoreVerification.governanceState.storeType, "external");
+  assert.equal(externalStoreVerification.governanceState.providerId, "test-only-memory-anchor");
+  assert.equal(externalStoreVerification.governanceState.minimumAcceptedSequence, 41);
+  assert.equal(externalStoreVerification.governanceState.revision, 1);
+  const externalStoreRestart = await verifyBuildingReviewPackageDirectory(
+    governedDirectory,
+    externalStoreVerifyArgs,
+  );
+  assert.equal(externalStoreRestart.integrity.valid, true,
+    JSON.stringify(externalStoreRestart.integrity.errors));
+  assert.equal(externalStoreRestart.governanceState.stateSha256,
+    externalStoreVerification.governanceState.stateSha256);
 
   const staleGovernanceAttestation = signTrustRegistryGovernanceAttestation({
     snapshotInventory: trustRegistryInventory,
