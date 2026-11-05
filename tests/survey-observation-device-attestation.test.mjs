@@ -27,7 +27,13 @@ function rawSignatureCheck(attestation,publicKeyPem){
 let activePublicKey;
 test("creates and verifies a device-key attestation bound to exact opaque record and manifest",()=>{
  const k=keys();activePublicKey=k.publicKeyPem;const r=registry([entry(k)]),a=signFixture(k,r),v=verifyFixture(a,r);
+ const payload=surveyObservationDeviceAttestationSigningBytes(a);
+ const signatureBytes=Buffer.from(a.signatureBase64,"base64");
+ const parsedKey=parseTrustedSurveyDeviceRegistry(r,{now:NOW}).activeEntries[0].publicKey;
+ assert.equal(signatureBytes.length,64,"Ed25519 signatures must decode to exactly 64 bytes.");
+ assert.equal(signatureBytes.toString("base64"),a.signatureBase64,"Signature Base64 must be canonical.");
  assert.equal(rawSignatureCheck(a,k.publicKeyPem),true,"Direct Ed25519 verification must pass for the creator's original public key.");
+ assert.equal(verifyRawEd25519(null,payload,parsedKey,signatureBytes),true,"Registry-parsed KeyObject must verify the same signed bytes.");
  assert.equal(a.algorithm,"Ed25519");assert.equal(a.publicationEligible,false);assert.equal(v.valid,true,JSON.stringify(v.checks));assert.equal(v.deviceId,"receiver-01");assert.equal(v.publicationEligible,false);
 });
 test("rejects record bytes and manifest substitution",()=>{
