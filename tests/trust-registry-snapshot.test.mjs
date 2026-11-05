@@ -83,6 +83,9 @@ test("same registry ID with different raw bytes produces a different exact-byte 
       trustRegistrySnapshotBytes: first.totalBytes,
       trustRegistrySnapshotsSha256: first.sha256,
       trustRegistrySnapshots: first.entries,
+      trustedSurveyorRegistryId: first.entries[0].registryId,
+      trustedSurveyDeviceRegistryId: first.entries[1].registryId,
+      trustedSurveyDeviceEnrollmentAuthorityRegistryId: first.entries[2].registryId,
     },
     ...changedWhitespace,
   });
@@ -99,6 +102,9 @@ test("verifies the complete inventory and rejects tampered snapshot metadata", (
     trustRegistrySnapshotBytes: inventory.totalBytes,
     trustRegistrySnapshotsSha256: inventory.sha256,
     trustRegistrySnapshots: inventory.entries,
+    trustedSurveyorRegistryId: inventory.entries[0].registryId,
+    trustedSurveyDeviceRegistryId: inventory.entries[1].registryId,
+    trustedSurveyDeviceEnrollmentAuthorityRegistryId: inventory.entries[2].registryId,
   };
   assert.equal(verifyTrustRegistrySnapshotInventory({ metadata, ...raw }).valid, true);
 
