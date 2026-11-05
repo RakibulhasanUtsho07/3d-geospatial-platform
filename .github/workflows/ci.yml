@@ -102,6 +102,7 @@ on:
       - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
       - feat/d3m-engine19-review-package-enrollment-evidence-20261105
       - feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105
+      - feat/d3m-engine21-signed-trust-registry-governance-20261105
 
   workflow_dispatch:
   pull_request:
@@ -125,6 +126,7 @@ on:
       - feat/d3m-engine18-signed-device-enrollment-evidence-20261105
       - feat/d3m-engine19-review-package-enrollment-evidence-20261105
       - feat/d3m-engine20-exact-trust-registry-snapshot-binding-20261105
+      - feat/d3m-engine21-signed-trust-registry-governance-20261105
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -226,6 +228,9 @@ jobs:
 
       - name: Test exact external trust-registry snapshot inventory
         run: npm run test:trust-registry-snapshot
+
+      - name: Test signed trust-registry governance and anti-rollback
+        run: npm run test:trust-registry-governance
 
       - name: Validate survey-device enrollment evidence verifier CLI
         run: npm run verify:survey-device-enrollment-evidence -- --help

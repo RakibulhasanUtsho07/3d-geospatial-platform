@@ -112,6 +112,9 @@ async function main() {
       trustedSurveyorRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
       trustedDeviceRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON ?? null,
       trustedEnrollmentAuthorityRegistry: process.env.SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON ?? null,
+      trustRegistryGovernanceAttestation: process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_ATTESTATION_JSON ?? null,
+      trustRegistryGovernancePublicKeyPem: process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_PUBLIC_KEY_PEM ?? null,
+      minimumTrustRegistrySequence: process.env.SURVEY_TRUST_REGISTRY_MINIMUM_SEQUENCE ?? null,
     })
     : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
