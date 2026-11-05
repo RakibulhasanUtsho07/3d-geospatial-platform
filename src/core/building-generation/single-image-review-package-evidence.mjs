@@ -10,6 +10,12 @@ import {
   MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORDS_BYTES,
   singleImageSurveyObservationRecordPath,
 } from "./single-image-survey-observation-records.mjs";
+import {
+  buildSurveyObservationAttributionInventory,
+  surveyObservationAttributionAttestationPath,
+  verifySurveyObservationAttributionAttestation,
+  MAX_TRUSTED_SURVEYOR_REGISTRY_BYTES,
+} from "./survey-observation-attribution-attestation.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -139,6 +145,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   jobId,
   buildingId,
   candidateGlbSha256,
+  trustedSurveyorRegistry = null,
 }) {
   if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) throw new TypeError("single-image smoke workspace is required.");
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("single-image smoke jobId is invalid.");
@@ -179,6 +186,12 @@ export async function prepareSingleImageReviewPackageEvidence({
   const controlManifest = parseJson(manifestBytes, "Control-point manifest");
   const observationRecordFiles = [];
   let observationRecordInventory = null;
+  const observationAttestationFiles = [];
+  let observationAttestationInventory = null;
+  const hasTrustedSurveyorRegistry = typeof trustedSurveyorRegistry === "string" && trustedSurveyorRegistry.trim().length > 0;
+  if (hasTrustedSurveyorRegistry && Buffer.byteLength(trustedSurveyorRegistry, "utf8") > MAX_TRUSTED_SURVEYOR_REGISTRY_BYTES) {
+    throw new RangeError("Trusted surveyor registry exceeds the 64 KiB limit.");
+  }
   if (report.georeferenceEvidence?.schemaVersion === "1.2.0") {
     const checkpoints = controlManifest.heldOutCheckpoints?.points;
     if (controlManifest.schemaVersion !== "1.2.0" || !Array.isArray(checkpoints) ||
@@ -208,6 +221,7 @@ export async function prepareSingleImageReviewPackageEvidence({
       observationRecordFiles.push({
         artifactType: "single-image-survey-observation-record",
         observationId: checkpoint.observationId,
+        checkpointId: checkpoint.id,
         relativePath,
         sha256: actualSha256,
         bytes: recordBytes,
@@ -221,6 +235,66 @@ export async function prepareSingleImageReviewPackageEvidence({
         bytes: file.bytes.length,
       })),
     );
+    if (hasTrustedSurveyorRegistry) {
+      for (const file of observationRecordFiles) {
+        const relativePath = surveyObservationAttributionAttestationPath(file.observationId);
+        const attestationBytes = await readStableWorkspaceFile(
+          root,
+          relativePath,
+          "Survey observation attribution attestation " + file.observationId,
+          32 * 1024,
+        );
+        const attestation = parseJson(attestationBytes, "Survey observation attribution attestation");
+        const result = verifySurveyObservationAttributionAttestation({
+          attestation,
+          recordBytes: file.bytes,
+          controlPointManifestBytes: manifestBytes,
+          observationId: file.observationId,
+          checkpointId: file.checkpointId,
+          buildingId,
+          trustedSurveyorRegistry,
+        });
+        if (!result.valid) {
+          throw new Error("Survey observation attribution signature verification failed for " +
+            file.observationId + ": " + result.errors.map((item) => item.id).join(","));
+        }
+        observationAttestationFiles.push({
+          artifactType: "single-image-survey-observation-attestation",
+          observationId: file.observationId,
+          checkpointId: file.checkpointId,
+          relativePath,
+          sha256: sha256(attestationBytes),
+          bytes: attestationBytes,
+          registryId: result.registryId,
+          surveyorId: result.surveyorId,
+          keyId: result.keyId,
+        });
+      }
+      observationAttestationInventory = buildSurveyObservationAttributionInventory(
+        observationAttestationFiles.map((file) => ({
+          observationId: file.observationId,
+          checkpointId: file.checkpointId,
+          relativePath: file.relativePath,
+          sha256: file.sha256,
+          bytes: file.bytes.length,
+        })),
+      );
+    } else {
+      // Do not silently omit present signatures from a package when the
+      // external trust registry was not supplied to verify them.
+      for (const file of observationRecordFiles) {
+        const sidecarPath = path.join(root, ...surveyObservationAttributionAttestationPath(file.observationId).split("/"));
+        try {
+          const info = await lstat(sidecarPath);
+          if (info.isSymbolicLink() || !info.isFile()) {
+            throw new TypeError("Survey observation attribution sidecar must be a regular file.");
+          }
+          throw new Error("Survey observation attribution sidecars exist but SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON was not supplied.");
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error;
+        }
+      }
+    }
   }
 
   const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
@@ -254,6 +328,15 @@ export async function prepareSingleImageReviewPackageEvidence({
       observationId: file.observationId,
     }));
   }
+  const observationAttestationBytesAfter = [];
+  for (const file of observationAttestationFiles) {
+    observationAttestationBytesAfter.push(await readStableWorkspaceFile(
+      root,
+      file.relativePath,
+      "Survey observation attribution attestation " + file.observationId,
+      32 * 1024,
+    ));
+  }
   if (after.model?.sha256 !== candidateGlbSha256 ||
       sha256(reportBytesAfter) !== sha256(reportBytes) ||
       sha256(receiptBytesAfter) !== sha256(receiptBytes) ||
@@ -262,7 +345,10 @@ export async function prepareSingleImageReviewPackageEvidence({
       observationRecordBytesAfter.some((record, index) =>
         record.relativePath !== observationRecordFiles[index].relativePath ||
         record.bytes.length !== observationRecordFiles[index].bytes.length ||
-        record.sha256 !== observationRecordFiles[index].sha256)) {
+        record.sha256 !== observationRecordFiles[index].sha256) ||
+      observationAttestationBytesAfter.some((bytes, index) =>
+        sha256(bytes) !== observationAttestationFiles[index].sha256 ||
+        !bytes.equals(observationAttestationFiles[index].bytes))) {
     throw new Error("Single-image smoke or survey observation evidence changed during review-package preparation.");
   }
 
@@ -278,13 +364,21 @@ export async function prepareSingleImageReviewPackageEvidence({
       sha256: file.sha256,
       bytes: file.bytes,
     })),
+    ...observationAttestationFiles.map((file) => ({
+      artifactType: file.artifactType,
+      observationId: file.observationId,
+      checkpointId: file.checkpointId,
+      relativePath: file.relativePath,
+      sha256: file.sha256,
+      bytes: file.bytes,
+    })),
   ];
   const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
   const hasVerticalCalibration = verticalEvidence?.status === "calibrated-needs-human-review";
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: hasIndependentCheckpoints ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -323,6 +417,14 @@ export async function prepareSingleImageReviewPackageEvidence({
         surveyObservationRecordBytes: observationRecordInventory.totalBytes,
         surveyObservationRecordsSha256: observationRecordInventory.sha256,
         surveyObservationRecords: observationRecordInventory.records,
+      } : {}),
+      ...(observationAttestationInventory ? {
+        surveyObservationAttestationCount: observationAttestationInventory.count,
+        surveyObservationAttestationBytes: observationAttestationInventory.totalBytes,
+        surveyObservationAttestationsSha256: observationAttestationInventory.sha256,
+        surveyObservationAttestations: observationAttestationInventory.entries,
+        surveyObservationAttributionStatus: "attribution-signatures-verified",
+        trustedSurveyorRegistryId: observationAttestationFiles[0]?.registryId ?? null,
       } : {}),
     } : {}),
     mapReady: false,
