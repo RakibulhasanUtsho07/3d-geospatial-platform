@@ -55,3 +55,12 @@ This stage validates deterministic calculations and internal evidence binding. I
 Synthetic tests prove only software behavior. They are not real-world accuracy, architectural fidelity, TripoSR/rembg inference, source rights or permission to publish.
 
 Keep `groundTruth`, `acceptanceEligible`, `publicationEligible`, `mapReady` and `automaticApproval` false. No Cesium publication is authorized by this increment.
+
+## Software validation — 2026-11-05
+
+- Validated code/test head: `66ae2f03f5bc9303d2734e7641039f4afa06c95b`.
+- Push Full CI [#41978812826](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41978812826) and PR Full CI [#41978818407](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41978818407) both completed successfully: 214/214 steps each, zero failures.
+- The offline review-package integrity suite passed 22/22 tests, including the end-to-end held-out 3D checkpoint package test. Both workflows also passed ESLint, production build, Chromium install, production viewport API checks, Dhaka tile/viewport benchmark suites and evidence uploads.
+- PR #363 remains Draft/open/unmerged, stacked on D3M-ENGINE-13 PR #362 at base `bc3b1d8242718f25250581819c9cc23d975d9581`. No promotion to `development` or `main`.
+
+This exact-head validation proves software behavior and evidence-byte binding only. It does not authenticate real GNSS/field-book records, surveyor identity or physical feature correspondence, and it is not real-world building accuracy evidence. Keep all release/publication flags false.
