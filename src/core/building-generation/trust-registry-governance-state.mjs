@@ -32,7 +32,7 @@ function canonicalJson(value) {
 }
 
 function parsePositiveInteger(value, label) {
-  const parsed = typeof value === "string" && /^(?:0|[1-9]\\d*)$/.test(value)
+  const parsed = typeof value === "string" && /^(?:0|[1-9]\d*)$/.test(value)
     ? Number(value)
     : value;
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
@@ -53,7 +53,7 @@ function assertIdentity({ registrySetId, governanceKeyFingerprintSha256 }) {
 
 function canonicalUtc(value) {
   if (typeof value !== "string" ||
-      !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value)) return false;
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
@@ -88,6 +88,9 @@ function validateState(value, identity) {
       value.governanceKeyFingerprintSha256 !== identity.governanceKeyFingerprintSha256) {
     throw new Error("Governance state belongs to a different registry set or pinned key.");
   }
+  if (typeof value.minimumAcceptedSequence !== "number") {
+    throw new TypeError("Persisted minimumAcceptedSequence must be a JSON number.");
+  }
   parsePositiveInteger(value.minimumAcceptedSequence, "minimumAcceptedSequence");
   if (!Number.isSafeInteger(value.revision) || value.revision < 0) {
     throw new TypeError("Governance state revision must be a non-negative safe integer.");
@@ -100,10 +103,12 @@ function validateState(value, identity) {
       throw new TypeError("Governance state field " + field + " is invalid.");
     }
   }
-  if (value.revision === 0 && value.previousStateSha256 !== null) {
+  if (value.revision === 0 && (value.previousStateSha256 !== null ||
+      value.lastAcceptedAttestationSha256 !== null || value.lastAcceptedSnapshotSha256 !== null)) {
     throw new TypeError("Initial governance state must not reference a previous state.");
   }
-  if (value.revision > 0 && value.previousStateSha256 === null) {
+  if (value.revision > 0 && (value.previousStateSha256 === null ||
+      value.lastAcceptedAttestationSha256 === null || value.lastAcceptedSnapshotSha256 === null)) {
     throw new TypeError("Advanced governance state must reference its previous state digest.");
   }
   const expectedDigest = sha256(Buffer.from(canonicalJson(statePayload(value)), "utf8"));
@@ -172,7 +177,7 @@ async function readStateFile(filePath, identity) {
       throw new TypeError("Governance state file JSON is invalid.");
     }
     const validated = validateState(value, identity);
-    if (bytes.toString("utf8") !== canonicalJson(validated) + "\\n") {
+    if (bytes.toString("utf8") !== canonicalJson(validated) + "\n") {
       throw new TypeError("Governance state file is not in canonical serialization form.");
     }
     return validated;
@@ -184,7 +189,7 @@ async function readStateFile(filePath, identity) {
 async function writeStateFile(filePath, state) {
   const directory = path.dirname(filePath);
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  const bytes = Buffer.from(canonicalJson(state) + "\\n", "utf8");
+  const bytes = Buffer.from(canonicalJson(state) + "\n", "utf8");
   if (bytes.length > MAX_TRUST_REGISTRY_GOVERNANCE_STATE_BYTES) {
     throw new RangeError("Governance state exceeds the permitted file size.");
   }
@@ -203,11 +208,13 @@ async function writeStateFile(filePath, state) {
   }
   try {
     await rename(temporaryPath, filePath);
-    const directoryHandle = await open(directory, constants.O_RDONLY);
-    try {
-      await directoryHandle.sync();
-    } finally {
-      await directoryHandle.close();
+    if (process.platform !== "win32") {
+      const directoryHandle = await open(directory, constants.O_RDONLY);
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
     }
   } catch (error) {
     try { await unlink(temporaryPath); } catch {}
@@ -237,7 +244,7 @@ async function withExclusiveLock(filePath, callback) {
     await handle.writeFile(canonicalJson({
       pid: process.pid,
       createdAtUtc: new Date().toISOString(),
-    }) + "\\n");
+    }) + "\n");
     await handle.sync();
     const stat = await handle.stat({ bigint: true });
     lockIdentity = { dev: stat.dev, ino: stat.ino };
