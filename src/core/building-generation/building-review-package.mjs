@@ -324,6 +324,8 @@ export function buildBuildingReviewPackageManifest({
       surveyObservationRecordsValid = false;
       surveyObservationAttestationsValid = false;
       surveyObservationDeviceAttestationsValid = false;
+      surveyDeviceEnrollmentEvidenceValid = false;
+      trustRegistrySnapshotValid = false;
     }
     const verticalMetadataValid = hasVerticalCalibration
       ? singleImageEvidence.verticalDatum === "EPSG:4979-ellipsoidal" &&
@@ -362,7 +364,7 @@ export function buildBuildingReviewPackageManifest({
         singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
         !verticalMetadataValid || !checkpointMetadataValid || !surveyObservationRecordsValid || !surveyObservationAttestationsValid ||
         !surveyObservationDeviceAttestationsValid ||
-        !surveyDeviceEnrollmentEvidenceValid ||
+        !surveyDeviceEnrollmentEvidenceValid || !trustRegistrySnapshotValid ||
         singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
         singleImageEvidence.automaticApproval !== false ||
         singleImageEvidence.candidateGlbSha256.toLowerCase() !==
