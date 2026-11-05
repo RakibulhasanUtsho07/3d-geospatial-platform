@@ -108,6 +108,11 @@ test("bootstraps once and advances state with a distinct independently checked a
   assert.equal(restarted.created, false);
   assert.equal(restarted.state.stateSha256, advanced.state.stateSha256);
   assert.equal(restarted.version, advanced.version);
+
+  const restartedWithoutBootstrapFloor = await store.loadOrInitialize({ ...IDENTITY });
+  assert.equal(restartedWithoutBootstrapFloor.created, false);
+  assert.equal(restartedWithoutBootstrapFloor.state.stateSha256, advanced.state.stateSha256);
+  assert.equal(restartedWithoutBootstrapFloor.version, advanced.version);
 });
 
 test("requires an operator bootstrap floor and never silently resets missing provider state", async () => {
