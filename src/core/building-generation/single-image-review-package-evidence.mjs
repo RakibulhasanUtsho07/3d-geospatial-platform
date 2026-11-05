@@ -3,6 +3,7 @@ import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageRuntimeSmoke } from "./verify-single-image-runtime-smoke.mjs";
+import { collectSingleImageSurveyObservationRecords } from "./single-image-survey-observation-records.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -130,6 +131,14 @@ export async function prepareSingleImageReviewPackageEvidence({
   const workflowReport = parseJson(workflowBytes, "Generation workflow report");
   const manifestPath = safeRelativePath(report.georeferenceEvidence.manifest.path, "Control-point manifest path");
   const manifestBytes = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
+  const rawControlManifest = parseJson(manifestBytes, "Control-point manifest");
+  const hasCheckpointManifest = report.georeferenceEvidence?.schemaVersion === "1.2.0";
+  const surveyObservationRecords = hasCheckpointManifest
+    ? await collectSingleImageSurveyObservationRecords({
+      workspaceRoot: root,
+      checkpoints: rawControlManifest.heldOutCheckpoints?.points,
+    })
+    : null;
 
   const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
   if (receipt.schemaVersion !== expectedReceiptSchema || receipt.payload?.georeference === undefined ||
@@ -155,11 +164,19 @@ export async function prepareSingleImageReviewPackageEvidence({
   const receiptBytesAfter = await readStableWorkspaceFile(root, receiptPath, "Generation artifact receipt", MAX_RECEIPT_BYTES);
   const workflowBytesAfter = await readStableWorkspaceFile(root, workflowPath, "Generation workflow report", MAX_WORKFLOW_BYTES);
   const manifestBytesAfter = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
+  const surveyObservationRecordsAfter = surveyObservationRecords
+    ? await collectSingleImageSurveyObservationRecords({
+      workspaceRoot: root,
+      checkpoints: rawControlManifest.heldOutCheckpoints?.points,
+    })
+    : null;
   if (after.model?.sha256 !== candidateGlbSha256 ||
       sha256(reportBytesAfter) !== sha256(reportBytes) ||
       sha256(receiptBytesAfter) !== sha256(receiptBytes) ||
       sha256(workflowBytesAfter) !== sha256(workflowBytes) ||
-      sha256(manifestBytesAfter) !== sha256(manifestBytes)) {
+      sha256(manifestBytesAfter) !== sha256(manifestBytes) ||
+      surveyObservationRecordsAfter?.inventorySha256 !== surveyObservationRecords?.inventorySha256 ||
+      surveyObservationRecordsAfter?.totalBytes !== surveyObservationRecords?.totalBytes) {
     throw new Error("Single-image smoke evidence changed during review-package preparation.");
   }
 
@@ -168,13 +185,14 @@ export async function prepareSingleImageReviewPackageEvidence({
     addFile("single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", receiptBytes),
     addFile("single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes),
     addFile("single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes),
+    ...(surveyObservationRecords?.files ?? []),
   ];
   const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
   const hasVerticalCalibration = verticalEvidence?.status === "calibrated-needs-human-review";
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: hasIndependentCheckpoints ? "1.2.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: hasIndependentCheckpoints ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -208,6 +226,9 @@ export async function prepareSingleImageReviewPackageEvidence({
       checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
       checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
       checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
+      surveyObservationRecordCount: surveyObservationRecords.count,
+      surveyObservationRecordTotalBytes: surveyObservationRecords.totalBytes,
+      surveyObservationRecordInventorySha256: surveyObservationRecords.inventorySha256,
     } : {}),
     mapReady: false,
     publicationEligible: false,

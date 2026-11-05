@@ -5,6 +5,7 @@ import { reviewGlbTextureBindings } from "./glb-texture-binding-qa.mjs";
 import { buildBuildingAccuracyBenchmark } from "./building-accuracy-benchmark.mjs";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageGeoreferenceEvidenceBytes } from "./single-image-georeference-evidence.mjs";
+import { verifyPackagedSingleImageSurveyObservationRecords } from "./single-image-survey-observation-records.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -400,8 +401,10 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
   ];
   const singleImageItems = singleImageTypes.map((type) => artifact(type));
   const singleImagePresent = singleImageItems.filter(Boolean).length;
+  const surveyRecordArtifacts = packageManifest.artifacts.filter((item) =>
+    item?.artifactType === "single-image-survey-observation-record");
   if (packageManifest.singleImageEvidence === undefined) {
-    check("single-image-evidence-group-absent-or-complete", singleImagePresent === 0,
+    check("single-image-evidence-group-absent-or-complete", singleImagePresent === 0 && surveyRecordArtifacts.length === 0,
       "Single-image georeference artifacts must not be partially included without signed package metadata.");
   } else {
     const metadata = packageManifest.singleImageEvidence;
@@ -409,7 +412,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0"].includes(metadata.schemaVersion)) {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
@@ -434,7 +437,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
       const expectedReceiptSchema = smokeReport.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
       const verticalEvidence = georeference.verticalEvidence ?? null;
       const checkpointEvidence = georeference.independentCheckpointEvidence ?? null;
-      const verticalMetadataMatches = ["1.1.0", "1.2.0"].includes(metadata.schemaVersion)
+      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0"].includes(metadata.schemaVersion)
         ? metadata.verticalDatum === "EPSG:4979-ellipsoidal" &&
           verticalEvidence?.status === "calibrated-needs-human-review" &&
           metadata.verticalStatus === verticalEvidence.status &&
@@ -451,7 +454,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
         : metadata.schemaVersion === "1.0.0" &&
           metadata.verticalDatum === "not-solved" &&
           verticalEvidence === null;
-      const checkpointMetadataMatches = metadata.schemaVersion === "1.2.0"
+      const checkpointMetadataMatches = ["1.2.0", "1.3.0"].includes(metadata.schemaVersion)
         ? checkpointEvidence?.status === "validated-needs-human-review" &&
           metadata.checkpointValidationStatus === checkpointEvidence.status &&
           metadata.checkpointEvidenceSha256 === digest(Buffer.from(canonicalJson(checkpointEvidence), "utf8")) &&
@@ -471,6 +474,26 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           checkpointEvidence.controls?.thresholdPass === true
         : checkpointEvidence === null &&
           !Object.keys(metadata).some((key) => key.startsWith("checkpoint"));
+
+      let surveyObservationRecordsMatch = false;
+      if (metadata.schemaVersion === "1.3.0") {
+        const parsedControlManifest = JSON.parse(manifestBytes.toString("utf8"));
+        const verifiedRecords = verifyPackagedSingleImageSurveyObservationRecords({
+          checkpoints: parsedControlManifest.heldOutCheckpoints?.points,
+          packageArtifacts: packageManifest.artifacts,
+          actualFiles,
+          expectedCount: metadata.surveyObservationRecordCount,
+          expectedTotalBytes: metadata.surveyObservationRecordTotalBytes,
+          expectedInventorySha256: metadata.surveyObservationRecordInventorySha256,
+        });
+        surveyObservationRecordsMatch =
+          verifiedRecords.count === metadata.checkpointCount &&
+          verifiedRecords.totalBytes === metadata.surveyObservationRecordTotalBytes &&
+          verifiedRecords.inventorySha256 === metadata.surveyObservationRecordInventorySha256;
+      } else {
+        surveyObservationRecordsMatch = surveyRecordArtifacts.length === 0 &&
+          !Object.keys(metadata).some((key) => key.startsWith("surveyObservationRecord"));
+      }
 
       if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
           smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
@@ -556,7 +579,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           metadata.generationArtifactReceiptSha256 !== receiptArtifact.sha256 ||
           metadata.workflowReportSha256 !== workflowArtifact.sha256 ||
           !verticalMetadataMatches ||
-          !checkpointMetadataMatches ||
+          !checkpointMetadataMatches || !surveyObservationRecordsMatch ||
           metadata.mapReady !== false || metadata.publicationEligible !== false ||
           metadata.automaticApproval !== false) {
         throw new Error("single-image-evidence-cross-binding-failed");
@@ -570,7 +593,9 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
         modelSha256: candidate.sha256,
       });
       passed = true;
-      detail = checkpointEvidence
+      detail = metadata.schemaVersion === "1.3.0"
+        ? "Opaque held-out survey observation-record bytes were independently re-hashed and cross-bound to the checkpoint manifest."
+        : checkpointEvidence
         ? "Exact smoke, generation receipt, workflow report and control-point bytes are bound to this candidate; horizontal/vertical fitting and held-out 3D checkpoint evidence were independently recomputed from the packaged manifest."
         : "Exact smoke, generation receipt, workflow report and control-point bytes are bound to this candidate; horizontal registration was independently recomputed from the packaged manifest.";
     } catch (error) {
