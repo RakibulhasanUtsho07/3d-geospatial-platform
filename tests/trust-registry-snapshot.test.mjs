@@ -113,6 +113,7 @@ test("verifies the complete inventory and rejects tampered snapshot metadata", (
     { ...metadata, trustRegistrySnapshotCount: 2 },
     { ...metadata, trustRegistrySnapshotBytes: metadata.trustRegistrySnapshotBytes + 1 },
     { ...metadata, trustRegistrySnapshotsSha256: "f".repeat(64) },
+    { ...metadata, trustedSurveyorRegistryId: "wrong-surveyor-registry" },
     { ...metadata, trustRegistrySnapshots: metadata.trustRegistrySnapshots.map((entry, i) =>
       i === 1 ? { ...entry, sha256: "e".repeat(64) } : entry) },
     { ...metadata, trustRegistrySnapshots: [...metadata.trustRegistrySnapshots].reverse() },
