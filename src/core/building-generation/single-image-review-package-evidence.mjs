@@ -28,6 +28,7 @@ import {
   MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
   MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES,
 } from "./survey-device-enrollment-evidence.mjs";
+import { buildTrustRegistrySnapshotInventory } from "./trust-registry-snapshot.mjs";
 import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
@@ -365,6 +366,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   }
   const enrollmentEvidenceFiles = [];
   let enrollmentEvidenceInventory = null;
+  let trustRegistrySnapshotInventory = null;
   const distinctDevices = new Map();
   for (const sidecar of observationDeviceAttestationFiles) {
     const existing = distinctDevices.get(sidecar.deviceId);
@@ -408,6 +410,11 @@ export async function prepareSingleImageReviewPackageEvidence({
       authorityId: file.authorityId, authorityType: file.authorityType, authorityRegistryId: file.authorityRegistryId,
     })));
     if (enrollmentEvidenceFiles.length !== enrollmentDirectoryEntries.length) throw new Error("Device enrollment evidence directory inventory is incomplete or contains orphaned files.");
+    trustRegistrySnapshotInventory = buildTrustRegistrySnapshotInventory({
+      trustedSurveyorRegistry,
+      trustedDeviceRegistry,
+      trustedEnrollmentAuthorityRegistry,
+    });
   } else if (enrollmentDirectoryEntries.length > 0) {
     throw new Error("Device enrollment evidence files exist but SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON was not supplied.");
   }
@@ -514,7 +521,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: enrollmentEvidenceInventory ? "1.6.0" : observationDeviceAttestationInventory ? "1.5.0" : observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: trustRegistrySnapshotInventory ? "1.7.0" : enrollmentEvidenceInventory ? "1.6.0" : observationDeviceAttestationInventory ? "1.5.0" : observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -577,6 +584,13 @@ export async function prepareSingleImageReviewPackageEvidence({
         surveyDeviceEnrollmentEvidence: enrollmentEvidenceInventory.entries,
         surveyDeviceEnrollmentEvidenceStatus: "enrollment-authority-evidence-verified",
         trustedSurveyDeviceEnrollmentAuthorityRegistryId: enrollmentEvidenceFiles[0]?.authorityRegistryId ?? null,
+      } : {}),
+      ...(trustRegistrySnapshotInventory ? {
+        trustRegistrySnapshotSchemaVersion: trustRegistrySnapshotInventory.schemaVersion,
+        trustRegistrySnapshotCount: trustRegistrySnapshotInventory.count,
+        trustRegistrySnapshotBytes: trustRegistrySnapshotInventory.totalBytes,
+        trustRegistrySnapshotsSha256: trustRegistrySnapshotInventory.sha256,
+        trustRegistrySnapshots: trustRegistrySnapshotInventory.entries,
       } : {}),
     } : {}),
     mapReady: false,
