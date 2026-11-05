@@ -72,10 +72,13 @@ function validateWriteResult(value, flag, identity, label) {
   return { [flag]: value[flag], ...snapshot };
 }
 
-function assertBootstrapFloor(state, bootstrapMinimumSequence) {
+function assertBootstrapFloor(state, bootstrapMinimumSequence, { required = false } = {}) {
   if (bootstrapMinimumSequence === null || bootstrapMinimumSequence === undefined ||
       bootstrapMinimumSequence === "") {
-    throw new Error("External governance state bootstrap requires an explicit operator minimum sequence.");
+    if (required) {
+      throw new Error("External governance state bootstrap requires an explicit operator minimum sequence.");
+    }
+    return;
   }
   const floor = Number(bootstrapMinimumSequence);
   if (!Number.isSafeInteger(floor) || floor < 1) {
@@ -132,6 +135,9 @@ export function createExternalTrustRegistryGovernanceStateStore({ provider }) {
         assertBootstrapFloor(existing.state, bootstrapMinimumSequence);
         return { state: existing.state, version: existing.version, created: false, providerId };
       }
+      if (bootstrapMinimumSequence === null || bootstrapMinimumSequence === undefined || bootstrapMinimumSequence === "") {
+        throw new Error("External governance state bootstrap requires an explicit operator minimum sequence.");
+      }
       const initialState = createTrustRegistryGovernanceInitialState({
         ...identity,
         bootstrapMinimumSequence,
@@ -146,7 +152,7 @@ export function createExternalTrustRegistryGovernanceStateStore({ provider }) {
       if (result.created && result.state.stateSha256 !== initialState.stateSha256) {
         throw new Error("External governance provider initialized a different state than requested.");
       }
-      assertBootstrapFloor(result.state, bootstrapMinimumSequence);
+      assertBootstrapFloor(result.state, bootstrapMinimumSequence, { required: true });
       return { state: result.state, version: result.version, created: result.created, providerId };
     },
 
