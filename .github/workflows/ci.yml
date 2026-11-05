@@ -97,6 +97,7 @@ on:
       - feat/d3m-engine13-ellipsoidal-height-evidence-20261104
       - feat/d3m-engine14-independent-3d-checkpoints-20261104
       - feat/d3m-engine15-byte-verified-survey-records-20261105
+      - feat/d3m-engine16-surveyor-record-attestations-20261105
 
   workflow_dispatch:
   pull_request:
