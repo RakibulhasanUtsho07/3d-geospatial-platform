@@ -575,3 +575,18 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - **Exact-head validation:** PR Full CI [#41993614343](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41993614343) has passed ESLint, offline review-package integrity (including D3M-16 signed sidecar e2e), D3M-16 registry/signature regression and signing CLI help validation. Push Full CI [#41993606995](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41993606995) is running. Both runs target exact code head `abb058b36a33e1badd89d1ee1f133922f5e019c9`; terminal Full CI results remain pending.
 - **External production blockers:** no real surveyor identity/key is provisioned and no genuine surveyor-signed field record has been received. Organization-led identity/qualification onboarding and external registry deployment remain required.
 - All release/publication flags remain false. PRs #363 and #366 remain Draft/open/unmerged; PR #368 remains Draft/open/unmerged and stacked on #366. No promotion to `development` or `main`.
+
+
+## D3M-ENGINE-17 — trusted survey-device key association (2026-11-05)
+
+**Tracking:** [Issue #369](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/369)  
+**Implementation branch:** `feat/d3m-engine17-device-record-attestations-20261105`  
+**Stack base:** D3M-ENGINE-16 PR #368 exact head `99863add8b32a70d693930afa3195d256b4b4e21`.
+
+D3M-15 preserves exact original held-out observation bytes; D3M-16 separately verifies a surveyor-key attribution signature. D3M-17 adds a distinct device-key association statement over the same record bytes, manifest hash, observation/checkpoint/building context and an external device enrollment registry.
+
+The external registry is public-key-only and separate from reviewer and surveyor trust. It contains opaque device/manufacturer/model identifiers, an organization-keyed HMAC-SHA-256 device serial commitment digest, an enrollment-evidence digest, Ed25519 public keys, bounded validity/revocation and linear key rotation. The new sidecar path is `evidence/survey-observations/<observationId>.device-attestation.json`; the package metadata version is 1.5.0 when both D3M-16 and D3M-17 registries and sidecars are verified. Legacy package schemas 1.0.0–1.4.0 remain unchanged.
+
+**Trust boundary:** the external enrollment authority is responsible for generating a non-reversible, keyed serial commitment and validating enrollment records. This code verifies the supplied digest binding, registry lifecycle and signature; it does not validate a manufacturer certificate, secure element, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy. Do not treat an enrollment-evidence digest as a certificate chain. CI uses synthetic keys only. All publication/map-ready/automatic-approval flags remain false.
+
+D3M-17 stays stacked on #368 and must not be merged or promoted independently of D3M-14/#363, D3M-15/#366 and D3M-16/#368. Exact-head CI and package-level negative tests are required before considering this increment validated.
