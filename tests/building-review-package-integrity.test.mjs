@@ -18,6 +18,7 @@ import { verifyBuildingReviewPackage } from "../src/core/building-generation/bui
 import {
   buildSingleImageSurveyObservationRecordInventory,
   singleImageSurveyObservationRecordPath,
+  MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
 } from "../src/core/building-generation/single-image-survey-observation-records.mjs";
 import {
   createSingleImageGeoreferenceEvidence,
@@ -955,4 +956,55 @@ test("binds original held-out survey record bytes through the complete review pa
   });
   assert.equal(driftedReport.valid, false);
   assert.ok(driftedReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+});
+
+
+test("canonical survey observation inventory is deterministic, bounded and rejects unsafe records", () => {
+  const records = Array.from({ length: 6 }, (_, index) => {
+    const observationId = "obs-" + (index + 1);
+    return {
+      observationId,
+      relativePath: singleImageSurveyObservationRecordPath(observationId),
+      sha256: String(index + 1).repeat(64),
+      bytes: 128 + index,
+    };
+  });
+  const first = buildSingleImageSurveyObservationRecordInventory(records);
+  const reversed = buildSingleImageSurveyObservationRecordInventory([...records].reverse());
+  assert.equal(first.sha256, reversed.sha256);
+  assert.equal(first.count, 6);
+  assert.equal(first.totalBytes, records.reduce((sum, item) => sum + item.bytes, 0));
+  assert.deepEqual(first.records.map((item) => item.observationId),
+    ["obs-1", "obs-2", "obs-3", "obs-4", "obs-5", "obs-6"]);
+
+  assert.throws(() => singleImageSurveyObservationRecordPath("../outside"), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory([
+    ...records,
+    { ...records[0] },
+  ]), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, relativePath: "evidence/other.record" } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, sha256: "z".repeat(64) } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, bytes: MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES + 1 } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    Array.from({ length: 9 }, (_, index) => ({
+      observationId: "large-" + (index + 1),
+      relativePath: singleImageSurveyObservationRecordPath("large-" + (index + 1)),
+      sha256: String(index + 1).repeat(64),
+      bytes: MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+    })),
+  ), /aggregate limit/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    Array.from({ length: 101 }, (_, index) => ({
+      observationId: "many-" + (index + 1),
+      relativePath: singleImageSurveyObservationRecordPath("many-" + (index + 1)),
+      sha256: "a".repeat(64),
+      bytes: 1,
+    })),
+  ), /6–100/i);
 });
