@@ -15,6 +15,7 @@ import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-re
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
+import { verifyBuildingReviewPackageDirectory } from "../src/core/building-generation/building-review-package-directory.mjs";
 import { readStableSingleImageSurveyObservationRecord } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
 import {
   buildSingleImageSurveyObservationRecordInventory,
@@ -1789,6 +1790,85 @@ test("binds original held-out survey record bytes through the complete review pa
     trustRegistryGovernanceNow: registryNow,
   });
   assert.equal(tamperedGovernanceReport.valid, false);
+
+  // D3M-22: persist the accepted governance floor across offline verifier restarts.
+  const governedDirectory = path.join(root, "governed-review-package");
+  await mkdir(governedDirectory, { recursive: true });
+  for (const file of enrolledActualFiles) {
+    const destination = path.join(governedDirectory, ...file.relativePath.split("/"));
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, file.content, { flag: "wx" });
+  }
+  const directoryManifestPath = path.join(governedDirectory, "package-manifest.json");
+  await writeFile(directoryManifestPath, JSON_BYTES(governedPackageManifest), { flag: "wx" });
+  const stateFilePath = path.join(root, "operator-trust", "governance-state.json");
+  const directoryVerifyArgs = {
+    ...trustRegistryRaw,
+    trustRegistryGovernanceAttestation: governanceAttestation,
+    trustRegistryGovernancePublicKeyPem: governancePublicKeyPem,
+    minimumTrustRegistrySequence: 40,
+    trustRegistryGovernanceStateFilePath: stateFilePath,
+    trustRegistryGovernanceNow: registryNow,
+  };
+  const firstDirectoryVerification = await verifyBuildingReviewPackageDirectory(
+    governedDirectory,
+    directoryVerifyArgs,
+  );
+  assert.equal(firstDirectoryVerification.integrity.valid, true,
+    JSON.stringify(firstDirectoryVerification.integrity.errors));
+  assert.equal(firstDirectoryVerification.governanceState.minimumAcceptedSequence, 41);
+  assert.equal(firstDirectoryVerification.governanceState.revision, 1);
+
+  const restartedDirectoryVerification = await verifyBuildingReviewPackageDirectory(
+    governedDirectory,
+    directoryVerifyArgs,
+  );
+  assert.equal(restartedDirectoryVerification.integrity.valid, true,
+    JSON.stringify(restartedDirectoryVerification.integrity.errors));
+  assert.equal(restartedDirectoryVerification.governanceState.minimumAcceptedSequence, 41);
+  assert.equal(restartedDirectoryVerification.governanceState.revision, 1);
+
+  const staleGovernanceAttestation = signTrustRegistryGovernanceAttestation({
+    snapshotInventory: trustRegistryInventory,
+    registrySetId: "survey-trust-q4-2026",
+    sequence: 40,
+    issuedAtUtc: registryNow.toISOString(),
+    expiresAtUtc: governanceExpiresAt,
+    governanceKeyId: "synthetic-trust-governance-root-01",
+    privateKey: governancePair.privateKey,
+  });
+  const staleGovernanceResult = verifyTrustRegistryGovernanceAttestation({
+    attestation: staleGovernanceAttestation,
+    governancePublicKeyPem,
+    minimumSequence: 40,
+    snapshotInventory: trustRegistryInventory,
+    now: registryNow,
+  });
+  assert.equal(staleGovernanceResult.valid, true);
+  const stalePackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: enrolledPackageManifest.artifacts,
+    singleImageEvidence: {
+      ...snapshotEvidence,
+      schemaVersion: "1.8.0",
+      trustRegistryGovernance: staleGovernanceResult.metadata,
+    },
+    generatedAt: registryNow.toISOString(),
+  });
+  await writeFile(directoryManifestPath, JSON_BYTES(stalePackageManifest));
+  const staleDirectoryVerification = await verifyBuildingReviewPackageDirectory(
+    governedDirectory,
+    {
+      ...directoryVerifyArgs,
+      trustRegistryGovernanceAttestation: staleGovernanceAttestation,
+    },
+  );
+  assert.equal(staleDirectoryVerification.integrity.valid, false);
+  assert.ok(staleDirectoryVerification.integrity.errors.some((item) =>
+    item.message.includes("trust-registry-governance-verification-failed")));
+  assert.equal(staleDirectoryVerification.governanceState.minimumAcceptedSequence, 41);
 });
 
 
