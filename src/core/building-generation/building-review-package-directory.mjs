@@ -181,6 +181,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
   trustRegistryGovernancePublicKeyPem = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_PUBLIC_KEY_PEM ?? null,
   minimumTrustRegistrySequence = process.env.SURVEY_TRUST_REGISTRY_MINIMUM_SEQUENCE ?? null,
   trustRegistryGovernanceStateFilePath = process.env.SURVEY_TRUST_REGISTRY_GOVERNANCE_STATE_FILE || null,
+  trustRegistryGovernanceNow = undefined,
 } = {}) {
   const snapshot = await readBuildingReviewPackageDirectory(directoryArg);
   const governance = snapshot.packageManifest?.singleImageEvidence?.schemaVersion === "1.8.0"
@@ -202,6 +203,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
       registrySetId: governance.registrySetId,
       governanceKeyFingerprintSha256: pinnedFingerprint,
       bootstrapMinimumSequence: minimumTrustRegistrySequence,
+      now: trustRegistryGovernanceNow,
     });
     governanceState = loaded.state;
     const configuredFloor = minimumTrustRegistrySequence === null ||
@@ -223,6 +225,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
     trustRegistryGovernanceAttestation,
     trustRegistryGovernancePublicKeyPem,
     minimumTrustRegistrySequence: effectiveMinimumSequence,
+    trustRegistryGovernanceNow,
   });
 
   if (integrity.valid && governance && governanceState && trustRegistryGovernanceStateFilePath) {
@@ -235,6 +238,7 @@ export async function verifyBuildingReviewPackageDirectory(directoryArg, {
         acceptedSequence: governance.sequence,
         acceptedAttestationSha256: governance.attestationSha256,
         acceptedSnapshotSha256: governance.snapshotSha256,
+        now: trustRegistryGovernanceNow,
       });
       governanceState = advanced.state;
     } catch (error) {
