@@ -590,3 +590,11 @@ The external registry is public-key-only and separate from reviewer and surveyor
 **Trust boundary:** the external enrollment authority is responsible for generating a non-reversible, keyed serial commitment and validating enrollment records. This code verifies the supplied digest binding, registry lifecycle and signature; it does not validate a manufacturer certificate, secure element, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy. Do not treat an enrollment-evidence digest as a certificate chain. CI uses synthetic keys only. All publication/map-ready/automatic-approval flags remain false.
 
 D3M-17 stays stacked on #368 and must not be merged or promoted independently of D3M-14/#363, D3M-15/#366 and D3M-16/#368. Exact-head CI and package-level negative tests are required before considering this increment validated.
+
+
+### D3M-ENGINE-17 validation addendum — 2026-11-05
+
+- **Exact-head software validation passed:** code/test head `0cbfd93de9886ad2bfe7d6dfe86d64405750823d`; Push Full CI [#41999290514](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41999290514) and PR Full CI [#41999297857](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/41999297857) both completed successfully with 218/218 steps and zero failed/cancelled steps. Both exact-head runs include device registry/signature tests, end-to-end package-integrity regression, CLI validation, ESLint, production build, Chromium and production viewport API/browser verification.
+- The initial signature failure was traced to the trusted registry parser storing the `publicKey` helper instead of the parsed Ed25519 `KeyObject`; the parser now stores `publicKey: key`. Focused registry/signature tests and package-integrity regression pass.
+- Trust boundary remains unchanged: CI uses synthetic keys; no manufacturer certificate, secure-element custody, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy is proven. All publication/map-ready/automatic-approval flags remain false.
+- PR #370 remains Draft/open/unmerged, stacked on #368. Do not promote this stack to `development` or `main` before independent review and external enrollment evidence.
