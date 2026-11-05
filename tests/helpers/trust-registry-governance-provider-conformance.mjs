@@ -146,6 +146,8 @@ export async function runTrustRegistryGovernanceProviderConformance({
   // A provider-specific integration may implement reopenProvider across a process boundary.
   const reopenedProvider = await reopenProvider();
   assertProvider(reopenedProvider, "reopened provider");
+  assert.notEqual(reopenedProvider, provider,
+    "reopenProvider must return a newly constructed client object");
   assert.equal(reopenedProvider.providerId, provider.providerId,
     "a reopened client must address the same provider identity");
   const reloaded = assertSnapshot(
