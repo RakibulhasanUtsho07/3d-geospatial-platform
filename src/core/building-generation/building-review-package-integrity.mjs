@@ -67,6 +67,7 @@ export function verifyBuildingReviewPackage({
   trustRegistryGovernanceAttestation = null,
   trustRegistryGovernancePublicKeyPem = null,
   minimumTrustRegistrySequence = null,
+  trustRegistryGovernanceNow = undefined,
 }) {
   if (!isObject(packageManifest) || packageManifest.schemaVersion !== "1.0.0" ||
     packageManifest.engine !== "building-review-package-v1" ||
@@ -756,6 +757,7 @@ export function verifyBuildingReviewPackage({
             governancePublicKeyPem: trustRegistryGovernancePublicKeyPem,
             minimumSequence: minimumTrustRegistrySequence,
             snapshotInventory: snapshotResult.recomputed,
+            now: trustRegistryGovernanceNow,
           });
           trustRegistryGovernanceMetadataMatches =
             governanceResult.valid &&
