@@ -18,7 +18,7 @@ Full CI runs the conformance suite on D3M-24 push and pull-request branches.
 
 ## What the reusable harness checks
 
-`runTrustRegistryGovernanceProviderConformance({ provider })` lives in `tests/helpers/trust-registry-governance-provider-conformance.mjs`. It uses a fresh registry-set identity containing a random UUID and a derived public-key fingerprint. It never targets a configured production registry identity.
+`runTrustRegistryGovernanceProviderConformance({ provider, reopenProvider })` lives in `tests/helpers/trust-registry-governance-provider-conformance.mjs`. It uses a fresh registry-set identity containing a random UUID and a derived public-key fingerprint. It never targets a configured production registry identity. The required `reopenProvider()` callback must construct a fresh client against the same isolated backend; a provider-specific integration can implement it across an actual process boundary.
 
 The suite requires the provider to implement:
 
