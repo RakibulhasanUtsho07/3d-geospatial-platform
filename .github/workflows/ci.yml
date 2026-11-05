@@ -644,6 +644,9 @@ jobs:
       - name: Test registry-bound Ed25519 review package signatures and CLI
         run: npm run test:building-review-package-signature
 
+      - name: Test trusted-surveyor registry and observation attribution signatures
+        run: npm run test:survey-observation-attribution
+
       - name: Validate signed review package verification CLI
         run: npm run verify:signed-building-review-package -- --help
 
