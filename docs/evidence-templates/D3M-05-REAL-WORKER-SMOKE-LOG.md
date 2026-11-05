@@ -151,3 +151,21 @@ Only smoke schema `1.3.0` requires and can report the source-image loader receip
 | Receipt binds independent GLB geometry-QA summary | `yes` / `no` / `not-recorded` |
 
 Keep receipt/report files in the restricted worker workspace. Record hashes and relative paths only; do not place source images, GLBs, model weights, absolute worker/cache paths or raw logs in Git. A valid local hash-bound receipt is not a signature, tamper-proof storage, real-world accuracy result or release approval.
+
+ 
+## Held-out survey observation record bytes (D3M-ENGINE-15)
+
+This section applies only when a D3M-14 schema 1.2.0 held-out checkpoint set is supplied and a D3M-15 review package is created.
+
+| Field | Value |
+|---|---|
+| Record hand-off status | `verified` / `blocked` / `not-requested-legacy-package` |
+| Expected held-out observation count | `NOT-RECORDED` |
+| Packaged record count | `NOT-RECORDED` |
+| Aggregate record bytes | `NOT-RECORDED` |
+| Canonical inventory SHA-256 | `NOT-RECORDED` |
+| Deterministic record directory | `evidence/survey-observations/<observationId>.record` |
+| Exact record SHA-256 matched each checkpoint declaration | `yes` / `no` / `not-run` |
+| Offline review-package record verification | `verified` / `rejected` / `not-run` |
+
+The package includes opaque original record bytes; they are not interpreted or rewritten. Limits are 8 MiB per record and 64 MiB total. Hash equality proves byte identity only and does not authenticate the surveyor, GNSS receiver, source or coordinate reference. Do not commit observation records outside an authorized review package or upload private field-book data to public GitHub.
