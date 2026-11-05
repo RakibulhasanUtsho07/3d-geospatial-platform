@@ -125,7 +125,7 @@ export function parseTrustedSurveyDeviceRegistry(input, {now: nowInput} = {}) {
       if (revoked<from || revoked>current || revoked>until) throw new RangeError("Device key revocation must occur inside its validity window and not in the future.");
     }
     if (e.replacesKeyId!==null) safeId(e.replacesKeyId,"replacesKeyId");
-    parsed.push(Object.freeze({...e,publicKey,keyFingerprintSha256:fp,registryId:registry.registryId,registryIssuedAtUtc:registry.issuedAtUtc,registryExpiresAtUtc:registry.expiresAtUtc}));
+    parsed.push(Object.freeze({...e,publicKey:key,keyFingerprintSha256:fp,registryId:registry.registryId,registryIssuedAtUtc:registry.issuedAtUtc,registryExpiresAtUtc:registry.expiresAtUtc}));
   }
   for (const [id,count] of activeByDevice) if(count!==1) throw new TypeError("Device "+id+" must have at most one active key.");
   const byId=new Map(parsed.map(e=>[e.keyId,e])), children=new Map();
