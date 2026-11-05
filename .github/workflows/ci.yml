@@ -647,6 +647,9 @@ jobs:
       - name: Test trusted-surveyor registry and observation attribution signatures
         run: npm run test:survey-observation-attribution
 
+      - name: Validate survey observation attribution signing CLI
+        run: npm run sign:survey-observation-attribution -- --help
+
       - name: Validate signed review package verification CLI
         run: npm run verify:signed-building-review-package -- --help
 
