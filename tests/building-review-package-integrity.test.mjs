@@ -27,6 +27,11 @@ import {
 } from "../src/core/building-generation/single-image-georeference-evidence.mjs";
 import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
 import {
+  buildSurveyObservationAttributionInventory,
+  createSurveyObservationAttributionAttestation,
+  surveyObservationAttributionAttestationPath,
+} from "../src/core/building-generation/survey-observation-attribution-attestation.mjs";
+import {
   signBuildingReviewPackageManifest,
   signBuildingReviewPackageManifestWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
@@ -957,6 +962,189 @@ test("binds original held-out survey record bytes through the complete review pa
   });
   assert.equal(driftedReport.valid, false);
   assert.ok(driftedReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+
+  // D3M-16: convert the exact D3M-15 byte-only package into a schema 1.4.0
+  // package using ephemeral test keys and detached per-observation sidecars.
+  const surveyorPair = generateKeyPairSync("ed25519");
+  const surveyorPrivateKeyPem = surveyorPair.privateKey.export({
+    type: "pkcs8", format: "pem",
+  }).toString();
+  const surveyorPublicKeyPem = surveyorPair.publicKey.export({
+    type: "spki", format: "pem",
+  }).toString();
+  const trustedSurveyorRegistry = {
+    schemaVersion: "1.0.0",
+    recordType: "trusted-surveyor-public-key-registry",
+    registryId: "synthetic-surveyors-test-registry",
+    issuedAtUtc: "2026-11-01T00:00:00.000Z",
+    expiresAtUtc: "2026-12-01T00:00:00.000Z",
+    entries: [{
+      surveyorId: "synthetic-surveyor-01",
+      keyId: "synthetic-surveyor-key-01",
+      status: "active",
+      publicKeyPem: surveyorPublicKeyPem,
+      validFromUtc: "2026-11-01T00:00:00.000Z",
+      validUntilUtc: "2026-12-01T00:00:00.000Z",
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  };
+  const attestationSidecars = recordInputs.map((record) => {
+    const checkpoint = manifest.heldOutCheckpoints.points.find(
+      (item) => item.observationId === record.observationId,
+    );
+    assert.ok(checkpoint);
+    const attestation = createSurveyObservationAttributionAttestation({
+      recordBytes: record.bytes,
+      controlPointManifestBytes: manifestBytes,
+      observationId: checkpoint.observationId,
+      checkpointId: checkpoint.id,
+      buildingId,
+      surveyorId: "synthetic-surveyor-01",
+      privateKeyPem: surveyorPrivateKeyPem,
+      trustedSurveyorRegistry,
+      attestedAtUtc: "2026-11-05T06:00:00.000Z",
+    });
+    const relativePath = surveyObservationAttributionAttestationPath(record.observationId);
+    const bytes = JSON_BYTES(attestation);
+    return {
+      artifactType: "single-image-survey-observation-attestation",
+      observationId: checkpoint.observationId,
+      checkpointId: checkpoint.id,
+      relativePath,
+      sha256: hash(bytes),
+      bytes,
+      registryId: attestation.registryId,
+      surveyorId: attestation.surveyorId,
+      keyId: attestation.keyId,
+    };
+  });
+  const attestationInventory = buildSurveyObservationAttributionInventory(
+    attestationSidecars.map((item) => ({
+      observationId: item.observationId,
+      checkpointId: item.checkpointId,
+      relativePath: item.relativePath,
+      sha256: item.sha256,
+      bytes: item.bytes.length,
+    })),
+  );
+  const signedEvidence = {
+    ...singleImageEvidence,
+    schemaVersion: "1.4.0",
+    surveyObservationAttestationCount: attestationInventory.count,
+    surveyObservationAttestationBytes: attestationInventory.totalBytes,
+    surveyObservationAttestationsSha256: attestationInventory.sha256,
+    surveyObservationAttestations: attestationInventory.entries,
+    surveyObservationAttributionStatus: "attribution-signatures-verified",
+    trustedSurveyorRegistryId: trustedSurveyorRegistry.registryId,
+    files: [
+      ...singleImageEvidence.files,
+      ...attestationSidecars.map((item) => ({
+        artifactType: item.artifactType,
+        observationId: item.observationId,
+        checkpointId: item.checkpointId,
+        relativePath: item.relativePath,
+        sha256: item.sha256,
+        bytes: item.bytes,
+      })),
+    ],
+  };
+  const signedArtifacts = [
+    ...packageManifest.artifacts,
+    ...attestationSidecars.map((item) => ({
+      artifactType: item.artifactType,
+      observationId: item.observationId,
+      checkpointId: item.checkpointId,
+      relativePath: item.relativePath,
+      sha256: item.sha256,
+      bytes: item.bytes.length,
+    })),
+  ];
+  const signedPackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: signedArtifacts,
+    singleImageEvidence: signedEvidence,
+    generatedAt: "2026-11-05T06:10:00.000Z",
+  });
+  const signedActualFiles = [
+    ...actualFiles,
+    ...attestationSidecars.map((item) => ({
+      relativePath: item.relativePath,
+      sha256: item.sha256,
+      bytes: item.bytes.length,
+      content: item.bytes,
+      isRegularFile: true,
+    })),
+  ];
+  const signedReport = verifyBuildingReviewPackage({
+    packageManifest: signedPackageManifest,
+    actualFiles: signedActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(signedPackageManifest)),
+    trustedSurveyorRegistry,
+  });
+  assert.equal(signedReport.valid, true, JSON.stringify(signedReport.errors));
+  assert.equal(signedReport.status, "verified");
+  assert.equal(signedPackageManifest.singleImageEvidence.schemaVersion, "1.4.0");
+  assert.equal(signedPackageManifest.singleImageEvidence.surveyObservationAttestationCount, 6);
+  assert.equal(signedPackageManifest.singleImageEvidence.trustedSurveyorRegistryId, trustedSurveyorRegistry.registryId);
+  assert.equal(signedReport.publicationEligible, false);
+  assert.ok(signedReport.checks.some((item) =>
+    item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  const signedWithoutRegistry = verifyBuildingReviewPackage({
+    packageManifest: signedPackageManifest,
+    actualFiles: signedActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(signedPackageManifest)),
+  });
+  assert.equal(signedWithoutRegistry.valid, false);
+  assert.ok(signedWithoutRegistry.errors.some((item) =>
+    item.message.includes("trusted-surveyor-registry-required-for-package-schema-1.4.0")));
+
+  const missingAttestationFiles = signedActualFiles.filter((file) =>
+    file.relativePath !== attestationSidecars[0].relativePath);
+  const missingAttestation = verifyBuildingReviewPackage({
+    packageManifest: signedPackageManifest,
+    actualFiles: missingAttestationFiles,
+    packageManifestSha256: hash(JSON_BYTES(signedPackageManifest)),
+    trustedSurveyorRegistry,
+  });
+  assert.equal(missingAttestation.valid, false);
+  assert.ok(missingAttestation.errors.some((item) =>
+    item.id === "file-present:" + attestationSidecars[0].relativePath));
+
+  const tamperedAttestationFiles = signedActualFiles.map((file) =>
+    file.relativePath === attestationSidecars[0].relativePath
+      ? { ...file, content: Buffer.concat([file.content, Buffer.from("tampered")]) }
+      : file);
+  const tamperedAttestation = verifyBuildingReviewPackage({
+    packageManifest: signedPackageManifest,
+    actualFiles: tamperedAttestationFiles,
+    packageManifestSha256: hash(JSON_BYTES(signedPackageManifest)),
+    trustedSurveyorRegistry,
+  });
+  assert.equal(tamperedAttestation.valid, false);
+  assert.ok(tamperedAttestation.errors.some((item) =>
+    item.id === "single-image-georeference-recomputed"));
+
+  const wrongSurveyorPair = generateKeyPairSync("ed25519");
+  const wrongRegistry = {
+    ...trustedSurveyorRegistry,
+    entries: [{
+      ...trustedSurveyorRegistry.entries[0],
+      publicKeyPem: wrongSurveyorPair.publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }],
+  };
+  const wrongSigner = verifyBuildingReviewPackage({
+    packageManifest: signedPackageManifest,
+    actualFiles: signedActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(signedPackageManifest)),
+    trustedSurveyorRegistry: wrongRegistry,
+  });
+  assert.equal(wrongSigner.valid, false);
+  assert.ok(wrongSigner.errors.some((item) =>
+    item.id === "single-image-georeference-recomputed"));
 });
 
 

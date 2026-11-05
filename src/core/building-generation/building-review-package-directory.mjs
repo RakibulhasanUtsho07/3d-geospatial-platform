@@ -168,12 +168,15 @@ export async function readBuildingReviewPackageDirectory(directoryArg) {
 /**
  * Recomputes all package integrity checks from the current filesystem snapshot.
  */
-export async function verifyBuildingReviewPackageDirectory(directoryArg) {
+export async function verifyBuildingReviewPackageDirectory(directoryArg, {
+  trustedSurveyorRegistry = process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
+} = {}) {
   const snapshot = await readBuildingReviewPackageDirectory(directoryArg);
   const integrity = verifyBuildingReviewPackage({
     packageManifest: snapshot.packageManifest,
     actualFiles: snapshot.actualFiles,
     packageManifestSha256: snapshot.packageManifestSha256,
+    trustedSurveyorRegistry,
   });
   return { ...snapshot, integrity };
 }

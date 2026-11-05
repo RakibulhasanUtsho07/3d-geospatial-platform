@@ -9,6 +9,11 @@ import {
   buildSingleImageSurveyObservationRecordInventory,
   singleImageSurveyObservationRecordPath,
 } from "./single-image-survey-observation-records.mjs";
+import {
+  buildSurveyObservationAttributionInventory,
+  surveyObservationAttributionAttestationPath,
+  verifySurveyObservationAttributionAttestation,
+} from "./survey-observation-attribution-attestation.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -43,7 +48,7 @@ function safeRelativePath(value) {
  * actually found on disk. A checksum package detects drift relative to its
  * manifest; it is not a signed provenance statement if both are replaced.
  */
-export function verifyBuildingReviewPackage({ packageManifest, actualFiles, packageManifestSha256 }) {
+export function verifyBuildingReviewPackage({ packageManifest, actualFiles, packageManifestSha256, trustedSurveyorRegistry = null }) {
   if (!isObject(packageManifest) || packageManifest.schemaVersion !== "1.0.0" ||
     packageManifest.engine !== "building-review-package-v1" ||
     !nonEmptyString(packageManifest.buildingId) || !Array.isArray(packageManifest.artifacts)) {
@@ -406,15 +411,17 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
   const singleImagePresent = singleImageItems.filter(Boolean).length;
   if (packageManifest.singleImageEvidence === undefined) {
     check("single-image-evidence-group-absent-or-complete",
-      singleImagePresent === 0 && (artifactByType.get("single-image-survey-observation-record") ?? []).length === 0,
-      "Single-image georeference or survey observation artifacts must not be partially included without signed package metadata.");
+      singleImagePresent === 0 &&
+        (artifactByType.get("single-image-survey-observation-record") ?? []).length === 0 &&
+        (artifactByType.get("single-image-survey-observation-attestation") ?? []).length === 0,
+      "Single-image georeference, survey observation record or attribution artifacts must not be partially included without signed package metadata.");
   } else {
     const metadata = packageManifest.singleImageEvidence;
     const complete = singleImageItems.length === 4 && singleImagePresent === 4;
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(metadata.schemaVersion)) {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
@@ -439,7 +446,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
       const expectedReceiptSchema = smokeReport.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
       const verticalEvidence = georeference.verticalEvidence ?? null;
       const checkpointEvidence = georeference.independentCheckpointEvidence ?? null;
-      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0"].includes(metadata.schemaVersion)
+      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(metadata.schemaVersion)
         ? metadata.verticalDatum === "EPSG:4979-ellipsoidal" &&
           verticalEvidence?.status === "calibrated-needs-human-review" &&
           metadata.verticalStatus === verticalEvidence.status &&
@@ -456,7 +463,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
         : metadata.schemaVersion === "1.0.0" &&
           metadata.verticalDatum === "not-solved" &&
           verticalEvidence === null;
-      const checkpointMetadataMatches = ["1.2.0", "1.3.0"].includes(metadata.schemaVersion)
+      const checkpointMetadataMatches = ["1.2.0", "1.3.0", "1.4.0"].includes(metadata.schemaVersion)
         ? checkpointEvidence?.status === "validated-needs-human-review" &&
           metadata.checkpointValidationStatus === checkpointEvidence.status &&
           metadata.checkpointEvidenceSha256 === digest(Buffer.from(canonicalJson(checkpointEvidence), "utf8")) &&
@@ -479,9 +486,11 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
 
       const surveyRecordArtifacts = artifactByType.get("single-image-survey-observation-record") ?? [];
       let surveyObservationRecordsMetadataMatches = false;
-      if (metadata.schemaVersion === "1.3.0") {
-        const controlManifest = JSON.parse(manifestBytes.toString("utf8"));
-        const checkpoints = controlManifest.heldOutCheckpoints?.points;
+      let controlManifest = null;
+      let checkpoints = null;
+      if (["1.3.0", "1.4.0"].includes(metadata.schemaVersion)) {
+        controlManifest = JSON.parse(manifestBytes.toString("utf8"));
+        checkpoints = controlManifest.heldOutCheckpoints?.points;
         if (controlManifest.schemaVersion !== "1.2.0" ||
             !Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100 ||
             checkpoints.length !== metadata.checkpointCount ||
@@ -514,6 +523,82 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
         surveyObservationRecordsMetadataMatches =
           surveyRecordArtifacts.length === 0 &&
           !Object.keys(metadata).some((key) => key.startsWith("surveyObservationRecord"));
+      }
+
+      const surveyAttestationArtifacts = artifactByType.get("single-image-survey-observation-attestation") ?? [];
+      let surveyObservationAttestationsMetadataMatches = false;
+      if (metadata.schemaVersion === "1.4.0") {
+        if (!trustedSurveyorRegistry) {
+          throw new Error("trusted-surveyor-registry-required-for-package-schema-1.4.0");
+        }
+        if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100 ||
+            surveyAttestationArtifacts.length !== checkpoints.length) {
+          throw new Error("single-image-survey-observation-attestation-inventory-incomplete");
+        }
+        const attestations = checkpoints.map((checkpoint) => {
+          const recordPath = singleImageSurveyObservationRecordPath(checkpoint.observationId);
+          const recordFile = actualByPath.get(recordPath);
+          const recordArtifact = artifactByPath.get(recordPath);
+          const attestationPath = surveyObservationAttributionAttestationPath(checkpoint.observationId);
+          const attestationArtifact = artifactByPath.get(attestationPath);
+          const attestationFile = actualByPath.get(attestationPath);
+          if (!recordFile || !recordArtifact ||
+              recordArtifact.artifactType !== "single-image-survey-observation-record" ||
+              !attestationArtifact ||
+              attestationArtifact.artifactType !== "single-image-survey-observation-attestation" ||
+              !attestationFile ||
+              attestationFile.content.length > 32 * 1024 ||
+              attestationFile.content.length !== attestationArtifact.bytes ||
+              digest(attestationFile.content) !== attestationArtifact.sha256) {
+            throw new Error("single-image-survey-observation-attestation-byte-binding-failed:" + checkpoint.observationId);
+          }
+          let attestation;
+          try {
+            attestation = JSON.parse(attestationFile.content.toString("utf8"));
+          } catch {
+            throw new Error("single-image-survey-observation-attestation-json-invalid:" + checkpoint.observationId);
+          }
+          const result = verifySurveyObservationAttributionAttestation({
+            attestation,
+            recordBytes: recordFile.content,
+            controlPointManifestBytes: manifestBytes,
+            observationId: checkpoint.observationId,
+            checkpointId: checkpoint.id,
+            buildingId: packageManifest.buildingId,
+            trustedSurveyorRegistry,
+          });
+          if (!result.valid || result.registryId !== metadata.trustedSurveyorRegistryId) {
+            throw new Error("single-image-survey-observation-attestation-signature-invalid:" + checkpoint.observationId +
+              ":" + result.errors.map((item) => item.id).join(","));
+          }
+          return {
+            observationId: checkpoint.observationId,
+            checkpointId: checkpoint.id,
+            registryId: result.registryId,
+            relativePath: attestationPath,
+            sha256: attestationArtifact.sha256,
+            bytes: attestationArtifact.bytes,
+          };
+        });
+        const attestationInventory = buildSurveyObservationAttributionInventory(attestations);
+        const metadataEntries = Array.isArray(metadata.surveyObservationAttestations)
+          ? metadata.surveyObservationAttestations
+          : [];
+        const sameInventory = canonicalJson(attestationInventory.entries) === canonicalJson(metadataEntries);
+        surveyObservationAttestationsMetadataMatches =
+          attestationInventory.count === metadata.surveyObservationAttestationCount &&
+          attestationInventory.count === metadata.checkpointCount &&
+          attestationInventory.totalBytes === metadata.surveyObservationAttestationBytes &&
+          attestationInventory.sha256 === metadata.surveyObservationAttestationsSha256 &&
+          sameInventory &&
+          metadata.surveyObservationAttributionStatus === "attribution-signatures-verified" &&
+          attestations.every((entry) => entry.registryId === metadata.trustedSurveyorRegistryId);
+      } else {
+        surveyObservationAttestationsMetadataMatches =
+          surveyAttestationArtifacts.length === 0 &&
+          !Object.keys(metadata).some((key) => key.startsWith("surveyObservationAttestation")) &&
+          !Object.hasOwn(metadata, "surveyObservationAttributionStatus") &&
+          !Object.hasOwn(metadata, "trustedSurveyorRegistryId");
       }
 
       if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
@@ -602,6 +687,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           !verticalMetadataMatches ||
           !checkpointMetadataMatches ||
           !surveyObservationRecordsMetadataMatches ||
+          !surveyObservationAttestationsMetadataMatches ||
           metadata.mapReady !== false || metadata.publicationEligible !== false ||
           metadata.automaticApproval !== false) {
         throw new Error("single-image-evidence-cross-binding-failed");
@@ -615,9 +701,11 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
         modelSha256: candidate.sha256,
       });
       passed = true;
-      detail = metadata.schemaVersion === "1.3.0"
-        ? "Exact smoke, generation receipt, workflow report, control-point manifest and original held-out survey record bytes are bound to this candidate; checkpoint calculations and the record inventory were independently recomputed from packaged bytes."
-        : checkpointEvidence
+      detail = metadata.schemaVersion === "1.4.0"
+        ? "Exact smoke, generation receipt, workflow report, control-point manifest, original held-out record bytes and current-registry Ed25519 attribution attestations are independently verified; this does not certify survey accuracy or physical feature correspondence."
+        : metadata.schemaVersion === "1.3.0"
+          ? "Exact smoke, generation receipt, workflow report, control-point manifest and original held-out survey record bytes are bound to this candidate; checkpoint calculations and the record inventory were independently recomputed from packaged bytes."
+          : checkpointEvidence
           ? "Exact smoke, generation receipt, workflow report and control-point bytes are bound to this candidate; horizontal/vertical fitting and held-out 3D checkpoint evidence were independently recomputed from the packaged manifest."
           : "Exact smoke, generation receipt, workflow report and control-point bytes are bound to this candidate; horizontal registration was independently recomputed from the packaged manifest.";
     } catch (error) {
