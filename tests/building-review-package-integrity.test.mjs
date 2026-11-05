@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { readFile, mkdtemp, mkdir, rm, writeFile, symlink, truncate } from "node:fs/promises";
 import { generateKeyPairSync } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
@@ -15,6 +15,12 @@ import { REQUIRED_REVIEW_VIEWS } from "../src/core/building-generation/render-re
 import { buildBuildingReleaseReadiness } from "../src/core/building-generation/building-release-readiness.mjs";
 import { buildBuildingReviewPackageManifest } from "../src/core/building-generation/building-review-package.mjs";
 import { verifyBuildingReviewPackage } from "../src/core/building-generation/building-review-package-integrity.mjs";
+import { readStableSingleImageSurveyObservationRecord } from "../src/core/building-generation/single-image-review-package-evidence.mjs";
+import {
+  buildSingleImageSurveyObservationRecordInventory,
+  singleImageSurveyObservationRecordPath,
+  MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+} from "../src/core/building-generation/single-image-survey-observation-records.mjs";
 import {
   createSingleImageGeoreferenceEvidence,
   loadSingleImageControlPointManifest,
@@ -557,7 +563,7 @@ function makeHeldOutManifest(sourceSha256) {
   };
 }
 
-test("recomputes held-out 3D checkpoints from exact packaged bytes through the complete review package", async (t) => {
+test("binds original held-out survey record bytes through the complete review package and preserves legacy D3M-14 packages", async (t) => {
   const base = await createFixture();
   const candidate = base.packageManifest.artifacts.find((item) => item.artifactType === "candidate-glb");
   const candidateFile = base.actualFiles.find((item) => item.relativePath === candidate.relativePath);
@@ -565,11 +571,31 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   const candidateSha256 = hash(candidateBytes);
   const sourceBytes = Buffer.from("fixture source facade image bytes");
   const sourceSha256 = hash(sourceBytes);
-  const root = await mkdtemp(path.join(os.tmpdir(), "d3m14-package-e2e-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m15-package-e2e-"));
   await mkdir(path.join(root, "survey"), { recursive: true });
+  await mkdir(path.join(root, "evidence/survey-observations"), { recursive: true });
   t.after(() => rm(root, { recursive: true, force: true }));
 
   const manifest = makeHeldOutManifest(sourceSha256);
+  const recordInputs = manifest.heldOutCheckpoints.points.map((checkpoint) => {
+    const bytes = Buffer.from("synthetic-test-only GNSS observation fixture:" + checkpoint.observationId);
+    checkpoint.observationRecordSha256 = hash(bytes);
+    return {
+      observationId: checkpoint.observationId,
+      relativePath: singleImageSurveyObservationRecordPath(checkpoint.observationId),
+      sha256: hash(bytes),
+      bytes,
+    };
+  });
+  for (const record of recordInputs) {
+    await writeFile(path.join(root, ...record.relativePath.split("/")), record.bytes, { flag: "wx" });
+  }
+  const recordInventory = buildSingleImageSurveyObservationRecordInventory(recordInputs.map((record) => ({
+    observationId: record.observationId,
+    relativePath: record.relativePath,
+    sha256: record.sha256,
+    bytes: record.bytes.length,
+  })));
   const manifestBytes = JSON_BYTES(manifest);
   await writeFile(path.join(root, "survey", "controls.json"), manifestBytes, { flag: "wx" });
   const loadedManifest = await loadSingleImageControlPointManifest({
@@ -720,17 +746,34 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
     ["single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes],
     ["single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes],
   ];
-  const newArtifacts = groupFiles.map(([artifactType, relativePath, bytes]) => ({
-    artifactType, relativePath, sha256: hash(bytes), bytes: bytes.length,
-  }));
-  const newFiles = groupFiles.map(([, relativePath, bytes]) => ({
-    relativePath, sha256: hash(bytes), bytes: bytes.length, content: bytes, isRegularFile: true,
-  }));
+  const newArtifacts = [
+    ...groupFiles.map(([artifactType, relativePath, bytes]) => ({
+      artifactType, relativePath, sha256: hash(bytes), bytes: bytes.length,
+    })),
+    ...recordInputs.map((record) => ({
+      artifactType: "single-image-survey-observation-record",
+      relativePath: record.relativePath,
+      sha256: record.sha256,
+      bytes: record.bytes.length,
+    })),
+  ];
+  const newFiles = [
+    ...groupFiles.map(([, relativePath, bytes]) => ({
+      relativePath, sha256: hash(bytes), bytes: bytes.length, content: bytes, isRegularFile: true,
+    })),
+    ...recordInputs.map((record) => ({
+      relativePath: record.relativePath,
+      sha256: record.sha256,
+      bytes: record.bytes.length,
+      content: record.bytes,
+      isRegularFile: true,
+    })),
+  ];
   const artifactDescriptors = [...base.packageManifest.artifacts, ...newArtifacts];
   const verticalEvidence = georeferenceEvidence.verticalEvidence;
   const checkpointEvidence = georeferenceEvidence.independentCheckpointEvidence;
   const singleImageEvidence = {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     jobId,
     buildingId,
     sourceId: source.sourceId,
@@ -761,6 +804,22 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
     checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
     checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
     checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
+    surveyObservationRecordCount: recordInventory.count,
+    surveyObservationRecordBytes: recordInventory.totalBytes,
+    surveyObservationRecordsSha256: recordInventory.sha256,
+    surveyObservationRecords: recordInventory.records,
+    files: [
+      ...groupFiles.map(([artifactType, relativePath, bytes]) => ({
+        artifactType, relativePath, sha256: hash(bytes), bytes,
+      })),
+      ...recordInputs.map((record) => ({
+        artifactType: "single-image-survey-observation-record",
+        observationId: record.observationId,
+        relativePath: record.relativePath,
+        sha256: record.sha256,
+        bytes: record.bytes,
+      })),
+    ],
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,
@@ -791,6 +850,72 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   assert.equal(packageManifest.singleImageEvidence.mapReady, false);
   assert.equal(packageManifest.singleImageEvidence.publicationEligible, false);
   assert.equal(packageManifest.singleImageEvidence.automaticApproval, false);
+  assert.equal(packageManifest.singleImageEvidence.schemaVersion, "1.3.0");
+  assert.equal(packageManifest.singleImageEvidence.surveyObservationRecordCount, 6);
+  assert.equal(packageManifest.singleImageEvidence.surveyObservationRecordBytes, recordInventory.totalBytes);
+  assert.equal(packageManifest.artifacts.filter((item) =>
+    item.artifactType === "single-image-survey-observation-record").length, 6);
+
+  const legacyManifest = JSON.parse(JSON.stringify(packageManifest));
+  const removedRecords = legacyManifest.artifacts.filter((item) =>
+    item.artifactType === "single-image-survey-observation-record");
+  legacyManifest.artifacts = legacyManifest.artifacts.filter((item) =>
+    item.artifactType !== "single-image-survey-observation-record");
+  legacyManifest.counts.artifacts -= removedRecords.length;
+  legacyManifest.counts.totalBytes -= removedRecords.reduce((sum, item) => sum + item.bytes, 0);
+  legacyManifest.singleImageEvidence.schemaVersion = "1.2.0";
+  delete legacyManifest.singleImageEvidence.surveyObservationRecordCount;
+  delete legacyManifest.singleImageEvidence.surveyObservationRecordBytes;
+  delete legacyManifest.singleImageEvidence.surveyObservationRecordsSha256;
+  const legacyFiles = actualFiles.filter((item) =>
+    !recordInputs.some((record) => record.relativePath === item.relativePath));
+  const legacyReport = verifyBuildingReviewPackage({
+    packageManifest: legacyManifest,
+    actualFiles: legacyFiles,
+    packageManifestSha256: hash(JSON_BYTES(legacyManifest)),
+  });
+  assert.equal(legacyReport.valid, true, JSON.stringify(legacyReport.errors));
+
+  const missingRecordFiles = actualFiles.filter((item) =>
+    item.relativePath !== recordInputs[0].relativePath);
+  const missingRecordReport = verifyBuildingReviewPackage({
+    packageManifest,
+    actualFiles: missingRecordFiles,
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(missingRecordReport.valid, false);
+  assert.ok(missingRecordReport.errors.some((item) =>
+    item.id === "file-present:" + recordInputs[0].relativePath));
+
+  const tamperedRecordFiles = actualFiles.map((item) => item.relativePath === recordInputs[0].relativePath
+    ? { ...item, content: Buffer.concat([item.content, Buffer.from("tampered")]) }
+    : item);
+  const tamperedRecordReport = verifyBuildingReviewPackage({
+    packageManifest,
+    actualFiles: tamperedRecordFiles,
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(tamperedRecordReport.valid, false);
+  assert.ok(tamperedRecordReport.errors.some((item) =>
+    item.id === "file-sha256:" + recordInputs[0].relativePath));
+  assert.ok(tamperedRecordReport.errors.some((item) =>
+    item.id === "single-image-georeference-recomputed"));
+
+  const forgedInventory = {
+    ...packageManifest,
+    singleImageEvidence: {
+      ...packageManifest.singleImageEvidence,
+      surveyObservationRecordsSha256: "f".repeat(64),
+    },
+  };
+  const forgedInventoryReport = verifyBuildingReviewPackage({
+    packageManifest: forgedInventory,
+    actualFiles,
+    packageManifestSha256: hash(JSON_BYTES(forgedInventory)),
+  });
+  assert.equal(forgedInventoryReport.valid, false);
+  assert.ok(forgedInventoryReport.errors.some((item) =>
+    item.id === "single-image-georeference-recomputed"));
 
   const forgedMetadata = {
     ...packageManifest,
@@ -832,4 +957,112 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   });
   assert.equal(driftedReport.valid, false);
   assert.ok(driftedReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+});
+
+
+test("canonical survey observation inventory is deterministic, bounded and rejects unsafe records", () => {
+  const records = Array.from({ length: 6 }, (_, index) => {
+    const observationId = index === 1 ? "Obs-2" : "obs-" + (index + 1);
+    return {
+      observationId,
+      relativePath: singleImageSurveyObservationRecordPath(observationId),
+      sha256: String(index + 1).repeat(64),
+      bytes: 128 + index,
+    };
+  });
+  const first = buildSingleImageSurveyObservationRecordInventory(records);
+  const reversed = buildSingleImageSurveyObservationRecordInventory([...records].reverse());
+  assert.equal(first.sha256, reversed.sha256);
+  assert.equal(first.count, 6);
+  assert.equal(first.totalBytes, records.reduce((sum, item) => sum + item.bytes, 0));
+  assert.deepEqual(first.records.map((item) => item.observationId),
+    ["Obs-2", "obs-1", "obs-3", "obs-4", "obs-5", "obs-6"]);
+
+  assert.throws(() => singleImageSurveyObservationRecordPath("../outside"), /invalid/i);
+  assert.throws(() => singleImageSurveyObservationRecordPath("CON"), /invalid/i);
+  assert.throws(() => singleImageSurveyObservationRecordPath("trailing."), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory([
+    ...records,
+    { ...records[0] },
+  ]), /invalid/i);
+  const caseCollision = {
+    ...records[0],
+    observationId: records[0].observationId.toUpperCase(),
+    relativePath: singleImageSurveyObservationRecordPath(records[0].observationId.toUpperCase()),
+  };
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory([...records, caseCollision]), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, relativePath: "evidence/other.record" } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, sha256: "z".repeat(64) } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    records.map((item, index) => index === 0 ? { ...item, bytes: MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES + 1 } : item),
+  ), /invalid/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    Array.from({ length: 9 }, (_, index) => ({
+      observationId: "large-" + (index + 1),
+      relativePath: singleImageSurveyObservationRecordPath("large-" + (index + 1)),
+      sha256: String(index + 1).repeat(64),
+      bytes: MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+    })),
+  ), /aggregate limit/i);
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
+    Array.from({ length: 101 }, (_, index) => ({
+      observationId: "many-" + (index + 1),
+      relativePath: singleImageSurveyObservationRecordPath("many-" + (index + 1)),
+      sha256: "a".repeat(64),
+      bytes: 1,
+    })),
+  ), /6–100/i);
+});
+
+
+test("stable survey record workspace reader preserves bytes and rejects missing, unsafe, symlink and oversized inputs", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m15-survey-record-reader-"));
+  const evidenceDir = path.join(root, "evidence", "survey-observations");
+  await mkdir(evidenceDir, { recursive: true });
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const observationId = "stable-read-observation";
+  const relativePath = singleImageSurveyObservationRecordPath(observationId);
+  const filePath = path.join(root, ...relativePath.split("/"));
+  const originalBytes = Buffer.from([0, 1, 2, 10, 13, 127, 128, 255]);
+  await writeFile(filePath, originalBytes, { flag: "wx" });
+
+  const result = await readStableSingleImageSurveyObservationRecord({
+    workspaceRoot: root,
+    observationId,
+  });
+  assert.equal(result.relativePath, relativePath);
+  assert.equal(result.sha256, hash(originalBytes));
+  assert.deepEqual(result.bytes, originalBytes);
+
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: "missing-record" }),
+  );
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: "../outside" }),
+    /invalid/i,
+  );
+
+  const symlinkId = "symlink-observation";
+  const symlinkPath = path.join(root, ...singleImageSurveyObservationRecordPath(symlinkId).split("/"));
+  const targetPath = path.join(evidenceDir, "target.record");
+  await writeFile(targetPath, Buffer.from("target"), { flag: "wx" });
+  await symlink(targetPath, symlinkPath);
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: symlinkId }),
+    /symbolic links/i,
+  );
+
+  const oversizedId = "oversized-observation";
+  const oversizedPath = path.join(root, ...singleImageSurveyObservationRecordPath(oversizedId).split("/"));
+  await writeFile(oversizedPath, Buffer.from("x"), { flag: "wx" });
+  await truncate(oversizedPath, MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES + 1);
+  await assert.rejects(
+    () => readStableSingleImageSurveyObservationRecord({ workspaceRoot: root, observationId: oversizedId }),
+    /size limit/i,
+  );
 });

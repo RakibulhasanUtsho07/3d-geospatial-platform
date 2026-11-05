@@ -1,8 +1,15 @@
 import { createHash } from "node:crypto";
+import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 import { canonicalJson } from "./generation-artifact-receipt.mjs";
 import { verifySingleImageRuntimeSmoke } from "./verify-single-image-runtime-smoke.mjs";
+import {
+  buildSingleImageSurveyObservationRecordInventory,
+  MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+  MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORDS_BYTES,
+  singleImageSurveyObservationRecordPath,
+} from "./single-image-survey-observation-records.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -51,7 +58,7 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
   }
   const actual = await realpath(current);
   if (!inside(root, actual)) throw new TypeError(label + " resolves outside the smoke workspace.");
-  const handle = await open(actual, "r");
+  const handle = await open(actual, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const before = await handle.stat();
     if (!before.isFile() || before.size < 1 || before.size > maxBytes) {
@@ -59,8 +66,9 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
     }
     const bytes = await handle.readFile();
     const after = await handle.stat();
+    const actualAfter = await realpath(current);
     const pathAfter = await lstat(actual);
-    if (pathAfter.isSymbolicLink() || !pathAfter.isFile() ||
+    if (actualAfter !== actual || pathAfter.isSymbolicLink() || !pathAfter.isFile() ||
         fileSignature(before) !== fileSignature(after) ||
         fileSignature(after) !== fileSignature(pathAfter) ||
         bytes.length !== after.size) {
@@ -70,6 +78,21 @@ async function readStableWorkspaceFile(root, relativePath, label, maxBytes) {
   } finally {
     await handle.close();
   }
+}
+
+export async function readStableSingleImageSurveyObservationRecord({ workspaceRoot, observationId }) {
+  if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) {
+    throw new TypeError("Survey observation workspace root is required.");
+  }
+  const root = await realpath(path.resolve(workspaceRoot));
+  const relativePath = singleImageSurveyObservationRecordPath(observationId);
+  const bytes = await readStableWorkspaceFile(
+    root,
+    relativePath,
+    "Held-out survey observation record " + observationId,
+    MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES,
+  );
+  return { observationId, relativePath, sha256: sha256(bytes), bytes };
 }
 
 function parseJson(bytes, label) {
@@ -130,6 +153,52 @@ export async function prepareSingleImageReviewPackageEvidence({
   const workflowReport = parseJson(workflowBytes, "Generation workflow report");
   const manifestPath = safeRelativePath(report.georeferenceEvidence.manifest.path, "Control-point manifest path");
   const manifestBytes = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
+  const controlManifest = parseJson(manifestBytes, "Control-point manifest");
+  const observationRecordFiles = [];
+  let observationRecordInventory = null;
+  if (report.georeferenceEvidence?.schemaVersion === "1.2.0") {
+    const checkpoints = controlManifest.heldOutCheckpoints?.points;
+    if (controlManifest.schemaVersion !== "1.2.0" || !Array.isArray(checkpoints) ||
+        checkpoints.length < 6 || checkpoints.length > 100 ||
+        checkpoints.length !== report.georeferenceEvidence.independentCheckpointEvidence?.controls?.count) {
+      throw new Error("Held-out control manifest does not declare the exact 6–100 checkpoints required by its georeference evidence.");
+    }
+    let totalRecordBytes = 0;
+    for (const checkpoint of checkpoints) {
+      const record = await readStableSingleImageSurveyObservationRecord({
+        workspaceRoot: root,
+        observationId: checkpoint.observationId,
+      });
+      const { relativePath, bytes: recordBytes, sha256: actualSha256 } = record;
+      if (typeof checkpoint.observationRecordSha256 !== "string" ||
+          !/^[a-f0-9]{64}$/.test(checkpoint.observationRecordSha256)) {
+        throw new Error("Held-out checkpoint is missing a valid observation-record SHA-256: " + checkpoint.id);
+      }
+      if (actualSha256 !== checkpoint.observationRecordSha256) {
+        throw new Error("Held-out survey observation record SHA-256 does not match checkpoint " + checkpoint.id + ".");
+      }
+      totalRecordBytes += recordBytes.length;
+      if (!Number.isSafeInteger(totalRecordBytes) ||
+          totalRecordBytes > MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORDS_BYTES) {
+        throw new RangeError("Held-out survey observation records exceed the 128 MiB aggregate limit.");
+      }
+      observationRecordFiles.push({
+        artifactType: "single-image-survey-observation-record",
+        observationId: checkpoint.observationId,
+        relativePath,
+        sha256: actualSha256,
+        bytes: recordBytes,
+      });
+    }
+    observationRecordInventory = buildSingleImageSurveyObservationRecordInventory(
+      observationRecordFiles.map((file) => ({
+        observationId: file.observationId,
+        relativePath: file.relativePath,
+        sha256: file.sha256,
+        bytes: file.bytes.length,
+      })),
+    );
+  }
 
   const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
   if (receipt.schemaVersion !== expectedReceiptSchema || receipt.payload?.georeference === undefined ||
@@ -155,12 +224,23 @@ export async function prepareSingleImageReviewPackageEvidence({
   const receiptBytesAfter = await readStableWorkspaceFile(root, receiptPath, "Generation artifact receipt", MAX_RECEIPT_BYTES);
   const workflowBytesAfter = await readStableWorkspaceFile(root, workflowPath, "Generation workflow report", MAX_WORKFLOW_BYTES);
   const manifestBytesAfter = await readStableWorkspaceFile(root, manifestPath, "Control-point manifest", MAX_MANIFEST_BYTES);
+  const observationRecordBytesAfter = [];
+  for (const file of observationRecordFiles) {
+    observationRecordBytesAfter.push(await readStableSingleImageSurveyObservationRecord({
+      workspaceRoot: root,
+      observationId: file.observationId,
+    }));
+  }
   if (after.model?.sha256 !== candidateGlbSha256 ||
       sha256(reportBytesAfter) !== sha256(reportBytes) ||
       sha256(receiptBytesAfter) !== sha256(receiptBytes) ||
       sha256(workflowBytesAfter) !== sha256(workflowBytes) ||
-      sha256(manifestBytesAfter) !== sha256(manifestBytes)) {
-    throw new Error("Single-image smoke evidence changed during review-package preparation.");
+      sha256(manifestBytesAfter) !== sha256(manifestBytes) ||
+      observationRecordBytesAfter.some((record, index) =>
+        record.relativePath !== observationRecordFiles[index].relativePath ||
+        record.bytes.length !== observationRecordFiles[index].bytes.length ||
+        record.sha256 !== observationRecordFiles[index].sha256)) {
+    throw new Error("Single-image smoke or survey observation evidence changed during review-package preparation.");
   }
 
   const files = [
@@ -168,13 +248,20 @@ export async function prepareSingleImageReviewPackageEvidence({
     addFile("single-image-generation-artifact-receipt", "reports/single-image-generation-artifact-receipt.json", receiptBytes),
     addFile("single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes),
     addFile("single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes),
+    ...observationRecordFiles.map((file) => ({
+      artifactType: file.artifactType,
+      observationId: file.observationId,
+      relativePath: file.relativePath,
+      sha256: file.sha256,
+      bytes: file.bytes,
+    })),
   ];
   const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
   const hasVerticalCalibration = verticalEvidence?.status === "calibrated-needs-human-review";
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: hasIndependentCheckpoints ? "1.2.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: hasIndependentCheckpoints ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -208,6 +295,12 @@ export async function prepareSingleImageReviewPackageEvidence({
       checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
       checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
       checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
+      ...(observationRecordInventory ? {
+        surveyObservationRecordCount: observationRecordInventory.count,
+        surveyObservationRecordBytes: observationRecordInventory.totalBytes,
+        surveyObservationRecordsSha256: observationRecordInventory.sha256,
+        surveyObservationRecords: observationRecordInventory.records,
+      } : {}),
     } : {}),
     mapReady: false,
     publicationEligible: false,
