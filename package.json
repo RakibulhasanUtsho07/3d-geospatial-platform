@@ -280,7 +280,9 @@
     "test:evidence-backed-vertical-slice": "node --test tests/evidence-backed-vertical-slice.test.mjs",
     "run:evidence-backed-vertical-slice": "node scripts/run-evidence-backed-vertical-slice.mjs",
     "test:publish-evidence-backed-vertical-slice": "node --test tests/publish-evidence-backed-vertical-slice.test.mjs",
-    "publish:evidence-backed-vertical-slice": "node scripts/publish-evidence-backed-vertical-slice.mjs"
+    "publish:evidence-backed-vertical-slice": "node scripts/publish-evidence-backed-vertical-slice.mjs",
+    "test:survey-device-enrollment-evidence": "node --test tests/survey-device-enrollment-evidence.test.mjs",
+    "verify:survey-device-enrollment-evidence": "node scripts/verify-survey-device-enrollment-evidence.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
