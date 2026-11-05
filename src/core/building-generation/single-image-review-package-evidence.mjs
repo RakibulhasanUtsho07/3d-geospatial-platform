@@ -16,6 +16,12 @@ import {
   verifySurveyObservationAttributionAttestation,
   MAX_TRUSTED_SURVEYOR_REGISTRY_BYTES,
 } from "./survey-observation-attribution-attestation.mjs";
+import {
+  buildSurveyObservationDeviceAttestationInventory,
+  surveyObservationDeviceAttestationPath,
+  verifySurveyObservationDeviceAttestation,
+  MAX_TRUSTED_SURVEY_DEVICE_REGISTRY_BYTES,
+} from "./survey-observation-device-attestation.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -146,6 +152,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   buildingId,
   candidateGlbSha256,
   trustedSurveyorRegistry = null,
+  trustedDeviceRegistry = null,
 }) {
   if (typeof workspaceRoot !== "string" || !workspaceRoot.trim()) throw new TypeError("single-image smoke workspace is required.");
   if (typeof jobId !== "string" || !SAFE_ID.test(jobId)) throw new TypeError("single-image smoke jobId is invalid.");
@@ -188,6 +195,8 @@ export async function prepareSingleImageReviewPackageEvidence({
   let observationRecordInventory = null;
   const observationAttestationFiles = [];
   let observationAttestationInventory = null;
+  const observationDeviceAttestationFiles = [];
+  let observationDeviceAttestationInventory = null;
   const hasTrustedSurveyorRegistry = typeof trustedSurveyorRegistry === "string" && trustedSurveyorRegistry.trim().length > 0;
   if (hasTrustedSurveyorRegistry && Buffer.byteLength(trustedSurveyorRegistry, "utf8") > MAX_TRUSTED_SURVEYOR_REGISTRY_BYTES) {
     throw new RangeError("Trusted surveyor registry exceeds the 64 KiB limit.");
@@ -297,6 +306,49 @@ export async function prepareSingleImageReviewPackageEvidence({
     }
   }
 
+    const hasTrustedDeviceRegistry = typeof trustedDeviceRegistry === "string" && trustedDeviceRegistry.trim().length > 0;
+    if (hasTrustedDeviceRegistry && Buffer.byteLength(trustedDeviceRegistry, "utf8") > MAX_TRUSTED_SURVEY_DEVICE_REGISTRY_BYTES) {
+      throw new RangeError("Trusted survey device registry exceeds the 64 KiB limit.");
+    }
+    if (hasTrustedDeviceRegistry) {
+      if (!hasTrustedSurveyorRegistry || observationAttestationFiles.length !== observationRecordFiles.length) {
+        throw new Error("D3M-ENGINE-17 requires D3M-ENGINE-16 surveyor attestations and the trusted surveyor registry.");
+      }
+      for (const file of observationRecordFiles) {
+        const relativePath = surveyObservationDeviceAttestationPath(file.observationId);
+        const sidecarBytes = await readStableWorkspaceFile(root, relativePath,
+          "Survey observation device attestation " + file.observationId, 32 * 1024);
+        const sidecar = parseJson(sidecarBytes, "Survey observation device attestation");
+        const result = verifySurveyObservationDeviceAttestation({
+          attestation: sidecar, recordBytes: file.bytes, controlPointManifestBytes: manifestBytes,
+          observationId: file.observationId, checkpointId: file.checkpointId, buildingId, trustedDeviceRegistry,
+        });
+        if (!result.valid) throw new Error("Survey observation device attestation verification failed for " +
+          file.observationId + ": " + result.errors.map((item) => item.id).join(","));
+        observationDeviceAttestationFiles.push({
+          artifactType: "single-image-survey-observation-device-attestation", observationId: file.observationId,
+          checkpointId: file.checkpointId, relativePath, sha256: sha256(sidecarBytes), bytes: sidecarBytes,
+          registryId: result.registryId, deviceId: result.deviceId, keyId: result.keyId,
+          enrollmentEvidenceSha256: result.enrollmentEvidenceSha256,
+        });
+      }
+      observationDeviceAttestationInventory = buildSurveyObservationDeviceAttestationInventory(
+        observationDeviceAttestationFiles.map((file) => ({
+          observationId: file.observationId, checkpointId: file.checkpointId, relativePath: file.relativePath,
+          sha256: file.sha256, bytes: file.bytes.length,
+        })),
+      );
+    } else {
+      for (const file of observationRecordFiles) {
+        const sidecarPath = path.join(root, ...surveyObservationDeviceAttestationPath(file.observationId).split("/"));
+        try {
+          const info = await lstat(sidecarPath);
+          if (info.isSymbolicLink() || !info.isFile()) throw new TypeError("Device-attestation sidecar must be a regular file.");
+          throw new Error("Device-attestation sidecars exist but SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON was not supplied.");
+        } catch (error) { if (error?.code !== "ENOENT") throw error; }
+      }
+    }
+
   const expectedReceiptSchema = report.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
   if (receipt.schemaVersion !== expectedReceiptSchema || receipt.payload?.georeference === undefined ||
       receipt.payload?.buildingId !== buildingId || receipt.payload?.jobId !== jobId ||
@@ -331,10 +383,13 @@ export async function prepareSingleImageReviewPackageEvidence({
   const observationAttestationBytesAfter = [];
   for (const file of observationAttestationFiles) {
     observationAttestationBytesAfter.push(await readStableWorkspaceFile(
-      root,
-      file.relativePath,
-      "Survey observation attribution attestation " + file.observationId,
-      32 * 1024,
+      root, file.relativePath, "Survey observation attribution attestation " + file.observationId, 32 * 1024,
+    ));
+  }
+  const observationDeviceAttestationBytesAfter = [];
+  for (const file of observationDeviceAttestationFiles) {
+    observationDeviceAttestationBytesAfter.push(await readStableWorkspaceFile(
+      root, file.relativePath, "Survey observation device attestation " + file.observationId, 32 * 1024,
     ));
   }
   if (after.model?.sha256 !== candidateGlbSha256 ||
@@ -348,7 +403,10 @@ export async function prepareSingleImageReviewPackageEvidence({
         record.sha256 !== observationRecordFiles[index].sha256) ||
       observationAttestationBytesAfter.some((bytes, index) =>
         sha256(bytes) !== observationAttestationFiles[index].sha256 ||
-        !bytes.equals(observationAttestationFiles[index].bytes))) {
+        !bytes.equals(observationAttestationFiles[index].bytes)) ||
+      observationDeviceAttestationBytesAfter.some((bytes, index) =>
+        sha256(bytes) !== observationDeviceAttestationFiles[index].sha256 ||
+        !bytes.equals(observationDeviceAttestationFiles[index].bytes))) {
     throw new Error("Single-image smoke or survey observation evidence changed during review-package preparation.");
   }
 
@@ -365,12 +423,12 @@ export async function prepareSingleImageReviewPackageEvidence({
       bytes: file.bytes,
     })),
     ...observationAttestationFiles.map((file) => ({
-      artifactType: file.artifactType,
-      observationId: file.observationId,
-      checkpointId: file.checkpointId,
-      relativePath: file.relativePath,
-      sha256: file.sha256,
-      bytes: file.bytes,
+      artifactType: file.artifactType, observationId: file.observationId, checkpointId: file.checkpointId,
+      relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes,
+    })),
+    ...observationDeviceAttestationFiles.map((file) => ({
+      artifactType: file.artifactType, observationId: file.observationId, checkpointId: file.checkpointId,
+      relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes,
     })),
   ];
   const verticalEvidence = report.georeferenceEvidence.verticalEvidence;
@@ -378,7 +436,7 @@ export async function prepareSingleImageReviewPackageEvidence({
   const checkpointEvidence = report.georeferenceEvidence.independentCheckpointEvidence;
   const hasIndependentCheckpoints = checkpointEvidence?.status === "validated-needs-human-review";
   return {
-    schemaVersion: observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
+    schemaVersion: observationDeviceAttestationInventory ? "1.5.0" : observationAttestationInventory ? "1.4.0" : hasIndependentCheckpoints && observationRecordInventory ? "1.3.0" : hasVerticalCalibration ? "1.1.0" : "1.0.0",
     jobId,
     buildingId,
     sourceId: report.source.sourceId,
@@ -425,6 +483,14 @@ export async function prepareSingleImageReviewPackageEvidence({
         surveyObservationAttestations: observationAttestationInventory.entries,
         surveyObservationAttributionStatus: "attribution-signatures-verified",
         trustedSurveyorRegistryId: observationAttestationFiles[0]?.registryId ?? null,
+      } : {}),
+      ...(observationDeviceAttestationInventory ? {
+        surveyObservationDeviceAttestationCount: observationDeviceAttestationInventory.count,
+        surveyObservationDeviceAttestationBytes: observationDeviceAttestationInventory.totalBytes,
+        surveyObservationDeviceAttestationsSha256: observationDeviceAttestationInventory.sha256,
+        surveyObservationDeviceAttestations: observationDeviceAttestationInventory.entries,
+        surveyObservationDeviceAttestationStatus: "device-key-attestations-verified",
+        trustedSurveyDeviceRegistryId: observationDeviceAttestationFiles[0]?.registryId ?? null,
       } : {}),
     } : {}),
     mapReady: false,

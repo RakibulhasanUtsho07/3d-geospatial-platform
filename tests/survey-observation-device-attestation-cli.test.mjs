@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import {spawnSync} from "node:child_process";
+import path from "node:path";
+import test from "node:test";
+import {fileURLToPath} from "node:url";
+const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."),CLI=path.join(ROOT,"scripts/sign-survey-observation-device-attestation.mjs");
+const run=(args,env=process.env)=>spawnSync(process.execPath,[CLI,...args],{cwd:ROOT,env,encoding:"utf8",timeout:10000,maxBuffer:1024*1024});
+test("device CLI help is local and does not need credentials",()=>{const e={...process.env};delete e.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON;const r=run(["--help"],e);assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON/);assert.match(r.stdout,/not manufacturer certification/i);assert.equal(r.stderr,"");});
+test("device CLI fails closed without external registry",()=>{const e={...process.env};delete e.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON;const r=run(["workspace","job-001","private.pem","--device-id","receiver-001"],e);assert.notEqual(r.status,0);assert.match(r.stderr,/trusted-survey-device-registry-secret-missing/);assert.doesNotMatch(r.stdout+r.stderr,/BEGIN .*PRIVATE KEY/);});
+test("device CLI rejects unsafe IDs before loading registry",()=>{const e={...process.env};delete e.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON;const r=run(["workspace","job-001","private.pem","--device-id","../device"],e);assert.notEqual(r.status,0);assert.match(r.stderr,/Usage:/);assert.doesNotMatch(r.stderr,/registry-secret-missing/);});

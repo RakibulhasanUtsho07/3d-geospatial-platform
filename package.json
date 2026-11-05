@@ -126,6 +126,8 @@
     "test:building-review-package-signature": "node --test tests/building-review-package-signature.test.mjs tests/building-review-package-trusted-signature.test.mjs tests/building-review-package-trusted-signature-cli.test.mjs",
     "test:survey-observation-attribution": "node --test tests/survey-observation-attribution-attestation.test.mjs tests/survey-observation-attribution-cli.test.mjs",
     "sign:survey-observation-attribution": "node scripts/sign-survey-observation-attribution.mjs",
+    "test:survey-observation-device-attestation": "node --test tests/survey-observation-device-attestation.test.mjs tests/survey-observation-device-attestation-cli.test.mjs",
+    "sign:survey-observation-device-attestation": "node scripts/sign-survey-observation-device-attestation.mjs",
     "sign:building-review-package": "node scripts/sign-building-review-package.mjs",
     "verify:building-review-package-signature": "node scripts/verify-building-review-package-signature.mjs",
     "verify:signed-building-review-package": "node scripts/verify-signed-building-review-package.mjs",

@@ -98,6 +98,7 @@ on:
       - feat/d3m-engine14-independent-3d-checkpoints-20261104
       - feat/d3m-engine15-byte-verified-survey-records-20261105
       - feat/d3m-engine16-surveyor-record-attestations-20261105
+      - feat/d3m-engine17-device-record-attestations-20261105
 
   workflow_dispatch:
   pull_request:
@@ -117,6 +118,7 @@ on:
       - feat/d3m-engine14-independent-3d-checkpoints-20261104
       - feat/d3m-engine15-byte-verified-survey-records-20261105
       - feat/d3m-engine16-surveyor-record-attestations-20261105
+      - feat/d3m-engine17-device-record-attestations-20261105
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -206,6 +208,12 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Test trusted survey-device registry and exact-byte device attestations
+        run: npm run test:survey-observation-device-attestation
+
+      - name: Validate survey observation device-attestation signing CLI
+        run: npm run sign:survey-observation-device-attestation -- --help
 
       - name: Test feature picking controller lifecycle
         run: npm run test:feature-picking-controller

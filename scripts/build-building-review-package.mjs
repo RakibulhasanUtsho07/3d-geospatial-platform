@@ -110,6 +110,7 @@ async function main() {
       buildingId: renderReferenceReview.buildingId,
       candidateGlbSha256,
       trustedSurveyorRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
+      trustedDeviceRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON ?? null,
     })
     : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
@@ -272,7 +273,11 @@ async function main() {
       ] : [
         "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
       ]),
-      ...(singleImageSmokeEvidence.schemaVersion === "1.4.0" ? [
+      ...(singleImageSmokeEvidence.schemaVersion === "1.5.0" ? [
+        "7. Inspect each byte-preserved held-out record, surveyor attribution sidecar and adjacent `*.device-attestation.json` sidecar. Offline verification requires both external registries and binds both signatures to exact record, manifest and checkpoint bytes.",
+        "8. A device-key signature establishes key possession and declared record association only; it does not prove manufacturer certification, secure-element custody, genuine receiver capture or measurement accuracy.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.4.0" ? [
         "7. Inspect each byte-preserved held-out survey observation and its adjacent `*.attestation.json` sidecar under `evidence/survey-observations/`. Offline package verification requires the external `SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON` registry and confirms exact record/manifest/checkpoint binding plus active Ed25519 key signatures.",
         "8. A valid signature attributes the exact record/checkpoint statement to a registered key; it does not prove civil identity, surveyor qualification, receiver hardware authenticity, rights, CRS correctness, measurement accuracy or physical feature correspondence.",
         "9. Record a separate human release decision outside this automated package.",

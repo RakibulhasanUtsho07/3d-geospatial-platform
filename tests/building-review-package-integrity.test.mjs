@@ -35,6 +35,12 @@ import {
   signBuildingReviewPackageManifest,
   signBuildingReviewPackageManifestWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
+import {
+  buildSurveyObservationDeviceAttestationInventory,
+  createSurveyObservationDeviceAttestation,
+  surveyObservationDeviceAttestationPath,
+} from "../src/core/building-generation/survey-observation-device-attestation.mjs";
+
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const semanticDigest = (value) => hash(Buffer.from(JSON.stringify(value)));
@@ -1143,8 +1149,187 @@ test("binds original held-out survey record bytes through the complete review pa
     trustedSurveyorRegistry: wrongRegistry,
   });
   assert.equal(wrongSigner.valid, false);
-  assert.ok(wrongSigner.errors.some((item) =>
-    item.id === "single-image-georeference-recomputed"));
+
+  // D3M-17: add an independent device-key signature for every same held-out
+  // observation and verify a 1.5.0 package against both current trust registries.
+  const devicePair = generateKeyPairSync("ed25519");
+  const devicePrivateKeyPem = devicePair.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const devicePublicKeyPem = devicePair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const registryNow = new Date();
+  const registryIssued = new Date(registryNow.getTime() - 60 * 60 * 1000).toISOString();
+  const registryExpires = new Date(registryNow.getTime() + 30 * 86400000).toISOString();
+  const trustedDeviceRegistry = {
+    schemaVersion: "1.0.0",
+    recordType: "trusted-survey-device-public-key-registry",
+    registryId: "synthetic-devices-test-registry",
+    issuedAtUtc: registryIssued,
+    expiresAtUtc: registryExpires,
+    entries: [{
+      deviceId: "synthetic-receiver-01",
+      manufacturerId: "synthetic-vendor",
+      modelId: "synthetic-gnss-model",
+      deviceSerialCommitmentSha256: hash(Buffer.from("synthetic-keyed-serial-commitment")),
+      enrollmentEvidenceSha256: hash(Buffer.from("synthetic-device-enrollment-evidence")),
+      keyId: "synthetic-receiver-key-01",
+      status: "active",
+      publicKeyPem: devicePublicKeyPem,
+      validFromUtc: registryIssued,
+      validUntilUtc: registryExpires,
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  };
+  const deviceSidecars = recordInputs.map((record) => {
+    const checkpoint = manifest.heldOutCheckpoints.points.find(
+      (item) => item.observationId === record.observationId,
+    );
+    const attestation = createSurveyObservationDeviceAttestation({
+      recordBytes: record.bytes,
+      controlPointManifestBytes: manifestBytes,
+      observationId: checkpoint.observationId,
+      checkpointId: checkpoint.id,
+      buildingId,
+      deviceId: "synthetic-receiver-01",
+      privateKeyPem: devicePrivateKeyPem,
+      trustedDeviceRegistry,
+      attestedAtUtc: new Date().toISOString(),
+    });
+    const relativePath = surveyObservationDeviceAttestationPath(record.observationId);
+    const bytes = JSON_BYTES(attestation);
+    return {
+      artifactType: "single-image-survey-observation-device-attestation",
+      observationId: checkpoint.observationId,
+      checkpointId: checkpoint.id,
+      relativePath,
+      sha256: hash(bytes),
+      bytes,
+    };
+  });
+  const deviceInventory = buildSurveyObservationDeviceAttestationInventory(
+    deviceSidecars.map((item) => ({
+      observationId: item.observationId,
+      checkpointId: item.checkpointId,
+      relativePath: item.relativePath,
+      sha256: item.sha256,
+      bytes: item.bytes.length,
+    })),
+  );
+  const deviceEvidence = {
+    ...signedEvidence,
+    schemaVersion: "1.5.0",
+    surveyObservationDeviceAttestationCount: deviceInventory.count,
+    surveyObservationDeviceAttestationBytes: deviceInventory.totalBytes,
+    surveyObservationDeviceAttestationsSha256: deviceInventory.sha256,
+    surveyObservationDeviceAttestations: deviceInventory.entries,
+    surveyObservationDeviceAttestationStatus: "device-key-attestations-verified",
+    trustedSurveyDeviceRegistryId: trustedDeviceRegistry.registryId,
+    files: [
+      ...signedEvidence.files,
+      ...deviceSidecars.map((item) => ({
+        artifactType: item.artifactType,
+        observationId: item.observationId,
+        checkpointId: item.checkpointId,
+        relativePath: item.relativePath,
+        sha256: item.sha256,
+        bytes: item.bytes,
+      })),
+    ],
+  };
+  const devicePackageManifest = buildBuildingReviewPackageManifest({
+    buildingId,
+    readinessReport: readiness,
+    renderManifestViews: renderManifest.views,
+    artifacts: [
+      ...signedArtifacts,
+      ...deviceSidecars.map((item) => ({
+        artifactType: item.artifactType,
+        observationId: item.observationId,
+        checkpointId: item.checkpointId,
+        relativePath: item.relativePath,
+        sha256: item.sha256,
+        bytes: item.bytes.length,
+      })),
+    ],
+    singleImageEvidence: deviceEvidence,
+    generatedAt: new Date().toISOString(),
+  });
+  const deviceActualFiles = [
+    ...signedActualFiles,
+    ...deviceSidecars.map((item) => ({
+      relativePath: item.relativePath,
+      sha256: item.sha256,
+      bytes: item.bytes.length,
+      content: item.bytes,
+      isRegularFile: true,
+    })),
+  ];
+  const deviceReport = verifyBuildingReviewPackage({
+    packageManifest: devicePackageManifest,
+    actualFiles: deviceActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(devicePackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+  });
+  assert.equal(deviceReport.valid, true, JSON.stringify(deviceReport.errors));
+  assert.equal(devicePackageManifest.singleImageEvidence.schemaVersion, "1.5.0");
+  assert.equal(devicePackageManifest.singleImageEvidence.surveyObservationDeviceAttestationCount, 6);
+  assert.equal(devicePackageManifest.singleImageEvidence.trustedSurveyDeviceRegistryId, trustedDeviceRegistry.registryId);
+  assert.equal(deviceReport.publicationEligible, false);
+  assert.ok(deviceReport.checks.some((item) =>
+    item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  const deviceWithoutRegistry = verifyBuildingReviewPackage({
+    packageManifest: devicePackageManifest,
+    actualFiles: deviceActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(devicePackageManifest)),
+    trustedSurveyorRegistry,
+  });
+  assert.equal(deviceWithoutRegistry.valid, false);
+  assert.ok(deviceWithoutRegistry.errors.some((item) =>
+    item.message.includes("trusted-survey-device-registry-required-for-package-schema-1.5.0")));
+
+  const missingDeviceSidecars = deviceActualFiles.filter((file) =>
+    file.relativePath !== deviceSidecars[0].relativePath);
+  const missingDevice = verifyBuildingReviewPackage({
+    packageManifest: devicePackageManifest,
+    actualFiles: missingDeviceSidecars,
+    packageManifestSha256: hash(JSON_BYTES(devicePackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+  });
+  assert.equal(missingDevice.valid, false);
+  assert.ok(missingDevice.errors.some((item) =>
+    item.id === "file-present:" + deviceSidecars[0].relativePath));
+
+  const tamperedDeviceSidecars = deviceActualFiles.map((file) =>
+    file.relativePath === deviceSidecars[0].relativePath
+      ? { ...file, content: Buffer.concat([file.content, Buffer.from("tampered")]) }
+      : file);
+  const tamperedDevice = verifyBuildingReviewPackage({
+    packageManifest: devicePackageManifest,
+    actualFiles: tamperedDeviceSidecars,
+    packageManifestSha256: hash(JSON_BYTES(devicePackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry,
+  });
+  assert.equal(tamperedDevice.valid, false);
+
+  const wrongDevicePair = generateKeyPairSync("ed25519");
+  const wrongDeviceRegistry = {
+    ...trustedDeviceRegistry,
+    entries: [{
+      ...trustedDeviceRegistry.entries[0],
+      publicKeyPem: wrongDevicePair.publicKey.export({ type: "spki", format: "pem" }).toString(),
+    }],
+  };
+  const wrongDeviceSigner = verifyBuildingReviewPackage({
+    packageManifest: devicePackageManifest,
+    actualFiles: deviceActualFiles,
+    packageManifestSha256: hash(JSON_BYTES(devicePackageManifest)),
+    trustedSurveyorRegistry,
+    trustedDeviceRegistry: wrongDeviceRegistry,
+  });
+  assert.equal(wrongDeviceSigner.valid, false);
 });
 
 
