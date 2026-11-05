@@ -27,6 +27,11 @@ import {
 } from "../src/core/building-generation/single-image-georeference-evidence.mjs";
 import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
 import {
+  buildSurveyObservationAttributionInventory,
+  createSurveyObservationAttributionAttestation,
+  surveyObservationAttributionAttestationPath,
+} from "../src/core/building-generation/survey-observation-attribution-attestation.mjs";
+import {
   signBuildingReviewPackageManifest,
   signBuildingReviewPackageManifestWithTrustedRegistry,
 } from "../src/core/building-generation/building-review-package-signature.mjs";
