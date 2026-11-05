@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import {
+  buildSurveyDeviceEnrollmentEvidenceInventory,
   parseTrustedSurveyDeviceEnrollmentAuthorityRegistry,
   surveyDeviceEnrollmentEvidencePath,
   surveyDeviceEnrollmentEvidenceSigningBytes,
@@ -33,14 +34,10 @@ function sorted(value) {
   return value;
 }
 function canonical(value) { return Buffer.from(JSON.stringify(sorted(value)), "utf8"); }
-function fingerprint(publicKeyPem) {
-  return HASH(createPublicKey(publicKeyPem).export({ type: "spki", format: "der" }));
-}
 
 function makeFixture({ authorityType = "independent-enrollment-authority" } = {}) {
   const device = keys();
   const authority = keys();
-  const deviceFingerprint = fingerprint(device.publicKeyPem);
   const authorityRegistry = {
     schemaVersion: "1.0.0",
     recordType: "trusted-survey-device-enrollment-authority-public-key-registry",
@@ -64,14 +61,12 @@ function makeFixture({ authorityType = "independent-enrollment-authority" } = {}
     recordType: "survey-device-enrollment-evidence",
     engine: "survey-device-enrollment-evidence-v1",
     signatureAlgorithm: "Ed25519",
-    signaturePurpose: "survey-device-key-enrollment-association-only",
+    signaturePurpose: "survey-device-hardware-identity-enrollment-only",
     enrollmentId: "enrollment-2026-001",
     deviceId: "receiver-01",
     manufacturerId: "vendor-01",
     modelId: "gnss-model-a",
     deviceSerialCommitmentSha256: "a".repeat(64),
-    keyId: "receiver-key-01",
-    devicePublicKeyFingerprintSha256: deviceFingerprint,
     authorityId: "survey-enrollment-office",
     authorityType,
     authorityKeyId: "enrollment-key-01",
@@ -115,13 +110,12 @@ function verifyFixture(fixture, overrides = {}) {
     trustedDeviceRegistry: fixture.deviceRegistry,
     trustedEnrollmentAuthorityRegistry: fixture.authorityRegistry,
     deviceId: "receiver-01",
-    keyId: "receiver-key-01",
     now: NOW,
     ...overrides,
   });
 }
 
-test("verifies exact signed enrollment bytes against the D3M-17 device key and operator authority registry", () => {
+test("verifies exact device-level enrollment bytes against D3M-17 identity and operator authority registry", () => {
   const fixture = makeFixture({ authorityType: "manufacturer" });
   const result = verifyFixture(fixture);
   assert.equal(result.valid, true, JSON.stringify(result.checks));
@@ -129,8 +123,8 @@ test("verifies exact signed enrollment bytes against the D3M-17 device key and o
   assert.equal(result.evidenceSha256, fixture.deviceRegistry.entries[0].enrollmentEvidenceSha256);
   assert.equal(result.publicationEligible, false);
   assert.equal(parseTrustedSurveyDeviceEnrollmentAuthorityRegistry(fixture.authorityRegistry, { now: NOW }).activeEntries.length, 1);
-  assert.equal(surveyDeviceEnrollmentEvidencePath("receiver-01", "receiver-key-01"), "evidence/device-enrollments/receiver-01.receiver-key-01.enrollment.json");
-  assert.throws(() => surveyDeviceEnrollmentEvidencePath("con", "receiver-key-01"), /cross-platform/);
+  assert.equal(surveyDeviceEnrollmentEvidencePath("receiver-01"), "evidence/device-enrollments/receiver-01.enrollment.json");
+  assert.throws(() => surveyDeviceEnrollmentEvidencePath("con"), /cross-platform/);
 });
 
 test("rejects digest drift, noncanonical evidence bytes and tampered signatures", () => {
@@ -147,7 +141,7 @@ test("rejects digest drift, noncanonical evidence bytes and tampered signatures"
   assert.ok(result.errors.some((item) => item.id === "enrollment-authority-ed25519-signature"));
 });
 
-test("rejects device identity, serial commitment and device-public-key substitution", () => {
+test("rejects wrong device identity and serial commitment substitution", () => {
   const fixture = makeFixture();
   const evidence = JSON.parse(fixture.evidenceBytes.toString("utf8"));
   evidence.deviceSerialCommitmentSha256 = "c".repeat(64);
@@ -157,7 +151,32 @@ test("rejects device identity, serial commitment and device-public-key substitut
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((item) => item.id === "device-identity-binding"));
   assert.equal(verifyFixture(fixture, { deviceId: "receiver-02" }).valid, false);
-  assert.equal(verifyFixture(fixture, { keyId: "receiver-key-02" }).valid, false);
+});
+
+test("same immutable enrollment statement remains valid after a D3M-17 device-key rotation", () => {
+  const fixture = makeFixture();
+  const oldEntry = fixture.deviceRegistry.entries[0];
+  const replacement = keys();
+  const revokedAtUtc = "2026-11-04T00:00:00.000Z";
+  const rotatedRegistry = {
+    ...fixture.deviceRegistry,
+    entries: [
+      { ...oldEntry, status: "revoked", revokedAtUtc },
+      {
+        ...oldEntry,
+        keyId: "receiver-key-02",
+        status: "active",
+        publicKeyPem: replacement.publicKeyPem,
+        validFromUtc: revokedAtUtc,
+        revokedAtUtc: null,
+        replacesKeyId: oldEntry.keyId,
+      },
+    ],
+  };
+  const result = verifyFixture({ ...fixture, deviceRegistry: rotatedRegistry });
+  assert.equal(result.valid, true, JSON.stringify(result.checks));
+  assert.equal(result.evidenceSha256, oldEntry.enrollmentEvidenceSha256);
+  assert.equal(result.activeDeviceRegistryKeyId, "receiver-key-02");
 });
 
 test("rejects unknown, wrong and revoked enrollment authorities", () => {
@@ -197,13 +216,45 @@ test("rejects authority registry expiry, malformed key and broken rotation chain
   assert.throws(() => parseTrustedSurveyDeviceEnrollmentAuthorityRegistry({ ...fixture.authorityRegistry, unexpected: true }, { now: NOW }), /exact versioned/);
 });
 
+test("device enrollment package inventory is deterministic, unique and bounded", () => {
+  const entries = [
+    {
+      deviceId: "receiver-02", keyId: "key-02",
+      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-02", "key-02"),
+      sha256: "b".repeat(64), bytes: 240,
+      authorityId: "authority-01", authorityType: "independent-enrollment-authority",
+      authorityRegistryId: "authority-registry-01",
+    },
+    {
+      deviceId: "receiver-01", keyId: "key-01",
+      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-01", "key-01"),
+      sha256: "a".repeat(64), bytes: 180,
+      authorityId: "authority-01", authorityType: "independent-enrollment-authority",
+      authorityRegistryId: "authority-registry-01",
+    },
+  ];
+  const first = buildSurveyDeviceEnrollmentEvidenceInventory(entries);
+  const second = buildSurveyDeviceEnrollmentEvidenceInventory([...entries].reverse());
+  assert.equal(first.sha256, second.sha256);
+  assert.equal(first.count, 2);
+  assert.equal(first.totalBytes, 420);
+  assert.deepEqual(first.entries.map((item) => item.deviceId), ["receiver-01", "receiver-02"]);
+  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory([...entries, entries[0]]), /duplicated/);
+  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory(entries.map((item, index) =>
+    index === 0 ? { ...item, relativePath: "evidence/device-enrollments/other.json" } : item)), /invalid/);
+  assert.throws(() => buildSurveyDeviceEnrollmentEvidenceInventory(entries.map((item, index) =>
+    index === 0 ? { ...item, authorityRegistryId: "different-registry" } : item)), /same authority registry/);
+});
+
 test("keeps the JSON schemas strict and versioned", async () => {
   const registrySchema = JSON.parse(await readFile(new URL("../trusted-survey-device-enrollment-authority-public-key-registry.schema.json", import.meta.url), "utf8"));
   const evidenceSchema = JSON.parse(await readFile(new URL("../survey-device-enrollment-evidence.schema.json", import.meta.url), "utf8"));
   assert.equal(registrySchema.additionalProperties, false);
   assert.equal(registrySchema.properties.schemaVersion.const, "1.0.0");
   assert.equal(evidenceSchema.additionalProperties, false);
-  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-key-enrollment-association-only");
+  assert.equal(evidenceSchema.properties.signaturePurpose.const, "survey-device-hardware-identity-enrollment-only");
+  assert.equal(evidenceSchema.required.includes("keyId"), false);
+  assert.equal(evidenceSchema.required.includes("devicePublicKeyFingerprintSha256"), false);
   assert.equal(evidenceSchema.properties.publicationEligible.const, false);
 });
 
@@ -213,6 +264,7 @@ test("offline CLI prints help, verifies a fixture and rejects symlink inputs", a
   const help = spawnSync(process.execPath, [script.pathname, "--help"], { encoding: "utf8" });
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /operator-provisioned trust anchor/);
+  assert.doesNotMatch(help.stdout, /--key-id/);
   const directory = await mkdtemp(path.join(os.tmpdir(), "d3m18-enrollment-"));
   try {
     const devices = path.join(directory, "devices.json");
@@ -223,10 +275,11 @@ test("offline CLI prints help, verifies a fixture and rejects symlink inputs", a
       writeFile(authorities, JSON.stringify(fixture.authorityRegistry)),
       writeFile(evidence, fixture.evidenceBytes),
     ]);
-    const args = [script.pathname, devices, authorities, evidence, "--device-id", "receiver-01", "--key-id", "receiver-key-01", "--now", NOW];
+    const args = [script.pathname, devices, authorities, evidence, "--device-id", "receiver-01", "--now", NOW];
     const good = spawnSync(process.execPath, args, { encoding: "utf8" });
     assert.equal(good.status, 0, good.stderr + good.stdout);
     assert.equal(JSON.parse(good.stdout).valid, true);
+    assert.equal(JSON.parse(good.stdout).activeDeviceRegistryKeyId, "receiver-key-01");
     const linked = path.join(directory, "device-link.json");
     await symlink(devices, linked);
     const bad = spawnSync(process.execPath, [script.pathname, linked, authorities, evidence, "--device-id", "receiver-01", "--key-id", "receiver-key-01", "--now", NOW], { encoding: "utf8" });

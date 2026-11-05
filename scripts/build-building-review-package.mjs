@@ -221,6 +221,13 @@ async function main() {
         sourcePath: null,
         relativePath: evidenceFile.relativePath,
         bytes: evidenceFile.bytes,
+        metadata: evidenceFile.artifactType === "single-image-survey-device-enrollment-evidence" ? {
+          deviceId: evidenceFile.deviceId,
+          keyId: evidenceFile.keyId,
+          authorityId: evidenceFile.authorityId,
+          authorityType: evidenceFile.authorityType,
+          authorityRegistryId: evidenceFile.authorityRegistryId,
+        } : {},
       });
     }
   }

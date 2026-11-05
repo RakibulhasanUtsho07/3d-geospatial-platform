@@ -599,14 +599,27 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - Trust boundary remains unchanged: CI uses synthetic keys; no manufacturer certificate, secure-element custody, hardware identity, genuine receiver capture, firmware integrity or measurement accuracy is proven. All publication/map-ready/automatic-approval flags remain false.
 - PR #370 remains Draft/open/unmerged, stacked on #368. Do not promote this stack to `development` or `main` before independent review and external enrollment evidence.
 
-## D3M-ENGINE-18 — authority-signed survey-device enrollment evidence verifier
+## D3M-ENGINE-18 — authority-signed survey-device hardware enrollment evidence
 
 - **Tracking issue:** [#371](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/371).
 - **Implementation branch:** `feat/d3m-engine18-signed-device-enrollment-evidence-20261105`; stacked on D3M-ENGINE-17 PR #370 exact head `3cde93738045e47da1b09e453573ed6bedda61a3`.
-- Closes the D3M-17 opaque enrollment digest gap with a strict, canonical, domain-separated Ed25519 enrollment statement. The exact document SHA-256 must match the `enrollmentEvidenceSha256` in the active D3M-17 device registry entry.
-- Adds a separate public-key-only enrollment-authority registry, validity/revocation and linear key-rotation checks, and binding to device ID, manufacturer/model, keyed serial commitment, device key ID/SPKI fingerprint, authority identity/key/registry and the registered device-key validity window.
+- Verifies an exact-byte, canonical, domain-separated Ed25519 **device-level** hardware-enrollment statement. Its SHA-256 must match the one stable `enrollmentEvidenceSha256` value shared across the device's D3M-17 key-rotation history.
+- Important D3M-17 compatibility finding: D3M-17 deliberately requires `enrollmentEvidenceSha256` to remain stable when a device key rotates. Therefore the enrollment statement does **not** bind an individual device key ID/fingerprint. D3M-17 remains responsible for device-key possession, validity, revocation and rotation.
+- Adds a separate public-key-only enrollment-authority registry, validity/revocation and linear key-rotation checks, and binding to device ID, manufacturer/model and privacy-preserving keyed serial commitment.
 - Adds an offline bounded-input CLI that rejects symlinks and changing files and prints only sanitized verification results. The authority registry is an operator-provisioned trust anchor, separate from reviewer/surveyor/device registries. An operator-assigned `manufacturer` authority type does not prove legal manufacturer identity or certificate-chain validation.
-- Adds schemas, synthetic-key adversarial tests, CLI tests, CI test/help wiring and runbook `docs/D3M-ENGINE-18-DEVICE-ENROLLMENT-EVIDENCE.md`.
-- **Scope limit:** this increment verifies an external signed evidence document but does not yet embed it in review-package schema 1.6.0 or make it a release/publication gate. No production authority key, device serial, enrollment document or private key is included. It does not prove secure-element custody, manufacturer certification, firmware integrity, genuine capture or measurement accuracy.
-- **Validation status:** local synthetic suite is 9/9 passing after hardening the Buffer-to-D3M-17-parser input boundary and requiring evidence issuance inside the device-key validity interval. Exact-head Push/PR Full CI is pending; do not claim the branch validated until both runs finish successfully.
+- Adds schemas, synthetic-key adversarial tests including D3M-17 key-rotation reuse, CLI tests, CI test/help wiring and runbook `docs/D3M-ENGINE-18-DEVICE-ENROLLMENT-EVIDENCE.md`.
+- **Scope limit:** this increment verifies a device-level external signed evidence document but does not yet embed it in review-package schema 1.6.0 or make it a release/publication gate. No production authority key, device serial, enrollment document or signing secret is included. It does not prove secure-element custody, manufacturer certification, firmware integrity, genuine capture or measurement accuracy.
+- **Validation status:** the initial key-specific binding design was corrected to preserve the D3M-17 rotation invariant. Exact-head Push/PR Full CI must pass before validation is claimed.
 - PR #370 and its dependency chain #368 → #366 → #363 remain Draft/open/unmerged. Do not merge, retarget or promote this stack to `development`/`main`. All publication/map-ready/automatic-approval flags remain false.
+
+## D3M-ENGINE-19 — bind signed device enrollment evidence into review packages
+
+- **Tracking issue:** [#373](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/373).
+- **Implementation branch:** `feat/d3m-engine19-review-package-enrollment-evidence-20261105`; stacked on D3M-ENGINE-18 PR #372 exact head `f97d13dcd94dee73a0dacfb9a229bf27177e5ab1`.
+- Extends single-image evidence package metadata to schema 1.6.0 when D3M-17 device attestations and D3M-18 enrollment evidence are both present. Carries exactly one original evidence document for every distinct device/key pair referenced by the held-out device-attestation sidecars.
+- Package preparation reads deterministic `evidence/device-enrollments/<deviceId>.<keyId>.enrollment.json` files using the existing bounded stable no-follow reader, verifies exact document SHA-256 against the active D3M-17 device registry entry and checks the D3M-18 authority signature. The inventory digest and authority registry ID are bound into package metadata and artifact inventory.
+- Offline package verification independently reconstructs device/key pairs from packaged D3M-17 sidecars and repeats D3M-18 verification against both current trust registries. Missing, extra/orphaned, tampered, wrong-key, wrong-authority and stale-digest evidence fail closed.
+- Preserves schema 1.5.0 as device-key-attested only and schemas 1.0.0–1.4.0 unchanged. Schema 1.6.0 does not authorize release or publication.
+- Adds synthetic end-to-end positive/negative coverage, inventory determinism tests, operator runbook `docs/D3M-ENGINE-19-REVIEW-PACKAGE-ENROLLMENT-EVIDENCE.md` and exact branch filters in Full CI.
+- **Validation status:** implementation/test/docs changes prepared on the D3M-18 descendant branch; exact-head CI is pending. The D3M-18 parent Full CI runs #42004699725 and #42004730348 still need terminal completion. No CI or real enrollment evidence pass is claimed for D3M-19 at this stage.
+- PR #372 remains Draft/open/unmerged, stacked on #370 → #368 → #366 → #363; all are still Draft/open/unmerged. Keep this stack review-only and do not promote it to `development`/`main`. All release/publication/map-ready/automatic-approval flags remain false.

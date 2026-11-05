@@ -264,6 +264,48 @@ export function surveyDeviceEnrollmentEvidencePath(deviceId, keyId) {
   return "evidence/device-enrollments/" + deviceId + "." + keyId + ".enrollment.json";
 }
 
+export function buildSurveyDeviceEnrollmentEvidenceInventory(entries) {
+  if (!Array.isArray(entries) || entries.length < 1 || entries.length > MAX_SURVEY_DEVICE_ENROLLMENT_AUTHORITIES) {
+    throw new RangeError("Device enrollment evidence inventory requires 1–100 unique device-key entries.");
+  }
+  const pairs = new Set();
+  const paths = new Set();
+  const normalized = entries.map((entry, index) => {
+    if (!isObject(entry)) throw new TypeError("Device enrollment evidence inventory entry " + index + " is invalid.");
+    const deviceId = safeId(entry.deviceId, "deviceId");
+    const keyId = safeId(entry.keyId, "keyId");
+    const relativePath = surveyDeviceEnrollmentEvidencePath(deviceId, keyId);
+    if (entry.relativePath !== relativePath || paths.has(relativePath) || pairs.has(deviceId + "\0" + keyId) ||
+        !HASH.test(entry.sha256 ?? "") || !Number.isSafeInteger(entry.bytes) ||
+        entry.bytes < 1 || entry.bytes > MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES ||
+        !isSafeId(entry.authorityId) ||
+        !["manufacturer", "independent-enrollment-authority"].includes(entry.authorityType) ||
+        !isSafeId(entry.authorityRegistryId)) {
+      throw new TypeError("Device enrollment evidence inventory entry " + index + " is invalid or duplicated.");
+    }
+    pairs.add(deviceId + "\0" + keyId);
+    paths.add(relativePath);
+    return {
+      deviceId, keyId, relativePath, sha256: entry.sha256, bytes: entry.bytes,
+      authorityId: entry.authorityId, authorityType: entry.authorityType,
+      authorityRegistryId: entry.authorityRegistryId,
+    };
+  }).sort((left, right) => left.deviceId.localeCompare(right.deviceId) || left.keyId.localeCompare(right.keyId));
+  const registryIds = new Set(normalized.map((entry) => entry.authorityRegistryId));
+  if (registryIds.size !== 1) throw new TypeError("All enrollment evidence in one inventory must use the same authority registry.");
+  const totalBytes = normalized.reduce((sum, entry) => sum + entry.bytes, 0);
+  if (!Number.isSafeInteger(totalBytes) ||
+      totalBytes > MAX_SURVEY_DEVICE_ENROLLMENT_AUTHORITIES * MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES) {
+    throw new RangeError("Device enrollment evidence inventory exceeds the aggregate byte limit.");
+  }
+  return {
+    count: normalized.length,
+    totalBytes,
+    sha256: sha256(Buffer.from(JSON.stringify(normalized), "utf8")),
+    entries: normalized,
+  };
+}
+
 export function verifySurveyDeviceEnrollmentEvidence({
   evidenceBytes,
   trustedDeviceRegistry,
