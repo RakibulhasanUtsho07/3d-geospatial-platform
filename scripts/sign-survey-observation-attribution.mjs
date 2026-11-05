@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { constants } from "node:fs";
+import { constants } from "node:fs";\nimport { createHash } from "node:crypto";
 import { lstat, open, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -165,7 +165,7 @@ async function main() {
     maxBytes: 1024 * 1024,
   });
   if (manifestFile.bytes.length !== georeference.manifest.bytes ||
-      (await import("node:crypto")).createHash("sha256").update(manifestFile.bytes).digest("hex") !== georeference.manifest.sha256) {
+      createHash("sha256").update(manifestFile.bytes).digest("hex") !== georeference.manifest.sha256) {
     throw new Error("Control-point manifest bytes do not match the verified smoke report.");
   }
   const controlManifest = parseJson(manifestFile.bytes, "Single-image control-point manifest");
@@ -268,15 +268,34 @@ async function main() {
     }
 
     const afterSmoke = await verifySingleImageRuntimeSmoke({ workspaceRoot, jobId });
+    const reportAfter = await readStableSingleImageWorkspaceEvidenceFile({
+      workspaceRoot,
+      relativePath: reportRelativePath,
+      label: "Single-image runtime smoke report",
+      maxBytes: MAX_SMOKE_REPORT_BYTES,
+    });
     const manifestAfter = await readStableSingleImageWorkspaceEvidenceFile({
       workspaceRoot,
       relativePath: manifestRelativePath,
       label: "Single-image held-out control-point manifest",
       maxBytes: 1024 * 1024,
     });
+    const changedRecords = [];
+    for (const candidate of candidates) {
+      const recordAfter = await readStableSingleImageSurveyObservationRecord({
+        workspaceRoot,
+        observationId: candidate.attestation.observationId,
+      });
+      if (recordAfter.sha256 !== candidate.record.sha256 ||
+          !recordAfter.bytes.equals(candidate.record.bytes)) {
+        changedRecords.push(candidate.attestation.observationId);
+      }
+    }
     if (afterSmoke.model?.sha256 !== beforeSmoke.model?.sha256 ||
-        !manifestAfter.bytes.equals(manifestFile.bytes)) {
-      throw new Error("Smoke output or control-point manifest changed during attribution signing.");
+        !reportAfter.bytes.equals(reportFile.bytes) ||
+        !manifestAfter.bytes.equals(manifestFile.bytes) ||
+        changedRecords.length > 0) {
+      throw new Error("Smoke output, control-point manifest or survey observation bytes changed during attribution signing.");
     }
   } catch (error) {
     await removeOnlyCreatedSidecars(created);
@@ -294,7 +313,7 @@ async function main() {
       observationId: candidate.attestation.observationId,
       checkpointId: candidate.attestation.checkpointId,
       relativePath: candidate.relativePath,
-      sha256: (await import("node:crypto")).createHash("sha256").update(candidate.bytes).digest("hex"),
+      sha256: createHash("sha256").update(candidate.bytes).digest("hex"),
       bytes: candidate.bytes.length,
     })),
     publicationEligible: false,
