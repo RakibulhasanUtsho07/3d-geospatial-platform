@@ -274,48 +274,32 @@ export function buildBuildingReviewPackageManifest({
           !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceRegistryId");
       }
       if (singleImageEvidence.schemaVersion === "1.6.0") {
-        const devicePairs = new Map();
+        const deviceIds = new Set();
         for (const item of deviceAttestationFiles) {
-          if (typeof item.deviceId !== "string" || typeof item.keyId !== "string") {
-            throw new Error("device-attestation file metadata omits device/key identity");
-          }
-          devicePairs.set(item.deviceId + "\0" + item.keyId, {
-            deviceId: item.deviceId, keyId: item.keyId,
-          });
+          if (typeof item.deviceId !== "string" || typeof item.keyId !== "string") throw new Error("device-attestation file metadata omits device/key identity");
+          deviceIds.add(item.deviceId);
         }
-        enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(
-          enrollmentEvidenceFiles.map((item) => ({
-            deviceId: item.deviceId, keyId: item.keyId, relativePath: item.relativePath,
-            sha256: item.sha256, bytes: item.bytes, authorityId: item.authorityId,
-            authorityType: item.authorityType, authorityRegistryId: item.authorityRegistryId,
-          })),
-        );
-        surveyDeviceEnrollmentEvidenceValid =
-          enrollmentEvidenceInventory.count === singleImageEvidence.surveyDeviceEnrollmentEvidenceCount &&
-          enrollmentEvidenceInventory.count === devicePairs.size &&
-          enrollmentEvidenceInventory.totalBytes === singleImageEvidence.surveyDeviceEnrollmentEvidenceBytes &&
+        enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(enrollmentEvidenceFiles.map((item) => ({
+          deviceId: item.deviceId, relativePath: item.relativePath, sha256: item.sha256, bytes: item.bytes,
+          authorityId: item.authorityId, authorityType: item.authorityType, authorityRegistryId: item.authorityRegistryId,
+        })));
+        surveyDeviceEnrollmentEvidenceValid = enrollmentEvidenceInventory.count === singleImageEvidence.surveyDeviceEnrollmentEvidenceCount &&
+          enrollmentEvidenceInventory.count === deviceIds.size && enrollmentEvidenceInventory.totalBytes === singleImageEvidence.surveyDeviceEnrollmentEvidenceBytes &&
           enrollmentEvidenceInventory.sha256 === singleImageEvidence.surveyDeviceEnrollmentEvidenceSha256 &&
           typeof singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId === "string" &&
           /^[a-z0-9][a-z0-9._-]{0,79}$/.test(singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId) &&
           singleImageEvidence.surveyDeviceEnrollmentEvidenceStatus === "enrollment-authority-evidence-verified" &&
-          enrollmentEvidenceArtifacts.length === enrollmentEvidenceInventory.count &&
-          enrollmentEvidenceFiles.length === enrollmentEvidenceInventory.count &&
+          enrollmentEvidenceArtifacts.length === enrollmentEvidenceInventory.count && enrollmentEvidenceFiles.length === enrollmentEvidenceInventory.count &&
           enrollmentEvidenceInventory.entries.every((entry) => {
-            const pair = devicePairs.get(entry.deviceId + "\0" + entry.keyId);
             const file = enrollmentEvidenceFiles.find((item) => item.relativePath === entry.relativePath);
             const artifact = enrollmentEvidenceArtifacts.find((item) => item.relativePath === entry.relativePath);
-            return pair && file && Buffer.isBuffer(file.bytes) && file.bytes.length === entry.bytes &&
-              hash(file.bytes) === entry.sha256 && file.sha256 === entry.sha256 &&
-              file.deviceId === entry.deviceId && file.keyId === entry.keyId &&
-              file.authorityId === entry.authorityId && file.authorityType === entry.authorityType &&
-              file.authorityRegistryId === entry.authorityRegistryId &&
-              artifact && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
-          }) &&
-          enrollmentEvidenceInventory.entries.every((entry) => entry.authorityRegistryId ===
-            singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId);
+            return deviceIds.has(entry.deviceId) && file && Buffer.isBuffer(file.bytes) && file.bytes.length === entry.bytes &&
+              hash(file.bytes) === entry.sha256 && file.sha256 === entry.sha256 && file.deviceId === entry.deviceId && !Object.hasOwn(file, "keyId") &&
+              file.authorityId === entry.authorityId && file.authorityType === entry.authorityType && file.authorityRegistryId === entry.authorityRegistryId &&
+              artifact && artifact.deviceId === entry.deviceId && !Object.hasOwn(artifact, "keyId") && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
+          }) && enrollmentEvidenceInventory.entries.every((entry) => entry.authorityRegistryId === singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId);
       } else {
-        surveyDeviceEnrollmentEvidenceValid =
-          enrollmentEvidenceArtifacts.length === 0 && enrollmentEvidenceFiles.length === 0 &&
+        surveyDeviceEnrollmentEvidenceValid = enrollmentEvidenceArtifacts.length === 0 && enrollmentEvidenceFiles.length === 0 &&
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyDeviceEnrollmentEvidence")) &&
           !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyDeviceEnrollmentAuthorityRegistryId");
       }

@@ -687,89 +687,46 @@ export function verifyBuildingReviewPackage({
         artifactByType.get("single-image-survey-device-enrollment-evidence") ?? [];
       let surveyDeviceEnrollmentEvidenceMetadataMatches = false;
       if (metadata.schemaVersion === "1.6.0") {
-        if (!trustedDeviceRegistry) {
-          throw new Error("trusted-survey-device-registry-required-for-package-schema-1.6.0");
-        }
-        if (!trustedEnrollmentAuthorityRegistry) {
-          throw new Error("trusted-survey-device-enrollment-authority-registry-required-for-package-schema-1.6.0");
-        }
-        if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100) {
-          throw new Error("single-image-device-enrollment-checkpoint-inventory-incomplete");
-        }
-        const devicePairs = new Map();
+        if (!trustedDeviceRegistry) throw new Error("trusted-survey-device-registry-required-for-package-schema-1.6.0");
+        if (!trustedEnrollmentAuthorityRegistry) throw new Error("trusted-survey-device-enrollment-authority-registry-required-for-package-schema-1.6.0");
+        if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100) throw new Error("single-image-device-enrollment-checkpoint-inventory-incomplete");
+        const deviceIds = new Set();
         for (const checkpoint of checkpoints) {
           const sidecarPath = surveyObservationDeviceAttestationPath(checkpoint.observationId);
           const sidecarFile = actualByPath.get(sidecarPath);
           const sidecarArtifact = artifactByPath.get(sidecarPath);
-          if (!sidecarFile || !sidecarArtifact ||
-              sidecarArtifact.artifactType !== "single-image-survey-observation-device-attestation") {
-            throw new Error("single-image-device-enrollment-device-attestation-missing:" + checkpoint.observationId);
-          }
+          if (!sidecarFile || !sidecarArtifact || sidecarArtifact.artifactType !== "single-image-survey-observation-device-attestation") throw new Error("single-image-device-enrollment-device-attestation-missing:" + checkpoint.observationId);
           let sidecar;
           try { sidecar = JSON.parse(sidecarFile.content.toString("utf8")); }
           catch { throw new Error("single-image-device-enrollment-device-attestation-json-invalid:" + checkpoint.observationId); }
-          const deviceId = sidecar?.deviceId;
-          const keyId = sidecar?.keyId;
-          if (typeof deviceId !== "string" || typeof keyId !== "string") {
-            throw new Error("single-image-device-enrollment-device-identity-missing:" + checkpoint.observationId);
-          }
-          const pairKey = deviceId + "\0" + keyId;
-          devicePairs.set(pairKey, { deviceId, keyId });
+          if (typeof sidecar?.deviceId !== "string") throw new Error("single-image-device-enrollment-device-identity-missing:" + checkpoint.observationId);
+          deviceIds.add(sidecar.deviceId);
         }
-        if (surveyDeviceEnrollmentEvidenceArtifacts.length !== devicePairs.size) {
-          throw new Error("single-image-device-enrollment-evidence-inventory-incomplete-or-extra");
-        }
+        if (surveyDeviceEnrollmentEvidenceArtifacts.length !== deviceIds.size) throw new Error("single-image-device-enrollment-evidence-inventory-incomplete-or-extra");
         const verifiedEnrollmentEntries = [];
-        for (const pair of [...devicePairs.values()].sort((a, b) =>
-          a.deviceId.localeCompare(b.deviceId) || a.keyId.localeCompare(b.keyId))) {
-          const relativePath = surveyDeviceEnrollmentEvidencePath(pair.deviceId, pair.keyId);
+        for (const deviceId of [...deviceIds].sort()) {
+          const relativePath = surveyDeviceEnrollmentEvidencePath(deviceId);
           const artifact = artifactByPath.get(relativePath);
           const actual = actualByPath.get(relativePath);
-          if (!artifact || artifact.artifactType !== "single-image-survey-device-enrollment-evidence" ||
-              !actual || actual.content.length > 32 * 1024 || actual.content.length !== artifact.bytes ||
-              digest(actual.content) !== artifact.sha256 ||
-              artifact.deviceId !== pair.deviceId || artifact.keyId !== pair.keyId) {
-            throw new Error("single-image-device-enrollment-evidence-byte-binding-failed:" + pair.deviceId + "/" + pair.keyId);
+          if (!artifact || artifact.artifactType !== "single-image-survey-device-enrollment-evidence" || !actual ||
+              actual.content.length > 32 * 1024 || actual.content.length !== artifact.bytes || digest(actual.content) !== artifact.sha256 ||
+              artifact.deviceId !== deviceId || Object.hasOwn(artifact, "keyId")) throw new Error("single-image-device-enrollment-evidence-byte-binding-failed:" + deviceId);
+          const result = verifySurveyDeviceEnrollmentEvidence({ evidenceBytes: actual.content, trustedDeviceRegistry, trustedEnrollmentAuthorityRegistry, deviceId });
+          if (!result.valid || result.evidenceSha256 !== artifact.sha256 || result.authorityRegistryId !== metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId ||
+              result.authorityId !== artifact.authorityId || result.authorityType !== artifact.authorityType || artifact.authorityRegistryId !== result.authorityRegistryId) {
+            throw new Error("single-image-device-enrollment-authority-signature-invalid:" + deviceId + ": " + result.errors.map((item) => item.id).join(","));
           }
-          const result = verifySurveyDeviceEnrollmentEvidence({
-            evidenceBytes: actual.content,
-            trustedDeviceRegistry,
-            trustedEnrollmentAuthorityRegistry,
-            deviceId: pair.deviceId,
-            keyId: pair.keyId,
-          });
-          if (!result.valid || result.evidenceSha256 !== artifact.sha256 ||
-              result.authorityRegistryId !== metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId ||
-              result.authorityId !== artifact.authorityId || result.authorityType !== artifact.authorityType ||
-              artifact.authorityRegistryId !== result.authorityRegistryId) {
-            throw new Error("single-image-device-enrollment-authority-signature-invalid:" +
-              pair.deviceId + "/" + pair.keyId + ":" + result.errors.map((item) => item.id).join(","));
-          }
-          verifiedEnrollmentEntries.push({
-            deviceId: pair.deviceId,
-            keyId: pair.keyId,
-            relativePath,
-            sha256: artifact.sha256,
-            bytes: artifact.bytes,
-            authorityId: result.authorityId,
-            authorityType: result.authorityType,
-            authorityRegistryId: result.authorityRegistryId,
-          });
+          verifiedEnrollmentEntries.push({ deviceId, relativePath, sha256: artifact.sha256, bytes: artifact.bytes,
+            authorityId: result.authorityId, authorityType: result.authorityType, authorityRegistryId: result.authorityRegistryId });
         }
         const inventory = buildSurveyDeviceEnrollmentEvidenceInventory(verifiedEnrollmentEntries);
-        const metadataEntries = Array.isArray(metadata.surveyDeviceEnrollmentEvidence)
-          ? metadata.surveyDeviceEnrollmentEvidence : [];
-        surveyDeviceEnrollmentEvidenceMetadataMatches =
-          inventory.count === metadata.surveyDeviceEnrollmentEvidenceCount &&
-          inventory.count === devicePairs.size &&
-          inventory.totalBytes === metadata.surveyDeviceEnrollmentEvidenceBytes &&
-          inventory.sha256 === metadata.surveyDeviceEnrollmentEvidenceSha256 &&
-          canonicalJson(inventory.entries) === canonicalJson(metadataEntries) &&
-          metadata.surveyDeviceEnrollmentEvidenceStatus === "enrollment-authority-evidence-verified" &&
+        const metadataEntries = Array.isArray(metadata.surveyDeviceEnrollmentEvidence) ? metadata.surveyDeviceEnrollmentEvidence : [];
+        surveyDeviceEnrollmentEvidenceMetadataMatches = inventory.count === metadata.surveyDeviceEnrollmentEvidenceCount && inventory.count === deviceIds.size &&
+          inventory.totalBytes === metadata.surveyDeviceEnrollmentEvidenceBytes && inventory.sha256 === metadata.surveyDeviceEnrollmentEvidenceSha256 &&
+          canonicalJson(inventory.entries) === canonicalJson(metadataEntries) && metadata.surveyDeviceEnrollmentEvidenceStatus === "enrollment-authority-evidence-verified" &&
           inventory.entries.every((entry) => entry.authorityRegistryId === metadata.trustedSurveyDeviceEnrollmentAuthorityRegistryId);
       } else {
-        surveyDeviceEnrollmentEvidenceMetadataMatches =
-          surveyDeviceEnrollmentEvidenceArtifacts.length === 0 &&
+        surveyDeviceEnrollmentEvidenceMetadataMatches = surveyDeviceEnrollmentEvidenceArtifacts.length === 0 &&
           !Object.keys(metadata).some((key) => key.startsWith("surveyDeviceEnrollmentEvidence")) &&
           !Object.hasOwn(metadata, "trustedSurveyDeviceEnrollmentAuthorityRegistryId");
       }

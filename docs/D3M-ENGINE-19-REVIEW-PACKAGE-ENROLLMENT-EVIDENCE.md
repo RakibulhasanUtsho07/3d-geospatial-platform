@@ -2,7 +2,7 @@
 
 **Tracking issue:** [#373](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/373)  
 **Implementation branch:** `feat/d3m-engine19-review-package-enrollment-evidence-20261105`  
-**Stack base:** D3M-ENGINE-18 PR [#372](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/372), exact base `f97d13dcd94dee73a0dacfb9a229bf27177e5ab1`.
+**Stack base:** D3M-ENGINE-18 PR [#372](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/pull/372), exact base `eaf3caabdd6825342d6948c70ee01d4185b49077`.
 
 ## Purpose
 
@@ -14,9 +14,9 @@ A package with D3M-17 device attestations and D3M-18 enrollment evidence uses `s
 
 - The existing D3M-17 record and device-attestation files (schema 1.5.0 semantics remain intact).
 - Exactly one `single-image-survey-device-enrollment-evidence` artifact for each distinct device identity referenced by those device-attestation sidecars, at `evidence/device-enrollments/<deviceId>.enrollment.json`.
-- Inventory count, total bytes, deterministic inventory SHA-256 and normalized entries (device/key/path/hash/size/authority identity), plus the trusted authority registry ID and `enrollment-authority-evidence-verified` status.
+- Inventory count, total bytes, deterministic inventory SHA-256 and normalized device-level entries (device ID/path/hash/size/authority identity), plus the trusted authority registry ID and `enrollment-authority-evidence-verified` status.
 
-Duplicate pairs are deduplicated at preparation. Missing documents, extra/orphaned files, duplicate/unsafe paths, file drift, wrong device/key identity, stale D3M-17 digest, invalid authority signature, unknown/revoked/expired authority and authority-registry substitution fail closed. The package directory inventory independently rejects symlinks and non-regular files.
+Repeated device-attestation sidecars for the same device ID are deduplicated at preparation. Missing documents, extra/orphaned files, duplicate/unsafe paths, file drift, wrong device identity, stale D3M-17 digest, invalid authority signature, unknown/revoked/expired authority and authority-registry substitution fail closed. The package directory inventory independently rejects symlinks and non-regular files.
 
 ## Build a package
 
@@ -56,7 +56,7 @@ unset SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON
 unset SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON
 ```
 
-Offline verification independently reconstructs the unique device-ID set from the packaged D3M-17 signed sidecars, locates one enrollment document for each device, hashes the exact bytes, checks the current D3M-17 registry digest, and verifies the D3M-18 Ed25519 authority statement using the operator-provisioned authority registry. The package-manifest checksum alone is not treated as cryptographic enrollment proof.
+Offline verification independently reconstructs the unique device-ID set from the packaged D3M-17 signed sidecars, locates one enrollment document for each device, hashes the exact bytes, checks the stable D3M-17 registry digest across the device's key history, and verifies the D3M-18 Ed25519 authority statement using the operator-provisioned authority registry. The package-manifest checksum alone is not treated as cryptographic enrollment proof. D3M-18 statements deliberately omit a device key ID or public-key fingerprint so the same immutable statement survives D3M-17 key rotation; per-key possession, validity and revocation remain D3M-17 responsibilities.
 
 ## Compatibility and release boundary
 
