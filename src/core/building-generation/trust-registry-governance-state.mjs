@@ -280,6 +280,82 @@ function createInitialState(identity, minimumAcceptedSequence, now) {
   });
 }
 
+/** Validate a state envelope against the independently supplied trust identity. */
+export function validateTrustRegistryGovernanceState(value, identity) {
+  return validateState(value, identity);
+}
+
+/** Build the first state envelope for an external atomic initialize-if-absent store. */
+export function createTrustRegistryGovernanceInitialState({
+  registrySetId,
+  governanceKeyFingerprintSha256,
+  bootstrapMinimumSequence,
+  now: nowInput,
+}) {
+  const identity = { registrySetId, governanceKeyFingerprintSha256 };
+  assertIdentity(identity);
+  const now = nowInput instanceof Date ? new Date(nowInput) : new Date(nowInput ?? Date.now());
+  if (!Number.isFinite(now.getTime())) throw new TypeError("Governance state clock is invalid.");
+  return createInitialState(identity, bootstrapMinimumSequence, now);
+}
+
+/** Pure transition builder shared by the file store and external CAS providers. */
+export function createNextTrustRegistryGovernanceState({
+  current,
+  registrySetId,
+  governanceKeyFingerprintSha256,
+  expectedRevision,
+  acceptedSequence,
+  acceptedAttestationSha256,
+  acceptedSnapshotSha256,
+  now: nowInput,
+}) {
+  const identity = { registrySetId, governanceKeyFingerprintSha256 };
+  const validated = validateState(current, identity);
+  const sequence = parsePositiveInteger(acceptedSequence, "acceptedSequence");
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new TypeError("expectedRevision must be a non-negative safe integer.");
+  }
+  if (validated.revision !== expectedRevision) {
+    throw new Error("Governance state compare-and-set revision conflict.");
+  }
+  if (!HASH.test(acceptedAttestationSha256 ?? "") || !HASH.test(acceptedSnapshotSha256 ?? "")) {
+    throw new TypeError("Accepted governance attestation and snapshot digests must be SHA-256.");
+  }
+  const now = nowInput instanceof Date ? new Date(nowInput) : new Date(nowInput ?? Date.now());
+  if (!Number.isFinite(now.getTime())) throw new TypeError("Governance state clock is invalid.");
+  if (sequence < validated.minimumAcceptedSequence) {
+    throw new Error("Governance sequence downgrade is not permitted.");
+  }
+  if (sequence === validated.minimumAcceptedSequence) {
+    if (validated.lastAcceptedAttestationSha256 === acceptedAttestationSha256 &&
+        validated.lastAcceptedSnapshotSha256 === acceptedSnapshotSha256) {
+      return { state: validated, changed: false };
+    }
+    if (validated.lastAcceptedAttestationSha256 !== null ||
+        validated.lastAcceptedSnapshotSha256 !== null) {
+      throw new Error("A governance sequence cannot be reused for a different statement or snapshot.");
+    }
+  }
+  if (validated.revision >= Number.MAX_SAFE_INTEGER) {
+    throw new RangeError("Governance state revision space is exhausted.");
+  }
+  const next = sealState({
+    schemaVersion: TRUST_REGISTRY_GOVERNANCE_STATE_SCHEMA_VERSION,
+    recordType: TRUST_REGISTRY_GOVERNANCE_STATE_RECORD_TYPE,
+    registrySetId: validated.registrySetId,
+    governanceKeyFingerprintSha256: validated.governanceKeyFingerprintSha256,
+    minimumAcceptedSequence: sequence,
+    revision: validated.revision + 1,
+    lastAcceptedAttestationSha256: acceptedAttestationSha256,
+    lastAcceptedSnapshotSha256: acceptedSnapshotSha256,
+    updatedAtUtc: now.toISOString(),
+    previousStateSha256: validated.stateSha256,
+  });
+  return { state: next, changed: true };
+}
+
+
 /**
  * Load the operator's persisted floor, or bootstrap exactly once from an
  * explicit operator-supplied floor. Corrupt or mismatched state is never reset.
