@@ -130,7 +130,8 @@ export function buildBuildingReviewPackageManifest({
   const singleImageArtifactCount = [...singleImageCounts.values()].reduce((sum, count) => sum + count, 0);
   if (singleImageEvidence === null) {
     if (singleImageArtifactCount !== 0 ||
-        (byType.get("single-image-survey-observation-record") ?? 0) !== 0) {
+        (byType.get("single-image-survey-observation-record") ?? 0) !== 0 ||
+        (byType.get("single-image-survey-observation-attestation") ?? 0) !== 0) {
       throw new Error("review-package-single-image-evidence-metadata-missing");
     }
   } else {
