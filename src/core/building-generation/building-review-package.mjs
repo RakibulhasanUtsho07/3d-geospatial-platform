@@ -308,7 +308,7 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
-      ...(["1.1.0", "1.2.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ? {
         verticalStatus: singleImageEvidence.verticalStatus,
         verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
         verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
