@@ -159,7 +159,10 @@ function validateBytes({recordBytes,controlPointManifestBytes}) {
   if(!Buffer.isBuffer(recordBytes)||recordBytes.length<1||recordBytes.length>16*1024*1024) throw new RangeError("Device-attested record must be a non-empty Buffer within 16 MiB.");
   if(!Buffer.isBuffer(controlPointManifestBytes)||controlPointManifestBytes.length<1||controlPointManifestBytes.length>1024*1024) throw new RangeError("Control manifest must be a non-empty Buffer within 1 MiB.");
 }
-function unsignedContext(envelope) { const v={}; for(const f of ATTESTATION_FIELDS) if(f!=="signatureBase64")v[f]=envelope[f]; return v; }
+function unsignedContext(envelope) {
+  const { signatureBase64: _signatureBase64, ...context } = envelope;
+  return context;
+}
 function signingBytes(context){return Buffer.concat([DOMAIN,Buffer.from(canonicalJson(context),"utf8")]);}
 
 export function createSurveyObservationDeviceAttestation({
