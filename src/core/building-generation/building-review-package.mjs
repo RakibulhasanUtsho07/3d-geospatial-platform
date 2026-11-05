@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { buildSingleImageSurveyObservationRecordInventory } from "./single-image-survey-observation-records.mjs";
+import { buildSurveyObservationAttributionInventory } from "./survey-observation-attribution-attestation.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -133,17 +134,25 @@ export function buildBuildingReviewPackageManifest({
       throw new Error("review-package-single-image-evidence-metadata-missing");
     }
   } else {
-    const hasVerticalCalibration = ["1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence?.schemaVersion);
-    const hasIndependentCheckpoints = ["1.2.0", "1.3.0"].includes(singleImageEvidence?.schemaVersion);
-    const hasByteVerifiedObservationRecords = singleImageEvidence?.schemaVersion === "1.3.0";
+    const hasVerticalCalibration = ["1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasIndependentCheckpoints = ["1.2.0", "1.3.0", "1.4.0"].includes(singleImageEvidence?.schemaVersion);
+    const hasByteVerifiedObservationRecords = ["1.3.0", "1.4.0"].includes(singleImageEvidence?.schemaVersion);
     const recordArtifacts = artifacts.filter((item) =>
       item.artifactType === "single-image-survey-observation-record");
     const recordFiles = Array.isArray(singleImageEvidence?.files)
       ? singleImageEvidence.files.filter((item) =>
         item.artifactType === "single-image-survey-observation-record")
       : [];
+    const attestationArtifacts = artifacts.filter((item) =>
+      item.artifactType === "single-image-survey-observation-attestation");
+    const attestationFiles = Array.isArray(singleImageEvidence?.files)
+      ? singleImageEvidence.files.filter((item) =>
+        item.artifactType === "single-image-survey-observation-attestation")
+      : [];
     let recordInventory = null;
     let surveyObservationRecordsValid = false;
+    let attestationInventory = null;
+    let surveyObservationAttestationsValid = false;
     try {
       if (hasByteVerifiedObservationRecords) {
         recordInventory = buildSingleImageSurveyObservationRecordInventory(
@@ -172,8 +181,43 @@ export function buildBuildingReviewPackageManifest({
           recordFiles.length === 0 &&
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationRecord"));
       }
+      if (singleImageEvidence.schemaVersion === "1.4.0") {
+        attestationInventory = buildSurveyObservationAttributionInventory(
+          singleImageEvidence.surveyObservationAttestations,
+        );
+        surveyObservationAttestationsValid =
+          attestationInventory.count === singleImageEvidence.surveyObservationAttestationCount &&
+          attestationInventory.totalBytes === singleImageEvidence.surveyObservationAttestationBytes &&
+          attestationInventory.sha256 === singleImageEvidence.surveyObservationAttestationsSha256 &&
+          attestationInventory.count === singleImageEvidence.checkpointCount &&
+          typeof singleImageEvidence.trustedSurveyorRegistryId === "string" &&
+          /^[a-z0-9][a-z0-9._-]{0,79}$/.test(singleImageEvidence.trustedSurveyorRegistryId) &&
+          singleImageEvidence.surveyObservationAttributionStatus === "attribution-signatures-verified" &&
+          attestationArtifacts.length === attestationInventory.count &&
+          attestationFiles.length === attestationInventory.count &&
+          attestationInventory.entries.every((entry) => {
+            const file = attestationFiles.find((item) => item.relativePath === entry.relativePath);
+            const artifact = attestationArtifacts.find((item) => item.relativePath === entry.relativePath);
+            return file && Buffer.isBuffer(file.bytes) &&
+              file.bytes.length === entry.bytes &&
+              hash(file.bytes) === entry.sha256 &&
+              file.sha256 === entry.sha256 &&
+              file.observationId === entry.observationId &&
+              file.checkpointId === entry.checkpointId &&
+              artifact && artifact.sha256.toLowerCase() === entry.sha256 &&
+              artifact.bytes === entry.bytes;
+          });
+      } else {
+        surveyObservationAttestationsValid =
+          attestationArtifacts.length === 0 &&
+          attestationFiles.length === 0 &&
+          !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationAttestation")) &&
+          !Object.hasOwn(singleImageEvidence ?? {}, "surveyObservationAttributionStatus") &&
+          !Object.hasOwn(singleImageEvidence ?? {}, "trustedSurveyorRegistryId");
+      }
     } catch {
       surveyObservationRecordsValid = false;
+      surveyObservationAttestationsValid = false;
     }
     const verticalMetadataValid = hasVerticalCalibration
       ? singleImageEvidence.verticalDatum === "EPSG:4979-ellipsoidal" &&
@@ -203,14 +247,14 @@ export function buildBuildingReviewPackageManifest({
           "checkpoint3dRmsErrorM", "checkpoint3dMaxResidualM"].every((key) =>
           Number.isFinite(singleImageEvidence[key]) && singleImageEvidence[key] >= 0)
       : !Object.keys(singleImageEvidence).some((key) => key.startsWith("checkpoint"));
-    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ||
+    if (!isObject(singleImageEvidence) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(singleImageEvidence.schemaVersion) ||
         !nonEmptyString(singleImageEvidence.jobId) || !nonEmptyString(singleImageEvidence.sourceId) ||
         !isHash(singleImageEvidence.sourceSha256) || !isHash(singleImageEvidence.candidateGlbSha256) ||
         !isHash(singleImageEvidence.controlPointManifestSha256) || !isHash(singleImageEvidence.smokeReportSha256) ||
         !isHash(singleImageEvidence.generationArtifactReceiptSha256) || !isHash(singleImageEvidence.workflowReportSha256) ||
         singleImageEvidence.buildingId !== buildingId ||
         singleImageEvidence.georeferenceStatus !== "calibrated-needs-human-review" ||
-        !verticalMetadataValid || !checkpointMetadataValid || !surveyObservationRecordsValid ||
+        !verticalMetadataValid || !checkpointMetadataValid || !surveyObservationRecordsValid || !surveyObservationAttestationsValid ||
         singleImageEvidence.mapReady !== false || singleImageEvidence.publicationEligible !== false ||
         singleImageEvidence.automaticApproval !== false ||
         singleImageEvidence.candidateGlbSha256.toLowerCase() !==
