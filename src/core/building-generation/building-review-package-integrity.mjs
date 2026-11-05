@@ -484,9 +484,11 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
 
       const surveyRecordArtifacts = artifactByType.get("single-image-survey-observation-record") ?? [];
       let surveyObservationRecordsMetadataMatches = false;
+      let controlManifest = null;
+      let checkpoints = null;
       if (["1.3.0", "1.4.0"].includes(metadata.schemaVersion)) {
-        const controlManifest = JSON.parse(manifestBytes.toString("utf8"));
-        const checkpoints = controlManifest.heldOutCheckpoints?.points;
+        controlManifest = JSON.parse(manifestBytes.toString("utf8"));
+        checkpoints = controlManifest.heldOutCheckpoints?.points;
         if (controlManifest.schemaVersion !== "1.2.0" ||
             !Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100 ||
             checkpoints.length !== metadata.checkpointCount ||
@@ -570,6 +572,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           return {
             observationId: checkpoint.observationId,
             checkpointId: checkpoint.id,
+            registryId: result.registryId,
             relativePath: attestationPath,
             sha256: attestationArtifact.sha256,
             bytes: attestationArtifact.bytes,
@@ -587,7 +590,7 @@ export function verifyBuildingReviewPackage({ packageManifest, actualFiles, pack
           attestationInventory.sha256 === metadata.surveyObservationAttestationsSha256 &&
           sameInventory &&
           metadata.surveyObservationAttributionStatus === "attribution-signatures-verified" &&
-          metadata.trustedSurveyorRegistryId === trustedSurveyorRegistry.registryId;
+          attestations.every((entry) => entry.registryId === metadata.trustedSurveyorRegistryId);
       } else {
         surveyObservationAttestationsMetadataMatches =
           surveyAttestationArtifacts.length === 0 &&
