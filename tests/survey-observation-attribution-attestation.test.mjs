@@ -6,6 +6,7 @@ import {
   createSurveyObservationAttributionAttestation,
   parseTrustedSurveyorRegistry,
   verifySurveyObservationAttributionAttestation,
+  surveyObservationAttributionAttestationPath,
 } from "../src/core/building-generation/survey-observation-attribution-attestation.mjs";
 
 const ISSUED = "2026-11-01T00:00:00.000Z";
@@ -281,6 +282,12 @@ test("rejects unknown fields in registry and attestation envelopes", () => {
 
 test("rejects unsafe identifiers and oversized record or manifest inputs", () => {
   const pair = keys();
+  assert.equal(
+    surveyObservationAttributionAttestationPath("Obs-Upper-01"),
+    "evidence/survey-observations/Obs-Upper-01.attestation.json",
+  );
+  assert.throws(() => surveyObservationAttributionAttestationPath("CON"), /cross-platform/i);
+  assert.throws(() => surveyObservationAttributionAttestationPath("trailing."), /cross-platform/i);
   const trusted = registry([entry(pair)]);
   assert.throws(() => signFixture(pair, trusted, { observationId: "../escape" }), /safe identifier/);
   assert.throws(() => createSurveyObservationAttributionAttestation({
