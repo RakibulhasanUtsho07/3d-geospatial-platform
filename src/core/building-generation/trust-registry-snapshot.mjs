@@ -155,13 +155,17 @@ export function verifyTrustRegistrySnapshotInventory({
     JSON.stringify(metadataInventory.entries) === JSON.stringify(recomputed.entries) &&
     metadataInventory.sha256 === recomputed.sha256 &&
     metadataInventory.totalBytes === recomputed.totalBytes;
+  const registryIdsMatch =
+    metadata?.trustedSurveyorRegistryId === recomputed.entries[0].registryId &&
+    metadata?.trustedSurveyDeviceRegistryId === recomputed.entries[1].registryId &&
+    metadata?.trustedSurveyDeviceEnrollmentAuthorityRegistryId === recomputed.entries[2].registryId;
   return {
     valid:
       metadata?.trustRegistrySnapshotSchemaVersion === recomputed.schemaVersion &&
       metadata?.trustRegistrySnapshotCount === recomputed.count &&
       metadata?.trustRegistrySnapshotBytes === recomputed.totalBytes &&
       metadata?.trustRegistrySnapshotsSha256 === recomputed.sha256 &&
-      entriesMatch,
+      entriesMatch && registryIdsMatch,
     recomputed,
     checks: [
       {
@@ -183,6 +187,10 @@ export function verifyTrustRegistrySnapshotInventory({
       {
         id: "trust-registry-snapshot-entries",
         status: entriesMatch ? "passed" : "failed",
+      },
+      {
+        id: "trust-registry-snapshot-registry-ids",
+        status: registryIdsMatch ? "passed" : "failed",
       },
     ],
   };
