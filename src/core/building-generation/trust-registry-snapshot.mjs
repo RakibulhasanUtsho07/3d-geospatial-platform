@@ -114,16 +114,13 @@ function parseRegistrySnapshot(role, raw) {
  * Registry contents remain external; only IDs, schema/type and raw-byte
  * digests are recorded in the package metadata.
  */
-export function buildTrustRegistrySnapshotInventory({
-  trustedSurveyorRegistry,
-  trustedDeviceRegistry,
-  trustedEnrollmentAuthorityRegistry,
-}) {
-  const values = {
-    trustedSurveyorRegistry,
-    trustedDeviceRegistry,
-    trustedEnrollmentAuthorityRegistry,
-  };
+export function buildTrustRegistrySnapshotInventory(values) {
+  const expectedInputs = REQUIRED_ROLES.map((role) => role.input);
+  if (!isObject(values) ||
+      Object.keys(values).length !== expectedInputs.length ||
+      Object.keys(values).some((key) => !expectedInputs.includes(key))) {
+    throw new TypeError("Trust registry snapshot input must contain exactly the surveyor, device and enrollment-authority registries.");
+  }
   const entries = REQUIRED_ROLES.map((role) => parseRegistrySnapshot(role, values[role.input]));
   const registryIds = new Set(entries.map((entry) => entry.registryId));
   if (registryIds.size !== REQUIRED_ROLES.length) {
