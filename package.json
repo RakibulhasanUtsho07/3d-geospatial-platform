@@ -284,6 +284,7 @@
     "test:survey-device-enrollment-evidence": "node --test tests/survey-device-enrollment-evidence.test.mjs",
     "test:trust-registry-snapshot": "node --test tests/trust-registry-snapshot.test.mjs",
     "test:trust-registry-governance": "node --test tests/trust-registry-governance-attestation.test.mjs",
+    "test:trust-registry-governance-state": "node --test tests/trust-registry-governance-state.test.mjs",
     "verify:survey-device-enrollment-evidence": "node scripts/verify-survey-device-enrollment-evidence.mjs"
   },
   "dependencies": {
