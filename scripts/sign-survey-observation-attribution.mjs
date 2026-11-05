@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { constants } from "node:fs";\nimport { createHash } from "node:crypto";
+import { constants } from "node:fs";
+import { createHash } from "node:crypto";
 import { lstat, open, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
