@@ -35,7 +35,7 @@ The test verifies:
 5. A simulated response loss after commit is recovered by reading and comparing the exact state digest; the client does not blindly replay the transition with a new version.
 6. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest.
 
-The synthetic negative fixtures prove that the harness detects a provider which accepts competing stale writes or returns a mismatched anchor.
+The synthetic negative fixtures prove that the harness detects a provider which accepts competing stale writes or returns a mismatched anchor. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
 
 ## Integrating a real provider
 
