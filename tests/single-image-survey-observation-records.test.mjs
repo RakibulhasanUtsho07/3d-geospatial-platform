@@ -139,3 +139,30 @@ test("offline verifier rejects missing, orphaned, tampered and wrong-inventory r
     ...expected, expectedInventorySha256: hash("forged"),
   }), /inventory metadata/);
 });
+
+test("enforces the 64 MiB aggregate limit even when each raw record is individually valid", () => {
+  const bytes = Buffer.alloc(MAX_SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_BYTES, 0x5a);
+  const checkpoints = Array.from({ length: 9 }, (_, index) => ({
+    id: "aggregate-checkpoint-" + index,
+    observationId: "aggregate-observation-" + index,
+    observationRecordSha256: hash(bytes),
+  }));
+  const packageArtifacts = checkpoints.map((checkpoint) => ({
+    artifactType: SINGLE_IMAGE_SURVEY_OBSERVATION_RECORD_ARTIFACT_TYPE,
+    relativePath: "evidence/survey-observations/" + checkpoint.observationId + ".record",
+    bytes: bytes.length,
+    sha256: hash(bytes),
+  }));
+  const actualFiles = packageArtifacts.map((artifact) => ({
+    relativePath: artifact.relativePath,
+    bytes: bytes.length,
+    content: bytes,
+    isRegularFile: true,
+  }));
+  assert.throws(() => verifyPackagedSingleImageSurveyObservationRecords({
+    checkpoints, packageArtifacts, actualFiles,
+    expectedCount: 9,
+    expectedTotalBytes: bytes.length * 9,
+    expectedInventorySha256: hash("aggregate-inventory"),
+  }), /64 MiB aggregate limit/);
+});
