@@ -25,6 +25,7 @@ import {
 } from "./survey-device-enrollment-evidence.mjs";
 import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 import { verifyTrustRegistrySnapshotInventory } from "./trust-registry-snapshot.mjs";
+import { verifyTrustRegistryGovernanceAttestation } from "./trust-registry-governance-attestation.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [
@@ -63,6 +64,9 @@ export function verifyBuildingReviewPackage({
   packageManifest, actualFiles, packageManifestSha256,
   trustedSurveyorRegistry = null, trustedDeviceRegistry = null,
   trustedEnrollmentAuthorityRegistry = null,
+  trustRegistryGovernanceAttestation = null,
+  trustRegistryGovernancePublicKeyPem = null,
+  minimumTrustRegistrySequence = null,
 }) {
   if (!isObject(packageManifest) || packageManifest.schemaVersion !== "1.0.0" ||
     packageManifest.engine !== "building-review-package-v1" ||
@@ -438,7 +442,7 @@ export function verifyBuildingReviewPackage({
     let passed = false;
     let detail = "The single-image georeference hand-off is incomplete or its exact input bindings are invalid.";
     try {
-      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)) {
+      if (!complete || !isObject(metadata) || !["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         throw new Error("single-image-evidence-group-incomplete");
       }
       const [smokeArtifact, receiptArtifact, workflowArtifact, controlManifestArtifact] = singleImageItems;
@@ -463,7 +467,7 @@ export function verifyBuildingReviewPackage({
       const expectedReceiptSchema = smokeReport.schemaVersion === "1.6.0" ? "1.2.0" : "1.1.0";
       const verticalEvidence = georeference.verticalEvidence ?? null;
       const checkpointEvidence = georeference.independentCheckpointEvidence ?? null;
-      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)
+      const verticalMetadataMatches = ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)
         ? metadata.verticalDatum === "EPSG:4979-ellipsoidal" &&
           verticalEvidence?.status === "calibrated-needs-human-review" &&
           metadata.verticalStatus === verticalEvidence.status &&
@@ -480,7 +484,7 @@ export function verifyBuildingReviewPackage({
         : metadata.schemaVersion === "1.0.0" &&
           metadata.verticalDatum === "not-solved" &&
           verticalEvidence === null;
-      const checkpointMetadataMatches = ["1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)
+      const checkpointMetadataMatches = ["1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)
         ? checkpointEvidence?.status === "validated-needs-human-review" &&
           metadata.checkpointValidationStatus === checkpointEvidence.status &&
           metadata.checkpointEvidenceSha256 === digest(Buffer.from(canonicalJson(checkpointEvidence), "utf8")) &&
@@ -505,7 +509,7 @@ export function verifyBuildingReviewPackage({
       let surveyObservationRecordsMetadataMatches = false;
       let controlManifest = null;
       let checkpoints = null;
-      if (["1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)) {
+      if (["1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         controlManifest = JSON.parse(manifestBytes.toString("utf8"));
         checkpoints = controlManifest.heldOutCheckpoints?.points;
         if (controlManifest.schemaVersion !== "1.2.0" ||
@@ -544,7 +548,7 @@ export function verifyBuildingReviewPackage({
 
       const surveyAttestationArtifacts = artifactByType.get("single-image-survey-observation-attestation") ?? [];
       let surveyObservationAttestationsMetadataMatches = false;
-      if (["1.4.0", "1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)) {
+      if (["1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         if (!trustedSurveyorRegistry) {
           throw new Error("trusted-surveyor-registry-required-for-package-schema-1.4.0");
         }
@@ -621,7 +625,7 @@ export function verifyBuildingReviewPackage({
 
       const surveyDeviceAttestationArtifacts = artifactByType.get("single-image-survey-observation-device-attestation") ?? [];
       let surveyObservationDeviceAttestationsMetadataMatches = false;
-      if (["1.5.0", "1.6.0", "1.7.0"].includes(metadata.schemaVersion)) {
+      if (["1.5.0", "1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         if (!trustedDeviceRegistry) {
           throw new Error("trusted-survey-device-registry-required-for-package-schema-1.5.0");
         }
@@ -687,7 +691,7 @@ export function verifyBuildingReviewPackage({
       const surveyDeviceEnrollmentEvidenceArtifacts =
         artifactByType.get("single-image-survey-device-enrollment-evidence") ?? [];
       let surveyDeviceEnrollmentEvidenceMetadataMatches = false;
-      if (["1.6.0", "1.7.0"].includes(metadata.schemaVersion)) {
+      if (["1.6.0", "1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         if (!trustedDeviceRegistry) throw new Error("trusted-survey-device-registry-required-for-package-schema-1.6.0");
         if (!trustedEnrollmentAuthorityRegistry) throw new Error("trusted-survey-device-enrollment-authority-registry-required-for-package-schema-1.6.0");
         if (!Array.isArray(checkpoints) || checkpoints.length < 6 || checkpoints.length > 100) throw new Error("single-image-device-enrollment-checkpoint-inventory-incomplete");
@@ -733,7 +737,8 @@ export function verifyBuildingReviewPackage({
       }
 
       let trustRegistrySnapshotMetadataMatches = false;
-      if (metadata.schemaVersion === "1.7.0") {
+      let trustRegistryGovernanceMetadataMatches = false;
+      if (["1.7.0", "1.8.0"].includes(metadata.schemaVersion)) {
         const snapshotResult = verifyTrustRegistrySnapshotInventory({
           metadata,
           trustedSurveyorRegistry,
@@ -745,13 +750,31 @@ export function verifyBuildingReviewPackage({
           throw new Error("trust-registry-snapshot-verification-failed:" +
             snapshotResult.checks.filter((item) => item.status !== "passed").map((item) => item.id).join(","));
         }
+        if (metadata.schemaVersion === "1.8.0") {
+          const governanceResult = verifyTrustRegistryGovernanceAttestation({
+            attestation: trustRegistryGovernanceAttestation,
+            governancePublicKeyPem: trustRegistryGovernancePublicKeyPem,
+            minimumSequence: minimumTrustRegistrySequence,
+            snapshotInventory: snapshotResult.recomputed,
+          });
+          trustRegistryGovernanceMetadataMatches =
+            governanceResult.valid &&
+            canonicalJson(governanceResult.metadata) === canonicalJson(metadata.trustRegistryGovernance);
+          if (!trustRegistryGovernanceMetadataMatches) {
+            throw new Error("trust-registry-governance-verification-failed:" +
+              governanceResult.errors.map((item) => item.id).join(","));
+          }
+        } else {
+          trustRegistryGovernanceMetadataMatches = !Object.hasOwn(metadata, "trustRegistryGovernance");
+        }
       } else {
         trustRegistrySnapshotMetadataMatches =
           !Object.keys(metadata).some((key) => key.startsWith("trustRegistrySnapshot")) &&
           !Object.hasOwn(metadata, "trustRegistrySnapshots");
+        trustRegistryGovernanceMetadataMatches = !Object.hasOwn(metadata, "trustRegistryGovernance");
       }
 
-      if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
+      if (["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
           smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
           !nonEmptyString(metadata.jobId) || smokeReport.jobId !== metadata.jobId ||
           smokeArtifact.relativePath !== "reports/single-image-runtime-smoke.json" ||
@@ -841,6 +864,7 @@ export function verifyBuildingReviewPackage({
           !surveyObservationDeviceAttestationsMetadataMatches ||
           !surveyDeviceEnrollmentEvidenceMetadataMatches ||
           !trustRegistrySnapshotMetadataMatches ||
+          !trustRegistryGovernanceMetadataMatches ||
           metadata.mapReady !== false || metadata.publicationEligible !== false ||
           metadata.automaticApproval !== false) {
         throw new Error("single-image-evidence-cross-binding-failed");
@@ -854,7 +878,9 @@ export function verifyBuildingReviewPackage({
         modelSha256: candidate.sha256,
       });
       passed = true;
-      detail = metadata.schemaVersion === "1.7.0"
+      detail = metadata.schemaVersion === "1.8.0"
+        ? "Exact held-out records and D3M-20 registry snapshots are verified; an independently pinned Ed25519 governance key authenticates the registry-set statement and an operator-pinned minimum sequence blocks rollback. This remains external trust-provisioning evidence, not proof of legal identity or measurement accuracy."
+        : metadata.schemaVersion === "1.7.0"
         ? "Exact held-out records, surveyor/device signatures, per-device enrollment statements and raw-byte SHA-256 snapshots of all three external trust registries are independently verified. Snapshot digests identify the trust documents used; they do not independently establish registry authorship, hardware authenticity or measurement accuracy."
         : metadata.schemaVersion === "1.6.0"
         ? "Exact held-out records, surveyor and device signatures, and one exact-byte enrollment statement per distinct device key are independently verified against current trusted registries. Enrollment-authority verification is evidence association only; it does not prove hardware authenticity, manufacturer certification or measurement accuracy."
