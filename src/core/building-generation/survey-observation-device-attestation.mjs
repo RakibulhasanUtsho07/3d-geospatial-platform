@@ -190,7 +190,9 @@ export function createSurveyObservationDeviceAttestation({
     publicKeyFingerprintSha256:d.keyFingerprintSha256,registryIssuedAtUtc:d.registryIssuedAtUtc,registryExpiresAtUtc:d.registryExpiresAtUtc,
     keyValidFromUtc:d.validFromUtc,keyValidUntilUtc:d.validUntilUtc,attestedAtUtc,publicationEligible:false,note:NOTE,
   };
-  return Object.freeze({...context,signatureBase64:sign(null,signingBytes(context),privateKey).toString("base64")});
+  const signingEnvelope = { ...context, signatureBase64: "" };
+  const signatureBase64 = sign(null, signingBytes(unsignedContext(signingEnvelope)), privateKey).toString("base64");
+  return Object.freeze({ ...context, signatureBase64 });
 }
 
 export function verifySurveyObservationDeviceAttestation({
