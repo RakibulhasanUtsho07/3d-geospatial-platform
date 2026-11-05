@@ -7,6 +7,7 @@ import {
   verifyTrustRegistrySnapshotInventory,
   validateTrustRegistrySnapshotInventoryEntries,
   MAX_TRUST_REGISTRY_SNAPSHOT_BYTES,
+  MAX_TRUST_REGISTRY_SNAPSHOT_TOTAL_BYTES,
 } from "../src/core/building-generation/trust-registry-snapshot.mjs";
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -213,6 +214,16 @@ test("enforces per-registry raw byte bounds and strict schema shape", async () =
     ...raw,
     trustedSurveyorRegistry: padded + " ",
   }), /1–64 KiB/);
+
+  const allAtLimit = { ...raw };
+  for (const key of Object.keys(allAtLimit)) {
+    allAtLimit[key] += " ".repeat(
+      MAX_TRUST_REGISTRY_SNAPSHOT_BYTES - Buffer.byteLength(allAtLimit[key], "utf8"),
+    );
+  }
+  const maximumInventory = buildTrustRegistrySnapshotInventory(allAtLimit);
+  assert.equal(maximumInventory.totalBytes, MAX_TRUST_REGISTRY_SNAPSHOT_TOTAL_BYTES);
+  assert.ok(maximumInventory.entries.every((entry) => entry.bytes === MAX_TRUST_REGISTRY_SNAPSHOT_BYTES));
 
   const schema = JSON.parse(await readFile(
     new URL("../trust-registry-snapshot-inventory.schema.json", import.meta.url),
