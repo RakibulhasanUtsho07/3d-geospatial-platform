@@ -353,7 +353,7 @@ export function buildBuildingReviewPackageManifest({
       generationArtifactReceiptSha256: singleImageEvidence.generationArtifactReceiptSha256.toLowerCase(),
       workflowReportSha256: singleImageEvidence.workflowReportSha256.toLowerCase(),
       verticalDatum: singleImageEvidence.verticalDatum,
-      ...(["1.1.0", "1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.1.0", "1.2.0", "1.3.0", "1.4.0"].includes(singleImageEvidence.schemaVersion) ? {
         verticalStatus: singleImageEvidence.verticalStatus,
         verticalEvidenceSha256: singleImageEvidence.verticalEvidenceSha256.toLowerCase(),
         verticalReferenceFrame: singleImageEvidence.verticalReferenceFrame,
@@ -363,7 +363,7 @@ export function buildBuildingReviewPackageManifest({
         verticalMaxResidualM: singleImageEvidence.verticalMaxResidualM,
         verticalControlPointCount: singleImageEvidence.verticalControlPointCount,
       } : {}),
-      ...(["1.2.0", "1.3.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.2.0", "1.3.0", "1.4.0"].includes(singleImageEvidence.schemaVersion) ? {
         checkpointValidationStatus: singleImageEvidence.checkpointValidationStatus,
         checkpointEvidenceSha256: singleImageEvidence.checkpointEvidenceSha256.toLowerCase(),
         checkpointReferenceFrame: singleImageEvidence.checkpointReferenceFrame,
@@ -376,10 +376,18 @@ export function buildBuildingReviewPackageManifest({
         checkpoint3dRmsErrorM: singleImageEvidence.checkpoint3dRmsErrorM,
         checkpoint3dMaxResidualM: singleImageEvidence.checkpoint3dMaxResidualM,
       } : {}),
-      ...(singleImageEvidence.schemaVersion === "1.3.0" ? {
+      ...(["1.3.0", "1.4.0"].includes(singleImageEvidence.schemaVersion) ? {
         surveyObservationRecordCount: singleImageEvidence.surveyObservationRecordCount,
         surveyObservationRecordBytes: singleImageEvidence.surveyObservationRecordBytes,
         surveyObservationRecordsSha256: singleImageEvidence.surveyObservationRecordsSha256.toLowerCase(),
+      } : {}),
+      ...(singleImageEvidence.schemaVersion === "1.4.0" ? {
+        surveyObservationAttestationCount: singleImageEvidence.surveyObservationAttestationCount,
+        surveyObservationAttestationBytes: singleImageEvidence.surveyObservationAttestationBytes,
+        surveyObservationAttestationsSha256: singleImageEvidence.surveyObservationAttestationsSha256.toLowerCase(),
+        surveyObservationAttestations: singleImageEvidence.surveyObservationAttestations,
+        surveyObservationAttributionStatus: singleImageEvidence.surveyObservationAttributionStatus,
+        trustedSurveyorRegistryId: singleImageEvidence.trustedSurveyorRegistryId,
       } : {}),
       mapReady: false,
       publicationEligible: false,
