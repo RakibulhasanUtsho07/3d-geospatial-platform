@@ -105,6 +105,17 @@ test("provider conformance suite rejects an anchor that does not bind its initia
   );
 });
 
+test("provider conformance suite requires a newly constructed client on reopen", async () => {
+  const fixture = syntheticProvider();
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      provider: fixture.provider,
+      reopenProvider: async () => fixture.provider,
+    }),
+    /newly constructed client object/i,
+  );
+});
+
 test("provider conformance suite rejects providers with missing contract methods", async () => {
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
