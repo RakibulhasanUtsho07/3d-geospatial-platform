@@ -23,7 +23,8 @@ const DOMAIN = Buffer.from(
   "3d-geospatial-platform/survey-observation-attribution/v1\0",
   "utf8",
 );
-const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;\nconst SAFE_CONTEXT_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
+const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+const SAFE_CONTEXT_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const BASE64_SIGNATURE = /^[A-Za-z0-9+/]{86}==$/;
 const REGISTRY_FIELDS = [
