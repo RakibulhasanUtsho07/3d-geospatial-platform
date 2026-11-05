@@ -286,7 +286,8 @@
     "test:trust-registry-governance": "node --test tests/trust-registry-governance-attestation.test.mjs",
     "test:trust-registry-governance-state": "node --test tests/trust-registry-governance-state.test.mjs",
     "verify:survey-device-enrollment-evidence": "node scripts/verify-survey-device-enrollment-evidence.mjs",
-    "test:trust-registry-governance-external-store": "node --test tests/trust-registry-governance-external-store.test.mjs"
+    "test:trust-registry-governance-external-store": "node --test tests/trust-registry-governance-external-store.test.mjs",
+    "test:trust-registry-governance-provider-conformance": "node --test tests/trust-registry-governance-provider-conformance.test.mjs"
   },
   "dependencies": {
     "cesium": "^1.146.0",
