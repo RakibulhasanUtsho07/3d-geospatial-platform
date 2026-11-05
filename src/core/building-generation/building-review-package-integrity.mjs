@@ -776,7 +776,7 @@ export function verifyBuildingReviewPackage({
         trustRegistryGovernanceMetadataMatches = !Object.hasOwn(metadata, "trustRegistryGovernance");
       }
 
-      if (["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
+      if (!["1.5.0", "1.6.0"].includes(smokeReport.schemaVersion) || smokeReport.kind !== "single-image-runtime-smoke" ||
           smokeReport.status !== "passed" || smokeReport.buildingId !== packageManifest.buildingId ||
           !nonEmptyString(metadata.jobId) || smokeReport.jobId !== metadata.jobId ||
           smokeArtifact.relativePath !== "reports/single-image-runtime-smoke.json" ||
