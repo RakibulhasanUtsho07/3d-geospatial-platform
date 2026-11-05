@@ -20,7 +20,7 @@ function entryFromAttestation(a){return {deviceId:a.deviceId,manufacturerId:a.ma
 let activePublicKey;
 test("creates and verifies a device-key attestation bound to exact opaque record and manifest",()=>{
  const k=keys();activePublicKey=k.publicKeyPem;const r=registry([entry(k)]),a=signFixture(k,r),v=verifyFixture(a,r);
- assert.equal(a.algorithm,"Ed25519");assert.equal(a.publicationEligible,false);assert.equal(v.valid,true);assert.equal(v.deviceId,"receiver-01");assert.equal(v.publicationEligible,false);
+ assert.equal(a.algorithm,"Ed25519");assert.equal(a.publicationEligible,false);assert.equal(v.valid,true,JSON.stringify(v.checks));assert.equal(v.deviceId,"receiver-01");assert.equal(v.publicationEligible,false);
 });
 test("rejects record bytes and manifest substitution",()=>{
  const k=keys();activePublicKey=k.publicKeyPem;const r=registry([entry(k)]),a=signFixture(k,r);
