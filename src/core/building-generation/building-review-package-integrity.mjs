@@ -672,6 +672,15 @@ export function verifyBuildingReviewPackage({
           canonicalJson(inventory.entries) === canonicalJson(metadataEntries) &&
           metadata.surveyObservationDeviceAttestationStatus === "device-key-attestations-verified" &&
           deviceAttestations.length === surveyDeviceAttestationArtifacts.length;
+      } else {
+        // Schemas before D3M-ENGINE-17 remain valid only when they contain no
+        // device-attestation artifacts or device-trust metadata. Do not let a
+        // legacy schema silently downgrade an included device attestation.
+        surveyObservationDeviceAttestationsMetadataMatches =
+          surveyDeviceAttestationArtifacts.length === 0 &&
+          !Object.keys(metadata).some((key) =>
+            key.startsWith("surveyObservationDeviceAttestation")) &&
+          !Object.hasOwn(metadata, "trustedSurveyDeviceRegistryId");
       }
 
       const surveyDeviceEnrollmentEvidenceArtifacts =
