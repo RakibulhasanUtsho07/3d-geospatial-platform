@@ -94,6 +94,13 @@ function safeId(value, label) {
   return value;
 }
 
+function safeContextId(value, label) {
+  if (typeof value !== "string" || !SAFE_CONTEXT_ID.test(value)) {
+    throw new TypeError(label + " must be a safe identifier.");
+  }
+  return value;
+}
+
 function canonicalize(value, ancestors = new Set()) {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") {
@@ -346,9 +353,9 @@ function validateBytes({ recordBytes, controlPointManifestBytes }) {
 }
 
 function validateContextIds({ observationId, checkpointId, buildingId, surveyorId }) {
-  safeId(observationId, "observationId");
-  safeId(checkpointId, "checkpointId");
-  safeId(buildingId, "buildingId");
+  safeContextId(observationId, "observationId");
+  safeContextId(checkpointId, "checkpointId");
+  safeContextId(buildingId, "buildingId");
   safeId(surveyorId, "surveyorId");
 }
 
