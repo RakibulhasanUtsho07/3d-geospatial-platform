@@ -23,12 +23,12 @@ import {
   MAX_TRUSTED_SURVEY_DEVICE_REGISTRY_BYTES,
 } from "./survey-observation-device-attestation.mjs";
 import {
-  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   verifySurveyDeviceEnrollmentEvidence,
   MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
   MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES,
 } from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;
@@ -365,18 +365,17 @@ export async function prepareSingleImageReviewPackageEvidence({
   }
   const enrollmentEvidenceFiles = [];
   let enrollmentEvidenceInventory = null;
-  const distinctDeviceKeys = new Map();
+  const distinctDevices = new Map();
   for (const sidecar of observationDeviceAttestationFiles) {
-    const pairKey = sidecar.deviceId + "\0" + sidecar.keyId;
-    const existing = distinctDeviceKeys.get(pairKey);
+    const existing = distinctDevices.get(sidecar.deviceId);
     if (existing && (existing.enrollmentEvidenceSha256 !== sidecar.enrollmentEvidenceSha256 ||
         existing.registryId !== sidecar.registryId)) {
-      throw new Error("One device-key pair resolves to conflicting enrollment evidence or device registries.");
+      throw new Error("One device identity resolves to conflicting enrollment evidence or device registries.");
     }
-    distinctDeviceKeys.set(pairKey, sidecar);
+    distinctDevices.set(sidecar.deviceId, sidecar);
   }
-  const expectedEnrollmentPaths = [...distinctDeviceKeys.values()]
-    .map((entry) => surveyDeviceEnrollmentEvidencePath(entry.deviceId, entry.keyId))
+  const expectedEnrollmentPaths = [...distinctDevices.values()]
+    .map((entry) => surveyDeviceEnrollmentEvidencePath(entry.deviceId))
     .sort();
   const enrollmentDirectory = path.join(root, "evidence", "device-enrollments");
   let enrollmentDirectoryEntries = [];
@@ -404,14 +403,13 @@ export async function prepareSingleImageReviewPackageEvidence({
     }
   }
   if (hasTrustedEnrollmentAuthorityRegistry) {
-    if (!hasTrustedDeviceRegistry || distinctDeviceKeys.size < 1) {
+    if (!hasTrustedDeviceRegistry || distinctDevices.size < 1) {
       throw new Error("D3M-ENGINE-18 enrollment evidence requires verified D3M-17 device attestations and the trusted device registry.");
     }
-    for (const entry of [...distinctDeviceKeys.values()].sort((a, b) =>
-      a.deviceId.localeCompare(b.deviceId) || a.keyId.localeCompare(b.keyId))) {
-      const relativePath = surveyDeviceEnrollmentEvidencePath(entry.deviceId, entry.keyId);
+    for (const entry of [...distinctDevices.values()].sort((a, b) => a.deviceId.localeCompare(b.deviceId))) {
+      const relativePath = surveyDeviceEnrollmentEvidencePath(entry.deviceId);
       const evidenceBytes = await readStableWorkspaceFile(
-        root, relativePath, "Device enrollment evidence " + entry.deviceId + "/" + entry.keyId,
+        root, relativePath, "Device enrollment evidence " + entry.deviceId,
         MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
       );
       const result = verifySurveyDeviceEnrollmentEvidence({
@@ -419,17 +417,15 @@ export async function prepareSingleImageReviewPackageEvidence({
         trustedDeviceRegistry,
         trustedEnrollmentAuthorityRegistry,
         deviceId: entry.deviceId,
-        keyId: entry.keyId,
       });
       if (!result.valid || result.evidenceSha256 !== entry.enrollmentEvidenceSha256 ||
           result.authorityRegistryId === null) {
-        throw new Error("Device enrollment evidence verification failed for " + entry.deviceId + "/" +
-          entry.keyId + ": " + result.errors.map((item) => item.id).join(","));
+        throw new Error("Device enrollment evidence verification failed for " + entry.deviceId + ": " +
+          result.errors.map((item) => item.id).join(","));
       }
       enrollmentEvidenceFiles.push({
         artifactType: "single-image-survey-device-enrollment-evidence",
         deviceId: entry.deviceId,
-        keyId: entry.keyId,
         authorityId: result.authorityId,
         authorityType: result.authorityType,
         authorityRegistryId: result.authorityRegistryId,
@@ -441,7 +437,6 @@ export async function prepareSingleImageReviewPackageEvidence({
     enrollmentEvidenceInventory = buildSurveyDeviceEnrollmentEvidenceInventory(
       enrollmentEvidenceFiles.map((file) => ({
         deviceId: file.deviceId,
-        keyId: file.keyId,
         relativePath: file.relativePath,
         sha256: file.sha256,
         bytes: file.bytes.length,

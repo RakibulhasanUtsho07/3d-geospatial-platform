@@ -6,14 +6,14 @@
 
 ## Purpose
 
-D3M-ENGINE-17 (package schema 1.5.0) verifies surveyor and device signatures over each exact held-out observation. D3M-ENGINE-18 adds an offline verifier for the authority-signed enrollment statement referenced by each device registry entry. D3M-ENGINE-19 carries one copy of that evidence document for each distinct `(deviceId, keyId)` used by the package and makes the offline package verifier repeat the enrollment checks.
+D3M-ENGINE-17 (package schema 1.5.0) verifies surveyor and device signatures over each exact held-out observation. D3M-ENGINE-18 adds an offline verifier for the authority-signed enrollment statement referenced by each device registry entry. D3M-ENGINE-19 carries one copy of that evidence document for each distinct `deviceId` used by the package and makes the offline package verifier repeat the enrollment checks.
 
 ## Package schema 1.6.0
 
 A package with D3M-17 device attestations and D3M-18 enrollment evidence uses `singleImageEvidence.schemaVersion = 1.6.0`. It includes:
 
 - The existing D3M-17 record and device-attestation files (schema 1.5.0 semantics remain intact).
-- Exactly one `single-image-survey-device-enrollment-evidence` artifact for each distinct device/key pair referenced by those device-attestation sidecars, at `evidence/device-enrollments/<deviceId>.<keyId>.enrollment.json`.
+- Exactly one `single-image-survey-device-enrollment-evidence` artifact for each distinct device identity referenced by those device-attestation sidecars, at `evidence/device-enrollments/<deviceId>.enrollment.json`.
 - Inventory count, total bytes, deterministic inventory SHA-256 and normalized entries (device/key/path/hash/size/authority identity), plus the trusted authority registry ID and `enrollment-authority-evidence-verified` status.
 
 Duplicate pairs are deduplicated at preparation. Missing documents, extra/orphaned files, duplicate/unsafe paths, file drift, wrong device/key identity, stale D3M-17 digest, invalid authority signature, unknown/revoked/expired authority and authority-registry substitution fail closed. The package directory inventory independently rejects symlinks and non-regular files.
@@ -40,7 +40,7 @@ unset SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON
 unset SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON
 ```
 
-The private smoke workspace must contain one canonical enrollment evidence file at the deterministic path for every distinct device/key pair. Preparation uses bounded stable no-follow reads and rechecks the exact evidence bytes before completion.
+The private smoke workspace must contain one canonical enrollment evidence file at the deterministic path for every distinct device identity. Preparation uses bounded stable no-follow reads and rechecks the exact evidence bytes before completion.
 
 ## Offline verify
 
@@ -56,7 +56,7 @@ unset SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON
 unset SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON
 ```
 
-Offline verification independently reconstructs the unique device-key set from the packaged D3M-17 signed sidecars, locates one enrollment document for each pair, hashes the exact bytes, checks the current D3M-17 registry digest, and verifies the D3M-18 Ed25519 authority statement using the operator-provisioned authority registry. The package-manifest checksum alone is not treated as cryptographic enrollment proof.
+Offline verification independently reconstructs the unique device-ID set from the packaged D3M-17 signed sidecars, locates one enrollment document for each device, hashes the exact bytes, checks the current D3M-17 registry digest, and verifies the D3M-18 Ed25519 authority statement using the operator-provisioned authority registry. The package-manifest checksum alone is not treated as cryptographic enrollment proof.
 
 ## Compatibility and release boundary
 

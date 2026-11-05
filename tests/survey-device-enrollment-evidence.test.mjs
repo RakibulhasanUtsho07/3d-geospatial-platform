@@ -6,13 +6,13 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import {
-  buildSurveyDeviceEnrollmentEvidenceInventory,
   parseTrustedSurveyDeviceEnrollmentAuthorityRegistry,
   surveyDeviceEnrollmentEvidencePath,
   surveyDeviceEnrollmentEvidenceSigningBytes,
   verifySurveyDeviceEnrollmentEvidence,
   SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 
 const ISSUED = "2026-11-01T00:00:00.000Z";
 const NOW = "2026-11-05T14:00:00.000Z";
@@ -219,15 +219,15 @@ test("rejects authority registry expiry, malformed key and broken rotation chain
 test("device enrollment package inventory is deterministic, unique and bounded", () => {
   const entries = [
     {
-      deviceId: "receiver-02", keyId: "key-02",
-      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-02", "key-02"),
+      deviceId: "receiver-02",
+      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-02"),
       sha256: "b".repeat(64), bytes: 240,
       authorityId: "authority-01", authorityType: "independent-enrollment-authority",
       authorityRegistryId: "authority-registry-01",
     },
     {
-      deviceId: "receiver-01", keyId: "key-01",
-      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-01", "key-01"),
+      deviceId: "receiver-01",
+      relativePath: surveyDeviceEnrollmentEvidencePath("receiver-01"),
       sha256: "a".repeat(64), bytes: 180,
       authorityId: "authority-01", authorityType: "independent-enrollment-authority",
       authorityRegistryId: "authority-registry-01",
