@@ -25,6 +25,7 @@ const DOMAIN = Buffer.from(
 );
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
 const SAFE_CONTEXT_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/i;
+const WINDOWS_RESERVED_DEVICE = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const BASE64_SIGNATURE = /^[A-Za-z0-9+/]{86}==$/;
 const REGISTRY_FIELDS = [
@@ -594,6 +595,9 @@ export function verifySurveyObservationAttributionAttestation({
  */
 export function surveyObservationAttributionAttestationPath(observationId) {
   safeContextId(observationId, "observationId");
+  if (observationId.endsWith(".") || WINDOWS_RESERVED_DEVICE.test(observationId.split(".")[0])) {
+    throw new TypeError("Survey observation ID is unsafe for a cross-platform sidecar path.");
+  }
   return "evidence/survey-observations/" + observationId + ".attestation.json";
 }
 
