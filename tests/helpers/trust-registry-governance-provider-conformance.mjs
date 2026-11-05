@@ -50,14 +50,22 @@ function assertWriteResult(value, flag, identity, label) {
  */
 export async function runTrustRegistryGovernanceProviderConformance({
   provider,
+  reopenProvider,
   bootstrapMinimumSequence = 5,
 } = {}) {
-  assert.ok(provider && typeof provider === "object", "provider is required");
-  assert.match(provider.providerId ?? "", /^[a-z0-9][a-z0-9._-]{0,79}$/,
-    "providerId must be a safe stable identifier");
-  for (const method of ["readState", "initializeStateIfAbsent", "compareAndSetState"]) {
-    assert.equal(typeof provider[method], "function", "provider must implement " + method);
-  }
+  const assertProvider = (candidate, label) => {
+    assert.ok(candidate && typeof candidate === "object", label + " is required");
+    assert.match(candidate.providerId ?? "", /^[a-z0-9][a-z0-9._-]{0,79}$/,
+      label + " providerId must be a safe stable identifier");
+    for (const method of ["readState", "initializeStateIfAbsent", "compareAndSetState"]) {
+      assert.equal(typeof candidate[method], "function", label + " must implement " + method);
+    }
+  };
+  assertProvider(provider, "provider");
+  assert.equal(typeof reopenProvider, "function",
+    "reopenProvider must construct a fresh client for the same isolated backend");
+  assert.ok(Number.isSafeInteger(bootstrapMinimumSequence + 2),
+    "bootstrapMinimumSequence must leave room for two monotonic test transitions");
   assert.ok(Number.isSafeInteger(bootstrapMinimumSequence) && bootstrapMinimumSequence > 0,
     "bootstrapMinimumSequence must be a positive safe integer");
 
@@ -135,8 +143,15 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.equal(stale.state.stateSha256, next.stateSha256,
     "stale CAS must preserve the winning state");
 
-  // Re-read through the provider interface to model a newly constructed consumer.
-  const reloaded = assertSnapshot(await provider.readState(identity), identity, "fresh read");
+  // Reconstruct a client and verify that its read observes the same backing record.
+  // A provider-specific integration may implement reopenProvider across a process boundary.
+  const reopenedProvider = await reopenProvider();
+  assertProvider(reopenedProvider, "reopened provider");
+  assert.equal(reopenedProvider.providerId, provider.providerId,
+    "a reopened client must address the same provider identity");
+  const reloaded = assertSnapshot(
+    await reopenedProvider.readState(identity), identity, "reopened-client read",
+  );
   assert.equal(reloaded.state.stateSha256, next.stateSha256,
     "a fresh read must observe the committed state and its anchor");
   assert.equal(reloaded.version, winner.version);
@@ -155,7 +170,7 @@ export async function runTrustRegistryGovernanceProviderConformance({
   let responseWasLost = false;
   try {
     const committedBeforeDisconnect = assertWriteResult(
-      await provider.compareAndSetState({
+      await reopenedProvider.compareAndSetState({
         identity,
         expectedVersion: reloaded.version,
         expectedStateSha256: reloaded.state.stateSha256,
@@ -177,7 +192,7 @@ export async function runTrustRegistryGovernanceProviderConformance({
   }
   assert.equal(responseWasLost, true);
   const recovered = assertSnapshot(
-    await provider.readState(identity), identity, "ambiguous-write recovery read",
+    await reopenedProvider.readState(identity), identity, "ambiguous-write recovery read",
   );
   assert.equal(recovered.state.stateSha256, nextAfterAmbiguous.stateSha256,
     "recovery read must identify the exact committed transition before any retry");
@@ -191,6 +206,7 @@ export async function runTrustRegistryGovernanceProviderConformance({
     casContenders: casResults.length,
     casWinners: 1,
     staleCasRejected: !stale.updated,
+    freshProviderReopened: reopenedProvider !== provider,
     freshReadMatched: recovered.state.stateSha256 === nextAfterAmbiguous.stateSha256,
     ambiguousCommitRecovered: responseWasLost,
     finalRevision: recovered.state.revision,
