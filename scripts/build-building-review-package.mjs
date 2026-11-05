@@ -111,6 +111,7 @@ async function main() {
       candidateGlbSha256,
       trustedSurveyorRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON ?? null,
       trustedDeviceRegistry: process.env.SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON ?? null,
+      trustedEnrollmentAuthorityRegistry: process.env.SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON ?? null,
     })
     : null;
   const geometryQa = analyzeGlbQuality(glbBytes);
@@ -280,7 +281,11 @@ async function main() {
       ] : [
         "6. Inspect `reports/single-image-runtime-smoke.json`, the generation receipt/workflow report and `evidence/single-image-control-points.json`; horizontal registration remains human-review-only and no vertical calibration was supplied.",
       ]),
-      ...(singleImageSmokeEvidence.schemaVersion === "1.5.0" ? [
+      ...(singleImageSmokeEvidence.schemaVersion === "1.6.0" ? [
+        "7. Inspect the exact enrollment statement under `evidence/device-enrollments/`. Offline verification requires the current D3M-17 device registry and the separate `SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON` registry; one signed enrollment document is verified for each distinct device/key pair.",
+        "8. This authority signature links exact enrollment bytes and device identity commitments to an operator-trusted authority key. It does not prove legal manufacturer identity, certificate-chain validity, secure-element custody, firmware integrity, genuine receiver capture or measurement accuracy.",
+        "9. Record a separate human release decision outside this automated package.",
+      ] : singleImageSmokeEvidence.schemaVersion === "1.5.0" ? [
         "7. Inspect each byte-preserved held-out record, surveyor attribution sidecar and adjacent `*.device-attestation.json` sidecar. Offline verification requires both external registries and binds both signatures to exact record, manifest and checkpoint bytes.",
         "8. A device-key signature establishes key possession and declared record association only; it does not prove manufacturer certification, secure-element custody, genuine receiver capture or measurement accuracy.",
         "9. Record a separate human release decision outside this automated package.",

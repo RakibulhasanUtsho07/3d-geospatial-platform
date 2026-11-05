@@ -546,6 +546,7 @@ export async function prepareSingleImageReviewPackageEvidence({
     })),
     ...observationDeviceAttestationFiles.map((file) => ({
       artifactType: file.artifactType, observationId: file.observationId, checkpointId: file.checkpointId,
+      deviceId: file.deviceId, keyId: file.keyId,
       relativePath: file.relativePath, sha256: file.sha256, bytes: file.bytes,
     })),
     ...enrollmentEvidenceFiles.map((file) => ({

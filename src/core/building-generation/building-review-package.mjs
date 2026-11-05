@@ -109,6 +109,13 @@ export function buildBuildingReviewPackageManifest({
       ...(artifact.width ? { width: artifact.width } : {}),
       ...(artifact.height ? { height: artifact.height } : {}),
       ...(artifact.rightsStatus ? { rightsStatus: artifact.rightsStatus } : {}),
+      ...(artifact.artifactType === "single-image-survey-device-enrollment-evidence" ? {
+        deviceId: artifact.deviceId,
+        keyId: artifact.keyId,
+        authorityId: artifact.authorityId,
+        authorityType: artifact.authorityType,
+        authorityRegistryId: artifact.authorityRegistryId,
+      } : {}),
     });
   }
 
@@ -202,7 +209,7 @@ export function buildBuildingReviewPackageManifest({
           recordFiles.length === 0 &&
           !Object.keys(singleImageEvidence ?? {}).some((key) => key.startsWith("surveyObservationRecord"));
       }
-      if (["1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion)) {
+      if (["1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion)) {
         attestationInventory = buildSurveyObservationAttributionInventory(
           singleImageEvidence.surveyObservationAttestations,
         );
@@ -473,7 +480,7 @@ export function buildBuildingReviewPackageManifest({
         surveyObservationRecordBytes: singleImageEvidence.surveyObservationRecordBytes,
         surveyObservationRecordsSha256: singleImageEvidence.surveyObservationRecordsSha256.toLowerCase(),
       } : {}),
-      ...(["1.4.0", "1.5.0"].includes(singleImageEvidence.schemaVersion) ? {
+      ...(["1.4.0", "1.5.0", "1.6.0"].includes(singleImageEvidence.schemaVersion) ? {
         surveyObservationAttestationCount: singleImageEvidence.surveyObservationAttestationCount,
         surveyObservationAttestationBytes: singleImageEvidence.surveyObservationAttestationBytes,
         surveyObservationAttestationsSha256: singleImageEvidence.surveyObservationAttestationsSha256.toLowerCase(),

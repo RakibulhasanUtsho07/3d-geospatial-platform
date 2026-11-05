@@ -428,8 +428,9 @@ export function verifyBuildingReviewPackage({
       singleImagePresent === 0 &&
         (artifactByType.get("single-image-survey-observation-record") ?? []).length === 0 &&
         (artifactByType.get("single-image-survey-observation-attestation") ?? []).length === 0 &&
-        (artifactByType.get("single-image-survey-observation-device-attestation") ?? []).length === 0,
-      "Single-image georeference, survey observation record, surveyor or device attestation artifacts must not be partially included without metadata.");
+        (artifactByType.get("single-image-survey-observation-device-attestation") ?? []).length === 0 &&
+        (artifactByType.get("single-image-survey-device-enrollment-evidence") ?? []).length === 0,
+      "Single-image georeference, survey observation record, surveyor, device attestation or device enrollment artifacts must not be included without metadata.");
   } else {
     const metadata = packageManifest.singleImageEvidence;
     const complete = singleImageItems.length === 4 && singleImagePresent === 4;
