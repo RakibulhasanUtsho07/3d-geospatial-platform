@@ -3,7 +3,7 @@ import { REQUIRED_REVIEW_VIEWS } from "./render-review-manifest.mjs";
 import { buildSingleImageSurveyObservationRecordInventory } from "./single-image-survey-observation-records.mjs";
 import { buildSurveyObservationAttributionInventory } from "./survey-observation-attribution-attestation.mjs";
 import { buildSurveyObservationDeviceAttestationInventory } from "./survey-observation-device-attestation.mjs";
-import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [

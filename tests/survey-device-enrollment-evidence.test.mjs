@@ -203,7 +203,7 @@ test("rejects enrollment statements issued outside their device-level validity w
     surveyDeviceEnrollmentEvidenceSigningBytes({ ...evidence, signatureBase64: "" }), fixture.authority.privateKey).toString("base64") });
   const registry = { ...fixture.deviceRegistry, entries: [{ ...fixture.deviceRegistry.entries[0], enrollmentEvidenceSha256: HASH(changed) }] };
   const result = verifySurveyDeviceEnrollmentEvidence({ evidenceBytes: changed, trustedDeviceRegistry: registry,
-    trustedEnrollmentAuthorityRegistry: fixture.authorityRegistry, deviceId: "receiver-01", keyId: "receiver-key-01", now: NOW });
+    trustedEnrollmentAuthorityRegistry: fixture.authorityRegistry, deviceId: "receiver-01", now: NOW });
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((item) => item.id === "enrollment-evidence-time-window"));
 });

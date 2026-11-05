@@ -2,34 +2,116 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:3d-geospatial-platform:schema:survey-device-enrollment-evidence:1.0.0",
   "title": "Survey-device enrollment evidence",
-  "description": "Canonical Ed25519 statement binding an externally enrolled device public key to the D3M-17 privacy-preserving identity commitments; not hardware certification or release approval.",
+  "description": "Canonical Ed25519 statement attesting device-level hardware identity enrollment commitments. It does not associate an individual device public key and remains stable across D3M-17 key rotation.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "recordType", "engine", "signatureAlgorithm", "signaturePurpose", "enrollmentId", "deviceId", "manufacturerId", "modelId", "deviceSerialCommitmentSha256", "keyId", "devicePublicKeyFingerprintSha256", "authorityId", "authorityType", "authorityKeyId", "authorityRegistryId", "authorityRegistryIssuedAtUtc", "authorityRegistryExpiresAtUtc", "issuedAtUtc", "validFromUtc", "validUntilUtc", "publicationEligible", "note", "signatureBase64"],
+  "required": [
+    "schemaVersion",
+    "recordType",
+    "engine",
+    "signatureAlgorithm",
+    "signaturePurpose",
+    "enrollmentId",
+    "deviceId",
+    "manufacturerId",
+    "modelId",
+    "deviceSerialCommitmentSha256",
+    "authorityId",
+    "authorityType",
+    "authorityKeyId",
+    "authorityRegistryId",
+    "authorityRegistryIssuedAtUtc",
+    "authorityRegistryExpiresAtUtc",
+    "issuedAtUtc",
+    "validFromUtc",
+    "validUntilUtc",
+    "publicationEligible",
+    "note",
+    "signatureBase64"
+  ],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
-    "recordType": { "const": "survey-device-enrollment-evidence" },
-    "engine": { "const": "survey-device-enrollment-evidence-v1" },
-    "signatureAlgorithm": { "const": "Ed25519" },
-    "signaturePurpose": { "const": "survey-device-key-enrollment-association-only" },
-    "enrollmentId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "deviceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "manufacturerId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "modelId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "deviceSerialCommitmentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "keyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "devicePublicKeyFingerprintSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "authorityId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "authorityType": { "enum": ["manufacturer", "independent-enrollment-authority"] },
-    "authorityKeyId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "authorityRegistryId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
-    "authorityRegistryIssuedAtUtc": { "type": "string", "format": "date-time" },
-    "authorityRegistryExpiresAtUtc": { "type": "string", "format": "date-time" },
-    "issuedAtUtc": { "type": "string", "format": "date-time" },
-    "validFromUtc": { "type": "string", "format": "date-time" },
-    "validUntilUtc": { "type": "string", "format": "date-time" },
-    "publicationEligible": { "const": false },
-    "note": { "const": "This authority signature associates a device key and privacy-preserving identity commitments with an enrollment statement only. It does not establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval." },
-    "signatureBase64": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" }
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "recordType": {
+      "const": "survey-device-enrollment-evidence"
+    },
+    "engine": {
+      "const": "survey-device-enrollment-evidence-v1"
+    },
+    "signatureAlgorithm": {
+      "const": "Ed25519"
+    },
+    "signaturePurpose": {
+      "const": "survey-device-hardware-identity-enrollment-only"
+    },
+    "enrollmentId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "deviceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "manufacturerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "modelId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "deviceSerialCommitmentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authorityId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "authorityType": {
+      "enum": [
+        "manufacturer",
+        "independent-enrollment-authority"
+      ]
+    },
+    "authorityKeyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "authorityRegistryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "authorityRegistryIssuedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authorityRegistryExpiresAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "issuedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "validFromUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "validUntilUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publicationEligible": {
+      "const": false
+    },
+    "note": {
+      "const": "This authority signature attests device-level hardware identity enrollment commitments only. It does not associate a particular device public key or establish a manufacturer certificate chain, secure-element custody, genuine receiver capture, firmware integrity, measurement accuracy or release approval."
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
   }
 }

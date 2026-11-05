@@ -20,10 +20,10 @@ import {
   verifySurveyObservationDeviceAttestation,
 } from "./survey-observation-device-attestation.mjs";
 import {
-  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   verifySurveyDeviceEnrollmentEvidence,
 } from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const requiredArtifactTypes = [

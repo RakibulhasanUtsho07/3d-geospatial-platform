@@ -23,12 +23,12 @@ import {
   MAX_TRUSTED_SURVEY_DEVICE_REGISTRY_BYTES,
 } from "./survey-observation-device-attestation.mjs";
 import {
-  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   verifySurveyDeviceEnrollmentEvidence,
   MAX_SURVEY_DEVICE_ENROLLMENT_EVIDENCE_BYTES,
   MAX_TRUSTED_SURVEY_DEVICE_ENROLLMENT_AUTHORITY_REGISTRY_BYTES,
 } from "./survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "./survey-device-enrollment-evidence-inventory.mjs";
 
 const MAX_REPORT_BYTES = 1024 * 1024;
 const MAX_RECEIPT_BYTES = 256 * 1024;

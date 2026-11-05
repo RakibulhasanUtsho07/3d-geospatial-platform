@@ -16,7 +16,7 @@ function parseArguments(args) {
     const value = args[index];
     if (value === "--help" || value === "-h") return { help: true };
     if (value.startsWith("--")) {
-      if (!["--device-id", "--key-id", "--now"].includes(value) || options.has(value) ||
+      if (!["--device-id", "--now"].includes(value) || options.has(value) ||
           !args[index + 1] || args[index + 1].startsWith("--")) {
         throw new Error("Unknown, duplicate or incomplete option: " + value);
       }
@@ -27,10 +27,8 @@ function parseArguments(args) {
     }
   }
   const deviceId = options.get("--device-id");
-  const keyId = options.get("--key-id");
-  if (positional.length !== 3 || !deviceId || !keyId ||
-      !SAFE_ID.test(deviceId) || !SAFE_ID.test(keyId)) {
-    throw new Error("Usage: npm run verify:survey-device-enrollment-evidence -- <trusted-devices.json> <trusted-enrollment-authorities.json> <enrollment-evidence.json> --device-id <id> --key-id <id> [--now <canonical-utc>]");
+  if (positional.length !== 3 || !deviceId || !SAFE_ID.test(deviceId)) {
+    throw new Error("Usage: npm run verify:survey-device-enrollment-evidence -- <trusted-devices.json> <trusted-enrollment-authorities.json> <enrollment-evidence.json> --device-id <id> [--now <canonical-utc>]");
   }
   return {
     help: false,
@@ -38,7 +36,6 @@ function parseArguments(args) {
     authorityRegistryPath: path.resolve(positional[1]),
     evidencePath: path.resolve(positional[2]),
     deviceId,
-    keyId,
     now: options.get("--now"),
   };
 }
@@ -79,7 +76,7 @@ async function main() {
   const options = parseArguments(process.argv.slice(2));
   if (options.help) {
     process.stdout.write("Verify a signed D3M-17 survey-device enrollment statement offline.\n\n" +
-      "Usage: npm run verify:survey-device-enrollment-evidence -- <trusted-devices.json> <trusted-enrollment-authorities.json> <enrollment-evidence.json> --device-id <id> --key-id <id> [--now <canonical-utc>]\n\n" +
+      "Usage: npm run verify:survey-device-enrollment-evidence -- <trusted-devices.json> <trusted-enrollment-authorities.json> <enrollment-evidence.json> --device-id <id> [--now <canonical-utc>]\n\n" +
       "All registries contain public keys only. The enrollment authority registry is an operator-provisioned trust anchor.\n");
     return 0;
   }
@@ -93,7 +90,6 @@ async function main() {
     trustedDeviceRegistry,
     trustedEnrollmentAuthorityRegistry,
     deviceId: options.deviceId,
-    keyId: options.keyId,
     now: options.now,
   });
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");

@@ -41,11 +41,11 @@ import {
   surveyObservationDeviceAttestationPath,
 } from "../src/core/building-generation/survey-observation-device-attestation.mjs";
 import {
-  buildSurveyDeviceEnrollmentEvidenceInventory,
   surveyDeviceEnrollmentEvidencePath,
   surveyDeviceEnrollmentEvidenceSigningBytes,
   SURVEY_DEVICE_ENROLLMENT_EVIDENCE_NOTE,
 } from "../src/core/building-generation/survey-device-enrollment-evidence.mjs";
+import { buildSurveyDeviceEnrollmentEvidenceInventory } from "../src/core/building-generation/survey-device-enrollment-evidence-inventory.mjs";
 
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
