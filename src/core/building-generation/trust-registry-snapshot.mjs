@@ -31,6 +31,47 @@ function inventoryBytes(entries) {
   return Buffer.from(JSON.stringify(entries), "utf8");
 }
 
+const ROLE_TYPES = new Map(REQUIRED_ROLES.map((entry) => [entry.role, entry.recordType]));
+
+export function validateTrustRegistrySnapshotInventoryEntries(entries) {
+  if (!Array.isArray(entries) || entries.length !== REQUIRED_ROLES.length) {
+    throw new RangeError("Trust registry snapshot inventory must contain exactly three registry entries.");
+  }
+  const normalized = entries.map((entry, index) => {
+    const expected = REQUIRED_ROLES[index];
+    if (!isObject(entry) ||
+        Object.keys(entry).length !== 6 ||
+        Object.keys(entry).some((key) => !["role", "recordType", "registryId", "schemaVersion", "sha256", "bytes"].includes(key)) ||
+        entry.role !== expected.role ||
+        entry.recordType !== ROLE_TYPES.get(expected.role) ||
+        typeof entry.registryId !== "string" || !SAFE_ID.test(entry.registryId) ||
+        entry.schemaVersion !== "1.0.0" ||
+        !/^[a-f0-9]{64}$/.test(entry.sha256 ?? "") ||
+        !Number.isSafeInteger(entry.bytes) || entry.bytes < 1 || entry.bytes > MAX_TRUST_REGISTRY_SNAPSHOT_BYTES) {
+      throw new TypeError("Trust registry snapshot inventory entry " + index + " is invalid or out of canonical order.");
+    }
+    return {
+      role: entry.role,
+      recordType: entry.recordType,
+      registryId: entry.registryId,
+      schemaVersion: entry.schemaVersion,
+      sha256: entry.sha256,
+      bytes: entry.bytes,
+    };
+  });
+  const totalBytes = normalized.reduce((total, entry) => total + entry.bytes, 0);
+  if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TRUST_REGISTRY_SNAPSHOT_TOTAL_BYTES) {
+    throw new RangeError("Combined trust registry snapshots exceed 192 KiB.");
+  }
+  return Object.freeze({
+    schemaVersion: TRUST_REGISTRY_SNAPSHOT_SCHEMA_VERSION,
+    count: normalized.length,
+    totalBytes,
+    sha256: sha256(inventoryBytes(normalized)),
+    entries: Object.freeze(normalized.map((entry) => Object.freeze(entry))),
+  });
+}
+
 function parseRegistrySnapshot(role, raw) {
   if (typeof raw !== "string" || raw.length === 0) {
     throw new TypeError("Trust registry snapshot " + role.role + " must be supplied as its exact raw UTF-8 JSON string.");
@@ -81,18 +122,7 @@ export function buildTrustRegistrySnapshotInventory({
     trustedEnrollmentAuthorityRegistry,
   };
   const entries = REQUIRED_ROLES.map((role) => parseRegistrySnapshot(role, values[role.input]));
-  const totalBytes = entries.reduce((total, entry) => total + entry.bytes, 0);
-  if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TRUST_REGISTRY_SNAPSHOT_TOTAL_BYTES) {
-    throw new RangeError("Combined trust registry snapshots exceed 192 KiB.");
-  }
-  const bytes = inventoryBytes(entries);
-  return Object.freeze({
-    schemaVersion: TRUST_REGISTRY_SNAPSHOT_SCHEMA_VERSION,
-    count: entries.length,
-    totalBytes,
-    sha256: sha256(bytes),
-    entries: Object.freeze(entries.map((entry) => Object.freeze(entry))),
-  });
+  return validateTrustRegistrySnapshotInventoryEntries(entries);
 }
 
 /**
@@ -111,9 +141,16 @@ export function verifyTrustRegistrySnapshotInventory({
     trustedDeviceRegistry,
     trustedEnrollmentAuthorityRegistry,
   });
-  const expectedEntries = metadata?.trustRegistrySnapshots;
-  const entriesMatch = Array.isArray(expectedEntries) &&
-    JSON.stringify(expectedEntries) === JSON.stringify(recomputed.entries);
+  let metadataInventory = null;
+  try {
+    metadataInventory = validateTrustRegistrySnapshotInventoryEntries(metadata?.trustRegistrySnapshots);
+  } catch {
+    metadataInventory = null;
+  }
+  const entriesMatch = metadataInventory !== null &&
+    JSON.stringify(metadataInventory.entries) === JSON.stringify(recomputed.entries) &&
+    metadataInventory.sha256 === recomputed.sha256 &&
+    metadataInventory.totalBytes === recomputed.totalBytes;
   return {
     valid:
       metadata?.trustRegistrySnapshotSchemaVersion === recomputed.schemaVersion &&
