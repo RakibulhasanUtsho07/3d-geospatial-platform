@@ -293,8 +293,8 @@ export function buildBuildingReviewPackageManifest({
           enrollmentEvidenceInventory.entries.every((entry) => {
             const file = enrollmentEvidenceFiles.find((item) => item.relativePath === entry.relativePath);
             const artifact = enrollmentEvidenceArtifacts.find((item) => item.relativePath === entry.relativePath);
-            return deviceIds.has(entry.deviceId) && file && Buffer.isBuffer(file.bytes) && file.bytes.length === entry.bytes &&
-              hash(file.bytes) === entry.sha256 && file.sha256 === entry.sha256 && file.deviceId === entry.deviceId && !Object.hasOwn(file, "keyId") &&
+            return deviceIds.has(entry.deviceId) && file && Number.isSafeInteger(file.bytes) && file.bytes === entry.bytes &&
+              file.sha256 === entry.sha256 && file.deviceId === entry.deviceId && !Object.hasOwn(file, "keyId") &&
               file.authorityId === entry.authorityId && file.authorityType === entry.authorityType && file.authorityRegistryId === entry.authorityRegistryId &&
               artifact && artifact.deviceId === entry.deviceId && !Object.hasOwn(artifact, "keyId") && artifact.sha256.toLowerCase() === entry.sha256 && artifact.bytes === entry.bytes;
           }) && enrollmentEvidenceInventory.entries.every((entry) => entry.authorityRegistryId === singleImageEvidence.trustedSurveyDeviceEnrollmentAuthorityRegistryId);

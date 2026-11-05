@@ -615,7 +615,7 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 ## D3M-ENGINE-19 — bind signed device enrollment evidence into review packages
 
 - **Tracking issue:** [#373](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/373).
-- **Implementation branch:** `feat/d3m-engine19-review-package-enrollment-evidence-20261105`; stacked on D3M-ENGINE-18 PR #372 exact head `f97d13dcd94dee73a0dacfb9a229bf27177e5ab1`.
+- **Implementation branch:** `feat/d3m-engine19-review-package-enrollment-evidence-20261105`; stacked on D3M-ENGINE-18 PR #372 exact head `eaf3caabdd6825342d6948c70ee01d4185b49077`.
 - Extends single-image evidence package metadata to schema 1.6.0 when D3M-17 device attestations and D3M-18 enrollment evidence are both present. Carries exactly one original evidence document for every distinct device identity referenced by the held-out device-attestation sidecars.
 - Package preparation reads deterministic `evidence/device-enrollments/<deviceId>.enrollment.json` files using the existing bounded stable no-follow reader, verifies exact document SHA-256 against the active D3M-17 device registry entry and checks the D3M-18 authority signature. The inventory digest and authority registry ID are bound into package metadata and artifact inventory.
 - Offline package verification independently reconstructs the unique device-ID set from packaged D3M-17 sidecars and repeats D3M-18 verification against both current trust registries. Missing, extra/orphaned, tampered, wrong-device-identity, wrong-authority and stale-digest evidence fail closed.

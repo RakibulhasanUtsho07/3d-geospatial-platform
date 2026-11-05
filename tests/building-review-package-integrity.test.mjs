@@ -1256,6 +1256,13 @@ test("binds original held-out survey record bytes through the complete review pa
     authorityType: enrollmentEvidenceArtifact.authorityType,
     authorityRegistryId: enrollmentEvidenceArtifact.authorityRegistryId,
   }]);
+  assert.throws(
+    () => buildSurveyDeviceEnrollmentEvidenceInventory([
+      ...enrollmentEvidenceInventory.entries,
+      ...enrollmentEvidenceInventory.entries,
+    ]),
+    /duplicated device or path/,
+  );
   const deviceSidecars = recordInputs.map((record) => {
     const checkpoint = manifest.heldOutCheckpoints.points.find(
       (item) => item.observationId === record.observationId,
