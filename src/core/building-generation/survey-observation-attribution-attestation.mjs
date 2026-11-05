@@ -580,3 +580,12 @@ export function verifySurveyObservationAttributionAttestation({
     note: "A valid attestation binds a trusted key to exact record bytes and checkpoint context only. It does not authenticate civil identity, qualification, receiver hardware, measurement accuracy, source rights or physical feature correspondence.",
   };
 }
+
+/**
+ * Deterministic detached-sidecar path. Callers cannot choose an arbitrary
+ * output path for a survey observation attribution envelope.
+ */
+export function surveyObservationAttributionAttestationPath(observationId) {
+  safeContextId(observationId, "observationId");
+  return "evidence/survey-observations/" + observationId + ".attestation.json";
+}
