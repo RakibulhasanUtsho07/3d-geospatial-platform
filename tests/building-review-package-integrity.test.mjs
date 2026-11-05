@@ -570,6 +570,20 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   t.after(() => rm(root, { recursive: true, force: true }));
 
   const manifest = makeHeldOutManifest(sourceSha256);
+  const surveyRecordRoot = path.join(root, "evidence", "survey-observations");
+  await mkdir(surveyRecordRoot, { recursive: true });
+  const surveyRecordPayloads = manifest.heldOutCheckpoints.points.map((point) => {
+    const bytes = Buffer.concat([Buffer.from("opaque-original-RTK-export:" + point.observationId), Buffer.from([0x00, 0xff])]);
+    point.observationRecordSha256 = hash(bytes);
+    return {
+      observationId: point.observationId,
+      relativePath: "evidence/survey-observations/" + point.observationId + ".record",
+      bytes,
+    };
+  });
+  for (const record of surveyRecordPayloads) {
+    await writeFile(path.join(root, record.relativePath), record.bytes, { flag: "wx" });
+  }
   const manifestBytes = JSON_BYTES(manifest);
   await writeFile(path.join(root, "survey", "controls.json"), manifestBytes, { flag: "wx" });
   const loadedManifest = await loadSingleImageControlPointManifest({
@@ -720,6 +734,9 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
     ["single-image-workflow-report", "reports/single-image-workflow-report.json", workflowBytes],
     ["single-image-control-point-manifest", "evidence/single-image-control-points.json", manifestBytes],
   ];
+  for (const record of surveyRecordPayloads) {
+    groupFiles.push(["single-image-survey-observation-record", record.relativePath, record.bytes]);
+  }
   const newArtifacts = groupFiles.map(([artifactType, relativePath, bytes]) => ({
     artifactType, relativePath, sha256: hash(bytes), bytes: bytes.length,
   }));
@@ -729,8 +746,14 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   const artifactDescriptors = [...base.packageManifest.artifacts, ...newArtifacts];
   const verticalEvidence = georeferenceEvidence.verticalEvidence;
   const checkpointEvidence = georeferenceEvidence.independentCheckpointEvidence;
+  const surveyRecordInventory = surveyRecordPayloads.map((record) => ({
+    observationId: record.observationId,
+    relativePath: record.relativePath,
+    bytes: record.bytes.length,
+    sha256: hash(record.bytes),
+  })).sort((a, b) => a.observationId.localeCompare(b.observationId));
   const singleImageEvidence = {
-    schemaVersion: "1.2.0",
+    schemaVersion: "1.3.0",
     jobId,
     buildingId,
     sourceId: source.sourceId,
@@ -761,6 +784,9 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
     checkpointVerticalMaxResidualM: checkpointEvidence.controls.verticalMaxResidualM,
     checkpoint3dRmsErrorM: checkpointEvidence.controls.spatial3dRmsErrorM,
     checkpoint3dMaxResidualM: checkpointEvidence.controls.spatial3dMaxResidualM,
+    surveyObservationRecordCount: surveyRecordInventory.length,
+    surveyObservationRecordTotalBytes: surveyRecordInventory.reduce((sum, item) => sum + item.bytes, 0),
+    surveyObservationRecordInventorySha256: hash(Buffer.from(canonicalJson(surveyRecordInventory), "utf8")),
     mapReady: false,
     publicationEligible: false,
     automaticApproval: false,
@@ -787,6 +813,60 @@ test("recomputes held-out 3D checkpoints from exact packaged bytes through the c
   assert.equal(report.status, "verified");
   assert.ok(report.checks.some((item) =>
     item.id === "single-image-georeference-recomputed" && item.status === "passed"));
+
+  const missingRecordPath = surveyRecordPayloads[0].relativePath;
+  const missingRecordReport = verifyBuildingReviewPackage({
+    packageManifest,
+    actualFiles: actualFiles.filter((file) => file.relativePath !== missingRecordPath),
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(missingRecordReport.valid, false);
+  assert.ok(missingRecordReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+
+  const tamperedRecordFiles = actualFiles.map((file) => {
+    if (file.relativePath !== missingRecordPath) return file;
+    const content = Buffer.from(file.content);
+    content[0] ^= 0xff;
+    return { ...file, content };
+  });
+  const tamperedRecordReport = verifyBuildingReviewPackage({
+    packageManifest, actualFiles: tamperedRecordFiles,
+    packageManifestSha256: hash(JSON_BYTES(packageManifest)),
+  });
+  assert.equal(tamperedRecordReport.valid, false);
+  assert.ok(tamperedRecordReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+
+  const orphanBytes = Buffer.from("orphan-record");
+  const orphanPath = "evidence/survey-observations/orphan-observation.record";
+  const orphanPackage = {
+    ...packageManifest,
+    artifacts: [...packageManifest.artifacts, {
+      artifactType: "single-image-survey-observation-record",
+      relativePath: orphanPath, bytes: orphanBytes.length, sha256: hash(orphanBytes),
+    }],
+    counts: { ...packageManifest.counts, artifacts: packageManifest.counts.artifacts + 1,
+      totalBytes: packageManifest.counts.totalBytes + orphanBytes.length },
+  };
+  const orphanReport = verifyBuildingReviewPackage({
+    packageManifest: orphanPackage,
+    actualFiles: [...actualFiles, { relativePath: orphanPath, bytes: orphanBytes.length,
+      sha256: hash(orphanBytes), content: orphanBytes, isRegularFile: true }],
+    packageManifestSha256: hash(JSON_BYTES(orphanPackage)),
+  });
+  assert.equal(orphanReport.valid, false);
+  assert.ok(orphanReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
+
+  const forgedInventory = {
+    ...packageManifest,
+    singleImageEvidence: { ...packageManifest.singleImageEvidence,
+      surveyObservationRecordInventorySha256: hash("forged-inventory") },
+  };
+  const forgedInventoryReport = verifyBuildingReviewPackage({
+    packageManifest: forgedInventory, actualFiles,
+    packageManifestSha256: hash(JSON_BYTES(forgedInventory)),
+  });
+  assert.equal(forgedInventoryReport.valid, false);
+  assert.ok(forgedInventoryReport.errors.some((item) => item.id === "single-image-georeference-recomputed"));
   assert.equal(report.publicationEligible, false);
   assert.equal(packageManifest.singleImageEvidence.mapReady, false);
   assert.equal(packageManifest.singleImageEvidence.publicationEligible, false);
