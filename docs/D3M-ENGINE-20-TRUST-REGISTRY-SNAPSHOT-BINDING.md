@@ -64,9 +64,15 @@ The registry documents remain outside the package. Keep them in the approved ope
 Set the three registry values from the approved secret manager into the process environment before package preparation:
 
 ```bash
-export SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON="$(< /secure/operator-managed/trusted-surveyors.json)"
-export SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON="$(< /secure/operator-managed/trusted-devices.json)"
-export SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON="$(< /secure/operator-managed/trusted-enrollment-authorities.json)"
+# Append a sentinel before command substitution ends so trailing newlines in each
+# registry file are preserved in the environment value and its exact-byte digest.
+raw="$(cat /secure/operator-managed/trusted-surveyors.json; printf .)"
+export SURVEY_OBSERVATION_TRUSTED_SURVEYORS_JSON="${raw%.}"
+raw="$(cat /secure/operator-managed/trusted-devices.json; printf .)"
+export SURVEY_OBSERVATION_TRUSTED_DEVICES_JSON="${raw%.}"
+raw="$(cat /secure/operator-managed/trusted-enrollment-authorities.json; printf .)"
+export SURVEY_DEVICE_ENROLLMENT_TRUSTED_AUTHORITIES_JSON="${raw%.}"
+unset raw
 
 # Build the review package. With D3M-16/17/18 sidecars and device enrollment evidence,
 # the builder verifies all evidence and records the exact raw trust-registry snapshots.
