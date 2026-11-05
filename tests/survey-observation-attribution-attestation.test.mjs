@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { generateKeyPairSync } from "node:crypto";\nimport { readFile } from "node:fs/promises";
+import { generateKeyPairSync } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createSurveyObservationAttributionAttestation,
