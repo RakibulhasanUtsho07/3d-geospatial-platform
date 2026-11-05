@@ -962,7 +962,7 @@ test("binds original held-out survey record bytes through the complete review pa
 
 test("canonical survey observation inventory is deterministic, bounded and rejects unsafe records", () => {
   const records = Array.from({ length: 6 }, (_, index) => {
-    const observationId = "obs-" + (index + 1);
+    const observationId = index === 1 ? "Obs-2" : "obs-" + (index + 1);
     return {
       observationId,
       relativePath: singleImageSurveyObservationRecordPath(observationId),
@@ -976,13 +976,21 @@ test("canonical survey observation inventory is deterministic, bounded and rejec
   assert.equal(first.count, 6);
   assert.equal(first.totalBytes, records.reduce((sum, item) => sum + item.bytes, 0));
   assert.deepEqual(first.records.map((item) => item.observationId),
-    ["obs-1", "obs-2", "obs-3", "obs-4", "obs-5", "obs-6"]);
+    ["Obs-2", "obs-1", "obs-3", "obs-4", "obs-5", "obs-6"]);
 
   assert.throws(() => singleImageSurveyObservationRecordPath("../outside"), /invalid/i);
+  assert.throws(() => singleImageSurveyObservationRecordPath("CON"), /invalid/i);
+  assert.throws(() => singleImageSurveyObservationRecordPath("trailing."), /invalid/i);
   assert.throws(() => buildSingleImageSurveyObservationRecordInventory([
     ...records,
     { ...records[0] },
   ]), /invalid/i);
+  const caseCollision = {
+    ...records[0],
+    observationId: records[0].observationId.toUpperCase(),
+    relativePath: singleImageSurveyObservationRecordPath(records[0].observationId.toUpperCase()),
+  };
+  assert.throws(() => buildSingleImageSurveyObservationRecordInventory([...records, caseCollision]), /invalid/i);
   assert.throws(() => buildSingleImageSurveyObservationRecordInventory(
     records.map((item, index) => index === 0 ? { ...item, relativePath: "evidence/other.record" } : item),
   ), /invalid/i);
