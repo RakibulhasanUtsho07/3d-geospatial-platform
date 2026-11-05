@@ -20,7 +20,7 @@ function entryFromAttestation(a){return {deviceId:a.deviceId,manufacturerId:a.ma
 function sortedJson(value){if(Array.isArray(value))return value.map(sortedJson);if(value&&typeof value==="object")return Object.fromEntries(Object.keys(value).sort().map(k=>[k,sortedJson(value[k])]));return value;}
 function rawSignatureCheck(attestation,publicKeyPem){
  const {signatureBase64,...unsigned}=attestation;
- const domain=Buffer.from("3d-geospatial-platform/survey-observation-device-attestation/v1\\0","utf8");
+ const domain=Buffer.from("3d-geospatial-platform/survey-observation-device-attestation/v1\0","utf8");
  const payload=Buffer.concat([domain,Buffer.from(JSON.stringify(sortedJson(unsigned)),"utf8")]);
  return verifyRawEd25519(null,payload,createPublicKey(publicKeyPem),Buffer.from(signatureBase64,"base64"));
 }
