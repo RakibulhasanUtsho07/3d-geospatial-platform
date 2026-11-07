@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   signTrustRegistryGovernanceProviderProcessReport,
@@ -100,8 +101,13 @@ function signFixture(options = {}) {
   return { pair, bytes, trustedReviewerRegistry, signatureEnvelope, signedAt };
 }
 
-test("D3M-28 signs exact process-report bytes with an active registry-bound Ed25519 key", () => {
+test("D3M-28 signs exact process-report bytes with an active registry-bound Ed25519 key and matches the schema", async () => {
   const fixture = signFixture();
+  const schemaPath = new URL("../trust-registry-governance-provider-process-report-signature.schema.json", import.meta.url);
+  const schema = JSON.parse(await readFile(schemaPath, "utf8"));
+  assert.deepEqual([...Object.keys(fixture.signatureEnvelope)].sort(), [...schema.required].sort());
+  assert.equal(schema.properties.signaturePurpose.const, fixture.signatureEnvelope.signaturePurpose);
+  assert.equal(schema.properties.engine.const, fixture.signatureEnvelope.engine);
   const result = verifyTrustRegistryGovernanceProviderProcessReportSignature({
     reportBytes: fixture.bytes,
     signatureEnvelope: fixture.signatureEnvelope,
