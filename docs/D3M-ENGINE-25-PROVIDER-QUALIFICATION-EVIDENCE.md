@@ -51,7 +51,7 @@ A capability Boolean, provider marketing statement or synthetic-only test does n
 
 ### D3M-27 process-isolated report semantics
 
-Schema 1.1.0 adds the provider's exact adapter module SHA-256 and `providerIntegration.processReportArtifactId`. A passed provider integration must reference a present `process-restart-report` artifact, and the same ID must appear in `evidence.processRestartVisibility`.
+Schema 1.1.0 adds the provider's exact adapter module SHA-256 and `providerIntegration.processReportArtifactId`. A passed provider integration must reference a present `process-restart-report` artifact, and the same ID must appear in `evidence.processRestartVisibility`. The artifact's `sourceUrl` must also equal the exact `providerIntegration.runUrl`, preventing substitution from another workflow run.
 
 After checking path safety, byte count and SHA-256, the verifier parses the report and validates the exact source commit, provider ID, adapter SHA-256, synthetic-only declaration, provider instance and namespace fingerprints, fresh-child-process execution mode, worker-process counts and required D3M-24 concurrency/restart/ambiguous-write outcomes. A report with a valid hash but substituted semantic fields is not considered verified. See `docs/D3M-ENGINE-27-PROCESS-QUALIFICATION-REPORT-BRIDGE.md`.
 
