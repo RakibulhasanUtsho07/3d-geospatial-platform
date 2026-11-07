@@ -4,7 +4,7 @@
 
 D3M-23 through D3M-28 establish the external monotonic-state provider contract, concurrency/process conformance, exact source/provider report binding and trusted reviewer signature. Those controls still do not establish that the state anchor is independently operated or that a reported state was freshly observed for this exact provider deployment.
 
-D3M-29 adds a fresh 256-bit challenge and a detached Ed25519 witness receipt. The receipt binds the exact challenge bytes, nonce, provider/source/adapter/deployment fingerprints, anchor/key/registry identities, an independently pinned governance-key fingerprint, opaque provider version, positive monotonic sequence and authoritative-state digest.
+D3M-29 adds a fresh 256-bit challenge and a detached Ed25519 witness receipt. The receipt binds the exact challenge bytes, nonce, provider/source/adapter/deployment fingerprints, the SHA-256 of the D3M-26 process report, its final revision and minimum accepted sequence, anchor/key/registry identities, an independently pinned governance-key fingerprint, opaque provider version, positive monotonic sequence and authoritative-state digest.
 
 A valid signature proves only that one active key in the operator-configured independent-anchor registry signed the exact challenge-bound statement. It does **not**, by itself, prove organizational independence, honest operation, physical isolation, provider-side rollback resistance or production qualification. Those facts still require out-of-band ownership validation, a real deployed anchor and independent security review.
 
@@ -41,7 +41,7 @@ node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs \
 
 The CLI uses a cryptographically random 32-byte nonce, a random challenge ID and an exact source/provider/adapter/instance/namespace context. TTL is bounded to 1–600 seconds (default 300). The output file is created exclusively with mode 0600; an existing file is never overwritten. The CLI does not contact the provider and does not sign anything.
 
-Deliver the exact challenge file bytes to the independently operated anchor through the organization's authenticated out-of-band channel. Do not send private keys, account/tenant identifiers, endpoints or credentials in the challenge. The anchor must read its own authoritative monotonic state after receiving the fresh nonce and return the schema-defined witness.
+Deliver the exact challenge file bytes to the independently operated anchor through the organization's authenticated out-of-band channel. Do not send private keys, account/tenant identifiers, endpoints or credentials in the challenge. The anchor must read its own authoritative monotonic state after receiving the fresh nonce and return the schema-defined witness. The challenge includes the exact SHA-256 and final revision/minimum accepted sequence from the already byte-verified and D3M-28-signed process report; the anchor must sign those same values into the witness. This prevents a witness from being replayed against a different report or quietly substituting another observed provider revision.
 
 ## Witness signing contract
 
@@ -54,7 +54,7 @@ UTF8("3d-geospatial-platform/d3m29-independent-anchor-witness/v1\\0")
 || exact challenge file bytes
 ```
 
-The witness must include the challenge SHA-256, challenge ID and nonce; exact source/provider/adapter and instance/namespace fingerprints; anchor ID, key ID and public-key fingerprint; registry ID and registry-set ID; independently pinned governance-key fingerprint; provider version; monotonic sequence; authoritative-state SHA-256; and observedAtUtc.
+The witness must include the challenge SHA-256, challenge ID and nonce; exact source/provider/adapter and instance/namespace fingerprints; the exact D3M-26 process-report SHA-256, final revision and final minimum accepted sequence; anchor ID, key ID and public-key fingerprint; registry ID and registry-set ID; independently pinned governance-key fingerprint; provider version; monotonic sequence; authoritative-state SHA-256; and observedAtUtc.
 
 The anchor private key stays with the independent anchor operator or its HSM. No D3M-29 script accepts, stores or emits that private key. The repository does not fabricate a witness or provide a production signer.
 
