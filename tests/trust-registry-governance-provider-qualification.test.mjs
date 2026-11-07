@@ -392,7 +392,8 @@ test("an integration run cannot be claimed before a provider is provisioned", ()
   manifest.schemaVersion = "1.1.0";
   manifest.provider.adapterModuleSha256 = null;
   manifest.providerIntegration = completeManifest().providerIntegration;
-  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider is not provisioned/);
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider integration cannot claim a run when the provider is not provisioned/);
 });
 
 test("both D3M-24 Full CI runs must finish successfully on the exact source SHA", () => {
@@ -649,6 +650,7 @@ test("legacy D3M-25 passed provider manifests remain readable but cannot skip th
   manifest.schemaVersion = "1.0.0";
   delete manifest.provider.adapterModuleSha256;
   delete manifest.providerIntegration.processReportArtifactId;
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
   const normalized = normalizeTrustRegistryProviderQualificationManifest(manifest);
   assert.equal(normalized.schemaVersion, "1.0.0");
   const report = assessTrustRegistryProviderQualification(manifest);
