@@ -476,12 +476,25 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
       }
       verifiedArtifactIds.push(artifact.id);
     } catch (error) {
+      const code = error && typeof error === "object" && typeof error.code === "string"
+        ? error.code
+        : "read-failed";
+      const safeMessages = {
+        symlink: "symlink evidence path is not permitted",
+        "not-directory": "evidence path parent is not a directory",
+        "path-escape": "evidence path resolves outside the artifact root",
+        "not-file": "evidence artifact is not a regular file",
+        "byte-count-mismatch": "evidence artifact byte count mismatch",
+        "too-large": "evidence artifact exceeds the size limit",
+        "sha256-mismatch": "evidence artifact SHA-256 mismatch",
+        ENOENT: "evidence artifact is missing",
+        EACCES: "evidence artifact cannot be read",
+        ELOOP: "evidence artifact path contains a symlink",
+      };
       failures.push({
         id: artifact.id,
-        code: error && typeof error === "object" && typeof error.code === "string"
-          ? error.code
-          : "read-failed",
-        message: error instanceof Error ? error.message : "unexpected artifact verification failure",
+        code,
+        message: safeMessages[code] ?? "evidence artifact could not be verified",
       });
     }
   }
