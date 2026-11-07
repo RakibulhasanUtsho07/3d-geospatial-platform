@@ -187,6 +187,32 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.deepEqual(stale.anchor, winner.anchor,
     "a stale CAS response must preserve the current winning anchor");
 
+  // A matching opaque version is insufficient when the caller's state digest
+  // is wrong. Both fields must be enforced as independent CAS preconditions.
+  const digestMismatchNextState = createNextTrustRegistryGovernanceState({
+    current: winner.state,
+    ...identity,
+    expectedRevision: winner.state.revision,
+    acceptedSequence: bootstrapMinimumSequence + 2,
+    acceptedAttestationSha256: sha256("D3M-24 digest mismatch attestation " + nonce),
+    acceptedSnapshotSha256: sha256("D3M-24 digest mismatch snapshot " + nonce),
+    now: new Date("2026-11-05T12:01:30.000Z"),
+  }).state;
+  const digestMismatch = assertWriteResult(await provider.compareAndSetState({
+    identity,
+    expectedVersion: winner.version,
+    expectedStateSha256: sha256("D3M-24 deliberately incorrect prior state " + nonce),
+    nextState: clone(digestMismatchNextState),
+  }), "updated", identity, "matching-version mismatched-digest CAS result");
+  assert.equal(digestMismatch.updated, false,
+    "a current provider version must not authorize a CAS with the wrong prior state digest");
+  assert.equal(digestMismatch.state.stateSha256, winner.state.stateSha256,
+    "a wrong expected state digest must leave the committed state unchanged");
+  assert.equal(digestMismatch.version, winner.version,
+    "a rejected digest precondition must not advance the provider version");
+  assert.deepEqual(digestMismatch.anchor, winner.anchor,
+    "a rejected digest precondition must not change the anchor");
+
   // Reconstruct a client and verify that its read observes the same backing record.
   // A provider-specific integration may implement reopenProvider across a process boundary.
   const reopenedProvider = await reopenProvider();
