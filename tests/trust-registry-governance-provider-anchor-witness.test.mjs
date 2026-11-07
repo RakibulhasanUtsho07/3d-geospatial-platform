@@ -139,7 +139,7 @@ test("D3M-29 rejects a challenge/provider-context substitution", () => {
     now: new Date(now.getTime() + 2_000),
   });
   assert.equal(report.valid, false);
-  assert.ok(report.errors.some((item) => item.code === "expected-provider-context"));
+  assert.ok(report.errors.some((item) => item.code === "challenge-provider-context"));
 });
 
 test("D3M-29 rejects tampering with exact challenge bytes", () => {
