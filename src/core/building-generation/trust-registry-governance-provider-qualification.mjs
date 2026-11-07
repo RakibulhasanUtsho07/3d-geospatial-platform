@@ -191,19 +191,27 @@ function normalizeCiRun(raw, label, expectedEvent) {
 }
 
 function normalizeProviderIntegration(raw) {
-  exactKeys(raw, ["status", "runId", "runUrl", "headSha", "suiteConclusion", "syntheticOnly"],
-    "providerIntegration");
+  exactKeys(raw, [
+    "status", "runId", "runUrl", "headSha", "suiteConclusion", "syntheticOnly",
+    "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
+  ], "providerIntegration");
   if (!["not-run", "passed", "failed", "pending"].includes(raw.status)) {
     throw new TypeError("providerIntegration.status is unsupported");
   }
   if (typeof raw.syntheticOnly !== "boolean") throw new TypeError("providerIntegration.syntheticOnly must be boolean");
   if (raw.status === "not-run") {
     if (raw.runId !== null || raw.runUrl !== null || raw.headSha !== null ||
-        raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true) {
-      throw new TypeError("not-run provider integration must not claim a run or real-provider result");
+        raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true ||
+        raw.providerInstanceFingerprintSha256 !== null ||
+        raw.providerNamespaceFingerprintSha256 !== null) {
+      throw new TypeError("not-run provider integration must not claim a run, provider identity or real-provider result");
     }
-    return { status: "not-run", runId: null, runUrl: null, headSha: null,
-      suiteConclusion: "not-run", syntheticOnly: true };
+    return {
+      status: "not-run", runId: null, runUrl: null, headSha: null,
+      suiteConclusion: "not-run", syntheticOnly: true,
+      providerInstanceFingerprintSha256: null,
+      providerNamespaceFingerprintSha256: null,
+    };
   }
   if (!Number.isSafeInteger(raw.runId) || raw.runId < 1) throw new TypeError("providerIntegration.runId must be positive");
   const runUrl = requireHttpsUrl(raw.runUrl, "providerIntegration.runUrl");
@@ -211,6 +219,10 @@ function normalizeProviderIntegration(raw) {
     throw new TypeError("providerIntegration.runUrl must identify the declared repository workflow run");
   }
   requireCommit(raw.headSha, "providerIntegration.headSha");
+  if (!hashOk(raw.providerInstanceFingerprintSha256) ||
+      !hashOk(raw.providerNamespaceFingerprintSha256)) {
+    throw new TypeError("provider integration must identify its exact provider instance and isolated namespace fingerprints");
+  }
   if (!["success", "failure", "pending"].includes(raw.suiteConclusion)) {
     throw new TypeError("providerIntegration.suiteConclusion is unsupported");
   }
@@ -324,6 +336,14 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
   };
 
   const providerIntegration = normalizeProviderIntegration(input.providerIntegration);
+  if (providerIntegration.status !== "not-run" && provider.status !== "provisioned") {
+    throw new TypeError("provider integration cannot claim a run when the provider is not provisioned");
+  }
+  if (providerIntegration.status !== "not-run" &&
+      (providerIntegration.providerInstanceFingerprintSha256 !== provider.instanceFingerprintSha256 ||
+       providerIntegration.providerNamespaceFingerprintSha256 !== provider.namespaceFingerprintSha256)) {
+    throw new TypeError("provider integration evidence is bound to a different provider instance or namespace");
+  }
   if (!Array.isArray(input.artifacts) || input.artifacts.length > 100) {
     throw new TypeError("artifacts must be an array of at most 100 records");
   }
