@@ -17,3 +17,10 @@ The report preserves `counts.vertexCount` as the total POSITION accessor count a
 
 
 For a non-indexed `TRIANGLES` primitive, glTF uses sequential vertex order as the implicit triangle index stream. Every `POSITION` entry is therefore referenced and the unreferenced counters remain zero.
+
+
+## Scene-space bounds versus mesh-local topology
+
+Aggregate `bounds` follow the active glTF scene (the declared default scene, or scene 0 when scenes are present but no default is declared). Node `matrix` or TRS transforms are composed through the parent-child hierarchy and every mesh instance contributes referenced POSITION vertices to the scene-space axis-aligned bounds. If no scene graph is available, the report uses an explicit mesh-local fallback warning. Mesh definitions not instanced in the active scene are still structurally/topologically checked but do not affect scene-space bounds.
+
+Per-primitive topology measurements remain in mesh-local coordinates. They are scale-relative review hints, not per-instance deformed-surface analysis. Static QA does not evaluate glTF animations, skinning or morph-target deformation. Scene-space bounds remain un-georeferenced and do not establish real-world dimensions, survey truth or architectural accuracy. A configurable bounded scene-node, mesh-instance and transformed-vertex budget prevents pathological scene graphs from causing unbounded work.

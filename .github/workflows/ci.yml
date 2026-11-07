@@ -87,6 +87,7 @@ on:
       - integration/p34-main-after-p37-20261103
       - feat/brf04-open-boundary-disconnected-regressions-20261107
       - feat/glb-qa-ignore-unreferenced-vertices-20261107
+      - feat/glb-qa-scene-transformed-bounds-20261107
       - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
   workflow_dispatch:

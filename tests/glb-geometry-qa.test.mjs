@@ -5,7 +5,7 @@ import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
-function makeGlb(positions,indices=null){
+function makeGlb(positions,indices=null,sceneGraph={}){
  const p=Buffer.alloc(positions.length*4);positions.forEach((value,index)=>p.writeFloatLE(value,index*4));
  const hasIndices=Array.isArray(indices);
  const index=hasIndices?Buffer.alloc(indices.length*2):Buffer.alloc(0);
@@ -21,7 +21,7 @@ function makeGlb(positions,indices=null){
   bufferViews.push({buffer:0,byteOffset:p.length,byteLength:index.length,target:34963});
  }
  const gltf={
-  asset:{version:"2.0",generator:"GLB geometry QA test"},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],
+  asset:{version:"2.0",generator:"GLB geometry QA test"},scene:sceneGraph.scene??0,scenes:sceneGraph.scenes??[{nodes:[0]}],nodes:sceneGraph.nodes??[{mesh:0}],
   meshes:[{primitives:[primitive]}],
   accessors,
   bufferViews,buffers:[{byteLength:p.length+index.length}],
@@ -97,6 +97,52 @@ test("treats every POSITION entry as referenced for a non-indexed TRIANGLES prim
  assert.deepEqual(report.bounds.min,[0,0,0]);
  assert.deepEqual(report.bounds.max,[1,1,0]);
  assert.ok(!report.warnings.includes("unreferenced-vertices-present"));
+});
+
+test("applies node translation and non-uniform scale to active-scene aggregate bounds",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:[{mesh:0,translation:[10,20,30],scale:[2,3,4]}],scenes:[{nodes:[0]}]});
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[10,20,30]);assert.deepEqual(report.bounds.max,[12,23,30]);assert.deepEqual(report.bounds.dimensions,[2,3,0]);
+ assert.equal(report.bounds.units,"scene-space-unverified");assert.equal(report.counts.meshInstanceCount,1);
+ assert.equal(report.meshDetails[0].sceneInstanceCount,1);assert.equal(report.meshDetails[0].topologyCoordinateSpace,"mesh-local");
+ assert.equal(report.meshDetails[0].topology.modelDiagonal,Number(Math.SQRT2.toFixed(6)));assert.equal(report.scene.boundsSpace,"scene-space-unverified");
+});
+test("applies node quaternion rotation to aggregate axis-aligned bounds",()=>{
+ const rotation=Math.SQRT1_2,glb=makeGlb([0,0,0,1,0,0,0,2,0],[0,1,2],{nodes:[{mesh:0,rotation:[0,0,rotation,rotation]}],scenes:[{nodes:[0]}]});
+ const report=analyzeGlbQuality(glb);
+ assert.ok(Math.abs(report.bounds.min[0]+2)<1e-6);assert.ok(Math.abs(report.bounds.min[1])<1e-6);
+ assert.ok(Math.abs(report.bounds.max[0])<1e-6);assert.ok(Math.abs(report.bounds.max[1]-1)<1e-6);
+});
+test("composes parent and child node transforms in glTF hierarchy order",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:[{translation:[10,5,0],children:[1]},{mesh:0,scale:[2,3,1]}],scenes:[{nodes:[0]}]});
+ const report=analyzeGlbQuality(glb);assert.deepEqual(report.bounds.min,[10,5,0]);assert.deepEqual(report.bounds.max,[12,8,0]);assert.equal(report.counts.sceneNodeCount,2);
+});
+test("includes every active-scene instance when one mesh is referenced by multiple nodes",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:[{mesh:0,translation:[10,0,0]},{mesh:0,translation:[0,20,0]}],scenes:[{nodes:[0,1]}]});
+ const report=analyzeGlbQuality(glb);assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[11,21,0]);
+ assert.equal(report.counts.meshInstanceCount,2);assert.equal(report.meshDetails[0].sceneInstanceCount,2);assert.equal(report.counts.boundsVertexEvaluations,6);
+});
+test("supports explicit column-major affine node matrices",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:[{mesh:0,matrix:[2,0,0,0,0,3,0,0,0,0,1,0,10,20,30,1]}],scenes:[{nodes:[0]}]});
+ const report=analyzeGlbQuality(glb);assert.deepEqual(report.bounds.min,[10,20,30]);assert.deepEqual(report.bounds.max,[12,23,30]);
+});
+test("falls back to explicit mesh-local bounds when scene graph data is absent",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:null,scenes:null}),report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.bounds.units,"mesh-local-unverified");
+ assert.ok(report.warnings.includes("scene-graph-unavailable-mesh-local-bounds-fallback"));
+});
+test("fails closed on invalid node transforms, hierarchy cycles and duplicate parenting",()=>{
+ const positions=[0,0,0,1,0,0,0,1,0],indices=[0,1,2];
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0.2,0,1,0,0,0,0,1,0,0,0,0,1]}],scenes:[{nodes:[0]}]}),/matrix must be affine/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],translation:[1,0,0]}],scenes:[{nodes:[0]}]}),/matrix and TRS/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,rotation:[0,0,0,0]}],scenes:[{nodes:[0]}]}),/normalized quaternion/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{children:[0],mesh:0}],scenes:[{nodes:[0]}]}),/contains a cycle/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{children:[2]},{children:[2]},{mesh:0}],scenes:[{nodes:[0,1]}]}),/referenced more than once/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:5}],scenes:[{nodes:[0]}]}),/invalid mesh index/);
+});
+test("bounds evaluation has a strict per-report vertex budget",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ assert.throws(()=>analyzeGlbQuality(glb,{maxSceneBoundsVertexEvaluations:2}),/maxSceneBoundsVertexEvaluations/);
 });
 
 test("detects degenerate triangles for operator review",()=>{

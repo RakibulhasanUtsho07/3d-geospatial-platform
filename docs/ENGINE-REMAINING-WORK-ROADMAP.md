@@ -351,3 +351,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - The prior P3.4 baseline failed its clean-tree provenance gate because the benchmark's own nested artifact directory appeared in Git status. The benchmark now parses NUL-delimited porcelain status and excludes only its own output subtree; tracked edits and all other untracked paths remain dirty. A temp-Git-repository regression test covers nested generated evidence plus unrelated tracked/untracked changes.
 - The P3.4 current-main candidate must still pass exact-head Full CI and the six-sample clean working-tree Real-Dhaka baseline. Until both succeed and the resulting screenshots/report are inspected, P3.4 is not accepted as complete. The diagnostics do not prove that the previous red imagery anomaly has been fixed.
 - The independent building accuracy, rights, survey, visual review and production workflow gates remain separate; no universal accuracy percentage or release eligibility is claimed.
+
+
+## BRF-04 — glTF scene-transformed aggregate geometry bounds (2026-11-07)
+
+- Tracking issue: [#397](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/397).
+- Gap: GLB geometry QA aggregated referenced POSITION coordinates in mesh-local space and did not apply the active glTF scene node hierarchy or repeated mesh instances.
+- Candidate applies column-major node matrices or TRS composition through parent-child nodes; every active-scene mesh instance contributes to aggregate bounds while topology diagnostics remain mesh-local.
+- Safety checks validate scene graph structure and transform inputs; node traversal, mesh instances and transformed vertex evaluations are bounded. GLBs without scene metadata use an explicitly warned mesh-local fallback. Animations, skinning and morph targets remain outside static QA.
+- Evidence boundary: scene-space bounds remain un-georeferenced; topology metrics remain mesh-local. No real-world scale, survey truth, architectural accuracy or publication eligibility is implied.
+- Validation: candidate implementation is being prepared against PR #395. Exact-head Full CI and human review are required; keep all release flags false.
