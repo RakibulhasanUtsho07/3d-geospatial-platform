@@ -63,10 +63,12 @@ The anchor private key stays with the independent anchor operator or its HSM. No
 Set `D3M29_INDEPENDENT_ANCHOR_KEYS_JSON` in the verifier environment to the independently provisioned, versioned, public-key-only registry. Separately set `D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256` to the 64-character SHA-256 fingerprint provisioned out-of-band for the registry governance public key. The verifier compares this independent pin to the registry envelope and witness; the registry cannot establish its own root of trust. Its exact envelope fields are:
 
 - `schemaVersion = 1.0.0`, `recordType = d3m29-independent-anchor-key-registry`.
-- `registryId`, `registrySetId`, `governancePublicKeyFingerprintSha256`, canonical `issuedAtUtc` / `expiresAtUtc`.
+- `registryId`, `registrySetId`, `governancePublicKeyFingerprintSha256`, Ed25519 `governancePublicKeyPem`, canonical `issuedAtUtc` / `expiresAtUtc`, and `governanceSignatureBase64`.
 - One or more entries containing `anchorId`, `keyId`, `status`, Ed25519 `publicKeyPem`, key validity times, `revokedAtUtc` and `replacesKeyId`.
 
 The registry is limited to 64 KiB, 100 entries and a 90-day maximum registry validity. It rejects private-key material, non-Ed25519 keys, duplicate IDs/fingerprints, ambiguous active keys, invalid replacement chains, revoked/expired keys and key windows outside the registry envelope. The operator-controlled environment is the trust source for this registry; do not assume a JSON value becomes independently trusted merely because it is checked into source control.
+
+The registry governance signature is Ed25519 over domain-separated bytes: `UTF8("3d-geospatial-platform/d3m29-independent-anchor-key-registry/v1\\0") || UTF8(canonicalJson(registry fields excluding governanceSignatureBase64)) || UTF8("\\0")`. The verifier checks that signature using the registry's public governance key, recomputes the SPKI-DER SHA-256 fingerprint, and compares it with the separately operator-pinned environment value. Challenge and witness JSON artifacts must be canonical JSON followed by exactly one newline; registry JSON may be canonical JSON with zero or one trailing newline. Registry input supplied as a string rejects duplicate-key/pretty-printed variants because its bytes must equal the canonical re-serialization. The in-memory object form is intended for trusted test harnesses; production CLI reads the operator-controlled JSON environment value as a string.
 
 The existing `RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON` remains separately required when verifying a passed D3M-28 process report. Do not substitute the reviewer registry for the independent-anchor registry.
 
@@ -115,7 +117,7 @@ npm run lint
 npm run build
 ```
 
-The test suite uses ephemeral Ed25519 keys and synthetic provider context. It covers valid fresh challenge/receipt verification, TTL bounds, stale challenge, provider-context substitution, exact-byte tampering, revoked key and signature tampering. These are software protocol tests only.
+The test suite uses ephemeral Ed25519 keys and synthetic provider context. It covers valid fresh challenge/receipt verification, 256-bit nonce uniqueness, TTL bounds, stale challenge, provider-context substitution, exact-byte/canonical-JSON tampering, process-report digest/final-revision substitution, wrong anchor-key identity, expired/revoked keys, duplicate-key registry JSON, substituted governance trust-root pin, tampered governance-registry signature, and witness-signature tampering. The D3M-25 integration test also verifies a fresh signed witness against the exact D3M-26 report bytes and state sequence, then mutates the witness signature to assert fail-closed qualification. These are software protocol tests only.
 
 ## Current operational state
 
