@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID, generateKeyPairSync, sign } from "node:crypto";
+import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,7 @@ import {
 } from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
 import { signTrustRegistryGovernanceProviderProcessReport } from "../src/core/building-generation/trust-registry-governance-provider-process-report-signature.mjs";
 import {
+  buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes,
   buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes,
   createTrustRegistryGovernanceProviderAnchorChallenge,
 } from "../src/core/building-generation/trust-registry-governance-provider-anchor-witness.mjs";
@@ -846,15 +848,20 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
   const anchorPublicKeyFingerprintSha256 = digest(
     anchorPair.publicKey.export({ type: "spki", format: "der" }),
   );
+  const governancePair = generateKeyPairSync("ed25519");
+  const governancePublicKeyPem = governancePair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const governancePublicKeyFingerprintSha256 = digest(
+    governancePair.publicKey.export({ type: "spki", format: "der" }),
+  );
   const verificationNow = new Date("2026-11-07T04:00:02.000Z");
   const challengeNow = new Date("2026-11-07T04:00:00.000Z");
-  const governancePublicKeyFingerprintSha256 = digest("independently pinned test governance key");
-  const independentAnchorKeyRegistry = {
+  const registryUnsigned = {
     schemaVersion: "1.0.0",
     recordType: "d3m29-independent-anchor-key-registry",
     registryId: "d3m29-test-anchor-registry",
     registrySetId: "d3m29-test-registry-set",
     governancePublicKeyFingerprintSha256,
+    governancePublicKeyPem,
     issuedAtUtc: "2026-11-01T00:00:00.000Z",
     expiresAtUtc: "2026-12-01T00:00:00.000Z",
     entries: [{
@@ -867,6 +874,16 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
       revokedAtUtc: null,
       replacesKeyId: null,
     }],
+    governanceSignatureBase64: "",
+  };
+  const registrySignature = sign(
+    null,
+    buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({ registry: registryUnsigned }),
+    governancePair.privateKey,
+  );
+  const independentAnchorKeyRegistry = {
+    ...registryUnsigned,
+    governanceSignatureBase64: registrySignature.toString("base64"),
   };
   const challenge = createTrustRegistryGovernanceProviderAnchorChallenge({
     sourceCommitSha: manifest.source.commitSha,
@@ -910,10 +927,10 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
     challengeBytes: challenge.bytes,
     witness: unsignedWitness,
   }), anchorPair.privateKey);
-  const witnessBytes = Buffer.from(JSON.stringify({
+  const witnessBytes = Buffer.from(canonicalJson({
     ...unsignedWitness,
     signatureBase64: signature.toString("base64"),
-  }, null, 2) + "\n", "utf8");
+  }) + "\n", "utf8");
 
   const oldAnchorArtifact = manifest.artifacts.find((item) => item.id === "evidence-independentanchorcustody");
   manifest.artifacts = manifest.artifacts.filter((item) => item !== oldAnchorArtifact);
@@ -989,13 +1006,14 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
     const witnessPath = path.join(root, "evidence/anchor-witness.json");
     const altered = JSON.parse(await readFile(witnessPath, "utf8"));
     altered.signatureBase64 = Buffer.alloc(64, 0x77).toString("base64");
-    const alteredBytes = Buffer.from(JSON.stringify(altered, null, 2) + "\n", "utf8");
+    const alteredBytes = Buffer.from(canonicalJson(altered) + "\n", "utf8");
     await writeFile(witnessPath, alteredBytes);
     const witnessArtifact = manifest.artifacts.find((item) => item.id === "d3m29-anchor-witness");
     witnessArtifact.bytes = alteredBytes.length;
     witnessArtifact.sha256 = digest(alteredBytes);
     const rejected = await verifyArtifacts(manifest, root, trustedReviewerRegistry, {
       independentAnchorKeyRegistry,
+      independentAnchorGovernanceKeyFingerprintSha256: governancePublicKeyFingerprintSha256,
       now: verificationNow,
     });
     assert.ok(rejected.failures.some((item) =>
