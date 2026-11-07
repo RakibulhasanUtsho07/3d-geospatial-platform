@@ -46,6 +46,7 @@ const hashOk = (value) => typeof value === "string" && SHA256.test(value);
 const commitOk = (value) => typeof value === "string" && COMMIT.test(value);
 const ID_OK = (value) => typeof value === "string" && ID.test(value);
 const MAX_ARTIFACT_BYTES = 128 * 1024 * 1024;
+const MAX_TOTAL_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
 function requireObject(value, label) {
   if (!object(value)) throw new TypeError(label + " must be an object");
@@ -79,8 +80,8 @@ function requireHttpsUrl(value, label) {
   } catch {
     throw new TypeError(label + " must be a valid HTTPS URL");
   }
-  if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
-    throw new TypeError(label + " must use HTTPS and must not contain credentials");
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new TypeError(label + " must use HTTPS and must not contain credentials, query strings or fragments");
   }
   return parsed.toString();
 }
@@ -133,8 +134,9 @@ function normalizeProvider(raw) {
   }
   const providerId = requireId(raw.providerId, "provider.providerId");
   for (const key of ["implementation", "version"]) {
-    if (!nonEmpty(raw[key]) || raw[key].length > 160) {
-      throw new TypeError("provider." + key + " must be a bounded non-empty string");
+    if (!nonEmpty(raw[key]) || raw[key].length > 160 ||
+        !/^[A-Za-z0-9][A-Za-z0-9 .+_:/-]{0,159}$/.test(raw[key])) {
+      throw new TypeError("provider." + key + " must be a bounded, non-secret identifier");
     }
   }
   if (!["development", "staging", "production"].includes(raw.environment)) {
@@ -144,8 +146,11 @@ function normalizeProvider(raw) {
     throw new TypeError("provisioned provider requires SHA-256 instance and namespace fingerprints");
   }
   const endpointUrl = new URL(requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin"));
-  if (endpointUrl.pathname !== "/" || endpointUrl.search || endpointUrl.hash) {
-    throw new TypeError("provider.endpointOrigin must be an HTTPS origin only, without path, query or fragment");
+  const hostname = endpointUrl.hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  if (endpointUrl.pathname !== "/" || hostname === "localhost" ||
+      hostname.endsWith(".localhost") || hostname === "::1" ||
+      /^127(?:\\.[0-9]{1,3}){3}$/.test(hostname) || hostname === "0.0.0.0") {
+    throw new TypeError("provider.endpointOrigin must be a remote HTTPS origin, not a local/loopback endpoint");
   }
   const endpointOrigin = endpointUrl.origin;
   return {
@@ -330,6 +335,11 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     if (artifact.status === "present" && artifact.sourceCommitSha !== source.commitSha) {
       throw new TypeError("artifact " + artifact.id + " is bound to a different source commit");
     }
+  }
+  const totalArtifactBytes = artifacts.reduce((total, artifact) =>
+    total + (artifact.status === "present" ? artifact.bytes : 0), 0);
+  if (totalArtifactBytes > MAX_TOTAL_ARTIFACT_BYTES) {
+    throw new TypeError("present evidence artifacts exceed the 512 MiB aggregate size limit");
   }
   const artifactsById = new Map(artifacts.map((artifact) => [artifact.id, artifact]));
   exactKeys(input.evidence, Object.keys(EVIDENCE_TYPES), "evidence");
