@@ -109,6 +109,12 @@ test("D3M-27 rejects synthetic adapter evidence when the provisioned provider is
   ), /synthetic declaration/i);
 });
 
+test("D3M-27 rejects an absent syntheticOnly declaration", () => {
+  assert.throws(() => validateTrustRegistryGovernanceProviderProcessReport(
+    report({ adapterDeclaredSyntheticOnly: null }), expected(),
+  ), /synthetic declaration/i);
+});
+
 test("D3M-27 keeps synthetic report semantics explicit instead of relabeling it as a real provider", () => {
   const syntheticReport = report({
     adapterDeclaredSyntheticOnly: true,
