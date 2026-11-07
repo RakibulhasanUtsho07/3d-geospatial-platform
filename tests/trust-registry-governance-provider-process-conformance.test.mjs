@@ -218,7 +218,9 @@ test("provider process runner writes a sanitized, source-bound report without pa
     const fs = await import("node:fs/promises");
     const reportText = await fs.readFile(reportFile, "utf8");
     const report = JSON.parse(reportText);
-    assert.equal(report.schemaVersion, "1.0.0");
+    assert.equal(report.schemaVersion, "1.1.0");
+    assert.equal(report.providerInstanceFingerprintSha256, null);
+    assert.equal(report.providerNamespaceFingerprintSha256, null);
     assert.equal(report.sourceCommitSha, sourceSha);
     assert.equal(report.providerId, "d3m26-file-backed-test-provider");
     assert.equal(report.adapterDeclaredSyntheticOnly, true);
@@ -301,4 +303,40 @@ test("provider worker re-hashes the adapter file and rejects stale module bytes"
   assert.ok(line, result.stderr);
   assert.equal(JSON.parse(line.slice("D3M26_PROVIDER_RESULT:".length)).errorCode,
     "D3M26_ADAPTER_HASH_MISMATCH");
+});
+
+test("non-synthetic provider reports require both privacy-safe deployment fingerprints", async () => {
+  await withTempDirectory(async (directory) => {
+    const adapter = path.join(directory, "operator-adapter.mjs");
+    const report = path.join(directory, "report.json");
+    await writeFile(adapter, [
+      "export const syntheticOnly = false;",
+      "export async function createProvider() {",
+      "  return {",
+      "    providerId: 'd3m27-operator-provider',",
+      "    readState: async () => null,",
+      "    initializeStateIfAbsent: async () => null,",
+      "    compareAndSetState: async () => null,",
+      "  };",
+      "}",
+      "",
+    ].join("\\n"), { mode: 0o600 });
+    const missing = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", adapter,
+      "--source-sha", "f".repeat(40),
+      "--report", report,
+    ], { encoding: "utf8", timeout: 10000 });
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /requires both provider instance and namespace fingerprints/i);
+
+    const mismatch = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", adapter,
+      "--source-sha", "f".repeat(40),
+      "--provider-instance-fingerprint-sha256", "a".repeat(64),
+    ], { encoding: "utf8", timeout: 10000 });
+    assert.notEqual(mismatch.status, 0);
+    assert.match(mismatch.stderr, /must be supplied together/i);
+  });
 });
