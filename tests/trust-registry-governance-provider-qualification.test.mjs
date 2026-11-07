@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   assessTrustRegistryProviderQualification,
   normalizeTrustRegistryProviderQualificationManifest,
@@ -72,6 +74,7 @@ function currentManifest() {
       runId: null,
       runUrl: null,
       headSha: null,
+      fullRunConclusion: "not-run",
       suiteConclusion: "not-run",
       syntheticOnly: true,
     },
@@ -102,6 +105,7 @@ function completeManifest() {
     runId: 42339999999,
     runUrl: "https://github.com/" + repository + "/actions/runs/42339999999",
     headSha: sourceCommitSha,
+    fullRunConclusion: "success",
     suiteConclusion: "success",
     syntheticOnly: false,
     providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
@@ -138,6 +142,12 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
   assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
   assert.equal(schema.properties.schemaVersion.const, "1.0.0");
+  assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
+  assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
+  assert.equal(
+    schema.properties.evidence.properties.independentSecurityReview.allOf[1].then.properties.verificationKind.const,
+    "independent-audit",
+  );
 });
 
 test("checked-in provider qualification state is valid but blocked without a real provider", async () => {
@@ -216,6 +226,21 @@ test("provider integration must match the exact evaluated source commit", () => 
   const report = assessTrustRegistryProviderQualification(manifest, {
   });
   assert.ok(report.blockers.includes("provider-integration-head-sha-mismatch"));
+});
+
+test("D3M-24 CI evidence cannot be relabeled as non-synthetic", () => {
+  const manifest = completeManifest();
+  manifest.conformanceCi.push.syntheticOnly = false;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /syntheticOnly must be true/);
+});
+
+test("provider integration full workflow must succeed independently of its focused suite", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.fullRunConclusion = "failure";
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("real-provider-integration-full-run-not-success"));
 });
 
 test("D3M-24 synthetic conformance workflow runs cannot be reused as a provider integration run", () => {
@@ -395,3 +420,97 @@ test("assessment rejects caller-supplied artifact IDs as byte-verification proof
   assert.equal(report.verifiedArtifactCount, 0);
   assert.ok(report.blockers.includes("artifact-verification-not-performed"));
 });
+const cliPath = fileURLToPath(new URL("../scripts/validate-trust-registry-governance-provider-qualification.mjs", import.meta.url));
+const currentManifestPath = fileURLToPath(new URL(
+  "../benchmarks/trust-registry-governance/provider-qualification-current.json",
+  import.meta.url,
+));
+
+function runQualificationCli(args, cwd) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+}
+
+test("qualification validator CLI help is available without a manifest", () => {
+  const result = runQualificationCli(["--help"], process.cwd());
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Usage: node scripts\\/validate-trust-registry-governance-provider-qualification\\.mjs/);
+});
+
+test("qualification validator CLI emits a hash-bound blocked report and never overwrites it", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-qualification-cli-"));
+  try {
+    const relativeReport = "reports/current-qualification.json";
+    const first = runQualificationCli([currentManifestPath, "--report", relativeReport], cwd);
+    assert.equal(first.status, 0, first.stderr);
+    const summary = JSON.parse(first.stdout);
+    assert.equal(summary.status, "blocked");
+    assert.equal(summary.productionQualificationEligible, false);
+    assert.equal(summary.releaseFlags.mapReady, false);
+
+    const reportPath = path.join(cwd, relativeReport);
+    const reportBytes = await readFile(reportPath);
+    const report = JSON.parse(reportBytes.toString("utf8"));
+    assert.equal(
+      report.manifestSha256,
+      createHash("sha256").update(await readFile(currentManifestPath)).digest("hex"),
+    );
+    assert.equal(
+      report.reportSha256,
+      createHash("sha256").update(JSON.stringify({ ...report, reportSha256: undefined })).digest("hex"),
+    );
+
+    const second = runQualificationCli([currentManifestPath, "--report", relativeReport], cwd);
+    assert.equal(second.status, 2);
+    assert.match(second.stderr, /EEXIST|already exists/i);
+    assert.deepEqual(await readFile(reportPath), reportBytes);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("qualification validator CLI rejects report-parent symlinks and traversal", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-report-path-"));
+  const outside = await mkdtemp(path.join(os.tmpdir(), "d3m25-report-outside-"));
+  try {
+    const traversal = runQualificationCli([currentManifestPath, "--report", "../escape.json"], cwd);
+    assert.equal(traversal.status, 2);
+    assert.match(traversal.stderr, /safe relative path|escapes/i);
+
+    await symlink(outside, path.join(cwd, "redirected"), "dir");
+    const redirected = runQualificationCli([currentManifestPath, "--report", "redirected/report.json"], cwd);
+    assert.equal(redirected.status, 2);
+    assert.match(redirected.stderr, /symbolic link|outside/i);
+    await assert.rejects(readFile(path.join(outside, "report.json")), { code: "ENOENT" });
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("qualification validator CLI rejects symlinked, oversized and malformed manifests", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-manifest-input-"));
+  try {
+    const malformedPath = path.join(cwd, "malformed.json");
+    await writeFile(malformedPath, "{not-json");
+    const malformed = runQualificationCli([malformedPath], cwd);
+    assert.equal(malformed.status, 2);
+
+    const oversizedPath = path.join(cwd, "oversized.json");
+    await writeFile(oversizedPath, Buffer.alloc(1024 * 1024 + 1, 0x20));
+    const oversized = runQualificationCli([oversizedPath], cwd);
+    assert.equal(oversized.status, 2);
+    assert.match(oversized.stderr, /1 MiB input limit/);
+
+    const symlinkPath = path.join(cwd, "manifest-link.json");
+    await symlink(currentManifestPath, symlinkPath);
+    const symlinked = runQualificationCli([symlinkPath], cwd);
+    assert.equal(symlinked.status, 2);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+

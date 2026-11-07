@@ -191,13 +191,15 @@ function normalizeCiRun(raw, label, expectedEvent) {
   if (!STEP_CONCLUSIONS.has(raw.providerConformanceStepConclusion)) {
     throw new TypeError(label + ".providerConformanceStepConclusion is unsupported");
   }
-  if (typeof raw.syntheticOnly !== "boolean") throw new TypeError(label + ".syntheticOnly must be boolean");
+  if (raw.syntheticOnly !== true) {
+    throw new TypeError(label + ".syntheticOnly must be true because D3M-24 conformance uses a synthetic provider fixture");
+  }
   return { ...raw, runUrl };
 }
 
 function normalizeProviderIntegration(raw) {
   exactKeys(raw, [
-    "status", "runId", "runUrl", "headSha", "suiteConclusion", "syntheticOnly",
+    "status", "runId", "runUrl", "headSha", "fullRunConclusion", "suiteConclusion", "syntheticOnly",
     "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
   ], "providerIntegration");
   if (!["not-run", "passed", "failed", "pending"].includes(raw.status)) {
@@ -206,14 +208,14 @@ function normalizeProviderIntegration(raw) {
   if (typeof raw.syntheticOnly !== "boolean") throw new TypeError("providerIntegration.syntheticOnly must be boolean");
   if (raw.status === "not-run") {
     if (raw.runId !== null || raw.runUrl !== null || raw.headSha !== null ||
-        raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true ||
+        raw.fullRunConclusion !== "not-run" || raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true ||
         raw.providerInstanceFingerprintSha256 !== null ||
         raw.providerNamespaceFingerprintSha256 !== null) {
       throw new TypeError("not-run provider integration must not claim a run, provider identity or real-provider result");
     }
     return {
       status: "not-run", runId: null, runUrl: null, headSha: null,
-      suiteConclusion: "not-run", syntheticOnly: true,
+      fullRunConclusion: "not-run", suiteConclusion: "not-run", syntheticOnly: true,
       providerInstanceFingerprintSha256: null,
       providerNamespaceFingerprintSha256: null,
     };
@@ -224,6 +226,9 @@ function normalizeProviderIntegration(raw) {
     throw new TypeError("providerIntegration.runUrl must identify the declared repository workflow run");
   }
   requireCommit(raw.headSha, "providerIntegration.headSha");
+  if (!CONCLUSIONS.has(raw.fullRunConclusion)) {
+    throw new TypeError("providerIntegration.fullRunConclusion is unsupported");
+  }
   if (!hashOk(raw.providerInstanceFingerprintSha256) ||
       !hashOk(raw.providerNamespaceFingerprintSha256)) {
     throw new TypeError("provider integration must identify its exact provider instance and isolated namespace fingerprints");
@@ -440,6 +445,9 @@ export function assessTrustRegistryProviderQualification(manifestInput, options 
   const integration = manifest.providerIntegration;
   if (integration.status !== "passed" || integration.suiteConclusion !== "success") {
     add("real-provider-integration-suite-not-passed");
+  }
+  if (integration.status !== "not-run" && integration.fullRunConclusion !== "success") {
+    add("real-provider-integration-full-run-not-success");
   }
   if (integration.status !== "not-run" && integration.headSha !== manifest.source.commitSha) {
     add("provider-integration-head-sha-mismatch");

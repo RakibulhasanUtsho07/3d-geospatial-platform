@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { constants } from "node:fs";
+import {
+  closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync,
+  realpathSync, writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
   assessTrustRegistryProviderQualification,
@@ -47,11 +51,26 @@ function safeReportPath(value) {
       value.split("/").some((part) => !part || part === "." || part === "..")) {
     throw new TypeError("Report path must be a safe relative path.");
   }
-  const root = process.cwd();
-  const target = path.resolve(root, ...value.split("/"));
-  if (!target.startsWith(root + path.sep)) throw new TypeError("Report path escapes the working directory.");
-  mkdirSync(path.dirname(target), { recursive: true });
-  return target;
+  const root = realpathSync(process.cwd());
+  const segments = value.split("/");
+  let parent = root;
+  for (const segment of segments.slice(0, -1)) {
+    const candidate = path.join(parent, segment);
+    try {
+      const info = lstatSync(candidate);
+      if (info.isSymbolicLink()) throw new TypeError("Report path must not traverse a symbolic link.");
+      if (!info.isDirectory()) throw new TypeError("Report path parent must be a directory.");
+    } catch (error) {
+      if (error && typeof error === "object" && error.code === "ENOENT") mkdirSync(candidate);
+      else throw error;
+    }
+    const resolved = realpathSync(candidate);
+    if (resolved !== candidate || (resolved !== root && !resolved.startsWith(root + path.sep))) {
+      throw new TypeError("Report path resolves outside the working directory.");
+    }
+    parent = resolved;
+  }
+  return path.join(parent, segments.at(-1));
 }
 
 async function main() {
@@ -67,9 +86,25 @@ async function main() {
     return;
   }
   const manifestPath = path.resolve(options.manifestPath);
-  const manifestBytes = readFileSync(manifestPath);
-  if (manifestBytes.length > MAX_MANIFEST_BYTES) {
-    throw new TypeError("Manifest exceeds the 1 MiB input limit.");
+  const manifestFd = openSync(manifestPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  let manifestBytes;
+  try {
+    const info = fstatSync(manifestFd);
+    if (!info.isFile()) throw new TypeError("Manifest input must be a regular file.");
+    if (info.size > MAX_MANIFEST_BYTES) throw new TypeError("Manifest exceeds the 1 MiB input limit.");
+    const chunks = [];
+    let totalBytes = 0;
+    while (totalBytes <= MAX_MANIFEST_BYTES) {
+      const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, MAX_MANIFEST_BYTES + 1 - totalBytes));
+      const bytesRead = readSync(manifestFd, buffer, 0, buffer.length, totalBytes);
+      if (bytesRead === 0) break;
+      chunks.push(buffer.subarray(0, bytesRead));
+      totalBytes += bytesRead;
+    }
+    if (totalBytes > MAX_MANIFEST_BYTES) throw new TypeError("Manifest exceeds the 1 MiB input limit.");
+    manifestBytes = Buffer.concat(chunks, totalBytes);
+  } finally {
+    closeSync(manifestFd);
   }
   const manifest = normalizeTrustRegistryProviderQualificationManifest(
     JSON.parse(manifestBytes.toString("utf8")),

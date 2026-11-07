@@ -156,7 +156,8 @@
         "suiteConclusion",
         "syntheticOnly",
         "providerInstanceFingerprintSha256",
-        "providerNamespaceFingerprintSha256"
+        "providerNamespaceFingerprintSha256",
+        "fullRunConclusion"
       ],
       "properties": {
         "status": {
@@ -213,6 +214,16 @@
             "null"
           ],
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "fullRunConclusion": {
+          "enum": [
+            "not-run",
+            "success",
+            "failure",
+            "in_progress",
+            "queued",
+            "pending"
+          ]
         }
       }
     },
@@ -286,7 +297,30 @@
           "$ref": "#/$defs/evidenceItem"
         },
         "independentSecurityReview": {
-          "$ref": "#/$defs/evidenceItem"
+          "allOf": [
+            {
+              "$ref": "#/$defs/evidenceItem"
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "verificationKind": {
+                    "const": "independent-audit"
+                  }
+                }
+              }
+            }
+          ]
         }
       }
     }
@@ -342,7 +376,7 @@
           ]
         },
         "syntheticOnly": {
-          "type": "boolean"
+          "const": true
         }
       }
     },

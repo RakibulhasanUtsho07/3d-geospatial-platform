@@ -46,7 +46,8 @@
     "suiteConclusion": "not-run",
     "syntheticOnly": true,
     "providerInstanceFingerprintSha256": null,
-    "providerNamespaceFingerprintSha256": null
+    "providerNamespaceFingerprintSha256": null,
+    "fullRunConclusion": "not-run"
   },
   "artifacts": [],
   "evidence": {
