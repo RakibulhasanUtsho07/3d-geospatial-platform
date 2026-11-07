@@ -22,6 +22,7 @@ Evaluator: `src/core/building-generation/trust-registry-governance-provider-qual
 The manifest binds:
 
 - provider ID, implementation/version, staging/production environment, a one-way instance fingerprint, a one-way isolated namespace fingerprint, and an HTTPS origin only;
+- the provider-specific integration run is bound to both the exact instance fingerprint and isolated namespace fingerprint, preventing evidence from a different tenant/cluster from being substituted;
 - source repository, branch and full 40-character commit SHA;
 - exact D3M-24 Push and PR workflow run IDs/URLs, event types, head SHAs, full-run conclusions and conformance-step conclusions;
 - a separate provider-integration run against the same source SHA, explicitly marked real or synthetic;
