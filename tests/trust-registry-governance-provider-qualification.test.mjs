@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, generateKeyPairSync } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,9 +12,25 @@ import {
   TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS,
   verifyTrustRegistryProviderQualificationArtifacts,
 } from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
+import { signTrustRegistryGovernanceProviderProcessReport } from "../src/core/building-generation/trust-registry-governance-provider-process-report-signature.mjs";
 
 const repository = "RakibulhasanUtsho07/3d-geospatial-platform";
 const sourceCommitSha = "786d901e5a7ed4effddbbbb563533820276fb4ba";
+const reviewerPair = generateKeyPairSync("ed25519");
+const reviewerPrivateKeyPem = reviewerPair.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+const reviewerPublicKeyPem = reviewerPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+const trustedReviewerRegistry = {
+  schemaVersion: "1.0.0",
+  recordType: "reconstruction-trusted-reviewer-key-registry",
+  registryId: "d3m25-test-reviewers",
+  issuedAtUtc: "2026-11-01T00:00:00.000Z",
+  expiresAtUtc: "2026-12-01T00:00:00.000Z",
+  entries: [{
+    reviewerId: "d3m25-test-reviewer", keyId: "d3m25-test-key", status: "active",
+    publicKeyPem: reviewerPublicKeyPem, validFromUtc: "2026-11-01T00:00:00.000Z",
+    validUntilUtc: "2026-12-01T00:00:00.000Z", revokedAtUtc: null, replacesKeyId: null,
+  }],
+};
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const evidenceTypes = {
   atomicBootstrapAndCompareAndSet: "multi-client-concurrency-report",
@@ -64,6 +80,25 @@ function processReport(manifest) {
     },
     trustBoundary: "Software conformance only. Adapter declarations are not independently authenticated. This report does not prove provider deployment, independent anchor custody, rollback resistance, security controls or production durability.",
   };
+}
+
+function processReportBytes(manifest) {
+  return Buffer.from(JSON.stringify(processReport(manifest)) + "\n");
+}
+
+function processReportSignatureBytes(manifest) {
+  const envelope = signTrustRegistryGovernanceProviderProcessReport({
+    reportBytes: processReportBytes(manifest),
+    privateKeyPem: reviewerPrivateKeyPem,
+    reviewerId: "d3m25-test-reviewer",
+    trustedReviewerRegistry,
+    signedAt: "2026-11-07T04:00:00.000Z",
+  });
+  return Buffer.from(JSON.stringify(envelope, null, 2) + "\n");
+}
+
+async function verifyArtifacts(manifest, root, registry = trustedReviewerRegistry) {
+  return verifyTrustRegistryProviderQualificationArtifacts(manifest, root, { trustedReviewerRegistry: registry });
 }
 
 function run({ id, event, conclusion = "success", headSha = sourceCommitSha } ) {
@@ -121,7 +156,7 @@ function currentManifest() {
 
 function completeManifest() {
   const manifest = currentManifest();
-  manifest.schemaVersion = "1.1.0";
+  manifest.schemaVersion = "1.2.0";
   manifest.provider = {
     status: "provisioned",
     providerId: "provider-staging-a",
@@ -147,18 +182,21 @@ function completeManifest() {
     providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
     processReportArtifactId: "evidence-processrestartvisibility",
+    processReportSignatureArtifactId: "evidence-process-report-signature",
   };
   manifest.artifacts = [];
   for (const key of TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS) {
     const id = "evidence-" + key.toLowerCase();
     const bytes = key === "processRestartVisibility"
-      ? JSON.stringify(processReport(manifest)) + "\n"
+      ? processReportBytes(manifest)
       : "independent provider evidence for " + key;
     manifest.artifacts.push({
       id,
       type: evidenceTypes[key],
       status: "present",
-      relativePath: "evidence/" + id + ".json",
+      relativePath: key === "processRestartVisibility"
+        ? "evidence/provider-process-conformance.json"
+        : "evidence/" + id + ".json",
       sha256: digest(bytes),
       bytes: Buffer.byteLength(bytes),
       sourceUrl: key === "processRestartVisibility"
@@ -172,6 +210,17 @@ function completeManifest() {
       verificationKind: key === "independentSecurityReview" ? "independent-audit" : "provider-test",
     };
   }
+  const signatureBytes = processReportSignatureBytes(manifest);
+  manifest.artifacts.push({
+    id: manifest.providerIntegration.processReportSignatureArtifactId,
+    type: "process-report-signature",
+    status: "present",
+    relativePath: "evidence/process-report-signature.json",
+    sha256: digest(signatureBytes),
+    bytes: signatureBytes.length,
+    sourceUrl: manifest.providerIntegration.runUrl,
+    sourceCommitSha,
+  });
   return manifest;
 }
 
@@ -182,10 +231,13 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.equal(schema.properties.evidence.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
   assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
-  assert.deepEqual(schema.properties.schemaVersion.enum, ["1.0.0", "1.1.0"]);
+  assert.deepEqual(schema.properties.schemaVersion.enum, ["1.0.0", "1.1.0", "1.2.0"]);
   assert.ok(schema.properties.provider.required.includes("adapterModuleSha256") === false,
     "D3M-25 schema 1.0.0 remains backward compatible");
   assert.ok(schema.properties.providerIntegration.properties.processReportArtifactId);
+  assert.ok(schema.properties.providerIntegration.properties.processReportSignatureArtifactId);
+  assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("process-report-signature"));
+  assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("process-report-signature"));
   const provisionedAdapterRule = schema.allOf.find((rule) =>
     rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
   assert.equal(
@@ -212,6 +264,8 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
     passedIntegrationRule.then.properties.providerIntegration.properties.providerNamespaceFingerprintSha256.type,
     "string",
   );
+  const signedRule = schema.allOf.find((rule) => rule.if?.properties?.schemaVersion?.const === "1.2.0" && rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed");
+  assert.equal(signedRule.then.properties.providerIntegration.properties.processReportSignatureArtifactId.type, "string");
   assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
   assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
   assert.equal(
@@ -250,13 +304,17 @@ test("complete hash-bound provider evidence reaches review only, never productio
       await mkdir(path.dirname(target), { recursive: true });
       const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
         artifact.id === "evidence-" + candidate.toLowerCase());
-      const bytes = key === "processRestartVisibility"
-        ? JSON.stringify(processReport(manifest)) + "\n"
-        : "independent provider evidence for " + key;
+      const bytes = artifact.type === "process-report-signature"
+        ? processReportSignatureBytes(manifest)
+        : key === "processRestartVisibility"
+          ? processReportBytes(manifest)
+          : "independent provider evidence for " + key;
       await writeFile(target, bytes);
     }
-    const verified = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    const verified = await verifyArtifacts(manifest, root);
     assert.equal(verified.failures.length, 0);
+    assert.ok(verified.verifiedArtifactIds.includes(manifest.providerIntegration.processReportSignatureArtifactId),
+      "the signature is verified only through the linked report verification path");
     assert.equal(Object.isFrozen(verified), true);
     assert.equal(Object.isFrozen(verified.verifiedArtifactIds), true);
     const report = assessTrustRegistryProviderQualification(manifest, {
@@ -337,7 +395,8 @@ test("an integration run cannot be claimed before a provider is provisioned", ()
   manifest.schemaVersion = "1.1.0";
   manifest.provider.adapterModuleSha256 = null;
   manifest.providerIntegration = completeManifest().providerIntegration;
-  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider is not provisioned/);
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider integration cannot claim a run when the provider is not provisioned/);
 });
 
 test("both D3M-24 Full CI runs must finish successfully on the exact source SHA", () => {
@@ -424,13 +483,13 @@ test("artifact verification rejects symlinks, byte-count mismatches and hash mis
     const target = path.join(root, first.relativePath);
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, "different evidence bytes");
-    let result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    let result = await verifyArtifacts(manifest, root);
     assert.ok(result.failures.some((failure) => failure.id === first.id &&
       ["byte-count-mismatch", "sha256-mismatch"].includes(failure.code)));
 
     await rm(target, { force: true });
     await symlink(path.join(root, "missing-target"), target);
-    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    result = await verifyArtifacts(manifest, root);
     const symlinkFailure = result.failures.find((failure) => failure.id === first.id && failure.code === "symlink");
     assert.ok(symlinkFailure);
     assert.equal(symlinkFailure.message.includes(root), false,
@@ -444,7 +503,7 @@ test("artifact verification rejects symlinks, byte-count mismatches and hash mis
     await writeFile(path.join(outsideDirectory, path.basename(target)),
       "independent provider evidence for " + evidenceKey);
     await symlink(outsideDirectory, path.dirname(target), "dir");
-    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    result = await verifyArtifacts(manifest, root);
     const parentSymlinkFailure = result.failures.find((failure) =>
       failure.id === first.id && failure.code === "symlink");
     assert.ok(parentSymlinkFailure, "parent-directory symlinks must be rejected");
@@ -594,11 +653,32 @@ test("legacy D3M-25 passed provider manifests remain readable but cannot skip th
   manifest.schemaVersion = "1.0.0";
   delete manifest.provider.adapterModuleSha256;
   delete manifest.providerIntegration.processReportArtifactId;
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
   const normalized = normalizeTrustRegistryProviderQualificationManifest(manifest);
   assert.equal(normalized.schemaVersion, "1.0.0");
   const report = assessTrustRegistryProviderQualification(manifest);
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.includes("provider-process-report-not-bound"));
+  assert.equal(report.productionQualificationEligible, false);
+  assert.deepEqual(report.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});
+
+
+test("D3M-28 blocks a legacy 1.1 passed integration that has no trusted report signature", () => {
+  const manifest = completeManifest();
+  manifest.schemaVersion = "1.1.0";
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
+  manifest.artifacts = manifest.artifacts.filter((artifact) => artifact.type !== "process-report-signature");
+  const normalized = normalizeTrustRegistryProviderQualificationManifest(manifest);
+  assert.equal(normalized.schemaVersion, "1.1.0");
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("provider-process-report-signature-not-bound"));
   assert.equal(report.productionQualificationEligible, false);
   assert.deepEqual(report.releaseFlags, {
     acceptanceEligible: false,
@@ -635,12 +715,14 @@ test("D3M-27 byte verification also validates process report semantics and exact
       await mkdir(path.dirname(target), { recursive: true });
       const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
         artifact.id === "evidence-" + candidate.toLowerCase());
-      let bytes = key === "processRestartVisibility"
-        ? JSON.stringify(processReport(manifest)) + "\n"
-        : "independent provider evidence for " + key;
+      let bytes = artifact.type === "process-report-signature"
+        ? processReportSignatureBytes(manifest)
+        : key === "processRestartVisibility"
+          ? processReportBytes(manifest)
+          : "independent provider evidence for " + key;
       await writeFile(target, bytes);
     }
-    let result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    let result = await verifyArtifacts(manifest, root);
     assert.equal(result.failures.length, 0);
     assert.ok(result.verifiedArtifactIds.includes(manifest.providerIntegration.processReportArtifactId));
 
@@ -650,13 +732,13 @@ test("D3M-27 byte verification also validates process report semantics and exact
     const tamperedReport = processReport(manifest);
     tamperedReport.providerNamespaceFingerprintSha256 = digest("substituted namespace");
     await writeFile(reportPath, JSON.stringify(tamperedReport) + "\n");
-    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    result = await verifyArtifacts(manifest, root);
     assert.ok(result.failures.some((failure) =>
       failure.id === reportArtifact.id && failure.code === "sha256-mismatch"));
 
     reportArtifact.bytes = Buffer.byteLength(JSON.stringify(tamperedReport) + "\n");
     reportArtifact.sha256 = digest(JSON.stringify(tamperedReport) + "\n");
-    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    result = await verifyArtifacts(manifest, root);
     assert.ok(result.failures.some((failure) =>
       failure.id === reportArtifact.id && failure.code === "process-report-invalid"),
     "a correctly re-hashed but semantically substituted report must remain invalid");
@@ -664,6 +746,68 @@ test("D3M-27 byte verification also validates process report semantics and exact
     assert.equal(assessment.status, "blocked");
     assert.ok(assessment.blockers.includes("evidence-artifact-not-byte-verified:" + reportArtifact.id));
     assert.ok(assessment.blockers.includes("artifact-verification-failed:" + reportArtifact.id + ":process-report-invalid"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+
+test("D3M-28 rejects additional unsigned process reports in verified restart evidence", () => {
+  const manifest = completeManifest();
+  const extraBytes = processReportBytes(manifest);
+  manifest.artifacts.push({
+    id: "unbound-process-report",
+    type: "process-restart-report",
+    status: "present",
+    relativePath: "evidence/unbound-process-report.json",
+    sha256: digest(extraBytes),
+    bytes: extraBytes.length,
+    sourceUrl: manifest.providerIntegration.runUrl,
+    sourceCommitSha,
+  });
+  manifest.evidence.processRestartVisibility.artifactIds.push("unbound-process-report");
+  assert.throws(
+    () => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /must reference only the exact signed provider integration report/i,
+  );
+});
+
+test("D3M-28 artifact verification rejects a changed or untrusted report signature", async () => {
+  const manifest = completeManifest();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m28-signature-verification-"));
+  try {
+    for (const artifact of manifest.artifacts) {
+      const target = path.join(root, artifact.relativePath);
+      await mkdir(path.dirname(target), { recursive: true });
+      const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
+        artifact.id === "evidence-" + candidate.toLowerCase());
+      const bytes = artifact.type === "process-report-signature"
+        ? processReportSignatureBytes(manifest)
+        : key === "processRestartVisibility"
+          ? processReportBytes(manifest)
+          : "independent provider evidence for " + key;
+      await writeFile(target, bytes);
+    }
+    let result = await verifyArtifacts(manifest, root);
+    assert.equal(result.failures.length, 0);
+    assert.ok(result.verifiedArtifactIds.includes(manifest.providerIntegration.processReportSignatureArtifactId));
+
+    const signatureArtifact = manifest.artifacts.find((artifact) =>
+      artifact.id === manifest.providerIntegration.processReportSignatureArtifactId);
+    const signaturePath = path.join(root, signatureArtifact.relativePath);
+    const alteredEnvelope = JSON.parse((await readFile(signaturePath, "utf8")));
+    alteredEnvelope.signatureBase64 = Buffer.alloc(64, 0x31).toString("base64");
+    const alteredBytes = Buffer.from(JSON.stringify(alteredEnvelope, null, 2) + "\n");
+    await writeFile(signaturePath, alteredBytes);
+    signatureArtifact.bytes = alteredBytes.length;
+    signatureArtifact.sha256 = digest(alteredBytes);
+    result = await verifyArtifacts(manifest, root);
+    assert.ok(result.failures.some((failure) =>
+      failure.id === signatureArtifact.id && failure.code === "process-report-signature-invalid"));
+    const assessment = assessTrustRegistryProviderQualification(manifest, { artifactVerification: result });
+    assert.equal(assessment.status, "blocked");
+    assert.ok(assessment.blockers.includes("artifact-verification-failed:" + signatureArtifact.id + ":process-report-signature-invalid"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

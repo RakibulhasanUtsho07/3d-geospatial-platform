@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-provider-process-report-signature:1.0.0",
+  "title": "D3M-28 trusted signature for a D3M-26 process-isolated provider report",
+  "description": "Detached Ed25519 attestation resolved through the current trusted-reviewer registry. It authenticates the signer and exact report bytes, not the truth of provider claims or production qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "engine",
+    "algorithm",
+    "signaturePurpose",
+    "reportFilename",
+    "processReportSha256",
+    "sourceCommitSha",
+    "providerId",
+    "adapterModuleSha256",
+    "adapterDeclaredSyntheticOnly",
+    "providerInstanceFingerprintSha256",
+    "providerNamespaceFingerprintSha256",
+    "reviewerId",
+    "keyId",
+    "registryId",
+    "publicKeyFingerprintSha256",
+    "registryIssuedAtUtc",
+    "registryExpiresAtUtc",
+    "keyValidFromUtc",
+    "keyValidUntilUtc",
+    "signedAt",
+    "productionQualificationEligible",
+    "signatureBase64",
+    "note"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "engine": {
+      "const": "d3m28-trust-registry-provider-process-report-signature-v1"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signaturePurpose": {
+      "const": "d3m28-process-report-attestation-not-provider-qualification"
+    },
+    "reportFilename": {
+      "const": "provider-process-conformance.json"
+    },
+    "processReportSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sourceCommitSha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "providerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "adapterModuleSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "adapterDeclaredSyntheticOnly": {
+      "type": "boolean"
+    },
+    "providerInstanceFingerprintSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "providerNamespaceFingerprintSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewerId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "registryId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+    },
+    "publicKeyFingerprintSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "registryIssuedAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "registryExpiresAtUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "keyValidFromUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "keyValidUntilUtc": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "signedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
+    "productionQualificationEligible": {
+      "const": false
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "minLength": 88,
+      "maxLength": 88
+    },
+    "note": {
+      "const": "An active trusted-reviewer key attested to exact process-report bytes and context. This does not prove provider truth, independent anchor custody, rollback resistance or production qualification."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "adapterDeclaredSyntheticOnly": {
+            "const": false
+          }
+        },
+        "required": [
+          "adapterDeclaredSyntheticOnly"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerInstanceFingerprintSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "providerNamespaceFingerprintSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

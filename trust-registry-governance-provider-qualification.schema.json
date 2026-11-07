@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-provider-qualification:1.0.0",
+  "$id": "urn:3d-geospatial-platform:schema:trust-registry-governance-provider-qualification:1.2.0",
   "title": "External trust-registry governance provider qualification evidence",
   "description": "Hash-bound provider deployment evidence. This manifest can reach ready-for-independent-review only; it never enables production qualification or release flags.",
   "type": "object",
@@ -20,7 +20,8 @@
     "schemaVersion": {
       "enum": [
         "1.0.0",
-        "1.1.0"
+        "1.1.0",
+        "1.2.0"
       ]
     },
     "manifestId": {
@@ -241,6 +242,13 @@
             "null"
           ],
           "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+        },
+        "processReportSignatureArtifactId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
         }
       }
     },
@@ -419,6 +427,7 @@
           "enum": [
             "multi-client-concurrency-report",
             "process-restart-report",
+            "process-report-signature",
             "ambiguous-write-report",
             "anchor-independence-review",
             "backup-restore-rollback-report",
@@ -478,6 +487,7 @@
           "enum": [
             "multi-client-concurrency-report",
             "process-restart-report",
+            "process-report-signature",
             "ambiguous-write-report",
             "anchor-independence-review",
             "backup-restore-rollback-report",
@@ -778,6 +788,190 @@
                 "pattern": "^[a-f0-9]{40}$"
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "adapterModuleSha256"
+            ],
+            "properties": {
+              "adapterModuleSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "not-provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "adapterModuleSha256"
+            ],
+            "properties": {
+              "adapterModuleSha256": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ],
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "processReportSignatureArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "providerInstanceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "providerNamespaceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "runId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "runUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://github\\.com/"
+              },
+              "headSha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.2.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not-run",
+                  "failed",
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportSignatureArtifactId": {
+                "const": null
+              },
+              "processReportArtifactId": {
+                "const": null
+              }
+            },
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ]
           }
         }
       }
