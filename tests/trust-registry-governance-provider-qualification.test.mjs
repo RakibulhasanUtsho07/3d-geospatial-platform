@@ -313,3 +313,12 @@ test("aggregate evidence size is bounded before any file bytes are opened", () =
   for (const artifact of manifest.artifacts) artifact.bytes = 128 * 1024 * 1024;
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /512 MiB aggregate/);
 });
+
+test("caller-supplied verified IDs cannot inflate the verified artifact count", () => {
+  const manifest = completeManifest();
+  const actualIds = manifest.artifacts.map((artifact) => artifact.id);
+  const report = assessTrustRegistryProviderQualification(manifest, {
+    verifiedArtifactIds: new Set([...actualIds, "not-a-manifest-artifact"]),
+  });
+  assert.equal(report.verifiedArtifactCount, actualIds.length);
+});
