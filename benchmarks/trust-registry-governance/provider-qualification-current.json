@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "manifestId": "d3m25-current-external-provider-qualification",
   "generatedAtUtc": "2026-11-07T04:16:33.000Z",
   "source": {
@@ -49,7 +49,8 @@
     "providerInstanceFingerprintSha256": null,
     "providerNamespaceFingerprintSha256": null,
     "fullRunConclusion": "not-run",
-    "processReportArtifactId": null
+    "processReportArtifactId": null,
+    "processReportSignatureArtifactId": null
   },
   "artifacts": [],
   "evidence": {
