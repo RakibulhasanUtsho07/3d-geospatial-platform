@@ -909,7 +909,7 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
   const witnessBytes = Buffer.from(JSON.stringify({
     ...unsignedWitness,
     signatureBase64: signature.toString("base64"),
-  }, null, 2) + "\\n", "utf8");
+  }, null, 2) + "\n", "utf8");
 
   const oldAnchorArtifact = manifest.artifacts.find((item) => item.id === "evidence-independentanchorcustody");
   manifest.artifacts = manifest.artifacts.filter((item) => item !== oldAnchorArtifact);
@@ -984,7 +984,7 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
     const witnessPath = path.join(root, "evidence/anchor-witness.json");
     const altered = JSON.parse(await readFile(witnessPath, "utf8"));
     altered.signatureBase64 = Buffer.alloc(64, 0x77).toString("base64");
-    const alteredBytes = Buffer.from(JSON.stringify(altered, null, 2) + "\\n", "utf8");
+    const alteredBytes = Buffer.from(JSON.stringify(altered, null, 2) + "\n", "utf8");
     await writeFile(witnessPath, alteredBytes);
     const witnessArtifact = manifest.artifacts.find((item) => item.id === "d3m29-anchor-witness");
     witnessArtifact.bytes = alteredBytes.length;
