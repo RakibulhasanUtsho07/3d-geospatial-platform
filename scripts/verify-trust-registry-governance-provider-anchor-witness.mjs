@@ -34,7 +34,7 @@ async function readRegularFile(inputPath, maxBytes, label) {
 function usage() {
   console.log("Usage: node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs <manifest.json> [--artifact-root DIR]");
   console.log("Verifies the exact D3M-29 challenge and independent-anchor witness referenced by a D3M-25 schema 1.3.0 manifest.");
-  console.log("The public-only registry is supplied through D3M29_INDEPENDENT_ANCHOR_KEYS_JSON; no private key is read.");
+  console.log("The public-only registry is supplied through D3M29_INDEPENDENT_ANCHOR_KEYS_JSON; its governance key is pinned separately by D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256. No private key is read.");
 }
 
 function parseArgs(args) {
@@ -79,6 +79,7 @@ async function main() {
   const artifactRoot = path.resolve(options.artifactRoot ?? path.dirname(path.resolve(options.manifestPath)));
   const verification = await verifyTrustRegistryProviderQualificationArtifacts(manifest, artifactRoot, {
     independentAnchorKeyRegistry: process.env.D3M29_INDEPENDENT_ANCHOR_KEYS_JSON,
+    independentAnchorGovernanceKeyFingerprintSha256: process.env.D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256,
   });
   const assessment = assessTrustRegistryProviderQualification(manifest, {
     artifactVerification: verification,
