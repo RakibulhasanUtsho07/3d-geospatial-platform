@@ -25,20 +25,24 @@ function syntheticProvider({
   cycleVersionOnSecondWrite = false,
   rollbackAnchorOnCompareAndSet = false,
 } = {}) {
-  let state = null;
-  let anchor = null;
-  let generation = 0;
-  const version = () => cycleVersionOnSecondWrite && generation >= 3
+  const records = new Map();
+  const identityKey = (identity) => JSON.stringify([
+    identity.registrySetId,
+    identity.governanceKeyFingerprintSha256,
+  ]);
+  const lookupRecord = (identity) => records.get(identityKey(identity)) ??
+    (ignoreRegistryIdentity ? records.values().next().value : undefined);
+  const version = (record) => cycleVersionOnSecondWrite && record.generation >= 3
     ? "generation-1"
-    : "generation-" + generation;
-  const snapshot = () => state === null ? null : ({
-    version: version(),
-    state: clone(state),
-    anchor: clone(anchor),
+    : "generation-" + record.generation;
+  const snapshot = (record) => ({
+    version: version(record),
+    state: clone(record.state),
+    anchor: clone(record.anchor),
   });
-  const assertIdentity = (identity) => {
-    assert.equal(state?.registrySetId, identity.registrySetId);
-    assert.equal(state?.governanceKeyFingerprintSha256,
+  const assertIdentity = (record, identity) => {
+    assert.equal(record.state.registrySetId, identity.registrySetId);
+    assert.equal(record.state.governanceKeyFingerprintSha256,
       identity.governanceKeyFingerprintSha256);
   };
   const anchorFor = (next) => ({
@@ -46,46 +50,53 @@ function syntheticProvider({
     minimumAcceptedSequence: next.minimumAcceptedSequence,
     stateSha256: next.stateSha256,
   });
-
   const initializeBarrier = createBarrier(8);
   const compareAndSetBarrier = createBarrier(8);
 
   const createClient = () => ({
     providerId: "synthetic-conformance-provider",
     async readState(identity) {
-      if (state === null) return null;
-      if (!ignoreRegistryIdentity) assertIdentity(identity);
-      return snapshot();
+      const record = lookupRecord(identity);
+      if (!record) return null;
+      if (!ignoreRegistryIdentity) assertIdentity(record, identity);
+      return snapshot(record);
     },
     async initializeStateIfAbsent({ identity, state: requestedState }) {
-      if (state !== null) {
-        if (!ignoreRegistryIdentity) assertIdentity(identity);
-        return { created: false, ...snapshot() };
+      const existing = lookupRecord(identity);
+      if (existing) {
+        if (!ignoreRegistryIdentity) assertIdentity(existing, identity);
+        return { created: false, ...snapshot(existing) };
       }
       // In the intentionally broken fixture, all callers observe "empty"
       // before any caller is allowed to commit, exposing a check-then-write race.
       if (raceInitializeIfAbsent) await initializeBarrier();
-      state = clone(requestedState);
-      generation += 1;
-      anchor = anchorFor(state);
-      if (corruptAnchor) anchor.revision += 1;
-      return { created: true, ...snapshot() };
+      const record = {
+        state: clone(requestedState),
+        anchor: null,
+        generation: 1,
+      };
+      record.anchor = anchorFor(record.state);
+      if (corruptAnchor) record.anchor.revision += 1;
+      records.set(identityKey(identity), record);
+      return { created: true, ...snapshot(record) };
     },
     async compareAndSetState({ identity, expectedVersion, expectedStateSha256, nextState }) {
-      if (!ignoreRegistryIdentity) assertIdentity(identity);
+      const record = lookupRecord(identity);
+      if (!record) throw new Error("synthetic provider record is missing");
+      if (!ignoreRegistryIdentity) assertIdentity(record, identity);
       if (!ignoreCompareAndSetVersion &&
-          (expectedVersion !== version() || expectedStateSha256 !== state.stateSha256)) {
-        return { updated: false, ...snapshot() };
+          (expectedVersion !== version(record) || expectedStateSha256 !== record.state.stateSha256)) {
+        return { updated: false, ...snapshot(record) };
       }
       // Capture the matching version before yielding. A correct atomic provider
       // would serialize this region or use a storage-level conditional write.
       if (raceCompareAndSet) await compareAndSetBarrier();
-      const previousAnchor = clone(anchor);
-      state = clone(nextState);
-      if (!reuseVersionOnWrite) generation += 1;
-      anchor = rollbackAnchorOnCompareAndSet ? previousAnchor : anchorFor(state);
-      if (corruptAnchor) anchor.revision += 1;
-      return { updated: true, ...snapshot() };
+      const previousAnchor = clone(record.anchor);
+      record.state = clone(nextState);
+      if (!reuseVersionOnWrite) record.generation += 1;
+      record.anchor = rollbackAnchorOnCompareAndSet ? previousAnchor : anchorFor(record.state);
+      if (corruptAnchor) record.anchor.revision += 1;
+      return { updated: true, ...snapshot(record) };
     },
   });
   return { provider: createClient(), reopenProvider: async () => createClient() };
