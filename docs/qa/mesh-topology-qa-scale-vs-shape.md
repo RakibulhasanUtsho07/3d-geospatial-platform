@@ -56,3 +56,8 @@ The adapter validates any supplied base `attributes.POSITION` accessor (layout, 
 An omitted primitive `mode` defaults to `TRIANGLES` (4). An explicitly supplied mode must be an integer from 0 through 6: POINTS (0), LINES (1), LINE_LOOP (2), LINE_STRIP (3), TRIANGLES (4), TRIANGLE_STRIP (5) or TRIANGLE_FAN (6). Explicit null, fractional, string, boolean, array/object, negative and greater-than-6 values fail closed; they are not treated as skippable non-triangle modes. This enum validation occurs before POSITION-attribute skip handling. Valid non-triangle modes remain outside the triangle geometry metrics.
 
 See the [Khronos glTF 2.0 mesh primitive specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#_mesh_primitive).
+
+
+## Bounded triangle index work
+
+The geometry QA adapter applies a configurable `maxIndices` work budget before reading or iterating a triangle index stream. The default is 15,000,000 indices; callers may set a value from 3 through 60,000,000. This cap applies both to explicit index accessor counts (including sparse-only accessors whose base is zero-initialized) and to the implicit index stream of non-indexed triangle primitives. Counts above the configured limit fail closed before per-index iteration. This is a resource-safety bound, not a geometry-quality or accuracy metric.

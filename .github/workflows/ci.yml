@@ -92,6 +92,7 @@ on:
       - feat/glb-qa-position-accessor-bounds-20261107
       - feat/glb-qa-nontriangle-position-bounds-20261107
       - feat/glb-qa-primitive-mode-enum-20261107
+      - feat/glb-qa-index-count-limit-20261107
       - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
   workflow_dispatch:
@@ -154,6 +155,7 @@ on:
       - feat/glb-qa-position-accessor-bounds-20261107
       - feat/glb-qa-nontriangle-position-bounds-20261107
       - feat/glb-qa-primitive-mode-enum-20261107
+      - feat/glb-qa-index-count-limit-20261107
       - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
       - feat/d3m01g-registry-preflight-20261031

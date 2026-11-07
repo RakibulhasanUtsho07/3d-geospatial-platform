@@ -152,15 +152,17 @@ function readPositions(accessor,views,binary,bufferLength,label,maxVertices,maxS
  }
  return positions;
 }
-function readIndices(accessor,views,binary,bufferLength,vertexCount,label,maxSparseEntries){
+function readIndices(accessor,views,binary,bufferLength,vertexCount,label,maxSparseEntries,maxIndices){
  if(!accessor){
   if(vertexCount%3!==0)throw new TypeError(label+" non-indexed triangle vertex count is not divisible by 3");
+  if(vertexCount>maxIndices)throw new RangeError(label+" exceeds maximum geometry QA index count "+maxIndices);
   return {count:vertexCount,read:i=>i};
  }
  const bytes=COMPONENT_BYTES[accessor.componentType],method=INDEX_READ[accessor.componentType];
  if(!bytes||!method)throw new TypeError(label+" index accessor must use uint8, uint16 or uint32 components");
  if(accessor.type!=="SCALAR")throw new TypeError(label+" index accessor must be SCALAR");
  const count=requireInt(accessor.count,label+" index count",1),accessorOffset=requireInt(accessor.byteOffset??0,label+" index accessor offset");
+ if(count>maxIndices)throw new RangeError(label+" exceeds maximum geometry QA index count "+maxIndices);
  let first=null;
  if(accessor.bufferView!==undefined){
   const data=readBufferView(accessor.bufferView,views,binary,bufferLength,label+" indices",{alignment:bytes});
@@ -318,6 +320,8 @@ export function analyzeGlbQuality(input,options={}){
  if(!Number.isSafeInteger(maxVertices)||maxVertices<3||maxVertices>20_000_000)throw new RangeError("maxVertices must be between 3 and 20000000");
  const maxSparseEntries=options.maxSparseEntries??1_000_000;
  if(!Number.isSafeInteger(maxSparseEntries)||maxSparseEntries<1||maxSparseEntries>5_000_000)throw new RangeError("maxSparseEntries must be between 1 and 5000000");
+ const maxIndices=options.maxIndices??15_000_000;
+ if(!Number.isSafeInteger(maxIndices)||maxIndices<3||maxIndices>60_000_000)throw new RangeError("maxIndices must be between 3 and 60000000");
  const scene=resolveSceneMeshInstances(gltf,options);
  const maxSceneBoundsVertexEvaluations=boundedOption(options.maxSceneBoundsVertexEvaluations,25_000_000,1,100_000_000,"maxSceneBoundsVertexEvaluations");
  let boundsVertexEvaluations=0,vertexCount=0,referencedVertexCount=0,unreferencedVertexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
@@ -350,7 +354,7 @@ export function analyzeGlbQuality(input,options={}){
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");
-   const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label,maxSparseEntries);
+   const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label,maxSparseEntries,maxIndices);
    const referenced=new Uint8Array(count);
    let primitiveReferencedVertexCount=0,degenerate=0;
    for(let i=0;i<indices.count;i+=3){

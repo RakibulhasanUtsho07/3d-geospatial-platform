@@ -401,3 +401,12 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Preserve valid non-triangle warning/skip behavior, POSITION metadata validation, triangle-only topology metrics, and explicit no-POSITION skips for valid non-triangle modes.
 - Regression coverage includes all malformed JSON value categories and omitted-mode default behavior.
 - Evidence boundary: primitive metadata validity only; no additional topology support or reconstruction-accuracy claim. All release gates remain false.
+
+
+## BRF-04 — bound triangle index counts in GLB geometry QA (2026-11-07)
+
+- Tracking issue: [#407](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/407).
+- Gap: explicit index accessor counts without a base bufferView (including sparse-only accessors) could declare unbounded work; non-indexed primitives also create an implicit index stream.
+- Add a `maxIndices` budget (default 15,000,000; permitted range 3–60,000,000) and reject over-cap counts before per-index processing.
+- Apply the same budget to explicit, sparse-only and non-indexed triangle streams; preserve streams within the cap.
+- Evidence boundary: resource-safety bound only; no topology expansion, architectural accuracy, georeferencing, survey or publication claim. Keep all release gates false.

@@ -141,6 +141,47 @@ test("applies sparse primitive index replacements before triangle validation",()
  assert.equal(report.meshDetails[0].topology.connectedComponentCount,1);
 });
 
+test("bounds zero-initialized index accessor counts before triangle iteration",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[1].bufferView;
+  state.json.accessors[1].count=6;
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxIndices:3}),/exceeds maximum geometry QA index count 3/);
+});
+
+test("bounds sparse-only zero-initialized index accessor counts before sparse lookup",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[1].bufferView;
+  state.json.accessors[1].count=6;
+  const indexView=addSparseView(state,Buffer.from([0]),1);
+  const valueView=addSparseView(state,encodeUInt([0],5123),2);
+  state.json.accessors[1].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxIndices:3}),/exceeds maximum geometry QA index count 3/);
+});
+
+test("applies the index work cap to non-indexed triangle primitives",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0,2,0,0,3,0,0,2,1,0]);
+ assert.throws(()=>analyzeGlbQuality(glb,{maxIndices:3}),/exceeds maximum geometry QA index count 3/);
+});
+
+test("allows an explicitly raised bounded index work cap",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[1].bufferView;
+  state.json.accessors[1].count=6;
+ });
+ const report=analyzeGlbQuality(glb,{maxIndices:6});
+ assert.equal(report.counts.triangleCount,2);
+ assert.equal(report.counts.degenerateTriangleCount,2);
+});
+
+test("validates the configurable maximum triangle index count",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ for(const maxIndices of [0,2,2.5,60_000_001,Number.MAX_SAFE_INTEGER]){
+  assert.throws(()=>analyzeGlbQuality(glb,{maxIndices}),/maxIndices must be between 3 and 60000000/);
+ }
+});
+
 test("supports sparse index values with an omitted zero-initialized base bufferView",()=>{
  const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,0,0]),state=>{
   delete state.json.accessors[1].bufferView;
