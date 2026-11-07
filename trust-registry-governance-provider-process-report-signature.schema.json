@@ -11,8 +11,7 @@
     "algorithm",
     "signaturePurpose",
     "reportFilename",
-    "reportSha256",
-    "reportBytes",
+    "processReportSha256",
     "sourceCommitSha",
     "providerId",
     "adapterModuleSha256",
@@ -28,7 +27,7 @@
     "keyValidFromUtc",
     "keyValidUntilUtc",
     "signedAt",
-    "publicationEligible",
+    "productionQualificationEligible",
     "signatureBase64",
     "note"
   ],
@@ -37,25 +36,20 @@
       "const": "1.0.0"
     },
     "engine": {
-      "const": "trust-registry-governance-provider-process-report-signature-v1"
+      "const": "d3m28-trust-registry-provider-process-report-signature-v1"
     },
     "algorithm": {
       "const": "Ed25519"
     },
     "signaturePurpose": {
-      "const": "provider-process-report-attestation-not-provider-qualification"
+      "const": "d3m28-process-report-attestation-not-provider-qualification"
     },
     "reportFilename": {
-      "const": "provider-process-report.json"
+      "const": "provider-process-conformance.json"
     },
-    "reportSha256": {
+    "processReportSha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
-    },
-    "reportBytes": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 1048576
     },
     "sourceCommitSha": {
       "type": "string",
@@ -127,7 +121,7 @@
       "format": "date-time",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
     },
-    "publicationEligible": {
+    "productionQualificationEligible": {
       "const": false
     },
     "signatureBase64": {
@@ -137,7 +131,7 @@
       "maxLength": 88
     },
     "note": {
-      "const": "The active trusted-reviewer registry key attests exact process-report bytes and provider context only. This is not provider qualification, independent audit or release approval."
+      "const": "An active trusted-reviewer key attested to exact process-report bytes and context. This does not prove provider truth, independent anchor custody, rollback resistance or production qualification."
     }
   },
   "allOf": [
