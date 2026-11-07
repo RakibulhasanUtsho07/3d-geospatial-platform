@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import path from "node:path";
@@ -128,6 +129,31 @@ async function main() {
       requiredReportArtifacts.some((id) => !reportVerification.verifiedArtifactIds.includes(id))) {
     throw new Error("D3M-29 challenge creation requires byte-verified D3M-26 report semantics and D3M-28 trusted signature.");
   }
+  const reportArtifact = manifest.artifacts.find((item) =>
+    item.id === manifest.providerIntegration.processReportArtifactId);
+  if (!reportArtifact || reportArtifact.status !== "present") {
+    throw new Error("D3M-29 challenge creation requires the exact D3M-26 process report artifact.");
+  }
+  const reportPath = path.join(artifactRoot, ...reportArtifact.relativePath.split("/"));
+  const reportBytes = await readRegularFile(reportPath, 1024 * 1024, "Provider process report");
+  const providerProcessReportSha256 = createHash("sha256").update(reportBytes).digest("hex");
+  if (reportBytes.length !== reportArtifact.bytes || providerProcessReportSha256 !== reportArtifact.sha256) {
+    throw new Error("D3M-29 process report changed after D3M-25/D3M-28 verification.");
+  }
+  let providerProcessReport;
+  try {
+    providerProcessReport = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(reportBytes));
+  } catch {
+    throw new Error("D3M-29 verified provider process report is not valid UTF-8 JSON.");
+  }
+  const providerFinalRevision = providerProcessReport?.conformance?.finalRevision;
+  const providerFinalMinimumAcceptedSequence =
+    providerProcessReport?.conformance?.finalMinimumAcceptedSequence;
+  if (!Number.isSafeInteger(providerFinalRevision) || providerFinalRevision < 1 ||
+      !Number.isSafeInteger(providerFinalMinimumAcceptedSequence) ||
+      providerFinalMinimumAcceptedSequence < 1) {
+    throw new Error("D3M-29 provider process report lacks its positive final revision or minimum accepted sequence.");
+  }
   const generated = createTrustRegistryGovernanceProviderAnchorChallenge({
     sourceCommitSha: manifest.source.commitSha,
     providerId: manifest.provider.providerId,
@@ -135,6 +161,9 @@ async function main() {
     syntheticOnly: manifest.provider.syntheticOnly,
     instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
     namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+    providerProcessReportSha256,
+    providerFinalRevision,
+    providerFinalMinimumAcceptedSequence,
     ttlSeconds: options.ttlSeconds,
   });
   const outputPath = resolveOutputPath(options.outputPath);
@@ -155,6 +184,9 @@ async function main() {
     output: path.relative(process.cwd(), outputPath),
     syntheticOnly: generated.challenge.syntheticOnly,
     processReportAndSignatureVerified: true,
+    providerProcessReportSha256,
+    providerFinalRevision,
+    providerFinalMinimumAcceptedSequence,
     productionQualificationEligible: false,
   }, null, 2));
 }
