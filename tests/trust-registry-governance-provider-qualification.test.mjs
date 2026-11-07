@@ -305,7 +305,7 @@ test("checked-in provider qualification state is valid but blocked without a rea
   });
 });
 
-test("complete hash-bound provider evidence reaches review only, never production approval", async () => {
+test("D3M-28 hash-bound provider evidence remains blocked until independent anchor witness is bound", async () => {
   const manifest = completeManifest();
   const root = await mkdtemp(path.join(os.tmpdir(), "d3m25-qualification-"));
   try {
@@ -330,7 +330,8 @@ test("complete hash-bound provider evidence reaches review only, never productio
     const report = assessTrustRegistryProviderQualification(manifest, {
       artifactVerification: verified,
     });
-    assert.equal(report.status, "ready-for-independent-review");
+    assert.equal(report.status, "blocked");
+    assert.ok(report.blockers.includes("independent-anchor-witness-not-bound"));
     assert.equal(report.productionQualificationEligible, false);
     assert.deepEqual(report.releaseFlags, {
       acceptanceEligible: false,
