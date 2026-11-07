@@ -110,7 +110,9 @@ async function main() {
     throw new Error("D3M-29 challenge creation requires a schema 1.3.0 manifest with independentAnchorWitness.status=not-run.");
   }
   if (manifest.provider.status !== "provisioned" || manifest.provider.syntheticOnly ||
-      manifest.providerIntegration.status !== "passed" || manifest.providerIntegration.syntheticOnly) {
+      manifest.providerIntegration.status !== "passed" || manifest.providerIntegration.syntheticOnly ||
+      manifest.providerIntegration.fullRunConclusion !== "success" ||
+      manifest.providerIntegration.headSha !== manifest.source.commitSha) {
     throw new Error("D3M-29 challenge creation requires a provisioned, non-synthetic provider and a passed real-provider integration run.");
   }
   const artifactRoot = path.resolve(options.artifactRoot ?? path.dirname(path.resolve(options.manifestPath)));
