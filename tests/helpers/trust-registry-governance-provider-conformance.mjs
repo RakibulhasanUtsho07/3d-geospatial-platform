@@ -208,6 +208,41 @@ export async function runTrustRegistryGovernanceProviderConformance({
   successfulWriteVersions.add(recovered.version);
   assert.equal(recovered.state.revision, reloaded.state.revision + 1);
 
+  // A provider must partition records by the complete registry identity. A
+  // second fresh identity must not see or overwrite the first identity's state.
+  const secondNonce = randomUUID();
+  const secondIdentity = Object.freeze({
+    registrySetId: "provider-conformance-" + secondNonce,
+    governanceKeyFingerprintSha256: sha256("D3M-24 provider conformance " + secondNonce),
+  });
+  assert.equal(await reopenedProvider.readState(secondIdentity), null,
+    "a distinct registry-set identity must not alias an existing governance state");
+  const secondInitialState = createTrustRegistryGovernanceInitialState({
+    ...secondIdentity,
+    bootstrapMinimumSequence,
+    now: new Date("2026-11-05T12:03:00.000Z"),
+  });
+  const secondInitialized = assertWriteResult(
+    await reopenedProvider.initializeStateIfAbsent({
+      identity: secondIdentity,
+      state: clone(secondInitialState),
+    }),
+    "created",
+    secondIdentity,
+    "second identity initialize result",
+  );
+  assert.equal(secondInitialized.created, true,
+    "a second registry identity must initialize its own isolated record");
+  const firstIdentityAfterSecondInitialize = assertSnapshot(
+    await reopenedProvider.readState(identity),
+    identity,
+    "first identity after second identity initialization",
+  );
+  assert.equal(firstIdentityAfterSecondInitialize.state.stateSha256, recovered.state.stateSha256,
+    "initializing another registry identity must not overwrite the first identity's state");
+  assert.equal(firstIdentityAfterSecondInitialize.version, recovered.version,
+    "initializing another registry identity must not change the first identity's version");
+
   return Object.freeze({
     providerId: provider.providerId,
     initializeContenders: initializeResults.length,
@@ -218,6 +253,7 @@ export async function runTrustRegistryGovernanceProviderConformance({
     freshProviderReopened: reopenedProvider !== provider,
     freshReadMatched: recovered.state.stateSha256 === nextAfterAmbiguous.stateSha256,
     ambiguousCommitRecovered: responseWasLost,
+    identityIsolationVerified: true,
     finalRevision: recovered.state.revision,
     finalMinimumAcceptedSequence: recovered.state.minimumAcceptedSequence,
   });
