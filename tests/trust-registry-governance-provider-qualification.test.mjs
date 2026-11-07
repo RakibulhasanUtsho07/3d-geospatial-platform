@@ -283,7 +283,10 @@ test("artifact verification rejects symlinks, byte-count mismatches and hash mis
     await rm(target, { force: true });
     await symlink(path.join(root, "missing-target"), target);
     result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
-    assert.ok(result.failures.some((failure) => failure.id === first.id && failure.code === "symlink"));
+    const symlinkFailure = result.failures.find((failure) => failure.id === first.id && failure.code === "symlink");
+    assert.ok(symlinkFailure);
+    assert.equal(symlinkFailure.message.includes(root), false,
+      "artifact diagnostics must not leak absolute local paths");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
