@@ -190,3 +190,65 @@ test("provider process runner help explains the explicit adapter contract", () =
   assert.match(result.stdout, /--allow-env NAME/);
   assert.match(result.stdout, /Never pass secrets as command-line values/i);
 });
+
+
+test("provider process runner writes a sanitized, source-bound report without paths or secrets", async () => {
+  await withTempDirectory(async (directory) => {
+    const stateFile = path.join(directory, "provider-state.json");
+    const reportFile = path.join(directory, "provider-report.json");
+    const sourceSha = "d".repeat(40);
+    const secret = "D3M26_TEST_SECRET_VALUE_MUST_NOT_APPEAR";
+    const result = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", fixtureModule,
+      "--allow-env", "D3M26_TEST_PROVIDER_STATE_FILE",
+      "--source-sha", sourceSha,
+      "--report", reportFile,
+    ], {
+      encoding: "utf8",
+      timeout: 120000,
+      env: {
+        ...process.env,
+        D3M26_TEST_PROVIDER_STATE_FILE: stateFile,
+        D3M26_TEST_SECRET: secret,
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const fs = await import("node:fs/promises");
+    const reportText = await fs.readFile(reportFile, "utf8");
+    const report = JSON.parse(reportText);
+    assert.equal(report.schemaVersion, "1.0.0");
+    assert.equal(report.sourceCommitSha, sourceSha);
+    assert.equal(report.providerId, "d3m26-file-backed-test-provider");
+    assert.equal(report.adapterDeclaredSyntheticOnly, true);
+    assert.equal(report.executionMode, "fresh-node-child-process-per-provider-operation");
+    assert.equal(report.processIsolationVerified, true);
+    assert.ok(report.workerProcessesStarted > 30);
+    assert.equal(report.workerProcessesStarted, report.uniqueWorkerInstances);
+    assert.equal(reportText.includes(secret), false);
+    assert.equal(reportText.includes(stateFile), false);
+  });
+});
+
+test("provider process runner requires an explicit source SHA and refuses report overwrite", async () => {
+  await withTempDirectory(async (directory) => {
+    const reportFile = path.join(directory, "existing-report.json");
+    await writeFile(reportFile, '{"preserve":true}\n', { mode: 0o600 });
+    const missingSha = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", fixtureModule,
+    ], { encoding: "utf8", timeout: 5000 });
+    assert.notEqual(missingSha.status, 0);
+    assert.match(missingSha.stderr, /--source-sha is required/i);
+    const overwrite = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", fixtureModule,
+      "--source-sha", "e".repeat(40),
+      "--report", reportFile,
+    ], { encoding: "utf8", timeout: 5000 });
+    assert.notEqual(overwrite.status, 0);
+    assert.match(overwrite.stderr, /already exists/i);
+    const preserved = await (await import("node:fs/promises")).readFile(reportFile, "utf8");
+    assert.equal(preserved, '{"preserve":true}\n');
+  });
+});

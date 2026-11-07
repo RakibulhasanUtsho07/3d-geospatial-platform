@@ -43,7 +43,8 @@ function parseArgs(argv) {
     }
   }
   if (!result.modulePath) throw new Error("--provider-module is required.");
-  if (result.sourceSha && !/^[a-f0-9]{40}$/.test(result.sourceSha)) {
+  if (!result.sourceSha) throw new Error("--source-sha is required so the report cannot guess provenance.");
+  if (!/^[a-f0-9]{40}$/.test(result.sourceSha)) {
     throw new Error("--source-sha must be a 40-character lowercase commit SHA.");
   }
   return result;
@@ -59,11 +60,22 @@ async function assertNoSymlinkParents(absolutePath) {
   }
 }
 
-async function writeReportOnce(reportPath, report) {
+async function validateReportTarget(reportPath) {
   const absolutePath = path.resolve(reportPath);
   await assertNoSymlinkParents(path.dirname(absolutePath));
   const parent = await realpath(path.dirname(absolutePath));
   if (parent !== path.dirname(absolutePath)) throw new Error("Report directory must use its canonical path.");
+  try {
+    await lstat(absolutePath);
+    throw new Error("Report file already exists; reports are write-once.");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  return absolutePath;
+}
+
+async function writeReportOnce(reportPath, report) {
+  const absolutePath = await validateReportTarget(reportPath);
   const handle = await open(absolutePath,
     constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
     0o600);
@@ -81,10 +93,8 @@ async function main() {
     process.stdout.write(usage() + "\n");
     return;
   }
-  const sourceSha = options.sourceSha ?? process.env.GITHUB_SHA ?? null;
-  if (sourceSha !== null && !/^[a-f0-9]{40}$/.test(sourceSha)) {
-    throw new Error("GITHUB_SHA is not a valid full commit SHA; provide --source-sha explicitly.");
-  }
+  const sourceSha = options.sourceSha;
+  if (options.reportPath) await validateReportTarget(options.reportPath);
   const metrics = createProviderProcessMetrics();
   const makeProvider = () => createProcessIsolatedTrustRegistryGovernanceProvider({
     modulePath: options.modulePath,

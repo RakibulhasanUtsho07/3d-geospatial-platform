@@ -165,7 +165,7 @@ export async function createProcessIsolatedTrustRegistryGovernanceProvider({
         windowsHide: true,
         stdio: ["pipe", "pipe", "ignore"],
       });
-      let output = "";
+      const outputChunks = [];
       let outputBytes = 0;
       let failure = null;
       let settled = false;
@@ -188,7 +188,7 @@ export async function createProcessIsolatedTrustRegistryGovernanceProvider({
           child.kill("SIGKILL");
           return;
         }
-        output += chunk.toString("utf8");
+        outputChunks.push(Buffer.from(chunk));
       });
       child.on("error", () => finish(new Error("Provider worker could not be started.")));
       child.on("close", (code) => {
@@ -198,7 +198,7 @@ export async function createProcessIsolatedTrustRegistryGovernanceProvider({
         }
         let parsed;
         try {
-          parsed = parseWorkerOutput(output);
+          parsed = parseWorkerOutput(Buffer.concat(outputChunks).toString("utf8"));
         } catch (error) {
           finish(error);
           return;

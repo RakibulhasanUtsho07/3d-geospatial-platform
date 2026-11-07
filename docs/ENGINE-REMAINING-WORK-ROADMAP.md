@@ -713,6 +713,13 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - Final hardening adds a required provider-integration full-workflow conclusion (in addition to its focused suite), locks both D3M-24 conformance records to synthetic provenance, schema-enforces independent-audit provenance for independent security review, and exercises the CLI's bounded/symlink-safe manifest and report paths. Exact-head Push and PR Full CI must rerun after this change.
 
 
+
+### D3M-ENGINE-25 exact-head post-hardening validation addendum — 2026-11-07
+
+- The final hardened exact head `85ce324122ce1f789422121dc9d5239651e96fe0` is now fully validated: Push Full CI [#42340151217](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340151217) and PR Full CI [#42340154740](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340154740) both completed `success`, each with 227/227 successful steps, zero failed steps and zero pending steps. The production viewport API verification and all six evidence-upload steps passed in both exact-head runs.
+- PR #386 remains Draft/open/unmerged, stacked on D3M-24 PR #384. D3M-24's exact base head remains `786d901e5a7ed4effddbbbb563533820276fb4ba`.
+- This is software/CI validation only. The external provider remains unprovisioned, the provider-specific integration run remains not-run, all 13 evidence classes remain missing, and every qualification/release flag remains false.
+
 ## D3M-ENGINE-26 — process-isolated external provider conformance runner
 
 - **Tracking issue:** [#387](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/387).
