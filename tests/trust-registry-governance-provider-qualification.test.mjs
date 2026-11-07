@@ -194,7 +194,9 @@ function completeManifest() {
       id,
       type: evidenceTypes[key],
       status: "present",
-      relativePath: "evidence/" + id + ".json",
+      relativePath: key === "processRestartVisibility"
+        ? "evidence/provider-process-conformance.json"
+        : "evidence/" + id + ".json",
       sha256: digest(bytes),
       bytes: Buffer.byteLength(bytes),
       sourceUrl: key === "processRestartVisibility"
