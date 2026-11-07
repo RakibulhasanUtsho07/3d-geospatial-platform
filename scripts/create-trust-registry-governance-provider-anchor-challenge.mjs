@@ -54,6 +54,19 @@ function parseArgs(args) {
   return result;
 }
 
+async function assertSafeDirectory(directoryPath) {
+  const absolute = path.resolve(directoryPath);
+  const root = path.parse(absolute).root;
+  let current = root;
+  for (const segment of absolute.slice(root.length).split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    const info = await lstat(current);
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      throw new TypeError("Challenge output directory path must contain only real directories, not symlinks.");
+    }
+  }
+}
+
 function resolveOutputPath(value) {
   if (!value || path.isAbsolute(value) || value.includes("\\") ||
       value.split("/").some((part) => !part || part === "." || part === "..")) {
@@ -107,10 +120,7 @@ async function main() {
   });
   const outputPath = resolveOutputPath(options.outputPath);
   const parent = path.dirname(outputPath);
-  const parentInfo = await lstat(parent);
-  if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink()) {
-    throw new TypeError("Challenge output parent must be an existing non-symlink directory.");
-  }
+  await assertSafeDirectory(parent);
   const handle = await open(outputPath, "wx", 0o600);
   try {
     await handle.writeFile(generated.bytes);
