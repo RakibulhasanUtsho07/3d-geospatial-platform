@@ -107,6 +107,7 @@ test("D3M-29 accepts a fresh witness signed by one active independent-anchor reg
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
     independentAnchorKeyRegistry: value.registry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
   });
@@ -165,6 +166,7 @@ test("D3M-29 rejects a revoked anchor key", () => {
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
     independentAnchorKeyRegistry: registry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
   });
