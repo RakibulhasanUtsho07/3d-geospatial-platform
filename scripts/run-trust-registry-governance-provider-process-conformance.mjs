@@ -16,6 +16,8 @@ function usage() {
     "  --allow-env NAME         Allow one environment variable into worker processes (repeatable)",
     "  --timeout-ms NUMBER      Per-operation worker timeout (100..120000; default 15000)",
     "  --source-sha SHA         Bind report to a 40-character source commit",
+    "  --provider-instance-fingerprint-sha256 SHA256   Bind report to a privacy-safe provider instance fingerprint",
+    "  --provider-namespace-fingerprint-sha256 SHA256  Bind report to an isolated namespace fingerprint",
     "  --report FILE            Write a sanitized, create-once JSON report",
     "  --help                   Show this help",
     "",
@@ -29,7 +31,9 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === "--help") return { help: true };
     if (arg === "--provider-module" || arg === "--timeout-ms" ||
-        arg === "--source-sha" || arg === "--report" || arg === "--allow-env") {
+        arg === "--source-sha" || arg === "--report" || arg === "--allow-env" ||
+        arg === "--provider-instance-fingerprint-sha256" ||
+        arg === "--provider-namespace-fingerprint-sha256") {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error("Missing value for " + arg + ".");
       index += 1;
@@ -37,6 +41,8 @@ function parseArgs(argv) {
       else if (arg === "--timeout-ms") result.timeoutMs = Number(value);
       else if (arg === "--source-sha") result.sourceSha = value;
       else if (arg === "--report") result.reportPath = value;
+      else if (arg === "--provider-instance-fingerprint-sha256") result.providerInstanceFingerprintSha256 = value;
+      else if (arg === "--provider-namespace-fingerprint-sha256") result.providerNamespaceFingerprintSha256 = value;
       else result.allowedEnvironmentKeys.push(value);
     } else {
       throw new Error("Unknown option: " + arg + ".");
@@ -46,6 +52,19 @@ function parseArgs(argv) {
   if (!result.sourceSha) throw new Error("--source-sha is required so the report cannot guess provenance.");
   if (!/^[a-f0-9]{40}$/.test(result.sourceSha)) {
     throw new Error("--source-sha must be a 40-character lowercase commit SHA.");
+  }
+  const hasInstanceFingerprint = Boolean(result.providerInstanceFingerprintSha256);
+  const hasNamespaceFingerprint = Boolean(result.providerNamespaceFingerprintSha256);
+  if (hasInstanceFingerprint !== hasNamespaceFingerprint) {
+    throw new Error("Provider instance and namespace fingerprints must be supplied together.");
+  }
+  for (const [label, value] of [
+    ["provider instance", result.providerInstanceFingerprintSha256],
+    ["provider namespace", result.providerNamespaceFingerprintSha256],
+  ]) {
+    if (value !== undefined && !/^[a-f0-9]{64}$/.test(value)) {
+      throw new Error("The " + label + " fingerprint must be a 64-character lowercase SHA-256 digest.");
+    }
   }
   return result;
 }
@@ -107,17 +126,23 @@ async function main() {
     provider,
     reopenProvider: makeProvider,
   });
+  if (provider.adapterDeclaredSyntheticOnly === false &&
+      (!options.providerInstanceFingerprintSha256 || !options.providerNamespaceFingerprintSha256)) {
+    throw new Error("A non-synthetic provider report requires both provider instance and namespace fingerprints.");
+  }
   const stats = provider.processStats;
   if (stats.workerProcessesStarted < 2 ||
       stats.uniqueWorkerInstances !== stats.workerProcessesStarted) {
     throw new Error("Provider process isolation did not produce distinct worker instances.");
   }
   const report = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "1.1.0",
     sourceCommitSha: sourceSha,
     providerId: provider.providerId,
     adapterModuleSha256: provider.adapterModuleSha256,
     adapterDeclaredSyntheticOnly: provider.adapterDeclaredSyntheticOnly,
+    providerInstanceFingerprintSha256: options.providerInstanceFingerprintSha256 ?? null,
+    providerNamespaceFingerprintSha256: options.providerNamespaceFingerprintSha256 ?? null,
     executionMode: "fresh-node-child-process-per-provider-operation",
     processIsolationVerified: true,
     workerProcessesStarted: stats.workerProcessesStarted,
