@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { generateKeyPairSync, createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, symlink, writeFile, lstat } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
   signTrustRegistryGovernanceProviderProcessReport,
@@ -9,6 +13,17 @@ import {
 
 const COMMIT = "571b864037d728370bc11dc6504f8d8a8106c588";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SIGN_CLI = path.join(ROOT, "scripts/sign-trust-registry-governance-provider-process-report.mjs");
+function runSignerCli(args, env) {
+  return spawnSync(process.execPath, [SIGN_CLI, ...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+    timeout: 30_000,
+  });
+}
+
 
 function keyPair() {
   const pair = generateKeyPairSync("ed25519");
@@ -247,4 +262,61 @@ test("D3M-28 signer rejects a private key not present in the active trusted regi
     trustedReviewerRegistry: fixture.trustedReviewerRegistry,
     signedAt: fixture.signedAt,
   }), /does-not-match-active-registry-key/);
+});
+
+
+test("D3M-28 signing CLI creates a create-once signature without leaking private-key or registry material", async (t) => {
+  const fixture = signFixture();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m28-report-signature-cli-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const reportPath = path.join(root, "provider-process-conformance.json");
+  const privateKeyPath = path.join(root, "reviewer-private.pem");
+  const signaturePath = path.join(root, "provider-process-conformance.json.sig.json");
+  await writeFile(reportPath, fixture.bytes, { flag: "wx" });
+  await writeFile(privateKeyPath, fixture.pair.privateKeyPem, { flag: "wx", mode: 0o600 });
+  const registryJson = JSON.stringify(fixture.trustedReviewerRegistry);
+  const env = { NODE_ENV: "production", RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: registryJson };
+  const args = [reportPath, privateKeyPath, "--reviewer-id", "d3m28-reviewer", "--signature", signaturePath];
+  const result = runSignerCli(args, env);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes(fixture.pair.privateKeyPem), false);
+  assert.equal(result.stderr.includes(fixture.pair.privateKeyPem), false);
+  assert.equal(result.stdout.includes(registryJson), false);
+  const envelope = JSON.parse(await readFile(signaturePath, "utf8"));
+  const verified = verifyTrustRegistryGovernanceProviderProcessReportSignature({
+    reportBytes: fixture.bytes,
+    signatureEnvelope: envelope,
+    trustedReviewerRegistry: fixture.trustedReviewerRegistry,
+    expectedContext: expectedContext(fixture.bytes),
+    now: new Date(),
+  });
+  assert.equal(verified.valid, true);
+  const duplicate = runSignerCli(args, env);
+  assert.equal(duplicate.status, 1);
+  assert.match(duplicate.stderr, /already exists|signing failed/i);
+});
+
+test("D3M-28 signing CLI fails closed without the registry and for symlinked private keys", async (t) => {
+  const fixture = signFixture();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m28-report-signature-cli-negative-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const reportPath = path.join(root, "provider-process-conformance.json");
+  const privateKeyPath = path.join(root, "reviewer-private.pem");
+  const symlinkPath = path.join(root, "reviewer-private-link.pem");
+  await writeFile(reportPath, fixture.bytes);
+  await writeFile(privateKeyPath, fixture.pair.privateKeyPem, { mode: 0o600 });
+  await symlink(privateKeyPath, symlinkPath);
+  const missingRegistry = runSignerCli([reportPath, privateKeyPath, "--reviewer-id", "d3m28-reviewer"], {
+    NODE_ENV: "production",
+    RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: "",
+  });
+  assert.equal(missingRegistry.status, 1);
+  assert.match(missingRegistry.stderr, /trusted-reviewer-registry-secret-missing/);
+  const symlinkedKey = runSignerCli([reportPath, symlinkPath, "--reviewer-id", "d3m28-reviewer"], {
+    NODE_ENV: "production",
+    RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: JSON.stringify(fixture.trustedReviewerRegistry),
+  });
+  assert.equal(symlinkedKey.status, 1);
+  assert.match(symlinkedKey.stderr, /regular non-symlink/);
+  await assert.rejects(lstat(reportPath + ".sig.json"), { code: "ENOENT" });
 });
