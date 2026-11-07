@@ -110,6 +110,7 @@ on:
       - feat/d3m-engine26-process-isolated-provider-conformance-20261107
       - feat/d3m-engine27-process-qualification-report-bridge-20261107
       - feat/d3m-engine28-signed-process-report-attestation-20261107
+      - feat/d3m-engine29-independent-anchor-witness-20261107
 
   workflow_dispatch:
   pull_request:
@@ -141,6 +142,7 @@ on:
       - feat/d3m-engine26-process-isolated-provider-conformance-20261107
       - feat/d3m-engine27-process-qualification-report-bridge-20261107
       - feat/d3m-engine28-signed-process-report-attestation-20261107
+      - feat/d3m-engine29-independent-anchor-witness-20261107
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -266,6 +268,14 @@ jobs:
 
       - name: Validate D3M-28 report signer CLI
         run: node scripts/sign-trust-registry-governance-provider-process-report.mjs --help
+      - name: Test D3M-29 independent anchor challenge and witness verification
+        run: npm run test:trust-registry-governance-provider-anchor-witness
+
+      - name: Validate D3M-29 anchor challenge CLI
+        run: node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs --help
+
+      - name: Validate D3M-29 anchor witness verification CLI
+        run: node scripts/verify-trust-registry-governance-provider-anchor-witness.mjs --help
 
       - name: Validate process-isolated provider runner CLI
         run: node scripts/run-trust-registry-governance-provider-process-conformance.mjs --help
