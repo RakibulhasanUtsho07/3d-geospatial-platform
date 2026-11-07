@@ -212,6 +212,13 @@ test("provider integration must match the exact evaluated source commit", () => 
   assert.ok(report.blockers.includes("provider-integration-head-sha-mismatch"));
 });
 
+test("D3M-24 synthetic conformance workflow runs cannot be reused as a provider integration run", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.runId = manifest.conformanceCi.push.runId;
+  manifest.providerIntegration.runUrl = manifest.conformanceCi.push.runUrl;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /separate run from the D3M-24 synthetic conformance workflows/);
+});
+
 test("provider integration evidence must match the exact provisioned instance and namespace", () => {
   const wrongInstance = completeManifest();
   wrongInstance.providerIntegration.providerInstanceFingerprintSha256 = digest("different instance");
