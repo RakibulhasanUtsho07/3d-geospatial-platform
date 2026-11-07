@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { createHash } from "node:crypto";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
+import { validateTrustRegistryGovernanceProviderProcessReport } from "./trust-registry-governance-provider-process-report.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
@@ -116,11 +117,13 @@ function safeRelativePath(value, label) {
   return value;
 }
 
-function normalizeProvider(raw) {
-  exactKeys(raw, [
+function normalizeProvider(raw, schemaVersion) {
+  const expectedKeys = [
     "status", "providerId", "implementation", "version", "environment",
     "instanceFingerprintSha256", "namespaceFingerprintSha256", "endpointOrigin", "syntheticOnly",
-  ], "provider");
+  ];
+  if (schemaVersion === "1.1.0") expectedKeys.push("adapterModuleSha256");
+  exactKeys(raw, expectedKeys, "provider");
   if (!["not-provisioned", "provisioned"].includes(raw.status)) {
     throw new TypeError("provider.status is unsupported");
   }
@@ -128,13 +131,15 @@ function normalizeProvider(raw) {
   if (raw.status === "not-provisioned") {
     if (raw.providerId !== null || raw.implementation !== null || raw.version !== null ||
         raw.environment !== "not-provisioned" || raw.instanceFingerprintSha256 !== null ||
-        raw.namespaceFingerprintSha256 !== null || raw.endpointOrigin !== null || raw.syntheticOnly !== true) {
+        raw.namespaceFingerprintSha256 !== null || raw.endpointOrigin !== null || raw.syntheticOnly !== true ||
+        (schemaVersion === "1.1.0" && raw.adapterModuleSha256 !== null)) {
       throw new TypeError("not-provisioned provider must not claim a deployment identity or endpoint");
     }
     return {
       status: "not-provisioned", providerId: null, implementation: null, version: null,
       environment: "not-provisioned", instanceFingerprintSha256: null,
       namespaceFingerprintSha256: null, endpointOrigin: null, syntheticOnly: true,
+      ...(schemaVersion === "1.1.0" ? { adapterModuleSha256: null } : {}),
     };
   }
   const providerId = requireId(raw.providerId, "provider.providerId");
@@ -149,6 +154,9 @@ function normalizeProvider(raw) {
   }
   if (!hashOk(raw.instanceFingerprintSha256) || !hashOk(raw.namespaceFingerprintSha256)) {
     throw new TypeError("provisioned provider requires SHA-256 instance and namespace fingerprints");
+  }
+  if (schemaVersion === "1.1.0" && !hashOk(raw.adapterModuleSha256)) {
+    throw new TypeError("D3M-27 provisioned provider requires the exact adapter module SHA-256");
   }
   const endpointUrl = new URL(requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin"));
   const hostname = endpointUrl.hostname.toLowerCase().replaceAll("[", "").replaceAll("]", "");
@@ -172,6 +180,7 @@ function normalizeProvider(raw) {
     namespaceFingerprintSha256: raw.namespaceFingerprintSha256,
     endpointOrigin,
     syntheticOnly: raw.syntheticOnly,
+    ...(schemaVersion === "1.1.0" ? { adapterModuleSha256: raw.adapterModuleSha256 } : {}),
   };
 }
 
@@ -197,11 +206,13 @@ function normalizeCiRun(raw, label, expectedEvent) {
   return { ...raw, runUrl };
 }
 
-function normalizeProviderIntegration(raw) {
-  exactKeys(raw, [
+function normalizeProviderIntegration(raw, schemaVersion) {
+  const expectedKeys = [
     "status", "runId", "runUrl", "headSha", "fullRunConclusion", "suiteConclusion", "syntheticOnly",
     "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
-  ], "providerIntegration");
+  ];
+  if (schemaVersion === "1.1.0") expectedKeys.push("processReportArtifactId");
+  exactKeys(raw, expectedKeys, "providerIntegration");
   if (!["not-run", "passed", "failed", "pending"].includes(raw.status)) {
     throw new TypeError("providerIntegration.status is unsupported");
   }
@@ -210,7 +221,8 @@ function normalizeProviderIntegration(raw) {
     if (raw.runId !== null || raw.runUrl !== null || raw.headSha !== null ||
         raw.fullRunConclusion !== "not-run" || raw.suiteConclusion !== "not-run" || raw.syntheticOnly !== true ||
         raw.providerInstanceFingerprintSha256 !== null ||
-        raw.providerNamespaceFingerprintSha256 !== null) {
+        raw.providerNamespaceFingerprintSha256 !== null ||
+        (schemaVersion === "1.1.0" && raw.processReportArtifactId !== null)) {
       throw new TypeError("not-run provider integration must not claim a run, provider identity or real-provider result");
     }
     return {
@@ -218,6 +230,7 @@ function normalizeProviderIntegration(raw) {
       fullRunConclusion: "not-run", suiteConclusion: "not-run", syntheticOnly: true,
       providerInstanceFingerprintSha256: null,
       providerNamespaceFingerprintSha256: null,
+      ...(schemaVersion === "1.1.0" ? { processReportArtifactId: null } : {}),
     };
   }
   if (!Number.isSafeInteger(raw.runId) || raw.runId < 1) throw new TypeError("providerIntegration.runId must be positive");
@@ -240,6 +253,12 @@ function normalizeProviderIntegration(raw) {
       (raw.status === "failed" && raw.suiteConclusion !== "failure") ||
       (raw.status === "pending" && raw.suiteConclusion !== "pending")) {
     throw new TypeError("providerIntegration.status and suiteConclusion must agree");
+  }
+  if (schemaVersion === "1.1.0") {
+    if (raw.status === "passed") requireId(raw.processReportArtifactId, "providerIntegration.processReportArtifactId");
+    else if (raw.processReportArtifactId !== null) {
+      throw new TypeError("providerIntegration.processReportArtifactId must be null unless integration status is passed");
+    }
   }
   return { ...raw, runUrl };
 }
@@ -323,7 +342,10 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     "schemaVersion", "manifestId", "generatedAtUtc", "source", "provider",
     "conformanceCi", "providerIntegration", "artifacts", "evidence",
   ], "provider qualification manifest");
-  if (input.schemaVersion !== "1.0.0") throw new TypeError("schemaVersion must be 1.0.0");
+  if (!["1.0.0", "1.1.0"].includes(input.schemaVersion)) {
+    throw new TypeError("schemaVersion must be 1.0.0 or 1.1.0");
+  }
+  const schemaVersion = input.schemaVersion;
   const manifestId = requireId(input.manifestId, "manifestId");
   const generatedAtUtc = validUtc(input.generatedAtUtc, "generatedAtUtc");
 
@@ -340,7 +362,7 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     branch: input.source.branch,
     commitSha: requireCommit(input.source.commitSha, "source.commitSha"),
   };
-  const provider = normalizeProvider(input.provider);
+  const provider = normalizeProvider(input.provider, schemaVersion);
 
   exactKeys(input.conformanceCi, ["push", "pullRequest"], "conformanceCi");
   const conformanceCi = {
@@ -348,7 +370,7 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     pullRequest: normalizeCiRun(input.conformanceCi.pullRequest, "conformanceCi.pullRequest", "pull_request"),
   };
 
-  const providerIntegration = normalizeProviderIntegration(input.providerIntegration);
+  const providerIntegration = normalizeProviderIntegration(input.providerIntegration, schemaVersion);
   if (providerIntegration.status !== "not-run" && provider.status !== "provisioned") {
     throw new TypeError("provider integration cannot claim a run when the provider is not provisioned");
   }
@@ -390,8 +412,27 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     evidence[key] = normalizeEvidence(input.evidence[key], artifactsById, key);
   }
 
+  if (schemaVersion === "1.1.0" && providerIntegration.status === "passed") {
+    const reportId = providerIntegration.processReportArtifactId;
+    const reportArtifact = artifactsById.get(reportId);
+    if (!reportArtifact || reportArtifact.type !== "process-restart-report" || reportArtifact.status !== "present") {
+      throw new TypeError("D3M-27 provider integration must reference a present process-restart-report artifact");
+    }
+    if (!evidence.processRestartVisibility.artifactIds.includes(reportId)) {
+      throw new TypeError("D3M-27 processRestartVisibility evidence must reference the exact provider integration report artifact");
+    }
+    if (reportArtifact.sourceUrl !== providerIntegration.runUrl) {
+      throw new TypeError("D3M-27 process report artifact source URL must identify the exact provider integration workflow run");
+    }
+  }
+  if (schemaVersion === "1.1.0" && evidence.processRestartVisibility.status === "verified" &&
+      (providerIntegration.status !== "passed" ||
+       !evidence.processRestartVisibility.artifactIds.includes(providerIntegration.processReportArtifactId))) {
+    throw new TypeError("D3M-27 verified processRestartVisibility requires the exact passed provider integration report");
+  }
+
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion,
     manifestId,
     generatedAtUtc,
     source,
@@ -443,6 +484,9 @@ export function assessTrustRegistryProviderQualification(manifestInput, options 
     }
   }
   const integration = manifest.providerIntegration;
+  if (manifest.schemaVersion === "1.0.0" && integration.status === "passed") {
+    add("provider-process-report-not-bound");
+  }
   if (integration.status !== "passed" || integration.suiteConclusion !== "success") {
     add("real-provider-integration-suite-not-passed");
   }
@@ -521,6 +565,36 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
         const bytes = await handle.readFile();
         const digest = createHash("sha256").update(bytes).digest("hex");
         if (digest !== artifact.sha256) throw Object.assign(new Error("evidence artifact SHA-256 mismatch"), { code: "sha256-mismatch" });
+        if (artifact.id === manifest.providerIntegration.processReportArtifactId &&
+            manifest.providerIntegration.status === "passed") {
+          if (bytes.length > 1024 * 1024) {
+            throw Object.assign(new Error("process-isolated provider report exceeds the 1 MiB limit"), {
+              code: "process-report-too-large",
+            });
+          }
+          let processReport;
+          try {
+            processReport = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+          } catch {
+            throw Object.assign(new Error("process-isolated provider report is not valid UTF-8 JSON"), {
+              code: "process-report-invalid",
+            });
+          }
+          try {
+            validateTrustRegistryGovernanceProviderProcessReport(processReport, {
+              sourceCommitSha: manifest.source.commitSha,
+              providerId: manifest.provider.providerId,
+              adapterModuleSha256: manifest.provider.adapterModuleSha256,
+              syntheticOnly: manifest.provider.syntheticOnly,
+              instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+              namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+            });
+          } catch {
+            throw Object.assign(new Error("process-isolated provider report does not match the qualified provider context"), {
+              code: "process-report-invalid",
+            });
+          }
+        }
       } finally {
         await handle.close();
       }
@@ -537,6 +611,8 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
         "byte-count-mismatch": "evidence artifact byte count mismatch",
         "too-large": "evidence artifact exceeds the size limit",
         "sha256-mismatch": "evidence artifact SHA-256 mismatch",
+        "process-report-too-large": "process-isolated provider report exceeds the 1 MiB limit",
+        "process-report-invalid": "process-isolated provider report does not match the qualified provider context",
         ENOENT: "evidence artifact is missing",
         EACCES: "evidence artifact cannot be read",
         ELOOP: "evidence artifact path contains a symlink",

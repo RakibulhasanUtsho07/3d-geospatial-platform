@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "manifestId": "d3m25-current-external-provider-qualification",
   "generatedAtUtc": "2026-11-07T04:16:33.000Z",
   "source": {
@@ -16,7 +16,8 @@
     "instanceFingerprintSha256": null,
     "namespaceFingerprintSha256": null,
     "endpointOrigin": null,
-    "syntheticOnly": true
+    "syntheticOnly": true,
+    "adapterModuleSha256": null
   },
   "conformanceCi": {
     "push": {
@@ -47,7 +48,8 @@
     "syntheticOnly": true,
     "providerInstanceFingerprintSha256": null,
     "providerNamespaceFingerprintSha256": null,
-    "fullRunConclusion": "not-run"
+    "fullRunConclusion": "not-run",
+    "processReportArtifactId": null
   },
   "artifacts": [],
   "evidence": {

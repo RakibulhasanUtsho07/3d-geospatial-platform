@@ -41,7 +41,16 @@ node scripts/run-trust-registry-governance-provider-process-conformance.mjs \
   --report artifacts/provider-process-conformance.json
 \`\`\`
 
-The named environment variables must already be present in the runner environment. Only explicitly allowlisted values are inherited by provider workers, in addition to a small runtime baseline. Never put credentials or secret values in command-line arguments. The report is created once and refuses overwrite; it contains the adapter entry-file SHA-256 and provider ID, but no adapter path, endpoint, environment values or secret data.
+The named environment variables must already be present in the runner environment. Only explicitly allowlisted values are inherited by provider workers, in addition to a small runtime baseline. Never put credentials or secret values in command-line arguments.
+
+For a **non-synthetic provider**, D3M-27 requires the operator to add both privacy-safe deployment fingerprints to the command:
+
+```bash
+  --provider-instance-fingerprint-sha256 <64-character-instance-fingerprint> \
+  --provider-namespace-fingerprint-sha256 <64-character-isolated-namespace-fingerprint>
+```
+
+Both values must be lowercase SHA-256 fingerprints and must exactly match the D3M-25 qualification manifest. They are one-way identifiers only; do not pass an endpoint, tenant/account ID, credential or secret. Synthetic CI fixtures may omit them, in which case the schema-1.1.0 report stores null values and remains synthetic-only. The report is created once and refuses overwrite; it contains the adapter entry-file SHA-256 and provider ID, but no adapter path, endpoint, environment values or secret data.
 
 Each operation has a bounded JSON request/response, a configurable worker timeout, an output-size limit and forced child cleanup on timeout/overflow. Worker stderr and arbitrary adapter stdout are not forwarded to the caller. Worker errors expose only a bounded error code, never the provider exception message.
 
@@ -65,3 +74,10 @@ No remote provider, credential, production endpoint, TPM/HSM counter or independ
 Implementation code SHA `28b5005c6bd46e7886ac5175469bfd63b32033e1` passed both Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156). Each run completed successfully with 229/229 successful job steps and no failures or cancellations. The production viewport verification and six existing evidence uploads passed too.
 
 The result is process-isolated **software validation only** using the synthetic file-backed fixture. It is not a real external provider deployment or evidence of independently protected anchor custody. No release or production qualification flag is enabled.
+
+
+## D3M-27 qualification report binding — 2026-11-07
+
+D3M-27 upgrades the process-conformance report to schema 1.1.0 and binds it to provider instance and isolated namespace fingerprints. The D3M-25 qualification verifier now parses the linked `process-restart-report` artifact after byte verification and checks exact source SHA, provider ID, adapter SHA-256, synthetic declaration, instance/namespace fingerprints, worker counts and D3M-24 conformance outcomes. A correctly re-hashed report with substituted fields is rejected. See `docs/D3M-ENGINE-27-PROCESS-QUALIFICATION-REPORT-BRIDGE.md`.
+
+The default synthetic fixture may omit deployment fingerprints and remains explicitly synthetic; this does not qualify a real provider or change any release flag.

@@ -49,6 +49,14 @@ The provider integration evidence must come from a separate actual provider-spec
 
 A capability Boolean, provider marketing statement or synthetic-only test does not satisfy an evidence class. Each `verified` record must reference a present artifact of the correct type and use `provider-test` or `independent-audit` provenance; the `independentSecurityReview` class specifically requires `independent-audit` so a provider cannot self-attest its own security review. The evaluator verifies local artifact paths, regular-file status, byte count and SHA-256. The programmatic assessment API accepts only an immutable verifier-minted result bound to the exact normalized manifest; caller-supplied artifact-ID sets are rejected, and a verification result cannot be replayed against a modified manifest. It rejects path traversal, file or parent-directory symlinks, localhost/loopback provider endpoints, query-string/fragment URLs and artifact collections above the aggregate size limit. Filesystem diagnostics are normalized so report output does not disclose absolute machine paths. The CLI rejects symlinked/non-regular manifest inputs, caps the manifest to 1 MiB while reading, rejects report-parent symlinks and path traversal, and writes reports with create-once semantics. It records the manifest, schema, validator and report hashes. Hash verification establishes byte integrity only; it does not prove an auditor's identity, the truth of a report, or the provider's actual security properties.
 
+### D3M-27 process-isolated report semantics
+
+Schema 1.1.0 adds the provider's exact adapter module SHA-256 and `providerIntegration.processReportArtifactId`. A passed provider integration must reference a present `process-restart-report` artifact, and the same ID must appear in `evidence.processRestartVisibility`. The artifact's `sourceUrl` must also equal the exact `providerIntegration.runUrl`, preventing substitution from another workflow run.
+
+After checking path safety, byte count and SHA-256, the verifier parses the report and validates the exact source commit, provider ID, adapter SHA-256, synthetic-only declaration, provider instance and namespace fingerprints, fresh-child-process execution mode, worker-process counts and required D3M-24 concurrency/restart/ambiguous-write outcomes. A report with a valid hash but substituted semantic fields is not considered verified. See `docs/D3M-ENGINE-27-PROCESS-QUALIFICATION-REPORT-BRIDGE.md`.
+
+Schema 1.0.0 remains parseable for backward compatibility, but a legacy manifest claiming a passed integration is blocked from `ready-for-independent-review` because it does not bind a D3M-26 process report. The current unprovisioned-provider fixture uses schema 1.1.0 with null adapter/report references and remains blocked.
+
 ## Assessment semantics
 
 - `blocked`: provider, exact CI, real integration run, one or more evidence classes, or artifact bytes are missing/failed/synthetic/mismatched.

@@ -108,6 +108,7 @@ on:
       - feat/d3m-engine24-provider-conformance-20261105
       - feat/d3m-engine25-provider-qualification-evidence-20261107
       - feat/d3m-engine26-process-isolated-provider-conformance-20261107
+      - feat/d3m-engine27-process-qualification-report-bridge-20261107
 
   workflow_dispatch:
   pull_request:
@@ -137,6 +138,7 @@ on:
       - feat/d3m-engine24-provider-conformance-20261105
       - feat/d3m-engine25-provider-qualification-evidence-20261107
       - feat/d3m-engine26-process-isolated-provider-conformance-20261107
+      - feat/d3m-engine27-process-qualification-report-bridge-20261107
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -253,6 +255,9 @@ jobs:
 
       - name: Test process-isolated external governance provider conformance
         run: npm run test:trust-registry-governance-provider-process-conformance
+
+      - name: Test D3M-26 process-report binding into D3M-25 qualification
+        run: npm run test:trust-registry-governance-provider-process-report
 
       - name: Validate process-isolated provider runner CLI
         run: node scripts/run-trust-registry-governance-provider-process-conformance.mjs --help
