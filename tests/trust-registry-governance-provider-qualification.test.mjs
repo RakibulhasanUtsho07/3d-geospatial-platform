@@ -186,6 +186,31 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.ok(schema.properties.provider.required.includes("adapterModuleSha256") === false,
     "D3M-25 schema 1.0.0 remains backward compatible");
   assert.ok(schema.properties.providerIntegration.properties.processReportArtifactId);
+  const provisionedAdapterRule = schema.allOf.find((rule) =>
+    rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
+  assert.equal(
+    provisionedAdapterRule.then.properties.provider.properties.adapterModuleSha256.type,
+    "string",
+    "a schema-1.1 provisioned provider must have a non-null adapter SHA-256",
+  );
+  const unprovisionedAdapterRule = schema.allOf.find((rule) =>
+    rule.if?.properties?.provider?.properties?.status?.const === "not-provisioned");
+  assert.equal(unprovisionedAdapterRule.then.properties.provider.properties.adapterModuleSha256.const, null);
+  const passedIntegrationRule = schema.allOf.find((rule) =>
+    rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed");
+  assert.equal(
+    passedIntegrationRule.then.properties.providerIntegration.properties.processReportArtifactId.type,
+    "string",
+    "a passed schema-1.1 integration must have a non-null process-report artifact ID",
+  );
+  assert.equal(
+    passedIntegrationRule.then.properties.providerIntegration.properties.providerInstanceFingerprintSha256.type,
+    "string",
+  );
+  assert.equal(
+    passedIntegrationRule.then.properties.providerIntegration.properties.providerNamespaceFingerprintSha256.type,
+    "string",
+  );
   assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
   assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
   assert.equal(
