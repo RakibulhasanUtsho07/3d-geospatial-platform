@@ -300,4 +300,16 @@ test("provider identity must not expose secrets or self-assert as an unqualified
     verifiedArtifactIds: new Set(development.artifacts.map((item) => item.id)),
   });
   assert.ok(report.blockers.includes("provider-environment-is-not-staging-or-production"));
+
+  for (const endpointOrigin of ["https://localhost", "https://127.0.0.1", "https://node.localhost"]) {
+    const local = completeManifest();
+    local.provider.endpointOrigin = endpointOrigin;
+    assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(local), /remote HTTPS origin/);
+  }
+});
+
+test("aggregate evidence size is bounded before any file bytes are opened", () => {
+  const manifest = completeManifest();
+  for (const artifact of manifest.artifacts) artifact.bytes = 128 * 1024 * 1024;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /512 MiB aggregate/);
 });
