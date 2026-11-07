@@ -421,6 +421,9 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     if (!evidence.processRestartVisibility.artifactIds.includes(reportId)) {
       throw new TypeError("D3M-27 processRestartVisibility evidence must reference the exact provider integration report artifact");
     }
+    if (reportArtifact.sourceUrl !== providerIntegration.runUrl) {
+      throw new TypeError("D3M-27 process report artifact source URL must identify the exact provider integration workflow run");
+    }
   }
   if (schemaVersion === "1.1.0" && evidence.processRestartVisibility.status === "verified" &&
       (providerIntegration.status !== "passed" ||
