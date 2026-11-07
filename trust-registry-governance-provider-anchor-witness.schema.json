@@ -215,6 +215,8 @@
         "registryId",
         "registrySetId",
         "governancePublicKeyFingerprintSha256",
+        "governancePublicKeyPem",
+        "governanceSignatureBase64",
         "issuedAtUtc",
         "expiresAtUtc",
         "entries"
@@ -248,6 +250,16 @@
           "items": {
             "$ref": "#/$defs/registryEntry"
           }
+        },
+        "governancePublicKeyPem": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 16384,
+          "pattern": "-----BEGIN PUBLIC KEY-----"
+        },
+        "governanceSignatureBase64": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
         }
       }
     },
