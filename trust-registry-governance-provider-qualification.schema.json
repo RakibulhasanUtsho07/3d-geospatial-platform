@@ -656,6 +656,131 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "properties": {
+              "adapterModuleSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "provider": {
+            "properties": {
+              "status": {
+                "const": "not-provisioned"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "provider"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "properties": {
+              "adapterModuleSha256": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              },
+              "providerInstanceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "providerNamespaceFingerprintSha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "runId": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "runUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://github\\.com/"
+              },
+              "headSha": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
