@@ -18,6 +18,7 @@ function createBarrier(parties) {
 function syntheticProvider({
   ignoreCompareAndSetVersion = false,
   staleConflictReturnsWrongVersion = false,
+  invalidVersionToken = false,
   raceInitializeIfAbsent = false,
   raceCompareAndSet = false,
   ignoreRegistryIdentity = false,
@@ -46,9 +47,11 @@ function syntheticProvider({
       assertIdentity(record, identity);
     }
   };
-  const version = (record) => cycleVersionOnSecondWrite && record.generation >= 3
-    ? "generation-1"
-    : "generation-" + record.generation;
+  const version = (record) => invalidVersionToken
+    ? "invalid version token"
+    : cycleVersionOnSecondWrite && record.generation >= 3
+      ? "generation-1"
+      : "generation-" + record.generation;
   const snapshot = (record) => ({
     version: version(record),
     state: clone(record.state),
@@ -235,6 +238,15 @@ test("provider conformance suite rejects a successful CAS without advancing its 
       ...syntheticProvider({ reuseVersionOnWrite: true }),
     }),
     /successful compare-and-set must not reuse any prior provider version token/i,
+  );
+});
+
+test("provider conformance suite rejects malformed provider version tokens", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ invalidVersionToken: true }),
+    }),
+    /version token must be opaque and bounded/i,
   );
 });
 
