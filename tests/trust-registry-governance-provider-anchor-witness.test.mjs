@@ -18,6 +18,9 @@ const context = Object.freeze({
   syntheticOnly: true,
   instanceFingerprintSha256: "c".repeat(64),
   namespaceFingerprintSha256: "d".repeat(64),
+  providerProcessReportSha256: "1".repeat(64),
+  providerFinalRevision: 8,
+  providerFinalMinimumAcceptedSequence: 9,
 });
 const governanceFingerprint = "e".repeat(64);
 
@@ -67,6 +70,9 @@ function fixture(overrides = {}) {
     syntheticOnly: context.syntheticOnly,
     instanceFingerprintSha256: context.instanceFingerprintSha256,
     namespaceFingerprintSha256: context.namespaceFingerprintSha256,
+    providerProcessReportSha256: context.providerProcessReportSha256,
+    providerFinalRevision: context.providerFinalRevision,
+    providerFinalMinimumAcceptedSequence: context.providerFinalMinimumAcceptedSequence,
     ttlSeconds: 300,
     now,
   });
@@ -87,6 +93,9 @@ function fixture(overrides = {}) {
     syntheticOnly: context.syntheticOnly,
     providerInstanceFingerprintSha256: context.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: context.namespaceFingerprintSha256,
+    providerProcessReportSha256: context.providerProcessReportSha256,
+    providerFinalRevision: context.providerFinalRevision,
+    providerFinalMinimumAcceptedSequence: context.providerFinalMinimumAcceptedSequence,
     anchorId: "external-anchor-a",
     keyId: "anchor-key-01",
     anchorPublicKeyFingerprintSha256: anchorFingerprint,
