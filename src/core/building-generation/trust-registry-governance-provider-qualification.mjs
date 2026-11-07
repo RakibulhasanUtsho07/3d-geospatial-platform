@@ -641,11 +641,12 @@ export function assessTrustRegistryProviderQualification(manifestInput, options 
  */
 export async function verifyTrustRegistryProviderQualificationArtifacts(manifestInput, artifactRoot, options = {}) {
   requireObject(options, "artifact verification options");
-  const supportedOptions = new Set(["trustedReviewerRegistry", "independentAnchorKeyRegistry", "now"]);
+  const supportedOptions = new Set(["trustedReviewerRegistry", "independentAnchorKeyRegistry", "independentAnchorGovernanceKeyFingerprintSha256", "now"]);
   const unsupportedOption = Object.keys(options).find((key) => !supportedOptions.has(key));
   if (unsupportedOption) throw new TypeError("unsupported artifact verification option: " + unsupportedOption);
   const trustedReviewerRegistry = options.trustedReviewerRegistry ?? process.env.RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON;
   const independentAnchorKeyRegistry = options.independentAnchorKeyRegistry ?? process.env.D3M29_INDEPENDENT_ANCHOR_KEYS_JSON;
+  const independentAnchorGovernanceKeyFingerprintSha256 = options.independentAnchorGovernanceKeyFingerprintSha256 ?? process.env.D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256;
   const verificationNow = options.now ?? new Date();
   const manifest = normalizeTrustRegistryProviderQualificationManifest(manifestInput);
   const root = await realpath(path.resolve(artifactRoot));
@@ -860,6 +861,7 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
         challengeBytes,
         witnessBytes,
         independentAnchorKeyRegistry,
+        independentAnchorGovernanceKeyFingerprintSha256,
         expectedContext: {
           sourceCommitSha: manifest.source.commitSha,
           providerId: manifest.provider.providerId,
