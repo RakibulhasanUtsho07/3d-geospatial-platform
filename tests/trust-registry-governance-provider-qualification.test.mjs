@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash, randomUUID, generateKeyPairSync } from "node:crypto";
+import { createHash, randomUUID, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -13,6 +13,10 @@ import {
   verifyTrustRegistryProviderQualificationArtifacts,
 } from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
 import { signTrustRegistryGovernanceProviderProcessReport } from "../src/core/building-generation/trust-registry-governance-provider-process-report-signature.mjs";
+import {
+  buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes,
+  createTrustRegistryGovernanceProviderAnchorChallenge,
+} from "../src/core/building-generation/trust-registry-governance-provider-anchor-witness.mjs";
 
 const repository = "RakibulhasanUtsho07/3d-geospatial-platform";
 const sourceCommitSha = "786d901e5a7ed4effddbbbb563533820276fb4ba";
@@ -97,8 +101,11 @@ function processReportSignatureBytes(manifest) {
   return Buffer.from(JSON.stringify(envelope, null, 2) + "\n");
 }
 
-async function verifyArtifacts(manifest, root, registry = trustedReviewerRegistry) {
-  return verifyTrustRegistryProviderQualificationArtifacts(manifest, root, { trustedReviewerRegistry: registry });
+async function verifyArtifacts(manifest, root, registry = trustedReviewerRegistry, extra = {}) {
+  return verifyTrustRegistryProviderQualificationArtifacts(manifest, root, {
+    trustedReviewerRegistry: registry,
+    ...extra,
+  });
 }
 
 function run({ id, event, conclusion = "success", headSha = sourceCommitSha } ) {
@@ -231,13 +238,16 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.equal(schema.properties.evidence.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
   assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
-  assert.deepEqual(schema.properties.schemaVersion.enum, ["1.0.0", "1.1.0", "1.2.0"]);
+  assert.deepEqual(schema.properties.schemaVersion.enum, ["1.0.0", "1.1.0", "1.2.0", "1.3.0"]);
   assert.ok(schema.properties.provider.required.includes("adapterModuleSha256") === false,
     "D3M-25 schema 1.0.0 remains backward compatible");
   assert.ok(schema.properties.providerIntegration.properties.processReportArtifactId);
   assert.ok(schema.properties.providerIntegration.properties.processReportSignatureArtifactId);
   assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("process-report-signature"));
   assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("process-report-signature"));
+  assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("anchor-witness-challenge"));
+  assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("anchor-witness-challenge"));
+  assert.ok(schema.properties.independentAnchorWitness);
   const provisionedAdapterRule = schema.allOf.find((rule) =>
     rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
   assert.equal(
@@ -264,7 +274,7 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
     passedIntegrationRule.then.properties.providerIntegration.properties.providerNamespaceFingerprintSha256.type,
     "string",
   );
-  const signedRule = schema.allOf.find((rule) => rule.if?.properties?.schemaVersion?.const === "1.2.0" && rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed");
+  const signedRule = schema.allOf.find((rule) => rule.if?.properties?.schemaVersion?.enum?.includes("1.2.0") && rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed");
   assert.equal(signedRule.then.properties.providerIntegration.properties.processReportSignatureArtifactId.type, "string");
   assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
   assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
@@ -820,4 +830,185 @@ test("D3M-27 process report artifact must originate from the exact provider inte
   reportArtifact.sourceUrl = "https://evidence.example/substituted-run";
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
     /source URL must identify the exact provider integration workflow run/i);
+});
+
+
+test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witness and exact artifact binding", async () => {
+  const manifest = completeManifest();
+  manifest.schemaVersion = "1.3.0";
+  const anchorPair = generateKeyPairSync("ed25519");
+  const anchorPublicKeyPem = anchorPair.publicKey.export({ type: "spki", format: "pem" }).toString();
+  const anchorPublicKeyFingerprintSha256 = digest(
+    anchorPair.publicKey.export({ type: "spki", format: "der" }),
+  );
+  const verificationNow = new Date("2026-11-07T04:00:02.000Z");
+  const challengeNow = new Date("2026-11-07T04:00:00.000Z");
+  const governancePublicKeyFingerprintSha256 = digest("independently pinned test governance key");
+  const independentAnchorKeyRegistry = {
+    schemaVersion: "1.0.0",
+    recordType: "d3m29-independent-anchor-key-registry",
+    registryId: "d3m29-test-anchor-registry",
+    registrySetId: "d3m29-test-registry-set",
+    governancePublicKeyFingerprintSha256,
+    issuedAtUtc: "2026-11-01T00:00:00.000Z",
+    expiresAtUtc: "2026-12-01T00:00:00.000Z",
+    entries: [{
+      anchorId: "external-anchor-01",
+      keyId: "external-anchor-key-01",
+      status: "active",
+      publicKeyPem: anchorPublicKeyPem,
+      validFromUtc: "2026-11-01T00:00:00.000Z",
+      validUntilUtc: "2026-12-01T00:00:00.000Z",
+      revokedAtUtc: null,
+      replacesKeyId: null,
+    }],
+  };
+  const challenge = createTrustRegistryGovernanceProviderAnchorChallenge({
+    sourceCommitSha: manifest.source.commitSha,
+    providerId: manifest.provider.providerId,
+    adapterModuleSha256: manifest.provider.adapterModuleSha256,
+    syntheticOnly: manifest.provider.syntheticOnly,
+    instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+    namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+    ttlSeconds: 300,
+    now: challengeNow,
+  });
+  const unsignedWitness = {
+    schemaVersion: "1.0.0",
+    engine: "d3m29-independent-anchor-witness-v1",
+    algorithm: "Ed25519",
+    signaturePurpose: "independent-anchor-fresh-challenge-response-not-provider-qualification",
+    challengeSha256: challenge.challengeSha256,
+    challengeId: challenge.challenge.challengeId,
+    nonceHex: challenge.challenge.nonceHex,
+    issuedAtUtc: challenge.challenge.issuedAtUtc,
+    expiresAtUtc: challenge.challenge.expiresAtUtc,
+    observedAtUtc: verificationNow.toISOString(),
+    sourceCommitSha: manifest.source.commitSha,
+    providerId: manifest.provider.providerId,
+    adapterModuleSha256: manifest.provider.adapterModuleSha256,
+    syntheticOnly: manifest.provider.syntheticOnly,
+    providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+    providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+    anchorId: "external-anchor-01",
+    keyId: "external-anchor-key-01",
+    anchorPublicKeyFingerprintSha256,
+    registryId: independentAnchorKeyRegistry.registryId,
+    registrySetId: independentAnchorKeyRegistry.registrySetId,
+    governancePublicKeyFingerprintSha256,
+    providerVersion: "monotonic-version-42",
+    monotonicSequence: 42,
+    authoritativeStateSha256: digest("independently anchored provider state"),
+    signatureBase64: "",
+  };
+  const signature = sign(null, buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes({
+    challengeBytes: challenge.bytes,
+    witness: unsignedWitness,
+  }), anchorPair.privateKey);
+  const witnessBytes = Buffer.from(JSON.stringify({
+    ...unsignedWitness,
+    signatureBase64: signature.toString("base64"),
+  }, null, 2) + "\\n", "utf8");
+
+  const oldAnchorArtifact = manifest.artifacts.find((item) => item.id === "evidence-independentanchorcustody");
+  manifest.artifacts = manifest.artifacts.filter((item) => item !== oldAnchorArtifact);
+  manifest.artifacts.push({
+    id: "d3m29-anchor-challenge",
+    type: "anchor-witness-challenge",
+    status: "present",
+    relativePath: "evidence/anchor-challenge.json",
+    sha256: digest(challenge.bytes),
+    bytes: challenge.bytes.length,
+    sourceUrl: manifest.providerIntegration.runUrl,
+    sourceCommitSha,
+  });
+  manifest.artifacts.push({
+    id: "d3m29-anchor-witness",
+    type: "anchor-independence-review",
+    status: "present",
+    relativePath: "evidence/anchor-witness.json",
+    sha256: digest(witnessBytes),
+    bytes: witnessBytes.length,
+    sourceUrl: manifest.providerIntegration.runUrl,
+    sourceCommitSha,
+  });
+  manifest.evidence.independentAnchorCustody = {
+    status: "verified",
+    artifactIds: ["d3m29-anchor-witness"],
+    verificationKind: "independent-audit",
+  };
+  manifest.independentAnchorWitness = {
+    status: "verified",
+    challengeArtifactId: "d3m29-anchor-challenge",
+    witnessArtifactId: "d3m29-anchor-witness",
+  };
+
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m29-qualification-"));
+  try {
+    for (const artifact of manifest.artifacts) {
+      const target = path.join(root, artifact.relativePath);
+      await mkdir(path.dirname(target), { recursive: true });
+      const evidenceKey = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((key) =>
+        artifact.id === "evidence-" + key.toLowerCase());
+      const bytes = artifact.id === "d3m29-anchor-challenge"
+        ? challenge.bytes
+        : artifact.id === "d3m29-anchor-witness"
+          ? witnessBytes
+          : artifact.type === "process-report-signature"
+            ? processReportSignatureBytes(manifest)
+            : evidenceKey === "processRestartVisibility"
+              ? processReportBytes(manifest)
+              : "independent provider evidence for " + evidenceKey;
+      await writeFile(target, bytes);
+    }
+    const verification = await verifyArtifacts(manifest, root, trustedReviewerRegistry, {
+      independentAnchorKeyRegistry,
+      now: verificationNow,
+    });
+    assert.deepEqual(verification.failures, []);
+    assert.ok(verification.verifiedArtifactIds.includes("d3m29-anchor-challenge"));
+    assert.ok(verification.verifiedArtifactIds.includes("d3m29-anchor-witness"));
+    const assessment = assessTrustRegistryProviderQualification(manifest, {
+      artifactVerification: verification,
+    });
+    assert.equal(assessment.status, "ready-for-independent-review");
+    assert.equal(assessment.productionQualificationEligible, false);
+    assert.deepEqual(assessment.releaseFlags, {
+      acceptanceEligible: false,
+      publicationEligible: false,
+      mapReady: false,
+      automaticApproval: false,
+    });
+
+    const witnessPath = path.join(root, "evidence/anchor-witness.json");
+    const altered = JSON.parse(await readFile(witnessPath, "utf8"));
+    altered.signatureBase64 = Buffer.alloc(64, 0x77).toString("base64");
+    const alteredBytes = Buffer.from(JSON.stringify(altered, null, 2) + "\\n", "utf8");
+    await writeFile(witnessPath, alteredBytes);
+    const witnessArtifact = manifest.artifacts.find((item) => item.id === "d3m29-anchor-witness");
+    witnessArtifact.bytes = alteredBytes.length;
+    witnessArtifact.sha256 = digest(alteredBytes);
+    const rejected = await verifyArtifacts(manifest, root, trustedReviewerRegistry, {
+      independentAnchorKeyRegistry,
+      now: verificationNow,
+    });
+    assert.ok(rejected.failures.some((item) =>
+      item.id === "d3m29-anchor-witness" && item.code === "independent-anchor-witness-invalid"));
+    const blocked = assessTrustRegistryProviderQualification(manifest, { artifactVerification: rejected });
+    assert.equal(blocked.status, "blocked");
+    assert.ok(blocked.blockers.includes("artifact-verification-failed:d3m29-anchor-witness:independent-anchor-witness-invalid"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("D3M-29 blocks legacy qualification manifests that claim verified independent anchor custody", () => {
+  const manifest = completeManifest();
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), 
+    /provider qualification manifest must contain exactly/i,
+  );
+  manifest.evidence.independentAnchorCustody.verificationKind = "independent-audit";
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("independent-anchor-witness-not-bound"));
 });
