@@ -109,6 +109,7 @@ test("validates dense POSITION values after sparse replacements are applied",()=
   const indexView=addSparseView(state,Buffer.from([1]),1);
   const valueView=addSparseView(state,encodeFloat([1,0,0]),4);
   state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[1,1,0];
  });
  const overridden=analyzeGlbQuality(makeOverlay(1));
  assert.deepEqual(overridden.bounds.min,[0,0,0]);
