@@ -21,6 +21,7 @@ const CHALLENGE_KEYS = Object.freeze([
   "schemaVersion", "engine", "challengeId", "nonceHex", "issuedAtUtc", "expiresAtUtc",
   "sourceCommitSha", "providerId", "adapterModuleSha256", "syntheticOnly",
   "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
+  "providerProcessReportSha256", "providerFinalRevision", "providerFinalMinimumAcceptedSequence",
 ]);
 const REGISTRY_KEYS = Object.freeze([
   "schemaVersion", "recordType", "registryId", "registrySetId",
@@ -32,6 +33,7 @@ const WITNESS_KEYS = Object.freeze([
   "challengeId", "nonceHex", "issuedAtUtc", "expiresAtUtc", "observedAtUtc",
   "sourceCommitSha", "providerId", "adapterModuleSha256", "syntheticOnly",
   "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
+  "providerProcessReportSha256", "providerFinalRevision", "providerFinalMinimumAcceptedSequence",
   "anchorId", "keyId", "anchorPublicKeyFingerprintSha256", "registryId", "registrySetId",
   "governancePublicKeyFingerprintSha256", "providerVersion", "monotonicSequence",
   "authoritativeStateSha256", "signatureBase64",
@@ -97,6 +99,7 @@ function normalizeContext(context) {
   exactKeys(context, [
     "sourceCommitSha", "providerId", "adapterModuleSha256", "syntheticOnly",
     "instanceFingerprintSha256", "namespaceFingerprintSha256",
+    "providerProcessReportSha256", "providerFinalRevision", "providerFinalMinimumAcceptedSequence",
   ], "provider challenge context");
   if (typeof context.syntheticOnly !== "boolean") throw new TypeError("syntheticOnly must be boolean");
   return Object.freeze({
@@ -106,7 +109,14 @@ function normalizeContext(context) {
     syntheticOnly: context.syntheticOnly,
     instanceFingerprintSha256: safeHash(context.instanceFingerprintSha256, "instanceFingerprintSha256"),
     namespaceFingerprintSha256: safeHash(context.namespaceFingerprintSha256, "namespaceFingerprintSha256"),
+    providerProcessReportSha256: safeHash(context.providerProcessReportSha256, "providerProcessReportSha256"),
+    providerFinalRevision: context.providerFinalRevision,
+    providerFinalMinimumAcceptedSequence: context.providerFinalMinimumAcceptedSequence,
   });
+  if (!Number.isSafeInteger(context.providerFinalRevision) || context.providerFinalRevision < 1 ||
+      !Number.isSafeInteger(context.providerFinalMinimumAcceptedSequence) || context.providerFinalMinimumAcceptedSequence < 1) {
+    throw new TypeError("provider process-report revision and minimum accepted sequence must be positive safe integers");
+  }
 }
 
 /**
@@ -121,6 +131,9 @@ export function createTrustRegistryGovernanceProviderAnchorChallenge({
   syntheticOnly,
   instanceFingerprintSha256,
   namespaceFingerprintSha256,
+  providerProcessReportSha256,
+  providerFinalRevision,
+  providerFinalMinimumAcceptedSequence,
   ttlSeconds = 300,
   now = new Date(),
 }) {
@@ -132,6 +145,7 @@ export function createTrustRegistryGovernanceProviderAnchorChallenge({
   const context = normalizeContext({
     sourceCommitSha, providerId, adapterModuleSha256, syntheticOnly,
     instanceFingerprintSha256, namespaceFingerprintSha256,
+    providerProcessReportSha256, providerFinalRevision, providerFinalMinimumAcceptedSequence,
   });
   const issuedAtUtc = nowDate.toISOString();
   const expiresAtUtc = new Date(nowDate.getTime() + ttlSeconds * 1000).toISOString();
@@ -148,6 +162,9 @@ export function createTrustRegistryGovernanceProviderAnchorChallenge({
     syntheticOnly: context.syntheticOnly,
     providerInstanceFingerprintSha256: context.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: context.namespaceFingerprintSha256,
+    providerProcessReportSha256: context.providerProcessReportSha256,
+    providerFinalRevision: context.providerFinalRevision,
+    providerFinalMinimumAcceptedSequence: context.providerFinalMinimumAcceptedSequence,
   });
   const bytes = Buffer.from(canonicalJson(challenge) + "\n", "utf8");
   return Object.freeze({
@@ -401,6 +418,9 @@ function parseChallenge(bytes, nowDate) {
     syntheticOnly: challenge.syntheticOnly,
     instanceFingerprintSha256: challenge.providerInstanceFingerprintSha256,
     namespaceFingerprintSha256: challenge.providerNamespaceFingerprintSha256,
+    providerProcessReportSha256: challenge.providerProcessReportSha256,
+    providerFinalRevision: challenge.providerFinalRevision,
+    providerFinalMinimumAcceptedSequence: challenge.providerFinalMinimumAcceptedSequence,
   });
   return { challenge, issued, expires, context };
 }
@@ -480,6 +500,9 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
         typeof witness.syntheticOnly === "boolean" &&
         SHA256.test(witness.providerInstanceFingerprintSha256 ?? "") &&
         SHA256.test(witness.providerNamespaceFingerprintSha256 ?? "") &&
+        SHA256.test(witness.providerProcessReportSha256 ?? "") &&
+        Number.isSafeInteger(witness.providerFinalRevision) && witness.providerFinalRevision >= 1 &&
+        Number.isSafeInteger(witness.providerFinalMinimumAcceptedSequence) && witness.providerFinalMinimumAcceptedSequence >= 1 &&
         SAFE_ID.test(witness.anchorId ?? "") &&
         SAFE_ID.test(witness.keyId ?? "") &&
         SHA256.test(witness.anchorPublicKeyFingerprintSha256 ?? "") &&
@@ -517,6 +540,9 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
     witness.syntheticOnly === parsedChallenge.context.syntheticOnly &&
     witness.providerInstanceFingerprintSha256 === parsedChallenge.context.instanceFingerprintSha256 &&
     witness.providerNamespaceFingerprintSha256 === parsedChallenge.context.namespaceFingerprintSha256 &&
+    witness.providerProcessReportSha256 === parsedChallenge.context.providerProcessReportSha256 &&
+    witness.providerFinalRevision === parsedChallenge.context.providerFinalRevision &&
+    witness.providerFinalMinimumAcceptedSequence === parsedChallenge.context.providerFinalMinimumAcceptedSequence &&
     context && Object.keys(context).every((key) => context[key] === parsedChallenge.context[key]));
   check("provider-identity-binding", providerMatches,
     "Witness must bind the same exact provider, source, adapter and deployment fingerprints.");
