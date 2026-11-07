@@ -312,6 +312,8 @@ test("complete hash-bound provider evidence reaches review only, never productio
     }
     const verified = await verifyArtifacts(manifest, root);
     assert.equal(verified.failures.length, 0);
+    assert.ok(verified.verifiedArtifactIds.includes(manifest.providerIntegration.processReportSignatureArtifactId),
+      "the signature is verified only through the linked report verification path");
     assert.equal(Object.isFrozen(verified), true);
     assert.equal(Object.isFrozen(verified.verifiedArtifactIds), true);
     const report = assessTrustRegistryProviderQualification(manifest, {
