@@ -5,22 +5,26 @@ import { analyzeGlbQuality } from "../src/core/building-generation/glb-geometry-
 import { generateProceduralGlb } from "../src/core/building-generation/procedural-glb.mjs";
 
 const fixture=JSON.parse(await readFile(new URL("./fixtures/demo-building-spec.json",import.meta.url),"utf8"));
-function makeGlb(positions,indices){
+function makeGlb(positions,indices=null){
  const p=Buffer.alloc(positions.length*4);positions.forEach((value,index)=>p.writeFloatLE(value,index*4));
- const index=Buffer.alloc(indices.length*2);indices.forEach((value,i)=>index.writeUInt16LE(value,i*2));
+ const hasIndices=Array.isArray(indices);
+ const index=hasIndices?Buffer.alloc(indices.length*2):Buffer.alloc(0);
+ if(hasIndices)indices.forEach((value,i)=>index.writeUInt16LE(value,i*2));
  const pad=(buffer)=>buffer.length%4?Buffer.concat([buffer,Buffer.alloc(4-buffer.length%4)]):buffer;
- const binary=pad(Buffer.concat([p,index]));
+ const binary=pad(hasIndices?Buffer.concat([p,index]):p);
+ const primitive={attributes:{POSITION:0},mode:4};
+ if(hasIndices)primitive.indices=1;
+ const accessors=[{bufferView:0,componentType:5126,count:positions.length/3,type:"VEC3"}];
+ const bufferViews=[{buffer:0,byteOffset:0,byteLength:p.length,target:34962}];
+ if(hasIndices){
+  accessors.push({bufferView:1,componentType:5123,count:indices.length,type:"SCALAR"});
+  bufferViews.push({buffer:0,byteOffset:p.length,byteLength:index.length,target:34963});
+ }
  const gltf={
   asset:{version:"2.0",generator:"GLB geometry QA test"},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],
-  meshes:[{primitives:[{attributes:{POSITION:0},indices:1,mode:4}]}],
-  accessors:[
-   {bufferView:0,componentType:5126,count:positions.length/3,type:"VEC3"},
-   {bufferView:1,componentType:5123,count:indices.length,type:"SCALAR"}
-  ],
-  bufferViews:[
-   {buffer:0,byteOffset:0,byteLength:p.length,target:34962},
-   {buffer:0,byteOffset:p.length,byteLength:index.length,target:34963}
-  ],buffers:[{byteLength:p.length+index.length}],
+  meshes:[{primitives:[primitive]}],
+  accessors,
+  bufferViews,buffers:[{byteLength:p.length+index.length}],
   materials:[{name:"test"}]
  };
  const jsonRaw=Buffer.from(JSON.stringify(gltf)),jsonPad=(4-jsonRaw.length%4)%4,json=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
@@ -78,6 +82,21 @@ test("ignores unreferenced positions for model bounds and topology scale while r
  assert.equal(topology.topologyAnalyzed,true);
  assert.ok(report.warnings.includes("unreferenced-vertices-present"));
  assert.ok(!report.warnings.includes("long-triangle-edges-present"));
+});
+
+test("treats every POSITION entry as referenced for a non-indexed TRIANGLES primitive",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0]);
+ const report=analyzeGlbQuality(glb),topology=report.meshDetails[0].topology;
+ assert.equal(report.counts.vertexCount,3);
+ assert.equal(report.counts.referencedVertexCount,3);
+ assert.equal(report.counts.unreferencedVertexCount,0);
+ assert.equal(report.meshDetails[0].referencedVertexCount,3);
+ assert.equal(report.meshDetails[0].unreferencedVertexCount,0);
+ assert.equal(topology.referencedVertexCount,3);
+ assert.equal(topology.unreferencedVertexCount,0);
+ assert.deepEqual(report.bounds.min,[0,0,0]);
+ assert.deepEqual(report.bounds.max,[1,1,0]);
+ assert.ok(!report.warnings.includes("unreferenced-vertices-present"));
 });
 
 test("detects degenerate triangles for operator review",()=>{

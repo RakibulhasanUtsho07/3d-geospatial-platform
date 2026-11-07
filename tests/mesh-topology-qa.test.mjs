@@ -43,6 +43,24 @@ test("ignores unreferenced positions for topology scale and preserves the memory
   assert.equal(bounded.topologySkipReason, "vertex-limit");
 });
 
+test("keeps referenced-only scale when topology maps are skipped by the full accessor limit", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    1000000, -1000000, 2000000,
+  ]);
+  const bounded = analyzeTriangleTopology(positions, triangleIndices([0, 1, 2]), {
+    maxTopologyVertices: 3,
+  });
+
+  assert.equal(bounded.topologyAnalyzed, false);
+  assert.equal(bounded.topologySkipReason, "vertex-limit");
+  assert.equal(bounded.vertexCount, 4);
+  assert.equal(bounded.referencedVertexCount, 3);
+  assert.equal(bounded.unreferencedVertexCount, 1);
+  assert.equal(bounded.modelDiagonal, Number(Math.SQRT2.toFixed(6)));
+  assert.ok(!bounded.warnings.includes("long-triangle-edges-present"));
+});
+
 test("continues rejecting non-finite unreferenced positions", () => {
   const positions = new Float32Array([
     0, 0, 0, 1, 0, 0, 0, 1, 0,
