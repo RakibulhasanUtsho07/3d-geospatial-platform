@@ -378,6 +378,13 @@ test("aggregate evidence size is bounded before any file bytes are opened", () =
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /512 MiB aggregate/);
 });
 
+test("independent security review cannot be self-attested as a provider test", () => {
+  const manifest = completeManifest();
+  manifest.evidence.independentSecurityReview.verificationKind = "provider-test";
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /independentSecurityReview requires independent-audit provenance/);
+});
+
 test("assessment rejects caller-supplied artifact IDs as byte-verification proof", () => {
   const manifest = completeManifest();
   const actualIds = manifest.artifacts.map((artifact) => artifact.id);

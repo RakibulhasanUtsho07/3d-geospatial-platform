@@ -292,6 +292,9 @@ function normalizeEvidence(raw, artifactsById, indexLabel) {
     if (artifactIds.length === 0 || !["provider-test", "independent-audit"].includes(raw.verificationKind)) {
       throw new TypeError("verified evidence requires present artifacts and provider-test or independent-audit provenance");
     }
+    if (indexLabel === "independentSecurityReview" && raw.verificationKind !== "independent-audit") {
+      throw new TypeError("independentSecurityReview requires independent-audit provenance");
+    }
   } else if (raw.status === "synthetic-only") {
     if (artifactIds.length === 0 || raw.verificationKind !== "synthetic-test") {
       throw new TypeError("synthetic-only evidence must identify its synthetic test artifacts");
