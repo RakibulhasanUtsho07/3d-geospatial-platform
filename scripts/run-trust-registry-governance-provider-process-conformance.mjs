@@ -131,9 +131,11 @@ async function main() {
     reopenProvider: makeProvider,
   });
   const stats = provider.processStats;
-  if (stats.workerProcessesStarted < 2 ||
-      stats.uniqueWorkerInstances !== stats.workerProcessesStarted) {
-    throw new Error("Provider process isolation did not produce distinct worker instances.");
+  if (stats.workerProcessesStarted < 30 ||
+      stats.uniqueWorkerInstances !== stats.workerProcessesStarted ||
+      stats.uniqueWorkerProcessIds < 2 ||
+      stats.uniqueWorkerProcessIds > stats.workerProcessesStarted) {
+    throw new Error("Provider process isolation did not meet the minimum distinct-worker and OS-process evidence threshold.");
   }
   const report = {
     schemaVersion: "1.1.0",
