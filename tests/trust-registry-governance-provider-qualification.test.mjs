@@ -152,7 +152,7 @@ function completeManifest() {
   for (const key of TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS) {
     const id = "evidence-" + key.toLowerCase();
     const bytes = key === "processRestartVisibility"
-      ? JSON.stringify(processReport(manifest)) + "\\n"
+      ? JSON.stringify(processReport(manifest)) + "\n"
       : "independent provider evidence for " + key;
     manifest.artifacts.push({
       id,
@@ -223,7 +223,7 @@ test("complete hash-bound provider evidence reaches review only, never productio
       const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
         artifact.id === "evidence-" + candidate.toLowerCase());
       const bytes = key === "processRestartVisibility"
-        ? JSON.stringify(processReport(manifest)) + "\\n"
+        ? JSON.stringify(processReport(manifest)) + "\n"
         : "independent provider evidence for " + key;
       await writeFile(target, bytes);
     }
@@ -602,7 +602,7 @@ test("D3M-27 byte verification also validates process report semantics and exact
       const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
         artifact.id === "evidence-" + candidate.toLowerCase());
       let bytes = key === "processRestartVisibility"
-        ? JSON.stringify(processReport(manifest)) + "\\n"
+        ? JSON.stringify(processReport(manifest)) + "\n"
         : "independent provider evidence for " + key;
       await writeFile(target, bytes);
     }
@@ -615,13 +615,13 @@ test("D3M-27 byte verification also validates process report semantics and exact
     const reportPath = path.join(root, reportArtifact.relativePath);
     const tamperedReport = processReport(manifest);
     tamperedReport.providerNamespaceFingerprintSha256 = digest("substituted namespace");
-    await writeFile(reportPath, JSON.stringify(tamperedReport) + "\\n");
+    await writeFile(reportPath, JSON.stringify(tamperedReport) + "\n");
     result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
     assert.ok(result.failures.some((failure) =>
       failure.id === reportArtifact.id && failure.code === "sha256-mismatch"));
 
-    reportArtifact.bytes = Buffer.byteLength(JSON.stringify(tamperedReport) + "\\n");
-    reportArtifact.sha256 = digest(JSON.stringify(tamperedReport) + "\\n");
+    reportArtifact.bytes = Buffer.byteLength(JSON.stringify(tamperedReport) + "\n");
+    reportArtifact.sha256 = digest(JSON.stringify(tamperedReport) + "\n");
     result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
     assert.ok(result.failures.some((failure) =>
       failure.id === reportArtifact.id && failure.code === "process-report-invalid"),
