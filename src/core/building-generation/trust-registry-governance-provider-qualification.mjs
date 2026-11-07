@@ -573,6 +573,9 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
   const failures = [];
   for (const artifact of manifest.artifacts) {
     if (artifact.status !== "present") continue;
+    // Signature artifacts are verified jointly with their process report below;
+    // never treat their file hash alone as a verified signer attestation.
+    if (artifact.type === "process-report-signature") continue;
     const parts = artifact.relativePath.split("/");
     let target = root;
     try {
@@ -685,14 +688,14 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
                 },
               });
               if (!signatureVerification.valid) {
-                throw Object.assign(new Error("trusted process-report signature did not verify"), {
-                  code: "process-report-signature-invalid",
-                });
+                throw new Error("trusted process-report signature did not verify");
               }
-            } catch (signatureError) {
-              const code = signatureError && typeof signatureError === "object" && typeof signatureError.code === "string"
-                ? signatureError.code : "process-report-signature-invalid";
-              throw Object.assign(new Error("trusted process-report signature could not be verified"), { code });
+              verifiedArtifactIds.push(signatureArtifact.id);
+            } catch {
+              // Do not expose local path/registry/parser details in qualification diagnostics.
+              throw Object.assign(new Error("trusted process-report signature could not be verified"), {
+                code: "process-report-signature-invalid",
+              });
             }
           }
         }
@@ -720,8 +723,11 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
         EACCES: "evidence artifact cannot be read",
         ELOOP: "evidence artifact path contains a symlink",
       };
+      const failureId = ["process-report-signature-invalid", "process-report-signature-missing"].includes(code)
+        ? manifest.providerIntegration.processReportSignatureArtifactId ?? artifact.id
+        : artifact.id;
       failures.push({
-        id: artifact.id,
+        id: failureId,
         code,
         message: safeMessages[code] ?? "evidence artifact could not be verified",
       });
