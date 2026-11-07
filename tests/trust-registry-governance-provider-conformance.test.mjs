@@ -166,12 +166,12 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
   });
 });
 
-test("provider conformance suite rejects a provider that permits competing stale CAS writers", async () => {
+test("provider conformance suite rejects a provider that ignores the expected version token", async () => {
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
       ...syntheticProvider({ ignoreCompareAndSetVersion: true }),
     }),
-    /exactly one writer may win/i,
+    /wrong provider version must not permit a CAS with the exact current state digest/i,
   );
 });
 
