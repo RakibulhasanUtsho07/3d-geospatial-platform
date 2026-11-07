@@ -8,6 +8,7 @@ import {
   verifyTrustRegistryProviderQualificationArtifacts,
 } from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
 
+const MAX_MANIFEST_BYTES = 1024 * 1024;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function usage() {
@@ -67,6 +68,9 @@ async function main() {
   }
   const manifestPath = path.resolve(options.manifestPath);
   const manifestBytes = readFileSync(manifestPath);
+  if (manifestBytes.length > MAX_MANIFEST_BYTES) {
+    throw new TypeError("Manifest exceeds the 1 MiB input limit.");
+  }
   const manifest = normalizeTrustRegistryProviderQualificationManifest(
     JSON.parse(manifestBytes.toString("utf8")),
   );
