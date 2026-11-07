@@ -143,11 +143,11 @@ function normalizeProvider(raw) {
   if (!hashOk(raw.instanceFingerprintSha256) || !hashOk(raw.namespaceFingerprintSha256)) {
     throw new TypeError("provisioned provider requires SHA-256 instance and namespace fingerprints");
   }
-  const endpoint = requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin");
-  const parsed = new URL(endpoint);
-  if (parsed.origin !== endpoint || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+  const endpointUrl = new URL(requireHttpsUrl(raw.endpointOrigin, "provider.endpointOrigin"));
+  if (endpointUrl.pathname !== "/" || endpointUrl.search || endpointUrl.hash) {
     throw new TypeError("provider.endpointOrigin must be an HTTPS origin only, without path, query or fragment");
   }
+  const endpointOrigin = endpointUrl.origin;
   return {
     status: "provisioned",
     providerId,
@@ -156,7 +156,7 @@ function normalizeProvider(raw) {
     environment: raw.environment,
     instanceFingerprintSha256: raw.instanceFingerprintSha256,
     namespaceFingerprintSha256: raw.namespaceFingerprintSha256,
-    endpointOrigin: endpoint,
+    endpointOrigin,
     syntheticOnly: raw.syntheticOnly,
   };
 }
@@ -204,6 +204,11 @@ function normalizeProviderIntegration(raw) {
   requireCommit(raw.headSha, "providerIntegration.headSha");
   if (!["success", "failure", "pending"].includes(raw.suiteConclusion)) {
     throw new TypeError("providerIntegration.suiteConclusion is unsupported");
+  }
+  if ((raw.status === "passed" && raw.suiteConclusion !== "success") ||
+      (raw.status === "failed" && raw.suiteConclusion !== "failure") ||
+      (raw.status === "pending" && raw.suiteConclusion !== "pending")) {
+    throw new TypeError("providerIntegration.status and suiteConclusion must agree");
   }
   return { ...raw, runUrl };
 }
