@@ -357,6 +357,7 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
   challengeBytes,
   witnessBytes,
   independentAnchorKeyRegistry,
+  independentAnchorGovernanceKeyFingerprintSha256 = process.env.D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256,
   expectedContext,
   now = new Date(),
 }) {
@@ -475,6 +476,18 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
       message: error instanceof Error ? error.message : "Independent-anchor registry is invalid.",
     }));
   }
+  let governancePinValid = false;
+  try {
+    safeHash(independentAnchorGovernanceKeyFingerprintSha256,
+      "independentAnchorGovernanceKeyFingerprintSha256");
+    governancePinValid = true;
+  } catch {
+    governancePinValid = false;
+  }
+  check("independently-pinned-governance-key",
+    Boolean(registry && governancePinValid &&
+      registry.governancePublicKeyFingerprintSha256 === independentAnchorGovernanceKeyFingerprintSha256),
+    "Independent-anchor registry governance-key fingerprint must match the separately operator-pinned environment value.");
   let matchingKeys = [];
   if (registry && witness && envelopeValid) {
     matchingKeys = registry.entries.filter((entry) =>
@@ -485,7 +498,8 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
   }
   // The key fingerprint is part of the signed envelope schema; reject an omitted or
   // substituted value before signature verification even if its registry lookup fails.
-  check("anchor-registry-binding", Boolean(registry && witness && envelopeValid &&
+  check("anchor-registry-binding", Boolean(registry && governancePinValid &&
+    registry.governancePublicKeyFingerprintSha256 === independentAnchorGovernanceKeyFingerprintSha256 && witness && envelopeValid &&
     witness.registryId === registry.registryId &&
     witness.registrySetId === registry.registrySetId &&
     witness.governancePublicKeyFingerprintSha256 === registry.governancePublicKeyFingerprintSha256 &&
