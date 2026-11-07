@@ -207,6 +207,7 @@ test("D3M-29 rejects altered witness signature bytes", () => {
     challengeBytes: value.bytes,
     witnessBytes: Buffer.from(canonicalJson(changed) + "\n", "utf8"),
     independentAnchorKeyRegistry: value.registry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
   });
@@ -242,6 +243,40 @@ test("D3M-29 rejects a registry that does not match the separately operator-pinn
   assert.ok(report.errors.some((item) => item.code === "anchor-registry-binding"));
 });
 
+
+
+test("D3M-29 rejects non-canonical challenge and witness JSON bytes", () => {
+  const value = fixture();
+  const prettyChallenge = Buffer.from(JSON.stringify(value.challenge, null, 2) + "\\n", "utf8");
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: prettyChallenge,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: value.registry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "challenge-invalid"));
+});
+
+test("D3M-29 rejects a registry governance signature altered after signing", () => {
+  const value = fixture();
+  const registry = {
+    ...value.registry,
+    governanceSignatureBase64: Buffer.alloc(64, 0x11).toString("base64"),
+  };
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: registry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "independent-anchor-registry-invalid"));
+});
 
 test("D3M-29 rejects an unsigned or tampered anchor-key registry even with a matching fingerprint pin", () => {
   const value = fixture();
