@@ -106,6 +106,7 @@ on:
       - feat/d3m-engine22-persisted-governance-state-20261105
       - feat/d3m-engine23-external-monotonic-store-provider-20261105
       - feat/d3m-engine24-provider-conformance-20261105
+      - feat/d3m-engine25-provider-qualification-evidence-20261107
 
   workflow_dispatch:
   pull_request:
@@ -133,6 +134,7 @@ on:
       - feat/d3m-engine22-persisted-governance-state-20261105
       - feat/d3m-engine23-external-monotonic-store-provider-20261105
       - feat/d3m-engine24-provider-conformance-20261105
+      - feat/d3m-engine25-provider-qualification-evidence-20261107
       - feat/p3-6-multibuilding-tiles-package
       - feat/p3-7-building-composition-evidence-20261102
       - feat/p3-8-overture-source-coverage-20261101
@@ -246,6 +248,24 @@ jobs:
 
       - name: Test external governance provider contract conformance
         run: npm run test:trust-registry-governance-provider-conformance
+
+      - name: Test external provider qualification evidence gate
+        run: npm run test:trust-registry-governance-provider-qualification
+
+      - name: Validate current external provider qualification remains blocked
+        run: |
+          mkdir -p artifacts
+          npm run validate:trust-registry-governance-provider-qualification -- benchmarks/trust-registry-governance/provider-qualification-current.json --report artifacts/d3m25-provider-qualification-report.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const report = JSON.parse(fs.readFileSync("artifacts/d3m25-provider-qualification-report.json", "utf8"));
+          if (report.status !== "blocked") throw new Error("The unprovisioned external provider must remain blocked.");
+          if (report.productionQualificationEligible !== false) throw new Error("Provider qualification must not enable production eligibility.");
+          if (!report.blockers.includes("real-provider-not-provisioned")) throw new Error("Missing real-provider provisioning blocker.");
+          if (!report.blockers.includes("real-provider-integration-suite-not-passed")) throw new Error("Missing real-provider integration blocker.");
+          if (Object.values(report.releaseFlags).some(Boolean)) throw new Error("D3M-25 must keep all release flags false.");
+          console.log("D3M-25 current state validated: no real provider, qualification blocked, all release flags false.");
+          NODE
 
       - name: Validate survey-device enrollment evidence verifier CLI
         run: npm run verify:survey-device-enrollment-evidence -- --help
