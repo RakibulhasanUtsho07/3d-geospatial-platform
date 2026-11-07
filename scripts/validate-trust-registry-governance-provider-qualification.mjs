@@ -87,6 +87,10 @@ async function main() {
       "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs",
       import.meta.url,
     ))),
+    schemaSha256: sha256(readFileSync(new URL(
+      "../trust-registry-governance-provider-qualification.schema.json",
+      import.meta.url,
+    ))),
     artifactVerification: {
       verifiedArtifactIds: artifactVerification.verifiedArtifactIds,
       failures: artifactVerification.failures,
