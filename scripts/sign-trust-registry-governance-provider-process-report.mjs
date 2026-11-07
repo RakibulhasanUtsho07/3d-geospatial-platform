@@ -43,12 +43,18 @@ function parseArguments(args) {
 }
 
 async function readRegularFile(filePath, label, maxBytes) {
+  const parent = path.dirname(filePath);
+  const resolvedParent = await realpath(parent);
+  if (resolvedParent !== parent) throw new Error(label + " path must not traverse a symlinked directory");
   const before = await lstat(filePath);
   if (!before.isFile() || before.isSymbolicLink()) throw new Error(label + " must be a regular non-symlink file");
   const handle = await open(filePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const info = await handle.stat();
     if (!info.isFile() || info.size < 1 || info.size > maxBytes) throw new Error(label + " has an invalid size or type");
+    if (label === "private key" && process.platform !== "win32" && (info.mode & 0o077) !== 0) {
+      throw new Error("private key file permissions must deny group and other access");
+    }
     return await handle.readFile();
   } finally {
     await handle.close();
