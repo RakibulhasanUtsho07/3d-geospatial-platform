@@ -166,7 +166,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
     warnings: [],
   };
 
-  if (referencedVertexCount > settings.maxTopologyVertices) {
+  if (vertexCount > settings.maxTopologyVertices) {
     common.topologySkipReason = "vertex-limit";
     common.warnings.push("topology-analysis-skipped-vertex-limit");
     if (common.elongatedTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");

@@ -11,6 +11,6 @@ This heuristic is still only a triage signal. It does not prove that flagged geo
 
 ## Unreferenced POSITION vertices
 
-A primitive can carry POSITION accessor entries that no triangle index uses. Those entries are still parsed, counted against the existing accessor-size guard, and rejected if any coordinate is non-finite. They must not affect the primitive's measured min/max bounds, topology `modelDiagonal`, long-edge thresholds, vertex-welding set, connected components, or topology-analysis vertex limit.
+A primitive can carry POSITION accessor entries that no triangle index uses. Those entries are still parsed, counted against the existing accessor-size guard, and rejected if any coordinate is non-finite. They must not affect the primitive's measured min/max bounds, topology `modelDiagonal`, long-edge thresholds, vertex-welding set or connected-component measurements. The existing topology-analysis vertex limit remains based on the full POSITION accessor count because it is a memory-safety guard, not a scale heuristic.
 
 The report preserves `counts.vertexCount` as the total POSITION accessor count and adds `referencedVertexCount` and `unreferencedVertexCount`. The same two counters are included in each `meshDetails` entry and the topology result; a non-zero unreferenced count produces the review warning `unreferenced-vertices-present`. This warning is diagnostic only and does not prove that a model is architecturally wrong.
