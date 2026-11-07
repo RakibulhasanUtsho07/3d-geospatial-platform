@@ -182,7 +182,7 @@ test("D3M-29 rejects a witness bound to another provider process-report digest o
   };
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
-    witnessBytes: Buffer.from(canonicalJson(changed) + "\\n", "utf8"),
+    witnessBytes: Buffer.from(canonicalJson(changed) + "\n", "utf8"),
     independentAnchorKeyRegistry: canonicalJson(value.registry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
@@ -276,7 +276,7 @@ test("D3M-29 rejects a registry that does not match the separately operator-pinn
 
 test("D3M-29 rejects non-canonical challenge and witness JSON bytes", () => {
   const value = fixture();
-  const prettyChallenge = Buffer.from(JSON.stringify(value.challenge, null, 2) + "\\n", "utf8");
+  const prettyChallenge = Buffer.from(JSON.stringify(value.challenge, null, 2) + "\n", "utf8");
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: prettyChallenge,
     witnessBytes: value.witnessBytes,
