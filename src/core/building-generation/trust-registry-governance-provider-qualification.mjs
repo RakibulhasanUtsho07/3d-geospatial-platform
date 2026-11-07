@@ -370,7 +370,16 @@ export function assessTrustRegistryProviderQualification(manifestInput, {
   artifactVerificationFailures = [],
 } = {}) {
   const manifest = normalizeTrustRegistryProviderQualificationManifest(manifestInput);
-  const verified = verifiedArtifactIds instanceof Set ? verifiedArtifactIds : new Set(verifiedArtifactIds);
+  const suppliedVerified = verifiedArtifactIds instanceof Set
+    ? verifiedArtifactIds
+    : new Set(verifiedArtifactIds);
+  const presentArtifactIds = new Set(manifest.artifacts
+    .filter((artifact) => artifact.status === "present")
+    .map((artifact) => artifact.id));
+  const verified = new Set([...suppliedVerified].filter((id) => presentArtifactIds.has(id)));
+  if (!Array.isArray(artifactVerificationFailures)) {
+    throw new TypeError("artifactVerificationFailures must be an array");
+  }
   const blockers = [];
   const add = (value) => { if (!blockers.includes(value)) blockers.push(value); };
 
