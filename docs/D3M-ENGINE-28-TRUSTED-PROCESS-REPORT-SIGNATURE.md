@@ -70,3 +70,16 @@ Full CI also checks the D3M-28 signer CLI help, production viewport API verifica
 - No external monotonic provider, production credential, independent anchor, TPM/HSM counter, production reviewer key or independent security review is provisioned by D3M-28.
 - A valid signature authenticates signer key identity and exact report bytes only. It does not prove the truth of provider claims or independent anchor custody.
 - Production qualification, acceptance, publication, map-ready and automatic-approval remain false.
+
+
+## Exact-head validation record — 2026-11-07
+
+Implementation/test head: `19254bdc1ed29aee4c952bdd8661aba3a49ead89`.
+
+- Push Full CI: [run #42349916912](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349916912) — terminal success, 232/232 steps successful.
+- PR Full CI: [run #42349920655](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42349920655) — terminal success, 232/232 steps successful.
+- Both runs had zero failed, cancelled, skipped or incomplete steps.
+- Both include successful ESLint; D3M-26 report binding; D3M-28 signer/schema/adversarial/CLI tests; D3M-25 qualification, legacy-schema compatibility and current blocked-manifest checks; production build; Chromium setup; production viewport API/browser/performance suite; and six final evidence uploads.
+- Each run produced seven non-expired artifacts: generated Ahsan Manzil GLB, P2.3 camera alignment, P2.4 render performance, P2.5 repeatability, P2.6 dynamic-map workload, multi-tile viewport/Playwright diagnostics and P3.4 map-panel visual evidence.
+- PR #391 remains Draft/open/unmerged and stacked on D3M-27 PR #390. No merge or branch promotion was performed.
+- CI uses a synthetic provider report and ephemeral test-only signer keys. No real provider, production reviewer key, independent monotonic anchor or operational credentials were provisioned. The production qualification manifest remains blocked; all 13 evidence classes are still missing and all release flags remain false.
