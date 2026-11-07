@@ -187,6 +187,32 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.deepEqual(stale.anchor, winner.anchor,
     "a stale CAS response must preserve the current winning anchor");
 
+  // A wrong provider version must be rejected even when the expected state
+  // digest is exactly current. The two CAS preconditions are independent.
+  const versionMismatchNextState = createNextTrustRegistryGovernanceState({
+    current: winner.state,
+    ...identity,
+    expectedRevision: winner.state.revision,
+    acceptedSequence: bootstrapMinimumSequence + 2,
+    acceptedAttestationSha256: sha256("D3M-24 version mismatch attestation " + nonce),
+    acceptedSnapshotSha256: sha256("D3M-24 version mismatch snapshot " + nonce),
+    now: new Date("2026-11-05T12:01:20.000Z"),
+  }).state;
+  const versionMismatch = assertWriteResult(await provider.compareAndSetState({
+    identity,
+    expectedVersion: afterInitialize.version,
+    expectedStateSha256: winner.state.stateSha256,
+    nextState: clone(versionMismatchNextState),
+  }), "updated", identity, "wrong-version matching-digest CAS result");
+  assert.equal(versionMismatch.updated, false,
+    "a wrong provider version must not permit a CAS with the exact current state digest");
+  assert.equal(versionMismatch.state.stateSha256, winner.state.stateSha256,
+    "a rejected version precondition must leave the committed state unchanged");
+  assert.equal(versionMismatch.version, winner.version,
+    "a rejected version precondition must not advance the provider version");
+  assert.deepEqual(versionMismatch.anchor, winner.anchor,
+    "a rejected version precondition must not change the anchor");
+
   // A matching opaque version is insufficient when the caller's state digest
   // is wrong. Both fields must be enforced as independent CAS preconditions.
   const digestMismatchNextState = createNextTrustRegistryGovernanceState({
