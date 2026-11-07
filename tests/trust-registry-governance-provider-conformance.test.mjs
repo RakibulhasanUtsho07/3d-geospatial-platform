@@ -19,6 +19,7 @@ function syntheticProvider({
   ignoreCompareAndSetVersion = false,
   raceInitializeIfAbsent = false,
   raceCompareAndSet = false,
+  ignoreRegistryIdentity = false,
   corruptAnchor = false,
   reuseVersionOnWrite = false,
   cycleVersionOnSecondWrite = false,
@@ -53,12 +54,12 @@ function syntheticProvider({
     providerId: "synthetic-conformance-provider",
     async readState(identity) {
       if (state === null) return null;
-      assertIdentity(identity);
+      if (!ignoreRegistryIdentity) assertIdentity(identity);
       return snapshot();
     },
     async initializeStateIfAbsent({ identity, state: requestedState }) {
       if (state !== null) {
-        assertIdentity(identity);
+        if (!ignoreRegistryIdentity) assertIdentity(identity);
         return { created: false, ...snapshot() };
       }
       // In the intentionally broken fixture, all callers observe "empty"
@@ -71,7 +72,7 @@ function syntheticProvider({
       return { created: true, ...snapshot() };
     },
     async compareAndSetState({ identity, expectedVersion, expectedStateSha256, nextState }) {
-      assertIdentity(identity);
+      if (!ignoreRegistryIdentity) assertIdentity(identity);
       if (!ignoreCompareAndSetVersion &&
           (expectedVersion !== version() || expectedStateSha256 !== state.stateSha256)) {
         return { updated: false, ...snapshot() };
@@ -102,6 +103,7 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
     freshProviderReopened: report.freshProviderReopened,
     freshReadMatched: report.freshReadMatched,
     ambiguousCommitRecovered: report.ambiguousCommitRecovered,
+    identityIsolationVerified: report.identityIsolationVerified,
     finalRevision: report.finalRevision,
     finalMinimumAcceptedSequence: report.finalMinimumAcceptedSequence,
   }, {
@@ -113,6 +115,7 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
     freshProviderReopened: true,
     freshReadMatched: true,
     ambiguousCommitRecovered: true,
+    identityIsolationVerified: true,
     finalRevision: 2,
     finalMinimumAcceptedSequence: 7,
   });
@@ -124,6 +127,15 @@ test("provider conformance suite rejects a provider that permits competing stale
       ...syntheticProvider({ ignoreCompareAndSetVersion: true }),
     }),
     /exactly one writer may win/i,
+  );
+});
+
+test("provider conformance suite rejects a provider that aliases distinct registry identities", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ ignoreRegistryIdentity: true }),
+    }),
+    /distinct registry-set identity must not alias an existing governance state/i,
   );
 });
 
