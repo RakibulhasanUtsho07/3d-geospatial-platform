@@ -117,6 +117,8 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
     freshProviderReopened: report.freshProviderReopened,
     freshReadMatched: report.freshReadMatched,
     ambiguousCommitRecovered: report.ambiguousCommitRecovered,
+    preCommitTimeoutSafeRetry: report.preCommitTimeoutSafeRetry,
+    ambiguousCompetingWinnerDetected: report.ambiguousCompetingWinnerDetected,
     identityIsolationVerified: report.identityIsolationVerified,
     finalRevision: report.finalRevision,
     finalMinimumAcceptedSequence: report.finalMinimumAcceptedSequence,
@@ -129,9 +131,11 @@ test("provider conformance suite accepts an atomic synthetic provider", async ()
     freshProviderReopened: true,
     freshReadMatched: true,
     ambiguousCommitRecovered: true,
+    preCommitTimeoutSafeRetry: true,
+    ambiguousCompetingWinnerDetected: true,
     identityIsolationVerified: true,
-    finalRevision: 2,
-    finalMinimumAcceptedSequence: 7,
+    finalRevision: 4,
+    finalMinimumAcceptedSequence: 9,
   });
 });
 
