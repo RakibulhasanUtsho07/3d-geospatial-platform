@@ -278,16 +278,16 @@ test("validates POSITION bounds for every supported non-triangle primitive mode"
  for(const mode of modes){
   const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
   const stale=mutateGlb(base,state=>{
-   const source=state.json.accessors[0];
+   const source=state.json.accessors[0],positionIndex=state.json.accessors.length;
    state.json.accessors.push({...source,min:[0,0,0],max:[0.5,1,0]});
-   state.json.meshes[0].primitives.push({attributes:{POSITION:1},mode});
+   state.json.meshes[0].primitives.push({attributes:{POSITION:positionIndex},mode});
   });
   assert.throws(()=>analyzeGlbQuality(stale),/accessor max does not match decoded POSITION values/, "mode "+mode+" must validate stale bounds");
   const missing=mutateGlb(base,state=>{
-   const source=state.json.accessors[0];
+   const source=state.json.accessors[0],positionIndex=state.json.accessors.length;
    const accessor={...source};delete accessor.min;
    state.json.accessors.push(accessor);
-   state.json.meshes[0].primitives.push({attributes:{POSITION:1},mode});
+   state.json.meshes[0].primitives.push({attributes:{POSITION:positionIndex},mode});
   });
   assert.throws(()=>analyzeGlbQuality(missing),/must define min as three finite numbers/, "mode "+mode+" must require min");
  }
