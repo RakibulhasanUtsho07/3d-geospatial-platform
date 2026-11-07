@@ -324,7 +324,7 @@ test("non-synthetic provider reports require both privacy-safe deployment finger
       "  };",
       "}",
       "",
-    ].join("\\n"), { mode: 0o600 });
+    ].join("\n"), { mode: 0o600 });
     const missing = spawnSync(process.execPath, [
       runnerScript,
       "--provider-module", adapter,
