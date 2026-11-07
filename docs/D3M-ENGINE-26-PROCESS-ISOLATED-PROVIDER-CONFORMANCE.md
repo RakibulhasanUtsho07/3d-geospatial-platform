@@ -58,3 +58,10 @@ CI uses \`tests/fixtures/trust-registry-governance-file-backed-provider.mjs\`. I
 - The D3M-25 qualification evaluator remains the final evidence gate. A successful process-isolated suite alone must never set production qualification, acceptance, publication, map-ready or automatic-approval flags.
 
 No remote provider, credential, production endpoint, TPM/HSM counter or independently controlled anchor is provisioned by this increment.
+
+
+## Exact-head CI validation — 2026-11-07
+
+Implementation code SHA `28b5005c6bd46e7886ac5175469bfd63b32033e1` passed both Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156). Each run completed successfully with 229/229 successful job steps and no failures or cancellations. The production viewport verification and six existing evidence uploads passed too.
+
+The result is process-isolated **software validation only** using the synthetic file-backed fixture. It is not a real external provider deployment or evidence of independently protected anchor custody. No release or production qualification flag is enabled.
