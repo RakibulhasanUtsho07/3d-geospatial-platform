@@ -31,19 +31,19 @@ The test verifies:
 1. Eight concurrent initialize-if-absent requests produce exactly one creator and one identical state/version/anchor visible to every caller.
 2. Eight writers using one expected version and state digest produce exactly one successful CAS. Every losing caller observes the winner's state and anchor.
 3. A stale version cannot overwrite the winner.
-4. A matching provider version cannot authorize a write when the expected prior-state digest is wrong; the record, version and anchor remain unchanged.
-5. A fresh read returns the exact committed state and anchor.
-5. A simulated response loss after commit is recovered by reading and comparing the exact state digest; the committed transition is recognized without replay.
-6. A timeout before commit is followed by read-back of the exact expected prior state, provider version and anchor. Only when all three still match is the original CAS retried once.
-7. If a different writer commits while the caller is timed out, read-back identifies the competing state and version. The timed-out intent is not replayed, and its original stale CAS is rejected.
-8. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest, including after a successful compare-and-set (a stale/rolled-back anchor is rejected).
-9. Every successful compare-and-set advances the opaque provider version token, and no historical token may be reused (ABA); a provider that reports success with a repeated token is rejected.
-10. A second unique registry-set/key identity receives an independent empty record, can initialize its own state, and cannot read or overwrite the first identity's record.
-11. Every losing or stale compare-and-set response returns the winning state, exact anchor and current provider version; a stale-replica version token is rejected.
-12. A repeated initialize-if-absent call with a different candidate state returns the existing state with `created: false` and preserves its exact provider version and anchor; it cannot reset an initialized record.
-13. Identity partitioning uses the complete pair of registry-set identifier and governance-key fingerprint. The harness probes both partial collisions: same registry-set identifier with a different fingerprint, and same fingerprint with a different registry-set identifier.
-14. Provider versions must be bounded opaque string tokens; malformed token shapes are rejected.
-
+4. A wrong provider version is rejected even when the expected state digest matches the current state exactly; state, version and anchor remain unchanged.
+5. A matching provider version cannot authorize a write when the expected prior-state digest is wrong; the record, version and anchor remain unchanged.
+6. A fresh read returns the exact committed state and anchor.
+7. A simulated response loss after commit is recovered by reading and comparing the exact state digest; the committed transition is recognized without replay.
+8. A timeout before commit is followed by read-back of the exact expected prior state, provider version and anchor. Only when all three still match is the original CAS retried once.
+9. If a different writer commits while the caller is timed out, read-back identifies the competing state and version. The timed-out intent is not replayed, and its original stale CAS is rejected.
+10. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest, including after a successful compare-and-set (a stale/rolled-back anchor is rejected).
+11. Every successful compare-and-set advances the opaque provider version token, and no historical token may be reused (ABA); a provider that reports success with a repeated token is rejected.
+12. A second unique registry-set/key identity receives an independent empty record, can initialize its own state, and cannot read or overwrite the first identity's record.
+13. Every losing or stale compare-and-set response returns the winning state, exact anchor and current provider version; a stale-replica version token is rejected.
+14. A repeated initialize-if-absent call with a different candidate state returns the existing state with `created: false` and preserves its exact provider version and anchor; it cannot reset an initialized record.
+15. Identity partitioning uses the complete pair of registry-set identifier and governance-key fingerprint. The harness probes both partial collisions: same registry-set identifier with a different fingerprint, and same fingerprint with a different registry-set identifier.
+16. Provider versions must be bounded opaque string tokens; malformed token shapes are rejected.
 
 The synthetic negative fixtures prove that the harness detects cross-identity record aliasing, providers incorrectly keyed only by either identity component, repeated initialize-if-absent overwrites, check-then-write races in initialize-if-absent, competing CAS writers that all pass the same precondition before any commit, malformed provider version tokens, version-token non-advancement, historical version-token reuse (ABA), stale-conflict responses with a mismatched provider version, and initial or post-write mismatched/rolled-back anchors. The ambiguity scenarios cover commit-before-response-loss (read recognizes the committed intent), timeout-before-commit (read confirms the exact old precondition before one safe retry), and a competing commit during the timeout (read detects the different winner and prevents replay of the timed-out intent). The race fixtures use an eight-party barrier so every contender observes the same pre-commit condition before any broken writer is allowed to commit; this validates that the harness detects these implementation defects, but is not itself a distributed-systems or real-provider test. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
 
