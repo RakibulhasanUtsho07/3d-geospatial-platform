@@ -31,7 +31,8 @@ The test verifies:
 1. Eight concurrent initialize-if-absent requests produce exactly one creator and one identical state/version/anchor visible to every caller.
 2. Eight writers using one expected version and state digest produce exactly one successful CAS. Every losing caller observes the winner's state and anchor.
 3. A stale version cannot overwrite the winner.
-4. A fresh read returns the exact committed state and anchor.
+4. A matching provider version cannot authorize a write when the expected prior-state digest is wrong; the record, version and anchor remain unchanged.
+5. A fresh read returns the exact committed state and anchor.
 5. A simulated response loss after commit is recovered by reading and comparing the exact state digest; the committed transition is recognized without replay.
 6. A timeout before commit is followed by read-back of the exact expected prior state, provider version and anchor. Only when all three still match is the original CAS retried once.
 7. If a different writer commits while the caller is timed out, read-back identifies the competing state and version. The timed-out intent is not replayed, and its original stale CAS is rejected.
