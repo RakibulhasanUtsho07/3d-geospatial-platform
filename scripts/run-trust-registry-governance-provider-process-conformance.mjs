@@ -122,6 +122,9 @@ async function main() {
     metrics,
   });
   const provider = await makeProvider();
+  if (typeof provider.adapterDeclaredSyntheticOnly !== "boolean") {
+    throw new Error("Provider adapter must explicitly declare syntheticOnly as true or false for the D3M-27 report.");
+  }
   if (provider.adapterDeclaredSyntheticOnly === false &&
       (!options.providerInstanceFingerprintSha256 || !options.providerNamespaceFingerprintSha256)) {
     throw new Error("A non-synthetic provider report requires both provider instance and namespace fingerprints.");
