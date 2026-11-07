@@ -672,6 +672,14 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
                 reportBytes: bytes,
                 signatureEnvelope,
                 trustedReviewerRegistry,
+                expectedContext: {
+                  sourceCommitSha: manifest.source.commitSha,
+                  providerId: manifest.provider.providerId,
+                  adapterModuleSha256: manifest.provider.adapterModuleSha256,
+                  syntheticOnly: manifest.provider.syntheticOnly,
+                  instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+                  namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+                },
               });
               if (!signatureVerification.valid) {
                 throw Object.assign(new Error("trusted process-report signature did not verify"), {
