@@ -229,6 +229,56 @@ test("D3M-29 rejects a revoked anchor key", () => {
   assert.ok(report.errors.some((item) => item.code === "anchor-registry-binding"));
 });
 
+
+test("D3M-29 rejects a validly signed witness that names the wrong anchor key", () => {
+  const value = fixture();
+  const altered = {
+    ...value.witness,
+    keyId: "substituted-anchor-key",
+    signatureBase64: "",
+  };
+  altered.signatureBase64 = sign(
+    null,
+    buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes({
+      challengeBytes: value.bytes,
+      witness: altered,
+    }),
+    value.privateKey,
+  ).toString("base64");
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: Buffer.from(canonicalJson(altered) + "\n", "utf8"),
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "anchor-registry-binding"));
+});
+
+test("D3M-29 rejects an active anchor key that has expired at verification time", () => {
+  const value = fixture();
+  const registry = structuredClone(value.registry);
+  registry.entries[0].validUntilUtc = new Date(now.getTime() + 1_000).toISOString();
+  registry.governanceSignatureBase64 = "";
+  registry.governanceSignatureBase64 = sign(
+    null,
+    buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({ registry }),
+    value.governancePrivateKey,
+  ).toString("base64");
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: canonicalJson(registry),
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "independent-anchor-registry-invalid"));
+});
+
 test("D3M-29 rejects altered witness signature bytes", () => {
   const value = fixture();
   const changed = { ...value.witness, signatureBase64: Buffer.alloc(64, 0x55).toString("base64") };
