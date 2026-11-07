@@ -246,8 +246,12 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("process-report-signature"));
   assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("process-report-signature"));
   assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("anchor-witness-challenge"));
+  assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("anchor-independence-review"));
   assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("anchor-witness-challenge"));
   assert.ok(schema.properties.independentAnchorWitness);
+  assert.ok(schema.$defs.registry.required.includes("governancePublicKeyPem"));
+  assert.ok(schema.$defs.registry.required.includes("governanceSignatureBase64"));
+  assert.ok(schema.$defs.registry.properties.governancePublicKeyFingerprintSha256);
   const provisionedAdapterRule = schema.allOf.find((rule) =>
     rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
   assert.equal(
