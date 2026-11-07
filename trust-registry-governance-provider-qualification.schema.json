@@ -18,7 +18,10 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0.0"
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ]
     },
     "manifestId": {
       "type": "string",
@@ -126,6 +129,13 @@
         },
         "syntheticOnly": {
           "type": "boolean"
+        },
+        "adapterModuleSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
@@ -224,6 +234,13 @@
             "queued",
             "pending"
           ]
+        },
+        "processReportArtifactId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
         }
       }
     },
@@ -521,5 +538,124 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          }
+        },
+        "required": [
+          "schemaVersion"
+        ]
+      },
+      "then": {
+        "properties": {
+          "provider": {
+            "required": [
+              "status",
+              "providerId",
+              "implementation",
+              "version",
+              "environment",
+              "instanceFingerprintSha256",
+              "namespaceFingerprintSha256",
+              "endpointOrigin",
+              "syntheticOnly",
+              "adapterModuleSha256"
+            ]
+          },
+          "providerIntegration": {
+            "required": [
+              "status",
+              "runId",
+              "runUrl",
+              "headSha",
+              "suiteConclusion",
+              "syntheticOnly",
+              "providerInstanceFingerprintSha256",
+              "providerNamespaceFingerprintSha256",
+              "fullRunConclusion",
+              "processReportArtifactId"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,119}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schemaVersion": {
+            "const": "1.1.0"
+          },
+          "providerIntegration": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not-run",
+                  "failed",
+                  "pending"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "providerIntegration"
+        ]
+      },
+      "then": {
+        "properties": {
+          "providerIntegration": {
+            "properties": {
+              "processReportArtifactId": {
+                "const": null
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
