@@ -40,6 +40,18 @@ test("ignores unreferenced positions when computing topology scale and vertex li
   assert.ok(!result.warnings.includes("long-triangle-edges-present"));
 });
 
+test("continues rejecting non-finite unreferenced positions", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    Number.NaN, 0, 0,
+  ]);
+
+  assert.throws(
+    () => analyzeTriangleTopology(positions, triangleIndices([0, 1, 2])),
+    /non-finite coordinate/,
+  );
+});
+
 test("detects detached triangle islands and reports the small detached component", () => {
   const positions = new Float32Array([
     0, 0, 0, 1, 0, 0, 0, 1, 0,

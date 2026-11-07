@@ -96,12 +96,13 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   }
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < vertexCount; i++) {
-    if (!referenced[i]) continue;
     for (let axis = 0; axis < 3; axis++) {
       const value = positions[i * 3 + axis];
       if (!validNumber(value)) throw new TypeError("topology positions contain a non-finite coordinate");
-      min[axis] = Math.min(min[axis], value);
-      max[axis] = Math.max(max[axis], value);
+      if (referenced[i]) {
+        min[axis] = Math.min(min[axis], value);
+        max[axis] = Math.max(max[axis], value);
+      }
     }
   }
   const diagonal = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
