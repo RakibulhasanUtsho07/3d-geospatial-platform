@@ -762,3 +762,18 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - **Trust boundary unchanged:** CI's process-report E2E uses the file-backed synthetic provider. D3M-25 current qualification remains blocked; no actual provider, integration run, independent monotonic anchor, production credentials, signer identity or rollback-resistance evidence is provisioned. All production qualification, release, acceptance, publication, map-ready and automatic-approval flags remain false.
 - PR #390 remains Draft/open/unmerged, stacked on PR #388 exact base `759de62b503ad40a4b8283b4cc7ca69a27afbc44`. No merge, retarget, branch promotion or provider provisioning was performed.
 
+## D3M-ENGINE-28 — trusted signatures for process-isolated provider reports
+
+- **Tracking issue:** [#391](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/391).
+- **Implementation branch:** `feat/d3m-engine28-signed-process-report-attestation-20261107`, created from D3M-27 PR #390 exact head `571b864037d728370bc11dc6504f8d8a8106c588`.
+- **Gap addressed:** D3M-27 validates exact report bytes and provider semantics, but its report is unsigned. Hash integrity does not authenticate who produced/attested to that report.
+- Adds a domain-separated Ed25519 detached signature contract for the exact D3M-26 report bytes and the source SHA, provider ID, adapter hash, synthetic declaration, instance/namespace fingerprints.
+- Signer identity, key ID, registry ID, fingerprint, revocation and validity are resolved only from the versioned trusted-reviewer registry. Legacy key arrays are not accepted. Private keys are read from a protected file; registry JSON and key material are never printed or passed on the command line.
+- Adds a bounded create-once signing CLI; report inputs are limited to 1 MiB, signature envelopes to 64 KiB, symlinked key/report/output paths are rejected, and the detached signature is written with exclusive creation and restrictive file permissions.
+- D3M-25 schema 1.2.0 requires a linked `process-report-signature` artifact for every passed provider integration. Signature and report artifacts must share the exact provider-integration workflow URL and source commit. The evaluator verifies the Ed25519 signature against the currently active trusted registry key before the process report may count as verified evidence.
+- D3M-25 schemas 1.0.0 and 1.1.0 remain readable. A passed integration under either legacy schema is blocked from `ready-for-independent-review` because no D3M-28 signature binding exists.
+- The checked-in current-state manifest is upgraded to schema 1.2.0 with null process-report and signature links. Provider remains `not-provisioned`; integration remains `not-run`; all 13 evidence classes remain missing. No reviewer private key, production identity, provider, endpoint or signature evidence is fabricated.
+- CI includes focused positive/adversarial signature tests and CLI help validation on the D3M-28 push/PR branch filters.
+- **Trust boundary:** a trusted reviewer signature authenticates exact report bytes and the signer key identity only. It does not independently prove a report's claims, provision a remote provider, establish independent anchor custody, prove provider rollback resistance, or qualify production. All production qualification, acceptance, publication, map-ready and automatic-approval flags remain false.
+- **Validation status:** implementation and tests are under exact-head Push/PR Full CI verification. Keep D3M-28 Draft/open/unmerged, stacked on D3M-27 PR #390; do not merge, retarget or promote to `development`/`main`.
+
