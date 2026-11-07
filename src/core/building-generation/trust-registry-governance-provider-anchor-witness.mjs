@@ -26,7 +26,7 @@ const WITNESS_KEYS = Object.freeze([
   "challengeId", "nonceHex", "issuedAtUtc", "expiresAtUtc", "observedAtUtc",
   "sourceCommitSha", "providerId", "adapterModuleSha256", "syntheticOnly",
   "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
-  "anchorId", "keyId", "registryId", "registrySetId",
+  "anchorId", "keyId", "anchorPublicKeyFingerprintSha256", "registryId", "registrySetId",
   "governancePublicKeyFingerprintSha256", "providerVersion", "monotonicSequence",
   "authoritativeStateSha256", "signatureBase64",
 ]);
@@ -136,7 +136,10 @@ export function createTrustRegistryGovernanceProviderAnchorChallenge({
     nonceHex: randomBytes(32).toString("hex"),
     issuedAtUtc,
     expiresAtUtc,
-    ...context,
+    sourceCommitSha: context.sourceCommitSha,
+    providerId: context.providerId,
+    adapterModuleSha256: context.adapterModuleSha256,
+    syntheticOnly: context.syntheticOnly,
     providerInstanceFingerprintSha256: context.instanceFingerprintSha256,
     providerNamespaceFingerprintSha256: context.namespaceFingerprintSha256,
   });
@@ -417,6 +420,7 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
         SHA256.test(witness.providerNamespaceFingerprintSha256 ?? "") &&
         SAFE_ID.test(witness.anchorId ?? "") &&
         SAFE_ID.test(witness.keyId ?? "") &&
+        SHA256.test(witness.anchorPublicKeyFingerprintSha256 ?? "") &&
         SAFE_ID.test(witness.registryId ?? "") &&
         SAFE_ID.test(witness.registrySetId ?? "") &&
         SHA256.test(witness.governancePublicKeyFingerprintSha256 ?? "") &&
