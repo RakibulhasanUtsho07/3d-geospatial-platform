@@ -6,7 +6,7 @@ import { validateTrustRegistryGovernanceProviderProcessReport } from "./trust-re
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,79}$/;
-const DOMAIN = Buffer.from("3d-geospatial-platform/trust-registry-governance-provider-process-report-signature/v1\\0", "utf8");
+const DOMAIN = Buffer.from("3d-geospatial-platform/trust-registry-governance-provider-process-report-signature/v1\0", "utf8");
 const PURPOSE = "d3m28-process-report-attestation-not-provider-qualification";
 const NOTE = "An active trusted-reviewer key attested to exact process-report bytes and context. This does not prove provider truth, independent anchor custody, rollback resistance or production qualification.";
 const TRUSTED_REGISTRY_MAX_BYTES = 64 * 1024;
@@ -77,7 +77,7 @@ function signingBytes(reportBytes, context) {
   return Buffer.concat([
     DOMAIN,
     Buffer.from(canonicalJson(context), "utf8"),
-    Buffer.from("\\0", "utf8"),
+    Buffer.from("\0", "utf8"),
     reportBytes,
   ]);
 }
