@@ -94,4 +94,6 @@ test("rejects malformed GLB data, invalid indices and non-finite coordinates",()
 test("bounds vertex scanning to guard a malformed or unexpectedly huge asset",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
  assert.throws(()=>analyzeGlbQuality(glb,{maxVertices:2}),/maxVertices/);
+ const unusedVertex=makeGlb([0,0,0,1,0,0,0,1,0,1000000,1000000,1000000],[0,1,2]);
+ assert.throws(()=>analyzeGlbQuality(unusedVertex,{maxVertices:3}),/exceeds maximum geometry QA vertex count 3/);
 });
