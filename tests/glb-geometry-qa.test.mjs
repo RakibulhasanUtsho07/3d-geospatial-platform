@@ -173,6 +173,17 @@ test("allows an explicitly raised bounded index work cap",()=>{
  const report=analyzeGlbQuality(glb,{maxIndices:6});
  assert.equal(report.counts.triangleCount,2);
  assert.equal(report.counts.degenerateTriangleCount,2);
+ assert.equal(report.counts.indexCount,6);
+});
+
+test("enforces maxIndices cumulatively across all GLB triangle primitives",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  state.json.meshes[0].primitives.push({...state.json.meshes[0].primitives[0]});
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxIndices:3}),/GLB exceeds maximum geometry QA index count 3/);
+ const report=analyzeGlbQuality(glb,{maxIndices:6});
+ assert.equal(report.counts.indexCount,6);
+ assert.equal(report.counts.triangleCount,2);
 });
 
 test("validates the configurable maximum triangle index count",()=>{

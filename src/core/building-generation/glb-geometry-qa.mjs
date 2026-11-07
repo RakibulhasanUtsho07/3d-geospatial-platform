@@ -324,7 +324,7 @@ export function analyzeGlbQuality(input,options={}){
  if(!Number.isSafeInteger(maxIndices)||maxIndices<3||maxIndices>60_000_000)throw new RangeError("maxIndices must be between 3 and 60000000");
  const scene=resolveSceneMeshInstances(gltf,options);
  const maxSceneBoundsVertexEvaluations=boundedOption(options.maxSceneBoundsVertexEvaluations,25_000_000,1,100_000_000,"maxSceneBoundsVertexEvaluations");
- let boundsVertexEvaluations=0,vertexCount=0,referencedVertexCount=0,unreferencedVertexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
+ let boundsVertexEvaluations=0,vertexCount=0,referencedVertexCount=0,unreferencedVertexCount=0,triangleIndexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],warnings=[],meshDetails=[],topologyWarnings=new Set();
  if(scene.warning)warnings.push(scene.warning);
  if(scene.uninstancedMeshDefinitionCount)warnings.push("uninstanced-mesh-definitions-excluded-from-scene-bounds");
@@ -354,7 +354,12 @@ export function analyzeGlbQuality(input,options={}){
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");
+   const declaredIndexCount=indexAccessor===null?count:requireInt(indexAccessor.count,label+" index count",1);
+   if(declaredIndexCount>maxIndices||triangleIndexCount>maxIndices-declaredIndexCount){
+    throw new RangeError("GLB exceeds maximum geometry QA index count "+maxIndices);
+   }
    const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label,maxSparseEntries,maxIndices);
+   triangleIndexCount+=indices.count;
    const referenced=new Uint8Array(count);
    let primitiveReferencedVertexCount=0,degenerate=0;
    for(let i=0;i<indices.count;i+=3){
@@ -415,7 +420,7 @@ export function analyzeGlbQuality(input,options={}){
  const status=warnings.length?"review-recommended":"basic-geometry-check-passed";
  return {
   schemaVersion:"1.0.0",engine:"glb-geometry-qa-v2",status,valid:true,format:"glb",
-  counts:{meshCount:gltf.meshes.length,primitiveCount,meshInstanceCount:scene.meshInstanceCount,boundsTransformCount:scene.boundsTransformCount,sceneNodeCount:scene.nodeCount,boundsVertexEvaluations,vertexCount,referencedVertexCount,unreferencedVertexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
+  counts:{meshCount:gltf.meshes.length,primitiveCount,meshInstanceCount:scene.meshInstanceCount,boundsTransformCount:scene.boundsTransformCount,sceneNodeCount:scene.nodeCount,boundsVertexEvaluations,vertexCount,referencedVertexCount,unreferencedVertexCount,indexCount:triangleIndexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
   bounds,meshDetails,warnings,externalUris,scene:{index:scene.sceneIndex,nodeCount:scene.nodeCount,meshInstanceCount:scene.meshInstanceCount,boundsTransformCount:scene.boundsTransformCount,localFallback:scene.localFallback,boundsSpace:scene.boundsSpace,boundsVertexEvaluations,maxSceneBoundsVertexEvaluations},
   limitations:["Geometry QA verifies GLB structure and computes heuristic mesh-topology hints; it does not verify architectural fidelity, real-world scale, up-axis, WGS84 georeference, camera calibration, or same-building identity.","Boundary edges can be expected on intentionally open surfaces; disconnected components can also be legitimate separate architectural parts, so topology warnings require visual review.","Unreferenced POSITION entries remain subject to accessor-size and finite-coordinate validation, but do not affect model bounds, model diagonal or topology scale; they are counted and reported separately.","Topology analysis welds near-coincident positions using a scale-relative tolerance and may be skipped above the configured per-primitive vertex limit.","Aggregate bounds apply the selected glTF scene node transforms when available and remain un-georeferenced; topology metrics are mesh-local.", "Static QA does not evaluate animation, skinning or morph-target deformation."],
  };
