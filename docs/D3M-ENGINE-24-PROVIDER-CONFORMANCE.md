@@ -36,7 +36,7 @@ The test verifies:
 6. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest, including after a successful compare-and-set (a stale/rolled-back anchor is rejected).
 7. Every successful compare-and-set advances the opaque provider version token, and no historical token may be reused (ABA); a provider that reports success with a repeated token is rejected.
 
-The synthetic negative fixtures prove that the harness detects a provider which accepts competing stale writes, reuses a version token after a successful write, cycles back to a historical version token (ABA), or returns an initial or post-write mismatched/rolled-back anchor. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
+The synthetic negative fixtures prove that the harness detects check-then-write races in initialize-if-absent, competing CAS writers that all pass the same precondition before any commit, version-token non-advancement, historical version-token reuse (ABA), and initial or post-write mismatched/rolled-back anchors. The race fixtures use an eight-party barrier so every contender observes the same pre-commit condition before any broken writer is allowed to commit; this validates that the harness detects these implementation defects, but is not itself a distributed-systems or real-provider test. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
 
 ## Integrating a real provider
 
