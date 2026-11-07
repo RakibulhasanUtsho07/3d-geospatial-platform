@@ -103,11 +103,11 @@ async function main() {
   console.log(JSON.stringify({
     status: "signature-created",
     signaturePath: path.relative(process.cwd(), options.signaturePath),
-    reportSha256: envelope.reportSha256,
+    processReportSha256: envelope.processReportSha256,
     signer: envelope.reviewerId,
     keyId: envelope.keyId,
     registryId: envelope.registryId,
-    publicationEligible: false,
+    productionQualificationEligible: envelope.productionQualificationEligible,
   }, null, 2));
 }
 
