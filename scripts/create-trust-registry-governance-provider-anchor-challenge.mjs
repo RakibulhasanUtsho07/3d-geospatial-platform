@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { constants } from "node:fs";
-import { lstat, open, writeFile } from "node:fs/promises";
+import { lstat, open } from "node:fs/promises";
 import path from "node:path";
 import {
   createTrustRegistryGovernanceProviderAnchorChallenge,
