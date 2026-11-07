@@ -1,0 +1,516 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  assessTrustRegistryProviderQualification,
+  normalizeTrustRegistryProviderQualificationManifest,
+  TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS,
+  verifyTrustRegistryProviderQualificationArtifacts,
+} from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
+
+const repository = "RakibulhasanUtsho07/3d-geospatial-platform";
+const sourceCommitSha = "786d901e5a7ed4effddbbbb563533820276fb4ba";
+const digest = (value) => createHash("sha256").update(value).digest("hex");
+const evidenceTypes = {
+  atomicBootstrapAndCompareAndSet: "multi-client-concurrency-report",
+  multiClientLinearizability: "multi-client-concurrency-report",
+  processRestartVisibility: "process-restart-report",
+  ambiguousWriteRecovery: "ambiguous-write-report",
+  independentAnchorCustody: "anchor-independence-review",
+  backupRestoreRollbackResistance: "backup-restore-rollback-report",
+  authenticatedClientIdentity: "authenticated-client-identity-review",
+  transportSecurity: "transport-security-review",
+  leastPrivilegeAuthorization: "least-privilege-review",
+  keyCustodyAndRotation: "key-custody-rotation-review",
+  auditRetention: "audit-retention-review",
+  operationalRecovery: "operational-recovery-review",
+  independentSecurityReview: "independent-security-review",
+};
+
+function run({ id, event, conclusion = "success", headSha = sourceCommitSha } ) {
+  return {
+    runId: id,
+    runUrl: "https://github.com/" + repository + "/actions/runs/" + id,
+    event,
+    headSha,
+    fullRunConclusion: conclusion,
+    providerConformanceStepConclusion: "success",
+    syntheticOnly: true,
+  };
+}
+
+function currentManifest() {
+  return {
+    schemaVersion: "1.0.0",
+    manifestId: "qualification-" + randomUUID(),
+    generatedAtUtc: "2026-11-07T04:15:10.000Z",
+    source: {
+      repository,
+      branch: "feat/d3m-engine24-provider-conformance-20261105",
+      commitSha: sourceCommitSha,
+    },
+    provider: {
+      status: "not-provisioned",
+      providerId: null,
+      implementation: null,
+      version: null,
+      environment: "not-provisioned",
+      instanceFingerprintSha256: null,
+      namespaceFingerprintSha256: null,
+      endpointOrigin: null,
+      syntheticOnly: true,
+    },
+    conformanceCi: {
+      push: run({ id: 42337017403, event: "push", conclusion: "in_progress" }),
+      pullRequest: run({ id: 42337019776, event: "pull_request" }),
+    },
+    providerIntegration: {
+      status: "not-run",
+      runId: null,
+      runUrl: null,
+      headSha: null,
+      fullRunConclusion: "not-run",
+      suiteConclusion: "not-run",
+      syntheticOnly: true,
+    },
+    artifacts: [],
+    evidence: Object.fromEntries(TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.map((key) => [
+      key, { status: "missing", artifactIds: [], verificationKind: "none" },
+    ])),
+  };
+}
+
+function completeManifest() {
+  const manifest = currentManifest();
+  manifest.provider = {
+    status: "provisioned",
+    providerId: "provider-staging-a",
+    implementation: "example-external-monotonic-store",
+    version: "1.2.3",
+    environment: "staging",
+    instanceFingerprintSha256: digest("provider instance"),
+    namespaceFingerprintSha256: digest("isolated provider namespace"),
+    endpointOrigin: "https://provider.example",
+    syntheticOnly: false,
+  };
+  manifest.conformanceCi.push.fullRunConclusion = "success";
+  manifest.conformanceCi.pullRequest.fullRunConclusion = "success";
+  manifest.providerIntegration = {
+    status: "passed",
+    runId: 42339999999,
+    runUrl: "https://github.com/" + repository + "/actions/runs/42339999999",
+    headSha: sourceCommitSha,
+    fullRunConclusion: "success",
+    suiteConclusion: "success",
+    syntheticOnly: false,
+    providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+    providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+  };
+  manifest.artifacts = [];
+  for (const key of TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS) {
+    const id = "evidence-" + key.toLowerCase();
+    const bytes = "independent provider evidence for " + key;
+    manifest.artifacts.push({
+      id,
+      type: evidenceTypes[key],
+      status: "present",
+      relativePath: "evidence/" + id + ".json",
+      sha256: digest(bytes),
+      bytes: Buffer.byteLength(bytes),
+      sourceUrl: "https://evidence.example/" + id,
+      sourceCommitSha,
+    });
+    manifest.evidence[key] = {
+      status: "verified",
+      artifactIds: [id],
+      verificationKind: key === "independentSecurityReview" ? "independent-audit" : "provider-test",
+    };
+  }
+  return manifest;
+}
+
+test("qualification schema evidence keys stay aligned with the evaluator", async () => {
+  const schemaPath = new URL("../trust-registry-governance-provider-qualification.schema.json", import.meta.url);
+  const schema = JSON.parse(await readFile(schemaPath, "utf8"));
+  const evaluatorKeys = [...TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS].sort();
+  assert.equal(schema.properties.evidence.additionalProperties, false);
+  assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
+  assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
+  assert.equal(schema.properties.schemaVersion.const, "1.0.0");
+  assert.equal(schema.$defs.ciRun.properties.syntheticOnly.const, true);
+  assert.ok(schema.properties.providerIntegration.required.includes("fullRunConclusion"));
+  assert.equal(
+    schema.properties.evidence.properties.independentSecurityReview.allOf[1].then.properties.verificationKind.const,
+    "independent-audit",
+  );
+});
+
+test("checked-in provider qualification state is valid but blocked without a real provider", async () => {
+  const manifestPath = new URL("../benchmarks/trust-registry-governance/provider-qualification-current.json", import.meta.url);
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.equal(report.productionQualificationEligible, false);
+  assert.ok(report.blockers.includes("real-provider-not-provisioned"));
+  assert.ok(report.blockers.includes("real-provider-integration-suite-not-passed"));
+  assert.equal(report.blockers.includes("conformance-ci-push-full-run-not-success"), false,
+    "the checked-in D3M-24 Push Full CI record must reflect its completed exact-head success");
+  assert.equal(report.blockers.includes("conformance-ci-pullRequest-full-run-not-success"), false,
+    "the checked-in D3M-24 PR Full CI record must reflect its completed exact-head success");
+  assert.ok(report.blockers.includes("evidence-missing:independentAnchorCustody"));
+  assert.deepEqual(report.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});
+
+test("complete hash-bound provider evidence reaches review only, never production approval", async () => {
+  const manifest = completeManifest();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m25-qualification-"));
+  try {
+    for (const artifact of manifest.artifacts) {
+      const target = path.join(root, artifact.relativePath);
+      await mkdir(path.dirname(target), { recursive: true });
+      const bytes = "independent provider evidence for " +
+        TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((key) =>
+          artifact.id === "evidence-" + key.toLowerCase());
+      await writeFile(target, bytes);
+    }
+    const verified = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    assert.equal(verified.failures.length, 0);
+    assert.equal(Object.isFrozen(verified), true);
+    assert.equal(Object.isFrozen(verified.verifiedArtifactIds), true);
+    const report = assessTrustRegistryProviderQualification(manifest, {
+      artifactVerification: verified,
+    });
+    assert.equal(report.status, "ready-for-independent-review");
+    assert.equal(report.productionQualificationEligible, false);
+    assert.deepEqual(report.releaseFlags, {
+      acceptanceEligible: false,
+      publicationEligible: false,
+      mapReady: false,
+      automaticApproval: false,
+    });
+    const alteredManifest = { ...manifest, manifestId: manifest.manifestId + "-altered" };
+    const staleVerification = assessTrustRegistryProviderQualification(alteredManifest, {
+      artifactVerification: verified,
+    });
+    assert.equal(staleVerification.status, "blocked");
+    assert.ok(staleVerification.blockers.includes("artifact-verification-manifest-mismatch"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("synthetic provider evidence cannot qualify as a real provider integration", () => {
+  const manifest = completeManifest();
+  manifest.provider.syntheticOnly = true;
+  manifest.providerIntegration.syntheticOnly = true;
+  const report = assessTrustRegistryProviderQualification(manifest, {
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("provider-is-synthetic-only"));
+  assert.ok(report.blockers.includes("provider-integration-is-synthetic-only"));
+});
+
+test("provider integration must match the exact evaluated source commit", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.headSha = "0".repeat(40);
+  const report = assessTrustRegistryProviderQualification(manifest, {
+  });
+  assert.ok(report.blockers.includes("provider-integration-head-sha-mismatch"));
+});
+
+test("D3M-24 CI evidence cannot be relabeled as non-synthetic", () => {
+  const manifest = completeManifest();
+  manifest.conformanceCi.push.syntheticOnly = false;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /syntheticOnly must be true/);
+});
+
+test("provider integration full workflow must succeed independently of its focused suite", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.fullRunConclusion = "failure";
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("real-provider-integration-full-run-not-success"));
+});
+
+test("D3M-24 synthetic conformance workflow runs cannot be reused as a provider integration run", () => {
+  const manifest = completeManifest();
+  manifest.providerIntegration.runId = manifest.conformanceCi.push.runId;
+  manifest.providerIntegration.runUrl = manifest.conformanceCi.push.runUrl;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /separate run from the D3M-24 synthetic conformance workflows/);
+});
+
+test("provider integration evidence must match the exact provisioned instance and namespace", () => {
+  const wrongInstance = completeManifest();
+  wrongInstance.providerIntegration.providerInstanceFingerprintSha256 = digest("different instance");
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(wrongInstance), /different provider instance or namespace/);
+
+  const wrongNamespace = completeManifest();
+  wrongNamespace.providerIntegration.providerNamespaceFingerprintSha256 = digest("different namespace");
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(wrongNamespace), /different provider instance or namespace/);
+});
+
+test("an integration run cannot be claimed before a provider is provisioned", () => {
+  const manifest = currentManifest();
+  manifest.providerIntegration = completeManifest().providerIntegration;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider is not provisioned/);
+});
+
+test("both D3M-24 Full CI runs must finish successfully on the exact source SHA", () => {
+  const manifest = completeManifest();
+  manifest.conformanceCi.push.fullRunConclusion = "in_progress";
+  manifest.conformanceCi.pullRequest.headSha = "0".repeat(40);
+  const report = assessTrustRegistryProviderQualification(manifest, {
+  });
+  assert.ok(report.blockers.includes("conformance-ci-push-full-run-not-success"));
+  assert.ok(report.blockers.includes("conformance-ci-pullRequest-head-sha-mismatch"));
+});
+
+test("a successful Full CI run cannot hide a failed provider-conformance step", () => {
+  const manifest = completeManifest();
+  manifest.conformanceCi.push.providerConformanceStepConclusion = "failure";
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.ok(report.blockers.includes("conformance-ci-push-provider-conformance-step-not-success"));
+});
+
+test("missing independent evidence classes remain explicit blockers", () => {
+  const manifest = completeManifest();
+  manifest.evidence.independentAnchorCustody = {
+    status: "missing", artifactIds: [], verificationKind: "none",
+  };
+  const report = assessTrustRegistryProviderQualification(manifest, {
+  });
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("evidence-missing:independentAnchorCustody"));
+});
+
+test("unknown and duplicate evidence artifact references are rejected", () => {
+  const unknown = completeManifest();
+  unknown.evidence.multiClientLinearizability.artifactIds = ["unknown-artifact"];
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(unknown), /unknown artifact/);
+
+  const duplicate = completeManifest();
+  duplicate.artifacts.push({ ...duplicate.artifacts[0] });
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(duplicate), /artifact IDs must be unique/);
+});
+
+test("evidence artifact source commits must match the qualified provider source commit", () => {
+  const manifest = completeManifest();
+  manifest.artifacts[0].sourceCommitSha = "0".repeat(40);
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /bound to a different source commit/);
+});
+
+test("provider endpoint origins reject credentials, paths, query strings and non-HTTPS URLs", () => {
+  for (const endpointOrigin of [
+    "https://user:password@provider.example",
+    "https://provider.example/private",
+    "https://provider.example?token=secret",
+    "http://provider.example",
+  ]) {
+    const manifest = completeManifest();
+    manifest.provider.endpointOrigin = endpointOrigin;
+    assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /HTTPS|origin only/);
+  }
+});
+
+test("unsafe and absolute artifact paths are rejected", () => {
+  for (const relativePath of ["../escape.json", "/tmp/evidence.json", "C:/evidence.json", "evidence\\secret.json"]) {
+    const manifest = completeManifest();
+    manifest.artifacts[0].relativePath = relativePath;
+    assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /safe project-relative path|unsafe path segment/);
+  }
+});
+
+test("missing and present evidence artifacts cannot be confused", () => {
+  const manifest = completeManifest();
+  manifest.artifacts[0] = {
+    id: manifest.artifacts[0].id,
+    type: manifest.artifacts[0].type,
+    status: "missing",
+    reason: "Not provisioned",
+  };
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /cannot claim a missing artifact/);
+});
+
+test("artifact verification rejects symlinks, byte-count mismatches and hash mismatches", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m25-artifact-check-"));
+  try {
+    const manifest = completeManifest();
+    const first = manifest.artifacts[0];
+    const target = path.join(root, first.relativePath);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, "different evidence bytes");
+    let result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    assert.ok(result.failures.some((failure) => failure.id === first.id &&
+      ["byte-count-mismatch", "sha256-mismatch"].includes(failure.code)));
+
+    await rm(target, { force: true });
+    await symlink(path.join(root, "missing-target"), target);
+    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    const symlinkFailure = result.failures.find((failure) => failure.id === first.id && failure.code === "symlink");
+    assert.ok(symlinkFailure);
+    assert.equal(symlinkFailure.message.includes(root), false,
+      "artifact diagnostics must not leak absolute local paths");
+
+    await rm(path.dirname(target), { recursive: true, force: true });
+    const outsideDirectory = path.join(root, "outside");
+    await mkdir(outsideDirectory, { recursive: true });
+    const evidenceKey = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((key) =>
+      first.id === "evidence-" + key.toLowerCase());
+    await writeFile(path.join(outsideDirectory, path.basename(target)),
+      "independent provider evidence for " + evidenceKey);
+    await symlink(outsideDirectory, path.dirname(target), "dir");
+    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    const parentSymlinkFailure = result.failures.find((failure) =>
+      failure.id === first.id && failure.code === "symlink");
+    assert.ok(parentSymlinkFailure, "parent-directory symlinks must be rejected");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("provider identity must not expose secrets or self-assert as an unqualified environment", () => {
+  const incomplete = completeManifest();
+  incomplete.provider.instanceFingerprintSha256 = null;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(incomplete), /fingerprints/);
+
+  const development = completeManifest();
+  development.provider.environment = "development";
+  const report = assessTrustRegistryProviderQualification(development, {
+  });
+  assert.ok(report.blockers.includes("provider-environment-is-not-staging-or-production"));
+
+  for (const endpointOrigin of ["https://localhost", "https://127.0.0.1", "https://node.localhost"]) {
+    const local = completeManifest();
+    local.provider.endpointOrigin = endpointOrigin;
+    assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(local), /remote HTTPS origin/);
+  }
+});
+
+test("aggregate evidence size is bounded before any file bytes are opened", () => {
+  const manifest = completeManifest();
+  for (const artifact of manifest.artifacts) artifact.bytes = 128 * 1024 * 1024;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /512 MiB aggregate/);
+});
+
+test("independent security review cannot be self-attested as a provider test", () => {
+  const manifest = completeManifest();
+  manifest.evidence.independentSecurityReview.verificationKind = "provider-test";
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /independentSecurityReview requires independent-audit provenance/);
+});
+
+test("assessment rejects caller-supplied artifact IDs as byte-verification proof", () => {
+  const manifest = completeManifest();
+  const actualIds = manifest.artifacts.map((artifact) => artifact.id);
+  assert.throws(() => assessTrustRegistryProviderQualification(manifest, {
+    verifiedArtifactIds: new Set([...actualIds, "not-a-manifest-artifact"]),
+  }), /unsupported assessment option: verifiedArtifactIds/);
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.verifiedArtifactCount, 0);
+  assert.ok(report.blockers.includes("artifact-verification-not-performed"));
+});
+const cliPath = fileURLToPath(new URL("../scripts/validate-trust-registry-governance-provider-qualification.mjs", import.meta.url));
+const currentManifestPath = fileURLToPath(new URL(
+  "../benchmarks/trust-registry-governance/provider-qualification-current.json",
+  import.meta.url,
+));
+
+function runQualificationCli(args, cwd) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+  });
+}
+
+test("qualification validator CLI help is available without a manifest", () => {
+  const result = runQualificationCli(["--help"], process.cwd());
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes("Usage: node scripts/validate-trust-registry-governance-provider-qualification.mjs"));
+});
+
+test("qualification validator CLI emits a hash-bound blocked report and never overwrites it", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-qualification-cli-"));
+  try {
+    const relativeReport = "reports/current-qualification.json";
+    const first = runQualificationCli([currentManifestPath, "--report", relativeReport], cwd);
+    assert.equal(first.status, 0, first.stderr);
+    const summary = JSON.parse(first.stdout);
+    assert.equal(summary.status, "blocked");
+    assert.equal(summary.productionQualificationEligible, false);
+    assert.equal(summary.releaseFlags.mapReady, false);
+
+    const reportPath = path.join(cwd, relativeReport);
+    const reportBytes = await readFile(reportPath);
+    const report = JSON.parse(reportBytes.toString("utf8"));
+    assert.equal(
+      report.manifestSha256,
+      createHash("sha256").update(await readFile(currentManifestPath)).digest("hex"),
+    );
+    assert.equal(
+      report.reportSha256,
+      createHash("sha256").update(JSON.stringify({ ...report, reportSha256: undefined })).digest("hex"),
+    );
+
+    const second = runQualificationCli([currentManifestPath, "--report", relativeReport], cwd);
+    assert.equal(second.status, 2);
+    assert.match(second.stderr, /EEXIST|already exists/i);
+    assert.deepEqual(await readFile(reportPath), reportBytes);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("qualification validator CLI rejects report-parent symlinks and traversal", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-report-path-"));
+  const outside = await mkdtemp(path.join(os.tmpdir(), "d3m25-report-outside-"));
+  try {
+    const traversal = runQualificationCli([currentManifestPath, "--report", "../escape.json"], cwd);
+    assert.equal(traversal.status, 2);
+    assert.match(traversal.stderr, /safe relative path|escapes/i);
+
+    await symlink(outside, path.join(cwd, "redirected"), "dir");
+    const redirected = runQualificationCli([currentManifestPath, "--report", "redirected/report.json"], cwd);
+    assert.equal(redirected.status, 2);
+    assert.match(redirected.stderr, /symbolic link|outside/i);
+    await assert.rejects(readFile(path.join(outside, "report.json")), { code: "ENOENT" });
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("qualification validator CLI rejects symlinked, oversized and malformed manifests", async () => {
+  const cwd = await mkdtemp(path.join(os.tmpdir(), "d3m25-manifest-input-"));
+  try {
+    const malformedPath = path.join(cwd, "malformed.json");
+    await writeFile(malformedPath, "{not-json");
+    const malformed = runQualificationCli([malformedPath], cwd);
+    assert.equal(malformed.status, 2);
+
+    const oversizedPath = path.join(cwd, "oversized.json");
+    await writeFile(oversizedPath, Buffer.alloc(1024 * 1024 + 1, 0x20));
+    const oversized = runQualificationCli([oversizedPath], cwd);
+    assert.equal(oversized.status, 2);
+    assert.match(oversized.stderr, /1 MiB input limit/);
+
+    const symlinkPath = path.join(cwd, "manifest-link.json");
+    await symlink(currentManifestPath, symlinkPath);
+    const symlinked = runQualificationCli([symlinkPath], cwd);
+    assert.equal(symlinked.status, 2);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1.0.0",
+  "manifestId": "d3m25-current-external-provider-qualification",
+  "generatedAtUtc": "2026-11-07T04:16:33.000Z",
+  "source": {
+    "repository": "RakibulhasanUtsho07/3d-geospatial-platform",
+    "branch": "feat/d3m-engine24-provider-conformance-20261105",
+    "commitSha": "786d901e5a7ed4effddbbbb563533820276fb4ba"
+  },
+  "provider": {
+    "status": "not-provisioned",
+    "providerId": null,
+    "implementation": null,
+    "version": null,
+    "environment": "not-provisioned",
+    "instanceFingerprintSha256": null,
+    "namespaceFingerprintSha256": null,
+    "endpointOrigin": null,
+    "syntheticOnly": true
+  },
+  "conformanceCi": {
+    "push": {
+      "runId": 42337017403,
+      "runUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337017403",
+      "event": "push",
+      "headSha": "786d901e5a7ed4effddbbbb563533820276fb4ba",
+      "fullRunConclusion": "success",
+      "providerConformanceStepConclusion": "success",
+      "syntheticOnly": true
+    },
+    "pullRequest": {
+      "runId": 42337019776,
+      "runUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337019776",
+      "event": "pull_request",
+      "headSha": "786d901e5a7ed4effddbbbb563533820276fb4ba",
+      "fullRunConclusion": "success",
+      "providerConformanceStepConclusion": "success",
+      "syntheticOnly": true
+    }
+  },
+  "providerIntegration": {
+    "status": "not-run",
+    "runId": null,
+    "runUrl": null,
+    "headSha": null,
+    "suiteConclusion": "not-run",
+    "syntheticOnly": true,
+    "providerInstanceFingerprintSha256": null,
+    "providerNamespaceFingerprintSha256": null,
+    "fullRunConclusion": "not-run"
+  },
+  "artifacts": [],
+  "evidence": {
+    "atomicBootstrapAndCompareAndSet": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "multiClientLinearizability": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "processRestartVisibility": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "ambiguousWriteRecovery": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "independentAnchorCustody": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "backupRestoreRollbackResistance": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "authenticatedClientIdentity": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "transportSecurity": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "leastPrivilegeAuthorization": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "keyCustodyAndRotation": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "auditRetention": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "operationalRecovery": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    },
+    "independentSecurityReview": {
+      "status": "missing",
+      "artifactIds": [],
+      "verificationKind": "none"
+    }
+  }
+}
