@@ -60,7 +60,7 @@ The anchor private key stays with the independent anchor operator or its HSM. No
 
 ## Configure the independent public-key registry
 
-Set `D3M29_INDEPENDENT_ANCHOR_KEYS_JSON` in the verifier environment to the independently provisioned, versioned, public-key-only registry. Its exact envelope fields are:
+Set `D3M29_INDEPENDENT_ANCHOR_KEYS_JSON` in the verifier environment to the independently provisioned, versioned, public-key-only registry. Separately set `D3M29_INDEPENDENT_ANCHOR_GOVERNANCE_KEY_FINGERPRINT_SHA256` to the 64-character SHA-256 fingerprint provisioned out-of-band for the registry governance public key. The verifier compares this independent pin to the registry envelope and witness; the registry cannot establish its own root of trust. Its exact envelope fields are:
 
 - `schemaVersion = 1.0.0`, `recordType = d3m29-independent-anchor-key-registry`.
 - `registryId`, `registrySetId`, `governancePublicKeyFingerprintSha256`, canonical `issuedAtUtc` / `expiresAtUtc`.
