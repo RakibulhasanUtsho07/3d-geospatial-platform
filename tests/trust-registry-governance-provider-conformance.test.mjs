@@ -8,12 +8,15 @@ function syntheticProvider({
   ignoreCompareAndSetVersion = false,
   corruptAnchor = false,
   reuseVersionOnWrite = false,
+  cycleVersionOnSecondWrite = false,
   rollbackAnchorOnCompareAndSet = false,
 } = {}) {
   let state = null;
   let anchor = null;
   let generation = 0;
-  const version = () => "generation-" + generation;
+  const version = () => cycleVersionOnSecondWrite && generation >= 3
+    ? "generation-1"
+    : "generation-" + generation;
   const snapshot = () => state === null ? null : ({
     version: version(),
     state: clone(state),
@@ -108,6 +111,15 @@ test("provider conformance suite rejects a successful CAS without advancing its 
       ...syntheticProvider({ reuseVersionOnWrite: true }),
     }),
     /successful compare-and-set must advance the provider version token/i,
+  );
+});
+
+test("provider conformance suite rejects a provider that reuses a historical version token (ABA)", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ cycleVersionOnSecondWrite: true }),
+    }),
+    /must never reuse a historical version token \(ABA\)/i,
   );
 });
 
