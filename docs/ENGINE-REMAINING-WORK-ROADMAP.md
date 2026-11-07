@@ -711,3 +711,33 @@ D3M-17 stays stacked on #368 and must not be merged or promoted independently of
 - The evaluator can return only `blocked` or `ready-for-independent-review`; `productionQualificationEligible`, acceptance, publication, map-ready and automatic-approval stay false even for a complete bundle.
 - **Latest fully verified exact head before final hardening:** `b500a7e5c457f0fab4418f082d2b0d5ee20e9cf3`; Push Full CI [#42338892262](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42338892262) and PR Full CI [#42338897822](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42338897822) both completed `success`, each with 227/227 successful steps, including D3M-25 focused tests, blocked-fixture validator, production build, production viewport API verification and evidence uploads. Earlier failed/cancelled runs on superseded SHAs are retained as history but are not acceptance evidence.
 - Final hardening adds a required provider-integration full-workflow conclusion (in addition to its focused suite), locks both D3M-24 conformance records to synthetic provenance, schema-enforces independent-audit provenance for independent security review, and exercises the CLI's bounded/symlink-safe manifest and report paths. Exact-head Push and PR Full CI must rerun after this change.
+
+
+
+### D3M-ENGINE-25 exact-head post-hardening validation addendum — 2026-11-07
+
+- The final hardened exact head `85ce324122ce1f789422121dc9d5239651e96fe0` is now fully validated: Push Full CI [#42340151217](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340151217) and PR Full CI [#42340154740](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42340154740) both completed `success`, each with 227/227 successful steps, zero failed steps and zero pending steps. The production viewport API verification and all six evidence-upload steps passed in both exact-head runs.
+- PR #386 remains Draft/open/unmerged, stacked on D3M-24 PR #384. D3M-24's exact base head remains `786d901e5a7ed4effddbbbb563533820276fb4ba`.
+- This is software/CI validation only. The external provider remains unprovisioned, the provider-specific integration run remains not-run, all 13 evidence classes remain missing, and every qualification/release flag remains false.
+
+## D3M-ENGINE-26 — process-isolated external provider conformance runner
+
+- **Tracking issue:** [#387](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/387).
+- **Implementation branch:** `feat/d3m-engine26-process-isolated-provider-conformance-20261107`, created from the exact D3M-25 PR #386 head `85ce324122ce1f789422121dc9d5239651e96fe0`.
+- **Gap addressed:** D3M-24's `reopenProvider()` verifies a newly constructed client object, but its checked-in fixture shares an in-memory closure. D3M-25 requires genuine process-restart visibility evidence; a new object alone is insufficient.
+- Adds a process-isolated provider proxy and worker protocol that instantiate the operator-supplied adapter and execute every read/initialize/CAS operation in a fresh Node child process. The existing D3M-24 conformance helper is reused without changing its contract.
+- The runner checks the adapter entry file's exact SHA-256 before every import, requires a regular non-symlink module, bounds requests/responses and execution time, kills timed-out workers, uses an explicit environment-variable allowlist, and suppresses adapter output/error messages that may disclose secrets.
+- Adds a temporary file-backed synthetic provider fixture using inter-process locking and atomic rename. CI exercises concurrent bootstrap/CAS and cross-process read-after-exit against it; the fixture keeps state and anchor in the same file and is not a production provider or independent anchor.
+- Adds focused negative coverage for symlinked/invalid adapters, missing factory exports, hung workers, oversized results, secret-bearing adapter exceptions and unsafe runtime environment injection.
+- The sanitized report binds the adapter entry-file hash, provider ID, source commit and child-process execution mode. An adapter's `syntheticOnly` declaration is metadata only and is not independent proof.
+- **Exact-head software validation passed:** implementation code head `28b5005c6bd46e7886ac5175469bfd63b32033e1`; Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156) both completed `success` on that same SHA with 229/229 successful job steps and zero failed/cancelled steps. Both runs passed ESLint, D3M-23/24/25 regressions, D3M-26 process-isolated conformance and CLI tests, production build, production viewport API/browser/performance verification, and all six evidence uploads.
+- Keep D3M-26 Draft/open/unmerged and stacked on D3M-25 PR #386; do not merge, retarget, mark ready or promote any branch to `development`/`main`.
+
+
+### D3M-ENGINE-26 exact-head validation addendum — 2026-11-07
+
+- PR #388 and its branch ref were confirmed at exact implementation SHA `28b5005c6bd46e7886ac5175469bfd63b32033e1`, stacked on D3M-25 PR #386 exact base `85ce324122ce1f789422121dc9d5239651e96fe0`.
+- Push Full CI [#42341553023](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341553023) and PR Full CI [#42341558156](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42341558156) both completed `success`; each job had 229/229 successful steps, zero failed steps and zero cancelled steps.
+- The process-isolated D3M-24 suite, malformed protocol and adapter-hash negative cases, worker timeout/size/secret-handling tests, CLI report/provenance tests, D3M-25 blocked-evidence invariant, production build, production viewport API verification and six existing CI evidence uploads all passed in both runs.
+- This is software conformance evidence using the local file-backed synthetic fixture only. The fixture's state and anchor are stored together; it does not prove a real remote provider, independent anchor custody, rollback resistance or production security. No production provider, credentials, endpoint, TPM/HSM counter or independently administered anchor is provisioned. D3M-25 qualification stays blocked and all release/publication/map-ready/automatic-approval flags remain false.
+- PR #388 remains Draft/open/unmerged, stacked on #386. No merge, retarget, review request or branch promotion was performed.
