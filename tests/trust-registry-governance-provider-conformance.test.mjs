@@ -4,8 +4,21 @@ import { runTrustRegistryGovernanceProviderConformance } from "./helpers/trust-r
 
 const clone = (value) => structuredClone(value);
 
+function createBarrier(parties) {
+  let arrivals = 0;
+  let release;
+  const ready = new Promise((resolve) => { release = resolve; });
+  return async () => {
+    arrivals += 1;
+    if (arrivals === parties) release();
+    await ready;
+  };
+}
+
 function syntheticProvider({
   ignoreCompareAndSetVersion = false,
+  raceInitializeIfAbsent = false,
+  raceCompareAndSet = false,
   corruptAnchor = false,
   reuseVersionOnWrite = false,
   cycleVersionOnSecondWrite = false,
@@ -33,6 +46,9 @@ function syntheticProvider({
     stateSha256: next.stateSha256,
   });
 
+  const initializeBarrier = createBarrier(8);
+  const compareAndSetBarrier = createBarrier(8);
+
   const createClient = () => ({
     providerId: "synthetic-conformance-provider",
     async readState(identity) {
@@ -45,6 +61,9 @@ function syntheticProvider({
         assertIdentity(identity);
         return { created: false, ...snapshot() };
       }
+      // In the intentionally broken fixture, all callers observe "empty"
+      // before any caller is allowed to commit, exposing a check-then-write race.
+      if (raceInitializeIfAbsent) await initializeBarrier();
       state = clone(requestedState);
       generation += 1;
       anchor = anchorFor(state);
@@ -57,6 +76,9 @@ function syntheticProvider({
           (expectedVersion !== version() || expectedStateSha256 !== state.stateSha256)) {
         return { updated: false, ...snapshot() };
       }
+      // Capture the matching version before yielding. A correct atomic provider
+      // would serialize this region or use a storage-level conditional write.
+      if (raceCompareAndSet) await compareAndSetBarrier();
       const previousAnchor = clone(anchor);
       state = clone(nextState);
       if (!reuseVersionOnWrite) generation += 1;
@@ -100,6 +122,24 @@ test("provider conformance suite rejects a provider that permits competing stale
   await assert.rejects(
     runTrustRegistryGovernanceProviderConformance({
       ...syntheticProvider({ ignoreCompareAndSetVersion: true }),
+    }),
+    /exactly one writer may win/i,
+  );
+});
+
+test("provider conformance suite detects a check-then-write initialization race", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ raceInitializeIfAbsent: true }),
+    }),
+    /exactly one concurrent initialize-if-absent operation/i,
+  );
+});
+
+test("provider conformance suite detects a compare-and-set race after concurrent precondition reads", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ raceCompareAndSet: true }),
     }),
     /exactly one writer may win/i,
   );
