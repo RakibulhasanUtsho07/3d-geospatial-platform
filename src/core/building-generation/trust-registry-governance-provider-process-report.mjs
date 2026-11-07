@@ -60,6 +60,27 @@ export function validateTrustRegistryGovernanceProviderProcessReport(input, expe
     "instanceFingerprintSha256",
     "namespaceFingerprintSha256",
   ], "expected provider process context");
+  if (typeof expected.sourceCommitSha !== "string" || !COMMIT.test(expected.sourceCommitSha)) {
+    throw new TypeError("expected sourceCommitSha must be a full lowercase Git commit SHA");
+  }
+  if (typeof expected.providerId !== "string" || !PROVIDER_ID.test(expected.providerId)) {
+    throw new TypeError("expected providerId must be a safe stable identifier");
+  }
+  requireHash(expected.adapterModuleSha256, "expected adapterModuleSha256");
+  if (typeof expected.syntheticOnly !== "boolean") {
+    throw new TypeError("expected syntheticOnly must be boolean");
+  }
+  if (expected.syntheticOnly === false) {
+    requireHash(expected.instanceFingerprintSha256, "expected instanceFingerprintSha256");
+    requireHash(expected.namespaceFingerprintSha256, "expected namespaceFingerprintSha256");
+  } else {
+    for (const [label, value] of [
+      ["expected instanceFingerprintSha256", expected.instanceFingerprintSha256],
+      ["expected namespaceFingerprintSha256", expected.namespaceFingerprintSha256],
+    ]) {
+      if (value !== null) requireHash(value, label);
+    }
+  }
   exactKeys(input, [
     "schemaVersion",
     "sourceCommitSha",
