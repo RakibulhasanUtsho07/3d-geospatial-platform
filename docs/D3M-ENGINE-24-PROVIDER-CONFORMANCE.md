@@ -33,9 +33,10 @@ The test verifies:
 3. A stale version cannot overwrite the winner.
 4. A fresh read returns the exact committed state and anchor.
 5. A simulated response loss after commit is recovered by reading and comparing the exact state digest; the client does not blindly replay the transition with a new version.
-6. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest, including after a successful compare-and-set (a stale/rolled-back anchor is rejected).\n7. Every successful compare-and-set advances the opaque provider version token; a provider that reports success while reusing the prior token is rejected.
+6. State and independent anchor fields agree exactly for revision, minimum accepted sequence and SHA-256 digest, including after a successful compare-and-set (a stale/rolled-back anchor is rejected).
+7. Every successful compare-and-set advances the opaque provider version token, and no historical token may be reused (ABA); a provider that reports success with a repeated token is rejected.
 
-The synthetic negative fixtures prove that the harness detects a provider which accepts competing stale writes, reuses a version token after a successful write, or returns an initial or post-write mismatched/rolled-back anchor. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
+The synthetic negative fixtures prove that the harness detects a provider which accepts competing stale writes, reuses a version token after a successful write, cycles back to a historical version token (ABA), or returns an initial or post-write mismatched/rolled-back anchor. The synthetic `reopenProvider` fixture returns a distinct client object over the same in-memory closure; it does not simulate a process restart or prove persistence after host failure.
 
 ## Integrating a real provider
 
