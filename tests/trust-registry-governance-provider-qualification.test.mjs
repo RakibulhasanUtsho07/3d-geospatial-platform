@@ -665,6 +665,26 @@ test("legacy D3M-25 passed provider manifests remain readable but cannot skip th
   });
 });
 
+
+test("D3M-28 blocks a legacy 1.1 passed integration that has no trusted report signature", () => {
+  const manifest = completeManifest();
+  manifest.schemaVersion = "1.1.0";
+  delete manifest.providerIntegration.processReportSignatureArtifactId;
+  manifest.artifacts = manifest.artifacts.filter((artifact) => artifact.type !== "process-report-signature");
+  const normalized = normalizeTrustRegistryProviderQualificationManifest(manifest);
+  assert.equal(normalized.schemaVersion, "1.1.0");
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.status, "blocked");
+  assert.ok(report.blockers.includes("provider-process-report-signature-not-bound"));
+  assert.equal(report.productionQualificationEligible, false);
+  assert.deepEqual(report.releaseFlags, {
+    acceptanceEligible: false,
+    publicationEligible: false,
+    mapReady: false,
+    automaticApproval: false,
+  });
+});
+
 test("D3M-27 refuses a process report artifact that is not bound to processRestartVisibility evidence", () => {
   const manifest = completeManifest();
   manifest.evidence.processRestartVisibility = {
@@ -723,6 +743,47 @@ test("D3M-27 byte verification also validates process report semantics and exact
     assert.equal(assessment.status, "blocked");
     assert.ok(assessment.blockers.includes("evidence-artifact-not-byte-verified:" + reportArtifact.id));
     assert.ok(assessment.blockers.includes("artifact-verification-failed:" + reportArtifact.id + ":process-report-invalid"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+
+test("D3M-28 artifact verification rejects a changed or untrusted report signature", async () => {
+  const manifest = completeManifest();
+  const root = await mkdtemp(path.join(os.tmpdir(), "d3m28-signature-verification-"));
+  try {
+    for (const artifact of manifest.artifacts) {
+      const target = path.join(root, artifact.relativePath);
+      await mkdir(path.dirname(target), { recursive: true });
+      const key = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((candidate) =>
+        artifact.id === "evidence-" + candidate.toLowerCase());
+      const bytes = artifact.type === "process-report-signature"
+        ? processReportSignatureBytes(manifest)
+        : key === "processRestartVisibility"
+          ? processReportBytes(manifest)
+          : "independent provider evidence for " + key;
+      await writeFile(target, bytes);
+    }
+    let result = await verifyArtifacts(manifest, root);
+    assert.equal(result.failures.length, 0);
+    assert.ok(result.verifiedArtifactIds.includes(manifest.providerIntegration.processReportSignatureArtifactId));
+
+    const signatureArtifact = manifest.artifacts.find((artifact) =>
+      artifact.id === manifest.providerIntegration.processReportSignatureArtifactId);
+    const signaturePath = path.join(root, signatureArtifact.relativePath);
+    const alteredEnvelope = JSON.parse((await readFile(signaturePath, "utf8")));
+    alteredEnvelope.signatureBase64 = Buffer.alloc(64, 0x31).toString("base64");
+    const alteredBytes = Buffer.from(JSON.stringify(alteredEnvelope, null, 2) + "\n");
+    await writeFile(signaturePath, alteredBytes);
+    signatureArtifact.bytes = alteredBytes.length;
+    signatureArtifact.sha256 = digest(alteredBytes);
+    result = await verifyArtifacts(manifest, root);
+    assert.ok(result.failures.some((failure) =>
+      failure.id === signatureArtifact.id && failure.code === "process-report-signature-invalid"));
+    const assessment = assessTrustRegistryProviderQualification(manifest, { artifactVerification: result });
+    assert.equal(assessment.status, "blocked");
+    assert.ok(assessment.blockers.includes("artifact-verification-failed:" + signatureArtifact.id + ":process-report-signature-invalid"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
