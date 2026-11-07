@@ -236,6 +236,8 @@ function completeManifest() {
 test("qualification schema evidence keys stay aligned with the evaluator", async () => {
   const schemaPath = new URL("../trust-registry-governance-provider-qualification.schema.json", import.meta.url);
   const schema = JSON.parse(await readFile(schemaPath, "utf8"));
+  const anchorSchemaPath = new URL("../trust-registry-governance-provider-anchor-witness.schema.json", import.meta.url);
+  const anchorSchema = JSON.parse(await readFile(anchorSchemaPath, "utf8"));
   const evaluatorKeys = [...TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS].sort();
   assert.equal(schema.properties.evidence.additionalProperties, false);
   assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
@@ -251,9 +253,11 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("anchor-independence-review"));
   assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("anchor-witness-challenge"));
   assert.ok(schema.properties.independentAnchorWitness);
-  assert.ok(schema.$defs.registry.required.includes("governancePublicKeyPem"));
-  assert.ok(schema.$defs.registry.required.includes("governanceSignatureBase64"));
-  assert.ok(schema.$defs.registry.properties.governancePublicKeyFingerprintSha256);
+  assert.ok(anchorSchema.$defs.registry.required.includes("governancePublicKeyPem"));
+  assert.ok(anchorSchema.$defs.registry.required.includes("governanceSignatureBase64"));
+  assert.ok(anchorSchema.$defs.registry.properties.governancePublicKeyFingerprintSha256);
+  assert.ok(anchorSchema.$defs.challenge.required.includes("providerProcessReportSha256"));
+  assert.ok(anchorSchema.$defs.witness.required.includes("providerFinalMinimumAcceptedSequence"));
   const provisionedAdapterRule = schema.allOf.find((rule) =>
     rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
   assert.equal(
