@@ -309,6 +309,30 @@ test("provider worker re-hashes the adapter file and rejects stale module bytes"
     "D3M26_ADAPTER_HASH_MISMATCH");
 });
 
+test("provider process runner requires an explicit syntheticOnly adapter declaration", async () => {
+  await withTempDirectory(async (directory) => {
+    const adapter = path.join(directory, "undeclared-adapter.mjs");
+    await writeFile(adapter, [
+      "export async function createProvider() {",
+      "  return {",
+      "    providerId: 'd3m27-undeclared-provider',",
+      "    readState: async () => null,",
+      "    initializeStateIfAbsent: async () => null,",
+      "    compareAndSetState: async () => null,",
+      "  };",
+      "}",
+      "",
+    ].join("\n"), { mode: 0o600 });
+    const result = spawnSync(process.execPath, [
+      runnerScript,
+      "--provider-module", adapter,
+      "--source-sha", "f".repeat(40),
+    ], { encoding: "utf8", timeout: 10000 });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /must explicitly declare syntheticOnly as true or false/i);
+  });
+});
+
 test("non-synthetic provider reports require both privacy-safe deployment fingerprints", async () => {
   await withTempDirectory(async (directory) => {
     const adapter = path.join(directory, "operator-adapter.mjs");
