@@ -94,12 +94,31 @@ export function validateTrustRegistryGovernanceProviderProcessReport(input, expe
       input.adapterDeclaredSyntheticOnly !== expected.syntheticOnly) {
     throw new TypeError("provider process report synthetic declaration does not match the provider record");
   }
-  const providerInstanceFingerprintSha256 = requireHash(
-    input.providerInstanceFingerprintSha256, "providerInstanceFingerprintSha256",
-  );
-  const providerNamespaceFingerprintSha256 = requireHash(
-    input.providerNamespaceFingerprintSha256, "providerNamespaceFingerprintSha256",
-  );
+  let providerInstanceFingerprintSha256;
+  let providerNamespaceFingerprintSha256;
+  if (expected.syntheticOnly === true) {
+    for (const [label, value] of [
+      ["expected instance fingerprint", expected.instanceFingerprintSha256],
+      ["expected namespace fingerprint", expected.namespaceFingerprintSha256],
+    ]) {
+      if (value !== null) requireHash(value, label);
+    }
+    for (const [label, value] of [
+      ["providerInstanceFingerprintSha256", input.providerInstanceFingerprintSha256],
+      ["providerNamespaceFingerprintSha256", input.providerNamespaceFingerprintSha256],
+    ]) {
+      if (value !== null) requireHash(value, label);
+    }
+    providerInstanceFingerprintSha256 = input.providerInstanceFingerprintSha256;
+    providerNamespaceFingerprintSha256 = input.providerNamespaceFingerprintSha256;
+  } else {
+    providerInstanceFingerprintSha256 = requireHash(
+      input.providerInstanceFingerprintSha256, "providerInstanceFingerprintSha256",
+    );
+    providerNamespaceFingerprintSha256 = requireHash(
+      input.providerNamespaceFingerprintSha256, "providerNamespaceFingerprintSha256",
+    );
+  }
   if (providerInstanceFingerprintSha256 !== expected.instanceFingerprintSha256 ||
       providerNamespaceFingerprintSha256 !== expected.namespaceFingerprintSha256) {
     throw new TypeError("provider process report is bound to a different provider instance or namespace");
