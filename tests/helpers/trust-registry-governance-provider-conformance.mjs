@@ -101,6 +101,10 @@ export async function runTrustRegistryGovernanceProviderConformance({
     await provider.readState(identity), identity, "read-after-initialize",
   );
   assert.equal(afterInitialize.state.stateSha256, initialState.stateSha256);
+  assert.equal(afterInitialize.version, first.version,
+    "read-after-initialize must preserve the initialized provider version");
+  assert.deepEqual(afterInitialize.anchor, first.anchor,
+    "read-after-initialize must preserve the initialized anchor");
 
   const next = createNextTrustRegistryGovernanceState({
     current: afterInitialize.state,
@@ -126,8 +130,10 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.equal(committed.filter((result) => result.updated).length, 1,
     "exactly one writer may win a compare-and-set race");
   const winner = committed.find((result) => result.updated);
-  assert.notEqual(winner.version, afterInitialize.version,
-    "a successful compare-and-set must advance the provider version token");
+  const successfulWriteVersions = new Set([afterInitialize.version]);
+  assert.equal(successfulWriteVersions.has(winner.version), false,
+    "a successful compare-and-set must not reuse any prior provider version token");
+  successfulWriteVersions.add(winner.version);
   for (const result of committed) {
     assert.equal(result.state.stateSha256, next.stateSha256,
       "losing writers must observe the committed state, not overwrite it");
@@ -197,7 +203,9 @@ export async function runTrustRegistryGovernanceProviderConformance({
   );
   assert.equal(recovered.state.stateSha256, nextAfterAmbiguous.stateSha256,
     "recovery read must identify the exact committed transition before any retry");
-  assert.notEqual(recovered.version, reloaded.version);
+  assert.equal(successfulWriteVersions.has(recovered.version), false,
+    "a provider must never reuse a historical version token (ABA) after a successful write");
+  successfulWriteVersions.add(recovered.version);
   assert.equal(recovered.state.revision, reloaded.state.revision + 1);
 
   return Object.freeze({
