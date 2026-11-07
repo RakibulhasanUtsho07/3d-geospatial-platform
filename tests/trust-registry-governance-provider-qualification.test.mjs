@@ -175,8 +175,10 @@ test("complete hash-bound provider evidence reaches review only, never productio
     }
     const verified = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
     assert.equal(verified.failures.length, 0);
+    assert.equal(Object.isFrozen(verified), true);
+    assert.equal(Object.isFrozen(verified.verifiedArtifactIds), true);
     const report = assessTrustRegistryProviderQualification(manifest, {
-      verifiedArtifactIds: new Set(verified.verifiedArtifactIds),
+      artifactVerification: verified,
     });
     assert.equal(report.status, "ready-for-independent-review");
     assert.equal(report.productionQualificationEligible, false);
@@ -186,6 +188,12 @@ test("complete hash-bound provider evidence reaches review only, never productio
       mapReady: false,
       automaticApproval: false,
     });
+    const alteredManifest = { ...manifest, manifestId: manifest.manifestId + "-altered" };
+    const staleVerification = assessTrustRegistryProviderQualification(alteredManifest, {
+      artifactVerification: verified,
+    });
+    assert.equal(staleVerification.status, "blocked");
+    assert.ok(staleVerification.blockers.includes("artifact-verification-manifest-mismatch"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -196,7 +204,6 @@ test("synthetic provider evidence cannot qualify as a real provider integration"
   manifest.provider.syntheticOnly = true;
   manifest.providerIntegration.syntheticOnly = true;
   const report = assessTrustRegistryProviderQualification(manifest, {
-    verifiedArtifactIds: new Set(manifest.artifacts.map((item) => item.id)),
   });
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.includes("provider-is-synthetic-only"));
@@ -207,7 +214,6 @@ test("provider integration must match the exact evaluated source commit", () => 
   const manifest = completeManifest();
   manifest.providerIntegration.headSha = "0".repeat(40);
   const report = assessTrustRegistryProviderQualification(manifest, {
-    verifiedArtifactIds: new Set(manifest.artifacts.map((item) => item.id)),
   });
   assert.ok(report.blockers.includes("provider-integration-head-sha-mismatch"));
 });
@@ -240,10 +246,16 @@ test("both D3M-24 Full CI runs must finish successfully on the exact source SHA"
   manifest.conformanceCi.push.fullRunConclusion = "in_progress";
   manifest.conformanceCi.pullRequest.headSha = "0".repeat(40);
   const report = assessTrustRegistryProviderQualification(manifest, {
-    verifiedArtifactIds: new Set(manifest.artifacts.map((item) => item.id)),
   });
   assert.ok(report.blockers.includes("conformance-ci-push-full-run-not-success"));
   assert.ok(report.blockers.includes("conformance-ci-pullRequest-head-sha-mismatch"));
+});
+
+test("a successful Full CI run cannot hide a failed provider-conformance step", () => {
+  const manifest = completeManifest();
+  manifest.conformanceCi.push.providerConformanceStepConclusion = "failure";
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.ok(report.blockers.includes("conformance-ci-push-provider-conformance-step-not-success"));
 });
 
 test("missing independent evidence classes remain explicit blockers", () => {
@@ -252,7 +264,6 @@ test("missing independent evidence classes remain explicit blockers", () => {
     status: "missing", artifactIds: [], verificationKind: "none",
   };
   const report = assessTrustRegistryProviderQualification(manifest, {
-    verifiedArtifactIds: new Set(manifest.artifacts.map((item) => item.id)),
   });
   assert.equal(report.status, "blocked");
   assert.ok(report.blockers.includes("evidence-missing:independentAnchorCustody"));
@@ -325,6 +336,19 @@ test("artifact verification rejects symlinks, byte-count mismatches and hash mis
     assert.ok(symlinkFailure);
     assert.equal(symlinkFailure.message.includes(root), false,
       "artifact diagnostics must not leak absolute local paths");
+
+    await rm(path.dirname(target), { recursive: true, force: true });
+    const outsideDirectory = path.join(root, "outside");
+    await mkdir(outsideDirectory, { recursive: true });
+    const evidenceKey = TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS.find((key) =>
+      first.id === "evidence-" + key.toLowerCase());
+    await writeFile(path.join(outsideDirectory, path.basename(target)),
+      "independent provider evidence for " + evidenceKey);
+    await symlink(outsideDirectory, path.dirname(target), "dir");
+    result = await verifyTrustRegistryProviderQualificationArtifacts(manifest, root);
+    const parentSymlinkFailure = result.failures.find((failure) =>
+      failure.id === first.id && failure.code === "symlink");
+    assert.ok(parentSymlinkFailure, "parent-directory symlinks must be rejected");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -338,7 +362,6 @@ test("provider identity must not expose secrets or self-assert as an unqualified
   const development = completeManifest();
   development.provider.environment = "development";
   const report = assessTrustRegistryProviderQualification(development, {
-    verifiedArtifactIds: new Set(development.artifacts.map((item) => item.id)),
   });
   assert.ok(report.blockers.includes("provider-environment-is-not-staging-or-production"));
 
@@ -355,11 +378,13 @@ test("aggregate evidence size is bounded before any file bytes are opened", () =
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /512 MiB aggregate/);
 });
 
-test("caller-supplied verified IDs cannot inflate the verified artifact count", () => {
+test("assessment rejects caller-supplied artifact IDs as byte-verification proof", () => {
   const manifest = completeManifest();
   const actualIds = manifest.artifacts.map((artifact) => artifact.id);
-  const report = assessTrustRegistryProviderQualification(manifest, {
+  assert.throws(() => assessTrustRegistryProviderQualification(manifest, {
     verifiedArtifactIds: new Set([...actualIds, "not-a-manifest-artifact"]),
-  });
-  assert.equal(report.verifiedArtifactCount, actualIds.length);
+  }), /unsupported assessment option: verifiedArtifactIds/);
+  const report = assessTrustRegistryProviderQualification(manifest);
+  assert.equal(report.verifiedArtifactCount, 0);
+  assert.ok(report.blockers.includes("artifact-verification-not-performed"));
 });

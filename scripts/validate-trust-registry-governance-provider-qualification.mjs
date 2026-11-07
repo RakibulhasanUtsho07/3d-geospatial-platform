@@ -77,8 +77,7 @@ async function main() {
   const artifactRoot = path.resolve(options.artifactRoot ?? path.dirname(manifestPath));
   const artifactVerification = await verifyTrustRegistryProviderQualificationArtifacts(manifest, artifactRoot);
   const assessment = assessTrustRegistryProviderQualification(manifest, {
-    verifiedArtifactIds: new Set(artifactVerification.verifiedArtifactIds),
-    artifactVerificationFailures: artifactVerification.failures,
+    artifactVerification,
   });
   const report = {
     ...assessment,

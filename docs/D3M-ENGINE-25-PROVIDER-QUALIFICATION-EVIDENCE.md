@@ -25,7 +25,7 @@ The manifest binds:
 - the provider-specific integration run is bound to both the exact instance fingerprint and isolated namespace fingerprint, preventing evidence from a different tenant/cluster from being substituted;
 - source repository, branch and full 40-character commit SHA;
 - exact D3M-24 Push and PR workflow run IDs/URLs, event types, head SHAs, full-run conclusions and conformance-step conclusions;
-- a separate provider-integration run against the same source SHA, explicitly marked real or synthetic;
+- a separate provider-integration run against the same source SHA and the exact provisioned instance/namespace fingerprints, explicitly marked real or synthetic; it must use a distinct workflow run rather than reusing either D3M-24 synthetic conformance run;
 - evidence artifacts identified by unique ID, type, project-relative path, SHA-256, byte count, HTTPS source URL and source commit;
 - one evidence record for every required deployment/security property.
 
@@ -47,7 +47,7 @@ The provider integration evidence must come from a separate actual provider-spec
 12. Operational recovery, alerting, ownership and incident procedures.
 13. An independent security-review artifact.
 
-A capability Boolean, provider marketing statement or synthetic-only test does not satisfy an evidence class. Each `verified` record must reference a present artifact of the correct type and use `provider-test` or `independent-audit` provenance. The evaluator verifies local artifact paths, regular-file status, byte count and SHA-256. It rejects path traversal, symlinks, localhost/loopback provider endpoints, query-string/fragment URLs and artifact collections above the aggregate size limit. Filesystem diagnostics are normalized so report output does not disclose absolute machine paths. The CLI also caps the manifest input at 1 MiB and records the manifest, schema, validator and report hashes. Hash verification establishes byte integrity only; it does not prove an auditor's identity, the truth of a report, or the provider's actual security properties.
+A capability Boolean, provider marketing statement or synthetic-only test does not satisfy an evidence class. Each `verified` record must reference a present artifact of the correct type and use `provider-test` or `independent-audit` provenance. The evaluator verifies local artifact paths, regular-file status, byte count and SHA-256. The programmatic assessment API accepts only an immutable verifier-minted result bound to the exact normalized manifest; caller-supplied artifact-ID sets are rejected, and a verification result cannot be replayed against a modified manifest. It rejects path traversal, file or parent-directory symlinks, localhost/loopback provider endpoints, query-string/fragment URLs and artifact collections above the aggregate size limit. Filesystem diagnostics are normalized so report output does not disclose absolute machine paths. The CLI also caps the manifest input at 1 MiB and records the manifest, schema, validator and report hashes. Hash verification establishes byte integrity only; it does not prove an auditor's identity, the truth of a report, or the provider's actual security properties.
 
 ## Assessment semantics
 

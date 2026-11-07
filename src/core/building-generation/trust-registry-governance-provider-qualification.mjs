@@ -47,6 +47,11 @@ const commitOk = (value) => typeof value === "string" && COMMIT.test(value);
 const ID_OK = (value) => typeof value === "string" && ID.test(value);
 const MAX_ARTIFACT_BYTES = 128 * 1024 * 1024;
 const MAX_TOTAL_ARTIFACT_BYTES = 512 * 1024 * 1024;
+const ARTIFACT_VERIFICATION_RESULTS = new WeakMap();
+
+function normalizedManifestDigest(manifest) {
+  return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
+}
 
 function requireObject(value, label) {
   if (!object(value)) throw new TypeError(label + " must be an object");
@@ -390,23 +395,32 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
   };
 }
 
-export function assessTrustRegistryProviderQualification(manifestInput, {
-  verifiedArtifactIds = new Set(),
-  artifactVerificationFailures = [],
-} = {}) {
+export function assessTrustRegistryProviderQualification(manifestInput, options = {}) {
+  requireObject(options, "assessment options");
+  const unsupportedOption = Object.keys(options).find((key) => key !== "artifactVerification");
+  if (unsupportedOption) throw new TypeError("unsupported assessment option: " + unsupportedOption);
+
   const manifest = normalizeTrustRegistryProviderQualificationManifest(manifestInput);
-  const suppliedVerified = verifiedArtifactIds instanceof Set
-    ? verifiedArtifactIds
-    : new Set(verifiedArtifactIds);
-  const presentArtifactIds = new Set(manifest.artifacts
-    .filter((artifact) => artifact.status === "present")
-    .map((artifact) => artifact.id));
-  const verified = new Set([...suppliedVerified].filter((id) => presentArtifactIds.has(id)));
-  if (!Array.isArray(artifactVerificationFailures)) {
-    throw new TypeError("artifactVerificationFailures must be an array");
-  }
   const blockers = [];
   const add = (value) => { if (!blockers.includes(value)) blockers.push(value); };
+  let verified = new Set();
+  let artifactVerificationFailures = [];
+  const artifactVerification = options.artifactVerification ?? null;
+
+  if (artifactVerification !== null) {
+    const verification = ARTIFACT_VERIFICATION_RESULTS.get(artifactVerification);
+    if (!verification) {
+      throw new TypeError("artifactVerification must be returned by verifyTrustRegistryProviderQualificationArtifacts");
+    }
+    if (verification.manifestDigest !== normalizedManifestDigest(manifest)) {
+      add("artifact-verification-manifest-mismatch");
+    } else {
+      verified = new Set(verification.verifiedArtifactIds);
+      artifactVerificationFailures = verification.failures;
+    }
+  } else if (manifest.artifacts.some((artifact) => artifact.status === "present")) {
+    add("artifact-verification-not-performed");
+  }
 
   if (manifest.provider.status !== "provisioned") add("real-provider-not-provisioned");
   if (manifest.provider.syntheticOnly) add("provider-is-synthetic-only");
@@ -523,7 +537,18 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
       });
     }
   }
-  return Object.freeze({ verifiedArtifactIds, failures });
+  const immutableVerifiedArtifactIds = Object.freeze([...verifiedArtifactIds]);
+  const immutableFailures = Object.freeze(failures.map((failure) => Object.freeze({ ...failure })));
+  const result = Object.freeze({
+    verifiedArtifactIds: immutableVerifiedArtifactIds,
+    failures: immutableFailures,
+  });
+  ARTIFACT_VERIFICATION_RESULTS.set(result, Object.freeze({
+    manifestDigest: normalizedManifestDigest(manifest),
+    verifiedArtifactIds: immutableVerifiedArtifactIds,
+    failures: immutableFailures,
+  }));
+  return result;
 }
 
 export const TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS = Object.freeze(Object.keys(EVIDENCE_TYPES));
