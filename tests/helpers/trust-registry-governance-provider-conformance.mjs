@@ -106,6 +106,39 @@ export async function runTrustRegistryGovernanceProviderConformance({
   assert.deepEqual(afterInitialize.anchor, first.anchor,
     "read-after-initialize must preserve the initialized anchor");
 
+  // Re-initializing an existing identity is an idempotent read, never a reset.
+  const conflictingInitialState = createTrustRegistryGovernanceInitialState({
+    ...identity,
+    bootstrapMinimumSequence: bootstrapMinimumSequence + 1,
+    now: new Date("2026-11-05T12:00:30.000Z"),
+  });
+  const repeatedInitialization = assertWriteResult(
+    await provider.initializeStateIfAbsent({
+      identity,
+      state: clone(conflictingInitialState),
+    }),
+    "created",
+    identity,
+    "repeated initialize-if-absent result",
+  );
+  assert.equal(repeatedInitialization.created, false,
+    "repeated initialize-if-absent must not create or reset an existing record");
+  assert.deepEqual(repeatedInitialization.state, afterInitialize.state,
+    "repeated initialize-if-absent must preserve the exact existing state");
+  assert.equal(repeatedInitialization.version, afterInitialize.version,
+    "repeated initialize-if-absent must preserve the existing provider version");
+  assert.deepEqual(repeatedInitialization.anchor, afterInitialize.anchor,
+    "repeated initialize-if-absent must preserve the existing anchor");
+  const afterRepeatedInitialization = assertSnapshot(
+    await provider.readState(identity),
+    identity,
+    "read-after-repeated-initialize",
+  );
+  assert.deepEqual(afterRepeatedInitialization.state, afterInitialize.state,
+    "a repeated initialize must not mutate the persisted state");
+  assert.equal(afterRepeatedInitialization.version, afterInitialize.version);
+  assert.deepEqual(afterRepeatedInitialization.anchor, afterInitialize.anchor);
+
   const next = createNextTrustRegistryGovernanceState({
     current: afterInitialize.state,
     ...identity,
@@ -397,10 +430,84 @@ export async function runTrustRegistryGovernanceProviderConformance({
     "a second registry identity must initialize its own isolated record");
   assert.deepEqual(secondInitialized.state, secondInitialState,
     "the second identity must receive its own exact initialized state");
+
+  // The identity is the full pair, not either field in isolation. Probe both
+  // partial collisions so a provider keyed only by registrySetId or only by
+  // key fingerprint cannot accidentally pass the isolation checks.
+  const partialIdentityProbes = [
+    {
+      label: "same registry-set identifier with a different key fingerprint",
+      identity: Object.freeze({
+        registrySetId: identity.registrySetId,
+        governanceKeyFingerprintSha256: sha256("D3M-24 alternate key " + randomUUID()),
+      }),
+    },
+    {
+      label: "same key fingerprint with a different registry-set identifier",
+      identity: Object.freeze({
+        registrySetId: "provider-conformance-" + randomUUID(),
+        governanceKeyFingerprintSha256: identity.governanceKeyFingerprintSha256,
+      }),
+    },
+  ];
+  const partialIdentitySnapshots = [];
+  for (const probe of partialIdentityProbes) {
+    assert.equal(await reopenedProvider.readState(probe.identity), null,
+      "a distinct registry-set identity must not alias an existing governance state");
+    const probeState = createTrustRegistryGovernanceInitialState({
+      ...probe.identity,
+      bootstrapMinimumSequence,
+      now: new Date("2026-11-05T12:03:30.000Z"),
+    });
+    const probeInitialized = assertWriteResult(
+      await reopenedProvider.initializeStateIfAbsent({
+        identity: probe.identity,
+        state: clone(probeState),
+      }),
+      "created",
+      probe.identity,
+      probe.label + " initialize result",
+    );
+    assert.equal(probeInitialized.created, true,
+      probe.label + " must initialize a separate record");
+    assert.deepEqual(probeInitialized.state, probeState,
+      probe.label + " must retain its own exact state");
+    const probeReadBack = assertSnapshot(
+      await reopenedProvider.readState(probe.identity),
+      probe.identity,
+      probe.label + " read-back",
+    );
+    assert.deepEqual(probeReadBack.state, probeState);
+    assert.equal(probeReadBack.version, probeInitialized.version);
+    assert.deepEqual(probeReadBack.anchor, probeInitialized.anchor);
+    partialIdentitySnapshots.push({ identity: probe.identity, snapshot: probeReadBack });
+  }
+
+  const secondIdentityAfterPartialInitializations = assertSnapshot(
+    await reopenedProvider.readState(secondIdentity),
+    secondIdentity,
+    "second identity after partial identity initializations",
+  );
+  assert.deepEqual(secondIdentityAfterPartialInitializations.state, secondInitialized.state,
+    "initializing partial-collision identities must not overwrite the complete second identity");
+  assert.equal(secondIdentityAfterPartialInitializations.version, secondInitialized.version);
+  assert.deepEqual(secondIdentityAfterPartialInitializations.anchor, secondInitialized.anchor);
+
+  for (const [index, probe] of partialIdentitySnapshots.entries()) {
+    const readBack = assertSnapshot(
+      await reopenedProvider.readState(probe.identity),
+      probe.identity,
+      "partial identity isolation re-check " + index,
+    );
+    assert.deepEqual(readBack.state, probe.snapshot.state);
+    assert.equal(readBack.version, probe.snapshot.version);
+    assert.deepEqual(readBack.anchor, probe.snapshot.anchor);
+  }
+
   const firstIdentityAfterSecondInitialize = assertSnapshot(
     await reopenedProvider.readState(identity),
     identity,
-    "first identity after second identity initialization",
+    "first identity after all other identity initializations",
   );
   assert.deepEqual(firstIdentityAfterSecondInitialize.state, afterCompetingCommit.state,
     "initializing another registry identity must not overwrite any field of the first identity's latest state");
