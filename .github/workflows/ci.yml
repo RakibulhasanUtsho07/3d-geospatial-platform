@@ -86,6 +86,7 @@ on:
       - integration/p37-floorplan-refresh-20261103
       - integration/p34-main-after-p37-20261103
       - feat/brf04-open-boundary-disconnected-regressions-20261107
+      - feat/glb-qa-ignore-unreferenced-vertices-20261107
 
   workflow_dispatch:
   pull_request:
@@ -140,6 +141,7 @@ on:
       - development
       - feat/d3m02-generation-job-map-publish-20261101
       - feat/brf04-topology-defect-regression-20261103
+      - feat/brf04-open-boundary-disconnected-regressions-20261107
 
       - feat/d3m01g-registry-preflight-20261031
       - feat/d3m01c-candidate-evidence-handoff-20261030

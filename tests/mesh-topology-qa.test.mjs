@@ -23,6 +23,23 @@ test("welds duplicated seam vertices so adjacent textured triangles remain one c
   assert.ok(!result.warnings.includes("disconnected-mesh-components-present"));
 });
 
+test("ignores unreferenced positions when computing topology scale and vertex limits", () => {
+  const positions = new Float32Array([
+    0, 0, 0, 1, 0, 0, 0, 1, 0,
+    1000000, -1000000, 2000000,
+  ]);
+  const result = analyzeTriangleTopology(positions, triangleIndices([0, 1, 2]), {
+    maxTopologyVertices: 3,
+  });
+
+  assert.equal(result.vertexCount, 4);
+  assert.equal(result.referencedVertexCount, 3);
+  assert.equal(result.unreferencedVertexCount, 1);
+  assert.equal(result.modelDiagonal, Number(Math.SQRT2.toFixed(6)));
+  assert.equal(result.topologyAnalyzed, true, "unused positions do not consume the referenced-vertex limit");
+  assert.ok(!result.warnings.includes("long-triangle-edges-present"));
+});
+
 test("detects detached triangle islands and reports the small detached component", () => {
   const positions = new Float32Array([
     0, 0, 0, 1, 0, 0, 0, 1, 0,

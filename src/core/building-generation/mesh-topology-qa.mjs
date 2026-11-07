@@ -82,10 +82,23 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   const settings = validateOptions(options);
   const vertexCount = positions.length / 3;
   const triangleCount = indices.count / 3;
+  const referenced = new Uint8Array(vertexCount);
+  let referencedVertexCount = 0;
+  for (let i = 0; i < indices.count; i++) {
+    const index = indices.read(i);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= vertexCount) {
+      throw new RangeError("topology triangle index is outside the POSITION accessor");
+    }
+    if (!referenced[index]) {
+      referenced[index] = 1;
+      referencedVertexCount++;
+    }
+  }
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-  for (let i = 0; i < positions.length; i += 3) {
+  for (let i = 0; i < vertexCount; i++) {
+    if (!referenced[i]) continue;
     for (let axis = 0; axis < 3; axis++) {
-      const value = positions[i + axis];
+      const value = positions[i * 3 + axis];
       if (!validNumber(value)) throw new TypeError("topology positions contain a non-finite coordinate");
       min[axis] = Math.min(min[axis], value);
       max[axis] = Math.max(max[axis], value);
@@ -127,6 +140,8 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
 
   const common = {
     vertexCount,
+    referencedVertexCount,
+    unreferencedVertexCount: vertexCount - referencedVertexCount,
     triangleCount,
     modelDiagonal: Number(diagonal.toFixed(6)),
     longEdgeThreshold: Number(longEdgeThreshold.toFixed(6)),
@@ -150,7 +165,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
     warnings: [],
   };
 
-  if (vertexCount > settings.maxTopologyVertices) {
+  if (referencedVertexCount > settings.maxTopologyVertices) {
     common.topologySkipReason = "vertex-limit";
     common.warnings.push("topology-analysis-skipped-vertex-limit");
     if (common.elongatedTriangleRatio > settings.maxLongEdgeTriangleRatio) common.warnings.push("long-triangle-edges-present");
@@ -162,6 +177,7 @@ export function analyzeTriangleTopology(positions, indices, options = {}) {
   const coordinateKeys = new Map();
   let weldedVertexCount = 0;
   for (let i = 0; i < vertexCount; i++) {
+    if (!referenced[i]) continue;
     const x = Math.round((positions[i * 3] - min[0]) / tolerance);
     const y = Math.round((positions[i * 3 + 1] - min[1]) / tolerance);
     const z = Math.round((positions[i * 3 + 2] - min[2]) / tolerance);

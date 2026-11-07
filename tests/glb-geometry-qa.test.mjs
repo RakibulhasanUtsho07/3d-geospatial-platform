@@ -58,6 +58,28 @@ test("includes topology review hints in the final GLB quality report",()=>{
  assert.ok(report.warnings.includes("open-boundary-edges-present"));
 });
 
+test("ignores unreferenced positions for model bounds and topology scale while reporting them",()=>{
+ const glb=makeGlb([
+  0,0,0,1,0,0,0,1,0,
+  1000000,-1000000,2000000
+ ],[0,1,2]);
+ const report=analyzeGlbQuality(glb),topology=report.meshDetails[0].topology;
+ assert.equal(report.counts.vertexCount,4);
+ assert.equal(report.counts.referencedVertexCount,3);
+ assert.equal(report.counts.unreferencedVertexCount,1);
+ assert.equal(report.meshDetails[0].referencedVertexCount,3);
+ assert.equal(report.meshDetails[0].unreferencedVertexCount,1);
+ assert.deepEqual(report.bounds.min,[0,0,0]);
+ assert.deepEqual(report.bounds.max,[1,1,0]);
+ assert.deepEqual(report.bounds.dimensions,[1,1,0]);
+ assert.equal(topology.modelDiagonal,Number(Math.SQRT2.toFixed(6)));
+ assert.equal(topology.referencedVertexCount,3);
+ assert.equal(topology.unreferencedVertexCount,1);
+ assert.equal(topology.topologyAnalyzed,true);
+ assert.ok(report.warnings.includes("unreferenced-vertices-present"));
+ assert.ok(!report.warnings.includes("long-triangle-edges-present"));
+});
+
 test("detects degenerate triangles for operator review",()=>{
  const glb=makeGlb([0,0,0,1,0,0,2,0,0],[0,1,2]),report=analyzeGlbQuality(glb);
  assert.equal(report.counts.degenerateTriangleCount,1);assert.ok(report.warnings.includes("degenerate-triangles-present"));
@@ -67,6 +89,7 @@ test("rejects malformed GLB data, invalid indices and non-finite coordinates",()
  assert.throws(()=>analyzeGlbQuality(Buffer.from("not a glb")),/GLB 2.0/);
  assert.throws(()=>analyzeGlbQuality(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,9])),/outside its POSITION accessor/);
  assert.throws(()=>analyzeGlbQuality(makeGlb([0,0,0,1,0,0,Number.NaN,1,0],[0,1,2])),/non-finite/);
+ assert.throws(()=>analyzeGlbQuality(makeGlb([0,0,0,1,0,0,0,1,0,Number.NaN,1,2],[0,1,2])),/non-finite/);
 });
 test("bounds vertex scanning to guard a malformed or unexpectedly huge asset",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);

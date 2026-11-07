@@ -88,7 +88,7 @@ export function analyzeGlbQuality(input,options={}){
  const {gltf,binary,bufferLength}=parseGlb(input),views=gltf.bufferViews||[],accessors=gltf.accessors||[];
  const maxVertices=options.maxVertices??5_000_000;
  if(!Number.isSafeInteger(maxVertices)||maxVertices<3||maxVertices>20_000_000)throw new RangeError("maxVertices must be between 3 and 20000000");
- let vertexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
+ let vertexCount=0,referencedVertexCount=0,unreferencedVertexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],warnings=[],meshDetails=[],topologyWarnings=new Set();
  for(let meshIndex=0;meshIndex<gltf.meshes.length;meshIndex++){
   const mesh=gltf.meshes[meshIndex];
@@ -100,14 +100,17 @@ export function analyzeGlbQuality(input,options={}){
    if(!Number.isSafeInteger(positionIndex)||!accessors[positionIndex])throw new TypeError(label+" has no valid POSITION accessor");
    const positions=readPositions(accessors[positionIndex],views,binary,bufferLength,label+" positions",maxVertices);
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
-   for(let i=0;i<positions.length;i+=3){min[0]=Math.min(min[0],positions[i]);min[1]=Math.min(min[1],positions[i+1]);min[2]=Math.min(min[2],positions[i+2]);max[0]=Math.max(max[0],positions[i]);max[1]=Math.max(max[1],positions[i+1]);max[2]=Math.max(max[2],positions[i+2]);}
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");
    const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label);
-   let degenerate=0;
+   const referenced=new Uint8Array(count);
+   let primitiveReferencedVertexCount=0,degenerate=0;
    for(let i=0;i<indices.count;i+=3){
     const ia=indices.read(i),ib=indices.read(i+1),ic=indices.read(i+2);
     if(ia>=count||ib>=count||ic>=count){indexOutOfRangeCount++;continue;}
+    if(!referenced[ia]){referenced[ia]=1;primitiveReferencedVertexCount++;}
+    if(!referenced[ib]){referenced[ib]=1;primitiveReferencedVertexCount++;}
+    if(!referenced[ic]){referenced[ic]=1;primitiveReferencedVertexCount++;}
     const ax=positions[ia*3],ay=positions[ia*3+1],az=positions[ia*3+2];
     const ux=positions[ib*3]-ax,uy=positions[ib*3+1]-ay,uz=positions[ib*3+2]-az;
     const vx=positions[ic*3]-ax,vy=positions[ic*3+1]-ay,vz=positions[ic*3+2]-az;
@@ -115,6 +118,15 @@ export function analyzeGlbQuality(input,options={}){
     if(!finite(area)||area<=1e-10)degenerate++;
    }
    if(indexOutOfRangeCount)throw new RangeError(label+" contains triangle indices outside its POSITION accessor");
+   const primitiveUnreferencedVertexCount=count-primitiveReferencedVertexCount;
+   referencedVertexCount+=primitiveReferencedVertexCount;
+   unreferencedVertexCount+=primitiveUnreferencedVertexCount;
+   for(let i=0;i<count;i++){
+    if(!referenced[i])continue;
+    const offset=i*3,x=positions[offset],y=positions[offset+1],z=positions[offset+2];
+    min[0]=Math.min(min[0],x);min[1]=Math.min(min[1],y);min[2]=Math.min(min[2],z);
+    max[0]=Math.max(max[0],x);max[1]=Math.max(max[1],y);max[2]=Math.max(max[2],z);
+   }
    const triangles=indices.count/3;triangleCount+=triangles;degenerateTriangleCount+=degenerate;
    const topology=analyzeTriangleTopology(positions,indices,{
     maxTopologyVertices:options.maxTopologyVertices,
@@ -125,13 +137,14 @@ export function analyzeGlbQuality(input,options={}){
     maxSmallComponentTriangles:options.maxSmallComponentTriangles
    });
    for(const warning of topology.warnings)topologyWarnings.add(warning);
-   meshDetails.push({meshIndex,primitiveIndex,vertexCount:count,triangleCount:triangles,degenerateTriangleCount:degenerate,materialIndex:primitive.material??null,topology});
+   meshDetails.push({meshIndex,primitiveIndex,vertexCount:count,referencedVertexCount:primitiveReferencedVertexCount,unreferencedVertexCount:primitiveUnreferencedVertexCount,triangleCount:triangles,degenerateTriangleCount:degenerate,materialIndex:primitive.material??null,topology});
   }
  }
  if(!primitiveCount||!triangleCount)throw new TypeError("GLB contains no triangle geometry supported by this QA adapter");
  const bounds=computeBounds(min,max),degenerateRatio=degenerateTriangleCount/triangleCount;
  if(triangleCount<12)warnings.push("very-small-triangle-count");
  if(degenerateTriangleCount)warnings.push("degenerate-triangles-present");
+ if(unreferencedVertexCount)warnings.push("unreferenced-vertices-present");
  const maxDegenerateRatio=options.maxDegenerateTriangleRatio??0.01;
  if(degenerateRatio>maxDegenerateRatio)warnings.push("degenerate-triangle-ratio-exceeds-threshold");
  warnings.push(...topologyWarnings);
@@ -147,8 +160,8 @@ export function analyzeGlbQuality(input,options={}){
  const status=warnings.length?"review-recommended":"basic-geometry-check-passed";
  return {
   schemaVersion:"1.0.0",engine:"glb-geometry-qa-v2",status,valid:true,format:"glb",
-  counts:{meshCount:gltf.meshes.length,primitiveCount,vertexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
+  counts:{meshCount:gltf.meshes.length,primitiveCount,vertexCount,referencedVertexCount,unreferencedVertexCount,triangleCount,degenerateTriangleCount,degenerateTriangleRatio:Number(degenerateRatio.toFixed(6)),materialCount:materials.length,textureCount:textures.length,imageCount:images.length,embeddedImageCount:embeddedImages},
   bounds,meshDetails,warnings,externalUris,
-  limitations:["Geometry QA verifies GLB structure and computes heuristic mesh-topology hints; it does not verify architectural fidelity, real-world scale, up-axis, WGS84 georeference, camera calibration, or same-building identity.","Boundary edges can be expected on intentionally open surfaces; disconnected components can also be legitimate separate architectural parts, so topology warnings require visual review.","Topology analysis welds near-coincident positions using a scale-relative tolerance and may be skipped above the configured per-primitive vertex limit.","Bounds are model-space values unless independently calibrated."],
+  limitations:["Geometry QA verifies GLB structure and computes heuristic mesh-topology hints; it does not verify architectural fidelity, real-world scale, up-axis, WGS84 georeference, camera calibration, or same-building identity.","Boundary edges can be expected on intentionally open surfaces; disconnected components can also be legitimate separate architectural parts, so topology warnings require visual review.","Unreferenced POSITION entries remain subject to accessor-size and finite-coordinate validation, but do not affect model bounds, model diagonal or topology scale; they are counted and reported separately.","Topology analysis welds near-coincident positions using a scale-relative tolerance and may be skipped above the configured per-primitive referenced-vertex limit.","Bounds are model-space values unless independently calibrated."],
  };
 }
