@@ -21,18 +21,31 @@ function syntheticProvider({
   raceInitializeIfAbsent = false,
   raceCompareAndSet = false,
   ignoreRegistryIdentity = false,
+  identityKeyMode = "complete",
+  overwriteExistingOnInitialize = false,
   corruptAnchor = false,
   reuseVersionOnWrite = false,
   cycleVersionOnSecondWrite = false,
   rollbackAnchorOnCompareAndSet = false,
 } = {}) {
   const records = new Map();
-  const identityKey = (identity) => JSON.stringify([
-    identity.registrySetId,
-    identity.governanceKeyFingerprintSha256,
-  ]);
+  const identityKey = (identity) => {
+    if (identityKeyMode === "registrySetId") return identity.registrySetId;
+    if (identityKeyMode === "governanceKeyFingerprintSha256") {
+      return identity.governanceKeyFingerprintSha256;
+    }
+    return JSON.stringify([
+      identity.registrySetId,
+      identity.governanceKeyFingerprintSha256,
+    ]);
+  };
   const lookupRecord = (identity) => records.get(identityKey(identity)) ??
     (ignoreRegistryIdentity ? records.values().next().value : undefined);
+  const verifyIdentity = (record, identity) => {
+    if (!ignoreRegistryIdentity && identityKeyMode === "complete") {
+      assertIdentity(record, identity);
+    }
+  };
   const version = (record) => cycleVersionOnSecondWrite && record.generation >= 3
     ? "generation-1"
     : "generation-" + record.generation;
@@ -59,13 +72,18 @@ function syntheticProvider({
     async readState(identity) {
       const record = lookupRecord(identity);
       if (!record) return null;
-      if (!ignoreRegistryIdentity) assertIdentity(record, identity);
+      verifyIdentity(record, identity);
       return snapshot(record);
     },
     async initializeStateIfAbsent({ identity, state: requestedState }) {
       const existing = lookupRecord(identity);
       if (existing) {
-        if (!ignoreRegistryIdentity) assertIdentity(existing, identity);
+        verifyIdentity(existing, identity);
+        if (overwriteExistingOnInitialize) {
+          existing.state = clone(requestedState);
+          existing.generation += 1;
+          existing.anchor = anchorFor(existing.state);
+        }
         return { created: false, ...snapshot(existing) };
       }
       // In the intentionally broken fixture, all callers observe "empty"
@@ -84,7 +102,7 @@ function syntheticProvider({
     async compareAndSetState({ identity, expectedVersion, expectedStateSha256, nextState }) {
       const record = lookupRecord(identity);
       if (!record) throw new Error("synthetic provider record is missing");
-      if (!ignoreRegistryIdentity) assertIdentity(record, identity);
+      verifyIdentity(record, identity);
       if (!ignoreCompareAndSetVersion &&
           (expectedVersion !== version(record) || expectedStateSha256 !== record.state.stateSha256)) {
         const rejected = snapshot(record);
@@ -154,6 +172,33 @@ test("provider conformance suite rejects a provider that aliases distinct regist
       ...syntheticProvider({ ignoreRegistryIdentity: true }),
     }),
     /distinct registry-set identity must not alias an existing governance state/i,
+  );
+});
+
+test("provider conformance suite rejects providers keyed only by registry-set identifier", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ identityKeyMode: "registrySetId" }),
+    }),
+    /distinct registry-set identity must not alias an existing governance state/i,
+  );
+});
+
+test("provider conformance suite rejects providers keyed only by governance-key fingerprint", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ identityKeyMode: "governanceKeyFingerprintSha256" }),
+    }),
+    /distinct registry-set identity must not alias an existing governance state/i,
+  );
+});
+
+test("provider conformance suite rejects initialize-if-absent overwriting existing state", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ overwriteExistingOnInitialize: true }),
+    }),
+    /repeated initialize-if-absent must preserve the exact existing state/i,
   );
 });
 
