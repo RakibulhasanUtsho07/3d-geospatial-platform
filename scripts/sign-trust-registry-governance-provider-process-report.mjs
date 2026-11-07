@@ -78,6 +78,9 @@ async function main() {
     return;
   }
   const options = parseArguments(args);
+  if (path.basename(options.reportPath) !== "provider-process-conformance.json") {
+    throw new Error("process report filename must be provider-process-conformance.json");
+  }
   const registry = process.env[REGISTRY_ENV];
   if (typeof registry !== "string" || !registry.trim()) throw new Error("trusted-reviewer-registry-secret-missing");
   if (Buffer.byteLength(registry, "utf8") > 64 * 1024) throw new Error("trusted-reviewer-registry-secret-exceeds-size-limit");
