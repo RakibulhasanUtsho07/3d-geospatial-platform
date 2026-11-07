@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "manifestId": "d3m25-current-external-provider-qualification",
-  "generatedAtUtc": "2026-11-07T04:15:10.000Z",
+  "generatedAtUtc": "2026-11-07T04:16:33.000Z",
   "source": {
     "repository": "RakibulhasanUtsho07/3d-geospatial-platform",
     "branch": "feat/d3m-engine24-provider-conformance-20261105",
@@ -24,7 +24,7 @@
       "runUrl": "https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337017403",
       "event": "push",
       "headSha": "786d901e5a7ed4effddbbbb563533820276fb4ba",
-      "fullRunConclusion": "in_progress",
+      "fullRunConclusion": "success",
       "providerConformanceStepConclusion": "success",
       "syntheticOnly": true
     },
