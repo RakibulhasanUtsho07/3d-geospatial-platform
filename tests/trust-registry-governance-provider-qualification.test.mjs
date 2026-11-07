@@ -161,7 +161,9 @@ function completeManifest() {
       relativePath: "evidence/" + id + ".json",
       sha256: digest(bytes),
       bytes: Buffer.byteLength(bytes),
-      sourceUrl: "https://evidence.example/" + id,
+      sourceUrl: key === "processRestartVisibility"
+        ? manifest.providerIntegration.runUrl
+        : "https://evidence.example/" + id,
       sourceCommitSha,
     });
     manifest.evidence[key] = {
@@ -633,4 +635,13 @@ test("D3M-27 byte verification also validates process report semantics and exact
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("D3M-27 process report artifact must originate from the exact provider integration workflow", () => {
+  const manifest = completeManifest();
+  const reportArtifact = manifest.artifacts.find((artifact) =>
+    artifact.id === manifest.providerIntegration.processReportArtifactId);
+  reportArtifact.sourceUrl = "https://evidence.example/substituted-run";
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /source URL must identify the exact provider integration workflow run/i);
 });
