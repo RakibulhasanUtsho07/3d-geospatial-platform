@@ -85,54 +85,6 @@ function mutateGlb(glb,mutator){
  mutator(state);
  return packGlb(state.json,state.binary);
 }
-function unpackGlb(glb){
- const jsonLength=glb.readUInt32LE(12);
- const json=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
- const binaryStart=20+jsonLength+8;
- const binary=Buffer.from(glb.subarray(binaryStart));
- const declaredLength=json.buffers?.[0]?.byteLength??binary.length;
- return {json,binary:binary.subarray(0,declaredLength)};
-}
-function packGlb(json,binary){
- json.buffers??=[{byteLength:binary.length}];
- json.buffers[0].byteLength=binary.length;
- const jsonRaw=Buffer.from(JSON.stringify(json)),jsonPad=(4-jsonRaw.length%4)%4;
- const jsonChunk=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
- const binPad=(4-binary.length%4)%4,binChunk=binPad?Buffer.concat([binary,Buffer.alloc(binPad)]):binary;
- const total=12+8+jsonChunk.length+8+binChunk.length,header=Buffer.alloc(12);
- header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
- const jh=Buffer.alloc(8);jh.writeUInt32LE(jsonChunk.length,0);jh.writeUInt32LE(0x4e4f534a,4);
- const bh=Buffer.alloc(8);bh.writeUInt32LE(binChunk.length,0);bh.writeUInt32LE(0x004e4942,4);
- return Buffer.concat([header,jh,jsonChunk,bh,binChunk]);
-}
-function addSparseView(state,bytes,alignment=4,viewExtra={}){
- const padding=(alignment-state.binary.length%alignment)%alignment;
- if(padding)state.binary=Buffer.concat([state.binary,Buffer.alloc(padding)]);
- const byteOffset=state.binary.length;
- state.binary=Buffer.concat([state.binary,bytes]);
- return state.json.bufferViews.push({buffer:0,byteOffset,byteLength:bytes.length,...viewExtra})-1;
-}
-function encodeUInt(values,componentType){
- const bytes=componentType===5121?1:componentType===5123?2:4;
- const buffer=Buffer.alloc(values.length*bytes);
- values.forEach((value,index)=>{
-  if(bytes===1)buffer.writeUInt8(value,index);
-  else if(bytes===2)buffer.writeUInt16LE(value,index*bytes);
-  else buffer.writeUInt32LE(value,index*bytes);
- });
- return buffer;
-}
-function encodeFloat(values){
- const buffer=Buffer.alloc(values.length*4);
- values.forEach((value,index)=>buffer.writeFloatLE(value,index*4));
- return buffer;
-}
-function mutateGlb(glb,mutator){
- const state=unpackGlb(glb);
- state.json.bufferViews??=[];
- mutator(state);
- return packGlb(state.json,state.binary);
-}
 test("applies sparse POSITION replacements over a dense base accessor",()=>{
  const glb=mutateGlb(makeGlb([0,0,0,0,0,0,0,0,0],[0,1,2]),state=>{
   const indexView=addSparseView(state,Buffer.from([1,2]),1);
