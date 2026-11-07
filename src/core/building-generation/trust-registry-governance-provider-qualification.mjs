@@ -340,6 +340,11 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     throw new TypeError("provider integration cannot claim a run when the provider is not provisioned");
   }
   if (providerIntegration.status !== "not-run" &&
+      (providerIntegration.runId === conformanceCi.push.runId ||
+       providerIntegration.runId === conformanceCi.pullRequest.runId)) {
+    throw new TypeError("provider integration must use a separate run from the D3M-24 synthetic conformance workflows");
+  }
+  if (providerIntegration.status !== "not-run" &&
       (providerIntegration.providerInstanceFingerprintSha256 !== provider.instanceFingerprintSha256 ||
        providerIntegration.providerNamespaceFingerprintSha256 !== provider.namespaceFingerprintSha256)) {
     throw new TypeError("provider integration evidence is bound to a different provider instance or namespace");
