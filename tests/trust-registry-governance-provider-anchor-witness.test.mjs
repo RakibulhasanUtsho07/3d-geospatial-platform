@@ -135,7 +135,7 @@ test("D3M-29 accepts a fresh witness signed by one active independent-anchor reg
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -151,7 +151,7 @@ test("D3M-29 rejects a stale challenge even when its original witness signature 
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     expectedContext: context,
     now: new Date(now.getTime() + 301_000),
   });
@@ -164,7 +164,7 @@ test("D3M-29 rejects a challenge/provider-context substitution", () => {
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     expectedContext: { ...context, providerId: "another-provider" },
     now: new Date(now.getTime() + 2_000),
   });
@@ -178,7 +178,7 @@ test("D3M-29 rejects tampering with exact challenge bytes", () => {
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: altered,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
   });
@@ -200,7 +200,7 @@ test("D3M-29 rejects a revoked anchor key", () => {
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: registry,
+    independentAnchorKeyRegistry: canonicalJson(registry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -215,7 +215,7 @@ test("D3M-29 rejects altered witness signature bytes", () => {
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: Buffer.from(canonicalJson(changed) + "\n", "utf8"),
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -242,7 +242,7 @@ test("D3M-29 rejects a registry that does not match the separately operator-pinn
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     independentAnchorGovernanceKeyFingerprintSha256: "9".repeat(64),
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -260,7 +260,7 @@ test("D3M-29 rejects non-canonical challenge and witness JSON bytes", () => {
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: prettyChallenge,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: value.registry,
+    independentAnchorKeyRegistry: canonicalJson(value.registry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -287,6 +287,26 @@ test("D3M-29 rejects a registry governance signature altered after signing", () 
   assert.ok(report.errors.some((item) => item.code === "independent-anchor-registry-invalid"));
 });
 
+
+test("D3M-29 rejects duplicate-key JSON in the operator registry string", () => {
+  const value = fixture();
+  const canonical = canonicalJson(value.registry);
+  const duplicated = canonical.replace(
+    '"registryId":',
+    '"registryId":"substituted-registry","registryId":',
+  );
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: duplicated,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "independent-anchor-registry-invalid"));
+});
+
 test("D3M-29 rejects an unsigned or tampered anchor-key registry even with a matching fingerprint pin", () => {
   const value = fixture();
   const tamperedRegistry = structuredClone(value.registry);
@@ -295,7 +315,7 @@ test("D3M-29 rejects an unsigned or tampered anchor-key registry even with a mat
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
-    independentAnchorKeyRegistry: tamperedRegistry,
+    independentAnchorKeyRegistry: canonicalJson(tamperedRegistry),
     independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
