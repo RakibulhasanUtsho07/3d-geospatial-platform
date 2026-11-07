@@ -303,9 +303,15 @@ test("D3M-28 signing CLI fails closed without the registry and for symlinked pri
   const reportPath = path.join(root, "provider-process-conformance.json");
   const privateKeyPath = path.join(root, "reviewer-private.pem");
   const symlinkPath = path.join(root, "reviewer-private-link.pem");
+  const symlinkDirectory = path.join(root, "report-directory-link");
+  const weakPrivateKeyPath = path.join(root, "reviewer-private-weak-permissions.pem");
   await writeFile(reportPath, fixture.bytes);
   await writeFile(privateKeyPath, fixture.pair.privateKeyPem, { mode: 0o600 });
   await symlink(privateKeyPath, symlinkPath);
+  await symlink(root, symlinkDirectory, "dir");
+  if (process.platform !== "win32") {
+    await writeFile(weakPrivateKeyPath, fixture.pair.privateKeyPem, { mode: 0o644 });
+  }
   const missingRegistry = runSignerCli([reportPath, privateKeyPath, "--reviewer-id", "d3m28-reviewer"], {
     NODE_ENV: "production",
     RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: "",
@@ -318,5 +324,26 @@ test("D3M-28 signing CLI fails closed without the registry and for symlinked pri
   });
   assert.equal(symlinkedKey.status, 1);
   assert.match(symlinkedKey.stderr, /regular non-symlink/);
+
+  const symlinkedReport = runSignerCli([
+    path.join(symlinkDirectory, "provider-process-conformance.json"),
+    privateKeyPath,
+    "--reviewer-id",
+    "d3m28-reviewer",
+  ], {
+    NODE_ENV: "production",
+    RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: JSON.stringify(fixture.trustedReviewerRegistry),
+  });
+  assert.equal(symlinkedReport.status, 1);
+  assert.match(symlinkedReport.stderr, /symlinked directory/);
+
+  if (process.platform !== "win32") {
+    const weakPermissions = runSignerCli([reportPath, weakPrivateKeyPath, "--reviewer-id", "d3m28-reviewer"], {
+      NODE_ENV: "production",
+      RECONSTRUCTION_TRUSTED_REVIEWER_KEYS_JSON: JSON.stringify(fixture.trustedReviewerRegistry),
+    });
+    assert.equal(weakPermissions.status, 1);
+    assert.match(weakPermissions.stderr, /permissions must deny group and other access/);
+  }
   await assert.rejects(lstat(reportPath + ".sig.json"), { code: "ENOENT" });
 });
