@@ -170,3 +170,44 @@ test("D3M-27 requires the validation context itself to be complete and non-ambig
     report(), { ...expected(), adapterModuleSha256: "not-a-hash" },
   ), /adapterModuleSha256/i);
 });
+
+test("synthetic reports may omit deployment fingerprints but real-provider reports may not", () => {
+  const syntheticReport = report({
+    adapterDeclaredSyntheticOnly: true,
+    providerInstanceFingerprintSha256: null,
+    providerNamespaceFingerprintSha256: null,
+  });
+  const syntheticExpected = expected({
+    syntheticOnly: true,
+    instanceFingerprintSha256: null,
+    namespaceFingerprintSha256: null,
+  });
+  assert.equal(
+    validateTrustRegistryGovernanceProviderProcessReport(syntheticReport, syntheticExpected).processIsolationVerified,
+    true,
+  );
+  assert.throws(() => validateTrustRegistryGovernanceProviderProcessReport(
+    report({ providerInstanceFingerprintSha256: null }),
+    expected(),
+  ), /providerInstanceFingerprintSha256/);
+});
+
+test("D3M-27 JSON Schema stays aligned with the semantic validator contract", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const schemaUrl = new URL("../trust-registry-governance-provider-process-report.schema.json", import.meta.url);
+  const schema = JSON.parse(await readFile(schemaUrl, "utf8"));
+  assert.deepEqual(Object.keys(schema.properties).sort(), [
+    "schemaVersion", "sourceCommitSha", "providerId", "adapterModuleSha256",
+    "adapterDeclaredSyntheticOnly", "providerInstanceFingerprintSha256",
+    "providerNamespaceFingerprintSha256", "executionMode", "processIsolationVerified",
+    "workerProcessesStarted", "uniqueWorkerInstances", "uniqueWorkerProcessIds",
+    "conformance", "trustBoundary",
+  ].sort());
+  assert.deepEqual(Object.keys(schema.properties.conformance.properties).sort(), [
+    "providerId", "initializeContenders", "initializeWinners", "casContenders", "casWinners",
+    "staleCasRejected", "freshProviderReopened", "freshReadMatched", "ambiguousCommitRecovered",
+    "preCommitTimeoutSafeRetry", "ambiguousCompetingWinnerDetected", "identityIsolationVerified",
+    "finalRevision", "finalMinimumAcceptedSequence",
+  ].sort());
+  assert.equal(schema.additionalProperties, false);
+});
