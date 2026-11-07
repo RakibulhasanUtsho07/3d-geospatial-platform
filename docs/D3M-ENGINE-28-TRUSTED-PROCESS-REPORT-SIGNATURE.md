@@ -25,10 +25,10 @@ node scripts/sign-trust-registry-governance-provider-process-report.mjs \
   artifacts/provider-process-conformance.json \
   /secure/keys/reviewer-ed25519-private.pem \
   --reviewer-id <registered-reviewer-id> \
-  --signature artifacts/provider-process-report.sig.json
+  --signature artifacts/provider-process-conformance.json.sig.json
 ```
 
-The default output is `<report-path>.sig.json` when `--signature` is omitted. Existing signature files are never overwritten; choose a new path for a new signing operation.
+The input basename must be exactly `provider-process-conformance.json`; this canonical name is included in the signed envelope. The default output is `<report-path>.sig.json` when `--signature` is omitted. Existing signature files are never overwritten; choose a new path for a new signing operation.
 
 Limits and filesystem controls:
 - report: regular non-symlink file, 1 MiB maximum;
@@ -37,7 +37,7 @@ Limits and filesystem controls:
 - signature envelope: 64 KiB maximum;
 - output: exclusive create, mode `0600`, parent directory must be a real directory and not a symlink.
 
-The signer validates the D3M-26 report schema before signing. Signing does not make a synthetic report non-synthetic.
+The signer validates the D3M-26 report schema before signing. The detached envelope binds `processReportSha256`, source/provider/adapter and instance/namespace fingerprints, trusted reviewer/key/registry metadata and key-validity timestamps; `productionQualificationEligible` is fixed to `false`. Signing does not make a synthetic report non-synthetic.
 
 ## D3M-25 schema 1.2.0 binding
 
