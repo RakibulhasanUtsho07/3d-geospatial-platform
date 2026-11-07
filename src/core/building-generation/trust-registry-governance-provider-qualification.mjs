@@ -442,6 +442,17 @@ export function normalizeTrustRegistryProviderQualificationManifest(input = {}) 
     throw new TypeError("D3M-27 verified processRestartVisibility requires the exact passed provider integration report");
   }
 
+  if (schemaVersion === "1.2.0" && providerIntegration.status === "passed") {
+    const signatureArtifact = artifactsById.get(providerIntegration.processReportSignatureArtifactId);
+    if (!signatureArtifact || signatureArtifact.type !== "process-report-signature" || signatureArtifact.status !== "present") {
+      throw new TypeError("D3M-28 provider integration must reference a present process-report-signature artifact");
+    }
+    if (signatureArtifact.sourceUrl !== providerIntegration.runUrl ||
+        signatureArtifact.sourceCommitSha !== source.commitSha) {
+      throw new TypeError("D3M-28 process-report signature artifact must identify the exact provider integration workflow run and source commit");
+    }
+  }
+
   return {
     schemaVersion,
     manifestId,
