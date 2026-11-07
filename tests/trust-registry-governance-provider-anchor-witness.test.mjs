@@ -98,6 +98,7 @@ function fixture(overrides = {}) {
     publicKeyPem,
     anchorFingerprint,
     privateKey,
+    independentAnchorGovernanceKeyFingerprintSha256: governanceFingerprint,
   };
 }
 
@@ -198,4 +199,20 @@ test("D3M-29 challenge nonce is fresh, 256-bit, and TTL is bounded", () => {
     ttlSeconds: 601,
     now,
   }), /between 1 and 600/);
+});
+
+
+test("D3M-29 rejects a registry that does not match the separately operator-pinned governance key", () => {
+  const value = fixture();
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: value.registry,
+    independentAnchorGovernanceKeyFingerprintSha256: "9".repeat(64),
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "independently-pinned-governance-key"));
+  assert.ok(report.errors.some((item) => item.code === "anchor-registry-binding"));
 });
