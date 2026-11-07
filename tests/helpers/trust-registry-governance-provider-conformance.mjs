@@ -395,15 +395,19 @@ export async function runTrustRegistryGovernanceProviderConformance({
   );
   assert.equal(secondInitialized.created, true,
     "a second registry identity must initialize its own isolated record");
+  assert.deepEqual(secondInitialized.state, secondInitialState,
+    "the second identity must receive its own exact initialized state");
   const firstIdentityAfterSecondInitialize = assertSnapshot(
     await reopenedProvider.readState(identity),
     identity,
     "first identity after second identity initialization",
   );
-  assert.equal(firstIdentityAfterSecondInitialize.state.stateSha256, recovered.state.stateSha256,
-    "initializing another registry identity must not overwrite the first identity's state");
-  assert.equal(firstIdentityAfterSecondInitialize.version, recovered.version,
-    "initializing another registry identity must not change the first identity's version");
+  assert.deepEqual(firstIdentityAfterSecondInitialize.state, afterCompetingCommit.state,
+    "initializing another registry identity must not overwrite any field of the first identity's latest state");
+  assert.equal(firstIdentityAfterSecondInitialize.version, afterCompetingCommit.version,
+    "initializing another registry identity must not change the first identity's latest version");
+  assert.deepEqual(firstIdentityAfterSecondInitialize.anchor, afterCompetingCommit.anchor,
+    "initializing another registry identity must not change the first identity's latest anchor");
 
   return Object.freeze({
     providerId: provider.providerId,
