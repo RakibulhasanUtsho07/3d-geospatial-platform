@@ -273,6 +273,43 @@ test("accepts an omitted base bufferView with no sparse overrides as a zero-init
  assert.equal(report.counts.degenerateTriangleCount,1);
 });
 
+test("validates POSITION bounds for every supported non-triangle primitive mode",()=>{
+ const modes=[0,1,2,3,5,6];
+ for(const mode of modes){
+  const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+  const stale=mutateGlb(base,state=>{
+   const source=state.json.accessors[0];
+   state.json.accessors.push({...source,min:[0,0,0],max:[0.5,1,0]});
+   state.json.meshes[0].primitives.push({attributes:{POSITION:1},mode});
+  });
+  assert.throws(()=>analyzeGlbQuality(stale),/accessor max does not match decoded POSITION values/, "mode "+mode+" must validate stale bounds");
+  const missing=mutateGlb(base,state=>{
+   const source=state.json.accessors[0];
+   const accessor={...source};delete accessor.min;
+   state.json.accessors.push(accessor);
+   state.json.meshes[0].primitives.push({attributes:{POSITION:1},mode});
+  });
+  assert.throws(()=>analyzeGlbQuality(missing),/must define min as three finite numbers/, "mode "+mode+" must require min");
+ }
+});
+
+test("validates but does not count non-triangle primitives in triangle geometry metrics",()=>{
+ const modes=[0,1,2,3,5,6];
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  for(const mode of modes){
+   state.json.accessors.push({...state.json.accessors[0]});
+   state.json.meshes[0].primitives.push({attributes:{POSITION:state.json.accessors.length-1},mode});
+  }
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.meshDetails.length,1);
+ assert.equal(report.counts.vertexCount,3);
+ assert.equal(report.counts.triangleCount,1);
+ for(let i=0;i<modes.length;i++){
+  assert.ok(report.warnings.includes("mesh 0 primitive "+(i+1)+" is not a TRIANGLES primitive and was not counted"));
+ }
+});
+
 test("validates POSITION accessor bounds from every decoded vertex including unreferenced entries",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0,5,-2,3],[0,1,2]);
  const report=analyzeGlbQuality(glb);

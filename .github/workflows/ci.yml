@@ -90,6 +90,7 @@ on:
       - feat/glb-qa-scene-transformed-bounds-20261107
       - feat/glb-qa-sparse-accessors-20261107
       - feat/glb-qa-position-accessor-bounds-20261107
+      - feat/glb-qa-nontriangle-position-bounds-20261107
       - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
   workflow_dispatch:
@@ -150,6 +151,7 @@ on:
       - feat/glb-qa-scene-transformed-bounds-20261107
       - feat/glb-qa-sparse-accessors-20261107
       - feat/glb-qa-position-accessor-bounds-20261107
+      - feat/glb-qa-nontriangle-position-bounds-20261107
       - test/glb-qa-unindexed-and-skipped-bounds-20261107
 
       - feat/d3m01g-registry-preflight-20261031

@@ -44,3 +44,8 @@ Every mesh POSITION accessor must declare three-component `min` and `max` arrays
 For accessors with neither a base `bufferView` nor sparse replacements, glTF defines a zero-initialized accessor and permits the declared `min`/`max` values to be arbitrary representable component values; QA still requires both POSITION bounds fields to be present but does not compare them to zero.
 
 See the [Khronos glTF 2.0 accessor bounds specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-bounds).
+
+
+## POSITION metadata on unsupported primitive topologies
+
+The adapter validates any supplied base `attributes.POSITION` accessor (layout, sparse substitutions, effective finite values and required `min`/`max` metadata) before it skips primitive topologies other than `TRIANGLES`. POINTS, LINES, LINE_LOOP, LINE_STRIP, TRIANGLE_STRIP and TRIANGLE_FAN still do not contribute to triangle counts, topology metrics or aggregate geometry bounds; they receive the existing not-counted warning. A non-triangle primitive without a POSITION attribute remains skipped with an explicit warning.

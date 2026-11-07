@@ -332,12 +332,18 @@ export function analyzeGlbQuality(input,options={}){
   if(!Array.isArray(mesh.primitives)||!mesh.primitives.length)throw new TypeError("mesh "+meshIndex+" contains no primitives");
   for(let primitiveIndex=0;primitiveIndex<mesh.primitives.length;primitiveIndex++){
    const primitive=mesh.primitives[primitiveIndex],label="mesh "+meshIndex+" primitive "+primitiveIndex;
-   if((primitive.mode??4)!==4){warnings.push(label+" is not a TRIANGLES primitive and was not counted");continue;}
-   const positionIndex=primitive.attributes?.POSITION;
+   const mode=primitive.mode??4,positionIndex=primitive.attributes?.POSITION;
+   if(positionIndex===undefined){
+    if(mode!==4){warnings.push(label+" has no POSITION accessor and was not counted");continue;}
+    throw new TypeError(label+" has no valid POSITION accessor");
+   }
    if(!Number.isSafeInteger(positionIndex)||!accessors[positionIndex])throw new TypeError(label+" has no valid POSITION accessor");
+   // POSITION accessor bounds are required independently of primitive topology.
+   // Validate source attributes before skipping topology modes this QA does not analyze.
    const positionAccessor=accessors[positionIndex];
    const positions=readPositions(positionAccessor,views,binary,bufferLength,label+" positions",maxVertices,maxSparseEntries);
    validatePositionAccessorBounds(positionAccessor,positions,label+" POSITION");
+   if(mode!==4){warnings.push(label+" is not a TRIANGLES primitive and was not counted");continue;}
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");

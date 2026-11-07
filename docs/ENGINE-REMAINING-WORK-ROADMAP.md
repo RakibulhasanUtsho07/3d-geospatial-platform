@@ -381,3 +381,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Preserve the glTF no-bufferView/no-sparse zero-initialized exception: bounds fields remain required for POSITION but numeric values are not compared against zero; values must remain representable as float32.
 - Evidence boundary: accessor metadata consistency only; no georeferencing, survey truth, real-world scale or architectural accuracy is implied. All release flags stay false.
 - Exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged.
+
+
+## BRF-04 — POSITION bounds before non-triangle topology skip (2026-11-07)
+
+- Tracking issue: [#403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/403).
+- Gap: the triangle-only GLB QA adapter returned early for non-TRIANGLES modes before validating their supplied POSITION accessor data and mandatory min/max metadata.
+- Validate supported POSITION accessor layout, sparse overlays, effective finite values and float32-rounded accessor bounds before the topology-mode skip.
+- Preserve triangle-only geometry counts, referenced-only aggregate bounds and topology metrics; non-triangle modes remain explicitly not counted. No POSITION attribute on a non-triangle primitive remains an explicit skip.
+- Evidence boundary: accessor-metadata coverage only; no new topology support, survey truth, georeferencing or architectural-accuracy claim. Keep all release gates false.
+- Requires exact-head Push/PR Full CI and human review; keep the child PR Draft/open/unmerged.
