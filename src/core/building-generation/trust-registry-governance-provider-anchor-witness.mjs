@@ -426,7 +426,7 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
         SHA256.test(witness.governancePublicKeyFingerprintSha256 ?? "") &&
         typeof witness.providerVersion === "string" &&
         witness.providerVersion.length >= 1 && witness.providerVersion.length <= 256 &&
-        /^[A-Za-z0-9][A-Za-z0-9._:+/-]{0,255}$/.test(witness.providerVersion) &&
+        /^[A-Za-z0-9][A-Za-z0-9._:+-]{0,255}$/.test(witness.providerVersion) &&
         Number.isSafeInteger(witness.monotonicSequence) && witness.monotonicSequence >= 1 &&
         SHA256.test(witness.authoritativeStateSha256 ?? "") &&
         Number.isFinite(utc(witness.issuedAtUtc, "witness.issuedAtUtc")) &&
