@@ -189,6 +189,8 @@ test("provider process runner help explains the explicit adapter contract", () =
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /--provider-module FILE/);
   assert.match(result.stdout, /--allow-env NAME/);
+  assert.match(result.stdout, /--provider-instance-fingerprint-sha256 SHA256/);
+  assert.match(result.stdout, /--provider-namespace-fingerprint-sha256 SHA256/);
   assert.match(result.stdout, /Never pass secrets as command-line values/i);
 });
 
