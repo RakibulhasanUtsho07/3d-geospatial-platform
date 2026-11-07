@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { canonicalJson } from "../src/core/building-generation/generation-artifact-receipt.mjs";
 import { test } from "node:test";
 import {
+  buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes,
   buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes,
   createTrustRegistryGovernanceProviderAnchorChallenge,
   verifyTrustRegistryGovernanceProviderAnchorWitness,
@@ -23,12 +25,18 @@ function fixture(overrides = {}) {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
   const publicKeyPem = publicKey.export({ type: "spki", format: "pem" });
   const anchorFingerprint = digest(publicKey.export({ type: "spki", format: "der" }));
-  const registry = {
+  const governancePair = generateKeyPairSync("ed25519");
+  const governancePublicKeyPem = governancePair.publicKey.export({ type: "spki", format: "pem" });
+  const governanceFingerprint = digest(
+    governancePair.publicKey.export({ type: "spki", format: "der" }),
+  );
+  const registryUnsigned = {
     schemaVersion: "1.0.0",
     recordType: "d3m29-independent-anchor-key-registry",
     registryId: "independent-anchor-registry-2026",
     registrySetId: "independent-anchor-set-01",
     governancePublicKeyFingerprintSha256: governanceFingerprint,
+    governancePublicKeyPem,
     issuedAtUtc: new Date(now.getTime() - 60_000).toISOString(),
     expiresAtUtc: new Date(now.getTime() + 86_400_000).toISOString(),
     entries: [{
@@ -41,6 +49,16 @@ function fixture(overrides = {}) {
       revokedAtUtc: null,
       replacesKeyId: null,
     }],
+    governanceSignatureBase64: "",
+  };
+  const registrySignature = sign(
+    null,
+    buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({ registry: registryUnsigned }),
+    governancePair.privateKey,
+  );
+  const registry = {
+    ...registryUnsigned,
+    governanceSignatureBase64: registrySignature.toString("base64"),
   };
   const generated = createTrustRegistryGovernanceProviderAnchorChallenge({
     sourceCommitSha: context.sourceCommitSha,
@@ -93,15 +111,16 @@ function fixture(overrides = {}) {
   return {
     ...generated,
     witness,
-    witnessBytes: Buffer.from(JSON.stringify(witness, null, 2) + "\n", "utf8"),
+    witnessBytes: Buffer.from(canonicalJson(witness) + "\\n", "utf8"),
     registry,
     publicKeyPem,
     anchorFingerprint,
     privateKey,
+    governancePrivateKey: governancePair.privateKey,
+    governancePublicKeyPem,
     independentAnchorGovernanceKeyFingerprintSha256: governanceFingerprint,
   };
 }
-
 test("D3M-29 accepts a fresh witness signed by one active independent-anchor registry key", () => {
   const value = fixture();
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
@@ -163,6 +182,12 @@ test("D3M-29 rejects a revoked anchor key", () => {
   const registry = structuredClone(value.registry);
   registry.entries[0].status = "revoked";
   registry.entries[0].revokedAtUtc = new Date(now.getTime() + 1_500).toISOString();
+  registry.governanceSignatureBase64 = "";
+  registry.governanceSignatureBase64 = sign(
+    null,
+    buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({ registry }),
+    value.governancePrivateKey,
+  ).toString("base64");
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
     witnessBytes: value.witnessBytes,
@@ -180,7 +205,7 @@ test("D3M-29 rejects altered witness signature bytes", () => {
   const changed = { ...value.witness, signatureBase64: Buffer.alloc(64, 0x55).toString("base64") };
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
-    witnessBytes: Buffer.from(JSON.stringify(changed), "utf8"),
+    witnessBytes: Buffer.from(canonicalJson(changed) + "\\n", "utf8"),
     independentAnchorKeyRegistry: value.registry,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
@@ -215,4 +240,22 @@ test("D3M-29 rejects a registry that does not match the separately operator-pinn
   assert.equal(report.valid, false);
   assert.ok(report.errors.some((item) => item.code === "independently-pinned-governance-key"));
   assert.ok(report.errors.some((item) => item.code === "anchor-registry-binding"));
+});
+
+
+test("D3M-29 rejects an unsigned or tampered anchor-key registry even with a matching fingerprint pin", () => {
+  const value = fixture();
+  const tamperedRegistry = structuredClone(value.registry);
+  tamperedRegistry.entries[0].publicKeyPem = value.publicKeyPem.replace("KEY", "KEY");
+  tamperedRegistry.entries[0].keyId = "attacker-substituted-key";
+  const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
+    challengeBytes: value.bytes,
+    witnessBytes: value.witnessBytes,
+    independentAnchorKeyRegistry: tamperedRegistry,
+    independentAnchorGovernanceKeyFingerprintSha256: value.independentAnchorGovernanceKeyFingerprintSha256,
+    expectedContext: context,
+    now: new Date(now.getTime() + 2_000),
+  });
+  assert.equal(report.valid, false);
+  assert.ok(report.errors.some((item) => item.code === "independent-anchor-registry-invalid"));
 });
