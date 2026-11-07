@@ -29,7 +29,7 @@ The manifest binds:
 - evidence artifacts identified by unique ID, type, project-relative path, SHA-256, byte count, HTTPS source URL and source commit;
 - one evidence record for every required deployment/security property.
 
-The provider integration evidence must come from an actual provider-specific integration run. The D3M-24 harness currently tests a synthetic in-memory provider; its successful conformance step is useful software validation but is not a real-provider integration result.
+The provider integration evidence must come from a separate actual provider-specific integration run with a run ID different from both D3M-24 synthetic conformance workflows, and must bind the exact instance and isolated namespace fingerprints. The D3M-24 harness currently tests a synthetic in-memory provider; its successful conformance step is useful software validation but is not a real-provider integration result.
 
 ## Required evidence classes
 
