@@ -5,7 +5,10 @@ import path from "node:path";
 import {
   createTrustRegistryGovernanceProviderAnchorChallenge,
 } from "../src/core/building-generation/trust-registry-governance-provider-anchor-witness.mjs";
-import { normalizeTrustRegistryProviderQualificationManifest } from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
+import {
+  normalizeTrustRegistryProviderQualificationManifest,
+  verifyTrustRegistryProviderQualificationArtifacts,
+} from "../src/core/building-generation/trust-registry-governance-provider-qualification.mjs";
 
 const MAX_MANIFEST_BYTES = 1024 * 1024;
 
@@ -31,16 +34,17 @@ async function readRegularFile(inputPath, maxBytes, label) {
 }
 
 function parseArgs(args) {
-  const result = { manifestPath: null, outputPath: null, ttlSeconds: 300 };
+  const result = { manifestPath: null, outputPath: null, artifactRoot: null, ttlSeconds: 300 };
   const seen = new Set();
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--output" || arg === "--ttl-seconds") {
+    if (arg === "--output" || arg === "--ttl-seconds" || arg === "--artifact-root") {
       if (seen.has(arg)) throw new TypeError(arg + " may be supplied only once.");
       seen.add(arg);
       const value = args[index + 1];
       if (!value || value.startsWith("--")) throw new TypeError("Missing value for " + arg + ".");
       if (arg === "--output") result.outputPath = value;
+      else if (arg === "--artifact-root") result.artifactRoot = value;
       else result.ttlSeconds = Number(value);
       index += 1;
     } else if (arg.startsWith("--")) {
@@ -81,7 +85,7 @@ function resolveOutputPath(value) {
 }
 
 function usage() {
-  console.log("Usage: node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs <manifest.json> --output <challenge.json> [--ttl-seconds 300]");
+  console.log("Usage: node scripts/create-trust-registry-governance-provider-anchor-challenge.mjs <manifest.json> --output <challenge.json> [--artifact-root DIR] [--ttl-seconds 300]");
   console.log("Creates a fresh 256-bit D3M-29 challenge for a provisioned, non-synthetic provider. Does not contact the provider or sign a witness.");
 }
 
@@ -109,6 +113,19 @@ async function main() {
       manifest.providerIntegration.status !== "passed" || manifest.providerIntegration.syntheticOnly) {
     throw new Error("D3M-29 challenge creation requires a provisioned, non-synthetic provider and a passed real-provider integration run.");
   }
+  const artifactRoot = path.resolve(options.artifactRoot ?? path.dirname(path.resolve(options.manifestPath)));
+  const reportVerification = await verifyTrustRegistryProviderQualificationArtifacts(
+    manifest,
+    artifactRoot,
+  );
+  const requiredReportArtifacts = [
+    manifest.providerIntegration.processReportArtifactId,
+    manifest.providerIntegration.processReportSignatureArtifactId,
+  ];
+  if (reportVerification.failures.length > 0 ||
+      requiredReportArtifacts.some((id) => !reportVerification.verifiedArtifactIds.includes(id))) {
+    throw new Error("D3M-29 challenge creation requires byte-verified D3M-26 report semantics and D3M-28 trusted signature.");
+  }
   const generated = createTrustRegistryGovernanceProviderAnchorChallenge({
     sourceCommitSha: manifest.source.commitSha,
     providerId: manifest.provider.providerId,
@@ -135,6 +152,7 @@ async function main() {
     expiresAtUtc: generated.challenge.expiresAtUtc,
     output: path.relative(process.cwd(), outputPath),
     syntheticOnly: generated.challenge.syntheticOnly,
+    processReportAndSignatureVerified: true,
     productionQualificationEligible: false,
   }, null, 2));
 }
