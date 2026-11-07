@@ -4,7 +4,12 @@ import { runTrustRegistryGovernanceProviderConformance } from "./helpers/trust-r
 
 const clone = (value) => structuredClone(value);
 
-function syntheticProvider({ ignoreCompareAndSetVersion = false, corruptAnchor = false } = {}) {
+function syntheticProvider({
+  ignoreCompareAndSetVersion = false,
+  corruptAnchor = false,
+  reuseVersionOnWrite = false,
+  rollbackAnchorOnCompareAndSet = false,
+} = {}) {
   let state = null;
   let anchor = null;
   let generation = 0;
@@ -49,9 +54,10 @@ function syntheticProvider({ ignoreCompareAndSetVersion = false, corruptAnchor =
           (expectedVersion !== version() || expectedStateSha256 !== state.stateSha256)) {
         return { updated: false, ...snapshot() };
       }
+      const previousAnchor = clone(anchor);
       state = clone(nextState);
-      generation += 1;
-      anchor = anchorFor(state);
+      if (!reuseVersionOnWrite) generation += 1;
+      anchor = rollbackAnchorOnCompareAndSet ? previousAnchor : anchorFor(state);
       if (corruptAnchor) anchor.revision += 1;
       return { updated: true, ...snapshot() };
     },
@@ -93,6 +99,24 @@ test("provider conformance suite rejects a provider that permits competing stale
       ...syntheticProvider({ ignoreCompareAndSetVersion: true }),
     }),
     /exactly one writer may win/i,
+  );
+});
+
+test("provider conformance suite rejects a successful CAS without advancing its version token", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ reuseVersionOnWrite: true }),
+    }),
+    /successful compare-and-set must advance the provider version token/i,
+  );
+});
+
+test("provider conformance suite rejects an anchor rolled back behind the committed state", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ rollbackAnchorOnCompareAndSet: true }),
+    }),
+    /anchor must independently match the exact state/i,
   );
 });
 
