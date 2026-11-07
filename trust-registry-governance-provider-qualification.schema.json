@@ -154,7 +154,9 @@
         "runUrl",
         "headSha",
         "suiteConclusion",
-        "syntheticOnly"
+        "syntheticOnly",
+        "providerInstanceFingerprintSha256",
+        "providerNamespaceFingerprintSha256"
       ],
       "properties": {
         "status": {
@@ -197,6 +199,20 @@
         },
         "syntheticOnly": {
           "type": "boolean"
+        },
+        "providerInstanceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "providerNamespaceFingerprintSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
         }
       }
     },
