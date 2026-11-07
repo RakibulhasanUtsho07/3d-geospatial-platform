@@ -23,8 +23,10 @@ The regression suite injects three independent defect classes:
 1. A +20% Y-axis scale change. The file remains structurally parseable but fails the dimension-tolerance check.
 2. A repeated triangle index. The file remains structurally parseable but geometry QA reports a degenerate triangle.
 3. A third use of an already shared edge. One triangle is changed to use the known shared edge (0, 2), while remaining non-degenerate. The parser still accepts the GLB, but topology QA must report at least one non-manifold edge and include `non-manifold-edges-present`.
+4. Removal of one triangle from the closed cuboid. The remaining GLB is structurally valid, but topology QA must count at least three boundary edges and report `open-boundary-edges-present`.
+5. Replacement of one cuboid triangle with a separate non-degenerate triangle using three newly appended vertices. The GLB remains structurally valid, but topology QA must report at least two connected components and one small detached component.
 
-The clean-baseline predicate checks topology explicitly, so a model with the injected non-manifold edge cannot accidentally pass merely because its dimensions and triangle counts remain unchanged.
+The clean-baseline predicate checks topology explicitly, so models with injected boundary, detached-component or non-manifold defects cannot accidentally pass merely because the GLB parser accepts them. These checks are separate from dimension screening and remain review-only heuristics; open surfaces and intentionally separate architectural parts may be legitimate.
 
 ## Run
 
