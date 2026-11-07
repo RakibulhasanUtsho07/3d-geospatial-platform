@@ -22,7 +22,7 @@ The D3M-26 CLI must first produce a valid process report. Then run:
 
 ```bash
 node scripts/sign-trust-registry-governance-provider-process-report.mjs \
-  artifacts/provider-process-report.json \
+  artifacts/provider-process-conformance.json \
   /secure/keys/reviewer-ed25519-private.pem \
   --reviewer-id <registered-reviewer-id> \
   --signature artifacts/provider-process-report.sig.json
