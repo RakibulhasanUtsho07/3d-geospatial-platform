@@ -13,6 +13,7 @@ import {
 
 const fixtureModule = fileURLToPath(new URL("./fixtures/trust-registry-governance-file-backed-provider.mjs", import.meta.url));
 const runnerScript = fileURLToPath(new URL("../scripts/run-trust-registry-governance-provider-process-conformance.mjs", import.meta.url));
+const workerScript = fileURLToPath(new URL("../scripts/trust-registry-governance-provider-process-worker.mjs", import.meta.url));
 
 async function withTempDirectory(callback) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "d3m26-provider-process-"));
@@ -251,4 +252,53 @@ test("provider process runner requires an explicit source SHA and refuses report
     const preserved = await (await import("node:fs/promises")).readFile(reportFile, "utf8");
     assert.equal(preserved, '{"preserve":true}\n');
   });
+});
+
+
+test("provider worker rejects malformed JSON and unexpected protocol fields", () => {
+  const malformedJson = spawnSync(process.execPath, [
+    workerScript,
+    fixtureModule,
+    "0".repeat(64),
+  ], { input: "{not-json", encoding: "utf8", timeout: 5000 });
+  assert.notEqual(malformedJson.status, 0);
+  const malformedLine = malformedJson.stdout.split(/\r?\n/)
+    .find((line) => line.startsWith("D3M26_PROVIDER_RESULT:"));
+  assert.ok(malformedLine, malformedJson.stderr);
+  assert.equal(JSON.parse(malformedLine.slice("D3M26_PROVIDER_RESULT:".length)).errorCode,
+    "D3M26_INVALID_REQUEST_JSON");
+
+  const unexpectedField = spawnSync(process.execPath, [
+    workerScript,
+    fixtureModule,
+    "0".repeat(64),
+  ], {
+    input: JSON.stringify({ operation: "describe", args: {}, unexpected: true }),
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  assert.notEqual(unexpectedField.status, 0);
+  const unexpectedLine = unexpectedField.stdout.split(/\r?\n/)
+    .find((line) => line.startsWith("D3M26_PROVIDER_RESULT:"));
+  assert.ok(unexpectedLine, unexpectedField.stderr);
+  assert.equal(JSON.parse(unexpectedLine.slice("D3M26_PROVIDER_RESULT:".length)).errorCode,
+    "D3M26_INVALID_REQUEST_ENVELOPE");
+});
+
+test("provider worker re-hashes the adapter file and rejects stale module bytes", () => {
+  const result = spawnSync(process.execPath, [
+    workerScript,
+    fixtureModule,
+    "0".repeat(64),
+  ], {
+    input: JSON.stringify({ operation: "describe", args: {} }),
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  assert.notEqual(result.status, 0);
+  const line = result.stdout.split(/\r?\n/)
+    .find((entry) => entry.startsWith("D3M26_PROVIDER_RESULT:"));
+  assert.ok(line, result.stderr);
+  assert.equal(JSON.parse(line.slice("D3M26_PROVIDER_RESULT:".length)).errorCode,
+    "D3M26_ADAPTER_HASH_MISMATCH");
 });
