@@ -104,6 +104,8 @@ function completeManifest() {
     headSha: sourceCommitSha,
     suiteConclusion: "success",
     syntheticOnly: false,
+    providerInstanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
+    providerNamespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
   };
   manifest.artifacts = [];
   for (const key of TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS) {
@@ -208,6 +210,22 @@ test("provider integration must match the exact evaluated source commit", () => 
     verifiedArtifactIds: new Set(manifest.artifacts.map((item) => item.id)),
   });
   assert.ok(report.blockers.includes("provider-integration-head-sha-mismatch"));
+});
+
+test("provider integration evidence must match the exact provisioned instance and namespace", () => {
+  const wrongInstance = completeManifest();
+  wrongInstance.providerIntegration.providerInstanceFingerprintSha256 = digest("different instance");
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(wrongInstance), /different provider instance or namespace/);
+
+  const wrongNamespace = completeManifest();
+  wrongNamespace.providerIntegration.providerNamespaceFingerprintSha256 = digest("different namespace");
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(wrongNamespace), /different provider instance or namespace/);
+});
+
+test("an integration run cannot be claimed before a provider is provisioned", () => {
+  const manifest = currentManifest();
+  manifest.providerIntegration = completeManifest().providerIntegration;
+  assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider is not provisioned/);
 });
 
 test("both D3M-24 Full CI runs must finish successfully on the exact source SHA", () => {
