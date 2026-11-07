@@ -61,6 +61,7 @@ Qualification manifest schema 1.1.0 adds:
 - `providerIntegration.processReportArtifactId`.
 
 When the provider integration status is `passed`, that ID must reference one present `process-restart-report` artifact. The exact same artifact ID must appear in `evidence.processRestartVisibility.artifactIds`.
+The artifact's `sourceUrl` must also equal the exact `providerIntegration.runUrl`, so a report file from another workflow run cannot be substituted even when its content and hash otherwise match.
 
 The D3M-25 artifact verifier performs both checks:
 
