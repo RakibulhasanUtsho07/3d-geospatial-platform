@@ -146,10 +146,14 @@ function resolveSceneMeshInstances(gltf,options={}){
   uninstancedMeshDefinitionCount:0,warning:reason,
  });
  const nodes=gltf.nodes,scenes=gltf.scenes;
- if(!Array.isArray(nodes)||!Array.isArray(scenes)||!scenes.length){
+ if(nodes!==undefined&&!Array.isArray(nodes))throw new TypeError("glTF nodes must be an array when provided");
+ if(scenes!==undefined&&!Array.isArray(scenes))throw new TypeError("glTF scenes must be an array when provided");
+ if(scenes===undefined&&nodes===undefined)return localFallback("scene-graph-unavailable-mesh-local-bounds-fallback");
+ if(scenes===undefined||nodes===undefined){
   if(Array.isArray(scenes)&&scenes.some(scene=>Array.isArray(scene?.nodes)&&scene.nodes.length))throw new TypeError("glTF scenes reference nodes but the nodes array is missing");
   return localFallback("scene-graph-unavailable-mesh-local-bounds-fallback");
  }
+ if(scenes.length===0)throw new TypeError("glTF scenes array must contain at least one scene");
  const sceneIndex=gltf.scene===undefined?0:gltf.scene;
  if(!Number.isSafeInteger(sceneIndex)||sceneIndex<0||sceneIndex>=scenes.length)throw new RangeError("glTF default scene index is outside the scenes array");
  const selectedScene=scenes[sceneIndex];

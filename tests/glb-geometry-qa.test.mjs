@@ -130,7 +130,7 @@ test("supports explicit column-major affine node matrices",()=>{
  const report=analyzeGlbQuality(glb);assert.deepEqual(report.bounds.min,[10,20,30]);assert.deepEqual(report.bounds.max,[12,23,30]);
 });
 test("falls back to explicit mesh-local bounds when scene graph data is absent",()=>{
- const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:null,scenes:null}),report=analyzeGlbQuality(glb);
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{nodes:undefined,scenes:undefined}),report=analyzeGlbQuality(glb);
  assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.bounds.units,"mesh-local-unverified");
  assert.ok(report.warnings.includes("scene-graph-unavailable-mesh-local-bounds-fallback"));
  assert.equal(report.counts.meshInstanceCount,0);assert.equal(report.counts.boundsTransformCount,1);
@@ -204,6 +204,46 @@ test("fails closed on invalid node transforms, hierarchy cycles and duplicate pa
  assert.throws(()=>analyzeGlbQuality(duplicateParent),/referenced more than once/);
  assert.throws(()=>analyzeGlbQuality(invalidMesh),/invalid mesh index/);
 });
+test("rejects malformed scene metadata instead of silently falling back",()=>{
+ const positions=[0,0,0,1,0,0,0,1,0],indices=[0,1,2];
+ const badNodes=makeGlb(positions,indices,{nodes:null,scenes:[{nodes:[0]}]});
+ const badScenes=makeGlb(positions,indices,{nodes:[{mesh:0}],scenes:null});
+ const emptyScenes=makeGlb(positions,indices,{nodes:[{mesh:0}],scenes:[]});
+ assert.throws(()=>analyzeGlbQuality(badNodes),/nodes must be an array/);
+ assert.throws(()=>analyzeGlbQuality(badScenes),/scenes must be an array/);
+ assert.throws(()=>analyzeGlbQuality(emptyScenes),/at least one scene/);
+});
+
+test("rejects an invalid default scene index and invalid root node index",()=>{
+ const positions=[0,0,0,1,0,0,0,1,0],indices=[0,1,2];
+ const badScene=makeGlb(positions,indices,{scene:1,nodes:[{mesh:0}],scenes:[{nodes:[0]}]});
+ const badRoot=makeGlb(positions,indices,{nodes:[{mesh:0}],scenes:[{nodes:[3]}]});
+ assert.throws(()=>analyzeGlbQuality(badScene),/default scene index is outside/);
+ assert.throws(()=>analyzeGlbQuality(badRoot),/invalid node index/);
+});
+
+test("enforces the scene mesh-instance limit",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
+  nodes:[{mesh:0},{mesh:0,translation:[5,0,0]}],scenes:[{nodes:[0,1]}]
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxSceneMeshInstances:1}),/maxSceneMeshInstances 1/);
+});
+
+test("bounds evaluation budget is applied across repeated mesh instances",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
+  nodes:[{mesh:0},{mesh:0,translation:[5,0,0]}],scenes:[{nodes:[0,1]}]
+ });
+ assert.throws(()=>analyzeGlbQuality(glb,{maxSceneBoundsVertexEvaluations:5}),/maxSceneBoundsVertexEvaluations 5/);
+});
+
+test("fails closed on non-finite composed parent-child transforms and malformed child arrays",()=>{
+ const positions=[0,0,0,1,0,0,0,1,0],indices=[0,1,2];
+ const overflow=makeGlb(positions,indices,{nodes:[{scale:[1.7e308,1,1],children:[1]},{mesh:0,scale:[2,1,1]}],scenes:[{nodes:[0]}]});
+ const badChildren=makeGlb(positions,indices,{nodes:[{children:3,mesh:0}],scenes:[{nodes:[0]}]});
+ assert.throws(()=>analyzeGlbQuality(overflow),/non-finite composed node transform/);
+ assert.throws(()=>analyzeGlbQuality(badChildren),/children must be an array/);
+});
+
 test("bounds evaluation has a strict per-report vertex budget",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
  assert.throws(()=>analyzeGlbQuality(glb,{maxSceneBoundsVertexEvaluations:2}),/maxSceneBoundsVertexEvaluations/);
