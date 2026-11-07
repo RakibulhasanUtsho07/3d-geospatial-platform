@@ -17,6 +17,7 @@ function createBarrier(parties) {
 
 function syntheticProvider({
   ignoreCompareAndSetVersion = false,
+  staleConflictReturnsWrongVersion = false,
   raceInitializeIfAbsent = false,
   raceCompareAndSet = false,
   ignoreRegistryIdentity = false,
@@ -86,7 +87,9 @@ function syntheticProvider({
       if (!ignoreRegistryIdentity) assertIdentity(record, identity);
       if (!ignoreCompareAndSetVersion &&
           (expectedVersion !== version(record) || expectedStateSha256 !== record.state.stateSha256)) {
-        return { updated: false, ...snapshot(record) };
+        const rejected = snapshot(record);
+        if (staleConflictReturnsWrongVersion) rejected.version = "stale-replica-version";
+        return { updated: false, ...rejected };
       }
       // Capture the matching version before yielding. A correct atomic provider
       // would serialize this region or use a storage-level conditional write.
@@ -147,6 +150,15 @@ test("provider conformance suite rejects a provider that aliases distinct regist
       ...syntheticProvider({ ignoreRegistryIdentity: true }),
     }),
     /distinct registry-set identity must not alias an existing governance state/i,
+  );
+});
+
+test("provider conformance suite rejects stale CAS responses with the wrong provider version", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ staleConflictReturnsWrongVersion: true }),
+    }),
+    /losing compare-and-set callers must observe the winner's provider version/i,
   );
 });
 
