@@ -11,6 +11,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^[a-f0-9]{40}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{0,119}$/;
 const DOMAIN = Buffer.from("3d-geospatial-platform/d3m29-independent-anchor-witness/v1\0", "utf8");
+const REGISTRY_DOMAIN = Buffer.from("3d-geospatial-platform/d3m29-independent-anchor-key-registry/v1\0", "utf8");
 const PURPOSE = "independent-anchor-fresh-challenge-response-not-provider-qualification";
 const REGISTRY_MAX_BYTES = 64 * 1024;
 const CHALLENGE_MAX_BYTES = 64 * 1024;
@@ -20,6 +21,11 @@ const CHALLENGE_KEYS = Object.freeze([
   "schemaVersion", "engine", "challengeId", "nonceHex", "issuedAtUtc", "expiresAtUtc",
   "sourceCommitSha", "providerId", "adapterModuleSha256", "syntheticOnly",
   "providerInstanceFingerprintSha256", "providerNamespaceFingerprintSha256",
+]);
+const REGISTRY_KEYS = Object.freeze([
+  "schemaVersion", "recordType", "registryId", "registrySetId",
+  "governancePublicKeyFingerprintSha256", "governancePublicKeyPem",
+  "issuedAtUtc", "expiresAtUtc", "entries", "governanceSignatureBase64",
 ]);
 const WITNESS_KEYS = Object.freeze([
   "schemaVersion", "engine", "algorithm", "signaturePurpose", "challengeSha256",
@@ -181,6 +187,21 @@ export function buildTrustRegistryGovernanceProviderAnchorWitnessSigningBytes({
   ]);
 }
 
+
+/**
+ * Build the domain-separated bytes for the independent-anchor registry
+ * governance signature. The corresponding private key stays out-of-band.
+ */
+export function buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({ registry }) {
+  exactKeys(registry, REGISTRY_KEYS, "independent-anchor registry");
+  const { governanceSignatureBase64: _signature, ...unsignedRegistry } = registry;
+  return Buffer.concat([
+    REGISTRY_DOMAIN,
+    Buffer.from(canonicalJson(unsignedRegistry), "utf8"),
+    Buffer.from("\\0", "utf8"),
+  ]);
+}
+
 function parseAnchorRegistry(input, nowDate) {
   if (typeof input === "string" && Buffer.byteLength(input, "utf8") > REGISTRY_MAX_BYTES) {
     throw new RangeError("Independent-anchor registry exceeds the 64 KiB limit");
@@ -193,10 +214,11 @@ function parseAnchorRegistry(input, nowDate) {
       throw new TypeError("D3M29_INDEPENDENT_ANCHOR_KEYS_JSON must be valid JSON");
     }
   }
-  exactKeys(registry, [
-    "schemaVersion", "recordType", "registryId", "registrySetId",
-    "governancePublicKeyFingerprintSha256", "issuedAtUtc", "expiresAtUtc", "entries",
-  ], "independent-anchor registry");
+  exactKeys(registry, REGISTRY_KEYS, "independent-anchor registry");
+  if (typeof input === "string" &&
+      input !== canonicalJson(registry) && input !== canonicalJson(registry) + "\\n") {
+    throw new TypeError("independent-anchor registry must use canonical JSON bytes");
+  }
   if (registry.schemaVersion !== "1.0.0" ||
       registry.recordType !== "d3m29-independent-anchor-key-registry") {
     throw new TypeError("independent-anchor registry schemaVersion or recordType is unsupported");
@@ -207,6 +229,39 @@ function parseAnchorRegistry(input, nowDate) {
     registry.governancePublicKeyFingerprintSha256,
     "governancePublicKeyFingerprintSha256",
   );
+  if (typeof registry.governancePublicKeyPem !== "string" ||
+      registry.governancePublicKeyPem.length < 64 ||
+      registry.governancePublicKeyPem.length > 16 * 1024 ||
+      /PRIVATE KEY/.test(registry.governancePublicKeyPem)) {
+    throw new TypeError("independent-anchor registry must carry a public governance key only");
+  }
+  let governancePublicKey;
+  try {
+    governancePublicKey = createPublicKey(registry.governancePublicKeyPem);
+  } catch {
+    throw new TypeError("independent-anchor registry governance public key is invalid");
+  }
+  if (governancePublicKey.asymmetricKeyType !== "ed25519") {
+    throw new TypeError("independent-anchor registry governance key must use Ed25519");
+  }
+  const computedGovernanceFingerprint = sha256(
+    governancePublicKey.export({ type: "spki", format: "der" }),
+  );
+  if (computedGovernanceFingerprint !== governanceFingerprint) {
+    throw new TypeError("independent-anchor registry governance key fingerprint does not match its public key");
+  }
+  if (typeof registry.governanceSignatureBase64 !== "string" ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(registry.governanceSignatureBase64)) {
+    throw new TypeError("independent-anchor registry governance signature must be canonical base64");
+  }
+  const registrySignature = Buffer.from(registry.governanceSignatureBase64, "base64");
+  if (registrySignature.length !== 64 ||
+      registrySignature.toString("base64") !== registry.governanceSignatureBase64 ||
+      !verify(null, buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningBytes({
+        registry,
+      }), governancePublicKey, registrySignature)) {
+    throw new TypeError("independent-anchor registry governance signature is invalid");
+  }
   const issued = utc(registry.issuedAtUtc, "registry.issuedAtUtc");
   const expires = utc(registry.expiresAtUtc, "registry.expiresAtUtc");
   if (expires <= issued || expires - issued > 90 * 24 * 60 * 60 * 1000) {
@@ -322,6 +377,9 @@ function parseAnchorRegistry(input, nowDate) {
 function parseChallenge(bytes, nowDate) {
   const challenge = parseJsonBytes(bytes, CHALLENGE_MAX_BYTES, "anchor challenge");
   exactKeys(challenge, CHALLENGE_KEYS, "anchor challenge");
+  if (!Buffer.from(canonicalJson(challenge) + "\\n", "utf8").equals(bytes)) {
+    throw new TypeError("anchor challenge must use canonical JSON bytes with one trailing newline");
+  }
   if (challenge.schemaVersion !== "1.0.0" || challenge.engine !== "d3m29-independent-anchor-challenge-v1") {
     throw new TypeError("anchor challenge schema or engine is unsupported");
   }
@@ -397,6 +455,9 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
   try {
     witness = parseJsonBytes(witnessBytes, WITNESS_MAX_BYTES, "anchor witness receipt");
     exactKeys(witness, WITNESS_KEYS, "anchor witness receipt");
+    if (!Buffer.from(canonicalJson(witness) + "\\n", "utf8").equals(witnessBytes)) {
+      throw new TypeError("anchor witness receipt must use canonical JSON bytes with one trailing newline");
+    }
   } catch (error) {
     errors.push(Object.freeze({
       code: "witness-invalid",
