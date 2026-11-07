@@ -308,6 +308,8 @@ test("provider integration evidence must match the exact provisioned instance an
 
 test("an integration run cannot be claimed before a provider is provisioned", () => {
   const manifest = currentManifest();
+  manifest.schemaVersion = "1.1.0";
+  manifest.provider.adapterModuleSha256 = null;
   manifest.providerIntegration = completeManifest().providerIntegration;
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest), /provider is not provisioned/);
 });
@@ -582,7 +584,11 @@ test("legacy D3M-25 passed provider manifests remain readable but cannot skip th
 
 test("D3M-27 refuses a process report artifact that is not bound to processRestartVisibility evidence", () => {
   const manifest = completeManifest();
-  manifest.evidence.processRestartVisibility.artifactIds = [];
+  manifest.evidence.processRestartVisibility = {
+    status: "missing",
+    artifactIds: [],
+    verificationKind: "none",
+  };
   assert.throws(() => normalizeTrustRegistryProviderQualificationManifest(manifest),
     /processRestartVisibility evidence must reference the exact provider integration report artifact/i);
 });
