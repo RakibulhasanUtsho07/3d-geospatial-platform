@@ -198,7 +198,7 @@ export function buildTrustRegistryGovernanceProviderAnchorKeyRegistrySigningByte
   return Buffer.concat([
     REGISTRY_DOMAIN,
     Buffer.from(canonicalJson(unsignedRegistry), "utf8"),
-    Buffer.from("\\0", "utf8"),
+    Buffer.from("\0", "utf8"),
   ]);
 }
 
@@ -216,7 +216,7 @@ function parseAnchorRegistry(input, nowDate) {
   }
   exactKeys(registry, REGISTRY_KEYS, "independent-anchor registry");
   if (typeof input === "string" &&
-      input !== canonicalJson(registry) && input !== canonicalJson(registry) + "\\n") {
+      input !== canonicalJson(registry) && input !== canonicalJson(registry) + "\n") {
     throw new TypeError("independent-anchor registry must use canonical JSON bytes");
   }
   if (registry.schemaVersion !== "1.0.0" ||
@@ -377,7 +377,7 @@ function parseAnchorRegistry(input, nowDate) {
 function parseChallenge(bytes, nowDate) {
   const challenge = parseJsonBytes(bytes, CHALLENGE_MAX_BYTES, "anchor challenge");
   exactKeys(challenge, CHALLENGE_KEYS, "anchor challenge");
-  if (!Buffer.from(canonicalJson(challenge) + "\\n", "utf8").equals(bytes)) {
+  if (!Buffer.from(canonicalJson(challenge) + "\n", "utf8").equals(bytes)) {
     throw new TypeError("anchor challenge must use canonical JSON bytes with one trailing newline");
   }
   if (challenge.schemaVersion !== "1.0.0" || challenge.engine !== "d3m29-independent-anchor-challenge-v1") {
@@ -455,7 +455,7 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
   try {
     witness = parseJsonBytes(witnessBytes, WITNESS_MAX_BYTES, "anchor witness receipt");
     exactKeys(witness, WITNESS_KEYS, "anchor witness receipt");
-    if (!Buffer.from(canonicalJson(witness) + "\\n", "utf8").equals(witnessBytes)) {
+    if (!Buffer.from(canonicalJson(witness) + "\n", "utf8").equals(witnessBytes)) {
       throw new TypeError("anchor witness receipt must use canonical JSON bytes with one trailing newline");
     }
   } catch (error) {
