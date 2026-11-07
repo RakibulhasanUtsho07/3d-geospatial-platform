@@ -122,14 +122,14 @@ async function main() {
     metrics,
   });
   const provider = await makeProvider();
-  const suite = await runTrustRegistryGovernanceProviderConformance({
-    provider,
-    reopenProvider: makeProvider,
-  });
   if (provider.adapterDeclaredSyntheticOnly === false &&
       (!options.providerInstanceFingerprintSha256 || !options.providerNamespaceFingerprintSha256)) {
     throw new Error("A non-synthetic provider report requires both provider instance and namespace fingerprints.");
   }
+  const suite = await runTrustRegistryGovernanceProviderConformance({
+    provider,
+    reopenProvider: makeProvider,
+  });
   const stats = provider.processStats;
   if (stats.workerProcessesStarted < 2 ||
       stats.uniqueWorkerInstances !== stats.workerProcessesStarted) {
