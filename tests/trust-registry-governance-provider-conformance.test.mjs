@@ -82,7 +82,11 @@ function syntheticProvider({
       const existing = lookupRecord(identity);
       if (existing) {
         verifyIdentity(existing, identity);
-        if (overwriteExistingOnInitialize) {
+        // Only the intentionally broken fixture mutates when the caller
+        // supplies a different initial state. Identical concurrent retries
+        // remain idempotent so the dedicated overwrite assertion is reached.
+        if (overwriteExistingOnInitialize &&
+            existing.state.stateSha256 !== requestedState.stateSha256) {
           existing.state = clone(requestedState);
           existing.generation += 1;
           existing.anchor = anchorFor(existing.state);
