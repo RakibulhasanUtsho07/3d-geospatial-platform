@@ -371,3 +371,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Validates unsigned sparse index types, strictly increasing unique index order, accessor index range, byte ranges, embedded-buffer references, no target/byteStride metadata, component alignment and tight packing. `maxSparseEntries` is an explicit memory bound.
 - Evidence boundary: this increases glTF input compatibility only; it does not prove geometry accuracy, georeferencing, survey truth or publication eligibility. PR #398 scene-transform and topology semantics remain unchanged.
 - Validation: exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged and release gates false.
+
+
+## BRF-04 — glTF POSITION accessor min/max validation (2026-11-07)
+
+- Tracking issue: [#401](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/401).
+- Gap: GLB QA consumed POSITION data but ignored the required accessor-level `min` and `max` metadata.
+- Validate both three-component finite arrays against all decoded POSITION vertices after sparse substitution. FLOAT32 declarations compare after `Math.fround`. Unreferenced POSITION entries remain part of accessor min/max even though they are excluded from referenced-only mesh bounds.
+- Preserve the glTF no-bufferView/no-sparse zero-initialized exception: bounds fields remain required for POSITION but numeric values are not compared against zero; values must remain representable as float32.
+- Evidence boundary: accessor metadata consistency only; no georeferencing, survey truth, real-world scale or architectural accuracy is implied. All release flags stay false.
+- Exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged.

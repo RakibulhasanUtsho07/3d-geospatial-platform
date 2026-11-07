@@ -104,6 +104,23 @@ function readAccessorBytes(accessor,views,binary,bufferLength,expectedType,label
  const sparse=readSparseAccessor(accessor,views,binary,bufferLength,count,accessor.componentType,3,label,maxSparseEntries);
  return {count,first,stride,sparse};
 }
+function validatePositionAccessorBounds(accessor,positions,label){
+ const {min,max}=accessor;
+ if(!Array.isArray(min)||min.length!==3||!min.every(finite))throw new TypeError(label+" accessor must define min as three finite numbers");
+ if(!Array.isArray(max)||max.length!==3||!max.every(finite))throw new TypeError(label+" accessor must define max as three finite numbers");
+ if(!min.every(value=>finite(Math.fround(value)))||!max.every(value=>finite(Math.fround(value))))throw new TypeError(label+" accessor bounds must be representable as float32");
+ if(accessor.bufferView===undefined&&accessor.sparse===undefined)return;
+ const actualMin=[Infinity,Infinity,Infinity],actualMax=[-Infinity,-Infinity,-Infinity];
+ for(let vertex=0;vertex<positions.length/3;vertex++)for(let axis=0;axis<3;axis++){
+  const value=positions[vertex*3+axis];
+  actualMin[axis]=Math.min(actualMin[axis],value);
+  actualMax[axis]=Math.max(actualMax[axis],value);
+ }
+ for(let axis=0;axis<3;axis++){
+  if(Math.fround(min[axis])!==actualMin[axis])throw new TypeError(label+" accessor min does not match decoded POSITION values at component "+axis);
+  if(Math.fround(max[axis])!==actualMax[axis])throw new TypeError(label+" accessor max does not match decoded POSITION values at component "+axis);
+ }
+}
 function readPositions(accessor,views,binary,bufferLength,label,maxVertices,maxSparseEntries){
  const data=readAccessorBytes(accessor,views,binary,bufferLength,"VEC3",label,maxSparseEntries);
  if(data.count>maxVertices)throw new RangeError(label+" exceeds maximum geometry QA vertex count "+maxVertices);
@@ -311,7 +328,9 @@ export function analyzeGlbQuality(input,options={}){
    if((primitive.mode??4)!==4){warnings.push(label+" is not a TRIANGLES primitive and was not counted");continue;}
    const positionIndex=primitive.attributes?.POSITION;
    if(!Number.isSafeInteger(positionIndex)||!accessors[positionIndex])throw new TypeError(label+" has no valid POSITION accessor");
-   const positions=readPositions(accessors[positionIndex],views,binary,bufferLength,label+" positions",maxVertices,maxSparseEntries);
+   const positionAccessor=accessors[positionIndex];
+   const positions=readPositions(positionAccessor,views,binary,bufferLength,label+" positions",maxVertices,maxSparseEntries);
+   validatePositionAccessorBounds(positionAccessor,positions,label+" POSITION");
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");

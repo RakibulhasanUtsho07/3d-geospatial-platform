@@ -35,3 +35,12 @@ The geometry QA adapter resolves sparse POSITION and primitive-index accessors b
 Sparse replacement indices must be strictly increasing and inside the accessor count. Sparse index/value bufferViews are required to reference the embedded GLB buffer, must not define `target` or `byteStride`, and must satisfy component alignment and tightly packed range bounds. Sparse index component types are limited to unsigned byte, unsigned short and unsigned int. Sparse entry counts are capped by the configurable `maxSparseEntries` guard. Malformed sparse data fails closed.
 
 See the [Khronos glTF 2.0 sparse accessor specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-sparse).
+
+
+## POSITION accessor bounds metadata
+
+Every mesh POSITION accessor must declare three-component `min` and `max` arrays. The geometry QA adapter compares those declarations against the decoded accessor values after sparse substitution, using float32 rounding (`Math.fround`) for the JSON values. The comparison includes unreferenced POSITION entries because accessor bounds describe the entire accessor, even though unreferenced vertices remain excluded from referenced-only geometry and topology bounds.
+
+For accessors with neither a base `bufferView` nor sparse replacements, glTF defines a zero-initialized accessor and permits the declared `min`/`max` values to be arbitrary representable component values; QA still requires both POSITION bounds fields to be present but does not compare them to zero.
+
+See the [Khronos glTF 2.0 accessor bounds specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-bounds).

@@ -14,7 +14,11 @@ function makeGlb(positions,indices=null,sceneGraph={}){
  const binary=pad(hasIndices?Buffer.concat([p,index]):p);
  const primitive={attributes:{POSITION:0},mode:4};
  if(hasIndices)primitive.indices=1;
- const accessors=[{bufferView:0,componentType:5126,count:positions.length/3,type:"VEC3"}];
+ const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(let vertex=0;vertex<positions.length/3;vertex++)for(let axis=0;axis<3;axis++){
+  const value=positions[vertex*3+axis];min[axis]=Math.min(min[axis],value);max[axis]=Math.max(max[axis],value);
+ }
+ const accessors=[{bufferView:0,componentType:5126,count:positions.length/3,type:"VEC3",min,max}];
  const bufferViews=[{buffer:0,byteOffset:0,byteLength:p.length,target:34962}];
  if(hasIndices){
   accessors.push({bufferView:1,componentType:5123,count:indices.length,type:"SCALAR"});
@@ -90,6 +94,7 @@ test("applies sparse POSITION replacements over a dense base accessor",()=>{
   const indexView=addSparseView(state,Buffer.from([1,2]),1);
   const valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
   state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[1,1,0];
  });
  const report=analyzeGlbQuality(glb);
  assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
@@ -102,6 +107,7 @@ test("supports zero-initialized POSITION accessors without a base bufferView",()
   const indexView=addSparseView(state,Buffer.from([1,2]),1);
   const valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
   state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[1,1,0];
  });
  const report=analyzeGlbQuality(glb);
  assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.meshDetails[0].topology.modelDiagonal,Number(Math.SQRT2.toFixed(6)));
@@ -248,6 +254,84 @@ test("accepts an omitted base bufferView with no sparse overrides as a zero-init
  const report=analyzeGlbQuality(glb);
  assert.deepEqual(report.bounds.dimensions,[0,0,0]);
  assert.equal(report.counts.degenerateTriangleCount,1);
+});
+
+test("validates POSITION accessor bounds from every decoded vertex including unreferenced entries",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0,5,-2,3],[0,1,2]);
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.counts.unreferencedVertexCount,1);
+ assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
+});
+
+test("accepts float32 bounds represented by nearby JSON decimals after Math.fround",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1.2,0,0,0,1,0],[0,1,2]),state=>{
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[1.2,1,0];
+ });
+ assert.equal(analyzeGlbQuality(glb).valid,true);
+});
+
+test("rejects missing, malformed or non-finite POSITION accessor bounds",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const missingMin=mutateGlb(base,state=>{delete state.json.accessors[0].min;});
+ const missingMax=mutateGlb(base,state=>{delete state.json.accessors[0].max;});
+ const shortMin=mutateGlb(base,state=>{state.json.accessors[0].min=[0,0];});
+ const nonNumeric=mutateGlb(base,state=>{state.json.accessors[0].max=[1,"1",0];});
+ const nonFinite=mutateGlb(base,state=>{state.json.accessors[0].min=[0,Number.NaN,0];});
+ assert.throws(()=>analyzeGlbQuality(missingMin),/must define min as three finite numbers/);
+ assert.throws(()=>analyzeGlbQuality(missingMax),/must define max as three finite numbers/);
+ assert.throws(()=>analyzeGlbQuality(shortMin),/must define min as three finite numbers/);
+ assert.throws(()=>analyzeGlbQuality(nonNumeric),/must define max as three finite numbers/);
+ assert.throws(()=>analyzeGlbQuality(nonFinite),/must define min as three finite numbers/);
+});
+
+test("rejects POSITION min/max metadata smaller or larger than decoded dense values",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const tooSmall=mutateGlb(base,state=>{state.json.accessors[0].max=[0.5,1,0];});
+ const tooLarge=mutateGlb(base,state=>{state.json.accessors[0].max=[2,1,0];});
+ const badMin=mutateGlb(base,state=>{state.json.accessors[0].min=[-1,0,0];});
+ assert.throws(()=>analyzeGlbQuality(tooSmall),/accessor max does not match decoded POSITION/);
+ assert.throws(()=>analyzeGlbQuality(tooLarge),/accessor max does not match decoded POSITION/);
+ assert.throws(()=>analyzeGlbQuality(badMin),/accessor min does not match decoded POSITION/);
+});
+
+test("validates POSITION min/max after sparse replacement and rejects stale sparse bounds",()=>{
+ const valid=mutateGlb(makeGlb([0,0,0,0,0,0,0,0,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from([1,2]),1),valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
+  state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[1,1,0];
+ });
+ const stale=mutateGlb(valid,state=>{state.json.accessors[0].max=[0,0,0];});
+ assert.equal(analyzeGlbQuality(valid).valid,true);
+ assert.throws(()=>analyzeGlbQuality(stale),/accessor max does not match decoded POSITION/);
+});
+
+test("accessor min/max include sparse replacements for unreferenced POSITION entries",()=>{
+ const valid=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0,5,0,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from([3]),1),valueView=addSparseView(state,encodeFloat([50,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+  state.json.accessors[0].min=[0,0,0];state.json.accessors[0].max=[50,1,0];
+ });
+ const report=analyzeGlbQuality(valid);
+ assert.equal(report.counts.unreferencedVertexCount,1);
+ assert.deepEqual(report.bounds.max,[1,1,0]);
+ const stale=mutateGlb(valid,state=>{state.json.accessors[0].max=[5,1,0];});
+ assert.throws(()=>analyzeGlbQuality(stale),/accessor max does not match decoded POSITION/);
+});
+
+test("allows representable declared bounds for zero-initialized no-base no-sparse POSITION accessors",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[0].bufferView;
+  state.json.accessors[0].min=[-100,20,30];state.json.accessors[0].max=[100,200,300];
+ });
+ assert.deepEqual(analyzeGlbQuality(glb).bounds.dimensions,[0,0,0]);
+});
+
+test("rejects no-source POSITION bounds that are not representable as float32",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[0].bufferView;
+  state.json.accessors[0].min=[-1e100,0,0];state.json.accessors[0].max=[1e100,0,0];
+ });
+ assert.throws(()=>analyzeGlbQuality(glb),/bounds must be representable as float32/);
 });
 
 test("reports mesh counts, finite bounds and numeric QA for a generated procedural GLB",()=>{
