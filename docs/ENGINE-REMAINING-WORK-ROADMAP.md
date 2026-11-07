@@ -361,3 +361,13 @@ Implementation contract and pinned schema references: [P3.7 Building Composition
 - Safety checks validate scene graph structure and transform inputs; node traversal, mesh instances and transformed vertex evaluations are bounded. GLBs without scene metadata use an explicitly warned mesh-local fallback. Animations, skinning and morph targets remain outside static QA.
 - Evidence boundary: scene-space bounds remain un-georeferenced; topology metrics remain mesh-local. No real-world scale, survey truth, architectural accuracy or publication eligibility is implied.
 - Validation: candidate implementation is being prepared against PR #395. Exact-head Full CI and human review are required; keep all release flags false.
+
+
+## BRF-04 — glTF 2.0 sparse accessor support (2026-11-07)
+
+- Tracking issue: [#399](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/issues/399).
+- Gap: the GLB QA adapter rejected sparse POSITION/index accessors and required dense base bufferViews, although valid glTF 2.0 assets may use zero-initialized bases plus strictly-increasing sparse replacements.
+- Candidate resolves dense or zero-initialized base values, then applies bounded sparse POSITION and index overrides before geometry/topology/scene-bounds evaluation.
+- Validates unsigned sparse index types, strictly increasing unique index order, accessor index range, byte ranges, embedded-buffer references, no target/byteStride metadata, component alignment and tight packing. `maxSparseEntries` is an explicit memory bound.
+- Evidence boundary: this increases glTF input compatibility only; it does not prove geometry accuracy, georeferencing, survey truth or publication eligibility. PR #398 scene-transform and topology semantics remain unchanged.
+- Validation: exact-head Push/PR Full CI and human review required. Keep the child PR Draft/open/unmerged and release gates false.

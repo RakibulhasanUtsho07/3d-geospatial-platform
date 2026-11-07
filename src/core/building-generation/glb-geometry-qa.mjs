@@ -33,51 +33,136 @@ function parseGlb(buffer){
  if(bufferDefs.length&&(!binary||!Number.isSafeInteger(bufferDefs[0].byteLength)||bufferDefs[0].byteLength>binary.length))throw new TypeError("GLB binary chunk is missing or shorter than the declared buffer");
  return {gltf,binary,bufferLength:bufferDefs[0]?.byteLength??binary?.length??0};
 }
-function readAccessorBytes(accessor,views,binary,bufferLength,expectedType,label){
+function readBufferView(index,views,binary,bufferLength,label,{alignment=1,forbidTargetAndStride=false}={}){
+ const viewIndex=requireInt(index,label+" bufferView index");
+ const view=views[viewIndex];
+ if(!view||view.buffer!==0)throw new TypeError(label+" bufferView must reference the embedded GLB buffer");
+ if(forbidTargetAndStride&&(view.target!==undefined||view.byteStride!==undefined))throw new TypeError(label+" sparse bufferView must not define target or byteStride");
+ if(!binary)throw new TypeError(label+" requires an embedded GLB BIN chunk");
+ const byteOffset=requireInt(view.byteOffset??0,label+" bufferView byteOffset");
+ const byteLength=requireInt(view.byteLength,label+" bufferView byteLength",1);
+ if(byteOffset%alignment!==0)throw new TypeError(label+" bufferView byteOffset is not aligned to "+alignment+" bytes");
+ if(byteOffset+byteLength>bufferLength||byteOffset+byteLength>binary.length)throw new TypeError(label+" bufferView exceeds the embedded binary buffer");
+ return {view,byteOffset,byteLength};
+}
+function readSparseAccessor(accessor,views,binary,bufferLength,count,componentType,components,label,maxSparseEntries){
+ if(accessor.sparse===undefined)return null;
+ const sparse=accessor.sparse;
+ if(!sparse||typeof sparse!=="object"||Array.isArray(sparse))throw new TypeError(label+" sparse metadata must be an object");
+ const sparseCount=requireInt(sparse.count,label+" sparse count",1);
+ if(sparseCount>count)throw new RangeError(label+" sparse count exceeds accessor count");
+ if(sparseCount>maxSparseEntries)throw new RangeError(label+" sparse count exceeds maximum sparse entry count "+maxSparseEntries);
+ const sparseIndices=sparse.indices,sparseValues=sparse.values;
+ if(!sparseIndices||typeof sparseIndices!=="object"||Array.isArray(sparseIndices))throw new TypeError(label+" sparse indices must be an object");
+ if(!sparseValues||typeof sparseValues!=="object"||Array.isArray(sparseValues))throw new TypeError(label+" sparse values must be an object");
+ const sparseIndexBytes=COMPONENT_BYTES[sparseIndices.componentType],sparseIndexMethod=INDEX_READ[sparseIndices.componentType];
+ if(!sparseIndexBytes||!sparseIndexMethod)throw new TypeError(label+" sparse indices componentType must be uint8, uint16 or uint32");
+ const indexView=readBufferView(sparseIndices.bufferView,views,binary,bufferLength,label+" sparse indices",{alignment:sparseIndexBytes,forbidTargetAndStride:true});
+ const indexByteOffset=requireInt(sparseIndices.byteOffset??0,label+" sparse indices byteOffset");
+ if(indexByteOffset%sparseIndexBytes!==0)throw new TypeError(label+" sparse indices byteOffset is not aligned to "+sparseIndexBytes+" bytes");
+ const indicesEnd=indexByteOffset+sparseCount*sparseIndexBytes;
+ if(indicesEnd>indexView.byteLength)throw new TypeError(label+" sparse indices exceed their bufferView");
+ const componentBytes=COMPONENT_BYTES[componentType];
+ const valueView=readBufferView(sparseValues.bufferView,views,binary,bufferLength,label+" sparse values",{alignment:componentBytes,forbidTargetAndStride:true});
+ const valueByteOffset=requireInt(sparseValues.byteOffset??0,label+" sparse values byteOffset");
+ if(valueByteOffset%componentBytes!==0)throw new TypeError(label+" sparse values byteOffset is not aligned to "+componentBytes+" bytes");
+ const valueElementBytes=componentBytes*components,valueLength=sparseCount*valueElementBytes,valueEnd=valueByteOffset+valueLength;
+ if(!Number.isSafeInteger(valueEnd)||valueEnd>valueView.byteLength)throw new TypeError(label+" sparse values exceed their bufferView");
+ const sparseIndexValues=new Uint32Array(sparseCount);
+ let previous=-1;
+ for(let i=0;i<sparseCount;i++){
+  const value=binary[sparseIndexMethod](indexView.byteOffset+indexByteOffset+i*sparseIndexBytes);
+  if(value>=count)throw new RangeError(label+" sparse index is outside its accessor count");
+  if(value<=previous)throw new TypeError(label+" sparse indices must be strictly increasing");
+  sparseIndexValues[i]=value;previous=value;
+ }
+ return {
+  count:sparseCount,
+  indices:sparseIndexValues,
+  valueElementBytes,
+  readValue:(entry,component=0)=>binary[
+   componentType===5126?"readFloatLE":INDEX_READ[componentType]
+  ](valueView.byteOffset+valueByteOffset+entry*valueElementBytes+component*componentBytes),
+ };
+}
+function readAccessorBytes(accessor,views,binary,bufferLength,expectedType,label,maxSparseEntries){
  if(!accessor||accessor.type!==expectedType)throw new TypeError(label+" accessor must use type "+expectedType);
  if(accessor.componentType!==5126)throw new TypeError(label+" accessor positions/normals must use float32 component type");
- if(accessor.sparse)throw new TypeError(label+" sparse accessors are not supported by this QA adapter");
- const view=views[accessor.bufferView];
- if(!view||view.buffer!==0)throw new TypeError(label+" accessor must reference the embedded GLB buffer");
  const count=requireInt(accessor.count,label+" count",1),accessorOffset=requireInt(accessor.byteOffset??0,label+" byteOffset");
- const viewOffset=requireInt(view.byteOffset??0,label+" bufferView byteOffset"),viewLength=requireInt(view.byteLength,label+" bufferView byteLength",1);
- const stride=view.byteStride??12;
- if(!Number.isSafeInteger(stride)||stride<12||stride>252||stride%4!==0)throw new TypeError(label+" bufferView has an invalid byteStride");
- const first=viewOffset+accessorOffset,required=first+(count-1)*stride+12;
- if(required>viewOffset+viewLength||required>bufferLength||required>binary.length)throw new TypeError(label+" accessor exceeds the binary buffer");
- return {count,first,stride};
+ let first=null,stride=12;
+ if(accessor.bufferView!==undefined){
+  const data=readBufferView(accessor.bufferView,views,binary,bufferLength,label+" accessor",{alignment:4});
+  const viewStride=data.view.byteStride===undefined?12:data.view.byteStride;
+  if(!Number.isSafeInteger(viewStride)||viewStride<12||viewStride>252||viewStride%4!==0)throw new TypeError(label+" bufferView has an invalid byteStride");
+  if(accessorOffset%4!==0)throw new TypeError(label+" accessor byteOffset is not aligned to 4 bytes");
+  first=data.byteOffset+accessorOffset;stride=viewStride;
+  const required=first+(count-1)*stride+12;
+  if(required>data.byteOffset+data.byteLength||required>bufferLength||required>binary.length)throw new TypeError(label+" accessor exceeds the binary buffer");
+ }else if(accessor.byteOffset!==undefined&&accessor.byteOffset!==0){
+  throw new TypeError(label+" accessor byteOffset must be zero when bufferView is absent");
+ }
+ const sparse=readSparseAccessor(accessor,views,binary,bufferLength,count,accessor.componentType,3,label,maxSparseEntries);
+ return {count,first,stride,sparse};
 }
-function readPositions(accessor,views,binary,bufferLength,label,maxVertices){
- const data=readAccessorBytes(accessor,views,binary,bufferLength,"VEC3",label);
+function readPositions(accessor,views,binary,bufferLength,label,maxVertices,maxSparseEntries){
+ const data=readAccessorBytes(accessor,views,binary,bufferLength,"VEC3",label,maxSparseEntries);
  if(data.count>maxVertices)throw new RangeError(label+" exceeds maximum geometry QA vertex count "+maxVertices);
  const positions=new Float32Array(data.count*3);
- for(let i=0;i<data.count;i++){
-  const offset=data.first+i*data.stride;
-  const x=binary.readFloatLE(offset),y=binary.readFloatLE(offset+4),z=binary.readFloatLE(offset+8);
-  if(!finite(x)||!finite(y)||!finite(z))throw new TypeError(label+" contains a non-finite vertex coordinate at vertex "+i);
-  positions[i*3]=x;positions[i*3+1]=y;positions[i*3+2]=z;
+ if(data.first!==null){
+  for(let i=0;i<data.count;i++){
+   const offset=data.first+i*data.stride;
+   const x=binary.readFloatLE(offset),y=binary.readFloatLE(offset+4),z=binary.readFloatLE(offset+8);
+   if(!finite(x)||!finite(y)||!finite(z))throw new TypeError(label+" contains a non-finite vertex coordinate at vertex "+i);
+   positions[i*3]=x;positions[i*3+1]=y;positions[i*3+2]=z;
+  }
+ }
+ if(data.sparse){
+  for(let entry=0;entry<data.sparse.count;entry++){
+   const vertex=data.sparse.indices[entry],offset=vertex*3;
+   for(let component=0;component<3;component++){
+    const value=data.sparse.readValue(entry,component);
+    if(!finite(value))throw new TypeError(label+" sparse values contain a non-finite coordinate at vertex "+vertex);
+    positions[offset+component]=value;
+   }
+  }
  }
  return positions;
 }
-function readIndices(accessor,views,binary,bufferLength,vertexCount,label){
+function readIndices(accessor,views,binary,bufferLength,vertexCount,label,maxSparseEntries){
  if(!accessor){
   if(vertexCount%3!==0)throw new TypeError(label+" non-indexed triangle vertex count is not divisible by 3");
   return {count:vertexCount,read:i=>i};
  }
- if(accessor.sparse)throw new TypeError(label+" sparse index accessors are not supported by this QA adapter");
  const bytes=COMPONENT_BYTES[accessor.componentType],method=INDEX_READ[accessor.componentType];
  if(!bytes||!method)throw new TypeError(label+" index accessor must use uint8, uint16 or uint32 components");
  if(accessor.type!=="SCALAR")throw new TypeError(label+" index accessor must be SCALAR");
- const view=views[accessor.bufferView];
- if(!view||view.buffer!==0)throw new TypeError(label+" indices must reference the embedded GLB buffer");
- const count=requireInt(accessor.count,label+" index count",1),viewOffset=requireInt(view.byteOffset??0,label+" index bufferView offset");
- const accessorOffset=requireInt(accessor.byteOffset??0,label+" index accessor offset"),viewLength=requireInt(view.byteLength,label+" index view length",1);
- const first=viewOffset+accessorOffset,end=first+count*bytes;
- if(end>viewOffset+viewLength||end>bufferLength||end>binary.length)throw new TypeError(label+" index accessor exceeds the binary buffer");
+ const count=requireInt(accessor.count,label+" index count",1),accessorOffset=requireInt(accessor.byteOffset??0,label+" index accessor offset");
+ let first=null;
+ if(accessor.bufferView!==undefined){
+  const data=readBufferView(accessor.bufferView,views,binary,bufferLength,label+" indices",{alignment:bytes});
+  if(data.view.byteStride!==undefined)throw new TypeError(label+" index bufferView must not define byteStride");
+  if(accessorOffset%bytes!==0)throw new TypeError(label+" index accessor byteOffset is not aligned to "+bytes+" bytes");
+  first=data.byteOffset+accessorOffset;
+  const end=first+count*bytes;
+  if(end>data.byteOffset+data.byteLength||end>bufferLength||end>binary.length)throw new TypeError(label+" index accessor exceeds the binary buffer");
+ }else if(accessor.byteOffset!==undefined&&accessor.byteOffset!==0){
+  throw new TypeError(label+" index accessor byteOffset must be zero when bufferView is absent");
+ }
+ const sparse=readSparseAccessor(accessor,views,binary,bufferLength,count,accessor.componentType,1,label,maxSparseEntries);
  if(count%3!==0)throw new TypeError(label+" triangle index count is not divisible by 3");
- return {count,read:i=>binary[method](first+i*bytes)};
-}
-const IDENTITY_MATRIX=Object.freeze([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+ const baseRead=first===null?()=>0:i=>binary[method](first+i*bytes);
+ return {count,read:i=>{
+  if(sparse){
+   let low=0,high=sparse.count-1;
+   while(low<=high){
+    const middle=(low+high)>>1,index=sparse.indices[middle];
+    if(index===i)return sparse.readValue(middle);
+    if(index<i)low=middle+1;else high=middle-1;
+   }
+  }
+  return baseRead(i);
+ }};
+}const IDENTITY_MATRIX=Object.freeze([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
 function boundedOption(value,fallback,min,max,label){
  const result=value??fallback;
  if(!Number.isSafeInteger(result)||result<min||result>max)throw new RangeError(label+" must be between "+min+" and "+max);
@@ -207,6 +292,8 @@ export function analyzeGlbQuality(input,options={}){
  const {gltf,binary,bufferLength}=parseGlb(input),views=gltf.bufferViews||[],accessors=gltf.accessors||[];
  const maxVertices=options.maxVertices??5_000_000;
  if(!Number.isSafeInteger(maxVertices)||maxVertices<3||maxVertices>20_000_000)throw new RangeError("maxVertices must be between 3 and 20000000");
+ const maxSparseEntries=options.maxSparseEntries??1_000_000;
+ if(!Number.isSafeInteger(maxSparseEntries)||maxSparseEntries<1||maxSparseEntries>5_000_000)throw new RangeError("maxSparseEntries must be between 1 and 5000000");
  const scene=resolveSceneMeshInstances(gltf,options);
  const maxSceneBoundsVertexEvaluations=boundedOption(options.maxSceneBoundsVertexEvaluations,25_000_000,1,100_000_000,"maxSceneBoundsVertexEvaluations");
  let boundsVertexEvaluations=0,vertexCount=0,referencedVertexCount=0,unreferencedVertexCount=0,triangleCount=0,degenerateTriangleCount=0,primitiveCount=0,indexOutOfRangeCount=0;
@@ -224,11 +311,11 @@ export function analyzeGlbQuality(input,options={}){
    if((primitive.mode??4)!==4){warnings.push(label+" is not a TRIANGLES primitive and was not counted");continue;}
    const positionIndex=primitive.attributes?.POSITION;
    if(!Number.isSafeInteger(positionIndex)||!accessors[positionIndex])throw new TypeError(label+" has no valid POSITION accessor");
-   const positions=readPositions(accessors[positionIndex],views,binary,bufferLength,label+" positions",maxVertices);
+   const positions=readPositions(accessors[positionIndex],views,binary,bufferLength,label+" positions",maxVertices,maxSparseEntries);
    const count=positions.length/3;vertexCount+=count;primitiveCount++;
    const indexAccessor=primitive.indices===undefined?null:accessors[primitive.indices];
    if(primitive.indices!==undefined&&(!Number.isSafeInteger(primitive.indices)||!indexAccessor))throw new TypeError(label+" references a missing index accessor");
-   const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label);
+   const indices=readIndices(indexAccessor,views,binary,bufferLength,count,label,maxSparseEntries);
    const referenced=new Uint8Array(count);
    let primitiveReferencedVertexCount=0,degenerate=0;
    for(let i=0;i<indices.count;i+=3){

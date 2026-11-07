@@ -27,3 +27,11 @@ Per-primitive topology measurements remain in mesh-local coordinates. They are s
 
 
 For mesh-local fallback reports, `scene.meshInstanceCount` remains zero because no active-scene mesh instance was resolved; `boundsTransformCount` records the identity fallback applied to each mesh definition.
+
+## glTF 2.0 sparse accessors
+
+The geometry QA adapter resolves sparse POSITION and primitive-index accessors before referenced-vertex accounting, topology evaluation and scene-space bounds. A dense base `bufferView` is read first; when it is absent the accessor base is zero-initialized as specified by glTF, then sparse replacements are applied.
+
+Sparse replacement indices must be strictly increasing and inside the accessor count. Sparse index/value bufferViews are required to reference the embedded GLB buffer, must not define `target` or `byteStride`, and must satisfy component alignment and tightly packed range bounds. Sparse index component types are limited to unsigned byte, unsigned short and unsigned int. Sparse entry counts are capped by the configurable `maxSparseEntries` guard. Malformed sparse data fails closed.
+
+See the [Khronos glTF 2.0 sparse accessor specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-accessor-sparse).

@@ -37,6 +37,267 @@ function makeGlb(positions,indices=null,sceneGraph={}){
  const bh=Buffer.alloc(8);bh.writeUInt32LE(binary.length,0);bh.writeUInt32LE(0x004e4942,4);
  return Buffer.concat([header,jh,json,bh,binary]);
 }
+function unpackGlb(glb){
+ const jsonLength=glb.readUInt32LE(12);
+ const json=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+ const binaryStart=20+jsonLength+8;
+ const binary=Buffer.from(glb.subarray(binaryStart));
+ const declaredLength=json.buffers?.[0]?.byteLength??binary.length;
+ return {json,binary:binary.subarray(0,declaredLength)};
+}
+function packGlb(json,binary){
+ json.buffers??=[{byteLength:binary.length}];
+ json.buffers[0].byteLength=binary.length;
+ const jsonRaw=Buffer.from(JSON.stringify(json)),jsonPad=(4-jsonRaw.length%4)%4;
+ const jsonChunk=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
+ const binPad=(4-binary.length%4)%4,binChunk=binPad?Buffer.concat([binary,Buffer.alloc(binPad)]):binary;
+ const total=12+8+jsonChunk.length+8+binChunk.length,header=Buffer.alloc(12);
+ header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
+ const jh=Buffer.alloc(8);jh.writeUInt32LE(jsonChunk.length,0);jh.writeUInt32LE(0x4e4f534a,4);
+ const bh=Buffer.alloc(8);bh.writeUInt32LE(binChunk.length,0);bh.writeUInt32LE(0x004e4942,4);
+ return Buffer.concat([header,jh,jsonChunk,bh,binChunk]);
+}
+function addSparseView(state,bytes,alignment=4,viewExtra={}){
+ const padding=(alignment-state.binary.length%alignment)%alignment;
+ if(padding)state.binary=Buffer.concat([state.binary,Buffer.alloc(padding)]);
+ const byteOffset=state.binary.length;
+ state.binary=Buffer.concat([state.binary,bytes]);
+ return state.json.bufferViews.push({buffer:0,byteOffset,byteLength:bytes.length,...viewExtra})-1;
+}
+function encodeUInt(values,componentType){
+ const bytes=componentType===5121?1:componentType===5123?2:4;
+ const buffer=Buffer.alloc(values.length*bytes);
+ values.forEach((value,index)=>{
+  if(bytes===1)buffer.writeUInt8(value,index);
+  else if(bytes===2)buffer.writeUInt16LE(value,index*bytes);
+  else buffer.writeUInt32LE(value,index*bytes);
+ });
+ return buffer;
+}
+function encodeFloat(values){
+ const buffer=Buffer.alloc(values.length*4);
+ values.forEach((value,index)=>buffer.writeFloatLE(value,index*4));
+ return buffer;
+}
+function mutateGlb(glb,mutator){
+ const state=unpackGlb(glb);
+ state.json.bufferViews??=[];
+ mutator(state);
+ return packGlb(state.json,state.binary);
+}
+function unpackGlb(glb){
+ const jsonLength=glb.readUInt32LE(12);
+ const json=JSON.parse(glb.subarray(20,20+jsonLength).toString("utf8").trim());
+ const binaryStart=20+jsonLength+8;
+ const binary=Buffer.from(glb.subarray(binaryStart));
+ const declaredLength=json.buffers?.[0]?.byteLength??binary.length;
+ return {json,binary:binary.subarray(0,declaredLength)};
+}
+function packGlb(json,binary){
+ json.buffers??=[{byteLength:binary.length}];
+ json.buffers[0].byteLength=binary.length;
+ const jsonRaw=Buffer.from(JSON.stringify(json)),jsonPad=(4-jsonRaw.length%4)%4;
+ const jsonChunk=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
+ const binPad=(4-binary.length%4)%4,binChunk=binPad?Buffer.concat([binary,Buffer.alloc(binPad)]):binary;
+ const total=12+8+jsonChunk.length+8+binChunk.length,header=Buffer.alloc(12);
+ header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(total,8);
+ const jh=Buffer.alloc(8);jh.writeUInt32LE(jsonChunk.length,0);jh.writeUInt32LE(0x4e4f534a,4);
+ const bh=Buffer.alloc(8);bh.writeUInt32LE(binChunk.length,0);bh.writeUInt32LE(0x004e4942,4);
+ return Buffer.concat([header,jh,jsonChunk,bh,binChunk]);
+}
+function addSparseView(state,bytes,alignment=4,viewExtra={}){
+ const padding=(alignment-state.binary.length%alignment)%alignment;
+ if(padding)state.binary=Buffer.concat([state.binary,Buffer.alloc(padding)]);
+ const byteOffset=state.binary.length;
+ state.binary=Buffer.concat([state.binary,bytes]);
+ return state.json.bufferViews.push({buffer:0,byteOffset,byteLength:bytes.length,...viewExtra})-1;
+}
+function encodeUInt(values,componentType){
+ const bytes=componentType===5121?1:componentType===5123?2:4;
+ const buffer=Buffer.alloc(values.length*bytes);
+ values.forEach((value,index)=>{
+  if(bytes===1)buffer.writeUInt8(value,index);
+  else if(bytes===2)buffer.writeUInt16LE(value,index*bytes);
+  else buffer.writeUInt32LE(value,index*bytes);
+ });
+ return buffer;
+}
+function encodeFloat(values){
+ const buffer=Buffer.alloc(values.length*4);
+ values.forEach((value,index)=>buffer.writeFloatLE(value,index*4));
+ return buffer;
+}
+function mutateGlb(glb,mutator){
+ const state=unpackGlb(glb);
+ state.json.bufferViews??=[];
+ mutator(state);
+ return packGlb(state.json,state.binary);
+}
+test("applies sparse POSITION replacements over a dense base accessor",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,0,0,0,0,0,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from([1,2]),1);
+  const valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
+  state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
+ assert.equal(report.counts.referencedVertexCount,3);assert.equal(report.counts.degenerateTriangleCount,0);
+});
+
+test("supports zero-initialized POSITION accessors without a base bufferView",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,0,0,0,0,0,0],[0,1,2]),state=>{
+  delete state.json.accessors[0].bufferView;
+  const indexView=addSparseView(state,Buffer.from([1,2]),1);
+  const valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
+  state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.meshDetails[0].topology.modelDiagonal,Number(Math.SQRT2.toFixed(6)));
+});
+
+test("applies sparse primitive index replacements before triangle validation",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,0,0]),state=>{
+  const indexView=addSparseView(state,Buffer.from([1,2]),1);
+  const valueView=addSparseView(state,encodeUInt([1,2],5123),4);
+  state.json.accessors[1].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.counts.triangleCount,1);assert.equal(report.counts.degenerateTriangleCount,0);
+ assert.equal(report.meshDetails[0].topology.connectedComponentCount,1);
+});
+
+test("supports sparse index values with an omitted zero-initialized base bufferView",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,0,0]),state=>{
+  delete state.json.accessors[1].bufferView;
+  const indexView=addSparseView(state,encodeUInt([0,1,2],5121),1);
+  const valueView=addSparseView(state,encodeUInt([0,1,2],5123),4);
+  state.json.accessors[1].sparse={count:3,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.equal(report.counts.degenerateTriangleCount,0);assert.deepEqual(report.bounds.dimensions,[1,1,0]);
+});
+
+test("supports each glTF unsigned sparse-index component width",()=>{
+ for(const componentType of [5121,5123,5125]){
+  const align=componentType===5121?1:componentType===5123?2:4;
+  const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,0,0]),state=>{
+   const indexView=addSparseView(state,encodeUInt([1,2],componentType),align);
+   const valueView=addSparseView(state,encodeUInt([1,2],5123),4);
+   state.json.accessors[1].sparse={count:2,indices:{bufferView:indexView,componentType},values:{bufferView:valueView}};
+  });
+  assert.equal(analyzeGlbQuality(glb).counts.degenerateTriangleCount,0);
+ }
+});
+
+test("rejects sparse accessor counts outside valid bounds and above configured caps",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const tooMany=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1,2,3,4]),1),valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0,2,0,0,3,0,0]),4);
+  state.json.accessors[0].sparse={count:4,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const overCap=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1,2]),1),valueView=addSparseView(state,encodeFloat([1,0,0,0,1,0]),4);
+  state.json.accessors[0].sparse={count:2,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(tooMany),/sparse count exceeds accessor count/);
+ assert.throws(()=>analyzeGlbQuality(overCap,{maxSparseEntries:1}),/maximum sparse entry count 1/);
+});
+
+test("rejects duplicate, decreasing and out-of-range sparse indices",()=>{
+ const make=(indices)=>mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from(indices),1),valueView=addSparseView(state,encodeFloat(Array(indices.length*3).fill(0)),4);
+  state.json.accessors[0].sparse={count:indices.length,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(make([1,1])),/strictly increasing/);
+ assert.throws(()=>analyzeGlbQuality(make([2,1])),/strictly increasing/);
+ assert.throws(()=>analyzeGlbQuality(make([3])),/outside its accessor count/);
+});
+
+test("rejects unsupported sparse index components and non-finite replacement coordinates",()=>{
+ const unsupported=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([Number.NaN,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5126},values:{bufferView:valueView}};
+ });
+ const nonFinite=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([Number.NaN,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(unsupported),/sparse indices componentType/);
+ assert.throws(()=>analyzeGlbQuality(nonFinite),/non-finite coordinate/);
+});
+
+test("rejects sparse bufferView target or stride metadata and out-of-range payloads",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const withTarget=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1,{target:34962}),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const withStride=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4,{byteStride:12});
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const shortValues=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(withTarget),/must not define target or byteStride/);
+ assert.throws(()=>analyzeGlbQuality(withStride),/must not define target or byteStride/);
+ assert.throws(()=>analyzeGlbQuality(shortValues),/sparse values exceed their bufferView/);
+});
+
+test("rejects sparse buffer references and misaligned sparse offsets",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const external=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.bufferViews[indexView].buffer=1;
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const misaligned=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([0,1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,byteOffset:1,componentType:5123},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(external),/must reference the embedded GLB buffer/);
+ assert.throws(()=>analyzeGlbQuality(misaligned),/sparse indices byteOffset is not aligned/);
+});
+
+test("rejects misaligned sparse bufferView offsets and sparse values offsets",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const badIndexViewOffset=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.bufferViews[indexView].byteOffset+=1;
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5123},values:{bufferView:valueView}};
+ });
+ const badValuesOffset=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView,byteOffset:1}};
+ });
+ assert.throws(()=>analyzeGlbQuality(badIndexViewOffset),/bufferView byteOffset is not aligned/);
+ assert.throws(()=>analyzeGlbQuality(badValuesOffset),/sparse values byteOffset is not aligned/);
+});
+
+test("rejects missing sparse count and short sparse index payloads",()=>{
+ const base=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const missingCount=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),1),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={indices:{bufferView:indexView,componentType:5121},values:{bufferView:valueView}};
+ });
+ const shortIndices=mutateGlb(base,state=>{
+  const indexView=addSparseView(state,Buffer.from([1]),2),valueView=addSparseView(state,encodeFloat([1,0,0]),4);
+  state.json.accessors[0].sparse={count:1,indices:{bufferView:indexView,componentType:5123},values:{bufferView:valueView}};
+ });
+ assert.throws(()=>analyzeGlbQuality(missingCount),/sparse count must be a valid/);
+ assert.throws(()=>analyzeGlbQuality(shortIndices),/sparse indices exceed their bufferView/);
+});
+
+test("accepts an omitted base bufferView with no sparse overrides as a zero-initialized accessor",()=>{
+ const glb=mutateGlb(makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]),state=>{
+  delete state.json.accessors[0].bufferView;
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.dimensions,[0,0,0]);
+ assert.equal(report.counts.degenerateTriangleCount,1);
+});
+
 test("reports mesh counts, finite bounds and numeric QA for a generated procedural GLB",()=>{
  const {glb}=generateProceduralGlb(fixture),report=analyzeGlbQuality(glb);
  assert.equal(report.valid,true);assert.equal(report.format,"glb");
