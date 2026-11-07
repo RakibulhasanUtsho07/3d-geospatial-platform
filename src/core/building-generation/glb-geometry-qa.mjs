@@ -149,11 +149,11 @@ function resolveSceneMeshInstances(gltf,options={}){
   if(Array.isArray(scenes)&&scenes.some(scene=>Array.isArray(scene?.nodes)&&scene.nodes.length))throw new TypeError("glTF scenes reference nodes but the nodes array is missing");
   return localFallback("scene-graph-unavailable-mesh-local-bounds-fallback");
  }
- const sceneIndex=gltf.scene??0;
+ const sceneIndex=gltf.scene===undefined?0:gltf.scene;
  if(!Number.isSafeInteger(sceneIndex)||sceneIndex<0||sceneIndex>=scenes.length)throw new RangeError("glTF default scene index is outside the scenes array");
  const selectedScene=scenes[sceneIndex];
  if(!selectedScene||typeof selectedScene!=="object"||Array.isArray(selectedScene))throw new TypeError("glTF selected scene must be an object");
- const roots=selectedScene.nodes??[];
+ const roots=selectedScene.nodes===undefined?[]:selectedScene.nodes;
  if(!Array.isArray(roots))throw new TypeError("glTF selected scene nodes must be an array");
  if(roots.length>maxSceneNodes)throw new RangeError("glTF selected scene exceeds maxSceneNodes "+maxSceneNodes);
  const state=new Uint8Array(nodes.length),instancesByMesh=new Map(),stack=[];
@@ -179,7 +179,7 @@ function resolveSceneMeshInstances(gltf,options={}){
    const list=instancesByMesh.get(node.mesh)??[];
    list.push(worldMatrix);instancesByMesh.set(node.mesh,list);
   }
-  const children=node.children??[];
+  const children=node.children===undefined?[]:node.children;
   if(!Array.isArray(children))throw new TypeError("node "+nodeIndex+" children must be an array");
   if(nodeCount+pendingNodeCount+children.length>maxSceneNodes)throw new RangeError("glTF selected scene exceeds maxSceneNodes "+maxSceneNodes);
   stack.push({nodeIndex,parentMatrix:worldMatrix,depth:entry.depth,exit:true});

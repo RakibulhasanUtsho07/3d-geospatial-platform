@@ -21,7 +21,10 @@ function makeGlb(positions,indices=null,sceneGraph={}){
   bufferViews.push({buffer:0,byteOffset:p.length,byteLength:index.length,target:34963});
  }
  const gltf={
-  asset:{version:"2.0",generator:"GLB geometry QA test"},scene:sceneGraph.scene??0,scenes:sceneGraph.scenes??[{nodes:[0]}],nodes:sceneGraph.nodes??[{mesh:0}],
+  asset:{version:"2.0",generator:"GLB geometry QA test"},
+  ...(Object.hasOwn(sceneGraph,"scene")?{scene:sceneGraph.scene}:{scene:0}),
+  ...(Object.hasOwn(sceneGraph,"scenes")?{scenes:sceneGraph.scenes}:{scenes:[{nodes:[0]}]}),
+  ...(Object.hasOwn(sceneGraph,"nodes")?{nodes:sceneGraph.nodes}:{nodes:[{mesh:0}]}),
   meshes:[{primitives:[primitive]}],
   accessors,
   bufferViews,buffers:[{byteLength:p.length+index.length}],
@@ -131,14 +134,54 @@ test("falls back to explicit mesh-local bounds when scene graph data is absent",
  assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);assert.equal(report.bounds.units,"mesh-local-unverified");
  assert.ok(report.warnings.includes("scene-graph-unavailable-mesh-local-bounds-fallback"));
 });
+test("uses only the declared default scene when a GLB contains multiple scenes",()=>{
+ const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2],{
+  scene:1,
+  nodes:[{mesh:0,translation:[100,0,0]},{mesh:0,translation:[-30,0,0]}],
+  scenes:[{nodes:[0]},{nodes:[1]}]
+ });
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[-30,0,0]);assert.deepEqual(report.bounds.max,[-29,1,0]);assert.equal(report.scene.index,1);
+});
+
+test("excludes mesh definitions not instanced in the active scene from aggregate bounds",()=>{
+ const original=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
+ const bytes=Buffer.from(original);
+ const jsonLength=bytes.readUInt32LE(12);
+ const json=JSON.parse(bytes.subarray(20,20+jsonLength).toString("utf8").trim());
+ const primitive=json.meshes[0].primitives[0];
+ json.meshes.push({primitives:[primitive]});
+ json.nodes.push({mesh:1,translation:[1000,0,0]});
+ json.scenes=[{nodes:[0]}];
+ json.nodes=[{mesh:0},{mesh:1,translation:[1000,0,0]}];
+ json.buffers[0].byteLength=bytes.length-28-jsonLength;
+ const jsonRaw=Buffer.from(JSON.stringify(json)),jsonPad=(4-jsonRaw.length%4)%4,newJson=Buffer.concat([jsonRaw,Buffer.alloc(jsonPad,0x20)]);
+ const binary=bytes.subarray(20+jsonLength+8);
+ const newTotal=12+8+newJson.length+8+binary.length,header=Buffer.alloc(12);
+ header.writeUInt32LE(0x46546c67,0);header.writeUInt32LE(2,4);header.writeUInt32LE(newTotal,8);
+ const jh=Buffer.alloc(8);jh.writeUInt32LE(newJson.length,0);jh.writeUInt32LE(0x4e4f534a,4);
+ const bh=Buffer.alloc(8);bh.writeUInt32LE(binary.length,0);bh.writeUInt32LE(0x004e4942,4);
+ const glb=Buffer.concat([header,jh,newJson,bh,binary]);
+ const report=analyzeGlbQuality(glb);
+ assert.deepEqual(report.bounds.min,[0,0,0]);assert.deepEqual(report.bounds.max,[1,1,0]);
+ assert.ok(report.warnings.includes("uninstanced-mesh-definitions-excluded-from-scene-bounds"));
+ assert.equal(report.counts.meshInstanceCount,1);
+});
+
 test("fails closed on invalid node transforms, hierarchy cycles and duplicate parenting",()=>{
  const positions=[0,0,0,1,0,0,0,1,0],indices=[0,1,2];
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0.2,0,1,0,0,0,0,1,0,0,0,0,1]}],scenes:[{nodes:[0]}]}),/matrix must be affine/);
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],translation:[1,0,0]}],scenes:[{nodes:[0]}]}),/matrix and TRS/);
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:0,rotation:[0,0,0,0]}],scenes:[{nodes:[0]}]}),/normalized quaternion/);
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{children:[0],mesh:0}],scenes:[{nodes:[0]}]}),/contains a cycle/);
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{children:[2]},{children:[2]},{mesh:0}],scenes:[{nodes:[0,1]}]}),/referenced more than once/);
- assert.throws(()=>analyzeGlbQuality(makeGlb(positions,indices,{nodes:[{mesh:5}],scenes:[{nodes:[0]}]}),/invalid mesh index/);
+ const malformedMatrix=makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0.2,0,1,0,0,0,0,1,0,0,0,0,1]}],scenes:[{nodes:[0]}]});
+ const mixedTransforms=makeGlb(positions,indices,{nodes:[{mesh:0,matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],translation:[1,0,0]}],scenes:[{nodes:[0]}]});
+ const invalidRotation=makeGlb(positions,indices,{nodes:[{mesh:0,rotation:[0,0,0,0]}],scenes:[{nodes:[0]}]});
+ const cyclic=makeGlb(positions,indices,{nodes:[{children:[0],mesh:0}],scenes:[{nodes:[0]}]});
+ const duplicateParent=makeGlb(positions,indices,{nodes:[{children:[2]},{children:[2]},{mesh:0}],scenes:[{nodes:[0,1]}]});
+ const invalidMesh=makeGlb(positions,indices,{nodes:[{mesh:5}],scenes:[{nodes:[0]}]});
+ assert.throws(()=>analyzeGlbQuality(malformedMatrix),/matrix must be affine/);
+ assert.throws(()=>analyzeGlbQuality(mixedTransforms),/matrix and TRS/);
+ assert.throws(()=>analyzeGlbQuality(invalidRotation),/normalized quaternion/);
+ assert.throws(()=>analyzeGlbQuality(cyclic),/contains a cycle/);
+ assert.throws(()=>analyzeGlbQuality(duplicateParent),/referenced more than once/);
+ assert.throws(()=>analyzeGlbQuality(invalidMesh),/invalid mesh index/);
 });
 test("bounds evaluation has a strict per-report vertex budget",()=>{
  const glb=makeGlb([0,0,0,1,0,0,0,1,0],[0,1,2]);
