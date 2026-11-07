@@ -962,8 +962,15 @@
             "properties": {
               "processReportSignatureArtifactId": {
                 "const": null
+              },
+              "processReportArtifactId": {
+                "const": null
               }
-            }
+            },
+            "required": [
+              "processReportArtifactId",
+              "processReportSignatureArtifactId"
+            ]
           }
         }
       }
