@@ -197,7 +197,8 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
     rule.if?.properties?.provider?.properties?.status?.const === "not-provisioned");
   assert.equal(unprovisionedAdapterRule.then.properties.provider.properties.adapterModuleSha256.const, null);
   const passedIntegrationRule = schema.allOf.find((rule) =>
-    rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed");
+    rule.if?.properties?.providerIntegration?.properties?.status?.const === "passed" &&
+    rule.then?.properties?.providerIntegration?.properties?.providerInstanceFingerprintSha256);
   assert.equal(
     passedIntegrationRule.then.properties.providerIntegration.properties.processReportArtifactId.type,
     "string",
