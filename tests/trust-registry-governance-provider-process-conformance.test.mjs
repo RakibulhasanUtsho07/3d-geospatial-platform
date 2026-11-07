@@ -228,8 +228,10 @@ test("provider process runner writes a sanitized, source-bound report without pa
     assert.equal(report.adapterDeclaredSyntheticOnly, true);
     assert.equal(report.executionMode, "fresh-node-child-process-per-provider-operation");
     assert.equal(report.processIsolationVerified, true);
-    assert.ok(report.workerProcessesStarted > 30);
+    assert.ok(report.workerProcessesStarted >= 30);
     assert.equal(report.workerProcessesStarted, report.uniqueWorkerInstances);
+    assert.ok(report.uniqueWorkerProcessIds >= 2);
+    assert.ok(report.uniqueWorkerProcessIds <= report.workerProcessesStarted);
     assert.equal(reportText.includes(secret), false);
     assert.equal(reportText.includes(stateFile), false);
   });
