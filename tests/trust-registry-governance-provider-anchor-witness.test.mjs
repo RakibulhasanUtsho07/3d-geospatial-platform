@@ -111,7 +111,7 @@ function fixture(overrides = {}) {
   return {
     ...generated,
     witness,
-    witnessBytes: Buffer.from(canonicalJson(witness) + "\\n", "utf8"),
+    witnessBytes: Buffer.from(canonicalJson(witness) + "\n", "utf8"),
     registry,
     publicKeyPem,
     anchorFingerprint,
@@ -205,7 +205,7 @@ test("D3M-29 rejects altered witness signature bytes", () => {
   const changed = { ...value.witness, signatureBase64: Buffer.alloc(64, 0x55).toString("base64") };
   const report = verifyTrustRegistryGovernanceProviderAnchorWitness({
     challengeBytes: value.bytes,
-    witnessBytes: Buffer.from(canonicalJson(changed) + "\\n", "utf8"),
+    witnessBytes: Buffer.from(canonicalJson(changed) + "\n", "utf8"),
     independentAnchorKeyRegistry: value.registry,
     expectedContext: context,
     now: new Date(now.getTime() + 2_000),
