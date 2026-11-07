@@ -487,6 +487,7 @@
           "enum": [
             "multi-client-concurrency-report",
             "process-restart-report",
+            "process-report-signature",
             "ambiguous-write-report",
             "anchor-independence-review",
             "backup-restore-rollback-report",
