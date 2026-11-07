@@ -174,6 +174,8 @@ async function execute() {
         ? adapterModule.syntheticOnly
         : null,
     };
+  } else if (request.operation === "readState") {
+    result = await provider.readState(request.args.identity);
   } else {
     result = await provider[request.operation](request.args);
   }

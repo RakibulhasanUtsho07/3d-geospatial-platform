@@ -95,7 +95,7 @@ test("provider worker timeout terminates a hung child process", async () => {
       "export async function createProvider() {",
       "  return {",
       "    providerId: 'd3m26-hanging-provider',",
-      "    readState: async () => new Promise(() => {}),",
+      "    readState: async () => { setInterval(() => {}, 1000); return new Promise(() => {}); },",
       "    initializeStateIfAbsent: async () => { throw new Error('unused'); },",
       "    compareAndSetState: async () => { throw new Error('unused'); },",
       "  };",
