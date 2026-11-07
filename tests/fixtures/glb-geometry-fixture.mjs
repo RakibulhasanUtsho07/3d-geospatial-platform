@@ -14,7 +14,10 @@ export function createBuildingGlb(mutate=null){
     nodes:[{translation:[1,0,2],children:[1]},{mesh:0,translation:[0,1,0]}],
     meshes:[{primitives:[{attributes:{POSITION:0},indices:1,mode:4}]}],
     buffers:[{byteLength:binary.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:pos.length},{buffer:0,byteOffset:pos.length,byteLength:index.length}],
-    accessors:[{bufferView:0,componentType:5126,count:BOX_POSITIONS.length,type:"VEC3"},{bufferView:1,componentType:5123,count:ids.length,type:"SCALAR"}]};
+    accessors:[{
+      bufferView:0,componentType:5126,count:BOX_POSITIONS.length,type:"VEC3",
+      min:[0,0,0],max:[2,3,4]
+    },{bufferView:1,componentType:5123,count:ids.length,type:"SCALAR"}]};
   if(mutate)mutate(json);
   const j=pad4(Buffer.from(JSON.stringify(json)),0x20),b=pad4(binary,0),total=12+8+j.length+8+b.length;
   const h=Buffer.alloc(12);h.writeUInt32LE(0x46546c67,0);h.writeUInt32LE(2,4);h.writeUInt32LE(total,8);
