@@ -600,8 +600,9 @@ export function verifyTrustRegistryGovernanceProviderAnchorWitness({
   }
   check("anchor-key-validity", keyWindowValid, "Witness time must fall within the active anchor-key validity window.");
   let signatureValid = false;
-  if (matchingKeys.length === 1 && witness && envelopeValid && challengeMatches &&
-      providerMatches && observationWindow && keyWindowValid) {
+  if (matchingKeys.length === 1 && registry && governancePinValid &&
+      registry.governancePublicKeyFingerprintSha256 === independentAnchorGovernanceKeyFingerprintSha256 &&
+      witness && envelopeValid && challengeMatches && providerMatches && observationWindow && keyWindowValid) {
     try {
       const bytes = Buffer.from(witness.signatureBase64, "base64");
       signatureValid = bytes.length === 64 && bytes.toString("base64") === witness.signatureBase64 &&
