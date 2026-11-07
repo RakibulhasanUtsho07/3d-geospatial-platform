@@ -17,6 +17,7 @@ function createBarrier(parties) {
 
 function syntheticProvider({
   ignoreCompareAndSetVersion = false,
+  ignoreCompareAndSetStateDigest = false,
   staleConflictReturnsWrongVersion = false,
   invalidVersionToken = false,
   raceInitializeIfAbsent = false,
@@ -110,8 +111,9 @@ function syntheticProvider({
       const record = lookupRecord(identity);
       if (!record) throw new Error("synthetic provider record is missing");
       verifyIdentity(record, identity);
-      if (!ignoreCompareAndSetVersion &&
-          (expectedVersion !== version(record) || expectedStateSha256 !== record.state.stateSha256)) {
+      if ((!ignoreCompareAndSetVersion && expectedVersion !== version(record)) ||
+          (!ignoreCompareAndSetStateDigest &&
+            expectedStateSha256 !== record.state.stateSha256)) {
         const rejected = snapshot(record);
         if (staleConflictReturnsWrongVersion) rejected.version = "stale-replica-version";
         return { updated: false, ...rejected };
@@ -206,6 +208,15 @@ test("provider conformance suite rejects initialize-if-absent overwriting existi
       ...syntheticProvider({ overwriteExistingOnInitialize: true }),
     }),
     /repeated initialize-if-absent must preserve the exact existing state/i,
+  );
+});
+
+test("provider conformance suite rejects a provider that ignores the expected prior state digest", async () => {
+  await assert.rejects(
+    runTrustRegistryGovernanceProviderConformance({
+      ...syntheticProvider({ ignoreCompareAndSetStateDigest: true }),
+    }),
+    /current provider version must not authorize a CAS with the wrong prior state digest/i,
   );
 });
 
