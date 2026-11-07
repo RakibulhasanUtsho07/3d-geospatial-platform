@@ -652,6 +652,7 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
   const root = await realpath(path.resolve(artifactRoot));
   const verifiedArtifactIds = [];
   const failures = [];
+  let verifiedProviderProcessReport = null;
   for (const artifact of manifest.artifacts) {
     if (artifact.status !== "present") continue;
     // Detached signatures/witnesses are verified jointly with their exact source bytes;
@@ -705,6 +706,17 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
               syntheticOnly: manifest.provider.syntheticOnly,
               instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
               namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+            });
+            if (!Number.isSafeInteger(processReport.conformance?.finalRevision) ||
+                processReport.conformance.finalRevision < 1 ||
+                !Number.isSafeInteger(processReport.conformance?.finalMinimumAcceptedSequence) ||
+                processReport.conformance.finalMinimumAcceptedSequence < 1) {
+              throw new TypeError("provider process report lacks a positive final revision or minimum accepted sequence");
+            }
+            verifiedProviderProcessReport = Object.freeze({
+              sha256: digest,
+              finalRevision: processReport.conformance.finalRevision,
+              finalMinimumAcceptedSequence: processReport.conformance.finalMinimumAcceptedSequence,
             });
           } catch {
             throw Object.assign(new Error("process-isolated provider report does not match the qualified provider context"), {
@@ -853,6 +865,13 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
           await handle.close();
         }
       }
+      const processReportId = manifest.providerIntegration.processReportArtifactId;
+      const processReportSignatureId = manifest.providerIntegration.processReportSignatureArtifactId;
+      if (!verifiedProviderProcessReport ||
+          !verifiedArtifactIds.includes(processReportId) ||
+          !verifiedArtifactIds.includes(processReportSignatureId)) {
+        throw new Error("D3M-29 requires byte-verified and trusted-signed D3M-26 process report");
+      }
       const [challengeBytes, witnessBytes] = await Promise.all([
         readBoundedArtifact(challengeArtifact, 64 * 1024),
         readBoundedArtifact(witnessArtifact, 64 * 1024),
@@ -869,6 +888,9 @@ export async function verifyTrustRegistryProviderQualificationArtifacts(manifest
           syntheticOnly: manifest.provider.syntheticOnly,
           instanceFingerprintSha256: manifest.provider.instanceFingerprintSha256,
           namespaceFingerprintSha256: manifest.provider.namespaceFingerprintSha256,
+          providerProcessReportSha256: verifiedProviderProcessReport.sha256,
+          providerFinalRevision: verifiedProviderProcessReport.finalRevision,
+          providerFinalMinimumAcceptedSequence: verifiedProviderProcessReport.finalMinimumAcceptedSequence,
         },
         now: verificationNow,
       });
