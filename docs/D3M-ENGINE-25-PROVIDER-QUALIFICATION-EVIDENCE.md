@@ -67,7 +67,7 @@ The manifest intentionally stores no credentials, access tokens, secret values, 
 - provider-specific integration run: not run;
 - all 13 required evidence classes: missing.
 
-The validator must therefore report `blocked`. Full CI asserts that this checked-in fixture remains blocked and that every release flag stays false. Update this snapshot only from fresh, exact-head workflow/provider evidence; do not infer success from stale run IDs or a synthetic fixture.
+The validator must therefore report `blocked`. Both D3M-24 Push Full CI [#42337017403](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337017403) and PR Full CI [#42337019776](https://github.com/RakibulhasanUtsho07/3d-geospatial-platform/actions/runs/42337019776) subsequently completed successfully on that exact SHA, with 225/225 successful steps each and the focused D3M-24 conformance step passed. Full CI asserts that this checked-in fixture remains blocked and that every release flag stays false. Update this snapshot only from fresh, exact-head workflow/provider evidence; do not infer success from stale run IDs or a synthetic fixture.
 
 ## Provider onboarding checklist
 
