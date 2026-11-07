@@ -964,6 +964,7 @@ test("D3M-29 qualifies independentAnchorCustody only after a fresh signed witnes
     }
     const verification = await verifyArtifacts(manifest, root, trustedReviewerRegistry, {
       independentAnchorKeyRegistry,
+      independentAnchorGovernanceKeyFingerprintSha256: governancePublicKeyFingerprintSha256,
       now: verificationNow,
     });
     assert.deepEqual(verification.failures, []);
