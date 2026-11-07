@@ -128,6 +128,16 @@ function completeManifest() {
   return manifest;
 }
 
+test("qualification schema evidence keys stay aligned with the evaluator", async () => {
+  const schemaPath = new URL("../trust-registry-governance-provider-qualification.schema.json", import.meta.url);
+  const schema = JSON.parse(await readFile(schemaPath, "utf8"));
+  const evaluatorKeys = [...TRUST_REGISTRY_PROVIDER_QUALIFICATION_EVIDENCE_KEYS].sort();
+  assert.equal(schema.properties.evidence.additionalProperties, false);
+  assert.deepEqual(Object.keys(schema.properties.evidence.properties).sort(), evaluatorKeys);
+  assert.deepEqual([...schema.properties.evidence.required].sort(), evaluatorKeys);
+  assert.equal(schema.properties.schemaVersion.const, "1.0.0");
+});
+
 test("checked-in provider qualification state is valid but blocked without a real provider", async () => {
   const manifestPath = new URL("../benchmarks/trust-registry-governance/provider-qualification-current.json", import.meta.url);
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
