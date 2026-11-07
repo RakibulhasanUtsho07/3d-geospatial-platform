@@ -237,6 +237,7 @@ test("qualification schema evidence keys stay aligned with the evaluator", async
   assert.ok(schema.properties.providerIntegration.properties.processReportArtifactId);
   assert.ok(schema.properties.providerIntegration.properties.processReportSignatureArtifactId);
   assert.ok(schema.$defs.presentArtifact.properties.type.enum.includes("process-report-signature"));
+  assert.ok(schema.$defs.missingArtifact.properties.type.enum.includes("process-report-signature"));
   const provisionedAdapterRule = schema.allOf.find((rule) =>
     rule.if?.properties?.provider?.properties?.status?.const === "provisioned");
   assert.equal(
@@ -750,6 +751,27 @@ test("D3M-27 byte verification also validates process report semantics and exact
   }
 });
 
+
+
+test("D3M-28 rejects additional unsigned process reports in verified restart evidence", () => {
+  const manifest = completeManifest();
+  const extraBytes = processReportBytes(manifest);
+  manifest.artifacts.push({
+    id: "unbound-process-report",
+    type: "process-restart-report",
+    status: "present",
+    relativePath: "evidence/unbound-process-report.json",
+    sha256: digest(extraBytes),
+    bytes: extraBytes.length,
+    sourceUrl: manifest.providerIntegration.runUrl,
+    sourceCommitSha,
+  });
+  manifest.evidence.processRestartVisibility.artifactIds.push("unbound-process-report");
+  assert.throws(
+    () => normalizeTrustRegistryProviderQualificationManifest(manifest),
+    /must reference only the exact signed provider integration report/i,
+  );
+});
 
 test("D3M-28 artifact verification rejects a changed or untrusted report signature", async () => {
   const manifest = completeManifest();
