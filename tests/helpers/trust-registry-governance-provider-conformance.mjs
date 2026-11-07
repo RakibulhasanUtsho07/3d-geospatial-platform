@@ -181,29 +181,40 @@ export async function runTrustRegistryGovernanceProviderConformance({
     now: new Date("2026-11-05T12:02:00.000Z"),
   }).state;
   let responseWasLost = false;
-  try {
-    const committedBeforeDisconnect = assertWriteResult(
-      await reopenedProvider.compareAndSetState({
+  let ambiguousWriteAttempts = 0;
+  const responseLostClient = {
+    ...reopenedProvider,
+    async compareAndSetState(payload) {
+      ambiguousWriteAttempts += 1;
+      const committedBeforeDisconnect = assertWriteResult(
+        await reopenedProvider.compareAndSetState(payload),
+        "updated",
         identity,
-        expectedVersion: reloaded.version,
-        expectedStateSha256: reloaded.state.stateSha256,
-        nextState: clone(nextAfterAmbiguous),
-      }),
-      "updated",
+        "ambiguous-write provider commit",
+      );
+      assert.equal(committedBeforeDisconnect.updated, true,
+        "the provider must commit before the transport response is lost");
+      responseWasLost = true;
+      throw Object.assign(new Error("synthetic transport response lost after provider commit"), {
+        code: "D3M24_SIMULATED_RESPONSE_LOST",
+      });
+    },
+  };
+  try {
+    await responseLostClient.compareAndSetState({
       identity,
-      "ambiguous-write result",
-    );
-    assert.equal(committedBeforeDisconnect.updated, true,
-      "the simulated ambiguous write must commit before its response is lost");
-    responseWasLost = true;
-    throw Object.assign(new Error("synthetic response lost after commit"), {
-      code: "D3M24_SIMULATED_RESPONSE_LOST",
+      expectedVersion: reloaded.version,
+      expectedStateSha256: reloaded.state.stateSha256,
+      nextState: clone(nextAfterAmbiguous),
     });
+    assert.fail("the synthetic post-commit response loss must reach the caller as an error");
   } catch (error) {
     assert.equal(error.code, "D3M24_SIMULATED_RESPONSE_LOST",
       "the synthetic transport fault must be the only swallowed failure");
   }
   assert.equal(responseWasLost, true);
+  assert.equal(ambiguousWriteAttempts, 1,
+    "the ambiguous write must be sent exactly once before state reconciliation");
   const recovered = assertSnapshot(
     await reopenedProvider.readState(identity), identity, "ambiguous-write recovery read",
   );
