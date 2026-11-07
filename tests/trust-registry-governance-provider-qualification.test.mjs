@@ -437,7 +437,7 @@ function runQualificationCli(args, cwd) {
 test("qualification validator CLI help is available without a manifest", () => {
   const result = runQualificationCli(["--help"], process.cwd());
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /Usage: node scripts\\/validate-trust-registry-governance-provider-qualification\\.mjs/);
+  assert.ok(result.stdout.includes("Usage: node scripts/validate-trust-registry-governance-provider-qualification.mjs"));
 });
 
 test("qualification validator CLI emits a hash-bound blocked report and never overwrites it", async () => {
